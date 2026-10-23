@@ -281,8 +281,11 @@ static void ts_draw(struct dialog *d, struct screen *display,
  * only voice an actual field. */
 static void ts_say(struct ts_edit *s)
 {
+    talk_settle();
     if (s->sel <= s->last_field)
         say_time(s->sel, s->tm);
+    else if (global_settings.talk_menu)
+        talk_id(s->sel == TS_OK(s) ? LANG_DIAG_OK : LANG_DIAG_CANCEL, false);
 }
 
 /* The selection is a grid: a row of time fields, optionally a row of date
@@ -418,6 +421,11 @@ bool set_time_screen(const char* title, struct tm *tm, bool set_date)
     s.cancelled = false;
     s.usb = false;
 
+    if (global_settings.talk_menu && title)
+    {
+        talk_string(title, false);
+        talk_force_enqueue_next();      /* the field after it */
+    }
     ts_say(&s);
 
     dialog_init(&d, CONTEXT_SETTINGS_TIME, title, NULL, &cb, &s);

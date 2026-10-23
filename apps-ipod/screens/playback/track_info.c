@@ -97,7 +97,7 @@ static void say_number_and_spell(char *buf, bool year_style)
             /* temporarily truncate the string here */
             tmp = *ptr;
             *ptr = '\0';
-            talk_spell(start, true);
+            talk_name(start, true);
             *ptr = tmp; /* restore string */
         }
     }
@@ -150,13 +150,13 @@ static void say_gain(char *buf)
             while (ptr >buf && ptr[-1] == ' ')
                 --ptr;
             if (ptr > buf)
-                talk_spell(buf, true);
+                talk_name(buf, true);
             else talk_id(VOICE_DB, true); /* say the dB unit */
         }else /* doesn't end with dB, just spell everything after the
                  number of dot. */
-            talk_spell(buf, true);
+            talk_name(buf, true);
     }else /* we didn't find a number, just spell everything */
-        talk_spell(buf, true);
+        talk_name(buf, true);
 }
 
 static const char * id3_get_or_speak_info(int selected_item, void* data,
@@ -196,27 +196,27 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
             case LANG_ID3_TITLE:
                 val=id3->title;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_ARTIST:
                 val=id3->artist;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_ALBUM:
                 val=id3->album;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_ALBUMARTIST:
                 val=id3->albumartist;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_GROUPING:
                 val=id3->grouping;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_DISCNUM:
                 if (id3->disc_string)
@@ -255,12 +255,12 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
 
                 val = id3->comment;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_GENRE:
                 val = id3->genre_string;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_SOUND_PROPERTIES:
                 /* One track only. A summary over several is not a
@@ -271,7 +271,7 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
                     return NULL;
                 val = buffer;
                 if(say_it)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_YEAR: {
                 /* the voiced date format picks the style: 'y' reads 2020 as
@@ -339,9 +339,9 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
                     talk_number(info->playlist_amount, true);
 
                     if (pl_modified)
-                        talk_spell("Modified", true);
+                        talk_name("Modified", true);
                     if (buffer) /* playlist name */
-                        talk_spell(buffer, true);
+                        talk_name(buffer, true);
                 }
                 break;
             case LANG_FORMAT:
@@ -350,7 +350,7 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
 
                 val = (char*) get_codec_string(id3->codectype);
                 if(say_it)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_ID3_BITRATE:
                 if (!id3->bitrate)
@@ -394,7 +394,7 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
             case LANG_ID3_COMPOSER:
                 val=id3->composer;
                 if(say_it && val)
-                    talk_spell(val, true);
+                    talk_name(val, true);
                 break;
             case LANG_FILESIZE: /* not LANG_ID3_FILESIZE because the string is shared */
                 if (!id3->filesize)

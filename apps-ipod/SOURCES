@@ -326,8 +326,18 @@ input/keymap_ipod.c
 #error "Unsupported CONFIG_KEYPAD for this fork (expected IPOD_4G_PAD)"
 #endif
 
+speech/announce.c
 speech/lang_override.c
 speech/language.c
+speech/lexicon.c
+speech/normalise.c
+speech/speech.c
+speech/synth.c
+#ifdef CPU_ARM
+speech/synth_arm.S
+#endif
+speech/synth_frames.c
+speech/synth_phonemes.c
 speech/talk.c
 
 system/activity.c

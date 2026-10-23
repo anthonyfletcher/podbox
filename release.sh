@@ -1,19 +1,20 @@
 #!/bin/sh
 # Build the current commit on the build server and publish it as the rolling
 # `latest` release, plus the Windows simulator as `Simulator`, the extra
-# themes as `Themes` and the bootloader installer as `Bootloader`.
+# themes as `Themes`, the voice files as `Voices` and the bootloader installer
+# as `Bootloader`.
 #
-# There are no version tags. Every run replaces all four releases and moves
+# There are no version tags. Every run replaces all five releases and moves
 # their tags to the commit that was built, so the release page always shows the
 # current build and nothing else.
 #
-# Four releases rather than one page of assets: the firmware zips unpack onto
-# a player, the simulator zips unpack onto a PC, the theme zips are optional
-# extras and the bootloader is installed once from a PC, and a page that
-# offers them all side by side invites unpacking the wrong one.
+# Five releases rather than one page of assets: the firmware zips unpack onto
+# a player, the simulator zips unpack onto a PC, the theme and voice zips are
+# optional extras and the bootloader is installed once from a PC, and a page
+# that offers them all side by side invites unpacking the wrong one.
 #
 # Only `latest` is marked Latest. GitHub features that release and the
-# repository's front page links to it, so the other three are created with
+# repository's front page links to it, so the other four are created with
 # --latest=false: what a visitor is offered first has to be the firmware.
 #
 # The build server is not recorded here -- see PODBOX_BUILD_SERVER below.
@@ -44,11 +45,14 @@
 #   --dry-run     build and verify, then stop -- the existing releases stand.
 #                 Required on any branch but master.
 #   --no-sim      skip the simulator; leave the Simulator release as it is
+#   --no-voices   skip the voice files; leave the Voices release as it is
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
 # installed and authenticated THERE -- see the --repo note further down, and
 # mingw-w64 for the bootloader installer's tools. The simulator also needs the
 # SDL2 mingw wrapper on the server; --no-sim is the way past a box without it.
+# The voices need Piper there (see build-voices.sh); --no-voices is the way
+# past a box without it. A first voice run takes about an hour.
 
 set -eu
 
@@ -68,6 +72,7 @@ TARGETS="ipod6g ipodvideo"
 RELEASE=latest
 SIM_RELEASE=Simulator
 THEMES_RELEASE=Themes
+VOICES_RELEASE=Voices
 BOOT_RELEASE=Bootloader
 
 # What build-bootloader.sh makes, under the name it is published as.
@@ -117,6 +122,14 @@ sim_asset_name() {
 }
 theme_asset_name() { echo "$1.zip"; }
 
+# A voice file is made for one build and will not load on the other player
+voices_asset_name() {
+    case "$1" in
+        ipod6g)    echo "voices-ipod6g.zip" ;;
+        ipodvideo) echo "voices-ipodvideo-5g.zip" ;;
+    esac
+}
+
 # Every extra theme in one download, beside the single ones.
 ALL_THEMES_ASSET=all-themes.zip
 
@@ -129,6 +142,7 @@ ASSUME_YES=
 DRAFT=
 DRY_RUN=
 WITH_SIM=1
+WITH_VOICES=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -136,6 +150,7 @@ while [ $# -gt 0 ]; do
         --draft)    DRAFT=--draft ;;
         --dry-run)  DRY_RUN=1 ;;
         --no-sim)   WITH_SIM= ;;
+        --no-voices) WITH_VOICES= ;;
         --server)   [ $# -ge 2 ] || die "--server needs user@host"
                     SERVER=$2; shift ;;
         --root)     [ $# -ge 2 ] || die "--root needs a path"
@@ -267,7 +282,8 @@ NOTES=$(mktemp)
 SIM_NOTES=$(mktemp)
 THEMES_NOTES=$(mktemp)
 BOOT_NOTES=$(mktemp)
-trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES"' EXIT
+VOICES_NOTES=$(mktemp)
+trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES" "$VOICES_NOTES"' EXIT
 
 {
     printf 'Built from `%s` on `%s`.\n\n' "$(git rev-parse HEAD)" "$BRANCH"
@@ -324,6 +340,26 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES"' EXIT
     printf 'installed in any order and on their own.\n'
 } > "$THEMES_NOTES"
 
+# The voices are made for this build, so the notes say which commit; no
+# commit list, since a voice changes only with the menus' words.
+{
+    printf 'Recorded voices for the menus, made for the PodBox build from\n'
+    printf '`%s`, in twelve languages: English, English (US),\n' \
+        "$(git rev-parse HEAD)"
+    printf 'Deutsch, Français, Español, Italiano, Nederlands, Português\n'
+    printf '(Brasil), Polski, Svenska, 日本語 and 简体中文.\n\n'
+    printf '| file | player |\n| --- | --- |\n'
+    printf '| `%s` | iPod Classic 6G/7G |\n' "$(voices_asset_name ipod6g)"
+    printf '| `%s` | iPod Video 5G/5.5G |\n\n' "$(voices_asset_name ipodvideo)"
+    printf 'Unzip onto the root of the player, so the `.rockbox` folder lands\n'
+    printf 'on top of the one already there. The voice for the language chosen\n'
+    printf 'in Settings > System > Language & Text > Language is the one used.\n\n'
+    printf 'They are optional: without them the built-in voice speaks the\n'
+    printf 'menus, in English. A voice file belongs to one build, so take these\n'
+    printf 'again with each new firmware -- an old one is refused and the\n'
+    printf 'built-in voice takes over.\n'
+} > "$VOICES_NOTES"
+
 # No commit list here either: the bootloader changes rarely, and is installed
 # once rather than with every build.
 {
@@ -341,7 +377,7 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES"' EXIT
 
 cat <<PLAN
 
-  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}
+  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS${WITH_SIM:+  (firmware and Windows simulator)}
@@ -366,6 +402,13 @@ echo "--------------------"
 cat "$THEMES_NOTES"
 echo
 
+if [ -n "$WITH_VOICES" ]; then
+    echo "voices release notes"
+    echo "--------------------"
+    cat "$VOICES_NOTES"
+    echo
+fi
+
 echo "bootloader release notes"
 echo "------------------------"
 cat "$BOOT_NOTES"
@@ -375,7 +418,7 @@ if [ -n "$DRY_RUN" ]; then
     echo "(--dry-run: will build and verify, then stop before publishing)"
 elif [ -z "$ASSUME_YES" ]; then
     printf 'Build this and replace the %s releases? [y/N] ' \
-        "$THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $BOOT_RELEASE, $RELEASE"
+        "$THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, $RELEASE"
     read -r reply
     case "$reply" in
         y|Y|yes|YES) ;;
@@ -424,6 +467,17 @@ for target in $SIM_TARGETS; do
     TOOL_WANT=".rockbox/tools/soundscan.exe .rockbox/tools/database_pb.exe .rockbox/tools/artcache_pb.exe"
 done
 
+# Made inside each firmware build, whose language strings number them. The
+# clip pool outlives the release directory, so only words that changed since
+# the last release are synthesised again.
+VOICE_TARGETS=
+[ -z "$WITH_VOICES" ] || VOICE_TARGETS=$TARGETS
+for target in $VOICE_TARGETS; do
+    say "Making the $target voices"
+    ssh "$SERVER" "cd '$REMOTE_DIR' && ./build-voices.sh build-hw-$target && \
+        cp build-hw-$target/voices.zip $(voices_asset_name "$target")"
+done
+
 # The script checks its own zip's contents.
 say "Building the bootloader installer"
 ssh "$SERVER" "cd '$REMOTE_DIR' && ./build-bootloader.sh"
@@ -450,6 +504,8 @@ for target in $TARGETS; do
                     .rockbox/wps/scrim.sbs .rockbox/wps/scrim/volband.bmp \
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
+                    .rockbox/speech/cmudict.bin \
+                    .rockbox/langs/english.vstrings \
                     .rockbox/fonts/LICENSE-Noto.txt \
                     $TOOL_WANT \
                     .rockbox/rockbox.ipod; do
@@ -458,6 +514,15 @@ for target in $TARGETS; do
         done
         printf '  %-10s ok  (%s)\n' '$target' \"\$(du -h '$zip' | cut -f1)\"
     "
+done
+
+# Every language, or the release would quietly ship without one -- Japanese
+# needs the newer Piper, and is the one left out on a box without it.
+for target in $VOICE_TARGETS; do
+    asset=$(voices_asset_name "$target")
+    n=$(ssh "$SERVER" "unzip -Z1 '$REMOTE_DIR/$asset'" | grep -c '[.]voice$' || true)
+    [ "$n" -eq 12 ] || die "$asset has $n voices, not 12 -- see build-voices.sh"
+    printf '  %-10s ok  (%s voices)\n' "$target" "$n"
 done
 
 # Cut from the zip just checked, so the two differ by .rockbox/tools/ and
@@ -663,6 +728,28 @@ if [ -n "$SIM_TARGETS" ]; then
 
     say "Published $COMMIT as $SIM_RELEASE"
     echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
+fi
+
+if [ -n "$VOICE_TARGETS" ]; then
+    say "Replacing the $VOICES_RELEASE release"
+    ssh "$SERVER" "gh release delete '$VOICES_RELEASE' --repo '$SLUG' --yes \
+        --cleanup-tag || true"
+    ssh "$SERVER" "gh api --method DELETE --silent \
+        'repos/$SLUG/git/refs/tags/$VOICES_RELEASE' 2>/dev/null || true"
+
+    scp -q "$VOICES_NOTES" "$SERVER:$REMOTE_DIR/voices-notes.md"
+    ssh "$SERVER" "cd '$REMOTE_DIR' && \
+        gh release create '$VOICES_RELEASE' \
+        --repo '$SLUG' \
+        --target '$SHA' \
+        --title 'Voices' \
+        --notes-file voices-notes.md \
+        --latest=false \
+        $DRAFT \
+        $(voices_asset_name ipod6g) $(voices_asset_name ipodvideo)"
+
+    say "Published $COMMIT as $VOICES_RELEASE"
+    echo "  https://github.com/$SLUG/releases/tag/$VOICES_RELEASE"
 fi
 
 say "Replacing the $BOOT_RELEASE release"

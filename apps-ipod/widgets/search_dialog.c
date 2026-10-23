@@ -25,6 +25,8 @@
 #include "draw/screen_access.h"
 #include "system/activity.h"
 #include "system/shutdown.h"      /* default_event_handler */
+#include "settings/settings.h"
+#include "speech/talk.h"
 #include "search_dialog.h"
 
 /* How long the query must stand still before the provider is asked to scan. */
@@ -219,6 +221,14 @@ static void search_draw(struct dialog *d, struct screen *display,
     display->set_drawmode(DRMODE_SOLID);
 }
 
+static void search_speak_result(const struct search_dlg *s)
+{
+    if (!global_settings.talk_menu)
+        return;
+    talk_settle();
+    talk_name(s->p->row_text(s->selected, s->ctx), false);
+}
+
 static int search_on_action(struct dialog *d, int action, void *data)
 {
     struct search_dlg *s = data;
@@ -251,11 +261,17 @@ static int search_on_action(struct dialog *d, int action, void *data)
         {
             case ACTION_KBD_DOWN:
                 if (s->selected + 1 < s->count)
+                {
                     s->selected++;
+                    search_speak_result(s);
+                }
                 break;
             case ACTION_KBD_UP:
                 if (s->selected > 0)
+                {
                     s->selected--;
+                    search_speak_result(s);
+                }
                 break;
         }
         return DIALOG_CONTINUE;
@@ -265,7 +281,17 @@ static int search_on_action(struct dialog *d, int action, void *data)
     {
         case ACTION_KBD_DONE:      /* PLAY (down): into the results */
             if (s->selected < 0 && s->count > 0)
+            {
                 s->selected = 0;
+                search_speak_result(s);
+            }
+            break;
+
+        case ACTION_KBD_SPEAK:     /* SELECT held: read back the query */
+            if (s->selected < 0)
+                edit_line_speak(&s->ed);
+            else
+                search_speak_result(s);
             break;
 
         case ACTION_KBD_SELECT:

@@ -28,6 +28,8 @@
 #include "input/action.h"
 #include "font.h"
 #include "api/misc.h"
+#include "settings/settings.h"
+#include "speech/talk.h"
 
 /* Wrapped lines held at once. Longer than any explanation worth reading on a
  * 320-pixel screen; the text is clipped rather than the array overrun. */
@@ -161,6 +163,12 @@ static void prose_draw(struct dialog *d, struct screen *s,
                        p->focus == PROSE_BUTTONS && p->sel == 1);
 }
 
+static void prose_speak_button(const struct prose *p)
+{
+    if (global_settings.talk_menu)
+        talk_string(p->sel == 1 ? p->accept : p->cancel, false);
+}
+
 static int prose_action(struct dialog *d, int action, void *data)
 {
     struct prose *p = data;
@@ -175,11 +183,15 @@ static int prose_action(struct dialog *d, int action, void *data)
             if (p->scroll + p->visible < p->lines)
                 p->scroll++;
             else
+            {
                 p->focus = PROSE_BUTTONS;   /* past the end: hand over */
+                prose_speak_button(p);
+            }
         }
         else if (p->sel < 1)
         {
             p->sel++;
+            prose_speak_button(p);
         }
         return DIALOG_CONTINUE;
 
@@ -187,7 +199,10 @@ static int prose_action(struct dialog *d, int action, void *data)
         if (p->focus == PROSE_BUTTONS)
         {
             if (p->sel > 0)
+            {
                 p->sel--;
+                prose_speak_button(p);
+            }
             else
                 p->focus = PROSE_TEXT;      /* back into the text */
         }
@@ -222,6 +237,7 @@ static int prose_action(struct dialog *d, int action, void *data)
         if (p->focus == PROSE_TEXT)
         {
             p->focus = PROSE_BUTTONS;
+            prose_speak_button(p);
             return DIALOG_CONTINUE;
         }
         return p->sel == 1 ? DIALOG_ACCEPT : DIALOG_CANCEL;
@@ -277,6 +293,12 @@ bool dialog_prose_confirm(const char *title, const char *body,
     p.sel    = accept_default ? 1 : 0;  /* once the buttons are reached */
 
     dialog_init(&d, CONTEXT_STD, title, NULL, &prose_cb, &p);
+    if (global_settings.talk_menu)
+    {
+        if (title)
+            talk_string(title, false);
+        talk_string(body, true);
+    }
 
     return dialog_run(&d, TIMEOUT_BLOCK) == DIALOG_ACCEPT;
 }

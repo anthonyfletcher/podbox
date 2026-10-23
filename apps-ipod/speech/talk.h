@@ -123,6 +123,28 @@ int talk_number(long n, bool enqueue); /* say a number */
 int talk_value(long n, int unit, bool enqueue); /* say a numeric value */
 int talk_value_decimal(long n, int unit, int decimals, bool enqueue);
 int talk_spell(const char* spell, bool enqueue); /* spell a string */
+/* Say UTF-8 text with the synthesiser; -1 if it is off. Words queued one
+ * after another are said as one phrase. Text with nothing to say in it is
+ * not an error. */
+int talk_text(const char *text, bool enqueue);
+/* Queue text after what is being said, as a part of its own rather than
+ * joined to the one before. Returns the part, which talk_text_playing()
+ * names while it is being said, or -1 if nothing was queued. */
+int talk_text_part(const char *text);
+int talk_text_playing(void);
+/* A string that is a lang ID (ID2P) said by its id, anything else read by
+ * the synthesiser. */
+int talk_string(const char *s, bool enqueue);
+/* Say a name: the synthesiser's reading if it is on, else spelled. */
+int talk_name(const char *name, bool enqueue);
+/* How long a selection has to stay put before it is spoken: scrolling past
+ * a row says nothing, and the speech cut off at each step stutters. */
+#define TALK_SETTLE (HZ/4)
+/* The next utterance waits TALK_SETTLE: for a value stepped by the wheel,
+ * where each step cuts off the last and only the one it stops on is said. */
+void talk_settle(void);
+/* Voice Menus or Speech Synthesiser has changed. */
+void talk_speech_changed(void);
 void talk_setting(const void *global_settings_variable); /* read a setting */
 void talk_disable(bool disable); /* temporarily disable (or re-enable) talking (temporarily, not persisted) */
 void talk_force_shutup(void); /* kill voice unconditionally */

@@ -222,7 +222,7 @@ static int item_get_talk(int selected_item, void *data)
             if(id>=0)
                 talk_id(id, true);
             else
-                talk_spell(this->name, true);
+                talk_name(this->name, true);
             talk_id(VOICE_PAUSE,true);
             if (this->state == SELECTED)
                 talk_id(LANG_ON, true);

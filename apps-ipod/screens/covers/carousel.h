@@ -109,6 +109,7 @@ struct carousel_model {
     int  (*on_menu)(void);   /* MENU-hold: run the in-screen menu; GO_TO_* or CAROUSEL_MENU_* */
     int  (*on_context)(int index); /* SELECT-hold: CAROUSEL_CONTEXT, see above */
     void (*prepare)(void);   /* one-off post-init setup (e.g. cache-version bookkeeping) */
+    void (*speak)(int index); /* say a slide, once it comes to rest */
     bool owns_cache_version;                           /* honours pf_cfg.cache_version */
     const char *title;                                 /* status-bar title */
 };

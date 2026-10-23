@@ -842,12 +842,17 @@ struct user_settings
 
     /* voice UI settings */
     bool talk_menu; /* enable voice UI */
+    bool talk_synth; /* the synthesiser speaks what a .voice file does not */
+    bool talk_recorded; /* a .voice file speaks the menus; off, the synth */
+    int talk_speech_rate; /* synthesised speech, percent of normal */
     int talk_dir; /* voiced directories mode: 0=off 1=number 2=spell */
     bool talk_dir_clip; /* use directory .talk clips */
     int talk_file; /* voice file mode: 0=off, 1=number, 2=spell */
     bool talk_file_clip; /* use file .talk clips */
     bool talk_filetype; /* say file type */
     bool talk_battery_level;
+    int talk_track_change; /* ANNOUNCE_* in speech/announce.h */
+    bool talk_list_title;  /* say a list's title before its row */
     int  talk_mixer_amp; /* Relative volume of voices, MIX_AMP_MPUTE->MIX_AMP_UNITY */
 
     /* file browser sorting */
@@ -888,6 +893,7 @@ struct user_settings
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */
     bool text_viewer_page_number; /* show the page number at the foot */
+    int text_viewer_read_aloud;   /* TV_READ_* in text_viewer.h */
     /* Synchronised lyrics viewer (apps-ipod/viewers/lyric_viewer). */
     int lyric_colour_mode;        /* as text_viewer_colour_mode */
     unsigned char lyric_font_file[MAX_FILENAME+1]; /* "" = UI font */

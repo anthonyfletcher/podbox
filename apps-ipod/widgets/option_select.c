@@ -157,8 +157,14 @@ void option_talk_value(const struct settings_list *setting, int value, bool enqu
             unit = tbl_info->unit;
             get_talk_id = tbl_info->get_talk_id;
         }
-        if (get_talk_id)
+        if (get_talk_id && get_talk_id(value, unit) >= 0)
             talk_id(get_talk_id(value, unit), enqueue);
+        else if (get_talk_id)
+        {
+            char buf[64];
+            talk_text(option_get_valuestring(setting, buf, sizeof(buf),
+                                             value), enqueue);
+        }
         else if (HASFLAG(setting, F_TIME_SETTING))
             talk_time_intervals(value, unit, enqueue);
         else
@@ -185,9 +191,14 @@ void option_talk_value(const struct settings_list *setting, int value, bool enqu
         {
             talk_id(setting->choice_setting->talks[value], enqueue);
         }
-        else
+        else if (P2ID(setting->choice_setting->desc[value]) >= 0)
         {
             talk_id(P2ID(setting->choice_setting->desc[value]), enqueue);
+        }
+        else
+        {
+            talk_text((const char *)setting->choice_setting->desc[value],
+                      enqueue);
         }
     }
 }

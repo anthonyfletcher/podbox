@@ -204,14 +204,34 @@ static void rating_draw(struct dialog *d, struct screen *s,
     s->set_foreground(fg);
 }
 
+/* A rating of half-stars as stars: "three and a half stars" */
+static void rating_speak(int rating, bool enqueue)
+{
+    int whole = rating / 2;
+
+    if (!global_settings.talk_menu)
+        return;
+    if (rating == 0)
+        talk_id(VOICE_NO_STARS, enqueue);
+    else if (whole == 0)
+        talk_id(VOICE_HALF_A_STAR, enqueue);
+    else
+    {
+        talk_number(whole, enqueue);
+        if (rating & 1)
+            talk_id(VOICE_AND_A_HALF, true);
+        talk_id(whole == 1 && !(rating & 1) ? VOICE_STAR : VOICE_STARS, true);
+    }
+}
+
 static void rating_set(struct rating_ctx *c, int rating)
 {
     rating = MAX(0, MIN(rating, RATING_MAX));
     if (rating == c->rating)
         return;
     c->rating = rating;
-    if (global_settings.talk_menu)
-        talk_number(rating, false);
+    talk_settle();
+    rating_speak(rating, false);
 }
 
 static int rating_on_action(struct dialog *d, int action, void *data)
@@ -270,8 +290,14 @@ bool rating_dialog(const char *title, int *rating)
     /* The press that opened this is still down, and its repeats would clear
      * the rating */
     action_wait_for_release();
-    if (global_settings.talk_menu)
-        talk_number(c.rating, false);
+    if (global_settings.talk_menu && title)
+    {
+        if (P2ID((unsigned char *)title) >= 0)
+            talk_id(P2ID((unsigned char *)title), false);
+        else
+            talk_text(title, false);
+    }
+    rating_speak(c.rating, true);
 
     dialog_init(&d, CONTEXT_STD, title, NULL, &cb, &c);
     dialog_run(&d, HZ / 2);

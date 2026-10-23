@@ -39,6 +39,7 @@
 #include "dialog.h"
 #include "color_picker.h"
 #include "draw/viewport.h"
+#include "speech/talk.h"
 
 /* ---- the colour --------------------------------------------------------- */
 
@@ -475,6 +476,36 @@ static void cd_draw(struct dialog *d, struct screen *display,
     }
 }
 
+/* The cell reached or changed: a digit by its channel and value, a channel
+ * by its name and level, or a button. */
+static void cd_speak(const struct colour_dlg *s)
+{
+    const char *labels = str(LANG_COLOR_RGB_LABELS);
+    char c[2] = { 0, 0 };
+
+    if (!global_settings.talk_menu)
+        return;
+    talk_settle();
+    if (s->sel < CD_CHAN)
+    {
+        unsigned v[3] = { s->rgb.red, s->rgb.green, s->rgb.blue };
+        unsigned nib = (s->sel % 2) == 0 ? v[s->sel / 2] >> 4
+                                         : v[s->sel / 2] & 0x0F;
+        c[0] = labels[s->sel / 2];
+        talk_spell(c, false);
+        c[0] = "0123456789ABCDEF"[nib];
+        talk_spell(c, true);
+    }
+    else if (s->sel < CD_CANCEL)
+    {
+        c[0] = labels[s->sel - CD_CHAN];
+        talk_spell(c, false);
+        talk_number(s->rgb.rgb_val[s->sel - CD_CHAN], true);
+    }
+    else
+        talk_id(s->sel == CD_OK ? LANG_DIAG_OK : LANG_DIAG_CANCEL, false);
+}
+
 static int cd_on_action(struct dialog *d, int action, void *data)
 {
     struct colour_dlg *s = data;
@@ -485,19 +516,23 @@ static int cd_on_action(struct dialog *d, int action, void *data)
         case ACTION_STD_PREV:
         case ACTION_STD_PREVREPEAT:
             cd_move_col(s, -1);
+            cd_speak(s);
             break;
 
         case ACTION_STD_NEXT:
         case ACTION_STD_NEXTREPEAT:
             cd_move_col(s, +1);
+            cd_speak(s);
             break;
 
         case ACTION_TIME_UP:
             cd_move_row(s, -1);
+            cd_speak(s);
             break;
 
         case ACTION_TIME_DOWN:
             cd_move_row(s, +1);
+            cd_speak(s);
             break;
 
         case ACTION_SETTINGS_INC:
@@ -511,7 +546,10 @@ static int cd_on_action(struct dialog *d, int action, void *data)
                 cd_step_digit(s, delta);
             else if (s->sel < CD_CANCEL)
                 cd_step_channel(s, delta);
-            break;                      /* on the buttons: nothing to step */
+            else
+                break;                  /* on the buttons: nothing to step */
+            cd_speak(s);
+            break;
         }
 
         case ACTION_STD_OK:
@@ -575,6 +613,12 @@ bool set_color(const char *title, unsigned *color, unsigned banned_color)
     style.box_margin = CD_PAD;
 
     dialog_init(&d, CONTEXT_SETTINGS_COLOURCHOOSER, title, &style, &cb, &s);
+    if (global_settings.talk_menu && title)
+    {
+        talk_string(title, false);
+        talk_force_enqueue_next();      /* the cell after it */
+    }
+    cd_speak(&s);
 
     if (dialog_run(&d, TIMEOUT_BLOCK) == DIALOG_ACCEPT)
         *color = s.rgb.color;

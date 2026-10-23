@@ -18,6 +18,8 @@
 #include "rbunicode.h"
 #include "input/action.h"
 #include "draw/screen_access.h"
+#include "settings/settings.h"
+#include "speech/talk.h"
 #include "edit_line.h"
 
 #define CARET_W 2            /* width of the bar caret drawn at the gap */
@@ -231,6 +233,54 @@ int edit_line_get(const struct edit_line *s, char *out, int outlen, bool trim)
     return (char *)o - out;
 }
 
+/* ---- speech ------------------------------------------------------------- */
+
+/* One character by its name: a letter or digit from the voice file where it
+ * has one, the rest through the synthesiser. */
+static void speak_char(ucschar_t ch)
+{
+    if (!global_settings.talk_menu)
+        return;
+    if (ch >= 'A' && ch <= 'Z')
+        talk_id(VOICE_CHAR_A + ch - 'A', false);
+    else if (ch >= 'a' && ch <= 'z')
+        talk_id(VOICE_CHAR_A + ch - 'a', false);
+    else if (ch >= '0' && ch <= '9')
+        talk_id(VOICE_ZERO + ch - '0', false);
+    else if (ch == ' ')
+        talk_id(VOICE_BLANK, false);
+    else if (ch == '.')
+        talk_id(VOICE_DOT, false);
+    else if (ch == '-')
+        talk_id(VOICE_CHAR_DASH, false);
+    else if (ch == '_')
+        talk_id(VOICE_CHAR_UNDERSCORE, false);
+    else if (ch == '\'')
+        talk_id(VOICE_CHAR_APOSTROPHE, false);
+    else if (ch == '&')
+        talk_id(VOICE_CHAR_AMPERSAND, false);
+    else if (ch == '/')
+        talk_id(VOICE_CHAR_SLASH, false);
+    else
+    {
+        unsigned char tmp[8];
+        *utf8encode(ch, tmp) = '\0';
+        talk_text((char *)tmp, false);
+    }
+}
+
+void edit_line_speak(const struct edit_line *s)
+{
+    char text[EDIT_LINE_MAX * 3];
+
+    if (!global_settings.talk_menu)
+        return;
+    if (edit_line_get(s, text, sizeof(text), true) == 0)
+        talk_id(VOICE_BLANK, false);
+    else
+        talk_name(text, false);
+}
+
 bool edit_line_owns_action(int action)
 {
     switch (action)
@@ -251,18 +301,27 @@ bool edit_line_action(struct edit_line *s, int action)
     switch (action)
     {
         case ACTION_KBD_DOWN:      /* wheel forward */
-            return wheel_step(s, +1);
         case ACTION_KBD_UP:        /* wheel back */
-            return wheel_step(s, -1);
-        case ACTION_KBD_LEFT:      /* tap left */
+            if (!wheel_step(s, action == ACTION_KBD_DOWN ? +1 : -1))
+                return false;
+            talk_settle();      /* the letter the wheel stops on */
+            speak_char(s->text[s->caret - 1]);
+            return true;
+        case ACTION_KBD_LEFT:      /* tap left: says the character crossed */
+            if (s->caret > 0)
+                speak_char(s->text[s->caret - 1]);
             caret_left(s);
             break;
-        case ACTION_KBD_RIGHT:     /* tap right */
+        case ACTION_KBD_RIGHT:     /* tap right: says the character crossed */
+            if (!s->editing && s->caret < s->len)
+                speak_char(s->text[s->caret]);
             caret_right(s);
             break;
         case ACTION_KBD_BACKSPACE: /* hold left -> backspace (throttled) */
             if (current_tick - s->last_del_tick >= DEL_REPEAT)
             {
+                if (s->caret > 0)
+                    speak_char(s->text[s->caret - 1]);
                 do_backspace(s);
                 s->last_del_tick = current_tick;
                 return true;
@@ -271,6 +330,8 @@ bool edit_line_action(struct edit_line *s, int action)
         case ACTION_KBD_DELETE:    /* hold right -> delete after the bar */
             if (current_tick - s->last_del_tick >= DEL_REPEAT)
             {
+                if (s->caret < s->len)
+                    speak_char(s->text[s->caret]);
                 do_delete(s);
                 s->last_del_tick = current_tick;
                 return true;

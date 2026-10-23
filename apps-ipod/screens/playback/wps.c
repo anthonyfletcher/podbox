@@ -83,6 +83,7 @@
 #include "database/tagcache.h"
 #include "metadata.h"
 #include "skin/wps_internals.h"
+#include "speech/talk.h"
 
 #define FF_REWIND_MAX_PERCENT 3 /* cap ff/rewind step size at max % of file */
                                 /* 3% of 30min file == 54s step size */
@@ -293,6 +294,9 @@ static bool ffwd_rew(int button, bool seek_from_end)
                 button = ACTION_WPS_STOPSEEK;
         }
     }
+    /* where it landed */
+    if (!usb && global_settings.talk_menu && get_wps_state()->id3)
+        talk_value(get_wps_state()->id3->elapsed / 1000, UNIT_TIME, false);
     return usb;
 }
 
@@ -868,6 +872,9 @@ long gui_wps_show(void)
                 /* play/pause */
             case ACTION_WPS_PLAY:
                 wps_do_action(WPS_PLAYPAUSE, true);
+                if (global_settings.talk_menu)
+                    talk_id(audio_status() & AUDIO_STATUS_PAUSE
+                            ? LANG_PAUSE : LANG_PLAY, false);
                 break;
 
             case ACTION_WPS_VOLUP: /* fall through */
@@ -878,6 +885,12 @@ long gui_wps_show(void)
                     adjust_volume(-1);
 
                 setvol();
+                talk_settle();
+                if (global_settings.talk_menu)
+                    talk_value_decimal(sound_val2phys(SOUND_VOLUME,
+                                                      global_status.volume),
+                                       UNIT_DB, sound_numdecimals(SOUND_VOLUME),
+                                       false);
                 FOR_NB_SCREENS(i)
                 {
                     skin_update(WPS, i, SKIN_REFRESH_NON_STATIC);

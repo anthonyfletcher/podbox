@@ -52,6 +52,7 @@
 #include "screens/system/usb_screen.h"
 #include "power.h"
 #include "speech/talk.h"
+#include "speech/announce.h"
 #include "system/shutdown.h"
 #include "dircache.h"
 #include "metadata/tag_trim.h"
@@ -786,6 +787,7 @@ static void init(void)
     cpu_boost(false);
 
     car_adapter_mode_init();
+    announce_init();
     output_pause_init();
     iap_setup(global_settings.serial_bitrate);
 #ifdef HAVE_USBSTACK

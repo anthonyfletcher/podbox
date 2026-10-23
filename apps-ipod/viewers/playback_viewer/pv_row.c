@@ -46,6 +46,7 @@
 #include "pv_tiles.h"
 #include "pv_play.h"
 #include "pv_row.h"
+#include "speech/talk.h"
 
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
@@ -818,6 +819,34 @@ static enum pv_build_result build_model(void *buf, size_t bufsz, bool art_on,
 /* One visit. Sets *again when a setting has changed that divides the working
  * memory differently: the model is built inside that division, so the only
  * honest way to apply it is to start over. */
+/* The card in focus, as one phrase per part: its section first when that
+ * has just changed. */
+static void speak_card(int sec, int idx, bool with_section)
+{
+    struct card_content c;
+    char text[256];
+    size_t n = 0;
+
+    if (!global_settings.talk_menu)
+        return;
+    text[0] = '\0';
+    if (with_section)
+        n += snprintf(text + n, sizeof(text) - n, "%s. ",
+                      pv_tiles_section_name(sec));
+    card_paint_clear(&c);
+    pv_tiles_content(idx, &c);
+    if (c.tag && n < sizeof(text))
+        n += snprintf(text + n, sizeof(text) - n, "%s, ", c.tag);
+    if (c.title && n < sizeof(text))
+        n += snprintf(text + n, sizeof(text) - n, "%s. ", c.title);
+    for (int i = 0; i < c.text.n && n < sizeof(text); i++)
+        n += snprintf(text + n, sizeof(text) - n, "%s ", c.text.run[i].text);
+    for (int i = 0; i < c.n_table && n < sizeof(text); i++)
+        n += snprintf(text + n, sizeof(text) - n, "%s, %s. ",
+                      c.table[i].label, c.table[i].value);
+    talk_name(text, false);
+}
+
 static int row_session(bool *again)
 {
     struct pv_totals totals;
@@ -828,6 +857,8 @@ static int row_session(bool *again)
     int ret = GO_TO_PREVIOUS;
     int year;
     bool moving = false, was_moving = false;
+    int spoken_sec = -1, spoken_focus = -1;
+    long speak_due = 0;         /* when the card at rest is said; 0 none */
     bool held = false;
     bool art_on;
 
@@ -908,6 +939,12 @@ static int row_session(bool *again)
     button_clear_queue();
     prev = USEC_TIMER;
 
+    /* The loop waits for a button before it draws again, so the card Spun
+     * opens on is said here. */
+    speak_card(sec_list[sec_at], row.focus, true);
+    spoken_sec = sec_at;
+    spoken_focus = row.focus;
+
     /* One frame loop, not a wait followed by a run to rest.
      *
      * Two things depend on it. The frame interval has to be measured across
@@ -928,7 +965,10 @@ static int row_session(bool *again)
             /* Anything still to draw -- a motion, or a picture waiting to be
              * read -- means the queue is polled rather than waited on. */
             bool busy = moving || art_want_at < art_want_n;
-            int btn = busy ? button_get(false) : button_get(true);
+            long left = speak_due - current_tick;
+            int btn = busy ? button_get(false)
+                    : speak_due ? button_get_w_tmo(left > 0 ? left : 0)
+                    : button_get(true);
             int code;
 
             if (btn == BUTTON_NONE)
@@ -1165,6 +1205,27 @@ static int row_session(bool *again)
 
         composite();
         lcd_update_rect(0, ROW_Y, LCD_WIDTH, ROW_H);
+
+        /* Said where the row comes to rest, once it has stayed there for
+         * TALK_SETTLE */
+        if (moving)
+        {
+            if (!was_moving)
+                talk_shutup();
+            speak_due = 0;
+        }
+        else if (sec_at != spoken_sec || row.focus != spoken_focus)
+        {
+            if (!speak_due)
+                speak_due = current_tick + TALK_SETTLE;
+            else if (!TIME_BEFORE(current_tick, speak_due))
+            {
+                speak_due = 0;
+                speak_card(sec_list[sec_at], row.focus, sec_at != spoken_sec);
+                spoken_sec = sec_at;
+                spoken_focus = row.focus;
+            }
+        }
 
         if (!moving && was_moving)
         {

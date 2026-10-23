@@ -20,6 +20,11 @@
  * the round starts: spinning the disk up and seeking into a track is not the
  * player's time to lose.
  *
+ * With Voice Menus on the quiz can be played by ear: the question and the
+ * five answers are read before the clip starts -- the clip waits for the
+ * reading, or for the wheel to cut it short -- each answer is said as it is
+ * reached, and the verdict and the final score are spoken.
+ *
  * Parts, in order:
  *   - best scores
  *   - drawing
@@ -58,6 +63,8 @@
 #include "playlist/playlist.h"
 #include "root_menu.h"
 #include "games/quiz/quiz_pick.h"
+#include "speech/talk.h"
+#include "audio/voice_thread.h"  /* voice_is_playing */
 #include "games/quiz/quiz.h"
 
 /* A libfile of one record, the best score */
@@ -303,6 +310,14 @@ struct view
     enum view_mode mode;
 };
 
+/* What each kind of round asks */
+static const int asks[QUIZ_KINDS] = {
+    [QUIZ_KIND_TITLE]  = LANG_QUIZ_KIND_TITLE,
+    [QUIZ_KIND_ARTIST] = LANG_QUIZ_KIND_ARTIST,
+    [QUIZ_KIND_ALBUM]  = LANG_QUIZ_KIND_ALBUM,
+    [QUIZ_KIND_YEAR]   = LANG_QUIZ_KIND_YEAR,
+};
+
 /* Each finished round's points, and whether it was answered right. */
 static int earned[QUIZ_ROUNDS];
 static bool was_right[QUIZ_ROUNDS];
@@ -317,12 +332,6 @@ static bool answered_right(const struct view *v)
  * score grows a digit, and the question has the rest of the line. */
 static void draw_head(const struct view *v)
 {
-    static const int asks[QUIZ_KINDS] = {
-        [QUIZ_KIND_TITLE]  = LANG_QUIZ_KIND_TITLE,
-        [QUIZ_KIND_ARTIST] = LANG_QUIZ_KIND_ARTIST,
-        [QUIZ_KIND_ALBUM]  = LANG_QUIZ_KIND_ALBUM,
-        [QUIZ_KIND_YEAR]   = LANG_QUIZ_KIND_YEAR,
-    };
     char buf[16], ask[48];
     int score = v->score + (answered_right(v) ? v->points : 0);
     int pips_w = QUIZ_ROUNDS * (PIP + PIP_GAP) - PIP_GAP;
@@ -554,7 +563,7 @@ static void screen_give_back(void)
  * be back on disk before the host takes the player. */
 static enum yesno_res ask(int lang_id)
 {
-    const char *lines[] = { (const char *)str(lang_id) };
+    const char *lines[] = { (const char *)ID2P(lang_id) };
     const struct text_message message = { lines, 1 };
     enum yesno_res res;
 
@@ -608,6 +617,41 @@ static bool clip_heard(int round, unsigned long from)
 
 static struct quiz_round rounds[QUIZ_ROUNDS];
 
+/* An answer by its number, then what it says */
+static void speak_choice(const struct quiz_round *r, int i, bool enqueue)
+{
+    char text[QUIZ_TITLE_MAX + 2];
+
+    talk_number(i + 1, enqueue);
+    snprintf(text, sizeof(text), "%s.", r->choice[i]);
+    talk_text_part(text);
+}
+
+/* The question and all five answers. True if anything is being said. */
+static bool speak_round(const struct quiz_round *r)
+{
+    if (!global_settings.talk_menu)
+        return false;
+    talk_id(asks[r->kind], false);
+    for (int i = 0; i < QUIZ_CHOICES; i++)
+        speak_choice(r, i, true);
+    return voice_is_playing();
+}
+
+static void speak_verdict(const struct view *v)
+{
+    if (!global_settings.talk_menu)
+        return;
+    if (answered_right(v))
+    {
+        talk_id(LANG_QUIZ_RIGHT, false);
+        talk_number(v->points, true);
+        return;
+    }
+    talk_id(v->picked < 0 ? LANG_QUIZ_TIMES_UP : LANG_QUIZ_WRONG, false);
+    talk_text_part(v->r->choice[v->r->right]);
+}
+
 /* Plays one round and adds what it earned to *score. */
 static enum round_end play_round(int round, int *score)
 {
@@ -620,11 +664,15 @@ static enum round_end play_round(int round, int *score)
     long round_tick = current_tick;
     long drain_tick = 0, pause_tick = 0;
     bool started = false, paused = false, by_hold = false, picked = false;
+    bool reading, cut = false;
 
     audio_stop();
-    playlist_start(round, from, 0);
-
     draw_all(&v);
+
+    /* The clip waits while the answers are read */
+    reading = speak_round(r);
+    if (!reading)
+        playlist_start(round, from, 0);
 
     while (1)
     {
@@ -648,6 +696,10 @@ static enum round_end play_round(int round, int *score)
                 {
                     v.sel--;
                     update_rows(&v);
+                    talk_settle();
+                    if (global_settings.talk_menu)
+                        speak_choice(r, v.sel, false);
+                    cut = true;
                 }
                 break;
 
@@ -656,11 +708,16 @@ static enum round_end play_round(int round, int *score)
                 {
                     v.sel++;
                     update_rows(&v);
+                    talk_settle();
+                    if (global_settings.talk_menu)
+                        speak_choice(r, v.sel, false);
+                    cut = true;
                 }
                 break;
 
             case ACTION_QUIZ_PICK:
-                picked = !paused;
+                /* not before the clip: the clock has not started */
+                picked = !paused && !reading;
                 break;
 
             case ACTION_QUIZ_PAUSE:
@@ -719,6 +776,16 @@ static enum round_end play_round(int round, int *score)
         if (paused)
             continue;
 
+        /* The reading is over, or the wheel cut it short: the clip */
+        if (reading && (!voice_is_playing() || cut))
+        {
+            reading = false;
+            playlist_start(round, from, 0);
+            round_tick = current_tick;
+        }
+        if (reading)
+            continue;
+
         if (!started && (clip_heard(round, from)
                          || TIME_AFTER(current_tick, round_tick + START_TIMEOUT)))
         {
@@ -755,7 +822,10 @@ static enum round_end play_round(int round, int *score)
     *score += earned[round];
 
     draw_all(&v);
+    speak_verdict(&v);
     sleep(REVEAL_TICKS);
+    while (voice_is_playing())     /* the verdict before the next question */
+        sleep(HZ/10);
     return ROUND_ANSWERED;
 }
 
@@ -889,6 +959,22 @@ static bool show_result(int score, bool record)
 
     lcd_update();
 
+    if (global_settings.talk_menu)
+    {
+        talk_number(score, false);
+        snprintf(buf, sizeof(buf), "%s.", out_of);
+        talk_text_part(buf);
+        if (record)
+            talk_id(LANG_QUIZ_NEW_BEST, true);
+        else
+        {
+            snprintf(buf, sizeof(buf), str(LANG_QUIZ_BEST), best);
+            talk_text_part(buf);
+        }
+        talk_ids(true, LANG_QUIZ_KEY_SELECT, LANG_QUIZ_PLAY_AGAIN,
+                 LANG_QUIZ_KEY_MENU, LANG_QUIZ_LEAVE_HINT);
+    }
+
     while (1)
     {
         int button = get_action(CONTEXT_MUSIC_QUIZ, TIMEOUT_BLOCK);
@@ -1011,7 +1097,7 @@ int music_quiz_screen(void)
             splash(HZ, ID2P(LANG_PARTY_MODE));
             return GO_TO_PREVIOUS;
         }
-        if (!yesno_pop(str(LANG_QUIZ_STOP_PLAYBACK)))
+        if (!yesno_pop((const char *)ID2P(LANG_QUIZ_STOP_PLAYBACK)))
             return GO_TO_PREVIOUS;
 
         /* Where a book was left, before it stops being the one playing. */

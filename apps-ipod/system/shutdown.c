@@ -34,6 +34,7 @@
 #include "input/action.h"
 #include "settings/settings.h"
 #include "speech/talk.h"
+#include "speech/announce.h"
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
 #include "widgets/list.h"
@@ -388,6 +389,11 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
         case SYS_OUTPUT_RESUME:
             output_pause_resume();
             return SYS_OUTPUT_RESUME;
+
+        case SYS_ANNOUNCE_TRACK:
+        case SYS_ANNOUNCE_DONE:
+            announce_event(event, button_get_data());
+            return event;
 #ifdef HAVE_USB_HOST_AUDIO
         case SYS_USB_DAC_ON:
             splash(HZ*2, ID2P(LANG_USB_DAC_ON));

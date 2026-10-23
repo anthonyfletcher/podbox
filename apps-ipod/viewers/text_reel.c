@@ -15,6 +15,7 @@
 #include "draw/screen_access.h"
 #include "draw/viewport.h"
 #include "settings/settings.h"
+#include "speech/talk.h"
 #include "backlight.h"
 #include "powermgmt.h"
 #include "system/shutdown.h"
@@ -59,6 +60,9 @@ static void tr_apply_colours(struct viewport *vp)
     vp->fg_pattern = dynamic_colors_resolve(global_settings.fg_color);
     vp->bg_pattern = dynamic_colors_resolve(global_settings.bg_color);
 }
+
+/* Lines read aloud, at most: the credits run to hundreds of names */
+#define TR_SPOKEN_MAX 100
 
 int text_reel_run(const char *const *lines, unsigned char *heights, int count)
 {
@@ -117,6 +121,15 @@ int text_reel_run(const char *const *lines, unsigned char *heights, int count)
     /* Line 0 enters from the bottom (top == LCD_HEIGHT at scroll 0); at
      * end_scroll the last line has cleared the top and the screen exits. */
     end_scroll = LCD_HEIGHT + total_lines * pitch;
+
+    /* Read out a line at a time, as far as the speech queue reaches */
+    if (global_settings.talk_menu)
+    {
+        talk_force_shutup();
+        for (i = 0; i < count && i < TR_SPOKEN_MAX; i++)
+            if (lines[i][0])
+                talk_text_part(lines[i]);
+    }
 
     while (1)
     {
@@ -187,6 +200,7 @@ int text_reel_run(const char *const *lines, unsigned char *heights, int count)
     }
 
   done:
+    talk_shutup();
     d->set_viewport(last);
     viewportmanager_theme_undo(SCREEN_MAIN, false);
     tr_backlight_use_settings();

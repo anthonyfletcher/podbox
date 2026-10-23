@@ -65,6 +65,11 @@ int edit_line_get(const struct edit_line *s, char *out, int outlen, bool trim);
 bool edit_line_action(struct edit_line *s, int action);
 bool edit_line_owns_action(int action);
 
+/* Say the whole line, with Voice Menus on: "blank" if it is empty. Each
+ * character is said by edit_line_action() as it is chosen, crossed or
+ * deleted. */
+void edit_line_speak(const struct edit_line *s);
+
 /* The line's height in the active viewport's font. */
 int edit_line_height(struct screen *display);
 

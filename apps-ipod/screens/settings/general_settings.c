@@ -934,6 +934,10 @@ static int talk_callback(int action,
                          struct gui_synclist *this_list);
 
 MENUITEM_SETTING(talk_menu_item, &global_settings.talk_menu, NULL);
+MENUITEM_SETTING(talk_synth_item, &global_settings.talk_synth, NULL);
+MENUITEM_SETTING(talk_recorded_item, &global_settings.talk_recorded, NULL);
+MENUITEM_SETTING(talk_speech_rate_item, &global_settings.talk_speech_rate,
+                 NULL);
 MENUITEM_SETTING(talk_dir_item, &global_settings.talk_dir, NULL);
 MENUITEM_SETTING(talk_dir_clip_item, &global_settings.talk_dir_clip, talk_callback);
 MENUITEM_SETTING(talk_file_item, &global_settings.talk_file, NULL);
@@ -964,13 +968,20 @@ static int talk_callback(int action,
     return action;
 }
 MENUITEM_SETTING(talk_filetype_item, &global_settings.talk_filetype, NULL);
+MENUITEM_SETTING(talk_list_title_item, &global_settings.talk_list_title, NULL);
+MENUITEM_SETTING(talk_track_change_item,
+                 &global_settings.talk_track_change, NULL);
 MENUITEM_SETTING(talk_battery_level_item,
                  &global_settings.talk_battery_level, NULL);
 MENUITEM_SETTING(talk_mixer_amp_item, &global_settings.talk_mixer_amp, NULL);
 MAKE_MENU(voice_settings_menu, ID2P(LANG_VOICE), 0, Icon_Voice,
-          &talk_menu_item, &talk_dir_item, &talk_dir_clip_item,
+          &talk_menu_item, &talk_synth_item, &talk_recorded_item,
+          &talk_speech_rate_item,
+          &talk_dir_item, &talk_dir_clip_item,
           &talk_file_item, &talk_file_clip_item, &talk_filetype_item,
-          &talk_battery_level_item, &talk_mixer_amp_item);
+          &talk_list_title_item, &talk_track_change_item,
+          &talk_battery_level_item,
+          &talk_mixer_amp_item);
 
 /** WPS settings menu **/
 

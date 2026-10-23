@@ -31,4 +31,5 @@ sh ../tools/check-zip-langs.sh rockbox.zip
 ../bundle-theme.sh
 ../bundle-help.sh
 ../bundle-trim.sh
+../bundle-speech.sh
 ../bundle-tools.sh

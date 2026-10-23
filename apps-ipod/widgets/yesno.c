@@ -39,7 +39,7 @@ struct yesno_ctx
     enum yesno_res tmo_default;    /* result on timeout, or YESNO_TMO for none */
     int  tmo_secs;                 /* initial timeout in seconds (button sizing) */
     long end_tick;
-    long talked_tick;
+    bool talked;                   /* the question has been said */
     bool talk_menu;
     const struct text_message *yes_message; /* shown on accept, optional */
     const struct text_message *no_message;  /* shown on cancel, optional */
@@ -55,13 +55,22 @@ static void talk_text_message(const struct text_message * message, bool enqueue)
     int line;
     for(line=0; line < message->nb_lines; line++)
     {
-        long id = P2ID((unsigned char *)message->message_lines[line]);
+        const char *text = message->message_lines[line];
+        long id = P2ID((unsigned char *)text);
         if(id>=0)
-        {
             talk_id(id, enqueue);
-            enqueue = true;
-        }
+        else if (text && *text)
+            talk_text(text, enqueue);   /* only the synthesiser can */
+        else
+            continue;
+        enqueue = true;
     }
+}
+
+static void talk_button(enum yesno_res selection, bool enqueue)
+{
+    talk_id(selection == YESNO_YES ? LANG_SET_BOOL_YES : LANG_SET_BOOL_NO,
+            enqueue);
 }
 
 static int put_message(struct screen *display,
@@ -263,11 +272,12 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
 {
     struct yesno_ctx *c = data;
 
-    /* Repeat the question every 5secs (more or less) */
-    if (c->talk_menu && TIME_AFTER(current_tick, c->talked_tick))
+    /* The question once, then the button it starts on */
+    if (c->talk_menu && !c->talked)
     {
-        c->talked_tick = current_tick + (HZ * 5);
+        c->talked = true;
         talk_text_message(c->message, false);
+        talk_button(c->selection, true);
     }
 
     switch (action)
@@ -278,11 +288,15 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
             c->result = c->selection; /* confirm the highlighted button */
             return (c->selection == YESNO_YES) ? DIALOG_ACCEPT : DIALOG_CANCEL;
         case ACTION_STD_PREV: /* scroll back / left -> Yes (left button) */
-            c->selection = YESNO_YES;
-            break;
         case ACTION_STD_NEXT: /* scroll fwd / right -> No (right button) */
-            c->selection = YESNO_NO;
+        {
+            enum yesno_res sel = action == ACTION_STD_PREV ? YESNO_YES
+                                                           : YESNO_NO;
+            if (sel != c->selection && c->talk_menu)
+                talk_button(sel, false);
+            c->selection = sel;
             break;
+        }
         case ACTION_STD_CANCEL:
         case ACTION_STD_MENU:
             if (!d->backlight_on)
@@ -378,7 +392,7 @@ static enum yesno_res yesno_run(int ticks, enum yesno_res tmo_default_res,
     c.tmo_default  = tmo_default_res;
     c.tmo_secs     = ticks / HZ;
     c.end_tick     = current_tick + ticks;
-    c.talked_tick  = current_tick - 1;
+    c.talked       = false;
     c.talk_menu    = global_settings.talk_menu;
     c.yes_message  = yes_message;
     c.no_message   = no_message;

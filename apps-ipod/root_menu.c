@@ -984,9 +984,7 @@ static int tagnavi_item_speak(int selected_item, void *data)
 
     if (browser_db_get_main_menu_row(index, &name))
     {
-        int id = P2ID(name);
-        if (id != -1)
-            talk_id(id, false);
+        talk_string((const char *)name, false);
     }
     return 0;
 }

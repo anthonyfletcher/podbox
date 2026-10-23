@@ -871,22 +871,44 @@ static int step_gain_simple(int g, int dir)
     return g < EQ_GAIN_MIN ? EQ_GAIN_MIN : g > EQ_GAIN_MAX ? EQ_GAIN_MAX : g;
 }
 
-static void speak_value(const struct eq_band_setting *s, enum field f)
+/* A field's value, after its name when the field has just been reached */
+static void speak_value(const struct eq_band_setting *s, enum field f,
+                        bool name)
 {
     if (!global_settings.talk_menu)
         return;
+    if (name)
+        talk_id(f == FIELD_FREQ ? (s->type == EQ_FILTER_PEAK
+                                   ? LANG_EQUALIZER_FIELD_CENTRE
+                                   : LANG_EQUALIZER_FIELD_CORNER)
+              : f == FIELD_GAIN ? LANG_GAIN
+              : f == FIELD_Q ? LANG_EQUALIZER_BAND_Q
+              : LANG_EQUALIZER_FIELD_TYPE, false);
     switch (f)
     {
-    case FIELD_FREQ: talk_value(s->cutoff, UNIT_HERTZ, false); break;
-    case FIELD_GAIN: talk_value_decimal(s->gain, UNIT_DB, 1, false); break;
-    case FIELD_Q:    talk_value_decimal(s->q, UNIT_INT, 1, false); break;
+    case FIELD_FREQ: talk_value(s->cutoff, UNIT_HERTZ, name); break;
+    case FIELD_GAIN: talk_value_decimal(s->gain, UNIT_DB, 1, name); break;
+    case FIELD_Q:    talk_value_decimal(s->q, UNIT_INT, 1, name); break;
     case FIELD_TYPE:
         talk_id(s->type == EQ_FILTER_LOW_SHELF ? LANG_EQUALIZER_TYPE_LOW_SHELF
               : s->type == EQ_FILTER_HIGH_SHELF ? LANG_EQUALIZER_TYPE_HIGH_SHELF
-              : LANG_EQUALIZER_TYPE_PEAK, false);
+              : LANG_EQUALIZER_TYPE_PEAK, name);
         break;
     default: break;
     }
+}
+
+/* The filter reached: which, where and how much */
+static void speak_band(void)
+{
+    const struct eq_band_setting *s = &global_settings.eq_band_settings[ed.band];
+
+    if (!global_settings.talk_menu)
+        return;
+    talk_id(LANG_EQUALIZER_BAND, false);
+    talk_number(ed.band, true);
+    talk_value(s->cutoff, UNIT_HERTZ, true);
+    talk_value_decimal(s->gain, UNIT_DB, 1, true);
 }
 
 /* One wheel step, or several when the wheel turns fast. */
@@ -933,7 +955,8 @@ static void wheel(int dir)
         return;
     *s = next;
     band_applied(ed.band);
-    speak_value(s, f);
+    talk_settle();
+    speak_value(s, f, false);
 }
 
 static void set_bypass(bool on)
@@ -1006,9 +1029,14 @@ static int sm_action(int action, struct gui_synclist *lists)
         global_settings.eq_auto_headroom = !global_settings.eq_auto_headroom;
         eq_apply();
         ed.changed = true;
+        if (global_settings.talk_menu)
+            talk_id(global_settings.eq_auto_headroom ? LANG_SET_BOOL_YES
+                                                     : LANG_SET_BOOL_NO, false);
         return ACTION_REDRAW;
     case SM_ENHANCED:
         ed.enhanced = !ed.enhanced;
+        if (global_settings.talk_menu)
+            talk_id(ed.enhanced ? LANG_SET_BOOL_YES : LANG_SET_BOOL_NO, false);
         global_settings.eq_editor_mode = ed.enhanced ? EQ_EDITOR_ENHANCED
                                                      : EQ_EDITOR_SIMPLE;
         ed.changed = true;
@@ -1122,6 +1150,7 @@ int eq_editor_screen(void)
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
     cpu_boost(true);
 #endif
+    speak_band();
 
     while (true)
     {
@@ -1169,9 +1198,7 @@ int eq_editor_screen(void)
             else
             {
                 ed.band = band;
-                if (global_settings.talk_menu)
-                    talk_value(global_settings.eq_band_settings[band].cutoff,
-                               UNIT_HERTZ, false);
+                speak_band();
             }
             break;
         }
@@ -1182,7 +1209,8 @@ int eq_editor_screen(void)
                 break;
             }
             ed.field = (ed.field + 1) % FIELD_COUNT;
-            speak_value(&global_settings.eq_band_settings[ed.band], ed.field);
+            speak_value(&global_settings.eq_band_settings[ed.band], ed.field,
+                        true);
             break;
         case ACTION_STD_CONTEXT:
             if (select_menu())
@@ -1198,7 +1226,11 @@ int eq_editor_screen(void)
         case ACTION_EQ_COMPARE:
             redraw = !ed.bypass;
             if (!ed.bypass)
+            {
                 set_bypass(true);
+                if (global_settings.talk_menu)
+                    talk_id(LANG_EQUALIZER_COMPARE, false);
+            }
             break;
         case ACTION_EQ_COMPARE_END:
             set_bypass(false);

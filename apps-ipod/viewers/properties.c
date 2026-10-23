@@ -180,7 +180,7 @@ static int speak_property_selection(int selected_item, void *data)
         talk_number(stats->file_count, true);
         break;
     default:
-        talk_spell(props[i + 1], true);
+        talk_name(props[i + 1], true);
         break;
     }
     return 0;

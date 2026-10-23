@@ -572,6 +572,8 @@ static int talk_menu_item(int selected_item, void *data)
                                     menu_get_name_and_icon->
                                     list_get_name_data, buffer, sizeof(buffer));
                         id = P2ID(str);
+                        if (id == -1 && str)
+                            talk_text((char *)str, false);
                     }
                 }
                 else

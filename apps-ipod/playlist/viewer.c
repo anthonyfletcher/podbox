@@ -930,6 +930,7 @@ static int playlist_callback_voice(int selected_item, void *data)
 {
     struct playlist_viewer *local_viewer = (struct playlist_viewer *)data;
     struct playlist_entry *track = pv_get_track(local_viewer, selected_item);
+    char name[MAX_PATH];
 
     if(global_settings.playlist_viewer_icons) {
         if (track->index == local_viewer->current_playing_track)
@@ -957,7 +958,10 @@ static int playlist_callback_voice(int selected_item, void *data)
             /* If loading from tags failed, only talk the file name */
         case PLAYLIST_VIEWER_ENTRY_SHOW_ID3_TITLE:
             /* If loading from tags failed, only talk the file name */
-            talk_file_or_spell(NULL, track->name, NULL, true);
+            if (talk_text(playlist_callback_name(selected_item, data,
+                                                 name, sizeof(name)),
+                          true) < 0)
+                talk_file_or_spell(NULL, track->name, NULL, true);
             break;
     }
     if (viewer.moving_track != -1)

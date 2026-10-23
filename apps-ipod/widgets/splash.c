@@ -24,7 +24,7 @@
 #include "system/activity.h"
 #include "dialog.h"
 
-static long progress_next_tick, talked_tick;
+static long progress_next_tick, talked_tick, progress_last_call;
 
 #define MAXLINES  (LCD_HEIGHT/6)
 #define MAXBUFFER 512
@@ -173,6 +173,19 @@ void splashf(int ticks, const char *fmt, ...)
     /* If fmt is a lang ID then get the corresponding string (which
        still might contain % place holders). */
     fmt = P2STR((unsigned char *)fmt);
+
+    /* Text that is not a lang ID only the synthesiser can say. A splash
+     * shown for no time is a status redrawn in a loop, so is left alone. */
+    if (id < 0 && ticks > 0 && global_settings.talk_menu)
+    {
+        char text[128];
+        va_start(ap, fmt);
+        vsnprintf(text, sizeof(text), fmt, ap);
+        va_end(ap);
+        talk_text(text, false);
+        talk_force_enqueue_next();
+    }
+
     FOR_NB_SCREENS(i)
     {
         struct screen * screen = &(screens[i]);
@@ -216,6 +229,10 @@ void splash_progress(int current, int total, const char *fmt, ...)
     int vp_flag = VP_FLAG_VP_DIRTY;
     /* progress update tick */
     long now = current_tick;
+    /* a run of calls with no gap of two seconds is one meter */
+    bool new_run = talked_tick == 0
+                   || TIME_AFTER(now, progress_last_call + HZ*2);
+    progress_last_call = now;
 
     if (current < total)
     {
@@ -226,13 +243,22 @@ void splash_progress(int current, int total, const char *fmt, ...)
         vp_flag = 0; /* don't mark vp dirty to prevent flashing */
     }
 
-    if (global_settings.talk_menu && !progress_silent &&
-        total > 0 &&
-        TIME_AFTER(current_tick, talked_tick + HZ*5))
+    /* The meter's message, once: a percentage read out every few seconds
+     * talks over everything else and says nothing the bar does not. */
+    if (global_settings.talk_menu && !progress_silent && new_run)
     {
-        talked_tick = current_tick;
-        talk_ids(false, LANG_LOADING_PERCENT,
-                 TALK_ID(current * 100 / total, UNIT_PERCENT));
+        long id = P2ID((const unsigned char *)fmt);
+        talked_tick = now;
+        if (id >= 0)
+            talk_id(id, false);
+        else
+        {
+            char text[128];
+            va_start(ap, fmt);
+            vsnprintf(text, sizeof(text), fmt, ap);
+            va_end(ap);
+            talk_text(text, false);
+        }
     }
 
     /* If fmt is a lang ID then get the corresponding string (which

@@ -485,6 +485,7 @@ Shadow Colour only while there is a shadow to colour.
 | Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
 | Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
 | Text Viewer ▸ Page Number | Shows a page counter at the foot. | No |  |
+| Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice; shown while Voice Menus and Speech Synthesiser are on. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. | Each Page |  |
 | Text Viewer ▸ Font | A font used only by the text viewer, so reading can use a different typeface from the menus. It starts as 22-noto-serif; Use UI Font switches to the interface font. | 22-noto-serif |  |
 | Lyrics Viewer ▸ Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | Theme |  |
 | Lyrics Viewer ▸ Alignment | Whether lyric lines are aligned left, centred or right. | Centre |  |
@@ -646,13 +647,18 @@ restart, which costs battery life: restart the player afterwards.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Voice Menus | Speaks menu entries aloud. Needs a voice file on the player. | Yes |  |
-| Voice Directories | Whether folder names are spoken, and whether by number or spelled out. | Off | **Adv** |
+| Voice Menus | Speaks menu entries aloud, with a voice file on the player or with Speech Synthesiser on. | No |  |
+| Speech Synthesiser | Speaks titles, artists and other names, and every menu a voice file does not cover, in a synthesised voice. Takes 1.5 MB of memory while Voice Menus is on, and turning it on during playback restarts the current track. | Yes |  |
+| Recorded Voice | Speaks the menus in the recorded voice of a voice file, when there is one on the player. Off, the synthesised voice speaks the menus as well, so one voice is heard throughout. Names are always read by the synthesised voice. | Yes |  |
+| Speech Rate | How fast the synthesised voice speaks. Recorded voice files are not affected. | 100% |  |
+| Voice Directories | Whether folder names are spoken, and whether by number or by name. With Speech Synthesiser on, Spell reads the name; without it, the name is spelled out. | Spell | **Adv** |
 | Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | No | **Adv** |
-| Voice Filenames | Whether filenames are spoken, and how. | Off | **Adv** |
+| Voice Filenames | Whether filenames are spoken, and how. With Speech Synthesiser on, Spell reads the name; without it, the name is spelled out. | Spell | **Adv** |
 | Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | No | **Adv** |
 | Say File Type | Speaks the file's type along with its name. | No | **Adv** |
-| Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | No | **Adv** |
+| Say List Titles | Says a list's title before its first row when you go into it, so you hear where you are as well as what is selected. | No |  |
+| Announce Track Change | Says the title and artist of each new track as it starts, with Voice Menus on. Over the Music speaks on top of it; Pause the Music pauses for the announcement and carries on after it. | Off |  |
+| Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs Voice Menus on. | No | **Adv** |
 | Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100% | **Adv** |
 
 ### System — Manage Settings

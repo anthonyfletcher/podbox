@@ -30,6 +30,7 @@
 #include "yesno.h"
 #include "dialog.h"
 #include "edit_line.h"
+#include "speech/talk.h"
 
 #define KBD_MARGIN 12        /* horizontal gap from the display edge to the box */
 #define KBD_BTN_GAP 10       /* gap between the Cancel and OK buttons */
@@ -124,6 +125,12 @@ static int kbd_confirm_cancel(struct kbd_edit *s)
     return DIALOG_CANCEL;
 }
 
+static void kbd_speak_button(const struct kbd_edit *s)
+{
+    if (global_settings.talk_menu)
+        talk_id(s->btn_ok ? LANG_DIAG_OK : LANG_DIAG_CANCEL, false);
+}
+
 static int kbd_on_action(struct dialog *d, int action, void *data)
 {
     (void)d;
@@ -143,12 +150,15 @@ static int kbd_on_action(struct dialog *d, int action, void *data)
             case ACTION_KBD_UP:
             case ACTION_KBD_DOWN:
                 s->btn_ok = !s->btn_ok;         /* toggle OK/Cancel */
+                kbd_speak_button(s);
                 break;
             case ACTION_KBD_LEFT:
                 s->btn_ok = false;              /* Cancel (left button) */
+                kbd_speak_button(s);
                 break;
             case ACTION_KBD_RIGHT:
                 s->btn_ok = true;               /* OK (right button) */
+                kbd_speak_button(s);
                 break;
         }
         return DIALOG_CONTINUE;
@@ -161,7 +171,11 @@ static int kbd_on_action(struct dialog *d, int action, void *data)
             {
                 s->on_buttons = true;
                 s->btn_ok = true;               /* start on OK */
+                kbd_speak_button(s);
             }
+            break;
+        case ACTION_KBD_SPEAK:     /* SELECT held: read back the text */
+            edit_line_speak(&s->ed);
             break;
         case ACTION_KBD_SELECT:    /* accept, or confirm the chosen button */
             if (s->on_buttons && !s->btn_ok)
@@ -171,6 +185,7 @@ static int kbd_on_action(struct dialog *d, int action, void *data)
             if (s->on_buttons)
             {
                 s->on_buttons = false;          /* back up to the input */
+                edit_line_speak(&s->ed);
                 break;
             }
             return kbd_confirm_cancel(s);
@@ -199,6 +214,7 @@ int dialog_input(char* text, int buflen)
     st.dirty = false;
 
     dialog_init(&d, CONTEXT_KEYBOARD, NULL, NULL, &cb, &st);
+    edit_line_speak(&st.ed);    /* what is there to edit */
     if (dialog_run(&d, TIMEOUT_BLOCK) != DIALOG_ACCEPT)
         return -1;           /* cancelled or USB */
 

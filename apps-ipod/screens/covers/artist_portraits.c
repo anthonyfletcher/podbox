@@ -24,6 +24,7 @@
 #include "carousel.h"
 #include "draw/line.h"              /* TEXT_FIT_BUF */
 #include "lang.h"
+#include "speech/talk.h"
 #include "database/db_summary.h" /* build_artist_index() */
 
 /* "Resume to this slide on next open", set by artist_enter() and consumed by
@@ -323,6 +324,12 @@ static int artist_on_context(int index)
     return CAROUSEL_CONTEXT;
 }
 
+static void artist_speak(int index)
+{
+    char name[TAGCACHE_BUFSZ];
+    talk_name(artist_name(index, name, sizeof(name)), false);
+}
+
 static const struct carousel_model artist_model = {
     .build_index = artist_build_index,
     .count       = artist_count,
@@ -336,6 +343,7 @@ static const struct carousel_model artist_model = {
     .set_initial = artist_set_initial,
     .on_menu     = artist_on_menu,
     .on_context  = artist_on_context,
+    .speak       = artist_speak,
     .owns_cache_version = false,
     .title       = (const char *)ID2P(LANG_ARTIST_PORTRAITS),
 };

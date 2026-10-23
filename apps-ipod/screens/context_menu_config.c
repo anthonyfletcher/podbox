@@ -21,6 +21,7 @@
 #include "screens/context_menu.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "context_menu_config.h"
+#include "speech/talk.h"
 
 /* The kind the open screen edits */
 static int edit_kind;
@@ -57,6 +58,9 @@ static int row_action_callback(int action, struct gui_synclist *lists)
     if (action == ACTION_STD_OK && sel >= 0 && sel < edit_count)
     {
         global_settings.context_hidden[edit_kind] ^= 1u << sel;
+        if (global_settings.talk_menu)
+            talk_id(global_settings.context_hidden[edit_kind] & (1u << sel)
+                    ? LANG_OFF : LANG_ON, false);
         /* Stay in the list: turning two rows back on is one visit */
         return ACTION_REDRAW;
     }

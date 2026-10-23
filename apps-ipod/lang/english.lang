@@ -25478,3 +25478,353 @@
     *: "Book Menu"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SPEECH_SYNTH
+  desc: in Voice settings: the speech synthesiser
+  user: core
+  <source>
+    *: "Speech Synthesiser"
+  </source>
+  <dest>
+    *: "Speech Synthesiser"
+  </dest>
+  <voice>
+    *: "Speech Synthesiser"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEECH_RATE
+  desc: in Voice settings: how fast the synthesiser speaks
+  user: core
+  <source>
+    *: "Speech Rate"
+  </source>
+  <dest>
+    *: "Speech Rate"
+  </dest>
+  <voice>
+    *: "Speech Rate"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_READ_ALOUD
+  desc: in Text Viewer settings: speak the text
+  user: core
+  <source>
+    *: "Read Aloud"
+  </source>
+  <dest>
+    *: "Read Aloud"
+  </dest>
+  <voice>
+    *: "Read Aloud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_PAGE
+  desc: in Text Viewer settings, Read Aloud: the page turned to
+  user: core
+  <source>
+    *: "Each Page"
+  </source>
+  <dest>
+    *: "Each Page"
+  </dest>
+  <voice>
+    *: "Each Page"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_CONTINUOUS
+  desc: in Text Viewer settings, Read Aloud: page after page
+  user: core
+  <source>
+    *: "Continuously"
+  </source>
+  <dest>
+    *: "Continuously"
+  </dest>
+  <voice>
+    *: "Continuously"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_DASH
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "dash"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_UNDERSCORE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "underscore"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_APOSTROPHE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "apostrophe"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_AMPERSAND
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "ampersand"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STAR
+  desc: spoken only, a rating: one star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "star"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STARS
+  desc: spoken only, a rating: several stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "stars"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_AND_A_HALF
+  desc: spoken only, a rating: three and a half stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "and a half"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_HALF_A_STAR
+  desc: spoken only, a rating of one half-star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "half a star"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_NO_STARS
+  desc: spoken only, a rating of nothing
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "no stars"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_TRACK_CHANGE
+  desc: in Voice settings: say each new track
+  user: core
+  <source>
+    *: "Announce Track Change"
+  </source>
+  <dest>
+    *: "Announce Track Change"
+  </dest>
+  <voice>
+    *: "Announce Track Change"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_OVER_MUSIC
+  desc: in Voice settings, Announce Track Change: speak on top of the music
+  user: core
+  <source>
+    *: "Over the Music"
+  </source>
+  <dest>
+    *: "Over the Music"
+  </dest>
+  <voice>
+    *: "Over the Music"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_PAUSE_MUSIC
+  desc: in Voice settings, Announce Track Change: pause while speaking
+  user: core
+  <source>
+    *: "Pause the Music"
+  </source>
+  <dest>
+    *: "Pause the Music"
+  </dest>
+  <voice>
+    *: "Pause the Music"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SAY_LIST_TITLES
+  desc: in Voice settings: say a list's title on entering it
+  user: core
+  <source>
+    *: "Say List Titles"
+  </source>
+  <dest>
+    *: "Say List Titles"
+  </dest>
+  <voice>
+    *: "Say List Titles"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_CHINESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Chinese"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_JAPANESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Japanese"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_KOREAN
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Korean"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_ARABIC
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Arabic"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_HEBREW
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Hebrew"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_THAI
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "Thai"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECORDED_VOICE
+  desc: in Voice settings: menus in a voice file's recorded voice
+  user: core
+  <source>
+    *: "Recorded Voice"
+  </source>
+  <dest>
+    *: "Recorded Voice"
+  </dest>
+  <voice>
+    *: "Recorded Voice"
+  </voice>
+</phrase>

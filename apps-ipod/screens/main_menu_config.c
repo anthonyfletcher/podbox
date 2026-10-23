@@ -410,7 +410,9 @@ static int config_screen(const struct menu_item_ex *carry)
                     break;
                 }
                 menu_items[cur_sel].enabled = !menu_items[cur_sel].enabled;
-                gui_synclist_speak_item(&list);
+                if (global_settings.talk_menu)
+                    talk_id(menu_items[cur_sel].enabled ? LANG_ON : LANG_OFF,
+                            false);
                 changed = true;
                 break;
             case ACTION_STD_CONTEXT:

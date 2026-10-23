@@ -24755,3 +24755,997 @@
     *: "艺术家"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_MENU_SET_ALBUM_RATING
+  desc: on an album's context menu in the database, the row rating every track of the album
+  user: core
+  <source>
+    *: "Set Album Rating"
+  </source>
+  <dest>
+    *: "设置专辑评分"
+  </dest>
+  <voice>
+    *: "设置专辑评分"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EDIT
+  desc: in the equalizer menu, the row opening the curve editor
+  user: core
+  <source>
+    *: "Edit EQ"
+  </source>
+  <dest>
+    *: "编辑均衡器"
+  </dest>
+  <voice>
+    *: "编辑均衡器"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESETS
+  desc: in the equalizer menu and the EQ editor's menu, the list of built-in and saved presets
+  user: core
+  <source>
+    *: "EQ Presets"
+  </source>
+  <dest>
+    *: "均衡器预设"
+  </dest>
+  <voice>
+    *: "均衡器预设"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_AUTO_HEADROOM
+  desc: equalizer setting: precut follows the curve's peak
+  user: core
+  <source>
+    *: "Auto Headroom"
+  </source>
+  <dest>
+    *: "自动余量"
+  </dest>
+  <voice>
+    *: "自动余量"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_COMPARE
+  desc: in the EQ editor's menu: switch the EQ off until a key is pressed
+  user: core
+  <source>
+    *: "Compare with Flat"
+  </source>
+  <dest>
+    *: "与平直对比"
+  </dest>
+  <voice>
+    *: "与平直对比"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ENHANCED_MODE
+  desc: in the EQ editor's menu: edit frequency, Q and type as well as gain
+  user: core
+  <source>
+    *: "Enhanced Mode"
+  </source>
+  <dest>
+    *: "增强模式"
+  </dest>
+  <voice>
+    *: "增强模式"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EQ_OFF
+  desc: in the EQ editor, while the EQ is switched off
+  user: core
+  <source>
+    *: "EQ off"
+  </source>
+  <dest>
+    *: "均衡器已关闭"
+  </dest>
+  <voice>
+    *: "均衡器已关闭"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ANY_KEY
+  desc: in the EQ editor while comparing with flat: how to switch the EQ back on
+  user: core
+  <source>
+    *: "Any key turns it on"
+  </source>
+  <dest>
+    *: "按任意键开启"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CLIPS
+  desc: in the EQ editor: how far the curve's peak is above the precut. %s is a value in dB
+  user: core
+  <source>
+    *: "Clips %s"
+  </source>
+  <dest>
+    *: "削波 %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_NO_CLIPPING
+  desc: in the EQ editor: the curve's peak is within the precut
+  user: core
+  <source>
+    *: "No clipping"
+  </source>
+  <dest>
+    *: "无削波"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BANDS_ON
+  desc: in the EQ editor: how many bands have a gain other than 0 dB, of how many
+  user: core
+  <source>
+    *: "%d of %d on"
+  </source>
+  <dest>
+    *: "%d / %d 开启"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_HEADROOM_IS
+  desc: in the EQ editor: the precut Auto Headroom has set. %s is a value in dB
+  user: core
+  <source>
+    *: "%s headroom"
+  </source>
+  <dest>
+    *: "余量 %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CENTRE
+  desc: in the EQ editor: the frequency of a peak band
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "中心"
+  </dest>
+  <voice>
+    *: "中心"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CORNER
+  desc: in the EQ editor: the frequency of a shelf band
+  user: core
+  <source>
+    *: "Corner"
+  </source>
+  <dest>
+    *: "拐点"
+  </dest>
+  <voice>
+    *: "拐点"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_TYPE
+  desc: in the EQ editor: a band's filter type
+  user: core
+  <source>
+    *: "Type"
+  </source>
+  <dest>
+    *: "类型"
+  </dest>
+  <voice>
+    *: "类型"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_LOW_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Low Shelf"
+  </source>
+  <dest>
+    *: "低架"
+  </dest>
+  <voice>
+    *: "低架"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_PEAK
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Peak"
+  </source>
+  <dest>
+    *: "峰值"
+  </dest>
+  <voice>
+    *: "峰值"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_HIGH_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "High Shelf"
+  </source>
+  <dest>
+    *: "高架"
+  </dest>
+  <voice>
+    *: "高架"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FONT_TOO_LARGE
+  desc: splash when the theme's font leaves the EQ curve no room; the band list opens instead
+  user: core
+  <source>
+    *: "The theme's font is too large for the EQ curve"
+  </source>
+  <dest>
+    *: "主题字体太大，无法显示均衡器曲线"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CUSTOM
+  desc: in the EQ editor: the curve is not a preset
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "自定义"
+  </dest>
+  <voice>
+    *: "自定义"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_FLAT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "平直"
+  </dest>
+  <voice>
+    *: "平直"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VOCAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vocal"
+  </source>
+  <dest>
+    *: "人声"
+  </dest>
+  <voice>
+    *: "人声"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LOUDNESS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Loudness"
+  </source>
+  <dest>
+    *: "响度"
+  </dest>
+  <voice>
+    *: "响度"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SPOKEN
+  desc: built-in EQ preset, for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "语音"
+  </dest>
+  <voice>
+    *: "语音"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_UNSAVED
+  desc: title when leaving the EQ editor with a curve not saved as a preset
+  user: core
+  <source>
+    *: "Save This EQ?"
+  </source>
+  <dest>
+    *: "保存此均衡器?"
+  </dest>
+  <voice>
+    *: "保存此均衡器?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EXIT_UNSAVED
+  desc: leave the EQ editor without saving the curve as a preset
+  user: core
+  <source>
+    *: "Exit Without Saving"
+  </source>
+  <dest>
+    *: "不保存并退出"
+  </dest>
+  <voice>
+    *: "不保存并退出"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_INFO
+  desc: in the context menu: details of the selected album
+  user: core
+  <source>
+    *: "Album Info"
+  </source>
+  <dest>
+    *: "专辑信息"
+  </dest>
+  <voice>
+    *: "专辑信息"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_INFO
+  desc: in the context menu: details of the selected artist
+  user: core
+  <source>
+    *: "Artist Info"
+  </source>
+  <dest>
+    *: "艺术家信息"
+  </dest>
+  <voice>
+    *: "艺术家信息"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_INFO
+  desc: in the context menu: details of the selected row
+  user: core
+  <source>
+    *: "Info"
+  </source>
+  <dest>
+    *: "信息"
+  </dest>
+  <voice>
+    *: "信息"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MORE
+  desc: in the context menu: the submenu of rarer actions
+  user: core
+  <source>
+    *: "More..."
+  </source>
+  <dest>
+    *: "更多..."
+  </dest>
+  <voice>
+    *: "更多"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MANAGE
+  desc: in the context menu: the submenu of file actions
+  user: core
+  <source>
+    *: "Manage..."
+  </source>
+  <dest>
+    *: "管理..."
+  </dest>
+  <voice>
+    *: "管理"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ALBUM
+  desc: in the context menu: open the track's album in the database
+  user: core
+  <source>
+    *: "Go to Album"
+  </source>
+  <dest>
+    *: "转到专辑"
+  </dest>
+  <voice>
+    *: "转到专辑"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ARTIST
+  desc: in the context menu: open the track's album artist in the database
+  user: core
+  <source>
+    *: "Go to Artist"
+  </source>
+  <dest>
+    *: "转到艺术家"
+  </dest>
+  <voice>
+    *: "转到艺术家"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_INFO
+  desc: in the context menu: details of the selected book
+  user: core
+  <source>
+    *: "Book Info"
+  </source>
+  <dest>
+    *: "书籍信息"
+  </dest>
+  <voice>
+    *: "书籍信息"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MENUS
+  desc: in Appearance: what each menu shows
+  user: core
+  <source>
+    *: "Menus"
+  </source>
+  <dest>
+    *: "菜单"
+  </dest>
+  <voice>
+    *: "菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE
+  desc: in a main menu or Music menu row's context menu
+  user: core
+  <source>
+    *: "Hide"
+  </source>
+  <dest>
+    *: "隐藏"
+  </dest>
+  <voice>
+    *: "隐藏"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTEXT_MENUS
+  desc: in Appearance > Menus: the rows each context menu shows
+  user: core
+  <source>
+    *: "Context Menus"
+  </source>
+  <dest>
+    *: "上下文菜单"
+  </dest>
+  <voice>
+    *: "上下文菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE_THIS_ROW
+  desc: on a long press of a context menu's row
+  user: core
+  <source>
+    *: "Hide This Row"
+  </source>
+  <dest>
+    *: "隐藏此行"
+  </dest>
+  <voice>
+    *: "隐藏此行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ROW_HIDDEN
+  desc: splash after a row is hidden
+  user: core
+  <source>
+    *: "Hidden. Show it again in Appearance > Menus"
+  </source>
+  <dest>
+    *: "已隐藏。可在 外观 > 菜单 中重新显示"
+  </dest>
+  <voice>
+    *: "已隐藏。可在 外观 > 菜单 中重新显示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ALL_ROWS
+  desc: in a context menu editor's context menu: turn every row back on
+  user: core
+  <source>
+    *: "Show All Rows"
+  </source>
+  <dest>
+    *: "显示所有行"
+  </dest>
+  <voice>
+    *: "显示所有行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOW_PLAYING_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Now Playing Menu"
+  </source>
+  <dest>
+    *: "正在播放菜单"
+  </dest>
+  <voice>
+    *: "正在播放菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Track Menu"
+  </source>
+  <dest>
+    *: "曲目菜单"
+  </dest>
+  <voice>
+    *: "曲目菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Album Menu"
+  </source>
+  <dest>
+    *: "专辑菜单"
+  </dest>
+  <voice>
+    *: "专辑菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Artist Menu"
+  </source>
+  <dest>
+    *: "艺术家菜单"
+  </dest>
+  <voice>
+    *: "艺术家菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FOLDER_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Folder Menu"
+  </source>
+  <dest>
+    *: "文件夹菜单"
+  </dest>
+  <voice>
+    *: "文件夹菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Book Menu"
+  </source>
+  <dest>
+    *: "书籍菜单"
+  </dest>
+  <voice>
+    *: "书籍菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEECH_SYNTH
+  desc: in Voice settings: the speech synthesiser
+  user: core
+  <source>
+    *: "Speech Synthesiser"
+  </source>
+  <dest>
+    *: "语音合成"
+  </dest>
+  <voice>
+    *: "语音合成"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEECH_RATE
+  desc: in Voice settings: how fast the synthesiser speaks
+  user: core
+  <source>
+    *: "Speech Rate"
+  </source>
+  <dest>
+    *: "语速"
+  </dest>
+  <voice>
+    *: "语速"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_READ_ALOUD
+  desc: in Text Viewer settings: speak the text
+  user: core
+  <source>
+    *: "Read Aloud"
+  </source>
+  <dest>
+    *: "朗读"
+  </dest>
+  <voice>
+    *: "朗读"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_PAGE
+  desc: in Text Viewer settings, Read Aloud: the page turned to
+  user: core
+  <source>
+    *: "Each Page"
+  </source>
+  <dest>
+    *: "每页"
+  </dest>
+  <voice>
+    *: "每页"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_CONTINUOUS
+  desc: in Text Viewer settings, Read Aloud: page after page
+  user: core
+  <source>
+    *: "Continuously"
+  </source>
+  <dest>
+    *: "连续"
+  </dest>
+  <voice>
+    *: "连续"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_DASH
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "短横线"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_UNDERSCORE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "下划线"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_APOSTROPHE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "撇号"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_AMPERSAND
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "和号"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STAR
+  desc: spoken only, a rating: one star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "星"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STARS
+  desc: spoken only, a rating: several stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "星"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_AND_A_HALF
+  desc: spoken only, a rating: three and a half stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "半"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_HALF_A_STAR
+  desc: spoken only, a rating of one half-star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "半颗星"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_NO_STARS
+  desc: spoken only, a rating of nothing
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "没有星"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_TRACK_CHANGE
+  desc: in Voice settings: say each new track
+  user: core
+  <source>
+    *: "Announce Track Change"
+  </source>
+  <dest>
+    *: "播报曲目切换"
+  </dest>
+  <voice>
+    *: "播报曲目切换"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_OVER_MUSIC
+  desc: in Voice settings, Announce Track Change: speak on top of the music
+  user: core
+  <source>
+    *: "Over the Music"
+  </source>
+  <dest>
+    *: "在音乐上播报"
+  </dest>
+  <voice>
+    *: "在音乐上播报"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_PAUSE_MUSIC
+  desc: in Voice settings, Announce Track Change: pause while speaking
+  user: core
+  <source>
+    *: "Pause the Music"
+  </source>
+  <dest>
+    *: "暂停音乐"
+  </dest>
+  <voice>
+    *: "暂停音乐"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SAY_LIST_TITLES
+  desc: in Voice settings: say a list's title on entering it
+  user: core
+  <source>
+    *: "Say List Titles"
+  </source>
+  <dest>
+    *: "读出列表标题"
+  </dest>
+  <voice>
+    *: "读出列表标题"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_CHINESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "中文"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_JAPANESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "日语"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_KOREAN
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "韩语"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_ARABIC
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "阿拉伯语"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_HEBREW
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "希伯来语"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_THAI
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "泰语"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECORDED_VOICE
+  desc: in Voice settings: menus in a voice file's recorded voice
+  user: core
+  <source>
+    *: "Recorded Voice"
+  </source>
+  <dest>
+    *: "录制语音"
+  </dest>
+  <voice>
+    *: "录制语音"
+  </voice>
+</phrase>

@@ -455,6 +455,12 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
         else if (button == ACTION_QS_VOLUP || button == ACTION_QS_VOLDOWN)
         {
             adjust_volume(button == ACTION_QS_VOLUP ? 1 : -1);
+            talk_settle();
+            if (global_settings.talk_menu)
+                talk_value_decimal(sound_val2phys(SOUND_VOLUME,
+                                                  global_status.volume),
+                                   UNIT_DB, sound_numdecimals(SOUND_VOLUME),
+                                   false);
 
             /* The volume keys change a setting this screen may be displaying,
              * and nothing else on this branch redraws it. Only worth the pass

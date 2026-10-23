@@ -49,6 +49,7 @@
 /*#define LOGF_ENABLE*/
 #include "logf.h"
 #include "folder_select.h"
+#include "speech/talk.h"
 
 /* The "bitmaps/" prefix is required, not cosmetic: dependencies are generated
  * with -MG, so a header that does not exist yet is recorded at the path as
@@ -750,6 +751,24 @@ static void folder_draw(struct dialog *d, struct screen *display,
     display->set_drawmode(DRMODE_SOLID);
 }
 
+/* The folder selected, and whether it is in */
+static void folder_speak(struct folder_dlg *s)
+{
+    struct folder *parent;
+    struct child *this;
+    char buf[MAX_PATH];
+
+    if (!global_settings.talk_menu)
+        return;
+    this = find_index(s->root, s->selected, &parent);
+    if (!this)
+        return;
+    talk_settle();
+    row_text(this, buf, sizeof(buf));
+    talk_name(buf, false);
+    talk_id(effective_included(this, parent) ? LANG_ON : LANG_OFF, true);
+}
+
 static int folder_on_action(struct dialog *d, int action, void *data)
 {
     struct folder_dlg *s = data;
@@ -761,13 +780,19 @@ static int folder_on_action(struct dialog *d, int action, void *data)
         case ACTION_STD_PREV:
         case ACTION_STD_PREVREPEAT:
             if (s->selected > 0)
+            {
                 s->selected--;
+                folder_speak(s);
+            }
             break;
 
         case ACTION_STD_NEXT:
         case ACTION_STD_NEXTREPEAT:
             if (s->selected + 1 < count_items(s->root))
+            {
                 s->selected++;
+                folder_speak(s);
+            }
             break;
 
         case ACTION_STD_OK:            /* expand / collapse */
@@ -786,8 +811,11 @@ static int folder_on_action(struct dialog *d, int action, void *data)
         case ACTION_STD_CONTEXT:       /* include / exclude */
             this = find_index(s->root, s->selected, &parent);
             if (this)
+            {
                 this->sel = effective_included(this, parent) ? SEL_EXCLUDE
                                                              : SEL_INCLUDE;
+                folder_speak(s);
+            }
             break;
 
         case ACTION_STD_CANCEL:
@@ -906,6 +934,7 @@ bool folder_select(char * header_text, char* setting, int setting_len)
      * stays whether or not a theme uses it. */
     push_current_activity(ACTIVITY_FOLDERSELECT);
     dialog_init(&d, CONTEXT_LIST, header_text, &style, &cb, &s);
+    folder_speak(&s);
     res = dialog_run(&d, POLL_IDLE);
     pop_current_activity();
 

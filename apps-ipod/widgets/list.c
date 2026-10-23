@@ -49,6 +49,7 @@
 #include "system/shutdown.h"
 #include "system/volume.h"
 #include "speech/talk.h"
+#include "speech/speech.h"
 #include "draw/viewport.h"
 #include "system/appevents.h"
 #include "skin/statusbar_skinned.h"
@@ -525,27 +526,48 @@ static void edge_beep(struct gui_synclist * gui_list, bool wrap)
     }
 }
 
-static void _gui_synclist_speak_item(struct gui_synclist *lists)
+/* A list that says nothing of its own has its row read as it is shown,
+ * once the synthesiser can. */
+static int speak_row_text(int selected_item, void *data)
+{
+    struct gui_synclist *lists = data;
+    char buf[MAX_PATH], value[64];
+    const char *text = lists->callback_get_item_name(selected_item,
+                                                     lists->data,
+                                                     buf, sizeof(buf));
+    if (text && *text)
+        talk_text(text, false);
+    if (lists->callback_get_item_value)
+    {
+        text = lists->callback_get_item_value(selected_item, lists->data,
+                                              value, sizeof(value));
+        if (text && *text)
+            talk_text(text, true);
+    }
+    return 0;
+}
+
+/* Say the selected row: at once, or once the selection has stayed put for
+ * TALK_SETTLE. */
+static void _gui_synclist_speak_item(struct gui_synclist *lists, bool now)
 {
     list_speak_item *cb = lists->callback_speak_item;
+    void *cb_data = lists->data;
+    if (!cb && lists->talk_menu && lists->callback_get_item_name
+        && speech_enabled())
+    {
+        cb = speak_row_text;
+        cb_data = lists;
+    }
     if (cb && lists->nb_items != 0)
     {
         talk_shutup();
-        /* If we have just very recently started talking, then we want
-           to stay silent for a while until things settle. Likewise if
-           we already had a pending scheduled announcement not yet due
-           we need to reschedule it. */
-        if ((lists->scheduled_talk_tick &&
-                TIME_BEFORE(current_tick, lists->scheduled_talk_tick)) ||
-            (lists->last_talked_tick &&
-                TIME_BEFORE(current_tick, lists->last_talked_tick + HZ/5)))
-        {
-            lists->scheduled_talk_tick = current_tick + HZ/5;
-        }
+        if (!now)
+            lists->scheduled_talk_tick = current_tick + TALK_SETTLE;
         else
         {
             lists->scheduled_talk_tick = 0; /* work done */
-            cb(lists->selected_item, lists->data);
+            cb(lists->selected_item, cb_data);
             lists->last_talked_tick = current_tick;
         }
     }
@@ -555,10 +577,17 @@ void gui_synclist_speak_item(struct gui_synclist *lists)
 {
     if (lists->talk_menu)
     {
+        /* Say List Titles: where this is, then what is selected in it */
+        if (global_settings.talk_list_title && lists->title
+            && lists->title[0])
+        {
+            talk_string(lists->title, false);
+            talk_force_enqueue_next();
+        }
         if (lists->nb_items == 0)
             talk_id(VOICE_EMPTY_LIST, true);
         else
-            _gui_synclist_speak_item(lists);
+            _gui_synclist_speak_item(lists, true);
     }
 }
 
@@ -574,7 +603,7 @@ void gui_synclist_select_item(struct gui_synclist * gui_list, int item_number)
     if (item_number != gui_list->selected_item)
     {
         gui_list->selected_item = item_number;
-        _gui_synclist_speak_item(gui_list);
+        _gui_synclist_speak_item(gui_list, false);
     }
     FOR_NB_SCREENS(i)
         gui_list_put_selection_on_screen(gui_list, i);
@@ -978,7 +1007,7 @@ bool gui_synclist_do_button(struct gui_synclist * lists, int *actionptr)
     if(lists->scheduled_talk_tick
        && TIME_AFTER(current_tick, lists->scheduled_talk_tick))
         /* scheduled postponed item announcement is due */
-        _gui_synclist_speak_item(lists);
+        _gui_synclist_speak_item(lists, true);
     {
         static bool was_recolouring = false;
         bool dc_active = dynamic_colors_needs_repaint() || dynamic_colors_pending();

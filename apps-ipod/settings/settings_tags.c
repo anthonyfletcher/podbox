@@ -330,6 +330,7 @@ static const struct tag_row tag_rows[] = {
 { "text viewer margin",       TAG_APPEARANCE,                    "text viewer" },
 { "text viewer line spacing", TAG_ADVANCED|TAG_APPEARANCE,       "text viewer leading" },
 { "text viewer page number",  TAG_APPEARANCE,                    "text viewer" },
+{ "text viewer read aloud",   TAG_VOICE,                         "text viewer speak read book" },
 { "text viewer font",         TAG_APPEARANCE,                    "text viewer typeface" },
 { "lyric colour mode",        TAG_APPEARANCE,                    "lyrics colors" },
 { "lyric align",              TAG_APPEARANCE,                    "lyrics alignment" },
@@ -410,11 +411,16 @@ static const struct tag_row tag_rows[] = {
 
 /* --- voice --------------------------------------------------------------- */
 { "talk menu",           TAG_VOICE,                              "voice speak menus" },
+{ "speech synthesiser",  TAG_VOICE,                              "voice speak synthesiser names titles" },
+{ "recorded voice",      TAG_VOICE,                              "voice file recorded menus synthesiser" },
+{ "speech rate",         TAG_VOICE,                              "voice speech speed rate" },
 { "talk dir",            TAG_ADVANCED|TAG_VOICE,                 "voice directories" },
 { "talk file",           TAG_ADVANCED|TAG_VOICE,                 "voice filenames" },
 { "talk dir clip",       TAG_ADVANCED|TAG_VOICE,                 "voice clips" },
 { "talk file clip",      TAG_ADVANCED|TAG_VOICE,                 "voice clips" },
 { "talk filetype",       TAG_ADVANCED|TAG_VOICE,                 "voice file type" },
+{ "say list titles",     TAG_VOICE,                              "voice speak list menu title heading" },
+{ "announce track change", TAG_VOICE,                             "voice speak track title artist song pause" },
 { "Announce Battery Level", TAG_ADVANCED|TAG_VOICE,              "voice speak battery level" },
 { "talk mixer level",    TAG_ADVANCED|TAG_VOICE,                 "voice volume" },
 };

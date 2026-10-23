@@ -24749,3 +24749,997 @@
     *: "de"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_MENU_SET_ALBUM_RATING
+  desc: on an album's context menu in the database, the row rating every track of the album
+  user: core
+  <source>
+    *: "Set Album Rating"
+  </source>
+  <dest>
+    *: "Classificar álbum"
+  </dest>
+  <voice>
+    *: "Classificar álbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EDIT
+  desc: in the equalizer menu, the row opening the curve editor
+  user: core
+  <source>
+    *: "Edit EQ"
+  </source>
+  <dest>
+    *: "Editar EQ"
+  </dest>
+  <voice>
+    *: "Editar EQ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESETS
+  desc: in the equalizer menu and the EQ editor's menu, the list of built-in and saved presets
+  user: core
+  <source>
+    *: "EQ Presets"
+  </source>
+  <dest>
+    *: "Predefinições de EQ"
+  </dest>
+  <voice>
+    *: "Predefinições de EQ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_AUTO_HEADROOM
+  desc: equalizer setting: precut follows the curve's peak
+  user: core
+  <source>
+    *: "Auto Headroom"
+  </source>
+  <dest>
+    *: "Margem automática"
+  </dest>
+  <voice>
+    *: "Margem automática"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_COMPARE
+  desc: in the EQ editor's menu: switch the EQ off until a key is pressed
+  user: core
+  <source>
+    *: "Compare with Flat"
+  </source>
+  <dest>
+    *: "Comparar com plano"
+  </dest>
+  <voice>
+    *: "Comparar com plano"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ENHANCED_MODE
+  desc: in the EQ editor's menu: edit frequency, Q and type as well as gain
+  user: core
+  <source>
+    *: "Enhanced Mode"
+  </source>
+  <dest>
+    *: "Modo avançado"
+  </dest>
+  <voice>
+    *: "Modo avançado"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EQ_OFF
+  desc: in the EQ editor, while the EQ is switched off
+  user: core
+  <source>
+    *: "EQ off"
+  </source>
+  <dest>
+    *: "EQ desligado"
+  </dest>
+  <voice>
+    *: "EQ desligado"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ANY_KEY
+  desc: in the EQ editor while comparing with flat: how to switch the EQ back on
+  user: core
+  <source>
+    *: "Any key turns it on"
+  </source>
+  <dest>
+    *: "Qualquer tecla o liga"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CLIPS
+  desc: in the EQ editor: how far the curve's peak is above the precut. %s is a value in dB
+  user: core
+  <source>
+    *: "Clips %s"
+  </source>
+  <dest>
+    *: "Corta %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_NO_CLIPPING
+  desc: in the EQ editor: the curve's peak is within the precut
+  user: core
+  <source>
+    *: "No clipping"
+  </source>
+  <dest>
+    *: "Sem corte"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BANDS_ON
+  desc: in the EQ editor: how many bands have a gain other than 0 dB, of how many
+  user: core
+  <source>
+    *: "%d of %d on"
+  </source>
+  <dest>
+    *: "%d de %d ligadas"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_HEADROOM_IS
+  desc: in the EQ editor: the precut Auto Headroom has set. %s is a value in dB
+  user: core
+  <source>
+    *: "%s headroom"
+  </source>
+  <dest>
+    *: "Margem de %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CENTRE
+  desc: in the EQ editor: the frequency of a peak band
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "Centro"
+  </dest>
+  <voice>
+    *: "Centro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CORNER
+  desc: in the EQ editor: the frequency of a shelf band
+  user: core
+  <source>
+    *: "Corner"
+  </source>
+  <dest>
+    *: "Corte"
+  </dest>
+  <voice>
+    *: "Corte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_TYPE
+  desc: in the EQ editor: a band's filter type
+  user: core
+  <source>
+    *: "Type"
+  </source>
+  <dest>
+    *: "Tipo"
+  </dest>
+  <voice>
+    *: "Tipo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_LOW_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Low Shelf"
+  </source>
+  <dest>
+    *: "Shelf grave"
+  </dest>
+  <voice>
+    *: "Shelf grave"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_PEAK
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Peak"
+  </source>
+  <dest>
+    *: "Pico"
+  </dest>
+  <voice>
+    *: "Pico"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_HIGH_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "High Shelf"
+  </source>
+  <dest>
+    *: "Shelf agudo"
+  </dest>
+  <voice>
+    *: "Shelf agudo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FONT_TOO_LARGE
+  desc: splash when the theme's font leaves the EQ curve no room; the band list opens instead
+  user: core
+  <source>
+    *: "The theme's font is too large for the EQ curve"
+  </source>
+  <dest>
+    *: "A fonte do tema é grande demais para a curva de EQ"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CUSTOM
+  desc: in the EQ editor: the curve is not a preset
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Personalizado"
+  </dest>
+  <voice>
+    *: "Personalizado"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_FLAT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "Plano"
+  </dest>
+  <voice>
+    *: "Plano"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VOCAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vocal"
+  </source>
+  <dest>
+    *: "Vocal"
+  </dest>
+  <voice>
+    *: "Vocal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LOUDNESS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Loudness"
+  </source>
+  <dest>
+    *: "Loudness"
+  </dest>
+  <voice>
+    *: "Loudness"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SPOKEN
+  desc: built-in EQ preset, for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "Voz falada"
+  </dest>
+  <voice>
+    *: "Voz falada"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_UNSAVED
+  desc: title when leaving the EQ editor with a curve not saved as a preset
+  user: core
+  <source>
+    *: "Save This EQ?"
+  </source>
+  <dest>
+    *: "Salvar este EQ?"
+  </dest>
+  <voice>
+    *: "Salvar este EQ?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EXIT_UNSAVED
+  desc: leave the EQ editor without saving the curve as a preset
+  user: core
+  <source>
+    *: "Exit Without Saving"
+  </source>
+  <dest>
+    *: "Sair sem salvar"
+  </dest>
+  <voice>
+    *: "Sair sem salvar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_INFO
+  desc: in the context menu: details of the selected album
+  user: core
+  <source>
+    *: "Album Info"
+  </source>
+  <dest>
+    *: "Informações do álbum"
+  </dest>
+  <voice>
+    *: "Informações do álbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_INFO
+  desc: in the context menu: details of the selected artist
+  user: core
+  <source>
+    *: "Artist Info"
+  </source>
+  <dest>
+    *: "Informações do artista"
+  </dest>
+  <voice>
+    *: "Informações do artista"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_INFO
+  desc: in the context menu: details of the selected row
+  user: core
+  <source>
+    *: "Info"
+  </source>
+  <dest>
+    *: "Informações"
+  </dest>
+  <voice>
+    *: "Informações"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MORE
+  desc: in the context menu: the submenu of rarer actions
+  user: core
+  <source>
+    *: "More..."
+  </source>
+  <dest>
+    *: "Mais..."
+  </dest>
+  <voice>
+    *: "Mais"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MANAGE
+  desc: in the context menu: the submenu of file actions
+  user: core
+  <source>
+    *: "Manage..."
+  </source>
+  <dest>
+    *: "Gerenciar..."
+  </dest>
+  <voice>
+    *: "Gerenciar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ALBUM
+  desc: in the context menu: open the track's album in the database
+  user: core
+  <source>
+    *: "Go to Album"
+  </source>
+  <dest>
+    *: "Ir para o álbum"
+  </dest>
+  <voice>
+    *: "Ir para o álbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ARTIST
+  desc: in the context menu: open the track's album artist in the database
+  user: core
+  <source>
+    *: "Go to Artist"
+  </source>
+  <dest>
+    *: "Ir para o artista"
+  </dest>
+  <voice>
+    *: "Ir para o artista"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_INFO
+  desc: in the context menu: details of the selected book
+  user: core
+  <source>
+    *: "Book Info"
+  </source>
+  <dest>
+    *: "Informações do livro"
+  </dest>
+  <voice>
+    *: "Informações do livro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MENUS
+  desc: in Appearance: what each menu shows
+  user: core
+  <source>
+    *: "Menus"
+  </source>
+  <dest>
+    *: "Menus"
+  </dest>
+  <voice>
+    *: "Menus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE
+  desc: in a main menu or Music menu row's context menu
+  user: core
+  <source>
+    *: "Hide"
+  </source>
+  <dest>
+    *: "Ocultar"
+  </dest>
+  <voice>
+    *: "Ocultar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTEXT_MENUS
+  desc: in Appearance > Menus: the rows each context menu shows
+  user: core
+  <source>
+    *: "Context Menus"
+  </source>
+  <dest>
+    *: "Menus de contexto"
+  </dest>
+  <voice>
+    *: "Menus de contexto"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE_THIS_ROW
+  desc: on a long press of a context menu's row
+  user: core
+  <source>
+    *: "Hide This Row"
+  </source>
+  <dest>
+    *: "Ocultar esta linha"
+  </dest>
+  <voice>
+    *: "Ocultar esta linha"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ROW_HIDDEN
+  desc: splash after a row is hidden
+  user: core
+  <source>
+    *: "Hidden. Show it again in Appearance > Menus"
+  </source>
+  <dest>
+    *: "Oculta. Mostre de novo em Aparência > Menus"
+  </dest>
+  <voice>
+    *: "Oculta. Mostre de novo em Aparência > Menus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ALL_ROWS
+  desc: in a context menu editor's context menu: turn every row back on
+  user: core
+  <source>
+    *: "Show All Rows"
+  </source>
+  <dest>
+    *: "Mostrar todas as linhas"
+  </dest>
+  <voice>
+    *: "Mostrar todas as linhas"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOW_PLAYING_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Now Playing Menu"
+  </source>
+  <dest>
+    *: "Menu Tocando"
+  </dest>
+  <voice>
+    *: "Menu Tocando"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Track Menu"
+  </source>
+  <dest>
+    *: "Menu da faixa"
+  </dest>
+  <voice>
+    *: "Menu da faixa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Album Menu"
+  </source>
+  <dest>
+    *: "Menu do álbum"
+  </dest>
+  <voice>
+    *: "Menu do álbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Artist Menu"
+  </source>
+  <dest>
+    *: "Menu do artista"
+  </dest>
+  <voice>
+    *: "Menu do artista"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FOLDER_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Folder Menu"
+  </source>
+  <dest>
+    *: "Menu da pasta"
+  </dest>
+  <voice>
+    *: "Menu da pasta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Book Menu"
+  </source>
+  <dest>
+    *: "Menu do livro"
+  </dest>
+  <voice>
+    *: "Menu do livro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEECH_SYNTH
+  desc: in Voice settings: the speech synthesiser
+  user: core
+  <source>
+    *: "Speech Synthesiser"
+  </source>
+  <dest>
+    *: "Sintetizador de voz"
+  </dest>
+  <voice>
+    *: "Sintetizador de voz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEECH_RATE
+  desc: in Voice settings: how fast the synthesiser speaks
+  user: core
+  <source>
+    *: "Speech Rate"
+  </source>
+  <dest>
+    *: "Velocidade da fala"
+  </dest>
+  <voice>
+    *: "Velocidade da fala"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_READ_ALOUD
+  desc: in Text Viewer settings: speak the text
+  user: core
+  <source>
+    *: "Read Aloud"
+  </source>
+  <dest>
+    *: "Ler em voz alta"
+  </dest>
+  <voice>
+    *: "Ler em voz alta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_PAGE
+  desc: in Text Viewer settings, Read Aloud: the page turned to
+  user: core
+  <source>
+    *: "Each Page"
+  </source>
+  <dest>
+    *: "Cada página"
+  </dest>
+  <voice>
+    *: "Cada página"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READ_ALOUD_CONTINUOUS
+  desc: in Text Viewer settings, Read Aloud: page after page
+  user: core
+  <source>
+    *: "Continuously"
+  </source>
+  <dest>
+    *: "Continuamente"
+  </dest>
+  <voice>
+    *: "Continuamente"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_DASH
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "hífen"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_UNDERSCORE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "sublinhado"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_APOSTROPHE
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "apóstrofo"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_CHAR_AMPERSAND
+  desc: spoken only, a character in the text editor
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "e comercial"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STAR
+  desc: spoken only, a rating: one star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "estrela"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_STARS
+  desc: spoken only, a rating: several stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "estrelas"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_AND_A_HALF
+  desc: spoken only, a rating: three and a half stars
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "e meia"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_HALF_A_STAR
+  desc: spoken only, a rating of one half-star
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "meia estrela"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_NO_STARS
+  desc: spoken only, a rating of nothing
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "nenhuma estrela"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_TRACK_CHANGE
+  desc: in Voice settings: say each new track
+  user: core
+  <source>
+    *: "Announce Track Change"
+  </source>
+  <dest>
+    *: "Anunciar troca de faixa"
+  </dest>
+  <voice>
+    *: "Anunciar troca de faixa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_OVER_MUSIC
+  desc: in Voice settings, Announce Track Change: speak on top of the music
+  user: core
+  <source>
+    *: "Over the Music"
+  </source>
+  <dest>
+    *: "Sobre a música"
+  </dest>
+  <voice>
+    *: "Sobre a música"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_PAUSE_MUSIC
+  desc: in Voice settings, Announce Track Change: pause while speaking
+  user: core
+  <source>
+    *: "Pause the Music"
+  </source>
+  <dest>
+    *: "Pausar a música"
+  </dest>
+  <voice>
+    *: "Pausar a música"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SAY_LIST_TITLES
+  desc: in Voice settings: say a list's title on entering it
+  user: core
+  <source>
+    *: "Say List Titles"
+  </source>
+  <dest>
+    *: "Falar títulos das listas"
+  </dest>
+  <voice>
+    *: "Falar títulos das listas"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_CHINESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "chinês"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_JAPANESE
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "japonês"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_KOREAN
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "coreano"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_ARABIC
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "árabe"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_HEBREW
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "hebraico"
+  </voice>
+</phrase>
+<phrase>
+  id: VOICE_SCRIPT_THAI
+  desc: spoken only, for a name in a script the synthesiser cannot read
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: "tailandês"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECORDED_VOICE
+  desc: in Voice settings: menus in a voice file's recorded voice
+  user: core
+  <source>
+    *: "Recorded Voice"
+  </source>
+  <dest>
+    *: "Voz gravada"
+  </dest>
+  <voice>
+    *: "Voz gravada"
+  </voice>
+</phrase>

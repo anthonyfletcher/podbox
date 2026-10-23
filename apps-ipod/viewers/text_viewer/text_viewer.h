@@ -22,4 +22,12 @@ int text_viewer(const char *file);
  * may since have been deleted; the caller checks. */
 bool text_viewer_last_document(char *buf, size_t bufsize);
 
+/* text_viewer_read_aloud */
+enum
+{
+    TV_READ_OFF = 0,
+    TV_READ_PAGE,
+    TV_READ_CONTINUOUS,
+};
+
 #endif /* _TEXT_VIEWER_H_ */

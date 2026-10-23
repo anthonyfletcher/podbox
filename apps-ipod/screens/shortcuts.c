@@ -640,7 +640,7 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
                         talk_dir_or_spell(sc->u.path, NULL, false);
                         break;
                     }
-                    talk_spell(sc->u.path, false);
+                    talk_name(sc->u.path, false);
                 }
                 break;
             case SHORTCUT_FILE:
@@ -651,7 +651,7 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
             case SHORTCUT_SETTING:
                 talk_id(sc->setting->lang_id, false);
                 if (sc->type == SHORTCUT_SETTING_APPLY)
-                    talk_spell(sc->u.path, true);
+                    talk_name(sc->u.path, true);
                 break;
 
             case SHORTCUT_TIME:
@@ -659,7 +659,7 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
                     talk_timedate();
                 else
                 if (sc->name[0] && sc->u.timedata.sleep_timeout >= 0)
-                    talk_spell(sc->name, false);
+                    talk_name(sc->name, false);
                 else
                     talk_sleeptimer(sc->u.timedata.sleep_timeout);
                 break;
@@ -667,12 +667,12 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
             case SHORTCUT_REBOOT:
                 if (!sc->name[0])
                 {
-                    talk_spell(type_strings[sc->type], false);
+                    talk_name(type_strings[sc->type], false);
                     break;
                 }
                 /* fall-through */
             default:
-                talk_spell(sc->name[0] ? sc->name : sc->u.path, false);
+                talk_name(sc->name[0] ? sc->name : sc->u.path, false);
                 break;
             }
         }

@@ -30,6 +30,7 @@
 #include "screens/playback/track_info.h"
 #include "text_box.h"         /* view_text prototype */
 #include "draw/text_wrap.h"
+#include "speech/talk.h"
 
 struct view_info {
     struct font* pf;
@@ -260,6 +261,14 @@ int view_text(const char *title, const char *text)
 
     init_view(&info, title, text);
     draw_text(&info);
+    if (global_settings.talk_menu)
+    {
+        if (title && P2ID((unsigned char *)title) >= 0)
+            talk_id(P2ID((unsigned char *)title), false);
+        else if (title)
+            talk_text(title, false);
+        talk_text(text, true);
+    }
 
     /* wait for keypress */
     while(1)

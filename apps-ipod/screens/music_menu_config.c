@@ -26,6 +26,7 @@
 #include "browse/browser_db.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "music_menu_config.h"
+#include "speech/talk.h"
 
 /* One row per bit of the mask; the rest cannot be hidden and so are not
  * listed. Comfortably more than the shipped menu's sixteen rows. */
@@ -74,7 +75,11 @@ static int row_action_callback(int action, struct gui_synclist *lists)
         int sel = gui_synclist_get_sel_pos(lists);
 
         if (sel >= 0 && sel < row_count)
+        {
             rows[sel].shown = !rows[sel].shown;
+            if (global_settings.talk_menu)
+                talk_id(rows[sel].shown ? LANG_ON : LANG_OFF, false);
+        }
 
         /* Stay in the list: this screen is a series of toggles, and leaving on
          * the first one would make turning two rows off a trip each. */

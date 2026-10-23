@@ -564,10 +564,10 @@ static int browser_voice_cb(int selected_item, void * data)
             return 0;
         }
 
-        /* Otherwise it is a custom "header" or a database entry, and there is
-           no talk clip for it: doing so needs headers told apart from entries,
-           and a subdirectory of clips per entry type (artist, album, ...).
-           Not implemented, so such rows are silent. */
+        /* Otherwise it is a custom "header" or a database entry, which only
+           the synthesiser can say. */
+        talk_text((char *)name, true);
+        return 0;
     }
     else
     {
@@ -638,7 +638,7 @@ static int browser_voice_cb(int selected_item, void * data)
                     *ext = 0;
             }
 
-        talk_spell(name, true);
+        talk_name(name, true);
 
         if (stripit && ext)
             *ext = '.';

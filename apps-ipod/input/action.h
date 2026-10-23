@@ -223,6 +223,7 @@ enum {
     ACTION_KBD_DOWN,
     ACTION_KBD_MORSE_INPUT,
     ACTION_KBD_MORSE_SELECT,
+    ACTION_KBD_SPEAK,           /* say what has been written so far */
 
 
     /* USB HID codes */

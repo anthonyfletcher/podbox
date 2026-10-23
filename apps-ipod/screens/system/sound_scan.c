@@ -46,6 +46,7 @@
 #include "metadata.h"
 #include "string-extra.h"
 #include "settings/settings.h"
+#include "speech/talk.h"
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
 #include "database/sound_cal.h"
@@ -416,6 +417,8 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
  * False if the user stopped instead of plugging in. */
 static bool ss_wait_for_charger(void)
 {
+    if (!charger_inserted() && global_settings.talk_menu)
+        talk_text("Connect the charger to continue", false);
     while (!charger_inserted())
     {
         int button;
@@ -539,6 +542,8 @@ static void ss_result(const char *msg)
 
     backlight_on();
     splash(0, msg);
+    if (global_settings.talk_menu)
+        talk_string(msg, false);
     action_wait_for_release();
     do
     {

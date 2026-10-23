@@ -23,6 +23,20 @@ MENUITEM_SETTING(text_viewer_line_spacing,
                  &global_settings.text_viewer_line_spacing, NULL);
 MENUITEM_SETTING(text_viewer_page_number,
                  &global_settings.text_viewer_page_number, NULL);
+/* Read Aloud means nothing without the synthesiser */
+static int read_aloud_callback(int action,
+                               const struct menu_item_ex *this_item,
+                               struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(global_settings.talk_menu && global_settings.talk_synth))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_SETTING(text_viewer_read_aloud,
+                 &global_settings.text_viewer_read_aloud, read_aloud_callback);
 
 /* Pick a .fnt from the fonts folder, storing just its name in the setting;
  * unlike the theme's own font item this does not touch the global UI font. */
@@ -72,5 +86,6 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_margin,
           &text_viewer_line_spacing,
           &text_viewer_page_number,
+          &text_viewer_read_aloud,
           &text_viewer_font_item,
           &text_viewer_font_reset_item);

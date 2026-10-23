@@ -12,22 +12,23 @@
  * provides the talk_* vocabulary (numbers, dates, spelling) the UI speaks
  * with.
  *
- * Speech is assembled from pre-recorded clips, not synthesised. Saying
- * "3:45" means queuing the clips for "three", "forty", "five" in order, which
- * is what the talk_number/talk_value vocabulary below is for -- and why
- * languages needing a different word order need their own logic here rather
- * than just a different .voice file.
+ * Speech is assembled from words in order. Saying "3:45" means queuing the
+ * words "three", "forty", "five", which is what the talk_number/talk_value
+ * vocabulary below is for -- and why languages needing a different word
+ * order need their own logic here rather than just a different .voice file.
  *
- * Clips come from two places: the .voice file (UI vocabulary, indexed by
- * lang id) and .talk files on disk (directory and file names, "talkbox").
- * Both are decoded through the same queue and mixed into the PCM stream on
- * the voice thread, so nothing here blocks the caller -- talk_id() returns
+ * Clips come from three places: the .voice file (UI vocabulary, indexed by
+ * lang id), .talk files on disk (directory and file names, "talkbox"), and
+ * the synthesiser (speech.c), which says what the .voice file cannot -- a
+ * string it lacks, every string without one, and the names of things. All
+ * go through the same queue and are mixed into the PCM stream on the voice
+ * thread, so nothing here blocks the caller -- talk_id() returns
  * immediately having only queued.
  *
  * Parts, in order:
  *   - constants, macros, types and module state
  *   - the .voice file: loading it and finding a clip by id
- *   - the clip queue and its locking
+ *   - the clip queue and its locking; synthesised text entries
  *   - .talk file (talkbox) handling for directories and files
  *   - the talk_* vocabulary the UI calls: ids, numbers, dates, spelling
  ****************************************************************************/
@@ -61,6 +62,8 @@
 #include "dir.h"
 #include "rbunicode.h"
 #include "core_alloc.h"
+#include "speech.h"
+#include "normalise.h"
 
 /** Constants **/
 
@@ -138,6 +141,8 @@ struct queue_entry /* one entry of the internal queue */
     int handle;    /* buflib handle to the clip data */
     int length;    /* total length of the clip */
     int remaining; /* bytes that still need to be deoded */
+    bool synth;    /* not a clip but text: speech.c's item */
+    int item;
 };
 
 static struct buflib_context clip_ctx;
@@ -491,6 +496,7 @@ static int get_clip(long id, struct queue_entry *q)
     q->handle    = retval;
     q->length    = clipsize;
     q->remaining = clipsize;
+    q->synth     = false;
     return 0;
 }
 
@@ -679,16 +685,43 @@ static inline bool is_silence(struct queue_entry *qe)
         return false;
 }
 
+/* What the voice thread needs to start an entry */
+static void start_entry(struct queue_entry *qe, const void **start,
+                        size_t *size, int *text)
+{
+    if (qe->synth)
+    {
+        *start = NULL;
+        *size = 0;
+        *text = qe->item;
+        return;
+    }
+    *start = commit_transfer(qe, size);
+    *text = -1;
+    curr_hd[0] = commit_buffer[1];
+    curr_hd[1] = commit_buffer[2];
+    curr_hd[2] = commit_buffer[3];
+}
+
 /* called in ISR context (on HWCODEC) if mp3 data got consumed */
-static void mp3_callback(const void** start, size_t* size)
+static void mp3_callback(const void** start, size_t* size, int *text)
 {
     struct queue_entry *qe = &queue[queue_read];
-    /* voice_thread.c hints us how many of the buffer we provided it actually
-     * consumed. Because buffers have to be frame-aligned for speex
-     * it might be less than what we presented */
-    if (*size)
-        sent = *size;
-    qe->remaining -= sent; /* we completed this */
+    *text = -1;
+    if (qe->synth)
+    {
+        speech_release(qe->item);
+        qe->remaining = 0;
+    }
+    else
+    {
+        /* voice_thread.c hints us how many of the buffer we provided it
+         * actually consumed. Because buffers have to be frame-aligned for
+         * speex it might be less than what we presented */
+        if (*size)
+            sent = *size;
+        qe->remaining -= sent; /* we completed this */
+    }
 
     if (qe->remaining > 0) /* current clip not finished? */
     {   /* feed the next 64K-1 chunk */
@@ -700,28 +733,19 @@ static void mp3_callback(const void** start, size_t* size)
 
     /* increment read position for the just played clip */
     queue_read = (queue_read + 1) & QUEUE_MASK;
+    *size = 0; /* end of data, unless another entry starts */
 
-    if (QUEUE_LEVEL == 0)
-    {
-        if (!is_silence(last_clip))
-        {   /* add silence clip when queue runs empty playing a voice clip,
-             * only if the previous clip wasn't already silence */
-            queue[queue_write] = silence;
-            queue_write = (queue_write + 1) & QUEUE_MASK;
-        }
-        else
-        {
-            *size = 0; /* end of data */
-        }
+    if (QUEUE_LEVEL == 0 && !is_silence(last_clip) && silence.length > 0)
+    {   /* add silence clip when queue runs empty playing a voice clip,
+         * only if the previous clip wasn't already silence */
+        queue[queue_write] = silence;
+        queue_write = (queue_write + 1) & QUEUE_MASK;
     }
 
     if (QUEUE_LEVEL != 0) /* queue is not empty? */
     {   /* start next clip */
         last_clip = &queue[queue_read];
-        *start = commit_transfer(last_clip, size);
-        curr_hd[0] = commit_buffer[1];
-        curr_hd[1] = commit_buffer[2];
-        curr_hd[2] = commit_buffer[3];
+        start_entry(last_clip, start, size, text);
     }
 
     talk_queue_unlock();
@@ -734,7 +758,8 @@ static bool talk_voice_required(void)
 {
     return (has_voicefile) /* Voice file is available */
         || (global_settings.talk_dir_clip)  /* Thumbnail clips are required */
-        || (global_settings.talk_file_clip);
+        || (global_settings.talk_file_clip)
+        || speech_enabled();
 }
 
 static bool talk_is_disabled(void)
@@ -814,6 +839,12 @@ static int talk_spell_basename(const char *path,
     const char *basename;
     size_t len = path_basename(path, &basename);
 
+    if (speech_enabled())
+    {
+        char name[MAX_PATH];
+        strmemccpy(name, basename, MIN(len + 1, sizeof(name)));
+        return talk_text(name, enqueue);
+    }
     return _talk_spell(basename, len, enqueue);
 }
 
@@ -848,6 +879,7 @@ void talk_force_shutup(void)
     talk_queue_lock();
     queue_write = queue_read = 0; /* reset the queue */
     thumbnail_buf_used = 0;
+    speech_clear();
     talk_queue_unlock();
     need_shutup = false;
 }
@@ -886,13 +918,12 @@ static void queue_clip(struct queue_entry *clip, bool enqueue)
 
     if (queue_level == 0)
     {   /* queue was empty, we have to do the initial start */
+        const void *buf;
         size_t size;
-        void *buf = commit_transfer(qe, &size);
+        int text;
+        start_entry(qe, &buf, &size, &text);
         last_clip = qe;
-        voice_play_data(buf, size, mp3_callback);
-        curr_hd[0] = commit_buffer[1];
-        curr_hd[1] = commit_buffer[2];
-        curr_hd[2] = commit_buffer[3];
+        voice_play_data(buf, size, text, mp3_callback);
     }
 
     need_shutup = true;
@@ -929,6 +960,7 @@ void talk_init(void)
     memset(&voicefile, 0, sizeof(voicefile));
 
     silence.handle = -1; /* pause clip not accessible */
+    silence.length = 0;
     voicefile_size = has_voicefile = 0;
     /* need to free these as their size depends on the voice file, and
      * this function is called when the talk voice file changes */
@@ -991,6 +1023,21 @@ void talk_init(void)
 out:
     if (filehandle >= 0)
         close(filehandle); /* close again, this was just to detect presence */
+
+    /* also when the voice file is stale, which the synthesiser stands in for */
+    speech_apply_settings();
+    if (speech_enabled())
+        voice_thread_init();
+}
+
+void talk_speech_changed(void)
+{
+    if (!talk_initialized)
+        return;
+    talk_force_shutup();
+    speech_apply_settings();
+    if (talk_voice_required())
+        voice_thread_init();
 }
 
 /* somebody else claims the mp3 buffer, e.g. for regular play/record */
@@ -1017,21 +1064,31 @@ int talk_id(int32_t id, bool enqueue)
     struct queue_entry clip;
     bool isloaded = true;
 
-    if (!has_voicefile)
+    bool synth = speech_enabled();
+    /* Recorded Voice off: the synthesiser says the menus too, so one voice
+     * speaks throughout */
+    bool clips = has_voicefile && (global_settings.talk_recorded || !synth);
+    if (!clips && !synth)
         return 0; /* no voicefile loaded, not an error -> pretend success */
     if (talk_is_disabled())
         return -1;
 
-    if (talk_handle <= 0 || index_handle <= 0) /* reload needed? */
-    {
+    if (clips && (talk_handle <= 0 || index_handle <= 0))
+    {   /* reload needed */
         int fd = open_voicefile();
         if (fd < 0 || !load_voicefile_index(fd))
-            return load_voicefile_failure(fd);
-        isloaded = load_voicefile_data(fd);
-        close(fd);
+        {
+            load_voicefile_failure(fd);
+            isloaded = false;
+        }
+        else
+        {
+            isloaded = load_voicefile_data(fd);
+            close(fd);
+        }
     }
 
-    if (id == -1 || !isloaded) /* -1 is an indication for silence */
+    if (id == -1) /* -1 is an indication for silence */
         return -1;
 
     decimals = (((uint32_t)id) >> DECIMAL_SHIFT) & 0x7;
@@ -1047,8 +1104,13 @@ int talk_id(int32_t id, bool enqueue)
         return 0; /* and stop, end of special case */
     }
 
-    if (get_clip(id, &clip) < 0)
-        return -1; /* not present */
+    if (!clips || !isloaded || get_clip(id, &clip) < 0)
+    {   /* not present: the synthesiser reads the string's voice text */
+        char text[MAX_PATH];
+        if (synth && speech_voice_string(id, text, sizeof(text)))
+            return talk_text(text, enqueue);
+        return -1;
+    }
 
 #ifdef LOGF_ENABLE
     if (id > VOICEONLY_DELIMITER)
@@ -1131,8 +1193,7 @@ static int _talk_file(const char* filename,
 
     if (size > 0)    /* Don't play missing clips */
     {
-        struct queue_entry clip;
-        clip.handle = handle;
+        struct queue_entry clip = { .handle = handle };
         clip.length = clip.remaining = size;
         if(prefix_ids)
             /* prefix thumbnail by speaking these ids, but only now
@@ -1530,6 +1591,110 @@ int talk_spell(const char* spell, bool enqueue)
     return _talk_spell(spell, NULL_TERMINATED, enqueue);
 }
 
+/* Queue text, joined to the newest entry if join and that is text not yet
+ * begun. Returns the item it went into, -1 for nothing said, or -2 with the
+ * synthesiser off. */
+static int text_item(const char *text, bool enqueue, bool join)
+{
+    static const int32_t script_ids[] =
+    {
+        [SCRIPT_CHINESE] = VOICE_SCRIPT_CHINESE,
+        [SCRIPT_JAPANESE] = VOICE_SCRIPT_JAPANESE,
+        [SCRIPT_KOREAN] = VOICE_SCRIPT_KOREAN,
+        [SCRIPT_ARABIC] = VOICE_SCRIPT_ARABIC,
+        [SCRIPT_HEBREW] = VOICE_SCRIPT_HEBREW,
+        [SCRIPT_THAI] = VOICE_SCRIPT_THAI,
+    };
+    const char *start, *end;
+    enum normalise_script script;
+
+    if (!speech_enabled() || talk_is_disabled())
+        return -2;
+
+    /* A script with no reading is said by its name from the language, so a
+     * .voice file says it as it says the menus: what comes before it, the
+     * name, then the rest. */
+    if (normalise_find_script(text, &start, &end, &script))
+    {
+        static char before[MAX_PATH];
+        int item = -1;
+        size_t n = MIN((size_t)(start - text), sizeof(before) - 1);
+
+        memcpy(before, text, n);
+        before[n] = '\0';
+        if (n > 0)
+        {
+            item = text_item(before, enqueue, join);
+            enqueue = true;
+        }
+        talk_id(script_ids[script], enqueue);
+        if (*end)
+            item = text_item(end, true, true);
+        return item < -1 ? -1 : item;
+    }
+
+    do_enqueue(enqueue); /* cut off all the pending stuff */
+
+    talk_queue_lock();
+    int item = -1, append = -1;
+    if (QUEUE_LEVEL < QUEUE_SIZE - 1)
+    {
+        const struct queue_entry *last =
+            &queue[(queue_write - 1) & QUEUE_MASK];
+        if (join && QUEUE_LEVEL > 0 && last->synth)
+            append = last->item;
+        item = speech_queue(text, append);
+    }
+    talk_queue_unlock();
+
+    if (item < 0)
+        return -1;      /* nothing to say, or no room for it */
+    if (item != append)
+    {
+        struct queue_entry entry =
+            { .synth = true, .item = item, .length = 1, .remaining = 1 };
+        queue_clip(&entry, true);
+    }
+    force_enqueue_next = false;
+    return item;
+}
+
+int talk_text(const char *text, bool enqueue)
+{
+    return text_item(text, enqueue, true) == -2 ? -1 : 0;
+}
+
+int talk_text_part(const char *text)
+{
+    int item = text_item(text, true, false);
+    return item < 0 ? -1 : item;
+}
+
+int talk_text_playing(void)
+{
+    return voice_is_playing() ? speech_rendering() : -1;
+}
+
+void talk_settle(void)
+{
+    voice_settle(TALK_SETTLE);
+}
+
+int talk_string(const char *s, bool enqueue)
+{
+    long id = P2ID((const unsigned char *)s);
+    if (id >= 0)
+        return talk_id(id, enqueue);
+    return s && *s ? talk_text(s, enqueue) : 0;
+}
+
+int talk_name(const char *name, bool enqueue)
+{
+    if (speech_enabled())
+        return talk_text(name, enqueue);
+    return talk_spell(name, enqueue);
+}
+
 void talk_disable(bool disable)
 {
     if (disable)
@@ -1682,6 +1847,7 @@ void talk_announce_voice_invalid(void)
             voice_thread_init();
             qe.handle = buf_handle;
             qe.length = qe.remaining = voice_sz;
+            qe.synth = false;
             queue_clip(&qe, false);
             voice_wait();
         }

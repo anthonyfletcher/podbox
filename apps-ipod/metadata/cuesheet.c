@@ -489,7 +489,7 @@ static int cuesheet_list_voice_cb(int list_index, void *data)
            is spelled rather than looked up. */
         talk_id(LANG_CHAPTER, true);
         talk_number(index + 1, true);
-        talk_spell(cue->tracks[index].title, true);
+        talk_name(cue->tracks[index].title, true);
         return 0;
     }
 

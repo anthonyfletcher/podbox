@@ -42,6 +42,10 @@
 #include "txt_source.h"
 #include "ts_io_core.h"
 #include "text_viewer.h"
+#include "speech/talk.h"
+#include "speech/speech.h"     /* speech_enabled */
+#include "audio/voice_thread.h" /* voice_is_playing */
+#include "powermgmt.h"   /* reset_poweroff_timer */
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -390,6 +394,120 @@ static void tv_draw(void)
     display->set_viewport(last);
 }
 
+/* How far past the page's end a reading may run to finish its sentence */
+#define TV_READ_AHEAD 1024
+/* Parts held at once: a page's sentences and the next page's first */
+#define TV_PARTS      64
+/* Characters a second the voice reads at a Speech Rate of 100% */
+#define TV_READ_CPS   17
+
+/* A page is read a sentence -- or a line -- at a time, each queued as a part
+ * of its own, so Continuously can tell which one the voice is on and turn
+ * the page as it crosses the edge, not when the reading runs out. */
+struct tv_part
+{
+    int item;                /* talk_text_part()'s */
+    off_t start, end;
+};
+static struct tv_part tv_parts[TV_PARTS];
+static int tv_nparts;
+static int tv_heard = -1;    /* the part last heard, and since when */
+static long tv_heard_tick;
+static off_t tv_read_upto;   /* where the queued reading ends */
+static bool tv_reading;      /* the page on screen is being read */
+
+/* Where the part at `from` ends, by `limit`: after a full stop, question or
+ * exclamation mark with white space after it, or at a line break -- which
+ * *stop asks to be read with a full stop's pause. */
+static off_t tv_part_end(off_t from, off_t limit, bool *stop)
+{
+    *stop = false;
+    for (off_t p = from; p < limit; p++)
+    {
+        unsigned char c = tv.win[p - tv.win_start];
+        unsigned char next = p + 1 < limit ? tv.win[p + 1 - tv.win_start]
+                                           : ' ';
+        if ((c == '.' || c == '!' || c == '?')
+            && (next == ' ' || next == '\n' || next == '\r'))
+            return p + 1;
+        if (c == '\n')
+        {
+            *stop = true;
+            return p + 1;
+        }
+    }
+    return limit;
+}
+
+/* Queue the parts from `from` that start before `page_end`, the last
+ * running on to its own end. */
+static void tv_queue_parts(off_t from, off_t page_end)
+{
+    static char text[TV_READ_AHEAD + 2];
+    off_t limit;
+
+    tv_ensure(page_end, TV_READ_AHEAD);
+    limit = tv.win_start + (off_t)tv.win_len;
+    if (limit > page_end + TV_READ_AHEAD)
+        limit = page_end + TV_READ_AHEAD;
+
+    while (from < page_end && from < limit)
+    {
+        bool stop;
+        off_t end = tv_part_end(from, limit, &stop);
+        size_t n = end - from;
+        int item;
+
+        if (n > sizeof(text) - 2)
+        {
+            n = sizeof(text) - 2;
+            while (n > 0 && (tv.win[from - tv.win_start + n] & 0xc0) == 0x80)
+                n--;        /* not through a character */
+            end = from + n;
+            stop = false;
+        }
+        memcpy(text, tv.win + (from - tv.win_start), n);
+        while (n > 0 && (text[n - 1] == ' ' || text[n - 1] == '\n'
+                         || text[n - 1] == '\r' || text[n - 1] == '\t'))
+            n--;
+        if (stop && n > 0 && !strchr(".,;:!?", text[n - 1]))
+            text[n++] = '.';
+        text[n] = '\0';
+
+        item = talk_text_part(text);
+        if (item >= 0)
+        {
+            if (tv_nparts == TV_PARTS)
+            {
+                memmove(tv_parts, tv_parts + 1,
+                        (TV_PARTS - 1) * sizeof(*tv_parts));
+                tv_nparts--;
+            }
+            tv_parts[tv_nparts++] = (struct tv_part){ item, from, end };
+        }
+        from = end;
+    }
+    tv_read_upto = from;
+}
+
+/* Read the page on screen aloud, with Voice Menus and the synthesiser on,
+ * on to the end of the sentence it stops in: a sentence cut at the edge of
+ * the screen is said as though it ended there. A page turn cuts off the
+ * one before. */
+static void tv_speak_page(void)
+{
+    tv_reading = false;
+    tv_nparts = 0;
+    tv_heard = -1;
+    if (global_settings.text_viewer_read_aloud == TV_READ_OFF
+        || !global_settings.talk_menu || !speech_enabled()
+        || tv.pos < tv.win_start)
+        return;
+    talk_force_shutup();
+    tv_queue_parts(tv.pos, tv.next);
+    tv_reading = true;
+}
+
 /* ---- loading splash --------------------------------------------------- */
 
 /* The container formats decompress and index before the first byte of text
@@ -498,6 +616,7 @@ static void tv_next_page(void)
         tv.stack[tv.sp++] = tv.pos;
     tv.pos = tv.next;
     tv_draw();
+    tv_speak_page();
 }
 
 static void tv_prev_page(void)
@@ -509,6 +628,66 @@ static void tv_prev_page(void)
         return;
     tv.sp--;
     tv_draw();
+    tv_speak_page();
+}
+
+/* Continuously: the voice has reached the next page, so show it and queue
+ * the rest of it behind what is still being said. */
+static void tv_turn_page(void)
+{
+    if (tv_at_end())
+    {
+        tv_reading = false;
+        return;
+    }
+    if (tv.sp < TV_MAX_PAGES)
+        tv.stack[tv.sp++] = tv.pos;
+    tv.pos = tv.next;
+    tv_draw();
+    reset_poweroff_timer();     /* listening is not idle */
+    tv_queue_parts(tv_read_upto > tv.pos ? tv_read_upto : tv.pos, tv.next);
+}
+
+/* Continuously: turn the page when the voice crosses its edge. In the
+ * sentence that runs over it, that is reckoned from the voice's pace and how
+ * much of the sentence is on this page. */
+static void tv_read_on(void)
+{
+    const struct tv_part *part = NULL;
+    int item;
+
+    if (!tv_reading
+        || global_settings.text_viewer_read_aloud != TV_READ_CONTINUOUS)
+        return;
+    if (!voice_is_playing())
+    {
+        tv_turn_page();         /* all said: the page had nothing more */
+        return;
+    }
+
+    item = talk_text_playing();
+    for (int i = 0; i < tv_nparts; i++)
+        if (tv_parts[i].item == item)
+            part = &tv_parts[i];
+    if (!part)
+        return;
+    if (item != tv_heard)
+    {
+        tv_heard = item;
+        tv_heard_tick = current_tick;
+    }
+
+    if (part->start >= tv.next)
+        tv_turn_page();
+    else if (part->end > tv.next)
+    {
+        long len = part->end - part->start;
+        long said = (long)HZ * len * 100
+                    / (TV_READ_CPS * global_settings.talk_speech_rate);
+        if (current_tick - tv_heard_tick
+            >= said * (tv.next - part->start) / len)
+            tv_turn_page();
+    }
 }
 
 /* Pages forward from the start without drawing until `target` falls on the
@@ -897,13 +1076,21 @@ int text_viewer(const char *file)
         tv_resume_to(resume);
 
     tv_draw();
+    tv_speak_page();
 
     while (1)
     {
-        int action = get_action(CONTEXT_STD, TIMEOUT_BLOCK);
+        bool continuous = tv_reading
+            && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
+        int action = get_action(CONTEXT_STD,
+                                continuous ? HZ/10 : TIMEOUT_BLOCK);
 
         switch (action)
         {
+            case ACTION_NONE:
+                tv_read_on();
+                break;
+
             case ACTION_STD_OK:          /* forward button (>>|) */
                 tv_next_page();
                 break;
@@ -938,6 +1125,7 @@ int text_viewer(const char *file)
     }
 
   done:
+    talk_shutup();             /* the page stops with the viewer */
     tv_resume_save(file, tv.pos, tv.file_size);
     tv_close();
     viewportmanager_theme_undo(SCREEN_MAIN, false);

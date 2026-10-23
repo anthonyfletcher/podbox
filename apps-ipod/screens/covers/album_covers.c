@@ -84,6 +84,7 @@
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
+#include "speech/talk.h"
 #include "carousel.h"     /* the shared engine: carousel_idx, the model */
 #include "draw/line.h"              /* TEXT_FIT_BUF */
 
@@ -141,6 +142,7 @@ static int  album_on_menu(void);
 static int  album_on_context(int index);
 static void album_prepare(void);
 static int  album_build_index(void);
+static void album_speak(int index);
 
 static const struct carousel_model album_model = {
     .build_index = album_build_index,
@@ -156,6 +158,7 @@ static const struct carousel_model album_model = {
     .on_menu     = album_on_menu,
     .on_context  = album_on_context,
     .prepare     = album_prepare,
+    .speak       = album_speak,
     .owns_cache_version = true,
     .title       = (const char *)ID2P(LANG_ALBUM_COVERS),
 };
@@ -183,6 +186,17 @@ static char* get_album_artist(const int slide_index, char *buf, size_t size)
     return buf;
 }
 
+
+/* The album, then its artist */
+static void album_speak(int index)
+{
+    char album[TAGCACHE_BUFSZ], artist[TAGCACHE_BUFSZ];
+    char text[2 * TAGCACHE_BUFSZ + 2];
+    snprintf(text, sizeof(text), "%s, %s",
+             get_album_name(index, album, sizeof(album)),
+             get_album_artist(index, artist, sizeof(artist)));
+    talk_name(text, false);
+}
 
 int carousel_album_order(void)
 {

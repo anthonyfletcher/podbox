@@ -93,6 +93,7 @@
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
 #include "carousel.h"     /* the shared engine: carousel_idx, the model */
+#include "speech/talk.h"
 
 /******************************* Globals ***********************************/
 static fb_data *lcd_fb;
@@ -4121,6 +4122,8 @@ static int album_covers_loop(void)
     long last_frame_tick = current_tick - PF_FRAME_TICKS;
     unsigned int seen_slides_loaded = pf_slides_loaded;
     long boost_until = current_tick + HZ;
+    int spoken_index = -1;
+    long speak_due = 0;         /* when the slide at rest is said; 0 none */
 
     while (true) {
         /* An artwork pass finished while the carousel was open. Slides loaded
@@ -4186,6 +4189,13 @@ static int album_covers_loop(void)
         }
         else
             timeout = (quiescent || dark) ? HZ/2 : HZ/16;
+
+        if (speak_due)
+        {
+            long left = speak_due - current_tick;
+            if (left < timeout || timeout == TIMEOUT_BLOCK)
+                timeout = left > 0 ? (int)left : 0;
+        }
 
         skin_inhibit_flush(true);
         button = get_custom_action(CONTEXT_PLUGIN, timeout, get_context_map);
@@ -4256,6 +4266,28 @@ static int album_covers_loop(void)
                 else
                     lcd_update_rect(dirty[i].x, dirty[i].y,
                                     dirty[i].w, dirty[i].h);
+            }
+        }
+
+        /* Said where the row comes to rest, not at every slide it passes:
+         * once it has stayed there for TALK_SETTLE. */
+        if (pf_state != pf_idle)
+        {
+            if (speak_due || spoken_index >= 0)
+                talk_shutup();
+            speak_due = 0;
+            spoken_index = -1;
+        }
+        else if (center_index != spoken_index && model->speak
+                 && global_settings.talk_menu)
+        {
+            if (!speak_due)
+                speak_due = current_tick + TALK_SETTLE;
+            else if (!TIME_BEFORE(current_tick, speak_due))
+            {
+                speak_due = 0;
+                spoken_index = center_index;
+                model->speak(center_index);
             }
         }
 

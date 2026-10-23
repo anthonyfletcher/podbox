@@ -2194,7 +2194,7 @@ static int menu_get_talk(int item, void *data)
     {
         talk_number(item + 1, true);
         talk_id(VOICE_PAUSE, true);
-        talk_spell(menuitems[item].desc, true);
+        talk_name(menuitems[item].desc, true);
      }
     return 0;
 }

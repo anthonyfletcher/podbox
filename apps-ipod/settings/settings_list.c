@@ -784,6 +784,13 @@ static void volume_limit_set_default(void* setting, void* defaultval)
 
 
 
+/* Loads or frees the synthesiser's files */
+static void speech_setting_changed(bool on)
+{
+    (void)on;
+    talk_speech_changed();
+}
+
 const struct settings_list settings[] = {
 /* system_status settings .resume.cfg */
     SYSTEM_STATUS_SOUND(F_NO_WRAP, volume, LANG_VOLUME, "volume", SOUND_VOLUME),
@@ -1293,14 +1300,23 @@ const struct settings_list settings[] = {
     {F_T_INT, &global_settings.peak_meter_max, LANG_PM_MAX,INT(0),
         "peak meter max", UNUSED},
     /* voice */
-    OFFON_SETTING(F_TEMPVAR, talk_menu, LANG_VOICE_MENU, true, "talk menu", NULL),
-    CHOICE_SETTING(0, talk_dir, LANG_VOICE_DIR, 0,
+    OFFON_SETTING(F_TEMPVAR|F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                  talk_menu, LANG_VOICE_MENU, false, "talk menu",
+                  speech_setting_changed),
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, talk_synth,
+                  LANG_SPEECH_SYNTH, true, "speech synthesiser",
+                  speech_setting_changed),
+    OFFON_SETTING(0, talk_recorded, LANG_RECORDED_VOICE, true,
+                  "recorded voice", NULL),
+    INT_SETTING(0, talk_speech_rate, LANG_SPEECH_RATE, 100, "speech rate",
+                UNIT_PERCENT, 50, 150, 10, NULL, NULL, NULL),
+    CHOICE_SETTING(0, talk_dir, LANG_VOICE_DIR, 2,
                    "talk dir", off_number_spell, NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_VOICE_NUMBER),
                    ID2P(LANG_VOICE_SPELL)),
     OFFON_SETTING(F_TEMPVAR, talk_dir_clip, LANG_VOICE_DIR_TALK, false,
                   "talk dir clip", NULL),
-    CHOICE_SETTING(0, talk_file, LANG_VOICE_FILE, 0,
+    CHOICE_SETTING(0, talk_file, LANG_VOICE_FILE, 2,
                    "talk file", off_number_spell, NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_VOICE_NUMBER),
                    ID2P(LANG_VOICE_SPELL)),
@@ -1308,6 +1324,12 @@ const struct settings_list settings[] = {
                   "talk file clip", NULL),
     OFFON_SETTING(F_TEMPVAR, talk_filetype, LANG_VOICE_FILETYPE, false,
                   "talk filetype", NULL),
+    OFFON_SETTING(0, talk_list_title, LANG_SAY_LIST_TITLES, false,
+                  "say list titles", NULL),
+    CHOICE_SETTING(0, talk_track_change, LANG_ANNOUNCE_TRACK_CHANGE, 0,
+                   "announce track change", "off,over music,pause music",
+                   NULL, 3, ID2P(LANG_OFF), ID2P(LANG_ANNOUNCE_OVER_MUSIC),
+                   ID2P(LANG_ANNOUNCE_PAUSE_MUSIC)),
     OFFON_SETTING(F_TEMPVAR, talk_battery_level, LANG_TALK_BATTERY_LEVEL, false,
                   "Announce Battery Level", NULL),
     INT_SETTING(0, talk_mixer_amp, LANG_TALK_MIXER_LEVEL, 100,
@@ -1702,6 +1724,10 @@ const struct settings_list settings[] = {
                  FONT_DIR "/", ".fnt"),
     OFFON_SETTING(0, text_viewer_page_number, LANG_TEXT_VIEWER_PAGE_NUMBER,
                   false, "text viewer page number", NULL),
+    CHOICE_SETTING(0, text_viewer_read_aloud, LANG_TEXT_VIEWER_READ_ALOUD, 1,
+                   "text viewer read aloud", "off,page,continuous", NULL, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_READ_ALOUD_PAGE),
+                   ID2P(LANG_READ_ALOUD_CONTINUOUS)),
     /* Synchronised lyrics viewer (apps-ipod/viewers/lyric_viewer) */
     CHOICE_SETTING(0, lyric_colour_mode, LANG_TEXT_VIEWER_COLOUR, 0,
                    "lyric colour mode",

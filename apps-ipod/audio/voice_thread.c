@@ -5,7 +5,8 @@
  * GNU General Public License (version 2+)
  *
  * The voice thread: decodes and mixes spoken clips over the music, at its
- * own priority so speech stays responsive.
+ * own priority so speech stays responsive. A clip is speex from a .voice or
+ * .talk file, or text that speech.c synthesises here at the same rate.
  ****************************************************************************/
 
 #include "config.h"
@@ -16,6 +17,7 @@
 #include "system/appevents.h"
 #include "voice_thread.h"
 #include "speech/talk.h"
+#include "speech/speech.h"
 #include "dsp_core.h"
 #include "pcm.h"
 #include "pcm_mixer.h"
@@ -102,6 +104,8 @@ struct voice_info
     const void *start;
     /* Size of clip */
     size_t size;
+    /* Or the speech.c item to synthesise, if >= 0 */
+    int text;
 };
 
 /* Private thread data for its current state that must be passed to its
@@ -116,6 +120,8 @@ struct voice_thread_data
     int lookahead;          /* Number of samples to drop at start of clip */
     struct dsp_buffer src;  /* Speex output buffer/input to DSP */
     struct dsp_buffer *dst; /* Pointer to DSP output buffer for PCM */
+    bool begun;             /* the first clip has started */
+    long wait;              /* tick before which it waits */
 };
 
 /* Functions called in their repective state that return the next state to
@@ -253,17 +259,26 @@ static void voice_buf_commit(int count)
     }
 }
 
+/* Until when a new utterance waits: see voice_settle() */
+static long settle_until;
+
+void voice_settle(long ticks)
+{
+    settle_until = current_tick + ticks;
+}
+
 /* Stop any current clip and start playing a new one */
-void voice_play_data(const void *start, size_t size,
+void voice_play_data(const void *start, size_t size, int text,
                      voice_play_callback_t get_more)
 {
-    if (voice_thread_id && start && size && get_more)
+    if (voice_thread_id && ((start && size) || text >= 0) && get_more)
     {
         struct voice_info voice_clip =
         {
             .get_more = get_more,
             .start    = start,
             .size     = size,
+            .text     = text,
         };
 
         LOGFQUEUE("mp3 >| voice Q_VOICE_PLAY");
@@ -298,6 +313,11 @@ void voice_wait(void)
 
     while (voice_playing)
         sleep(1);
+}
+
+bool voice_is_playing(void)
+{
+    return voice_playing;
 }
 
 void voice_set_mixer_level(int percent)
@@ -362,6 +382,20 @@ static enum voice_state voice_message(struct voice_thread_data *td)
         /* Clean-start the decoder */
         td->st = speex_decoder_init(&speex_wb_mode);
 
+        /* Words queued one at a time are said as one phrase if they arrive
+         * before rendering starts, so text gives the caller a moment; and a
+         * value still being changed is not said until it settles. */
+        td->begun = false;
+        td->wait = current_tick + (td->vi.text >= 0 ? HZ/50 : 0);
+        if (TIME_BEFORE(td->wait, settle_until))
+            td->wait = settle_until;
+
+        if (td->vi.text >= 0)
+        {
+            td->lookahead = 0;
+            return VOICE_STATE_DECODE;
+        }
+
         /* Make bit buffer use our own buffer */
         speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
                                   td->vi.size);
@@ -402,36 +436,79 @@ static enum voice_state voice_message(struct voice_thread_data *td)
     return VOICE_STATE_MESSAGE;
 }
 
+/* The clip is done: start the next. False if there is none. */
+static bool voice_next_clip(struct voice_thread_data *td)
+{
+    td->vi.size = 0;
+    td->vi.text = -1;
+
+    if (td->vi.get_more != NULL)
+        td->vi.get_more(&td->vi.start, &td->vi.size, &td->vi.text);
+
+    if (td->vi.text >= 0)
+    {
+        speech_render_begin(td->vi.text);
+        return true;
+    }
+    if (td->vi.start != NULL && td->vi.size > 0)
+    {
+        /* Make bit buffer use our own buffer */
+        speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
+                                  td->vi.size);
+        /* Don't skip any samples when we're stringing clips together */
+        td->lookahead = 0;
+        return true;
+    }
+
+    /* If all clips are done and not playing, force pcm playback. */
+    if (voice_unplayed_frames() > 0)
+        voice_start_playback();
+    return false;
+}
+
+/* Synthesise a frame of text, or move on once it is all said */
+static enum voice_state voice_synthesise(struct voice_thread_data *td)
+{
+    int count = speech_render(voice_buf->spx_outbuf, VOICE_FRAME_COUNT);
+    if (count == 0)
+        return voice_next_clip(td) ? VOICE_STATE_DECODE : VOICE_STATE_MESSAGE;
+
+    yield();
+
+    td->src.remcount  = count;
+    td->src.pin[0]    = voice_buf->spx_outbuf;
+    td->src.pin[1]    = NULL;
+    td->src.proc_mask = 0;
+    return VOICE_STATE_BUFFER_INSERT;
+}
+
 /* Decode frames or stop if all have completed */
 static enum voice_state voice_decode(struct voice_thread_data *td)
 {
     if (!queue_empty(&voice_queue))
         return VOICE_STATE_MESSAGE;
 
+    if (!td->begun)
+    {
+        if (TIME_BEFORE(current_tick, td->wait))
+        {
+            sleep(1);
+            return VOICE_STATE_DECODE;
+        }
+        td->begun = true;
+        if (td->vi.text >= 0)
+            speech_render_begin(td->vi.text);
+    }
+
+    if (td->vi.text >= 0)
+        return voice_synthesise(td);
+
     /* Decode the data */
     if (speex_decode_int(td->st, &td->bits, voice_buf->spx_outbuf) < 0)
     {
         /* End of stream or error - get next clip */
-        td->vi.size = 0;
-
-        if (td->vi.get_more != NULL)
-            td->vi.get_more(&td->vi.start, &td->vi.size);
-
-        if (td->vi.start != NULL && td->vi.size > 0)
-        {
-            /* Make bit buffer use our own buffer */
-            speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
-                                      td->vi.size);
-            /* Don't skip any samples when we're stringing clips together */
-            td->lookahead = 0;
-        }
-        else
-        {
-            /* If all clips are done and not playing, force pcm playback. */
-            if (voice_unplayed_frames() > 0)
-                voice_start_playback();
+        if (!voice_next_clip(td))
             return VOICE_STATE_MESSAGE;
-        }
     }
     else
     {
@@ -446,7 +523,7 @@ static enum voice_state voice_decode(struct voice_thread_data *td)
              * as necessary */
             int bitPtr = td->bits.bitPtr;
             td->vi.size = td->bits.charPtr;
-            td->vi.get_more(&td->vi.start, &td->vi.size);
+            td->vi.get_more(&td->vi.start, &td->vi.size, &td->vi.text);
             speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
                                       td->vi.size);
             td->bits.bitPtr = bitPtr;
