@@ -1453,7 +1453,8 @@ music. Off, nothing is spoken and no voice is loaded.
 Which voice speaks. Built-in is the synthesised voice throughout and needs no
 voice file. Voice File for Menus speaks the menus in a voice file's recorded
 voice and the names in the synthesised one; Voice File Only uses the voice file
-alone, spells names out and says nothing without one. The synthesised voice
+alone and spells names out. Without a voice file that matches this firmware,
+the built-in voice speaks instead. The synthesised voice
 takes 1.5 MB of memory and a voice file about 5 MB, so changing this during
 playback can restart the current track.
 

@@ -18,7 +18,8 @@
  * takes 1.5 MB, which stops and rebuffers playback if the audio buffer
  * already holds the memory. */
 void speech_apply_settings(void);
-/* Speak Aloud is on with a voice the synthesiser speaks */
+/* Speak Aloud is on with a voice the synthesiser speaks, or with Voice File
+ * Only and no voice file to speak it */
 bool speech_wanted(void);
 
 /* True while the synthesiser can speak. */

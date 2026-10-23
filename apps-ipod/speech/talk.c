@@ -1166,6 +1166,11 @@ bool is_voice_queued(void)
     return QUEUE_LEVEL > 0;
 }
 
+bool talk_has_voicefile(void)
+{
+    return has_voicefile;
+}
+
 /* Make sure the current utterance is not interrupted by the next one. */
 void talk_force_enqueue_next(void)
 {

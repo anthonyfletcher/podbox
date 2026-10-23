@@ -156,8 +156,11 @@ static void load_strings(const char *lang)
 
 bool speech_wanted(void)
 {
+    /* Voice File Only with no file that loads, as after an update without
+     * the matching voices, would leave the player silent, menus and all */
     return global_settings.talk_menu
-           && global_settings.talk_voice != TALK_VOICE_FILE_ONLY;
+           && (global_settings.talk_voice != TALK_VOICE_FILE_ONLY
+               || !talk_has_voicefile());
 }
 
 void speech_apply_settings(void)

@@ -105,6 +105,7 @@ void talk_init(void);
 int talk_get_bufsize(void); /* get the loaded voice file size */
 size_t talkbuf_init(char* bufstart);
 bool is_voice_queued(void); /* Are there more voice clips to be spoken? */
+bool talk_has_voicefile(void); /* a .voice file loaded and matches the build */
 int talk_id(int32_t id, bool enqueue); /* play a voice ID from voicefont */
 /* play a thumbnail from file */
 int talk_file(const char *root, const char *dir, const char *file,

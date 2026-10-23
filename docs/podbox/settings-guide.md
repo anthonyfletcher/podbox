@@ -648,7 +648,7 @@ restart, which costs battery life: restart the player afterwards.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Speak Aloud | Speaks the player aloud: menus, settings, dialogs and the names of your music. Off, nothing is spoken and no voice is loaded. | No |  |
-| Voice | Which voice speaks. Built-in is the synthesised voice throughout and needs no voice file. Voice File for Menus speaks the menus in a voice file's recorded voice and the names in the synthesised one; Voice File Only uses the voice file alone, spells names out and says nothing without one. The synthesised voice takes 1.5 MB of memory and a voice file about 5 MB, so changing this during playback can restart the current track. | Built-in |  |
+| Voice | Which voice speaks. Built-in is the synthesised voice throughout and needs no voice file. Voice File for Menus speaks the menus in a voice file's recorded voice and the names in the synthesised one; Voice File Only uses the voice file alone and spells names out. Without a voice file that matches this firmware, the built-in voice speaks instead. The synthesised voice takes 1.5 MB of memory and a voice file about 5 MB, so changing this during playback can restart the current track. | Built-in |  |
 | Speech Rate | How fast the synthesised voice speaks. Recorded voice files are not affected. | 100% |  |
 | Voice Directories | Whether folder names are spoken, and whether by number or by name. Spell reads the name, or spells it out with Voice File Only. | Spell | **Adv** |
 | Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | No | **Adv** |

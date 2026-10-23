@@ -135,7 +135,8 @@ enum {
 /* talk_voice: which voice speaks */
 enum {
     TALK_VOICE_BUILT_IN = 0,    /* the synthesiser, throughout */
-    TALK_VOICE_FILE_MENUS,      /* a .voice file the menus, the synth names */
+    TALK_VOICE_FILE_MENUS,      /* a .voice file says the menus, the synth
+                                 * the names */
     TALK_VOICE_FILE_ONLY,       /* a .voice file; names spelled */
 };
 
