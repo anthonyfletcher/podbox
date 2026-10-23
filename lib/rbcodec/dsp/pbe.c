@@ -155,11 +155,10 @@ static void pbe_process(struct dsp_proc_entry *this,
     }
 
     /* apply Biophonic EQ   */
-    eq_high_shelf1_gain_process(&pbe_filter[0], buf->p32, buf->remcount,
-                                buf->format.num_channels);
+    eq_high_shelf1_gain_process(&pbe_filter[0], buf->p32, count,
+                                num_channels);
     for (int i = 1; i < 5; i++)
-        eq_peak_process(&pbe_filter[i], buf->p32, buf->remcount,
-                        buf->format.num_channels);
+        eq_peak_process(&pbe_filter[i], buf->p32, count, num_channels);
 
     (void)this;
 }

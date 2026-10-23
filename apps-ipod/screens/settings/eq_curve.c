@@ -169,11 +169,6 @@ static int32_t point_hz16(int point)
     return 20 * fp16_exp(point * LN1000_16 / (EQ_CURVE_POINTS - 1));
 }
 
-int eq_curve_point_hz(int point)
-{
-    return (point_hz16(point) + 0x8000) >> 16;
-}
-
 int eq_curve_position(int hz)
 {
     if (hz <= 20)
@@ -243,9 +238,8 @@ int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs)
     return peak;
 }
 
-int eq_curve_headroom(const struct eq_band_setting *bands, unsigned int fs)
+int eq_curve_headroom(int peak)
 {
-    int peak = eq_curve_peak(bands, fs);
     int tenths;
 
     if (peak <= 0)

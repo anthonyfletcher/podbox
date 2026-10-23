@@ -27,7 +27,8 @@
 
 static bool paused_for_us;      /* this announcement paused the music */
 
-void announce_track(bool enqueue)
+/* Say the current track's title and artist, after what is being said */
+static void announce_track(void)
 {
     struct mp3entry *id3 = audio_current_track();
     char trimmed[MAX_PATH], text[2 * MAX_PATH];
@@ -41,7 +42,7 @@ void announce_track(bool enqueue)
         snprintf(text, sizeof(text), "%s, %s", title, id3->artist);
     else
         snprintf(text, sizeof(text), "%s", title);
-    talk_name(text, enqueue);
+    talk_name(text, true);
 }
 
 /* On the audio thread */
@@ -63,11 +64,25 @@ static void voice_changed(unsigned short id, void *data)
         button_queue_post(SYS_ANNOUNCE_DONE, 0);
 }
 
+/* The announcement that paused the music is over: resumed only if nobody
+ * has touched the pause since */
+static void announce_done(void)
+{
+    paused_for_us = false;
+    if (audio_status() & AUDIO_STATUS_PAUSE)
+        audio_resume();
+}
+
 void announce_event(long event, intptr_t data)
 {
     if (event == SYS_ANNOUNCE_TRACK)
     {
-        int status = audio_status();
+        int status;
+
+        /* the end of the last one was posted to a screen that dropped it */
+        if (paused_for_us && !voice_is_playing())
+            announce_done();
+        status = audio_status();
         if (global_settings.talk_track_change == ANNOUNCE_PAUSE_MUSIC
             && data /* followed on by itself */
             && (status & AUDIO_STATUS_PLAY) && !(status & AUDIO_STATUS_PAUSE))
@@ -75,7 +90,7 @@ void announce_event(long event, intptr_t data)
             audio_pause();
             paused_for_us = true;
         }
-        announce_track(true);
+        announce_track();
         if (paused_for_us && !voice_is_playing())
         {
             /* nothing could be said, so nothing will end */
@@ -84,12 +99,7 @@ void announce_event(long event, intptr_t data)
         }
     }
     else if (event == SYS_ANNOUNCE_DONE && paused_for_us)
-    {
-        /* resumed only if nobody has touched the pause since */
-        paused_for_us = false;
-        if (audio_status() & AUDIO_STATUS_PAUSE)
-            audio_resume();
-    }
+        announce_done();
 }
 
 void announce_init(void)

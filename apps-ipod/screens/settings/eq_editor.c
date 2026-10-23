@@ -27,6 +27,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include "string-extra.h"
 #include "system.h"
@@ -79,6 +80,10 @@ static int preset_file_count;
 /* What the curve was last set from, for the editor's title; empty once a
  * band is changed by hand. */
 static char preset_name[PRESET_NAME_MAX];
+
+/* Bands changed in the editor since it opened or a preset was chosen or
+ * saved. */
+static bool unsaved;
 
 static void apply_builtin(int i)
 {
@@ -228,6 +233,7 @@ int eq_presets_screen(void)
         apply_builtin(info.selection);
         strmemccpy(preset_name, str(builtin_presets[info.selection].lang),
                    sizeof preset_name);
+        unsaved = false;
     }
     else
     {
@@ -235,7 +241,10 @@ int eq_presets_screen(void)
         restore_saved();
         snprintf(path, sizeof path, EQS_DIR "/%s.cfg", name);
         if (settings_load_config(path, true))
+        {
             strmemccpy(preset_name, name, sizeof preset_name);
+            unsaved = false;
+        }
     }
     settings_save();
     return 0;
@@ -261,7 +270,6 @@ static struct
     bool bypass;                /* the EQ is off to compare */
     bool latched;               /* ...from the menu, until a key */
     bool changed;
-    bool unsaved;               /* bands changed since a preset was chosen */
     int peak;                  /* hundredths of a dB */
     int font_ui, font_bold, font_small;
     int ui_h, small_h, row, srow;
@@ -325,17 +333,12 @@ static bool load_layout(void)
     return axis - top - 8 >= CURVE_MIN_H;
 }
 
-static unsigned int curve_fs(void)
-{
-    return eq_dsp_frequency();
-}
-
 static void rebuild_curve(void)
 {
-    eq_curve_init(&curve, curve_fs());
+    eq_curve_init(&curve, eq_dsp_frequency());
     for (int b = 0; b < EQ_NUM_BANDS; b++)
         eq_curve_set_band(&curve, b, &global_settings.eq_band_settings[b]);
-    ed.peak = eq_curve_peak(global_settings.eq_band_settings, curve_fs());
+    ed.peak = eq_curve_peak(global_settings.eq_band_settings, curve.fs);
 }
 
 /** drawing **/
@@ -685,16 +688,15 @@ static void draw_simple(void)
     format_db(db, sizeof db, s->gain);
     text(ed.font_bold, CURVE_X, y2, ed.fg, db);
 
+    format_db(db, sizeof db, -(int)global_settings.eq_precut);
     if (global_settings.eq_auto_headroom)
     {
         text_right(ed.font_small, LCD_WIDTH - CURVE_X, y1, ed.dim,
                    str(LANG_EQUALIZER_AUTO_HEADROOM));
-        format_db(db, sizeof db, -(int)global_settings.eq_precut);
         text_right(ed.font_bold, LCD_WIDTH - CURVE_X, y2, ed.fg, db);
     }
     else
     {
-        format_db(db, sizeof db, -(int)global_settings.eq_precut);
         snprintf(buf, sizeof buf, "%s %s", str(LANG_EQUALIZER_PRECUT), db);
         text_right(ed.font_small, LCD_WIDTH - CURVE_X, y1, ed.dim, buf);
         headroom_text(buf, sizeof buf, &warn);
@@ -703,11 +705,21 @@ static void draw_simple(void)
     }
 }
 
-static const char *type_name(enum eq_filter_type t)
+static int type_lang(int t)
 {
-    return str(t == EQ_FILTER_LOW_SHELF ? LANG_EQUALIZER_TYPE_LOW_SHELF
-             : t == EQ_FILTER_HIGH_SHELF ? LANG_EQUALIZER_TYPE_HIGH_SHELF
-             : LANG_EQUALIZER_TYPE_PEAK);
+    return t == EQ_FILTER_LOW_SHELF ? LANG_EQUALIZER_TYPE_LOW_SHELF
+         : t == EQ_FILTER_HIGH_SHELF ? LANG_EQUALIZER_TYPE_HIGH_SHELF
+         : LANG_EQUALIZER_TYPE_PEAK;
+}
+
+static int field_lang(const struct eq_band_setting *s, enum field f)
+{
+    return f == FIELD_FREQ ? (s->type == EQ_FILTER_PEAK
+                              ? LANG_EQUALIZER_FIELD_CENTRE
+                              : LANG_EQUALIZER_FIELD_CORNER)
+         : f == FIELD_GAIN ? LANG_GAIN
+         : f == FIELD_Q ? LANG_EQUALIZER_BAND_Q
+         : LANG_EQUALIZER_FIELD_TYPE;
 }
 
 static void draw_enhanced(void)
@@ -718,7 +730,6 @@ static void draw_enhanced(void)
     int axis = fields - 8 - ed.srow;
     struct area a = { top + 4, axis - top - 8, 12 };
     char title[24], right[64], part[48], vals[FIELD_COUNT][16];
-    const char *names[FIELD_COUNT];
     int active = 0, x;
     bool warn;
 
@@ -754,21 +765,17 @@ static void draw_enhanced(void)
     lcd_set_foreground(ed.grid);
     lcd_hline(CURVE_X, CURVE_X + CURVE_W - 1, fields - 4);
 
-    names[FIELD_FREQ] = str(s->type == EQ_FILTER_PEAK ? LANG_EQUALIZER_FIELD_CENTRE
-                                                       : LANG_EQUALIZER_FIELD_CORNER);
-    names[FIELD_GAIN] = str(LANG_GAIN);
-    names[FIELD_Q] = str(LANG_EQUALIZER_BAND_Q);
-    names[FIELD_TYPE] = str(LANG_EQUALIZER_FIELD_TYPE);
     format_hz(vals[FIELD_FREQ], sizeof vals[0], s->cutoff);
     format_db(vals[FIELD_GAIN], sizeof vals[0], s->gain);
     snprintf(vals[FIELD_Q], sizeof vals[0], "%d.%d", s->q / 10, s->q % 10);
-    strmemccpy(vals[FIELD_TYPE], type_name(s->type), sizeof vals[0]);
+    strmemccpy(vals[FIELD_TYPE], str(type_lang(s->type)), sizeof vals[0]);
 
     x = CURVE_X;
     for (int i = 0; i < FIELD_COUNT; i++)
     {
         bool act = (int)ed.field == i;
-        int w = text_width(ed.font_small, names[i]);
+        const char *name = str(field_lang(s, i));
+        int w = text_width(ed.font_small, name);
         int vw = text_width(act ? ed.font_bold : ed.font_ui, vals[i]);
 
         if (vw > w)
@@ -779,7 +786,7 @@ static void draw_enhanced(void)
             lcd_fillrect(x, fields, 3, ed.srow + ed.row);
         }
         text(ed.font_small, x + 9, fields + (ed.srow - ed.small_h) / 2,
-             act ? ed.fg : ed.dim, names[i]);
+             act ? ed.fg : ed.dim, name);
         text(act ? ed.font_bold : ed.font_ui, x + 9,
              fields + ed.srow + (ed.row - ed.ui_h) / 2,
              act ? ed.fg : ed.dim, vals[i]);
@@ -820,12 +827,11 @@ static void band_applied(int band)
     ed.peak = eq_curve_peak(global_settings.eq_band_settings, curve.fs);
     if (global_settings.eq_auto_headroom)
     {
-        global_settings.eq_precut =
-            eq_curve_headroom(global_settings.eq_band_settings, curve.fs);
+        global_settings.eq_precut = eq_curve_headroom(ed.peak);
         dsp_set_eq_precut(global_settings.eq_precut);
     }
     preset_name[0] = '\0';
-    ed.changed = ed.unsaved = true;
+    ed.changed = unsaved = true;
 }
 
 static int step_freq(int hz, int dir)
@@ -878,22 +884,13 @@ static void speak_value(const struct eq_band_setting *s, enum field f,
     if (!global_settings.talk_menu)
         return;
     if (name)
-        talk_id(f == FIELD_FREQ ? (s->type == EQ_FILTER_PEAK
-                                   ? LANG_EQUALIZER_FIELD_CENTRE
-                                   : LANG_EQUALIZER_FIELD_CORNER)
-              : f == FIELD_GAIN ? LANG_GAIN
-              : f == FIELD_Q ? LANG_EQUALIZER_BAND_Q
-              : LANG_EQUALIZER_FIELD_TYPE, false);
+        talk_id(field_lang(s, f), false);
     switch (f)
     {
     case FIELD_FREQ: talk_value(s->cutoff, UNIT_HERTZ, name); break;
     case FIELD_GAIN: talk_value_decimal(s->gain, UNIT_DB, 1, name); break;
     case FIELD_Q:    talk_value_decimal(s->q, UNIT_INT, 1, name); break;
-    case FIELD_TYPE:
-        talk_id(s->type == EQ_FILTER_LOW_SHELF ? LANG_EQUALIZER_TYPE_LOW_SHELF
-              : s->type == EQ_FILTER_HIGH_SHELF ? LANG_EQUALIZER_TYPE_HIGH_SHELF
-              : LANG_EQUALIZER_TYPE_PEAK, name);
-        break;
+    case FIELD_TYPE: talk_id(type_lang(s->type), name); break;
     default: break;
     }
 }
@@ -951,7 +948,12 @@ static void wheel(int dir)
         break;
     }
 
-    if (!memcmp(&next, s, sizeof next) || !eq_band_fits(&next, curve.fs))
+    /* A band that does not fit, from the band list or a .cfg, can still be
+     * brought toward 0 dB: a smaller gain never fits less, and 0 fits. */
+    if (!memcmp(&next, s, sizeof next))
+        return;
+    if (!eq_band_fits(&next, curve.fs)
+        && (eq_band_fits(s, curve.fs) || abs(next.gain) >= abs(s->gain)))
         return;
     *s = next;
     band_applied(ed.band);
@@ -979,7 +981,7 @@ static bool save_preset(void)
     n = strlen(preset_name);
     if (n > 4 && !strcasecmp(preset_name + n - 4, ".cfg"))
         preset_name[n - 4] = '\0';
-    ed.unsaved = false;
+    unsaved = false;
     return true;
 }
 
@@ -1067,8 +1069,6 @@ static bool select_menu(void)
     case SM_PRESETS:
         if (eq_presets_screen() == MENU_ATTACHED_USB)
             return true;
-        if (preset_name[0])
-            ed.unsaved = false;
         rebuild_curve();
         break;
     case SM_COMPARE:
@@ -1107,7 +1107,7 @@ static int confirm_exit(void)
     static const int lang[] = { LANG_EQUALIZER_SAVE, LANG_EQUALIZER_EXIT_UNSAVED };
     struct simplelist_info info;
 
-    if (!ed.unsaved || builtin_match() >= 0)
+    if (!unsaved || builtin_match() >= 0)
         return 1;
     simplelist_info_init(&info, str(LANG_EQUALIZER_UNSAVED), ARRAYLEN(lang),
                          (void *)lang);
@@ -1142,7 +1142,7 @@ int eq_editor_screen(void)
             && global_settings.settings_mode == SETTINGS_MODE_EVERYTHING);
     ed.band = 0;
     ed.field = FIELD_GAIN;
-    ed.bypass = ed.latched = ed.changed = false;
+    ed.bypass = ed.latched = ed.changed = unsaved = false;
     load_colours();
     rebuild_curve();
 
@@ -1169,7 +1169,7 @@ int eq_editor_screen(void)
                 load_colours();
             continue;
         }
-        if (ed.latched && action != ACTION_REDRAW)
+        if (ed.latched && action != ACTION_REDRAW && !(action & SYS_EVENT))
         {
             ed.latched = false;
             set_bypass(false);

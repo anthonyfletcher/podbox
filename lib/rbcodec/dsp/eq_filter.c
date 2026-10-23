@@ -20,7 +20,8 @@
  * u1 the last u. struct dsp_filter carries them with its own meaning per
  * type -- coefs and history below -- so a band changing type goes through
  * eq_filter_convert(). The sum is carried down as filter_process() does it:
- * see dsp_filter.c for the frac word.
+ * see dsp_filter.c for the frac word. Samples reach 16x full scale, so u and
+ * x - x2 can reach 32x: they are held at the 32-bit limits, not wrapped.
  *
  * Parts, in order:
  *   - coefficients: the peak from filter_pk_coefs()' own intermediates, the
@@ -199,6 +200,11 @@ static inline int32_t carry_down(int64_t acc, unsigned int shift,
     return out >> 32;
 }
 
+static inline int32_t sat32(int64_t v)
+{
+    return v > INT32_MAX ? INT32_MAX : v < INT32_MIN ? INT32_MIN : v;
+}
+
 void eq_peak_process(struct dsp_filter *f, int32_t * const buf[], int count,
                      unsigned int channels)
 {
@@ -211,7 +217,7 @@ void eq_peak_process(struct dsp_filter *f, int32_t * const buf[], int count,
         for (int i = 0; i < count; i++)
         {
             int32_t x = p[i];
-            int64_t acc = (int64_t)(x - h[0]) * c[0]
+            int64_t acc = (int64_t)sat32((int64_t)x - h[0]) * c[0]
                         + (int64_t)h[2] * c[1] + (int64_t)h[3] * c[2];
             int32_t e = carry_down(acc, PEAK_SHIFT, &f->frac[ch]);
             h[0] = h[1], h[1] = x, h[3] = h[2], h[2] = e;
@@ -232,7 +238,7 @@ static void shelf_process(struct dsp_filter *f, int32_t * const buf[],
         for (int i = 0; i < count; i++)
         {
             int32_t x = p[i];
-            int32_t u = low ? x + h[0] : x - h[0];
+            int32_t u = sat32(low ? (int64_t)x + h[0] : (int64_t)x - h[0]);
             int64_t acc = (int64_t)u * c[0] + (int64_t)h[1] * c[1]
                         + (int64_t)h[2] * c[2] + (int64_t)h[3] * c[3];
             int32_t e = carry_down(acc, SHELF_SHIFT, &f->frac[ch]);
@@ -267,7 +273,7 @@ static void shelf1_process(struct dsp_filter *f, int32_t * const buf[],
         for (int i = 0; i < count; i++)
         {
             int32_t x = p[i];
-            int32_t u = low ? x + h[0] : x - h[0];
+            int32_t u = sat32(low ? (int64_t)x + h[0] : (int64_t)x - h[0]);
             int64_t acc = (int64_t)u * c[0] + (int64_t)h[1] * c[1];
             int32_t e = carry_down(acc, SHELF1_SHIFT, &f->frac[ch]);
             h[0] = x, h[1] = e;

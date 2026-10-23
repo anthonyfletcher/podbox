@@ -103,13 +103,6 @@ static void load_dictionary(void)
         dict_handle = core_free(dict_handle);
 }
 
-/* The strings' allocation: an offset into the file for each id, those of
- * the first table then the voice-only ones, followed by the file. */
-static uint16_t *string_offsets(void)
-{
-    return core_get_data(strings_handle);
-}
-
 static int id_slot(int32_t id)
 {
     if (id >= 0 && id < ID1_COUNT)
@@ -138,7 +131,10 @@ static void load_strings(const char *lang)
     memset(offsets, 0xff, index);
     if (size < VSTRINGS_HEADER || size >= NO_STRING
         || file[0] != VSTRINGS_COOKIE || file[1] != VSTRINGS_VERSION
-        || file[2] != TARGET_ID)
+        || file[2] != TARGET_ID
+        /* the string count, as a .voice file is checked: another build's
+         * strings are numbered differently */
+        || ((file[4] << 8) | file[5]) != ID1_COUNT + ID2_COUNT)
     {
         strings_handle = core_free(strings_handle);
         return;
@@ -200,11 +196,13 @@ bool speech_voice_string(int32_t id, char *buf, int size)
     int slot = id_slot(id);
     if (!strings_handle || slot < 0)
         return false;
-    uint16_t offset = string_offsets()[slot];
+    /* the strings' allocation: an offset into the file for each id, those
+     * of the first table then the voice-only ones, followed by the file */
+    const uint16_t *offsets = core_get_data(strings_handle);
+    uint16_t offset = offsets[slot];
     if (offset == NO_STRING)
         return false;
-    const char *s = (const char *)string_offsets()
-                    + (ID1_COUNT + ID2_COUNT) * sizeof(uint16_t) + offset;
+    const char *s = (const char *)(offsets + ID1_COUNT + ID2_COUNT) + offset;
     strmemccpy(buf, s, size);
     return buf[0] != '\0';
 }
@@ -250,6 +248,8 @@ void speech_release(int item)
     ring_read = item_end(item);
     if (item == newest)
         newest = -1;
+    if (item == begun)
+        begun = -1;
     if (--live == 0)
         ring_read = ring_write = 0;
 }

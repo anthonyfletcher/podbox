@@ -71,9 +71,7 @@ struct hotkey_assignment {
     uint8_t icon;           /* themable_icons value shown beside the entry */
 };                          /* (Pick ONPLAY_FUNC_RETURN to use function's return value) */
 
-/* The two hotkey settings hold their action as item 0 of an int that has room
-   for HK_CTX_ITEMS of them; the rest are unused. */
-#define HK_CTX_ITEMS (5) /* 6 x 5 = 30 bits */
+/* The two hotkey settings hold their action as item 0 of an int. */
 #define HK_CTX_MASK  (0x3F)
 #define HK_CTX_BITS  (6) /* 6 bits, enough for 62 hotkey actions */
 #define HK_CTX_SET(item, hotkey) ((hotkey & HK_CTX_MASK) << (item * HK_CTX_BITS))

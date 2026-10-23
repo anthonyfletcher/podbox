@@ -1208,25 +1208,19 @@ static int clipboard_paste(void)
 
 static long selected_track_idx(void);
 
-/* True only when a rating was kept. An album's rating overwrites every
- * track, so Cancel has to be told apart from keeping the rating it opened
- * on. */
-static bool pick_rating(const unsigned char *title, int *rating)
-{
-    return rating_dialog((const char *)P2STR(title), rating);
-}
-
 /* An entry number is only good for the generation it was read in: a Rebuild
  * finishing while the picker is up renumbers the tracks, and the rating would
- * land on someone else's. */
+ * land on someone else's. The picker is false only on Cancel: an album's
+ * rating overwrites every track, so Cancel has to be told apart from keeping
+ * the rating it opened on. */
 static int set_rating(bool album)
 {
     long idx = album ? -1 : selected_track_idx();
     int rating = album ? 0 : browser_db_get_rating(idx);
     uint32_t generation = tagcache_generation();
 
-    if (!pick_rating(album ? ID2P(LANG_MENU_SET_ALBUM_RATING)
-                           : ID2P(LANG_MENU_SET_RATING), &rating))
+    if (!rating_dialog(str(album ? LANG_MENU_SET_ALBUM_RATING
+                                 : LANG_MENU_SET_RATING), &rating))
         return 0;
 
     if (!tagcache_is_usable() || tagcache_generation() != generation)
@@ -2412,17 +2406,10 @@ void wps_context_menu_load_from_cfg(void *setting, char *value)
 char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len)
 {
     int var = *(int*)setting;
-    int items = 1;
 
-    unsigned int written;
-    char *buffer = buf;
-    for (int i = 0; i < items && buf_len > 0; i++)
-    {
-        written = snprintf(buffer, buf_len, "%s, ",
-                    lang_id_to_english(get_hotkey(HK_CTX_GET(i, var))->lang_id));
-        buf_len -= written;
-        buffer += written;
-    }
+    if (buf_len > 0)
+        snprintf(buf, buf_len, "%s, ",
+                 lang_id_to_english(get_hotkey(HK_CTX_GET(0, var))->lang_id));
     return buf;
 }
 
@@ -2444,29 +2431,28 @@ static int item_row_count;
 
 /* data is the row's index into item_rows, plus CONTEXT_ROWS_MAX for a slot
  * under More */
-static int item_row_index(const struct menu_item_ex *this_item)
+static int item_row_index(const void *data)
 {
-    return (intptr_t)this_item->menu_get_name_and_icon->list_get_name_data
-           % CONTEXT_ROWS_MAX;
+    return (intptr_t)data % CONTEXT_ROWS_MAX;
 }
 
 static char *item_row_name(int selected_item, void *data,
                            char *buffer, size_t buffer_len)
 {
     (void)selected_item; (void)buffer; (void)buffer_len;
-    return str(item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].lang_id);
+    return str(item_rows[item_row_index(data)].lang_id);
 }
 
 static int item_row_speak(int selected_item, void *data)
 {
     (void)selected_item;
-    talk_id(item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].lang_id, false);
+    talk_id(item_rows[item_row_index(data)].lang_id, false);
     return 0;
 }
 
 static int item_row_run(void *data)
 {
-    context_menu_result = item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].run();
+    context_menu_result = item_rows[item_row_index(data)].run();
     return 0;
 }
 
@@ -2474,14 +2460,13 @@ static int item_row_callback(int action,
                              const struct menu_item_ex *this_item,
                              struct gui_synclist *this_list)
 {
-    intptr_t data =
-        (intptr_t)this_item->menu_get_name_and_icon->list_get_name_data;
-    int i = item_row_index(this_item);
+    void *data = this_item->menu_get_name_and_icon->list_get_name_data;
+    int i = item_row_index(data);
 
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM &&
         (i >= item_row_count ||
-         item_rows[i].more != (data >= CONTEXT_ROWS_MAX)))
+         item_rows[i].more != ((intptr_t)data >= CONTEXT_ROWS_MAX)))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -2541,12 +2526,12 @@ MAKE_ONPLAYMENU_TITLED( item_menu,
  * global_settings.context_hidden[], which is saved by name. */
 
 static const short now_playing_rows[] = {
-    LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_TRACK_INFO,
-    LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_LYRICS, LANG_SLEEP_TIMER,
-    LANG_SOUND_MIX, LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL,
-    LANG_SHOW_IN_FILES, LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU,
-    LANG_BROWSE_CUESHEET, LANG_BROWSE_CHAPTERS, LANG_EQUALIZER,
-    LANG_SOUND_SETTINGS, LANG_PLAYBACK, LANG_DELETE,
+    LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_GO_TO_ALBUM,
+    LANG_GO_TO_ARTIST, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
+    LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_SHOW_IN_FILES,
+    LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU, LANG_BROWSE_CUESHEET,
+    LANG_BROWSE_CHAPTERS, LANG_EQUALIZER, LANG_SOUND_SETTINGS, LANG_PLAYBACK,
+    LANG_DELETE,
 };
 static const short track_rows[] = {
     LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_WINDDOWN, LANG_MENU_SET_RATING,
@@ -2651,7 +2636,7 @@ static int row_lang_id(const struct menu_item_ex *row)
             return LANG_SLEEP_TIMER;
         if (d->list_get_name == item_row_name)
         {
-            int i = (intptr_t)d->list_get_name_data % CONTEXT_ROWS_MAX;
+            int i = item_row_index(d->list_get_name_data);
             return i < item_row_count ? item_rows[i].lang_id : -1;
         }
     }
@@ -2686,12 +2671,11 @@ static bool row_hideable(const struct menu_item_ex *row)
     return row_bit(ctx_kind, row) >= 0;
 }
 
+/* Only ever called for a row row_hideable() has passed */
 static void row_hide(const struct menu_item_ex *row)
 {
     int bit = row_bit(ctx_kind, row);
 
-    if (bit < 0)
-        return;
     global_settings.context_hidden[ctx_kind] |= 1u << bit;
     settings_save();
     splash(HZ, ID2P(LANG_ROW_HIDDEN));

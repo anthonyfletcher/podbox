@@ -723,6 +723,20 @@ static int moving_action(int action, struct gui_synclist *lists)
 {
     int sel = gui_synclist_get_sel_pos(lists);
 
+    if (IS_SYSEVENT(action))
+    {
+        /* System events go on to the list. USB takes the screen, so the
+         * shortcut goes back where it was first and the list in memory
+         * still matches the file. */
+        if (action == SYS_USB_CONNECTED)
+        {
+            carry_to(moving_from);
+            gui_synclist_select_item(lists, moving_from);
+            moving_item = -1;
+        }
+        return action;
+    }
+
     if (sel != moving_item)
     {
         carry_to(sel);

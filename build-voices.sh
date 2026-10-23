@@ -49,8 +49,7 @@ fi
 # the two do not jar where they take turns.
 model_of() {
     case "$1" in
-        english)              echo en_US-joe-medium ;;
-        english-us)           echo en_US-joe-medium ;;
+        english|english-us)   echo en_US-joe-medium ;;
         deutsch)              echo de_DE-thorsten-high ;;
         francais)             echo fr_FR-siwis-medium ;;
         espanol)              echo es_ES-sharvard-medium ;;

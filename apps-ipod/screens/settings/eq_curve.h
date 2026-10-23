@@ -30,8 +30,6 @@ void eq_curve_set_band(struct eq_curve *c, int band,
 /* Sum of every band at a point, hundredths of a dB. */
 int eq_curve_total(const struct eq_curve *c, int point);
 
-/* A point's frequency in Hz. */
-int eq_curve_point_hz(int point);
 /* Where f sits along the axis, 0 (20 Hz) to 65536 (20 kHz). */
 int eq_curve_position(int hz);
 
@@ -40,7 +38,7 @@ int eq_curve_position(int hz);
 int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs);
 /* Precut, in tenths of a dB, that keeps that peak at or below 0 dB --
  * rounded up to 0.5 dB and held within the Precut setting's range. */
-int eq_curve_headroom(const struct eq_band_setting *bands, unsigned int fs);
+int eq_curve_headroom(int peak);
 
 /* False if the DSP's fixed-point coefficients would overflow for this band,
  * so the player would no longer play what the curve shows. */

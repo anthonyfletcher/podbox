@@ -373,6 +373,7 @@ static void hat_pitches(int clause)
     if (total == 0)
         return;
     bool falls = clause != ',' && clause != '?';
+    int top = falls ? 1080 : 1050, drop = falls ? 200 : 100;
     int64_t t = 0, t_nucleus = 0;
     for (int i = 0; i < nph; i++)
     {
@@ -381,10 +382,8 @@ static void hat_pitches(int clause)
         t = t1;
         if (i == last)
             t_nucleus = t0;
-        int base0 = (falls ? 1080 : 1050)
-                    - (falls ? 200 : 100) * t0 / total;
-        int base1 = (falls ? 1080 : 1050)
-                    - (falls ? 200 : 100) * t1 / total;
+        int base0 = top - drop * t0 / total;
+        int base1 = top - drop * t1 / total;
         int s0 = 0, s1 = 0;
         if (first >= 0 && i >= first && i < last)
         {

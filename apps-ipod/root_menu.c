@@ -1190,6 +1190,38 @@ enum list_row_kind root_menu_item_kind(const struct menu_item_ex *item)
     return slot < 0 ? LIST_ROW_ACTION : browser_db_get_main_menu_row_kind(slot);
 }
 
+/* The items that are turned off, and where: after this many of the items
+ * that are on. The root menu shows none of them; they are kept so that
+ * Edit Main Menu can show each where it was, and written back into
+ * "root menu order" with a '!' before the key. */
+static struct {
+    int8_t idx;                 /* into menu_table[] */
+    uint8_t after;
+} root_menu_off[MAX_MENU_ITEMS];
+static unsigned root_menu_off_count;
+
+/* Keeps each item that is turned off in its place when an item that is on
+ * is added at, or taken from, position 'at' */
+static void root_menu_off_shift(unsigned at, int by)
+{
+    unsigned k;
+
+    for (k = 0; k < root_menu_off_count; k++)
+        if (root_menu_off[k].after > at)
+            root_menu_off[k].after += by;
+}
+
+/* The root_menu_off[] entry for 'item', or -1 */
+static int root_menu_off_find(const struct menu_item_ex *item)
+{
+    unsigned k;
+
+    for (k = 0; k < root_menu_off_count; k++)
+        if (menu_table[root_menu_off[k].idx].item == item)
+            return k;
+    return -1;
+}
+
 /* settings_load() reads the saved order before browser_db_init() has parsed
  * tagnavi.config, so root_menu_load_from_cfg() cannot tell which tagnavi
  * slots are backed by a row and keeps every one the order names, in place.
@@ -1208,6 +1240,8 @@ static void root_menu_fixup_tagnavi_slots(void)
 
         if (slot < 0 || browser_db_get_main_menu_row(slot, NULL))
             root_menu__[out++] = root_menu__[i];
+        else
+            root_menu_off_shift(out, -1);
     }
 
     if (out != count)
@@ -1223,14 +1257,18 @@ static void root_menu_fixup_tagnavi_slots(void)
  * how a row is *positioned*, and taking it away would mean the one row nobody
  * could move. Toggling the setting re-asserts whichever state it wants.
  *
+ * A row the user has hidden stays hidden on first entry, and comes back where
+ * it was when the setting is turned on.
+ *
  * Safe before tagnavi.config is parsed: the slot comes back -1 and this does
  * nothing, which is why root_menu() calls it again on first entry. */
-void root_menu_set_audiobooks_row(bool on)
+static void audiobooks_row(bool on, bool unhide)
 {
     int slot = browser_db_spoken_main_menu_slot();
     struct menu_item_ex *item;
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
     unsigned i;
+    int off;
 
     if (slot < 0 || slot >= TAGNAVI_MAIN_MENU_SLOTS)
         return;
@@ -1246,26 +1284,40 @@ void root_menu_set_audiobooks_row(bool on)
     {
         unsigned at = count;
 
-        if (i < count || count >= MAX_MENU_ITEMS)
-            return;                     /* already there, or no room */
+        off = root_menu_off_find(item);
+        if (i < count || count >= MAX_MENU_ITEMS || (off >= 0 && !unhide))
+            return;                     /* already there, no room, or hidden */
 
-        /* After the last tagnavi row, else before Settings, else last. */
-        for (i = count; i-- > 0; )
-            if (tagnavi_slot_of_item(root_menu__[i]) >= 0)
-                break;
-        if (i < count)
-            at = i + 1;
+        if (off >= 0)
+        {
+            /* Where it was hidden, and no longer listed as turned off */
+            if (root_menu_off[off].after < count)
+                at = root_menu_off[off].after;
+            root_menu_off_count--;
+            memmove(&root_menu_off[off], &root_menu_off[off + 1],
+                    (root_menu_off_count - off) * sizeof(root_menu_off[0]));
+        }
         else
-            for (i = 0; i < count; i++)
-                if (root_menu__[i] == &menu_)
-                {
-                    at = i;
+        {
+            /* After the last tagnavi row, else before Settings, else last. */
+            for (i = count; i-- > 0; )
+                if (tagnavi_slot_of_item(root_menu__[i]) >= 0)
                     break;
-                }
+            if (i < count)
+                at = i + 1;
+            else
+                for (i = 0; i < count; i++)
+                    if (root_menu__[i] == &menu_)
+                    {
+                        at = i;
+                        break;
+                    }
+        }
 
         memmove(&root_menu__[at + 1], &root_menu__[at],
                 (count - at) * sizeof(root_menu__[0]));
         root_menu__[at] = item;
+        root_menu_off_shift(at, 1);
         count++;
     }
     else
@@ -1274,10 +1326,16 @@ void root_menu_set_audiobooks_row(bool on)
             return;                     /* already absent */
         memmove(&root_menu__[i], &root_menu__[i + 1],
                 (count - i - 1) * sizeof(root_menu__[0]));
+        root_menu_off_shift(i, -1);
         count--;
     }
 
     root_menu_set_count(count);
+}
+
+void root_menu_set_audiobooks_row(bool on)
+{
+    audiobooks_row(on, true);
 }
 
 /* menu_table[] less the tagnavi slots whose row is hidden, such as Custom
@@ -1297,16 +1355,6 @@ struct menu_table *root_menu_get_options(int *nb_options)
     *nb_options = n;
     return shown;
 }
-
-/* The items that are turned off, and where: after this many of the items
- * that are on. The root menu shows none of them; they are kept so that
- * Edit Main Menu can show each where it was, and written back into
- * "root menu order" with a '!' before the key. */
-static struct {
-    int8_t idx;                 /* into menu_table[] */
-    uint8_t after;
-} root_menu_off[MAX_MENU_ITEMS];
-static unsigned root_menu_off_count;
 
 /* The menu_table[] index a config token names, or -1. Tagnavi slots match
  * whether or not tagnavi.config has been parsed yet: see
@@ -1392,6 +1440,17 @@ void root_menu_load_from_cfg(void* setting, char *value)
     }
     if (!main_menu_added)
         root_menu__[menu_item_count++] = (struct menu_item_ex *)&menu_;
+    /* An item listed both on and off is off, but for Settings */
+    for (unsigned i = menu_item_count; i-- > 0; )
+    {
+        if (root_menu__[i] == &menu_
+            || root_menu_off_find(root_menu__[i]) < 0)
+            continue;
+        memmove(&root_menu__[i], &root_menu__[i + 1],
+                (menu_item_count - i - 1) * sizeof(root_menu__[0]));
+        root_menu_off_shift(i, -1);
+        menu_item_count--;
+    }
     root_menu_.flags |= MENU_ITEM_COUNT(menu_item_count);
     /* A .cfg loaded once tagnavi.config is parsed gets no first entry to
      * drop the slots it names that have no row. */
@@ -1810,7 +1869,7 @@ void root_menu(void)
         root_menu_fixup_tagnavi_slots();
     /* Now that tagnavi.config has been parsed the slot can be found, which it
      * could not be when the setting was loaded. */
-    root_menu_set_audiobooks_row(global_settings.segregate_audiobooks);
+    audiobooks_row(global_settings.segregate_audiobooks, false);
     push_current_activity(ACTIVITY_MAINMENU);
     next_screen = root_menu_setup_screens();
     debug_log_notice(true);

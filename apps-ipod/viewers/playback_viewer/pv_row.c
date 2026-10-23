@@ -816,9 +816,6 @@ static enum pv_build_result build_model(void *buf, size_t bufsz, bool art_on,
                           bufsz - (art_on ? ART_BYTES : 0), out, year);
 }
 
-/* One visit. Sets *again when a setting has changed that divides the working
- * memory differently: the model is built inside that division, so the only
- * honest way to apply it is to start over. */
 /* The card in focus, as one phrase per part: its section first when that
  * has just changed. */
 static void speak_card(int sec, int idx, bool with_section)
@@ -847,6 +844,9 @@ static void speak_card(int sec, int idx, bool with_section)
     talk_name(text, false);
 }
 
+/* One visit. Sets *again when a setting has changed that divides the working
+ * memory differently: the model is built inside that division, so the only
+ * honest way to apply it is to start over. */
 static int row_session(bool *again)
 {
     struct pv_totals totals;
@@ -857,7 +857,7 @@ static int row_session(bool *again)
     int ret = GO_TO_PREVIOUS;
     int year;
     bool moving = false, was_moving = false;
-    int spoken_sec = -1, spoken_focus = -1;
+    int spoken_sec, spoken_focus;
     long speak_due = 0;         /* when the card at rest is said; 0 none */
     bool held = false;
     bool art_on;
@@ -987,6 +987,13 @@ static int row_session(bool *again)
             {
                 default_event_handler(btn);
                 goto done;
+            }
+            /* the rest as every screen answers them: a track announcement
+             * that paused the music resumes it on one */
+            if (IS_SYSEVENT(btn))
+            {
+                default_event_handler(btn);
+                continue;
             }
 
             /* Raw button codes rather than an action context, the way the

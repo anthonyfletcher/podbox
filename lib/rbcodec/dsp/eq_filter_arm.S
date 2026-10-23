@@ -57,8 +57,17 @@
     add     sp, sp, #20
 .endm
 
+    @ \d = \n \op \d, held at the 32-bit limits rather than wrapping: on
+    @ overflow the sign is wrong, so the limit is the sign flipped.
+.macro SAT op, d, n
+    \op\()s \d, \n, \d
+    movvs   \d, \d, asr #31
+    eorvs   \d, \d, #0x80000000
+.endm
+
 /****************************************************************************
- * eq_peak_process: e = g (x - x2) + c1 e1 + c2 e2, y = x + e, shift 4.
+ * eq_peak_process: e = g (x - x2) + c1 e1 + c2 e2, y = x + e, shift 4,
+ * x - x2 saturated.
  *
  * r4-r6 g, c1, c2; r7, r8, r11, r12 the inputs, rotating; r9, r10 e1 and
  * e2, swapping; r0, r1 the sum; r2 samples left; r3 the buffer; r14 frac.
@@ -83,7 +92,7 @@ eq_peak_process:
     blt     .pk_tail
 .pk_loop:
     ldmia   r3, { r11, r12 }        @ x2 r7, x1 r8
-    sub     r7, r11, r7
+    SAT     sub, r7, r11
     smull   r0, r1, r4, r7
     smlal   r0, r1, r5, r9
     smlal   r0, r1, r6, r10
@@ -93,7 +102,7 @@ eq_peak_process:
     adc     r10, r10, #0
     add     r7, r11, r10
     str     r7, [r3], #4
-    sub     r8, r12, r8             @ x2 r8, x1 r11
+    SAT     sub, r8, r12            @ x2 r8, x1 r11
     smull   r0, r1, r4, r8
     smlal   r0, r1, r5, r10
     smlal   r0, r1, r6, r9
@@ -104,7 +113,7 @@ eq_peak_process:
     add     r8, r12, r9
     str     r8, [r3], #4
     ldmia   r3, { r7, r8 }          @ x2 r11, x1 r12
-    sub     r11, r7, r11
+    SAT     sub, r11, r7
     smull   r0, r1, r4, r11
     smlal   r0, r1, r5, r9
     smlal   r0, r1, r6, r10
@@ -114,7 +123,7 @@ eq_peak_process:
     adc     r10, r10, #0
     add     r11, r7, r10
     str     r11, [r3], #4
-    sub     r12, r8, r12            @ x2 r12, x1 r7
+    SAT     sub, r12, r8            @ x2 r12, x1 r7
     smull   r0, r1, r4, r12
     smlal   r0, r1, r5, r10
     smlal   r0, r1, r6, r9
@@ -131,7 +140,7 @@ eq_peak_process:
     beq     .pk_done
 .pk_one:
     ldr     r11, [r3]
-    sub     r7, r11, r7
+    SAT     sub, r7, r11
     smull   r0, r1, r4, r7
     smlal   r0, r1, r5, r9
     smlal   r0, r1, r6, r10
@@ -155,7 +164,8 @@ eq_peak_process:
 
 /****************************************************************************
  * eq_low_shelf_process, eq_high_shelf_process:
- * e = n0 u + n2 u1 + c1 e1 + c2 e2, u = x +- x1, y = x + e, shift 5.
+ * e = n0 u + n2 u1 + c1 e1 + c2 e2, u = x +- x1 saturated, y = x + e,
+ * shift 5.
  *
  * r4-r7 n0, n2, c1, c2; r8-r10 x, x1 and u1, rotating, as u is formed in
  * x1's register; r11, r12 e1 and e2, swapping. The rest as for the peak.
@@ -165,7 +175,7 @@ eq_peak_process:
     @ e into \e2, which becomes e1; y out through \u1.
 .macro SHELF_SAMPLE op, x, x1, u1, e1, e2
     ldr     \x, [r3]
-    \op     \x1, \x, \x1
+    SAT     \op, \x1, \x
     smull   r0, r1, r4, \x1
     smlal   r0, r1, r5, \u1
     smlal   r0, r1, r6, \e1
@@ -233,7 +243,7 @@ eq_peak_process:
 
 /****************************************************************************
  * eq_low_shelf1_process, eq_high_shelf1_process, eq_high_shelf1_gain_process:
- * e = k u + p e1, u = x +- x1, y = x + e, shift 4; with the gain,
+ * e = k u + p e1, u = x +- x1 saturated, y = x + e, shift 4; with the gain,
  * y = (G x >> 28) + e and k already scaled by G.
  *
  * r4, r5, r9 k, p, G; r6 and r8 x and x1, swapping, as u is formed in x1's
@@ -244,7 +254,7 @@ eq_peak_process:
     @ through \x1, leaving \x as x1.
 .macro SHELF1_SAMPLE op, gain, x, x1
     ldr     \x, [r3]
-    \op     \x1, \x, \x1
+    SAT     \op, \x1, \x
     smull   r0, r1, \x1, r4
     smlal   r0, r1, r5, r7
     mov     r7, r1, lsl #4

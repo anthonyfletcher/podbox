@@ -500,7 +500,7 @@ static void tv_speak_page(void)
     tv_nparts = 0;
     tv_heard = -1;
     if (global_settings.text_viewer_read_aloud == TV_READ_OFF
-        || !global_settings.talk_menu || !speech_enabled()
+        || !speech_enabled()
         || tv.pos < tv.win_start)
         return;
     talk_force_shutup();

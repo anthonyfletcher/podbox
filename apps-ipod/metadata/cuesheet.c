@@ -565,7 +565,8 @@ enum cue_browse_result browse_cuesheet(struct cuesheet *cue)
     while (!done)
     {
         gui_synclist_draw(&lists);
-        action = get_action(CONTEXT_LIST,TIMEOUT_BLOCK);
+        action = get_action(CONTEXT_LIST,
+                            list_do_action_timeout(&lists, TIMEOUT_BLOCK));
         if (gui_synclist_do_button(&lists, &action))
             continue;
         switch (action)

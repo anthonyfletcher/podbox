@@ -611,7 +611,8 @@ void synth_init(int rate)
     fm.cur_silent = true;
 }
 
-int synth_queue_space(void)
+/* Frames the queue can still take. */
+static int synth_queue_space(void)
 {
     return SYNTH_QUEUE_SIZE - (fm.tail - fm.head);
 }

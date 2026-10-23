@@ -175,8 +175,10 @@ void splashf(int ticks, const char *fmt, ...)
     fmt = P2STR((unsigned char *)fmt);
 
     /* Text that is not a lang ID only the synthesiser can say. A splash
-     * shown for no time is a status redrawn in a loop, so is left alone. */
-    if (id < 0 && ticks > 0 && global_settings.talk_menu)
+     * shown for no time is a status redrawn in a loop, so is left alone, as
+     * is one whose caller has just said it and forced it to be heard out. */
+    if (id < 0 && ticks > 0 && global_settings.talk_menu
+        && talk_on_ui_thread() && !talk_force_enqueue_pending())
     {
         char text[128];
         va_start(ap, fmt);

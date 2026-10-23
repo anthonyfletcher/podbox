@@ -1037,7 +1037,7 @@ bool lexicon_init(const void *data, size_t size)
     if (!d || size < 16 || memcmp(d, "PBLX", 4) || d[4] != 1 || d[5] != 0)
         return false;
     uint32_t blocks = read32(d + 8);
-    if (blocks == 0 || 16 + 4 * (size_t)blocks > size)
+    if (blocks == 0 || blocks > (size - 16) / 4)
         return false;
     dict = d;
     dict_size = size;
@@ -1126,14 +1126,18 @@ size_t lexicon_ipa(const char *words, uint16_t *ipa, int max, int *len)
                 break;
             ipa[m++] = ' ';
         }
-        for (int i = 0; i < count && m >= 0; i++)
-            m = put_phone(phones[i], ipa, m, max);
-        if (m < 0)
+        bool fits = true;
+        for (int i = 0; i < count && fits; i++)
         {
-            if (n > 0)
-                break;          /* the word starts the next call */
-            m = max;            /* a word too long to fit at all: cut it */
+            int next = put_phone(phones[i], ipa, m, max);
+            if (next < 0)
+                fits = false;
+            else
+                m = next;
         }
+        /* a word too long to fit at all is cut after its last whole phone */
+        if (!fits && n > 0)
+            break;              /* the word starts the next call */
         n = m;
         p = end;
     }

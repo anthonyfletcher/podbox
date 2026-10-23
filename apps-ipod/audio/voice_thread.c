@@ -524,9 +524,14 @@ static enum voice_state voice_decode(struct voice_thread_data *td)
             int bitPtr = td->bits.bitPtr;
             td->vi.size = td->bits.charPtr;
             td->vi.get_more(&td->vi.start, &td->vi.size, &td->vi.text);
-            speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
-                                      td->vi.size);
-            td->bits.bitPtr = bitPtr;
+            if (td->vi.text >= 0)
+                speech_render_begin(td->vi.text);
+            else
+            {
+                speex_bits_set_bit_buffer(&td->bits, (void *)td->vi.start,
+                                          td->vi.size);
+                td->bits.bitPtr = bitPtr;
+            }
         }
 
         yield();

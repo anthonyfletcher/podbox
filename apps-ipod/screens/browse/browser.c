@@ -1349,7 +1349,9 @@ static int dirbrowse(void)
                 /* Nor does a Music menu row (Artists, Albums) hold music: it
                  * opens a list. The browser's menu would act on whatever the
                  * descent reaches first -- the first artist's tracks, for
-                 * Artists -- so the row's own menu is offered instead. */
+                 * Artists -- so the row's own menu is offered instead, and
+                 * the hotkey, which would act on that same music, does
+                 * nothing. */
                 if (id3db && numentries
                     && customaction == ONPLAY_NO_CUSTOMACTION)
                 {
@@ -1359,6 +1361,8 @@ static int dirbrowse(void)
                     if (kind == LIST_ROW_MENU || kind == LIST_ROW_CUSTOM_MENU
                         || kind == LIST_ROW_CUSTOM || kind == LIST_ROW_ACTION)
                     {
+                        if (hotkey)
+                            break;
                         if (music_row_menu() == MENU_ATTACHED_USB)
                             return exit_to_new_screen(GO_TO_ROOT);
                         reload_dir = true;

@@ -48,9 +48,6 @@ struct synth_frame
 /* Reset the generator and empty its queue. */
 void synth_init(int sample_rate);
 
-/* Frames the queue can still take. */
-int synth_queue_space(void);
-
 /* Queue a frame, or silence when frame is NULL: held for at least min_us,
  * reached by fading from the previous frame over fade_us, or its formants
  * over formant_fade_us when that is longer. False when full. */

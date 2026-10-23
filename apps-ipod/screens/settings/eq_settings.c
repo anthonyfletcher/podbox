@@ -87,8 +87,8 @@ unsigned int eq_dsp_frequency(void)
 void eq_apply(void)
 {
     if (global_settings.eq_auto_headroom)
-        global_settings.eq_precut = eq_curve_headroom(
-            global_settings.eq_band_settings, eq_dsp_frequency());
+        global_settings.eq_precut = eq_curve_headroom(eq_curve_peak(
+            global_settings.eq_band_settings, eq_dsp_frequency()));
     dsp_eq_enable(global_settings.eq_enabled);
     dsp_set_eq_precut(global_settings.eq_precut);
     /* Update all bands */

@@ -364,26 +364,34 @@ static void filter_album(struct tagcache_search *tcs,
     tagcache_search_add_filter(tcs, tag_albumartist, album->artist_seek);
 }
 
-int db_summary_album_tracks(const struct album_data *album,
-                            bool (*sink)(const char *path, void *data),
-                            void *data)
+/* The search on the album's tracks, boosted, or false when the database
+ * would not be searched */
+static bool album_search(struct tagcache_search *tcs,
+                         const struct album_data *album)
 {
-    struct tagcache_search tcs;
+    cpu_boost(true);
+    if (!tagcache_search(tcs, tag_filename))
+    {
+        cpu_boost(false);
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return false;
+    }
+    filter_album(tcs, album);
+    return true;
+}
+
+/* db_summary_album_tracks() from a search album_search() opened, which this
+ * finishes */
+static int album_tracks_from(struct tagcache_search *tcs,
+                             const struct album_data *album,
+                             bool (*sink)(const char *path, void *data),
+                             void *data)
+{
     char buf[MAX_PATH];
     struct album_track *list;
     size_t list_sz = 0;
     int cap, found = 0, added = 0;
     bool sorted;
-
-    cpu_boost(true);
-    if (!tagcache_search(&tcs, tag_filename))
-    {
-        cpu_boost(false);
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        return -1;
-    }
-
-    filter_album(&tcs, album);
 
     /* A search returns entries in master-index order -- the order the files
      * were scanned, which is close to track order for most rips and wrong for
@@ -396,7 +404,7 @@ int db_summary_album_tracks(const struct album_data *album,
     cap = list ? (int)(list_sz / sizeof(*list)) : 0;
     sorted = (cap > 0);
 
-    while (sorted && tagcache_get_next(&tcs, buf, sizeof(buf)))
+    while (sorted && tagcache_get_next(tcs, buf, sizeof(buf)))
     {
         int disc, track;
 
@@ -407,13 +415,13 @@ int db_summary_album_tracks(const struct album_data *album,
             sorted = false;
             break;
         }
-        disc  = tagcache_get_numeric(&tcs, tag_discnumber);
-        track = tagcache_get_numeric(&tcs, tag_tracknumber);
+        disc  = tagcache_get_numeric(tcs, tag_discnumber);
+        track = tagcache_get_numeric(tcs, tag_tracknumber);
         if (disc < 0)
             disc = 0;
         if (track < 0)
             track = 0;
-        list[found].idx_id = tcs.idx_id;
+        list[found].idx_id = tcs->idx_id;
         /* Disc above track, so disc 2's track 1 follows disc 1's last. An
          * untagged disc or track sorts as 0, which puts it first -- the same
          * place the browser's format string puts it. Both are masked: these
@@ -428,7 +436,7 @@ int db_summary_album_tracks(const struct album_data *album,
         qsort(list, found, sizeof(*list), compare_album_tracks);
         for (int i = 0; i < found; i++)
         {
-            if (!tagcache_retrieve(&tcs, list[i].idx_id, tag_filename,
+            if (!tagcache_retrieve(tcs, list[i].idx_id, tag_filename,
                                    buf, sizeof(buf)))
                 continue;
             if (!sink(buf, data))
@@ -439,11 +447,11 @@ int db_summary_album_tracks(const struct album_data *album,
     else
     {
         /* Restart: the walk above may have consumed part of the search. */
-        tagcache_search_finish(&tcs);
-        if (tagcache_search(&tcs, tag_filename))
+        tagcache_search_finish(tcs);
+        if (tagcache_search(tcs, tag_filename))
         {
-            filter_album(&tcs, album);
-            while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+            filter_album(tcs, album);
+            while (tagcache_get_next(tcs, buf, sizeof(buf)))
             {
                 if (!sink(buf, data))
                     break;
@@ -452,9 +460,20 @@ int db_summary_album_tracks(const struct album_data *album,
         }
     }
 
-    tagcache_search_finish(&tcs);
+    tagcache_search_finish(tcs);
     cpu_boost(false);
     return added;
+}
+
+int db_summary_album_tracks(const struct album_data *album,
+                            bool (*sink)(const char *path, void *data),
+                            void *data)
+{
+    struct tagcache_search tcs;
+
+    if (!album_search(&tcs, album))
+        return -1;
+    return album_tracks_from(&tcs, album, sink, data);
 }
 
 static bool insert_sink(const char *path, void *data)
@@ -465,30 +484,34 @@ static bool insert_sink(const char *path, void *data)
 int db_summary_play_album(const struct album_data *album)
 {
     struct playlist_insert_context context;
+    struct tagcache_search tcs;
     int added;
 
     if (!warn_on_pl_erase())
         return -1;
 
-    /* Checked first: a search is refused while a commit runs, and the
-     * playlist is not to be emptied for nothing. */
-    if (!tagcache_search_ready())
+    /* The search first: refused while a commit runs, and the playlist is
+     * not to be emptied for nothing. */
+    if (!album_search(&tcs, album))
+        return -1;
+    if (playlist_create(NULL, NULL) < 0)
     {
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        tagcache_search_finish(&tcs);
+        cpu_boost(false);
         return -1;
     }
-    if (playlist_create(NULL, NULL) < 0)
-        return -1;
     if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
                                        false, false) < 0)
     {
         /* create() keeps the playlist lock even when it fails; release()
          * is the only thing that gives it back. */
         playlist_insert_context_release(&context);
+        tagcache_search_finish(&tcs);
+        cpu_boost(false);
         return -1;
     }
 
-    added = db_summary_album_tracks(album, insert_sink, &context);
+    added = album_tracks_from(&tcs, album, insert_sink, &context);
     playlist_insert_context_release(&context);
 
     if (added <= 0)

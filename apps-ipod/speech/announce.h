@@ -27,10 +27,6 @@ enum
 /* Listen for track changes; once, after audio_init(). */
 void announce_init(void);
 
-/* Say the current track's title and artist: enqueued, or cutting off what
- * is being said. */
-void announce_track(bool enqueue);
-
 /* On the UI thread, for the two events above and their data. */
 void announce_event(long event, intptr_t data);
 

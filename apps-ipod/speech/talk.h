@@ -167,6 +167,12 @@ int talk_time_intervals(long time, int unit_idx, bool enqueue);
 /* Enqueue next utterance even if enqueue parameter is false: don't
    interrupt the current utterance. */
 void talk_force_enqueue_next(void);
+/* Whether the next utterance is forced to enqueue: something has just been
+   said that it must not interrupt. */
+bool talk_force_enqueue_pending(void);
+/* Whether the caller is the UI thread, the only one the synthesiser's text
+   front end may run on. */
+bool talk_on_ui_thread(void);
 
 /* speaks one or more IDs (from an array)). */
 int talk_idarray(const long *idarray, bool enqueue);

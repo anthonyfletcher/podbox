@@ -64,6 +64,7 @@
 #include "root_menu.h"
 #include "games/quiz/quiz_pick.h"
 #include "speech/talk.h"
+#include "speech/announce.h"   /* SYS_ANNOUNCE_TRACK */
 #include "audio/voice_thread.h"  /* voice_is_playing */
 #include "games/quiz/quiz.h"
 
@@ -764,6 +765,10 @@ static enum round_end play_round(int round, int *score)
                     audio_resume();
                 }
                 draw_all(&v);
+                break;
+
+            case SYS_ANNOUNCE_TRACK:
+                /* the clip's title is the answer */
                 break;
 
             default:

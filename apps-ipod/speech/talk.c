@@ -118,6 +118,7 @@ static struct voicefile_header voicefile; /* loaded voicefile */
 static bool has_voicefile; /* a voicefile file is present */
 static bool need_shutup; /* is there possibly any voice playing to be shutup */
 static bool force_enqueue_next; /* enqueue next utterance even if enqueue is false */
+static unsigned int ui_thread; /* the one talk_init() is first called on */
 static int queue_write; /* write index of queue, by application */
 static int queue_read; /* read index of queue, by ISR context */
 static enum talk_status talk_status = TALK_STATUS_OK;
@@ -939,12 +940,17 @@ void talk_init(void)
     talk_temp_disable_count = 0;
     if (talk_initialized && !strcasecmp(last_lang, global_settings.lang_file))
     {
-        /* not a new file, nothing to do */
+        /* not a new file, but a loaded .cfg or a reset can still have
+         * switched the synthesiser on or off */
+        if (speech_enabled() !=
+            (global_settings.talk_menu && global_settings.talk_synth))
+            talk_speech_changed();
         return;
     }
 
     if(!talk_initialized)
     {
+        ui_thread = thread_self();
         mutex_init(&queue_mutex);
         mutex_init(&read_buffer_mutex);
     }
@@ -1143,6 +1149,16 @@ int talk_idarray(const long *ids, bool enqueue)
 void talk_force_enqueue_next(void)
 {
     force_enqueue_next = true;
+}
+
+bool talk_force_enqueue_pending(void)
+{
+    return force_enqueue_next;
+}
+
+bool talk_on_ui_thread(void)
+{
+    return thread_self() == ui_thread;
 }
 
 /* play a thumbnail from file */
@@ -1591,48 +1607,11 @@ int talk_spell(const char* spell, bool enqueue)
     return _talk_spell(spell, NULL_TERMINATED, enqueue);
 }
 
-/* Queue text, joined to the newest entry if join and that is text not yet
- * begun. Returns the item it went into, -1 for nothing said, or -2 with the
- * synthesiser off. */
-static int text_item(const char *text, bool enqueue, bool join)
+/* Queue text with no script run in it, joined to the newest entry if join
+ * and that is text not yet begun. Returns the item it went into, or -1 for
+ * nothing said. */
+static int queue_text(const char *text, bool enqueue, bool join)
 {
-    static const int32_t script_ids[] =
-    {
-        [SCRIPT_CHINESE] = VOICE_SCRIPT_CHINESE,
-        [SCRIPT_JAPANESE] = VOICE_SCRIPT_JAPANESE,
-        [SCRIPT_KOREAN] = VOICE_SCRIPT_KOREAN,
-        [SCRIPT_ARABIC] = VOICE_SCRIPT_ARABIC,
-        [SCRIPT_HEBREW] = VOICE_SCRIPT_HEBREW,
-        [SCRIPT_THAI] = VOICE_SCRIPT_THAI,
-    };
-    const char *start, *end;
-    enum normalise_script script;
-
-    if (!speech_enabled() || talk_is_disabled())
-        return -2;
-
-    /* A script with no reading is said by its name from the language, so a
-     * .voice file says it as it says the menus: what comes before it, the
-     * name, then the rest. */
-    if (normalise_find_script(text, &start, &end, &script))
-    {
-        static char before[MAX_PATH];
-        int item = -1;
-        size_t n = MIN((size_t)(start - text), sizeof(before) - 1);
-
-        memcpy(before, text, n);
-        before[n] = '\0';
-        if (n > 0)
-        {
-            item = text_item(before, enqueue, join);
-            enqueue = true;
-        }
-        talk_id(script_ids[script], enqueue);
-        if (*end)
-            item = text_item(end, true, true);
-        return item < -1 ? -1 : item;
-    }
-
     do_enqueue(enqueue); /* cut off all the pending stuff */
 
     talk_queue_lock();
@@ -1657,6 +1636,51 @@ static int text_item(const char *text, bool enqueue, bool join)
     }
     force_enqueue_next = false;
     return item;
+}
+
+/* Queue text, as queue_text() does. Returns the item its end went into, -1
+ * for nothing said, or -2 with the synthesiser off. */
+static int text_item(const char *text, bool enqueue, bool join)
+{
+    static const int32_t script_ids[] =
+    {
+        [SCRIPT_CHINESE] = VOICE_SCRIPT_CHINESE,
+        [SCRIPT_JAPANESE] = VOICE_SCRIPT_JAPANESE,
+        [SCRIPT_KOREAN] = VOICE_SCRIPT_KOREAN,
+        [SCRIPT_ARABIC] = VOICE_SCRIPT_ARABIC,
+        [SCRIPT_HEBREW] = VOICE_SCRIPT_HEBREW,
+        [SCRIPT_THAI] = VOICE_SCRIPT_THAI,
+    };
+    const char *start, *end;
+    enum normalise_script script;
+    int item = -1;
+
+    if (!speech_enabled() || talk_is_disabled())
+        return -2;
+
+    /* A script with no reading is said by its name from the language, so a
+     * .voice file says it as it says the menus: what comes before it, the
+     * name, then the rest. */
+    while (normalise_find_script(text, &start, &end, &script))
+    {
+        static char before[MAX_PATH];
+        size_t n = MIN((size_t)(start - text), sizeof(before) - 1);
+
+        memcpy(before, text, n);
+        before[n] = '\0';
+        item = -1;
+        if (n > 0)
+        {
+            item = queue_text(before, enqueue, join);
+            enqueue = true;
+        }
+        talk_id(script_ids[script], enqueue);
+        if (!*end)
+            return item;
+        text = end;
+        enqueue = join = true;
+    }
+    return queue_text(text, enqueue, join);
 }
 
 int talk_text(const char *text, bool enqueue)

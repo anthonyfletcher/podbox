@@ -796,7 +796,8 @@ static bool read_boundary(const unsigned char **p, int *clause, bool start)
         /* only before a space, the end, or more of the same */
         const unsigned char *after;
         ucschar_t f = peek(s, &after);
-        if (f != ' ' && f != 0 && f != '\n' && !strchr(".?!,;:", f)
+        if (f != ' ' && f != 0 && f != '\n'
+            && !(f < 0x80 && strchr(".?!,;:", f))
             && f != ')' && f != ']' && f != '"' && f != 0x201d
             && c != 0x2026 && c < 0x3000)
             return false;

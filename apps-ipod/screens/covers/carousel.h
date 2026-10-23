@@ -84,13 +84,14 @@ enum pf_scroll_line_type {
  * album I recorded with db_summary_play_album_on_exit()". The play cannot
  * happen inside the carousel: ordering the album needs the app buffer, and
  * this screen holds a claim on it until cleanup() runs. album_covers() does it
- * on the way out, once carousel_run() has returned. Negative, so it never
- * collides with a GO_TO_* value. */
-#define CAROUSEL_PLAY_ALBUM    (-3)
+ * on the way out, once carousel_run() has returned. Below every GO_TO_* and
+ * MENU_* value in root_menu.h, which stop at -10, so it never collides with
+ * one. */
+#define CAROUSEL_PLAY_ALBUM    (-20)
 /* on_context() recorded a slide for its menu, which runs once the carousel has
  * let go of the app buffer the menu's rows need. The model's own entry point
- * shows it and opens the carousel again. */
-#define CAROUSEL_CONTEXT       (-4)
+ * shows it and opens the carousel again. Below root_menu.h's values too. */
+#define CAROUSEL_CONTEXT       (-21)
 
 /* The seam between the generic coverflow engine and the data it shows. */
 struct carousel_model {

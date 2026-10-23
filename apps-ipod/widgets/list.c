@@ -307,7 +307,7 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     gui_list->title = NULL;
     gui_list->title_icon = Icon_NOICON;
 
-    gui_list->scheduled_talk_tick = gui_list->last_talked_tick = 0;
+    gui_list->scheduled_talk_tick = 0;
 
     gui_list->title_color = -1;
     gui_list->callback_get_item_color = NULL;
@@ -568,7 +568,6 @@ static void _gui_synclist_speak_item(struct gui_synclist *lists, bool now)
         {
             lists->scheduled_talk_tick = 0; /* work done */
             cb(lists->selected_item, cb_data);
-            lists->last_talked_tick = current_tick;
         }
     }
 }

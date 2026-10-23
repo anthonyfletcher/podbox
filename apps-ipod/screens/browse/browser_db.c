@@ -3122,6 +3122,7 @@ entry_skip_formatter:
         if (global_settings.talk_menu) {
             talk_id(LANG_SHOWDIR_BUFFER_FULL, true);
             talk_value(total_count, UNIT_INT, true);
+            talk_force_enqueue_next();
         }
 
         /* (voiced above) */
@@ -5311,13 +5312,17 @@ int browser_db_get_rating(long idx_id)
 }
 
 /* The playing track's id3 is the live entry, so the WPS shows the new rating
- * at once rather than at the next track. */
+ * at once rather than at the next track. Its entry number is from the
+ * generation it was buffered in, so after an Update it is found by path. */
 void browser_db_set_rating(long idx_id, int rating)
 {
     struct mp3entry *id3 = audio_current_track();
+    long playing = browser_db_track_idx(id3);
 
     tagcache_update_numeric(idx_id, tag_rating, rating);
-    if (browser_db_track_idx(id3) == idx_id)
+    if (playing < 0 && id3)
+        playing = tagcache_find_path(id3->path);
+    if (id3 && idx_id >= 0 && playing == idx_id)
         id3->rating = rating;
 }
 
