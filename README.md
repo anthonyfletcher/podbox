@@ -1,12 +1,12 @@
 # PodBox
 
-**PodBox is Rockbox, rebuilt for the iPod Classic and iPod Video.** Album covers and artist
+**PodBox is Rockbox, reworked for the iPod Classic and iPod Video.** Album covers and artist
 photos sit beside every list, and the whole interface takes its colours from whatever is
-playing. Search finds anything in your library as you type.
+playing.
 
 It goes further than the iPod ever did: build playlists from how your music actually sounds,
 look back on a year of listening, read lyrics as they are sung, and keep your place in every
-audiobook - all on the player, with no computer or app needed.
+audiobook - all on the player.
 
 <a href='https://ko-fi.com/P3J3200FZY' target='_blank'><img height='36' style='border:0px;height:36px;' src='docs/podbox/images/support_me_on_kofi_dark.png' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
@@ -31,7 +31,9 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   and your changes come with it, and a theme never picks up changes made in another
   - Reset them with `Settings > Appearance > Forget My Changes`
 - Choose what is on the main menu and in what order, including items promoted from the Music menu
-  - `Settings > Appearance > Edit Main Menu`
+  - `Settings > Appearance > Menus > Edit Main Menu`
+- Choose what is in the Music menu and all the context menus
+  - `Settings > Library > Menus`
 - Show album art or artist art on the Now Playing screen
   - Theme dependent (the theme must show album art)
   - `Settings > Appearance > Now Playing Screen > Now Playing Artwork`
@@ -41,7 +43,9 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   screen
   - Off by default. `Settings > Appearance > Now Playing Screen > Trim Titles`
   - Add your own patterns in `.rockbox/library/user/trim.txt`, which an update leaves alone
-- Dialogs, splashes and prompts follow the theme, and no screen breaks out of it
+- Message, input, confirmation, search, colour, date and time and folder dialogs share one
+  themed design
+  - `Settings > Appearance > Dialogs`
 
 ## Music
 
@@ -70,10 +74,7 @@ or promoted onto the main menu.
   - Hold `Select` on the album or artist and select `Listening Progress`
 - Start a sleep timer from the Now Playing screen, with your usual length already chosen
   - Hold `Select` and select `Sleep Timer`
-- Choose what is in the Music menu and in what order
-  - `Settings > Library > Music > Edit Music Menu`
-- Add your own views to the Music menu, such as one genre, a decade, or an artist's groupings
-  above their albums
+- Add your own views to the Music menu or an artist's groupings above their albums
   - See [`music-menu-guide.md`](docs/podbox/music-menu-guide.md)
 
 ## Search
@@ -161,16 +162,38 @@ pdf, md, html and rtf, and the image viewer is built in.
 
 <img src="docs/podbox/images/ss_grid_playback_report.png" alt="Screenshot"/>
 
-Your year in listening, read from the player's playback log (the standard log or the Last.fm
-one). Based on [Spun](https://github.com/majorsiebe/Stats_for_iPod).
+Your year in listening, like the summaries streaming services send at the end of the year, worked
+out on the player from what it has logged. Based on [Spun](https://github.com/majorsiebe/Stats_for_iPod).
 
-- A row of cards: In Numbers, Week by Week, Top Artists, Top Songs, Top Albums, Skips and
-  Achievements - plus Newly Unlocked, when you have earned something since you last looked
-  - The wheel scrolls along a section, `Left`/`Right` change section
-  - `Select` opens a card to show the detail behind it - the figures, who a song is by, the
-    album it came from
-  - `Play` on an artist, album or song card plays it
-  - Hold `Menu` to pick a year, or all time, and for the settings
+- `Playback Report` on the main menu
+  - It reads the log that `Settings > Playback > Logging` writes, on by default: the standard
+    playback log, or the Last.fm scrobbler log if you log that instead
+  - It counts your whole history, from the first entry of the log.
+- The report is a row of cards in sections. The wheel scrolls along a section, and `Left`/`Right`
+  move between sections
+  - **In Numbers** - minutes listened, plays, different tracks, plays skipped and your peak hour,
+    then charts of what you play in the morning, afternoon, evening and at night, and how often
+    you are still listening after midnight
+  - **Week by Week** - how many weeks had music, your best day, your longest run of days in a
+    row, then a card for every week with its minutes and a chart of its seven days
+  - **Top Artists**, **Top Songs** and **Top Albums** - your top ten of each, with their
+    artwork, ranked by plays or by minutes
+  - **Skips** - the share of plays you skipped, the songs you skip most, and your most-played
+    songs that you have never skipped. A play counts as skipped if you stopped it after
+    5 seconds but before half the song (or 4 minutes) had played
+  - **Achievements** - 340 badges for milestones in minutes, plays, skips, the number of
+    different songs, artists and albums, night listening, streaks and record days. Each shows
+    the date you earned it, and the next badge in each series shows how close you are.
+    Badges count your whole history, whatever year is on screen
+  - **Newly Unlocked** - first in the row, when you have earned badges since you last looked
+- `Select` opens a card to show the detail behind it
+  - An artist: their minutes, plays, songs and skips, and their top album and song
+  - A song: who it is by, the album it is from and its figures
+  - A week: its figures, top artist and top song
+  - A badge: what it is for, and when you earned it
+- `Play` on an artist, album or song plays it: all of an artist's tracks, an album in order, or
+  the one song
+- Hold `Menu` to choose a year or All Time, and for the settings
 
 ## Playlist engine
 
@@ -208,6 +231,25 @@ together.
   and the spread of tempos, keys and loudness by decade
   - `Settings > Library > Playlist Engine > Library Sound`
 
+## Equalizer
+
+<img src="docs/podbox/images/ss_grid_eq.png" alt="Screenshot"/>
+
+The equalizer is drawn as a curve, the sound it really makes, and you shape it while the music
+plays. Simple mode gives ten bands to raise and lower; Enhanced mode sets each band's frequency,
+Q and type as well.
+
+- `Settings > Sound > Equalizer > Edit EQ`
+  - The wheel sets a band's gain, `Left`/`Right` choose the band
+  - In Enhanced mode, `Select` moves between gain, frequency, Q and type
+  - Hold `Play` to hear the music without the EQ, and let go to hear it again
+  - Hold `Menu` for presets, saving, resetting, Auto Headroom and Enhanced Mode
+- Six built-in presets - Flat, Bass, Treble, Vocal, Loudness and Spoken - each played as you
+  scroll past it, then any you have saved
+  - `Settings > Sound > Equalizer > EQ Presets`
+- Boosting does not clip: Auto Headroom (on by default) turns the equalizer down by its highest
+  boost, and shows by how much
+
 ## Games
 
 <img src="docs/podbox/images/ss_grid_games.png" alt="Screenshot"/>
@@ -224,20 +266,6 @@ away.
 - Music Quiz: `Music > Quiz`
   - Choose which questions it asks in `Settings > Library > Music > Quiz Questions`
   - Remove it from the menu with `Settings > Library > Music > Edit Music Menu`
-
-## Language
-
-- Everything PodBox adds is translated into English (US), Deutsch, Français, Español, Italiano,
-  Nederlands, Português (Brasil), Polski, Svenska, 日本語 and 简体中文
-  - `Settings > System > Language & Text > Language`
-  - Other languages show Rockbox's own translations, with PodBox's additions in English
-  - Achievement names and descriptions in the Playback Report stay in English
-- These translations were made with AI, with little human oversight, and no native speaker has
-  checked them yet. Expect some wording that is wrong, awkward or too long for the screen
-  - If you find one, please [open an issue](https://github.com/anthonyfletcher/podbox/issues)
-    with the language, where the text appears and what it should say
-- Replace any on-screen text with your own
-  - See [`language-override-guide.md`](docs/podbox/language-override-guide.md)
 
 ## Settings
 
@@ -258,25 +286,54 @@ for the full list.
 - Shut down or restart from the menu
   - `Settings > System > Startup/Shutdown`
 
+## Language and Voice
+
+- Everything PodBox adds is translated into English (US), Deutsch, Français, Español, Italiano,
+  Nederlands, Português (Brasil), Polski, Svenska, 日本語 and 简体中文
+  - `Settings > System > Language & Text > Language`
+  - Other languages show Rockbox's own translations, with PodBox's additions in English
+  - Achievement names and descriptions in the Playback Report stay in English
+- These translations were made with AI, with little human oversight, and no native speaker has
+  checked them yet. Expect some wording that is wrong, awkward or too long for the screen
+  - If you find one, please [open an issue](https://github.com/anthonyfletcher/podbox/issues)
+    with the language, where the text appears and what it should say
+- Replace any on-screen text with your own
+  - See [`language-override-guide.md`](docs/podbox/language-override-guide.md)
+- Have the player speak, with a synthesised voice built into the firmware: menus, settings and dialogs,
+  and the names of your artists, albums, tracks and files - no voice file needed
+  - Turn the voice on with `Settings > System > Language & Text > Voice > Speech Synthesiser`
+  - Choose how fast it speaks with `Speech Rate`
+- Hear what you are typing: each letter as you choose it, and the whole text when you hold
+  `Select`
+- Hear a list's title as you go into it
+  - `Settings > System > Language & Text > Voice > Say List Titles`
+- Hear each new track's title and artist, over the music or with the music paused
+  - `Settings > System > Language & Text > Voice > Announce Track Change`
+- Have documents read aloud, a page at a time or straight through, turning the pages as it goes
+  - `Settings > Library > Viewers > Text Viewer > Read Aloud`
+- Play the Music Quiz by ear: the question and the five answers are read before the clip plays
+- The built-in voice reads English. Names in other Latin-alphabet languages are read as English
+  would read them; Greek, Cyrillic and Japanese kana are read from their letters; other scripts,
+  such as Chinese or Arabic, are named rather than read
+- Rockbox voice files are also supported, with higher quality output but limited range to language
+  strings
+  - Turn off `Settings > System > Language & Text > Voice > Recorded Voice` to hear the built-in
+    voice throughout rather than two voices taking turns
+
 ## Behind the scenes
 
-- Faster, more capable decoding
-  - PodBox decodes 24-bit FLAC and ALAC with ARM assembly, so hi-res files take less of the
-    processor, and seeks correctly in `.m4b` audiobooks over 27 hours long
-  - From Rockbox: faster FLAC, Opus and APE decoding plus DSD (`.dsf`/`.dff`) playback
+- Faster decoding with more ARM assembly resulting in less CPU usage - particularly beneficial for the iPod Video
+- Faster equalizer, Auditory Fatigue Reduction and Perceptual Bass Enhancement with more ARM
+  assembly resulting in less CPU usage - again - particularly beneficial for the iPod Video
 - Art is cached at the sizes the screens use, so lists and carousels stay smooth
   - `Settings > Library > Art Cache` for settings
   - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache`
   - `System > Background Tasks` to see what it is doing
 - Album and artist lists come straight from the database held in memory, so Album Covers, the
   charts and Random Album open quickly
-- Your library data - database, play history and caches - lives in `.rockbox/library/`
 - `Back` and `Menu` behave the same way in every menu
-- Message, input, confirmation, search, colour, date and time and folder dialogs share one
-  themed design
-  - `Settings > Appearance > Dialogs`
-- PodBox works with docks, receivers, USB DACs, computers, the earphone remote and some modern
-  cars - see [Connectivity](#connectivity)
+- PodBox works as a DAC, soundcard, and can even pretend to be an iPhone to connect to modern cars -
+  see [Connectivity](#connectivity)
 - New theme tags for richer graphics and easier theme building
   - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
 
@@ -328,7 +385,6 @@ a window on a Windows PC.
 
 - **There are no plugins.** The viewers you need are built in; the games and other plugins are
   gone
-- **The Database menu is now Music**
 - **PodBox builds its own library database** in `.rockbox/library/`, the first time it starts.
   Rockbox's desktop database tool does not write it - use `database_pb.exe` (see
   [First run](#first-run))
@@ -515,7 +571,7 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
   Shown only while `Accessory Protocol` is on
 - `Settings > System > Accessories > Accessory Artwork` specifies where the cover comes from.
   `Prefer Cache` by default, which appears almost at once. `As Album Art`, `Prefer Embedded` and
-  `Prefer Image File` send the original image - sharper, but slower to appear and more work for a 5G.
+  `Prefer Image File` send the original image - sharper, but slower to appear and more work for a iPod Video.
   Only JPEGs under 512 KB are sent as they are. A dock or older car gets the art cache's cover
   whichever is chosen; `Off` sends no cover to anything
 
@@ -674,6 +730,20 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
   - Apple's USB mode requests
 - pymobiledevice3 by doronz88 (https://github.com/doronz88/pymobiledevice3)
   - Fetched the iPhone's logs of its conversation with the car
+
+### Speech
+
+- NV Speech Player by NV Access (https://github.com/nvaccess/NVSpeechPlayer), GPL v2
+  - The synthesiser and its rules for rhythm, ported to whole-number arithmetic for the iPod;
+    based on Dennis Klatt's formant synthesiser
+- The CMU Pronouncing Dictionary by Carnegie Mellon University
+  (https://github.com/cmusphinx/cmudict), BSD licence, shipped as
+  `.rockbox/speech/LICENSE-cmudict.txt`
+  - How the words it holds are said
+- "Automatic Translation of English Text to Phonetics by Means of Letter-to-Sound Rules", NRL
+  Report 7948 (Elovitz, Johnson, McHugh and Shore, 1976), in John A. Wasser's public-domain
+  transcription
+  - How the words the dictionary lacks are said
 
 ### Spike Video
 

@@ -90,7 +90,7 @@ Rockbox builds out of tree, and `build-hw.sh` is only wrapping five steps:
 make -j"$(nproc)"
 make zip
 sh ../tools/check-zip-langs.sh rockbox.zip
-../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-tools.sh
+../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-speech.sh && ../bundle-tools.sh
 ```
 
 Three of them are easy to get wrong by hand, and all fail quietly:
@@ -100,8 +100,8 @@ Three of them are easy to get wrong by hand, and all fail quietly:
   instead — you get working firmware with none of this fork's work in it.
 - **`make zip` on its own is incomplete.** `tools/buildzip.pl` is deliberately
   kept close to Rockbox and knows nothing about this fork, so its zip has no
-  theme, no first-boot config, no iconset, no setting explanations and no
-  title trimming patterns. The `bundle-*.sh` scripts add them and strip what a
+  theme, no first-boot config, no iconset, no setting explanations, no
+  title trimming patterns and no speech dictionary. The `bundle-*.sh` scripts add them and strip what a
   plugin-less build cannot use; `bundle-tools.sh` also adds the desktop
   tools `soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`, and skips
   them with a warning unless a Windows simulator build
@@ -115,6 +115,34 @@ Three of them are easy to get wrong by hand, and all fail quietly:
 
 For an incremental rebuild, re-run everything except `configure` from inside the
 existing build directory.
+
+`bundle-speech.sh` fetches the CMU Pronouncing Dictionary the first time, into
+`~/.cache/podbox-speech`, and needs `python3` to turn it into the player's
+`cmudict.bin`.
+
+## Building the voices
+
+The recorded voices — a `.voice` file per language, for English and the eleven
+translations — are not in the firmware zip. `build-voices.sh` makes them inside
+a finished build directory, into `voices.zip`, and `release.sh` publishes them as
+the `Voices` release. A voice file is numbered by the build that made it, so
+it has to be made in the build directory it goes with.
+
+They are spoken by [Piper](https://github.com/OHF-Voice/piper1-gpl), set up once
+in a Python environment of its own, `~/piper` unless `$PIPER_PYTHON` names
+another:
+
+```sh
+sudo apt install python3-venv python3-dev     # dev: pyopenjtalk compiles
+python3 -m venv ~/piper
+~/piper/bin/pip install piper-tts pyopenjtalk  # pyopenjtalk is for Japanese
+./build-voices.sh build-hw-ipodvideo           # or name some languages after it
+```
+
+Each language's model is downloaded the first time it is wanted, into
+`~/piper-models`. Every clip is kept in `~/.cache/podbox-voice-pool`, so the
+first run takes about two minutes a language and later ones only remake the
+words that changed. `release.sh --no-voices` releases without them.
 
 ## Running the simulator
 

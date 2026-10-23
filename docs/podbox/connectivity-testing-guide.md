@@ -12,21 +12,14 @@ one that does.
 ## 2. Capture the iPod's log
 
 1. Turn on `Settings > Settings Mode` **Everything**, then
-   `Settings > System > Debug Logs > USB and Accessory Log`. For a dock, also
-   turn on `Settings > System > Show Debug Menu`, which the Serial iAP screen
-   below needs
-2. Delete `.rockbox/logs/usb.log` and `.rockbox/logs/usb.1.log` from the iPod
-   if they're there
+   `Settings > System > Debug Logs > USB and Accessory Log`.
+2. For a dock, also turn on `Settings > System > Show Debug Menu`
 3. Connect to the accessory and repeat the problem
-4. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
+4. For a dock, take a photo of `System > Debug > Serial iAP` while docked.
+5. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
    one), then turn `USB and Accessory Log` off - it slows every USB
    connection. If you forget, it switches itself off after
-   `Settings > System > Debug Logs > Switch Off After`, 24 hours by default,
-   counted by the clock from when it was turned on
-
-Lines with `iap serial` after the time came over the dock connector's serial
-pins; the rest came over USB. If a dock leaves nothing after the `==` header lines,
-take a photo of `System > Debug > Serial iAP` while docked.
+   `Settings > System > Debug Logs > Switch Off After`, 24 hours by default.
 
 ## 3. Capture an iPhone's log (cars and USB docks)
 

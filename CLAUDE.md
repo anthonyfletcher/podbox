@@ -192,7 +192,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-tools.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-speech.sh && ../bundle-tools.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -209,25 +209,30 @@ make clean / make veryclean
 **Theme bundling — `make zip` is not enough.** `tools/buildzip.pl` is kept as
 close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Scrim, no first-boot `config.cfg`, no
-setting explanations and no title trimming patterns**. Follow it with the
-bundle scripts -- `../bundle-theme.sh`, `../bundle-help.sh`,
-`../bundle-trim.sh`, and for the player `../bundle-tools.sh`, which adds the
-desktop tools as `.rockbox/tools/soundscan.exe`, `database_pb.exe` and
-`artcache_pb.exe`.
-`./build-hw.sh` runs all four and `./build-sim.sh` the first three; a bare
+setting explanations, no title trimming patterns and no speech
+dictionary**. Follow it with the bundle scripts -- `../bundle-theme.sh`,
+`../bundle-help.sh`, `../bundle-trim.sh`, `../bundle-speech.sh`, and for the
+player `../bundle-tools.sh`, which adds the desktop tools as
+`.rockbox/tools/soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`.
+`./build-hw.sh` runs all five and `./build-sim.sh` the first four; a bare
 `make zip` runs none.
 
 Scrim is the only theme in the build. The others in `themes/` are published
 as their own release by `release.sh`, one zip each.
 
-`bundle-help.sh` and `bundle-trim.sh` are the two whose absence is silent.
+`bundle-help.sh`, `bundle-trim.sh` and `bundle-speech.sh` are the three whose
+absence is silent.
 The first ships `docs/podbox/settings-help.txt` as
 `.rockbox/docs/settings-help.txt`, and without it every **Explain** entry in a
 setting's context menu finds no file and shows nothing. The second ships
 `apps-ipod/trim.config` as `.rockbox/trim.config`, which is the whole of what
 **Trim Titles** trims -- there is no compiled-in copy, so without it the
-setting switches on and does nothing. Neither makes anything else misbehave, so
-a zip built by hand without them looks finished.
+setting switches on and does nothing. The third ships the synthesiser's
+`.rockbox/speech/cmudict.bin` (written from the CMU dictionary, fetched into
+`~/.cache/podbox-speech` the first time) and the build's own
+`.rockbox/langs/english.vstrings`; without them Speech Synthesiser says
+nothing. None makes anything else misbehave, so a zip built by hand without
+them looks finished.
 
 `bundle-theme.sh` also deletes the `classic_statusbar` theme, which
 `buildzip.pl` copies straight out of `wps/` without consulting `WPSLIST`. It
@@ -241,8 +246,8 @@ written beside it -- a `wps/classic_statusbar/*` pattern does not match those.
 `rockboxui`, storage in `simdisk/` beside it. A Windows `.exe` cross-compiles
 with `--type=as6` (that is **(A)dvanced** plus `s` and `6`; plain `--type=s6`
 silently gives a *normal* build). Follow either with `make zip` and
-`bundle-theme.sh`, `bundle-help.sh` and `bundle-trim.sh`, then unzip into
-`simdisk/`, or it starts themeless.
+`bundle-theme.sh`, `bundle-help.sh`, `bundle-trim.sh` and `bundle-speech.sh`,
+then unzip into `simdisk/`, or it starts themeless.
 Read `apps-ipod/sim/README.md` before touching any of it.
 
 ```bash
@@ -511,11 +516,19 @@ hand-built zip with every **Explain** entry silently empty looks finished.
   `settings-guide.md` still describe the settings that exist. See **Adding,
   Removing or Renaming a Setting** above
 - `tools/voice.pl` — voice file generator (TTS). Paths point at `apps-ipod/`.
-  Voice builds are still unexercised here: no TTS engine or encoder is
-  installed on the build server, so `make voice` has never run. The pipeline
-  either side of that is wired — `rockbox-info.txt` reports `Voice format: 400`
-  again, and `configure` exports `COREAPPSDIR` so both `voice.pl` and
-  `mkinfo.pl` find the application layer
+  `build-voices.sh <build dir>` runs `make voice` there with Piper
+  (piper-tts with pyopenjtalk, in the `~/piper` venv on the build server)
+  for English and the eleven translations, into `voices.zip`; `release.sh`
+  publishes one per player as the `Voices` release (`--no-voices` skips it).
+  A `.voice` file is numbered by that build's language strings, so any
+  `english.lang` change leaves the old one rejected, and a translation that
+  lacks strings speaks them in English: bring the eleven `.lang` files up to
+  date before a release
+- `tools/speech/` — the speech synthesiser's host side: `gen_lexicon.py`
+  (`cmudict.bin`), `gen_phonemes.py` (`synth_phonemes.c` from NV Speech
+  Player's `data.py`) and `text_render.c`, which renders text to a WAV on
+  the build server. The synthesiser itself is `apps-ipod/speech/`, and
+  `.specifications/on-device-speech.md` is its specification
 **Theme Lens lives outside the tree**, in the git-ignored `.build/theme-lens/`
 — the skin reader, linter and previewer. `python serve.py <theme folder>` (or
 double-click `ThemeLens.cmd`) edits that folder live; `ctl.py` drives a running

@@ -123,7 +123,7 @@ menu editors behind it (main_menu_config, music_menu_config).
 |---|---|
 | `settings/` | The settings model and its table. |
 | `input/` | Buttons, actions, keymaps. |
-| `speech/` | Voice output and translation. |
+| `speech/` | Voice output -- recorded clips and the speech synthesiser -- and translation. |
 | `system/` | Cross-cutting glue: shutdown and system events, the activity stack, string/path helpers, time formatting, volume, and `app_util` (assorted small UI helpers). |
 
 ### Boundaries
