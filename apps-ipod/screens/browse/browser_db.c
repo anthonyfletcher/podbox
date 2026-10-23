@@ -5231,7 +5231,8 @@ static bool browser_db_insert_selection(int position, bool queue,
 /* Execute action_cb for all subentries of the current table's
  * selected item, handing over each entry's filename in the
  * callback function parameter. Parameter will be NULL for
- * entries whose filename couldn't be retrieved.
+ * entries whose filename couldn't be retrieved. Rows that are not
+ * tracks, such as <Random>, are passed over.
  *
  * The caller supplies the filename buffer. A MAX_PATH array here would sit on
  * the stack underneath splash_progress() and the callback, which is deep
@@ -5267,7 +5268,10 @@ bool browser_db_subentries_do_action(struct tagcache_search *tcs,
                 last_tick = current_tick;
             }
 
-            if (!action_cb(tagcache_retrieve(tcs, browser_db_get_entry(tc, i)->extraseek,
+            struct tagentry *entry = browser_db_get_entry(tc, i);
+            if (entry->newtable != TABLE_PLAYTRACK)
+                continue;
+            if (!action_cb(tagcache_retrieve(tcs, entry->extraseek,
                                              tcs->type, buf, buf_sz) ? buf : NULL))
             {
                 ret = false;

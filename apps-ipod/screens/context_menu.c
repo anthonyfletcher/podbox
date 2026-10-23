@@ -398,9 +398,9 @@ static bool sound_album_selectable(void)
 /* Every track of the selected album, handed to the read-out's accumulator.
  *
  * True carries the enumeration on. There is no failure this can have -- a
- * track the index holds nothing for is simply not counted, and a synthetic
- * row arrives as NULL and is ignored -- and returning false would abandon the
- * rest of the album over one of them. */
+ * track the index holds nothing for is simply not counted, and one whose
+ * name cannot be read arrives as NULL and is ignored -- and returning false
+ * would abandon the rest of the album over one of them. */
 static bool sound_album_add_cb(const char *file_name)
 {
     sound_props_album_add(file_name);
