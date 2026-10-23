@@ -22,6 +22,10 @@ int text_viewer(const char *file);
  * may since have been deleted; the caller checks. */
 bool text_viewer_last_document(char *buf, size_t bufsize);
 
+/* Writes the reading places an older firmware kept as text into their
+ * libfile, at the first boot of a new layout */
+bool text_viewer_convert_places(const char *text_file);
+
 /* text_viewer_read_aloud */
 enum
 {

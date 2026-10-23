@@ -38,6 +38,7 @@
 #include "metadata/book_resume.h"
 #include "games/quiz/quiz.h"
 #include "games/spike/spike_score.h"
+#include "viewers/text_viewer/text_viewer.h"
 
 /* Where layout 1 kept its version, as text */
 #define FORMAT_FILE_1  LIB_DIR "/format.txt"
@@ -541,9 +542,10 @@ static void drop_old_moves(void)
     }
 }
 
-/* A text file an older firmware kept, at either name it had, through its
- * own module's converter. A .dat already there is newer, and the text is
- * then kept for the owner to look at. */
+/* A text file an older firmware kept, at either name it had (NULL for a file
+ * that only ever had one), through its own module's converter. A .dat
+ * already there is newer, and the text is then kept for the owner to look
+ * at. */
 static bool convert_text(const char *const old[2], const char *dat,
                          bool (*convert)(const char *text))
 {
@@ -551,7 +553,7 @@ static bool convert_text(const char *const old[2], const char *dat,
 
     for (int i = 0; i < 2; i++)
     {
-        if (!file_exists(old[i]))
+        if (!old[i] || !file_exists(old[i]))
             continue;
         if (file_exists(dat))
         {
@@ -592,11 +594,16 @@ static bool convert_text_files(void)
         ROCKBOX_DIR "/spike.scores", LIB_USER_DIR "/spike_scores.txt" };
     static const char *const run[2] = {
         ROCKBOX_DIR "/spike.run", LIB_CACHE_DIR "/spike_run.txt" };
+    /* Text under a .dat name, from before the layout had a place for it */
+    static const char *const reading[2] = {
+        ROCKBOX_DIR "/textviewer.dat", NULL };
 
     return convert_text(books, LIB_AUDIOBOOKS_FILE, book_resume_convert)
          & convert_text(quiz, LIB_QUIZ_FILE, quiz_scores_convert)
          & convert_text(spike, LIB_SPIKE_FILE, convert_spike_scores)
-         & convert_text(run, LIB_SPIKE_RUN_FILE, convert_spike_run);
+         & convert_text(run, LIB_SPIKE_RUN_FILE, convert_spike_run)
+         & convert_text(reading, LIB_READING_FILE,
+                        text_viewer_convert_places);
 }
 
 /* ------------------------------------------------------------------ *
@@ -638,6 +645,7 @@ static const char *const dead[] = {
     ROCKBOX_DIR "/docs.lst.tmp",
     ROCKBOX_DIR "/images.lst.tmp",
     ROCKBOX_DIR "/database_changelog.txt.new",
+    ROCKBOX_DIR "/textviewer.dat.tmp",
     LIB_ART_DIR "/stamps.dat.tmp",
     LIB_ART_DIR "/noart_albums.lst.tmp",
     LIB_ART_DIR "/noart_artists.lst.tmp",

@@ -23,6 +23,8 @@
 #include "config.h"
 #include "file.h"            /* off_t, open/close/rename/remove, fdprintf */
 #include "rbpaths.h"         /* ROCKBOX_DIR */
+#include "system/library_files.h"
+#include "database/libfile.h"
 #include "input/action.h"
 #include "draw/screen_access.h"   /* screens[] */
 #include "kernel.h"          /* HZ, SYS_USB_CONNECTED */
@@ -66,7 +68,7 @@
 #define TV_MAX_PAGES    8192
 
 /* Most recently read documents and where the reader got to, newest first. */
-#define TV_RESUME_FILE  ROCKBOX_DIR "/textviewer.dat"
+#define TV_RESUME_FILE  LIB_READING_FILE
 #define TV_RESUME_MAX   16
 
 /* Inset on each edge when the margin setting is on. */
@@ -714,41 +716,60 @@ static void tv_resume_to(off_t target)
 
 /* ---- resume ----------------------------------------------------------- */
 
-/* The space before a resume line's path, or NULL if the line is malformed. */
-static char *tv_resume_path_sep(char *line)
+/* One document's place, a record of TV_RESUME_FILE. `size` is the
+ * document's length when the offset was recorded: offsets index the extracted
+ * text, so a document that has changed on disk invalidates them, and the
+ * length is the cheap half of noticing. (It cannot catch an edit that
+ * preserves the length, nor a layout change -- page boundaries also move with
+ * the font and spacing.) */
+struct tv_place
 {
-    char *end_off = strchr(line, ' ');
+    int32_t off;
+    int32_t size;
+    char path[MAX_PATH];
+};
 
-    return end_off ? strchr(end_off + 1, ' ') : NULL;
+static int tv_places_open(struct libfile_header *h)
+{
+    return libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC,
+                        LIB_READING_VERSION, sizeof(struct tv_place), h, NULL);
 }
 
-/* Lines are "<offset> <size> <path>", newest first. The path trails so it may
- * hold spaces. `size` is the document's length when the offset was recorded:
- * offsets index the extracted text, so a document that has changed on disk
- * invalidates them, and the length is the cheap half of noticing. (It cannot
- * catch an edit that preserves the length, nor a layout change -- page
- * boundaries also move with the font and spacing.) */
+/* The next record, its path terminated whatever the file holds */
+static bool tv_place_read(int fd, struct tv_place *p)
+{
+    if (read(fd, p, sizeof(*p)) != (ssize_t)sizeof(*p))
+        return false;
+    p->path[sizeof(p->path) - 1] = '\0';
+    return true;
+}
+
+/* Zeroed past the path, so the same places are the same bytes */
+static void tv_place_set(struct tv_place *p, off_t off, off_t size,
+                         const char *path)
+{
+    memset(p, 0, sizeof(*p));
+    p->off = off;
+    p->size = size;
+    strmemccpy(p->path, path, sizeof(p->path));
+}
+
 static off_t tv_resume_load(const char *file, off_t size)
 {
-    int fd = open(TV_RESUME_FILE, O_RDONLY);
-    char line[MAX_PATH + 32];
+    struct libfile_header h;
+    struct tv_place p;
     off_t off = 0;
+    int fd = tv_places_open(&h);
 
     if (fd < 0)
         return 0;
 
-    while (read_line(fd, line, sizeof line) > 0)
+    for (uint32_t i = 0; i < h.count && tv_place_read(fd, &p); i++)
     {
-        char *end_size = tv_resume_path_sep(line);
-        char *end_off;
-
-        if (!end_size || strcmp(end_size + 1, file))
+        if (strcmp(p.path, file))
             continue;
-
-        end_off = strchr(line, ' ');
-        *end_off = *end_size = '\0';
-        if ((off_t)atoi(end_off + 1) == size)
-            off = (off_t)atoi(line);
+        if ((off_t)p.size == size)
+            off = p.off;
         break;                               /* first hit is the newest */
     }
 
@@ -756,14 +777,14 @@ static off_t tv_resume_load(const char *file, off_t size)
     return off;
 }
 
-/* Rewrites the list with `file` at the front, streaming the old entries past
- * a single line buffer rather than holding them all on the stack. Every write
- * is checked: the new list replaces the old one, so a short one would lose
- * every other document's place. */
+/* Rewrites the list with `file` at the front, streaming the old records past
+ * a single buffer rather than holding them all on the stack. */
 static void tv_resume_save(const char *file, off_t off, off_t size)
 {
-    char line[MAX_PATH + 32];
-    int old, new_fd, kept = 1, len;
+    struct libfile_writer w;
+    struct libfile_header h;
+    struct tv_place p;
+    int old, kept = 1;
     bool ok;
 
     /* The player's own documents, such as the licence, are not reading, so
@@ -772,76 +793,86 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
                      sizeof(ROCKBOX_DIR "/docs/") - 1))
         return;
 
-    new_fd = open(TV_RESUME_FILE ".tmp", O_CREAT|O_WRONLY|O_TRUNC, 0666);
-    if (new_fd < 0)
+    if (!libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
+                       LIB_READING_VERSION, sizeof(p), NULL))
         return;
 
-    len = snprintf(line, sizeof line, "%ld %ld %s\n", (long)off, (long)size,
-                   file);
-    ok = len > 0 && len < (int)sizeof line
-         && write(new_fd, line, len) == len;
+    tv_place_set(&p, off, size, file);
+    ok = libfile_write(&w, &p, sizeof(p), 1);
 
-    old = open(TV_RESUME_FILE, O_RDONLY);
+    old = tv_places_open(&h);
     if (old >= 0)
     {
-        while (ok && kept < TV_RESUME_MAX
-               && read_line(old, line, sizeof line) > 0)
+        for (uint32_t i = 0; ok && kept < TV_RESUME_MAX && i < h.count
+                             && tv_place_read(old, &p); i++)
         {
-            char *end_size = tv_resume_path_sep(line);
-
-            if (!end_size)
-                continue;
-            if (!strcmp(end_size + 1, file))
-                continue;                    /* superseded by the new entry */
-
-            /* read_line() leaves room for its NUL, so the newline fits. */
-            len = strlen(line);
-            line[len++] = '\n';
-            ok = write(new_fd, line, len) == len;
+            if (!strcmp(p.path, file))
+                continue;                    /* superseded by the new record */
+            ok = libfile_write(&w, &p, sizeof(p), 1);
             kept++;
         }
         close(old);
     }
-    if (close(new_fd) < 0 || !ok)
-    {
-        remove(TV_RESUME_FILE ".tmp");
-        return;
-    }
-
-    remove(TV_RESUME_FILE);
-    rename(TV_RESUME_FILE ".tmp", TV_RESUME_FILE);
+    libfile_finish(&w, ok);
 }
 
-/* The document on the newest line, for the main menu's "Continue reading".
- *
- * The parse lives here rather than in the caller because the format is this
- * file's: two space-delimited numbers, then the path as everything left. The
- * path is last precisely so it may contain spaces, so it cannot be picked out
- * by tokenising the line.
+/* The document on the newest record, for the main menu's "Continue reading".
  *
  * Says nothing about whether the document still exists -- that is the
  * caller's to check, since it is the caller who has to decide what to do
  * about it. */
 bool text_viewer_last_document(char *buf, size_t bufsize)
 {
-    int fd = open(TV_RESUME_FILE, O_RDONLY);
-    char line[MAX_PATH + 32];
-    char *path;
+    struct libfile_header h;
+    struct tv_place p;
     bool found = false;
+    int fd = tv_places_open(&h);
 
     if (fd < 0)
         return false;
 
-    if (read_line(fd, line, sizeof line) > 0
-        && (path = tv_resume_path_sep(line)) != NULL
-        && path[1] != '\0')
+    if (h.count >= 1 && tv_place_read(fd, &p) && p.path[0] != '\0')
     {
-        strmemccpy(buf, path + 1, bufsize);
+        strmemccpy(buf, p.path, bufsize);
         found = true;
     }
 
     close(fd);
     return found;
+}
+
+/* The text file held lines of "<offset> <size> <path>", newest first, the
+ * path last so it may hold spaces. */
+bool text_viewer_convert_places(const char *text_file)
+{
+    struct libfile_writer w;
+    struct tv_place p;
+    char line[MAX_PATH + 32];
+    int kept = 0;
+    bool ok;
+    int fd = open(text_file, O_RDONLY);
+
+    if (fd < 0)
+        return false;
+    ok = libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
+                       LIB_READING_VERSION, sizeof(p), NULL);
+
+    while (ok && kept < TV_RESUME_MAX
+           && read_line(fd, line, sizeof(line)) > 0)
+    {
+        char *end_off = strchr(line, ' ');
+        char *end_size = end_off ? strchr(end_off + 1, ' ') : NULL;
+
+        if (!end_size || end_size[1] == '\0')
+            continue;
+        *end_size = '\0';
+        tv_place_set(&p, atoi(line), atoi(end_off + 1), end_size + 1);
+        ok = libfile_write(&w, &p, sizeof(p), 1);
+        kept++;
+    }
+
+    close(fd);
+    return libfile_finish(&w, ok);
 }
 
 /* ---- lifecycle -------------------------------------------------------- */

@@ -28,8 +28,9 @@
  * change to it adds upgrade steps and bumps this.
  *   1: library/, logs/, the libfile .dat files.
  *   2: the database in library/database; every file the player owns a .dat.
- *   3: no album index on disk: tagcache keeps the album tables. */
-#define LIBRARY_FORMAT 3
+ *   3: no album index on disk: tagcache keeps the album tables.
+ *   4: the text viewer's reading places in user/. */
+#define LIBRARY_FORMAT 4
 
 #define LIB_FORMAT_FILE     LIB_DIR "/format.dat"
 #define LIB_SOUND_FILE      LIB_DIR "/sound.dat"
@@ -43,6 +44,7 @@
 #define LIB_BADGES_FILE     LIB_USER_DIR "/report_badges.dat"
 #define LIB_QUIZ_FILE       LIB_USER_DIR "/quiz_scores.dat"
 #define LIB_SPIKE_FILE      LIB_USER_DIR "/spike_scores.dat"
+#define LIB_READING_FILE    LIB_USER_DIR "/reading.dat"
 #define LIB_KNOWN_ARTISTS_FILE LIB_USER_DIR "/known_artists.txt"
 #define LIB_PLAYER_NAME_FILE   LIB_USER_DIR "/player_name.txt"
 #define LIB_TRIM_FILE       LIB_USER_DIR "/trim.txt"
@@ -93,6 +95,8 @@
 #define LIB_SPIKE_MAGIC     0x534b5053u     /* "SPKS"; and the run, "SPKR" */
 #define LIB_SPIKE_RUN_MAGIC 0x524b5053u
 #define LIB_SPIKE_VERSION   1
+#define LIB_READING_MAGIC   0x44414552u     /* "READ" */
+#define LIB_READING_VERSION 1
 #define LIB_PATHS_MAGIC     0x48544150u     /* "PATH" */
 #define LIB_PATHS_VERSION   1
 #define LIB_UNREADABLE_MAGIC 0x44524e55u    /* "UNRD" */
