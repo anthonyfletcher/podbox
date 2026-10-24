@@ -25051,30 +25051,30 @@
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_VOCAL
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Vocal"
+    *: none
   </source>
   <dest>
-    *: "Sång"
+    *: none
   </dest>
   <voice>
-    *: "Sång"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_LOUDNESS
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Loudness"
+    *: none
   </source>
   <dest>
-    *: "Loudness"
+    *: none
   </dest>
   <voice>
-    *: "Loudness"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25775,5 +25775,75 @@
   </dest>
   <voice>
     *: "Läs upp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_NEUTRAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Neutral"
+  </source>
+  <dest>
+    *: "Neutral"
+  </dest>
+  <voice>
+    *: "Neutral"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_WARM
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Varm"
+  </dest>
+  <voice>
+    *: "Varm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VIVID
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vivid"
+  </source>
+  <dest>
+    *: "Livfull"
+  </dest>
+  <voice>
+    *: "Livfull"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SUB_BASS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Sub Bass"
+  </source>
+  <dest>
+    *: "Subbas"
+  </dest>
+  <voice>
+    *: "Subbas"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LATE_NIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Late Night"
+  </source>
+  <dest>
+    *: "Sen kväll"
+  </dest>
+  <voice>
+    *: "Sen kväll"
   </voice>
 </phrase>

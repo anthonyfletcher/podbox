@@ -58,16 +58,44 @@
 struct eq_preset
 {
     int lang;
-    signed char half_db[EQ_NUM_BANDS];  /* gain at each default band */
+    struct eq_band_setting bands[EQ_NUM_BANDS];
 };
 
+#define LS(hz, q, g) { EQ_FILTER_LOW_SHELF, hz, q, g }
+#define PK(hz, q, g) { EQ_FILTER_PEAK, hz, q, g }
+#define HS(hz, q, g) { EQ_FILTER_HIGH_SHELF, hz, q, g }
+
+/* Q and gain in tenths. A band a preset leaves alone stays at its default
+ * frequency, flat, so the bands still run low to high across the editor. */
 static const struct eq_preset builtin_presets[] = {
-    { LANG_EQUALIZER_PRESET_FLAT,     {   0,  0,  0, 0, 0,  0, 0, 0,  0,  0 } },
-    { LANG_BASS,                      {  12, 10,  7, 3, 0,  0, 0, 0,  0,  0 } },
-    { LANG_TREBLE,                    {   0,  0,  0, 0, 0,  0, 3, 6,  9, 11 } },
-    { LANG_EQUALIZER_PRESET_VOCAL,    {  -4, -3, -2, 0, 3,  6, 6, 3,  0, -2 } },
-    { LANG_EQUALIZER_PRESET_LOUDNESS, {  10,  8,  4, 0, -2, -2, 0, 3, 6,  8 } },
-    { LANG_EQUALIZER_PRESET_SPOKEN,   { -12, -8, -4, 0, 4,  6, 6, 2, -2, -6 } },
+    { LANG_EQUALIZER_PRESET_FLAT, {
+        LS(32, 7, 0), PK(64, 10, 0), PK(125, 10, 0), PK(250, 10, 0),
+        PK(500, 10, 0), PK(1000, 10, 0), PK(2000, 10, 0), PK(4000, 10, 0),
+        PK(8000, 10, 0), HS(16000, 7, 0) } },
+    { LANG_EQUALIZER_PRESET_NEUTRAL, {
+        LS(80, 7, 15), PK(64, 10, 0), PK(125, 10, 0), PK(250, 9, 5),
+        PK(500, 10, 0), PK(1000, 10, 0), PK(2000, 10, 0), PK(3200, 16, -10),
+        PK(6500, 20, -8), HS(14000, 7, 10) } },
+    { LANG_EQUALIZER_PRESET_WARM, {
+        LS(100, 7, 20), PK(64, 10, 0), PK(125, 10, 0), PK(300, 8, 10),
+        PK(500, 10, 0), PK(1000, 10, -3), PK(2000, 10, 0), PK(3000, 12, -15),
+        PK(7000, 18, -12), HS(12000, 7, -5) } },
+    { LANG_EQUALIZER_PRESET_VIVID, {
+        LS(55, 7, 30), PK(64, 10, 0), PK(180, 12, -8), PK(250, 10, 0),
+        PK(500, 10, 0), PK(1000, 10, 0), PK(1800, 10, 6), PK(3500, 20, -8),
+        PK(5500, 25, -10), HS(12000, 7, 18) } },
+    { LANG_EQUALIZER_PRESET_SUB_BASS, {
+        LS(50, 7, 45), PK(64, 10, 0), PK(160, 10, -10), PK(250, 10, 0),
+        PK(400, 12, -5), PK(1000, 10, 0), PK(2000, 10, 0), PK(3000, 15, -5),
+        PK(8000, 10, 0), HS(13000, 7, 5) } },
+    { LANG_EQUALIZER_PRESET_LATE_NIGHT, {
+        LS(70, 7, 35), PK(64, 10, 0), PK(125, 10, 0), PK(250, 10, 8),
+        PK(500, 10, 0), PK(1000, 10, 0), PK(2500, 10, -15),
+        PK(4500, 15, -15), PK(8000, 15, -10), HS(13000, 7, 10) } },
+    { LANG_EQUALIZER_PRESET_SPOKEN, {
+        LS(32, 7, -60), PK(64, 10, -40), PK(125, 10, -20), PK(250, 10, 0),
+        PK(500, 10, 20), PK(1000, 10, 30), PK(2000, 10, 30), PK(4000, 10, 10),
+        PK(8000, 10, -10), HS(16000, 7, -30) } },
 };
 #define BUILTIN_COUNT ((int)ARRAYLEN(builtin_presets))
 
@@ -87,12 +115,8 @@ static bool unsaved;
 
 static void apply_builtin(int i)
 {
-    for (int b = 0; b < EQ_NUM_BANDS; b++)
-    {
-        global_settings.eq_band_settings[b] = eq_defaults[b];
-        global_settings.eq_band_settings[b].gain =
-            builtin_presets[i].half_db[b] * 5;
-    }
+    memcpy(global_settings.eq_band_settings, builtin_presets[i].bands,
+           sizeof builtin_presets[i].bands);
     global_settings.eq_enabled = true;
     eq_apply();
 }
@@ -106,9 +130,9 @@ static int builtin_match(void)
         for (b = 0; b < EQ_NUM_BANDS; b++)
         {
             const struct eq_band_setting *s = &global_settings.eq_band_settings[b];
-            const struct eq_band_setting *d = &eq_defaults[b];
+            const struct eq_band_setting *d = &builtin_presets[i].bands[b];
             if (s->type != d->type || s->cutoff != d->cutoff || s->q != d->q
-                || s->gain != builtin_presets[i].half_db[b] * 5)
+                || s->gain != d->gain)
                 break;
         }
         if (b == EQ_NUM_BANDS)

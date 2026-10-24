@@ -1929,9 +1929,13 @@ them. Hold Play to hear the music without the EQ. Leaving with a curve that
 is neither saved nor a built-in preset offers to save it.
 
 [action: EQ Presets]
-Six built-in curves, then any presets you have saved. Moving through the
+Seven built-in curves, then any presets you have saved. Moving through the
 built-in ones plays each straight away; Select keeps one and Menu puts back
 what you had.
+
+Neutral, Warm and Vivid are gentle voicings for most music. Sub Bass lifts
+only the deepest bass, Late Night suits listening quietly for a long time,
+and Spoken Word clears up audiobooks and podcasts.
 
 [action: Time & Date Settings]
 Opens the clock: the time and date themselves, and how they are shown.

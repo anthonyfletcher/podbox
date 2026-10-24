@@ -25062,30 +25062,30 @@
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_VOCAL
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Vocal"
+    *: none
   </source>
   <dest>
-    *: "Gesang"
+    *: none
   </dest>
   <voice>
-    *: "Gesang"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_LOUDNESS
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Loudness"
+    *: none
   </source>
   <dest>
-    *: "Loudness"
+    *: none
   </dest>
   <voice>
-    *: "Loudness"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25786,5 +25786,75 @@
   </dest>
   <voice>
     *: "Vorlesen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_NEUTRAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Neutral"
+  </source>
+  <dest>
+    *: "Neutral"
+  </dest>
+  <voice>
+    *: "Neutral"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_WARM
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Warm"
+  </dest>
+  <voice>
+    *: "Warm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VIVID
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vivid"
+  </source>
+  <dest>
+    *: "Lebendig"
+  </dest>
+  <voice>
+    *: "Lebendig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SUB_BASS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Sub Bass"
+  </source>
+  <dest>
+    *: "Tiefbass"
+  </dest>
+  <voice>
+    *: "Tiefbass"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LATE_NIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Late Night"
+  </source>
+  <dest>
+    *: "Spätabends"
+  </dest>
+  <voice>
+    *: "Spätabends"
   </voice>
 </phrase>

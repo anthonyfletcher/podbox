@@ -25070,30 +25070,30 @@
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_VOCAL
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Vocal"
+    *: none
   </source>
   <dest>
-    *: "Voix"
+    *: none
   </dest>
   <voice>
-    *: "Voix"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_EQUALIZER_PRESET_LOUDNESS
-  desc: built-in EQ preset
+  desc: deprecated
   user: core
   <source>
-    *: "Loudness"
+    *: none
   </source>
   <dest>
-    *: "Loudness"
+    *: none
   </dest>
   <voice>
-    *: "Loudness"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25794,5 +25794,75 @@
   </dest>
   <voice>
     *: "Lecture à voix haute"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_NEUTRAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Neutral"
+  </source>
+  <dest>
+    *: "Neutre"
+  </dest>
+  <voice>
+    *: "Neutre"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_WARM
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Chaud"
+  </dest>
+  <voice>
+    *: "Chaud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VIVID
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vivid"
+  </source>
+  <dest>
+    *: "Vif"
+  </dest>
+  <voice>
+    *: "Vif"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SUB_BASS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Sub Bass"
+  </source>
+  <dest>
+    *: "Infragraves"
+  </dest>
+  <voice>
+    *: "Infragraves"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LATE_NIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Late Night"
+  </source>
+  <dest>
+    *: "Nuit"
+  </dest>
+  <voice>
+    *: "Nuit"
   </voice>
 </phrase>
