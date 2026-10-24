@@ -25848,3 +25848,31 @@
     *: "Nacht"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BRIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Helder"
+  </dest>
+  <voice>
+    *: "Helder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BASS_BOOST
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bass Boost"
+  </source>
+  <dest>
+    *: "Basversterking"
+  </dest>
+  <voice>
+    *: "Basversterking"
+  </voice>
+</phrase>

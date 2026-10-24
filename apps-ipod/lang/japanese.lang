@@ -25846,3 +25846,31 @@
     *: "ナイト"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BRIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "ブライト"
+  </dest>
+  <voice>
+    *: "ブライト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BASS_BOOST
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bass Boost"
+  </source>
+  <dest>
+    *: "低音強調"
+  </dest>
+  <voice>
+    *: "低音強調"
+  </voice>
+</phrase>

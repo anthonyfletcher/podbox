@@ -25858,3 +25858,31 @@
     *: "Spätabends"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BRIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Hell"
+  </dest>
+  <voice>
+    *: "Hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BASS_BOOST
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bass Boost"
+  </source>
+  <dest>
+    *: "Bassanhebung"
+  </dest>
+  <voice>
+    *: "Bassanhebung"
+  </voice>
+</phrase>

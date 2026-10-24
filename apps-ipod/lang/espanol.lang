@@ -25848,3 +25848,31 @@
     *: "Nocturno"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BRIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Brillante"
+  </dest>
+  <voice>
+    *: "Brillante"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BASS_BOOST
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bass Boost"
+  </source>
+  <dest>
+    *: "Refuerzo de graves"
+  </dest>
+  <voice>
+    *: "Refuerzo de graves"
+  </voice>
+</phrase>

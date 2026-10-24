@@ -25847,3 +25847,31 @@
     *: "深夜"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BRIGHT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "明亮"
+  </dest>
+  <voice>
+    *: "明亮"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_BASS_BOOST
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Bass Boost"
+  </source>
+  <dest>
+    *: "低音增强"
+  </dest>
+  <voice>
+    *: "低音增强"
+  </voice>
+</phrase>
