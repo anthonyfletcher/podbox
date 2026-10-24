@@ -1155,7 +1155,7 @@ bool settings_save_config_as(int options, char *filename, size_t len)
             break;
         case SETTINGS_SAVE_EQPRESET:
             folder = EQS_DIR;
-            namebase = "eq";
+            namebase = "EQ";
             break;
         case SETTINGS_SAVE_SOUND:
             folder = ROCKBOX_DIR;
@@ -1166,18 +1166,26 @@ bool settings_save_config_as(int options, char *filename, size_t len)
             namebase = "config";
             break;
     }
-    create_numbered_filename(filename, folder, namebase, ".cfg", 2
-                             IF_CNFN_NUM_(, NULL));
+    const char *made = create_numbered_filename(filename, folder, namebase,
+                                                ".cfg", 2 IF_CNFN_NUM_(, NULL));
 
-    /* allow user to modify filename */
-    while (true) {
-        if (!kbd_input(filename, len, NULL)) {
-            break;
-        }
-        else {
+    /* An EQ preset is named, not placed: the keyboard shows the name alone
+     * and the file always goes in EQS_DIR. */
+    if (options == SETTINGS_SAVE_EQPRESET)
+    {
+        char name[MAX_FILENAME];
+
+        strmemccpy(name, made ? strrchr(made, '/') + 1 : namebase,
+                   sizeof name);
+        if (made)
+            name[strlen(name) - 4] = '\0';      /* ".cfg" */
+        if (kbd_input(name, sizeof name, NULL) || !name[0])
             return false;
-        }
+        snprintf(filename, len, "%s/%s.cfg", folder, name);
     }
+    /* allow user to modify filename */
+    else if (kbd_input(filename, len, NULL))
+        return false;
 
     if (settings_write_config(filename, options))
     {

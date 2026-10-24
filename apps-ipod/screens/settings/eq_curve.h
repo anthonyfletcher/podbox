@@ -36,6 +36,10 @@ int eq_curve_position(int hz);
 /* The highest the combined response reaches, hundredths of a dB: the points
  * above plus each band's own frequency, so a narrow peak is not missed. */
 int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs);
+/* The same, for the bands curve c holds: only their own frequencies are
+ * evaluated, which is what lets the editor keep up with the wheel. */
+int eq_curve_peak_of(const struct eq_curve *c,
+                     const struct eq_band_setting *bands);
 /* Precut, in tenths of a dB, that keeps that peak at or below 0 dB --
  * rounded up to 0.5 dB and held within the Precut setting's range. */
 int eq_curve_headroom(int peak);

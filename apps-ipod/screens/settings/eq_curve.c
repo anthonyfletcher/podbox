@@ -214,16 +214,17 @@ int eq_curve_total(const struct eq_curve *c, int point)
 
 /** peak and headroom **/
 
-int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs)
+/* Points first..last-1: the curve's, then each band's own frequency. */
+static int peak_over(const struct eq_band_setting *bands, unsigned int fs,
+                     int first, int last, int peak)
 {
     struct band_pre p[EQ_NUM_BANDS];
     int64_t top = (int64_t)(fs * 49 / 100) << 16;
-    int peak = -32767;
 
     for (int b = 0; b < EQ_NUM_BANDS; b++)
         band_prepare(&p[b], &bands[b], fs);
 
-    for (int i = 0; i < EQ_CURVE_POINTS + EQ_NUM_BANDS; i++)
+    for (int i = first; i < last; i++)
     {
         int64_t hz16 = i < EQ_CURVE_POINTS ? point_hz16(i)
             : (int64_t)hz_limit(bands[i - EQ_CURVE_POINTS].cutoff, fs) << 16;
@@ -236,6 +237,26 @@ int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs)
             peak = sum;
     }
     return peak;
+}
+
+int eq_curve_peak(const struct eq_band_setting *bands, unsigned int fs)
+{
+    return peak_over(bands, fs, 0, EQ_CURVE_POINTS + EQ_NUM_BANDS, -32767);
+}
+
+int eq_curve_peak_of(const struct eq_curve *c,
+                     const struct eq_band_setting *bands)
+{
+    int peak = -32767;
+
+    for (int i = 0; i < EQ_CURVE_POINTS; i++)
+    {
+        int sum = eq_curve_total(c, i);
+        if (sum > peak)
+            peak = sum;
+    }
+    return peak_over(bands, c->fs, EQ_CURVE_POINTS,
+                     EQ_CURVE_POINTS + EQ_NUM_BANDS, peak);
 }
 
 int eq_curve_headroom(int peak)

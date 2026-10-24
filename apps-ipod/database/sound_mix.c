@@ -56,6 +56,7 @@
 #include "database/sound_mood.h"
 #include "database/tagcache.h"
 #include "playlist/playlist.h"
+#include "audio.h"
 #include "system/app_util.h"
 #include "widgets/splash.h"
 #include "metadata/book_resume.h"
@@ -1283,6 +1284,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
         return 0;
     }
 
+    bool keep = false;
+
     /* Extending leaves the playlist alone: it is the listener's, it is the
      * history this run is avoiding repeats against, and replacing it would
      * throw away both. */
@@ -1300,7 +1303,24 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
             return SOUND_MIX_CANCELLED;
         }
 
-        if (playlist_create(NULL, NULL) < 0)
+        /* A seed already playing is left playing, not started again: kept
+         * as Keep Current Track keeps it, with the mix after it. */
+        if (lead && (audio_status() & AUDIO_STATUS_PLAY))
+        {
+            struct mp3entry *id3 = audio_current_track();
+            keep = id3 != NULL && path_key(id3->path) == skip_key;
+        }
+
+        if (keep)
+        {
+            if (playlist_remove_all_tracks(NULL) < 0)
+            {
+                cpu_boost(false);
+                return SOUND_MIX_NO_PLAYLIST;
+            }
+            playlist_set_from_artist(false);
+        }
+        else if (playlist_create(NULL, NULL) < 0)
         {
             cpu_boost(false);
             return SOUND_MIX_NO_PLAYLIST;
@@ -1330,7 +1350,9 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
      * unless Play Selected First is off; either way it is not among the
      * choices. A mood or an album's mean is not a track and begins at its own
      * first choice. */
-    if (lead && playlist_insert_context_add(&context, seed_path) >= 0)
+    if (keep)
+        added++;
+    else if (lead && playlist_insert_context_add(&context, seed_path) >= 0)
         added++;
 
     for (i = 0; i < chosen; i++)
@@ -1364,7 +1386,10 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     }
     have_remembered = true;
 
-    playlist_start(base, 0, 0);
+    if (keep)
+        playlist_forget_inserts();
+    else
+        playlist_start(base, 0, 0);
 
     return added;
 }

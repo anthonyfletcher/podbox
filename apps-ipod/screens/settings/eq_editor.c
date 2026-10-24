@@ -338,7 +338,7 @@ static void rebuild_curve(void)
     eq_curve_init(&curve, eq_dsp_frequency());
     for (int b = 0; b < EQ_NUM_BANDS; b++)
         eq_curve_set_band(&curve, b, &global_settings.eq_band_settings[b]);
-    ed.peak = eq_curve_peak(global_settings.eq_band_settings, curve.fs);
+    ed.peak = eq_curve_peak_of(&curve, global_settings.eq_band_settings);
 }
 
 /** drawing **/
@@ -824,7 +824,7 @@ static void band_applied(int band)
     }
     dsp_set_eq_coefs(band, s);
     eq_curve_set_band(&curve, band, s);
-    ed.peak = eq_curve_peak(global_settings.eq_band_settings, curve.fs);
+    ed.peak = eq_curve_peak_of(&curve, global_settings.eq_band_settings);
     if (global_settings.eq_auto_headroom)
     {
         global_settings.eq_precut = eq_curve_headroom(ed.peak);
@@ -1129,7 +1129,7 @@ int eq_editor_screen(void)
 {
     struct viewport vp;
     int ret = 0;
-    bool redraw = true;
+    bool redraw = true, dirty = false;
 
     if (!load_layout())
     {
@@ -1150,14 +1150,22 @@ int eq_editor_screen(void)
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
     cpu_boost(true);
 #endif
+    /* Play held is Compare here, and held long enough it would power off */
+    button_set_sw_poweroff_state(false);
     speak_band();
 
     while (true)
     {
         int action;
 
-        if (redraw)
+        /* Steps already queued are applied before the screen is drawn: a
+         * fast turn that drew every one would starve playback. */
+        dirty |= redraw;
+        if (dirty && button_queue_empty())
+        {
             draw();
+            dirty = false;
+        }
         redraw = true;
 
         action = get_action(CONTEXT_SETTINGS_EQ, HZ / 4);
@@ -1258,6 +1266,7 @@ int eq_editor_screen(void)
     }
 
 done:
+    button_set_sw_poweroff_state(true);
     set_bypass(false);
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
     cpu_boost(false);

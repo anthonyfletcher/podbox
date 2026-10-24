@@ -4653,7 +4653,11 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
      * currently-playing track's album, otherwise wherever was last viewed. */
     model->set_initial(selected_file);
 
+    /* Play held is the random spin here, and held long enough it would power
+     * off */
+    button_set_sw_poweroff_state(false);
     ret = album_covers_loop();
+    button_set_sw_poweroff_state(true);
 
     cleanup();
 
