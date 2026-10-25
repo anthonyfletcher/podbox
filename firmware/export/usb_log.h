@@ -166,6 +166,8 @@ enum usb_log_type
                           * audio_status() << 8; for a serial reset, b = the
                           * line said it departed, c = lingoes, d = the
                           * interface state */
+    USB_LOG_STORAGE,     /* mass storage: a = USB_LOG_STORAGE_*, the rest
+                          * as named there */
 };
 
 #define USB_LOG_OUTPUT_GONE    0
@@ -203,6 +205,22 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_AUDIO_UNDERFLOW   5
 #define USB_LOG_AUDIO_OVERFLOW    6
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
+
+/* The last sixteen commands are written as a pair of HISTORY entries each
+ * when the host ends the configuration with the cable in */
+#define USB_LOG_STORAGE_HISTORY 0 /* b = opcode, c = tag, d = microseconds
+                                   * before the configuration ended */
+#define USB_LOG_STORAGE_HISTORY_CSW 1 /* b = CSW status, 0xff for none,
+                                       * | 0x100 once the host took it,
+                                       * c = residue, d = data length */
+#define USB_LOG_STORAGE_RESIDUE 2 /* a read or write answered good with data
+                                   * unsent: b = opcode, c = tag,
+                                   * d = residue */
+#define USB_LOG_STORAGE_HELD    3 /* waits for the disk: b = opcode */
+#define USB_LOG_STORAGE_XFER    4 /* a transfer failed or came up short:
+                                   * b = state, c = status, d = length,
+                                   * bit 31 set for IN */
+#define USB_LOG_STORAGE_BAD_CBW 5 /* c = signature, d = length */
 
 #define USB_LOG_HOST_PORT_READ 0x80
 

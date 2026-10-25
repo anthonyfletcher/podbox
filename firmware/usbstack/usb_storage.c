@@ -30,6 +30,8 @@
 /* Needed to get at the audio buffer */
 #include "audio.h"
 #include "usb_storage.h"
+#include "usb_log.h"
+#include "usb.h"
 #if CONFIG_RTC
 #include "timefuncs.h"
 #endif
@@ -318,6 +320,10 @@ static struct {
 
 static void handle_scsi(struct command_block_wrapper* cbw);
 static void send_csw(int status);
+static void history_add(const struct command_block_wrapper *cbw);
+static void history_csw(int status);
+static void history_taken(void);
+static void history_dump(void);
 static void reject_command(const struct command_block_wrapper *cbw);
 static void account_data_transfer(int dir, int status, int length);
 static void send_command_result(void *data,int size);
@@ -605,6 +611,10 @@ static int usb_storage_init_connection(void)
 
 void usb_storage_disconnect(void)
 {
+    /* With the cable still in, the host ended the configuration: a bus
+     * reset, usually after a command timed out */
+    if(usb_detect() == USB_INSERTED)
+        history_dump();
     /* The transfer buffers stay claimed for the life of the firmware --
      * releasing them here means re-allocating on the next connection, which is
      * the cost usb_storage_alloc_buffers() exists to move out of the way. */
@@ -623,6 +633,9 @@ static void usb_storage_transfer_complete(int ep,int dir,int status,int length)
     logf("transfer result for ep %d/%d %X %d", ep,dir,status, length);
 
     account_data_transfer(dir, status, length);
+    if(status != 0)
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_XFER, state, status,
+                length | (dir == USB_DIR_IN ? 0x80000000 : 0));
 
     switch(state) {
         case WAITING_FOR_STORAGE:
@@ -637,6 +650,8 @@ static void usb_storage_transfer_complete(int ep,int dir,int status,int length)
                 if((unsigned int)length!=(cur_cmd.block_size* cur_cmd.count)
                   && (unsigned int)length!=WRITE_BUFFER_SIZE) {
                     logf("unexpected length :%d",length);
+                    usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_XFER, state, 0,
+                            length);
                     break;
                 }
 
@@ -699,6 +714,7 @@ static void usb_storage_transfer_complete(int ep,int dir,int status,int length)
         case WAITING_FOR_CSW_COMPLETION_OR_COMMAND:
             if(dir==USB_DIR_IN) {
                 /* This was the CSW */
+                history_taken();
                 state = WAITING_FOR_COMMAND;
             }
             else {
@@ -718,6 +734,8 @@ static void usb_storage_transfer_complete(int ep,int dir,int status,int length)
             if(dir==USB_DIR_OUT) {
                 logf("OUT received in WAITING_FOR_CSW_COMPLETION");
             }
+            else
+                history_taken();
             handle_scsi(cbw);
             break;
         case SENDING_RESULT:
@@ -910,6 +928,8 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
 
     if(letoh32(cbw->signature) != CBW_SIGNATURE) {
         logf("ums: bad cbw signature (%x)", cbw->signature);
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_BAD_CBW, 0,
+                letoh32(cbw->signature), letoh32(cbw->data_transfer_length));
         usb_drv_stall(EP_IN, true,true);
         usb_drv_stall(EP_OUT, true,false);
         return;
@@ -918,6 +938,7 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
      * to trigger a second execution of the same command with
      * bogus data */
     cbw->signature=0;
+    history_add(cbw);
 
 #if defined(HAVE_MULTIDRIVE)
     if(skip_first) lun++;
@@ -1542,6 +1563,8 @@ static void handle_scsi(struct command_block_wrapper* cbw)
        && !usb_storage_is_ejected()
 #endif
        ) {
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_HELD, cbw->command_block[0],
+                0, 0);
         state = WAITING_FOR_STORAGE;
         return;
     }
@@ -1629,6 +1652,7 @@ static void send_csw(int status)
     tb.csw->tag = cur_cmd.tag;
     tb.csw->data_residue = htole32(cur_cmd.data_residue);
     tb.csw->status = status;
+    history_csw(status);
 
     usb_drv_send_nonblocking(EP_IN, tb.csw,
             sizeof(struct command_status_wrapper));
@@ -1645,6 +1669,76 @@ static void send_csw(int status)
         cur_sense_data.asc=0;
         cur_sense_data.ascq=0;
     }
+}
+
+/* The last commands and their CSWs, written to the USB log only when the
+ * host ends the configuration, so a mount logs nothing until a host gives
+ * up on one. USB thread only. */
+#define HISTORY_SIZE 16
+#define HISTORY_NO_CSW 0xff
+static struct {
+    uint32_t us;
+    uint32_t tag;
+    uint32_t length;
+    uint32_t residue;
+    uint8_t op;
+    uint8_t status;
+    bool taken;
+} history[HISTORY_SIZE];
+static unsigned int history_count;
+
+static void history_add(const struct command_block_wrapper *cbw)
+{
+    unsigned int i = history_count++ % HISTORY_SIZE;
+    history[i].us = USEC_TIMER;
+    history[i].tag = letoh32(cbw->tag);
+    history[i].length = letoh32(cbw->data_transfer_length);
+    history[i].op = cbw->command_block[0];
+    history[i].status = HISTORY_NO_CSW;
+    history[i].taken = false;
+}
+
+static void history_csw(int status)
+{
+    if(history_count == 0)
+        return;
+    unsigned int i = (history_count - 1) % HISTORY_SIZE;
+    uint8_t op = history[i].op;
+
+    history[i].status = status;
+    history[i].residue = cur_cmd.data_residue;
+    /* The signature of a completion reported twice: a read or write
+     * answered good before its data went out */
+    if(status == UMS_STATUS_GOOD && cur_cmd.data_residue != 0 &&
+       (op == SCSI_READ_10 || op == SCSI_READ_16 ||
+        op == SCSI_WRITE_10 || op == SCSI_WRITE_16))
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_RESIDUE, op,
+                history[i].tag, cur_cmd.data_residue);
+}
+
+static void history_taken(void)
+{
+    if(history_count != 0)
+        history[(history_count - 1) % HISTORY_SIZE].taken = true;
+}
+
+static void history_dump(void)
+{
+#ifndef BOOTLOADER
+    unsigned int n = MIN(history_count, HISTORY_SIZE);
+    uint32_t now = USEC_TIMER;
+
+    for(unsigned int k = history_count - n; k != history_count; k++)
+    {
+        unsigned int i = k % HISTORY_SIZE;
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_HISTORY, history[i].op,
+                history[i].tag, now - history[i].us);
+        usb_log(USB_LOG_STORAGE, USB_LOG_STORAGE_HISTORY_CSW,
+                history[i].status | (history[i].taken ? 0x100 : 0),
+                history[i].residue, history[i].length);
+    }
+#endif
+    history_count = 0;
 }
 
 static void copy_padded(char *dest, char *src, int len)

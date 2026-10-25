@@ -1865,6 +1865,16 @@ static void transfer_completed(void)
 
                 int length=0;
                 struct transfer_descriptor* td=&td_array[pipe*NUM_TDS_PER_EP];
+                struct transfer_descriptor* first_td=td;
+                /* Report a transfer once. A TD finishing after the clear
+                 * above sets its bit again for the transfer this pass
+                 * reports, and the core keeps one completion per endpoint,
+                 * so a second report is taken for the endpoint's next
+                 * transfer. The batch queue's TDs live elsewhere. */
+                bool batch_pipe = batch_ep != 0 &&
+                                  pipe == ep_to_pipe_index(batch_ep);
+                if (!batch_pipe && !(td->reserved & DTD_RESERVED_IN_USE))
+                    continue;
                 if ((td->size_ioc_sts & DTD_ERROR_MASK) &&
                     pipe_is_iso(ep, dir) &&
                     iso_errors_logged[pipe] < ISO_LOG_MAX) {
@@ -1887,6 +1897,7 @@ static void transfer_completed(void)
                         ((td->size_ioc_sts & DTD_PACKET_SIZE) >> DTD_LENGTH_BIT_POS));
                     td=(struct transfer_descriptor*) td->next_td_ptr;
                 }
+                first_td->reserved &= ~DTD_RESERVED_IN_USE;
                 if (ep == EP_CONTROL && dir == DIR_IN &&
                     pending_device_address >= 0 &&
                     qh->status == 0 && length == 0) {

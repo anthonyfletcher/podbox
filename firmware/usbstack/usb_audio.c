@@ -521,6 +521,8 @@ static void usb_audio_init(void)
         logf("usbaudio: %lu Hz", hw_freq_sampr[i]);
         encode3(as_playback_format_type_i.tSamFreq[i], hw_freq_sampr[i]);
     }
+    /* Once a cable: init_connection() keeps the host's rate */
+    as_playback_freq_idx = HW_FREQ_DEFAULT;
 }
 
 /*
@@ -1204,8 +1206,8 @@ static bool usb_audio_control_request(struct usb_ctrlrequest* req, uint8_t* reqd
 
 /*
  * Called by usb_core_do_set_config() when the
- * connection is ready to be used. Currently just sets
- * the audio sample rate to default.
+ * connection is ready to be used. Resets the DSP and
+ * reapplies the sample rate.
  */
 static int usb_audio_init_connection(void)
 {
@@ -1231,7 +1233,11 @@ static int usb_audio_init_connection(void)
 #endif
 
     usb_as_playback_intf_alt = 0;
-    set_playback_sampling_frequency(HW_SAMPR_DEFAULT);
+    /* Windows' recovery from a bus reset restores the configuration and the
+     * streaming alternate but never resends the rate, so the rate it last
+     * set has to outlive the reset. */
+    set_playback_sampling_frequency(
+        usb_audio_get_playback_sampling_frequency());
     tmp_saved_vol = sound_current(SOUND_VOLUME);
     usb_audio_playing = false;
     return 0;

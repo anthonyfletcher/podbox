@@ -49,6 +49,30 @@ static const char *usb_log_driver_name(int i)
     }
 }
 
+static const char *scsi_name(int op)
+{
+    switch (op)
+    {
+        case 0x00: return "TEST UNIT READY";
+        case 0x03: return "REQUEST SENSE";
+        case 0x12: return "INQUIRY";
+        case 0x1a: return "MODE SENSE 6";
+        case 0x1b: return "START STOP UNIT";
+        case 0x1e: return "PREVENT ALLOW REMOVAL";
+        case 0x23: return "READ FORMAT CAPACITIES";
+        case 0x25: return "READ CAPACITY 10";
+        case 0x28: return "READ 10";
+        case 0x2a: return "WRITE 10";
+        case 0x35: return "SYNCHRONIZE CACHE";
+        case 0x5a: return "MODE SENSE 10";
+        case 0x88: return "READ 16";
+        case 0x8a: return "WRITE 16";
+        case 0x9e: return "READ CAPACITY 16";
+        case 0xa0: return "REPORT LUNS";
+        default: return "?";
+    }
+}
+
 /* What a setup packet asks for, as far as names go */
 static const char *usb_log_request_name(int type, int req, int value)
 {
@@ -667,6 +691,44 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
             break;
         }
 #endif
+        case USB_LOG_STORAGE:
+            if (e->a == USB_LOG_STORAGE_HISTORY)
+                snprintf(p, size, "storage: earlier: %02x %s, tag %lu, "
+                         "%lu ms before", e->b, scsi_name(e->b),
+                         (unsigned long)e->c, (unsigned long)e->d / 1000);
+            else if (e->a == USB_LOG_STORAGE_HISTORY_CSW)
+            {
+                int st = e->b & 0xff;
+
+                if (st == 0xff)
+                    snprintf(p, size, "storage:   NO CSW, %lu bytes asked",
+                             (unsigned long)e->d);
+                else
+                    snprintf(p, size, "storage:   CSW %s, residue %lu of "
+                             "%lu, %s", st == 0 ? "good" :
+                             st == 1 ? "fail" : "PHASE",
+                             (unsigned long)e->c, (unsigned long)e->d,
+                             e->b & 0x100 ? "taken" : "NOT TAKEN");
+            }
+            else if (e->a == USB_LOG_STORAGE_RESIDUE)
+                snprintf(p, size, "storage: %02x %s, tag %lu, answered good "
+                         "with %lu bytes UNSENT", e->b, scsi_name(e->b),
+                         (unsigned long)e->c, (unsigned long)e->d);
+            else if (e->a == USB_LOG_STORAGE_HELD)
+                snprintf(p, size, "storage: %02x %s held for the disk",
+                         e->b, scsi_name(e->b));
+            else if (e->a == USB_LOG_STORAGE_XFER)
+                snprintf(p, size, "storage: %s transfer %s in state %d, "
+                         "status %lx, %lu bytes",
+                         e->d >> 31 ? "IN" : "OUT",
+                         e->c ? "FAILED" : "SHORT", e->b,
+                         (unsigned long)e->c,
+                         (unsigned long)(e->d & 0x7fffffff));
+            else
+                snprintf(p, size, "storage: BAD CBW, signature %08lx, "
+                         "%lu bytes", (unsigned long)e->c,
+                         (unsigned long)e->d);
+            break;
         case USB_LOG_SYNC:
             snprintf(p, size, "log on disk after %lu ms%s",
                      (unsigned long)e->c / 1000, e->a ? ", TIMED OUT" : "");
