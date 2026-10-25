@@ -44,6 +44,11 @@ ifdef USE_LTO
  CODECLDFLAGS += -e __header
 endif
 
+# Use -O2 as the baseline for everything under codecs! It is set before
+# the libraries are included, because libopus.make copies CODECFLAGS
+# with := as it is read.
+CODECFLAGS += -O2
+
 # the codec libraries
 include $(RBCODECLIB_DIR)/codecs/demac/libdemac.make
 include $(RBCODECLIB_DIR)/codecs/liba52/liba52.make
@@ -87,9 +92,6 @@ endif
 
 # set CODECFLAGS per codec lib, since gcc takes the last -Ox and the last
 # in a -ffoo -fno-foo pair, there is no need to filter them out
-
-# Use -O2 as the baseline for everything under codecs!
-CODECFLAGS += -O2
 
 # fine-tuning of CODECFLAGS per cpu arch
 ifeq ($(ARCH),arch_arm)
