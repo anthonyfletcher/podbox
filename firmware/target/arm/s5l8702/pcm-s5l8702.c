@@ -166,6 +166,9 @@ static void sink_dma_start(const void* addr, size_t size)
     pcm_remaining = size;
     I2STXCOM = I2STXCOM_START;
     dma_play_callback((void*)addr);
+#ifdef HAVE_CS42L55
+    audiohw_unmute();
+#endif
 }
 
 /* MCLK = 12MHz (MCLKDIV2=1), [CS42L55 DS, s4.8] */

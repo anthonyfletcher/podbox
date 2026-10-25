@@ -104,13 +104,17 @@ void audiohw_preinit(void)
                          | PWRCTL1_PDN_ADCB);
 }
 
+/* Runs after the settings have set the output volumes, so it leaves those
+ * registers alone. The master mute stays on until audiohw_unmute(): an
+ * unmuted output with no I2S data hisses. */
 void audiohw_postinit(void)
 {
-    cscodec_write(HPACTL, 0);
-    cscodec_write(HPBCTL, 0);
-    cscodec_write(LINEACTL, 0);
-    cscodec_write(LINEBCTL, 0);
     cscodec_write(CLSHCTL, CLSHCTL_ADPTPWR_SIGNAL);
+}
+
+/* Called once the I2S data is flowing */
+void audiohw_unmute(void)
+{
     audiohw_mute(false);
 }
 

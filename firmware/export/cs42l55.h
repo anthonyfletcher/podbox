@@ -44,6 +44,7 @@ AUDIOHW_SETTING(MIC_GAIN,     "dB", 0,  1, -96,   0,   0, val + PGA_GAIN_DB)
 void audiohw_enable_lineout(bool enable);
 void audiohw_idle_powerdown(void);
 void audiohw_idle_powerup(void);
+void audiohw_unmute(void);
 
 /* Register addresses and bits */
 
