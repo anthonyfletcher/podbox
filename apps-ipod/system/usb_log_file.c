@@ -277,6 +277,9 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                 snprintf(p, size, "< ack %lu", (unsigned long)e->c);
             else if (e->a == USB_LOG_RESP_STALL)
                 snprintf(p, size, "< STALL");
+            else if (e->a == USB_LOG_RESP_LATE)
+                snprintf(p, size, "< DROPPED: no request waiting for it "
+                         "(EP0 state %lu)", (unsigned long)e->c);
             else
                 snprintf(p, size, "< STALL, data stage %lu too long",
                          (unsigned long)e->c);

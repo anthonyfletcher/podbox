@@ -436,9 +436,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             return IAPGeneralCommandID_RetIPodOptionsForLingo;
         } break;
         case IAPGeneralCommandID_GetSupportedEventNotification: {
-            alloc_response(IAPRetSupportedEventNotificationPayload);
-            response->mask = swap_64(IAPSetEventNotificationEvents_FlowControl);
-            return IAPGeneralCommandID_RetSupportedEventNotification;
+            /* refused, as the serial side refuses it */
+            return -IAPAckStatus_EBadParameter;
         } break;
         case IAPGeneralCommandID_SetAvailableCurrent: {
             read_request(IAPSetAvailableCurrentPayload);
@@ -902,11 +901,14 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
             } break;
             case IAPExtendedIndexedPlayingTrackInfoType_TrackArtworkCount: {
-                // IAPArtworkPixelFormats_RGB565LE;
-                // struct IAPExtendedRetIndexedPlayingTrackInfoTrackArtworkCountPayload payload = {
-                //     .};
-                warn("artwork not implemented");
-                return -IAPAckStatus_ECommandFailed;
+                /* no counts at all for a track without art */
+                const IAPBool art = iap_platform_track_has_art(ctx, swap_32(request->track_index));
+                alloc_response_extra(IAPExtendedRetIndexedPlayingTrackInfoTrackArtworkCountPayload, art ? sizeof(response->data[0]) : 0);
+                if(art) {
+                    response->data[0].format = swap_16(IAP_ARTWORK_FORMAT_ID);
+                    response->data[0].count  = swap_16(1);
+                }
+                return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
             } break;
             default:
                 warn("invalid request type 0x%02" PRIX8, request->type);

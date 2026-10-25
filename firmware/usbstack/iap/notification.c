@@ -42,6 +42,8 @@ void iap_on_track_playback_index(uint32_t index, bool track_ready) {
 
     struct IAPContext* ctx = _iap_acquire_ctx(false);
 
+    /* before the accessory hears of the track and asks about it */
+    iap_platform_track_changed(index);
     if(track_ready) {
         /* called from from audio_finish_load_track() */
         goto notify;

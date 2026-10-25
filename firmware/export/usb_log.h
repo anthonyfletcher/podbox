@@ -193,6 +193,7 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
 
 #define USB_LOG_HOST_PORT_READ 0x80
+#define USB_LOG_RESP_LATE      3 /* nothing waiting for it; c = EP0 state */
 
 #define USB_LOG_HOST_SETTING_NO_OUT      0x01 /* no isochronous OUT endpoint */
 #define USB_LOG_HOST_SETTING_NOT_TYPE_I  0x02

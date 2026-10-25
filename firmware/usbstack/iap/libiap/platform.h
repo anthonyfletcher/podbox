@@ -123,6 +123,8 @@ IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used
 IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* total, uint64_t* avail);
 IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformTrackInfo* info);
 IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t index);
+/* whether open_artwork would find the track's art; never reads the disk for the playing track */
+IAPBool iap_platform_track_has_art(struct IAPContext* iap_ctx, uint32_t index);
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork);
 IAPBool iap_platform_get_artwork_ptr(struct IAPContext* iap_ctx, struct IAPPlatformArtwork* artwork, struct IAPSpan* span);
 IAPBool iap_platform_close_artwork(struct IAPContext* iap_ctx, struct IAPPlatformArtwork* artwork);

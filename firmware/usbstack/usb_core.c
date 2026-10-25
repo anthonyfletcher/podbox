@@ -1669,7 +1669,10 @@ void usb_core_control_response(enum usb_control_response response, const void* d
         }
         break;
     default:
-        panicf("usb_core: invalid control response ep_state=%d", ep0_state);
+        /* A handler that outlasted the host's patience answers a request
+         * already abandoned, or answered by a handler run twice */
+        usb_log(USB_LOG_RESPONSE, USB_LOG_RESP_LATE, handling_request.bRequest,
+                ep0_state, 0);
         break;
     }
     restore_irq(oldlevel);

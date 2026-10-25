@@ -176,24 +176,55 @@ static bool slot_art(struct Platform* plt, uint32_t index) {
 /* The playing track's art cache answer is kept until the track or Accessory
  * Artwork changes: the play status carries it, accessories poll that about
  * once a second, and each check opens a file, which keeps the disk from
- * sleeping */
+ * sleeping. The audio thread works it out as the track changes. The USB
+ * thread must not wait on the disk then: the next track is buffering, a
+ * check can take seconds, and a car abandons a request after five. */
+static struct {
+    char     path[MAX_PATH];
+    uint32_t index;
+    int      setting;
+    int      result;
+} playing_art = {.index = UINT32_MAX};
+static bool playing_art_busy; /* the audio thread is working it out */
+
+static bool playing_art_known(uint32_t index, const struct mp3entry* id3) {
+    return playing_art.index == index && playing_art.setting == global_settings.car_artwork &&
+           !strcmp(playing_art.path, id3->path);
+}
+
+static int check_playing_art(uint32_t index, const struct mp3entry* id3) {
+    playing_art_busy = true;
+    const int result = iap_artwork_check(index);
+    playing_art.index   = index;
+    playing_art.setting = global_settings.car_artwork;
+    playing_art.result  = result;
+    strlcpy(playing_art.path, id3->path, sizeof(playing_art.path));
+    playing_art_busy = false;
+    return result;
+}
+
+void iap_platform_track_changed(uint32_t index) {
+    struct mp3entry* id3 = audio_current_track();
+    if(id3 != NULL && !playing_art_known(index, id3)) {
+        check_playing_art(index, id3);
+    }
+}
+
+/* Mid-check on the audio thread, the track is reported without art rather
+ * than wait for it */
 static int playing_art_check(uint32_t index) {
-    static char     path[MAX_PATH];
-    static uint32_t checked = UINT32_MAX;
-    static int      setting = -1;
-    static int      result;
     struct mp3entry* id3 = audio_current_track();
 
     if(id3 == NULL) {
         return iap_artwork_check(index);
     }
-    if(checked != index || setting != global_settings.car_artwork || strcmp(path, id3->path)) {
-        result  = iap_artwork_check(index);
-        checked = index;
-        setting = global_settings.car_artwork;
-        strlcpy(path, id3->path, sizeof(path));
+    if(playing_art_known(index, id3)) {
+        return playing_art.result;
     }
-    return result;
+    if(playing_art_busy) {
+        return USB_LOG_IAP_ART_CACHE_NO_FILE;
+    }
+    return check_playing_art(index, id3);
 }
 
 /* The playing track's answer goes in the USB log each time it changes */
@@ -211,6 +242,10 @@ static bool has_art(struct Platform* plt, uint32_t index) {
         }
     }
     return cache == USB_LOG_IAP_ART_CACHE_OK || slot;
+}
+
+IAPBool iap_platform_track_has_art(struct IAPContext* iap_ctx, uint32_t index) {
+    return index < (uint32_t)playlist_amount() && has_art(iap_ctx->platform, index);
 }
 
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
