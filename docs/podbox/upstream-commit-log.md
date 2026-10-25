@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`f684d3ba6a`**, merged 2026-10-19 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`51ea28ffd2`**, merged 2026-10-25 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -291,8 +291,20 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-15 | `04b76b253c` `32c4833822` `44c4f86d96` `cd8f5e8fd3` `4792e54cb2` `2bb2944aae` `bffcfbac33` `a4eb62e540` `955883e3ab` `fc3db7a1f4` `2a846650b0` `dd3d7b8aa3` `5221341740` `f83df128d0` `8f7f7768e5` `8d5b600068` `fbd69aa986` `a7c11ccc78` `b30d9fbb70` `3ec22c9ee9` `d8389d10b1` `79dea5d24d` `23c06e0e91` | Sony PSP, Agptek Rocker, YP-CP3, rk27xx ZSP500, x1000, sonynwz, imx31, hwstub | **N/A** | Other targets. |
 | 2026-10-15 | `798ba1064e` `879107bf40` `6f36ae4e0c` `472d4c39ab` `f6b01efdd3` | plugins | **N/A** | No plugin system. |
 | 2026-10-17 | `f8161c9884` | Korean translation | **N/A** | Translation. |
+| 2026-10-14 | `54c1c07992` | Shrink the codec buffer from 1 MB to 512 KB | **Declined** | Both players keep 1 MiB: at 512 KiB the 6G's AAC codec has about 128 KB of heap, and libm4a's index of a long audiobook about a fifth as many chunks. |
+| 2026-10-24 | `a7871a0d81` | codecs: `-O2` baseline for all codecs | **Adopted** | With the baseline moved above the library includes, or `libopus.make` snapshots `CODECFLAGS` without it and Opus builds at `-Os`. FLAC, Vorbis and AAC keep `-O2`; ALAC and libmad go to `-O3`, codeclib to `-O2`. Every codec fits the 5G's IRAM as before. |
+| 2026-10-22 | `51fdc7f856` | usb_storage: fail writes with an unexpected transfer length | **Adopted** | The `usb.log` entry for a short transfer stays. |
+| 2026-10-22 | `72d1473497` | usb-designware: reject transfers on unconfigured endpoints | **Adopted** | The 6G. The iAP2 and serial iAP callers already handle a failed send; the sound card ignores it. |
+| 2026-10-24 | `51ea28ffd2` | Remove the hosted fiiom3klinux target | **Adopted** | The `apps/` half has nothing to port. |
+| 2026-10-23 | `2facabaf93` | settings: 'show icons' is a theme setting | **Adopted (independently)** | |
+| 2026-10-16 | `41b30aed48` `bd56a5f5d8` | pictureflow: embedded album art, and its manual entry | **Adopted (independently)** | The carousel takes embedded art through `art_cache.c`. |
+| 2026-10-17 | `8e77162da9` `b883250b3a` | plugin API `settings_apply()`, test_boost | **N/A** | No plugin system. |
+| 2026-10-19 | `0c071d5150` `4b1a197304` `bc10e4453f` `a933f290d6` `7ab156b3b2` | translation updates | **N/A** | Translation. |
+| 2026-10-17 | `685eb7a1af` `c8940732da` `c715b6f7a3` `cee3cb8963` `bad21c5f52` | cabbiev2: recording, FM and remote screens, one backdrop per size | **N/A** | `wps/`. Its two new `fonts/0[56]-Cabbie-Bold.bdf` are converted into every zip by `buildzip.pl`. |
+| 2026-10-20 | `3f9b8fc997` `e3b1d0c2f5` `4584b4ef02` `92ff5b292f` `299f69f56b` `c97aa2e641` `96e37a26a4` `5ba7999490` | hwstub, beastpatcher, rbutil, skinshots | **N/A** | `utils/`. |
+| 2026-10-22 | `8ea6f00d6f` `4b2d55842f` `6a0cbd8212` `96fa1f9a94` `6982a638e4` `6d2b2b7bc5` `64f1b245eb` `9c5ec176d9` `aad17bb83e` `f7d31808ff` `ac867479d9` `6d8094b2a5` `7be0ce3655` `1eecf5f62f` `e0d723fdfb` `25b755a21c` `8054a1dcd0` `0098ba6023` `9377ad18c7` | imx31, Fuze v2, iPod Nano 3G, rk27xx, YP-CP3, Ingenic, AXP PMU, HM-60x | **N/A** | Other targets. |
 
-Complete through `f684d3ba6a` (2026-10-18), merged as `93dfc45df3`.
+Complete through `51ea28ffd2` (2026-10-24), merged as `bd491b9915`.
 
 ---
 
