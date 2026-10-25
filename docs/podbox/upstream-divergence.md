@@ -331,6 +331,7 @@ and produces the wrong firmware.
 | `database_pb/` | Runs the player's database Update or Rebuild against a mounted player. Ships as `.rockbox/tools/database_pb.exe`; compiles `apps-ipod/database/tagcache.c` with `DBTOOL`. Upstream's `database/`, the (D)atabase build, writes upstream's database and is left as it is. |
 | `artcache_pb/` | Runs the player's art cache pass against a mounted player. Ships as `.rockbox/tools/artcache_pb.exe`; compiles `apps-ipod/metadata/art_cache.c` and its image code with `DBTOOL`. |
 | `spun_testlog.pl` | Synthesises playback logs, and the expected parse, for Spun. |
+| `gen_about_art.py` | Writes `apps-ipod/screens/system/about_art.h`, the About page's logo mask and QR code, from `docs/podbox/images/logo/`. Run by hand; needs Pillow and `qrcode`. |
 
 ### CheckWPS
 

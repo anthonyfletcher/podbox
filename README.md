@@ -1,4 +1,9 @@
-# PodBox
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/podbox/images/logo/podbox-horizontal-on-dark.svg">
+    <img src="docs/podbox/images/logo/podbox-horizontal-auto.svg" alt="PodBox" width="300">
+  </picture>
+</h1>
 
 **PodBox is Rockbox, reworked for the iPod Classic and iPod Video.** Album covers and artist
 photos sit beside every list, and the whole interface takes its colours from whatever is
