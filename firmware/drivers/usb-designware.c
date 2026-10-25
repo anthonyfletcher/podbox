@@ -820,9 +820,10 @@ void usb_drv_iso_in_retry(void)
     uint32_t stuck = iso_in_waiting & iso_in_untaken & ~iso_in_learning;
     for (int ep = 1; ep < USB_NUM_ENDPOINTS; ep++)
     {
-        if (stuck & (1 << ep))
+        uint32_t bit = 1 << ep;
+        if (stuck & bit)
         {
-            iso_in_known &= ~(1 << ep);
+            iso_in_known &= ~bit;
             usb_dw_iso_in_learn(ep);
         }
     }
@@ -2510,12 +2511,13 @@ void usb_drv_ep_init(const struct usb_drv_ep_alloc_ctx* ctx, int ep)
     iso_errors_logged[epnum][epdir] = 0;
     if (epdir == USB_DW_EPDIR_IN)
     {
+        uint32_t bit = 1 << epnum;
         usb_dw_target_disable_irq();
-        iso_in_odd &= ~(1 << epnum);
-        iso_in_known &= ~(1 << epnum);
-        iso_in_waiting &= ~(1 << epnum);
-        iso_in_learning &= ~(1 << epnum);
-        iso_in_untaken &= ~(1 << epnum);
+        iso_in_odd &= ~bit;
+        iso_in_known &= ~bit;
+        iso_in_waiting &= ~bit;
+        iso_in_learning &= ~bit;
+        iso_in_untaken &= ~bit;
         iso_parity_logged[epnum][0] = iso_parity_logged[epnum][1] = 0;
         usb_dw_iso_in_watch();
         usb_dw_target_enable_irq();

@@ -518,11 +518,15 @@ unsigned long debug_log_files_size(void)
             continue;
         for (int n = 0; n <= DEBUG_LOG_KEEP; n++)
         {
+            const char *path = log_info[id].path;
             int fd;
 
             if (n)
+            {
                 old_path(id, n, old, sizeof old);
-            fd = open(n ? old : log_info[id].path, O_RDONLY);
+                path = old;
+            }
+            fd = open(path, O_RDONLY);
 
             if (fd >= 0)
             {

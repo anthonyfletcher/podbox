@@ -173,58 +173,26 @@ static bool slot_art(struct Platform* plt, uint32_t index) {
            plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
 }
 
-/* The playing track's art cache answer is kept until the track or Accessory
- * Artwork changes: the play status carries it, accessories poll that about
- * once a second, and each check opens a file, which keeps the disk from
- * sleeping. The audio thread works it out as the track changes. The USB
- * thread must not wait on the disk then: the next track is buffering, a
- * check can take seconds, and a car abandons a request after five. */
-static struct {
-    char     path[MAX_PATH];
-    uint32_t index;
-    int      setting;
-    int      result;
-} playing_art = {.index = UINT32_MAX};
-static bool playing_art_busy; /* the audio thread is working it out */
-
-static bool playing_art_known(uint32_t index, const struct mp3entry* id3) {
-    return playing_art.index == index && playing_art.setting == global_settings.car_artwork &&
-           !strcmp(playing_art.path, id3->path);
-}
-
-static int check_playing_art(uint32_t index, const struct mp3entry* id3) {
-    playing_art_busy = true;
-    const int result = iap_artwork_check(index);
-    playing_art.index   = index;
-    playing_art.setting = global_settings.car_artwork;
-    playing_art.result  = result;
-    strlcpy(playing_art.path, id3->path, sizeof(playing_art.path));
-    playing_art_busy = false;
-    return result;
-}
-
+/* The playing track's art cache answer is kept: the play status carries it,
+ * accessories poll that about once a second, and each check opens a file,
+ * which keeps the disk from sleeping. It is worked out on the background
+ * thread, as the track starts: no thread an accessory waits on may wait on
+ * the disk then, since the next track is buffering, a check can take
+ * seconds, and a car abandons a request after five. */
 void iap_platform_track_changed(uint32_t index) {
     struct mp3entry* id3 = audio_current_track();
-    if(id3 != NULL && !playing_art_known(index, id3)) {
-        check_playing_art(index, id3);
+    if(id3 != NULL) {
+        iap_artwork_playing_check(index, id3->path);
     }
 }
 
-/* Mid-check on the audio thread, the track is reported without art rather
- * than wait for it */
 static int playing_art_check(uint32_t index) {
     struct mp3entry* id3 = audio_current_track();
 
     if(id3 == NULL) {
         return iap_artwork_check(index);
     }
-    if(playing_art_known(index, id3)) {
-        return playing_art.result;
-    }
-    if(playing_art_busy) {
-        return USB_LOG_IAP_ART_CACHE_NO_FILE;
-    }
-    return check_playing_art(index, id3);
+    return iap_artwork_playing_check(index, id3->path);
 }
 
 /* The playing track's answer goes in the USB log each time it changes */

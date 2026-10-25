@@ -11,6 +11,8 @@
  *   - art_path(): the thumbnail a track's art is read from
  *   - the queries: iap_artwork_format_valid(), _exists(), _put_formats(),
  *     _put_counts()
+ *   - iap_artwork_playing_check(): the playing track's answer, worked out on
+ *     the background thread
  *   - iap_artwork_load(): the art scaled, for either transport
  *   - the serial transfer: iap_artwork_start(), _send_next(), _active(),
  *     _stop()
@@ -23,6 +25,8 @@
 #include "metadata/art_cache.h"
 #include "settings.h"
 #include "usb_log.h"
+#include "string-extra.h"
+#include "system/bg_task.h"
 #include "iap-core.h"
 #include "iap-artwork.h"
 
@@ -123,6 +127,72 @@ int iap_artwork_check(uint32_t track)
 bool iap_artwork_exists(uint32_t track)
 {
     return iap_artwork_check(track) == USB_LOG_IAP_ART_CACHE_OK;
+}
+
+/* The playing track's answer, kept until the track or Accessory Artwork
+ * changes. Asked for is playing_want; playing_known is what the background
+ * thread last answered, and want_gen moves on each new request so a check
+ * overtaken by one is done again. */
+struct art_key {
+    uint32_t track;
+    int setting;
+    char path[MAX_PATH];
+};
+static struct art_key playing_want, playing_known = { .track = UINT32_MAX };
+static int playing_result;
+static unsigned int want_gen;
+static bool playing_posted;
+
+#define IAP_ART_EVENT_CHECK 1
+
+static bool key_is(const struct art_key *k, uint32_t track, const char *path)
+{
+    return k->track == track && k->setting == global_settings.car_artwork
+           && !strcmp(k->path, path);
+}
+
+static void playing_event(const struct queue_event *ev)
+{
+    struct art_key k;
+    unsigned int gen;
+    int result;
+
+    (void)ev;
+    do
+    {
+        gen = want_gen;
+        k = playing_want;
+        result = iap_artwork_check(k.track);
+    } while (gen != want_gen);
+    playing_known = k;
+    playing_result = result;
+    playing_posted = false;
+}
+
+static struct bg_task playing_task = {
+    .name = "iAP artwork",
+    .handle_event = playing_event,
+};
+
+int iap_artwork_playing_check(uint32_t track, const char *path)
+{
+    if (global_settings.car_artwork == CAR_ARTWORK_OFF)
+        return USB_LOG_IAP_ART_CACHE_OFF;
+    if (key_is(&playing_known, track, path))
+        return playing_result;
+    if (!key_is(&playing_want, track, path))
+    {
+        playing_want.track = track;
+        playing_want.setting = global_settings.car_artwork;
+        strlcpy(playing_want.path, path, sizeof playing_want.path);
+        want_gen++;
+        if (!playing_posted)
+        {
+            playing_posted = true;
+            bg_task_post(&playing_task, IAP_ART_EVENT_CHECK);
+        }
+    }
+    return USB_LOG_IAP_ART_CACHE_NO_FILE;
 }
 
 void iap_artwork_put_formats(void)

@@ -17,6 +17,11 @@ void iap_artwork_put_counts(uint32_t track);
 bool iap_artwork_exists(uint32_t track);
 /* The same, as why not: a USB_LOG_IAP_ART_CACHE_* value */
 int iap_artwork_check(uint32_t track);
+/* The same for the playing track, at path, without waiting on the disk: the
+ * check runs on the background thread, and until it has answered the track
+ * has no art (USB_LOG_IAP_ART_CACHE_NO_FILE). The answer is kept until the
+ * track or Accessory Artwork changes. */
+int iap_artwork_playing_check(uint32_t track, const char *path);
 bool iap_artwork_format_valid(uint16_t format);
 /* The track's art scaled to dim x dim native pixels into buf, of size
  * bytes; false with none. Serial and USB iAP both send it. */

@@ -42,7 +42,7 @@ struct Platform {
 
 void iap_platform_seek_tick(struct IAPContext* ctx);
 void iap_platform_seek_stop(struct IAPContext* ctx);
-/* From the audio thread as a track starts: its art is looked up there */
+/* As a track starts: its art is looked up on the background thread */
 void iap_platform_track_changed(uint32_t index);
 /* Playback moves to the iAP sink, from the rates the sink offers */
 bool iap_platform_take_sink(void);
