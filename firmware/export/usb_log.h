@@ -276,6 +276,8 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_IAP_ART_CACHE_NO_TRACK 2 /* no such track, or no cache size */
 #define USB_LOG_IAP_ART_CACHE_NO_FILE  3 /* the folder has no thumbnail */
 #define USB_LOG_IAP_ART_CACHE_BAD_FILE 4 /* one the formats cannot use */
+#define USB_LOG_IAP_ART_CACHE_PENDING  5 /* the playing track's, not checked
+                                          * yet */
 
 #define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
 #define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */

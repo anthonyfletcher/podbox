@@ -19,7 +19,7 @@ bool iap_artwork_exists(uint32_t track);
 int iap_artwork_check(uint32_t track);
 /* The same for the playing track, at path, without waiting on the disk: the
  * check runs on the background thread, and until it has answered the track
- * has no art (USB_LOG_IAP_ART_CACHE_NO_FILE). The answer is kept until the
+ * has no art (USB_LOG_IAP_ART_CACHE_PENDING). The answer is kept until the
  * track or Accessory Artwork changes. */
 int iap_artwork_playing_check(uint32_t track, const char *path);
 bool iap_artwork_format_valid(uint16_t format);

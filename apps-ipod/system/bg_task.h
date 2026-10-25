@@ -143,8 +143,12 @@ void bg_task_init(struct bg_task *task);
 /* Start the thread every task shares. Once, after every bg_task_init(). */
 void bg_task_start(void);
 
-/* Queue an event for the task's handle_event(), to run on the thread. */
+/* Queue an event for the task's handle_event(), to run on the thread. One
+ * that arrives during a USB session is thrown away unhandled. */
 void bg_task_post(struct bg_task *task, long id);
+/* Whether the task's event id is waiting on the queue. Exact only for an id
+ * no other task posts. */
+bool bg_task_queued(const struct bg_task *task, long id);
 
 /* The largest work_bytes any registered task declares: what the audio buffer
  * has to leave free for a background pass not to be paid for in stopped

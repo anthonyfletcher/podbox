@@ -579,7 +579,7 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
             };
             static const char *const cache[] = {
                 "a thumbnail", "Accessory Artwork off", "no track or size",
-                "no thumbnail", "an unusable thumbnail"
+                "no thumbnail", "an unusable thumbnail", "not checked yet"
             };
             const bool has = e->c == USB_LOG_IAP_ART_CACHE_OK || e->d;
             snprintf(p, size, "iap: track %u %s%s; art cache: %s%s", e->b,
@@ -587,7 +587,7 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      e->a == USB_LOG_IAP_ART_REPORTED
                          ? (has ? ", told it has art" : ", told it has none")
                          : "",
-                     e->c < 5 ? cache[e->c] : "?",
+                     e->c < 6 ? cache[e->c] : "?",
                      e->d ? ", playback's art used" : "");
             break;
         }

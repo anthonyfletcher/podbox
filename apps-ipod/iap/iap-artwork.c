@@ -141,9 +141,9 @@ struct art_key {
 static struct art_key playing_want, playing_known = { .track = UINT32_MAX };
 static int playing_result;
 static unsigned int want_gen;
-static bool playing_posted;
+static bool playing_running; /* the background thread is checking */
 
-#define IAP_ART_EVENT_CHECK 1
+#define IAP_ART_EVENT_CHECK 2   /* unique on the thread, for bg_task_queued() */
 
 static bool key_is(const struct art_key *k, uint32_t track, const char *path)
 {
@@ -158,6 +158,7 @@ static void playing_event(const struct queue_event *ev)
     int result;
 
     (void)ev;
+    playing_running = true;
     do
     {
         gen = want_gen;
@@ -166,7 +167,7 @@ static void playing_event(const struct queue_event *ev)
     } while (gen != want_gen);
     playing_known = k;
     playing_result = result;
-    playing_posted = false;
+    playing_running = false;
 }
 
 static struct bg_task playing_task = {
@@ -186,13 +187,13 @@ int iap_artwork_playing_check(uint32_t track, const char *path)
         playing_want.setting = global_settings.car_artwork;
         strlcpy(playing_want.path, path, sizeof playing_want.path);
         want_gen++;
-        if (!playing_posted)
-        {
-            playing_posted = true;
-            bg_task_post(&playing_task, IAP_ART_EVENT_CHECK);
-        }
     }
-    return USB_LOG_IAP_ART_CACHE_NO_FILE;
+    /* Asked again until answered: the thread throws away what it is sent
+     * while a host has the disk */
+    if (!playing_running
+        && !bg_task_queued(&playing_task, IAP_ART_EVENT_CHECK))
+        bg_task_post(&playing_task, IAP_ART_EVENT_CHECK);
+    return USB_LOG_IAP_ART_CACHE_PENDING;
 }
 
 void iap_artwork_put_formats(void)
