@@ -81,6 +81,7 @@
 #define IMX233        233
 #define RK27XX       2700
 #define X1000        1000
+#define X1600        1600
 #define STM32H743   32743
 #define N10480H     10480
 #define TACHYON     4000
@@ -149,8 +150,8 @@
 #define IHIFI_800_PAD      68
 #define XDUOO_X3II_PAD     69
 #define XDUOO_X20_PAD      70
-#define FIIO_M3K_LINUX_PAD 71
 #define EROSQ_PAD          72
+// 71 can be reused
 #define FIIO_M3K_PAD       73
 #define SHANLING_Q1_PAD    74
 #define ECHO_R1_PAD        75
@@ -360,6 +361,7 @@ Lyre prototype 1 */
 #define RTC_NANO3G   25 /* Dialog Semiconductor D1671 ??? */
 #define RTC_NANO4G   26 /* Dialog Semiconductor D1759 ??? */
 #define RTC_STM32H743 27
+#define RTC_X1600    28 /* Ingenic X1600 */
 
 /* USB On-the-go */
 #define USBOTG_M66591   6591 /* M:Robe 500 */
@@ -570,8 +572,6 @@ Lyre prototype 1 */
 #include "config/xduoox3ii.h"
 #elif defined(XDUOO_X20)
 #include "config/xduoox20.h"
-#elif defined(FIIO_M3K_LINUX)
-#include "config/fiiom3klinux.h"
 #elif defined(FIIO_M3K)
 #include "config/fiiom3k.h"
 #elif defined(EROS_Q)
@@ -1324,10 +1324,10 @@ Lyre prototype 1 */
 
 #endif /* NUM_CORES */
 
-#ifdef HAVE_HEADPHONE_DETECTION
-/* Timeout objects required if headphone detection is enabled */
+#if defined(HAVE_HEADPHONE_DETECTION) || defined(HAVE_LINEOUT_DETECTION)
+/* Timeout objects required if headphone or line out detection is enabled */
 #define INCLUDE_TIMEOUT_API
-#endif /* HAVE_HEADPHONE_DETECTION */
+#endif /* HAVE_HEADPHONE_DETECTION || HAVE_LINEOUT_DETECTION */
 
 #ifdef HAVE_TOUCHSCREEN
 /* Timeout objects required for kinetic list scrolling */
