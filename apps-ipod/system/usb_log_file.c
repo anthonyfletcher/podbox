@@ -336,6 +336,16 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
         case USB_LOG_ALT:
             snprintf(p, size, "audio: interface %d alternate %d",
                      e->a, e->b);
+        case USB_LOG_ISO_PARITY:
+            if (e->c)
+                snprintf(p, size, "ep %02x iso: host took a packet on %s "
+                         "microframes, %lu after arming", e->a,
+                         e->b ? "odd" : "even", (unsigned long)e->d);
+            else
+                snprintf(p, size, "ep %02x iso: no packet taken in %lu "
+                         "microframes, now sending on %s ones", e->a,
+                         (unsigned long)e->d, e->b ? "even" : "odd");
+            break;
             break;
         case USB_LOG_RATE:
             snprintf(p, size, "audio: rate %lu asked, %lu set",

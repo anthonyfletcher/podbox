@@ -257,6 +257,14 @@ void usb_drv_host_poll(struct usb_drv_host_status *st);
 int usb_drv_get_frame_number(void);
 #endif
 
+#if CONFIG_USBOTG == USBOTG_DESIGNWARE
+/* Searches again for the microframe parity of a high-speed isochronous IN
+ * packet the host has not taken since the last call. Call it about every
+ * 100 ms while a stream is on: a host can switch one on long before it
+ * reads it. */
+void usb_drv_iso_in_retry(void);
+#endif
+
 /* batched request api is for workloads that perform very high-frequency,
  * performance-sensitive isochronous transactions continuously.
  * this api allows multiple transaction requests to be buffered in udc driver.

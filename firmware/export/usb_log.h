@@ -51,6 +51,10 @@ enum usb_log_type
     USB_LOG_XFER_FAIL,   /* a transfer the controller would not start:
                           * a = endpoint, b = error, c, d = registers */
     USB_LOG_ISO_ERROR,   /* a = endpoint, c = status, d = length */
+    USB_LOG_ISO_PARITY,  /* a high-speed isochronous IN endpoint's microframe
+                          * parity: a = endpoint, b = 1 odd; c = 0 switched
+                          * to it, or 1 the host took a packet on it; d =
+                          * microframes since it was last set */
     USB_LOG_ALT,         /* a = interface, b = alternate, c = result */
     USB_LOG_RATE,        /* c = rate asked for, d = rate set */
     USB_LOG_AUDIO,       /* a = USB_LOG_AUDIO_*, c, d as named there */

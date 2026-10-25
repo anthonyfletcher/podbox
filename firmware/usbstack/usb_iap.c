@@ -780,6 +780,9 @@ static void usb_iap_notify_event(intptr_t data) {
             struct IAPDateTime time;
             _iap_convert_datetime(get_time(), &time);
             iap_notify_time_setting(ctx, &time);
+#if CONFIG_USBOTG == USBOTG_DESIGNWARE
+        usb_drv_iso_in_retry();
+#endif
         }
 
 #ifdef HAS_BUTTON_HOLD

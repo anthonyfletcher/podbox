@@ -704,6 +704,133 @@ static int usb_dw_log_ep(int epnum, enum usb_dw_epdir epdir)
     return epnum | (epdir == USB_DW_EPDIR_IN ? USB_DIR_IN : 0);
 }
 
+/* A high-speed host polls an isochronous IN endpoint on microframes of one
+ * parity only, and the controller sends a packet only on the parity it was
+ * armed for. Each endpoint starts even; until the host takes a packet, one
+ * left untaken for longer than a 1 ms poll interval switches it, up to
+ * ISO_IN_SWITCHES times, so a host not reading costs little. A host may
+ * switch a stream on long before it reads it, so usb_drv_iso_in_retry()
+ * searches again for a packet still untaken. The parity a packet was taken
+ * on is kept until the endpoint is set up again, or a transfer is started
+ * over one the host never took. Endpoint bit masks: waiting is armed and
+ * untaken, learning is waiting and still switching, untaken is waiting at
+ * the last retry and not taken since. */
+#define ISO_IN_PATIENCE 9 /* microframes */
+#define ISO_IN_SWITCHES 8
+static uint32_t iso_in_odd, iso_in_known, iso_in_waiting, iso_in_learning;
+static uint32_t iso_in_untaken;
+static uint16_t iso_in_since[USB_NUM_ENDPOINTS]; /* armed, or last switched */
+static uint8_t iso_in_switches[USB_NUM_ENDPOINTS];
+static uint8_t iso_parity_logged[USB_NUM_ENDPOINTS][2]; /* switched, taken */
+
+static unsigned usb_dw_uframe(void)
+{
+    return (DWC_DSTS >> 8) & 0x3FFF;
+}
+
+static void usb_dw_iso_in_watch(void)
+{
+    if (iso_in_learning)
+        DWC_GINTMSK |= IISOIXFR;
+    else
+        DWC_GINTMSK &= ~IISOIXFR;
+}
+
+static void usb_dw_iso_in_log(int epnum, int taken)
+{
+    if (iso_parity_logged[epnum][taken] < ISO_LOG_MAX)
+    {
+        iso_parity_logged[epnum][taken]++;
+        usb_log(USB_LOG_ISO_PARITY, epnum | USB_DIR_IN,
+                (iso_in_odd >> epnum) & 1, taken,
+                (usb_dw_uframe() - iso_in_since[epnum]) & 0x3FFF);
+    }
+}
+
+static void usb_dw_iso_in_learn(int epnum)
+{
+    iso_in_learning |= 1 << epnum;
+    iso_in_since[epnum] = usb_dw_uframe();
+    iso_in_switches[epnum] = 0;
+    DWC_GINTSTS = IISOIXFR;
+}
+
+static void usb_dw_iso_in_armed(int epnum)
+{
+    uint32_t bit = 1 << epnum;
+    if (iso_in_waiting & bit)
+        iso_in_known &= ~bit;
+    iso_in_waiting |= bit;
+    iso_in_since[epnum] = usb_dw_uframe();
+    if (!(iso_in_known & bit))
+        usb_dw_iso_in_learn(epnum);
+    usb_dw_iso_in_watch();
+}
+
+static void usb_dw_iso_in_taken(int epnum)
+{
+    uint32_t bit = 1 << epnum;
+    if (!(iso_in_waiting & bit))
+        return;
+    iso_in_waiting &= ~bit;
+    iso_in_learning &= ~bit;
+    iso_in_untaken &= ~bit;
+    if (!(iso_in_known & bit))
+    {
+        iso_in_known |= bit;
+        usb_dw_iso_in_log(epnum, 1);
+    }
+    usb_dw_iso_in_watch();
+}
+
+static void usb_dw_iso_in_incomplete(void)
+{
+    unsigned now = usb_dw_uframe();
+    for (int ep = 1; ep < USB_NUM_ENDPOINTS; ep++)
+    {
+        uint32_t bit = 1 << ep;
+        if (!(iso_in_learning & bit))
+            continue;
+        if (!(DWC_DIEPCTL(ep) & EPENA))
+        {
+            /* flushed */
+            iso_in_waiting &= ~bit;
+            iso_in_learning &= ~bit;
+            continue;
+        }
+        if (((now - iso_in_since[ep]) & 0x3FFF) < ISO_IN_PATIENCE)
+            continue;
+        if (iso_in_switches[ep] == ISO_IN_SWITCHES)
+        {
+            iso_in_learning &= ~bit;
+            continue;
+        }
+        usb_dw_iso_in_log(ep, 0);
+        iso_in_odd ^= bit;
+        DWC_DIEPCTL(ep) |= (iso_in_odd & bit) ? SETD1PIDOF : SETD0PIDEF;
+        iso_in_since[ep] = now;
+        iso_in_switches[ep]++;
+    }
+    usb_dw_iso_in_watch();
+}
+
+void usb_drv_iso_in_retry(void)
+{
+    usb_dw_target_disable_irq();
+    uint32_t stuck = iso_in_waiting & iso_in_untaken & ~iso_in_learning;
+    for (int ep = 1; ep < USB_NUM_ENDPOINTS; ep++)
+    {
+        if (stuck & (1 << ep))
+        {
+            iso_in_known &= ~(1 << ep);
+            usb_dw_iso_in_learn(ep);
+        }
+    }
+    iso_in_untaken = iso_in_waiting;
+    usb_dw_iso_in_watch();
+    usb_dw_target_enable_irq();
+}
+
 static void usb_dw_epstart(int epnum, enum usb_dw_epdir epdir,
                            void* buf, uint32_t size)
 {
@@ -758,18 +885,25 @@ static void usb_dw_epstart(int epnum, enum usb_dw_epdir epdir,
          *
          * TODO: this needs to take into account the endpoint's bInterval,
          * and currently will not work for USB 2.0 endpoints that require
-         * one packet per microframe. For slower USB 2.0 endpoints data is
-         * only transferred on *even* frames; SETD1PIDOF is not used.
+         * one packet per microframe. For slower USB 2.0 OUT endpoints data
+         * is only transferred on *even* microframes; a high-speed IN
+         * endpoint finds its parity, above.
          * This also breaks for USB 1.0 endpoints with bInterval > 1 for
          * the same reason.
          */
-        if (usb_drv_port_speed() || (usb_drv_get_frame_number() & 1))
+        if (usb_drv_port_speed() && epdir == USB_DW_EPDIR_IN)
+        {
+            DWC_EPCTL(epnum, epdir) |= EPENA | nak |
+                (((iso_in_odd >> epnum) & 1) ? SETD1PIDOF : SETD0PIDEF);
+            usb_dw_iso_in_armed(epnum);
+        }
+        else if (usb_drv_port_speed() || (usb_drv_get_frame_number() & 1))
             DWC_EPCTL(epnum, epdir) |= EPENA | nak | SETD0PIDEF;
         else
             DWC_EPCTL(epnum, epdir) |= EPENA | nak | SETD1PIDOF;
 
         /* The raw interrupt status carries the incomplete-isochronous bits,
-         * which are not enabled as interrupts. */
+         * an interrupt only while an IN endpoint's parity is unknown. */
         if (iso_starts_logged[epnum][epdir] < ISO_LOG_MAX)
         {
             iso_starts_logged[epnum][epdir]++;
@@ -1024,6 +1158,7 @@ static void usb_dw_iepint(int ep)
 
     if (epints & XFRC)
     {
+        usb_dw_iso_in_taken(ep);
         usb_dw_handle_xfer_complete(ep, USB_DW_EPDIR_IN);
     }
 }
@@ -1140,6 +1275,12 @@ static void usb_dw_irq(void)
                 usb_dw_oepint(ep);
             }
         }
+    }
+
+    if (gintsts & IISOIXFR)
+    {
+        DWC_GINTSTS = IISOIXFR;
+        usb_dw_iso_in_incomplete();
     }
 
     if (gintsts & USBRST)
@@ -2355,6 +2496,18 @@ void usb_drv_ep_init(const struct usb_drv_ep_alloc_ctx* ctx, int ep)
 
     iso_starts_logged[epnum][epdir] = 0;
     iso_errors_logged[epnum][epdir] = 0;
+    if (epdir == USB_DW_EPDIR_IN)
+    {
+        usb_dw_target_disable_irq();
+        iso_in_odd &= ~(1 << epnum);
+        iso_in_known &= ~(1 << epnum);
+        iso_in_waiting &= ~(1 << epnum);
+        iso_in_learning &= ~(1 << epnum);
+        iso_in_untaken &= ~(1 << epnum);
+        iso_parity_logged[epnum][0] = iso_parity_logged[epnum][1] = 0;
+        usb_dw_iso_in_watch();
+        usb_dw_target_enable_irq();
+    }
     usb_log(USB_LOG_EP_INIT, ep, type, mps, DWC_EPCTL(epnum, epdir));
 
     dw_ep->active = true;
