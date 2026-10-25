@@ -34,7 +34,9 @@
 #include "rbversion.h"
 #include "backtrace.h"
 #include "safe_read.h"
+#include "string-extra.h"
 #include "thread-internal.h"
+#include "usb_log.h"
 #include "hang_catch.h"
 
 #define HANG_SECS   5
@@ -57,39 +59,44 @@ static bool after_call(uint32_t a)
 
 /* The unwinder steps forward to a function's return, which a loop that
  * never ends never reaches. The words on the stack that follow a call are
- * the callers, with some stale ones among them: four to a line, from the
- * innermost. */
-static void stack_scan(uint32_t sp, uint32_t top, unsigned int *y)
+ * the callers, with some stale ones among them, from the innermost. */
+#define STACK_CALLS 32
+static int stack_scan(uint32_t sp, uint32_t top, uint32_t *found)
 {
-    uint32_t found[4], w;
-    int n = 0, lines = 0;
+    uint32_t w;
+    int n = 0;
 
-    lcd_puts(1, (*y)++, "stack:");
-    for (; sp < top && lines < 8; sp += 4)
-    {
-        if (!safe_read32((uint32_t *)sp, &w) || !after_call(w))
-            continue;
-        found[n++] = w;
-        if (n == 4 || sp + 4 >= top)
-        {
-            lcd_putsf(1, (*y)++, "%08lx %08lx %08lx %08lx",
-                      (unsigned long)found[0],
-                      (unsigned long)(n > 1 ? found[1] : 0),
-                      (unsigned long)(n > 2 ? found[2] : 0),
-                      (unsigned long)(n > 3 ? found[3] : 0));
-            n = 0;
-            lines++;
-        }
-    }
-    if (n)
-        lcd_putsf(1, (*y)++, "%08lx %08lx %08lx", (unsigned long)found[0],
-                  (unsigned long)(n > 1 ? found[1] : 0),
-                  (unsigned long)(n > 2 ? found[2] : 0));
+    for (; sp < top && n < STACK_CALLS; sp += 4)
+        if (safe_read32((uint32_t *)sp, &w) && after_call(w))
+            found[n++] = w;
+    return n;
 }
 
 /* Where the stuck thread was, taken by the tick */
 static const struct thread_entry *hang_thread;
 static uint32_t hang_pc, hang_sp, hang_lr;
+
+/* The report goes to the USB log first, and waits up to three seconds for
+ * the log's writer: drawing on the 6G yields while the LCD's DMA runs, and
+ * the screen it was drawing can then be drawn over. */
+static void hang_log(const struct thread_entry *t, const uint32_t *calls,
+                     int n)
+{
+    char name[8] = "?";
+
+    if (t && t->name)
+        strlcpy(name, t->name, sizeof name);
+    const uint8_t *c = (const uint8_t *)name;
+
+    usb_log(USB_LOG_HANG, 0, 0,
+            (uint32_t)c[0] << 24 | c[1] << 16 | c[2] << 8 | c[3],
+            (uint32_t)c[4] << 24 | c[5] << 16 | c[6] << 8 | c[7]);
+    usb_log(USB_LOG_HANG, 1, 0, hang_pc, hang_lr);
+    for (int i = 0; i < n; i += 2)
+        usb_log(USB_LOG_HANG, 2, i / 2, calls[i],
+                i + 1 < n ? calls[i + 1] : 0);
+    usb_log_sync();
+}
 
 /* Entered by the stuck thread itself, as the tick returned it here rather
  * than to its loop: drawing from the tick would wait on the 6G's LCD DMA,
@@ -97,8 +104,12 @@ static uint32_t hang_pc, hang_sp, hang_lr;
 static void NORETURN_ATTR hang_show(void)
 {
     const struct thread_entry *t = hang_thread;
+    uint32_t calls[STACK_CALLS];
     unsigned int y = 1;
+    int n = t ? stack_scan(hang_sp, (uint32_t)t->stack + t->stack_size,
+                           calls) : 0;
 
+    hang_log(t, calls, n);
     disable_interrupt(IRQ_FIQ_STATUS);
     lcd_set_viewport(NULL);
 #if LCD_DEPTH > 1
@@ -112,8 +123,12 @@ static void NORETURN_ATTR hang_show(void)
               HANG_SECS);
     lcd_putsf(1, y++, "lr:%08lx", (unsigned long)hang_lr);
     rb_backtrace(hang_pc, hang_sp, &y);
-    if (t)
-        stack_scan(hang_sp, (uint32_t)t->stack + t->stack_size, &y);
+    lcd_puts(1, y++, "stack:");
+    for (int i = 0; i < n; i += 4)
+        lcd_putsf(1, y++, "%08lx %08lx %08lx %08lx", (unsigned long)calls[i],
+                  (unsigned long)(i + 1 < n ? calls[i + 1] : 0),
+                  (unsigned long)(i + 2 < n ? calls[i + 2] : 0),
+                  (unsigned long)(i + 3 < n ? calls[i + 3] : 0));
     lcd_update();
 
     /* Waiting for a button, as a panic leaves it */

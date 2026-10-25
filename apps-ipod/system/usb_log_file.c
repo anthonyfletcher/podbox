@@ -336,9 +336,6 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
             snprintf(p, size, "ep %02x iso ERROR %08lx, %lu bytes",
                      e->a, (unsigned long)e->c, (unsigned long)e->d);
             break;
-        case USB_LOG_ALT:
-            snprintf(p, size, "audio: interface %d alternate %d",
-                     e->a, e->b);
         case USB_LOG_ISO_PARITY:
             if (e->c)
                 snprintf(p, size, "ep %02x iso: host took a packet on %s "
@@ -349,6 +346,9 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                          "microframes, now sending on %s ones", e->a,
                          (unsigned long)e->d, e->b ? "even" : "odd");
             break;
+        case USB_LOG_ALT:
+            snprintf(p, size, "audio: interface %d alternate %d",
+                     e->a, e->b);
             break;
         case USB_LOG_RATE:
             snprintf(p, size, "audio: rate %lu asked, %lu set",
@@ -567,6 +567,32 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      e->d ? ", playback's art used" : "");
             break;
         }
+        case USB_LOG_IAP_RUN:
+        {
+            int lingo = e->a & ~USB_LOG_IAP_FROM_PLAYER;
+            char trans[8] = "";
+
+            if (e->c >> 16 != 0xffff)
+                snprintf(trans, sizeof trans, " #%lu",
+                         (unsigned long)(e->c >> 16));
+            snprintf(p, size, "iap < %s:%s%s: %lu more like it, the last "
+                     "%02lx %02lx %02lx %02lx", usb_log_iap_lingo(lingo),
+                     usb_log_iap_command(lingo, e->b), trans,
+                     (unsigned long)(e->c & 0xffff),
+                     (unsigned long)(e->d >> 24),
+                     (unsigned long)(e->d >> 16 & 0xff),
+                     (unsigned long)(e->d >> 8 & 0xff),
+                     (unsigned long)(e->d & 0xff));
+            break;
+        }
+        case USB_LOG_IAP_REPORT:
+            if (e->a)
+                snprintf(p, size, "iap < report read by the host after "
+                         "%lu ms", (unsigned long)e->d);
+            else
+                snprintf(p, size, "iap < report NOT READ by the host for "
+                         "%lu ms", (unsigned long)e->d);
+            break;
         case USB_LOG_IAP_IDENTIFY:
         {
             static const char *const auth[] = {
@@ -644,6 +670,28 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
         case USB_LOG_SYNC:
             snprintf(p, size, "log on disk after %lu ms%s",
                      (unsigned long)e->c / 1000, e->a ? ", TIMED OUT" : "");
+            break;
+        case USB_LOG_HANG:
+            if (e->a == 0)
+            {
+                char name[9];
+
+                for (int i = 0; i < 8; i++)
+                {
+                    unsigned ch = (i < 4 ? e->c >> (24 - 8 * i)
+                                         : e->d >> (56 - 8 * i)) & 0xff;
+                    name[i] = ch >= 0x20 && ch < 0x7f ? ch : '\0';
+                }
+                name[8] = '\0';
+                snprintf(p, size, "HANG: thread \"%s\" held the core",
+                         name);
+            }
+            else if (e->a == 1)
+                snprintf(p, size, "HANG: pc %08lx lr %08lx",
+                         (unsigned long)e->c, (unsigned long)e->d);
+            else
+                snprintf(p, size, "HANG: stack %u: %08lx %08lx", e->b,
+                         (unsigned long)e->c, (unsigned long)e->d);
             break;
         default:
             snprintf(p, size, "? type %d", e->type);

@@ -97,6 +97,34 @@ void iap_debug_reset_timestamp(void) {
 /* libiap's TransIDSupported; iap.c keeps the enum private */
 #define TRANS_ID_SUPPORTED 1
 
+/* A run of the player's packets with one lingo, command and transaction, a
+ * car reading the whole library above all, is logged as its first two and
+ * then one line for the rest: one line each fills the log in seconds and
+ * rotates the start of the session away. */
+#define RUN_LOGGED 2
+
+static struct {
+    uint8_t  lingo;
+    unsigned command, trans, count;
+    uint32_t first;
+} run;
+
+void iap_log_flush(void) {
+    if(run.count > RUN_LOGGED) {
+        usb_log(USB_LOG_IAP_RUN, run.lingo | USB_LOG_IAP_FROM_PLAYER, run.command,
+                MIN(run.count - RUN_LOGGED, 0xffff) | run.trans << 16, run.first);
+    }
+    run.count = 0;
+}
+
+void iap_log_tick(void) {
+    static unsigned last_count;
+    if(run.count == last_count) {
+        iap_log_flush();
+    }
+    last_count = run.count;
+}
+
 void iap_log_report(struct IAPContext* ctx, const void* report, size_t size, bool from_player) {
     const struct IAPHIDReport* r = report;
     if(size < sizeof(*r) || (r->link_control & IAPHIDReportLinkControlBits_Continue)) {
@@ -143,6 +171,21 @@ void iap_log_report(struct IAPContext* ctx, const void* report, size_t size, boo
     uint32_t       first   = 0;
     for(unsigned i = 0; i < 4; i += 1) {
         first = first << 8 | (i < payload ? p[i] : 0);
+    }
+    if(from_player && run.count && lingo == run.lingo && command == run.command && trans == run.trans) {
+        run.count += 1;
+        run.first = first;
+        if(run.count > RUN_LOGGED) {
+            return;
+        }
+    } else {
+        iap_log_flush();
+        if(from_player) {
+            run.lingo   = lingo;
+            run.command = command;
+            run.trans   = trans;
+            run.count   = 1;
+        }
     }
     usb_log(USB_LOG_IAP, lingo | (from_player ? USB_LOG_IAP_FROM_PLAYER : 0), command,
             payload | trans << 16, first);

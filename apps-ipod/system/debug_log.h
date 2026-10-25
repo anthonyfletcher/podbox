@@ -32,9 +32,11 @@ enum debug_log_id {
     DEBUG_LOG_COUNT,
 };
 
-/* A file at this size is renamed to <name>.1.<ext>, replacing the last one,
- * and a new one starts with a header. */
+/* A file at this size is renamed to <name>.1.<ext>, each older copy moves up
+ * one, the one past DEBUG_LOG_KEEP is deleted, and a new file starts with a
+ * header. */
 #define DEBUG_LOG_CAP (256*1024)
+#define DEBUG_LOG_KEEP 4
 
 /* Append one tick-stamped line. Newline is added; do not pass one. When the
  * log is off a call costs a test and a return, so call sites can sit in hot
@@ -75,7 +77,7 @@ bool debug_log_any_on(void);
  * never do */
 int debug_log_minutes_left(void);
 
-/* Bytes in every log file and its rotated copy */
+/* Bytes in every log file and its rotated copies */
 unsigned long debug_log_files_size(void);
 
 /* From the root menu: the splash for logs that have just switched themselves

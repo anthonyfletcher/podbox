@@ -340,9 +340,28 @@ enum Notify {
 static long          counts_tick;
 static unsigned long counts_elapsed;
 
+/* A report the host leaves unread for a second is logged, and again when it
+ * is read: an accessory gone quiet after the player's last reply has either
+ * not been given it or does not want to go on. Reports are counted as read,
+ * so a tick that finds one waiting knows whether it is the same one. */
+static unsigned long reports_read;
+static unsigned long report_watched;
+static long          report_waiting_since;
+static bool          report_unread_logged;
+
+static void watch_report(const struct IAPContext* ctx) {
+    if(!ctx->send_busy || reports_read != report_watched) {
+        report_watched       = reports_read;
+        report_waiting_since = current_tick;
+    } else if(!report_unread_logged && TIME_AFTER(current_tick, report_waiting_since + HZ)) {
+        usb_log(USB_LOG_IAP_REPORT, 0, 0, 0, (current_tick - report_waiting_since) * 1000 / HZ);
+        report_unread_logged = true;
+    }
+}
+
 /* Every 5 s, what the stream took against how far the track moved, as iAP2
- * logs it. Only a running stream counts packets, so a period with none
- * logs nothing. */
+ * logs it. A period with the stream switched on and no packet taken logs
+ * zeros: the host is not reading it. */
 static void log_audio_counts(void) {
     struct iap_audio_counts c;
     uint32_t                ran_empty, failed;
@@ -353,7 +372,7 @@ static void log_audio_counts(void) {
     const unsigned long    elapsed = id3 ? id3->elapsed : 0;
     iap_audio_take_counts(&c);
     usb_drv_batch_take_counts(&ran_empty, &failed);
-    if(c.bytes || c.silent) {
+    if(c.bytes || c.silent || c.on) {
         usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_TAKEN, MIN((current_tick - counts_tick) * 1000 / HZ, 0xffff), c.bytes, c.chunks);
         usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_GAPS, MIN(c.odd, 0xffff), c.silent, elapsed - counts_elapsed);
         usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_USB, 0, ran_empty, failed);
@@ -442,6 +461,7 @@ static int usb_iap_init_connection(void) {
     last_charge_state      = -1;
     last_minute            = -1;
     last_hold_switch_state = -1;
+    report_unread_logged   = false;
 
     iap_debug_reset_timestamp();
     usb_iap2_connect();
@@ -569,6 +589,7 @@ static void usb_iap_disconnect(void) {
     _iap_release_ctx();
     check_act(iap_audio_deinit(), );
     iap_library_close(IAP_LIBRARY_USB);
+    iap_log_flush();
     LOG("disconnected");
 }
 
@@ -587,6 +608,11 @@ static void usb_iap_transfer_complete(int ep, int dir, int status, int length) {
 #if DEBUG_DUMP_TX
         LOG("ep=%d dir=%d state=%d length=%d", ep, dir, status, length);
 #endif
+        reports_read++;
+        if(report_unread_logged) {
+            usb_log(USB_LOG_IAP_REPORT, 1, 0, 0, (current_tick - report_waiting_since) * 1000 / HZ);
+            report_unread_logged = false;
+        }
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         if(status == 0) {
             check_act(iap_notify_send_complete(ctx), );
@@ -754,12 +780,17 @@ static bool usb_iap_control_request(struct usb_ctrlrequest* req, uint8_t* reqdat
 static void usb_iap_notify_event(intptr_t data) {
     switch(data) {
     case Notify_Tick: {
+#if CONFIG_USBOTG == USBOTG_DESIGNWARE
+        usb_drv_iso_in_retry();
+#endif
         if(usb_iap2_tick()) {
             /* the connection is iAP2's, and libiap stays quiet */
             return;
         }
         log_audio_counts();
+        iap_log_tick();
         struct IAPContext* ctx = _iap_acquire_ctx(true);
+        watch_report(ctx);
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
         if(iap_platform_control_waits(ctx)) {
@@ -780,9 +811,6 @@ static void usb_iap_notify_event(intptr_t data) {
             struct IAPDateTime time;
             _iap_convert_datetime(get_time(), &time);
             iap_notify_time_setting(ctx, &time);
-#if CONFIG_USBOTG == USBOTG_DESIGNWARE
-        usb_drv_iso_in_retry();
-#endif
         }
 
 #ifdef HAS_BUTTON_HOLD

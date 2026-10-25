@@ -539,6 +539,7 @@ void iap_audio_take_counts(struct iap_audio_counts *c) {
     c->chunks = count_chunks;
     c->silent = count_silent;
     c->odd    = count_odd;
+    c->on     = enabled;
     count_bytes = count_chunks = count_silent = count_odd = 0;
     restore_irq(irq);
 }

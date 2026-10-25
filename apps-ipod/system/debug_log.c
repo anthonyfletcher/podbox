@@ -136,7 +136,7 @@ static struct {
 } logs[DEBUG_LOG_COUNT];
 
 static bool ready;              /* debug_log_init() has run */
-static struct mutex rotate_lock; /* rotate_path */
+static struct mutex rotate_lock; /* rotate_path, rotate_to */
 
 /* Minutes from switching on, by Switch Off After's index; 0 never */
 static const unsigned short expiry_minutes[] = { 60, 6*60, 24*60, 7*24*60, 0 };
@@ -212,13 +212,13 @@ static void write_header(int fd, enum debug_log_id id, const char *what)
         li->state(fd, m);
 }
 
-/* <name>.1.<ext> beside the file */
-static void old_path(enum debug_log_id id, char *buf, size_t size)
+/* <name>.<n>.<ext> beside the file */
+static void old_path(enum debug_log_id id, int n, char *buf, size_t size)
 {
     const char *path = log_info[id].path;
     const char *dot = strrchr(path, '.');
 
-    snprintf(buf, size, "%.*s.1%s", (int)(dot - path), path, dot);
+    snprintf(buf, size, "%.*s.%d%s", (int)(dot - path), path, n, dot);
 }
 
 static int open_locked(enum debug_log_id id)
@@ -228,14 +228,20 @@ static int open_locked(enum debug_log_id id)
     if (fd >= 0 && ffilesize(fd) >= DEBUG_LOG_CAP)
     {
         /* Static: the storage thread rotates too, from disk_idle_cb(), and
-         * its stack has no room for a path beside the rename */
-        static char rotate_path[MAX_PATH];
+         * its stack has no room for two paths beside the rename */
+        static char rotate_path[MAX_PATH], rotate_to[MAX_PATH];
 
         close(fd);
         mutex_lock(&rotate_lock);
-        old_path(id, rotate_path, sizeof rotate_path);
-        remove(rotate_path);
-        rename(log_info[id].path, rotate_path);
+        old_path(id, DEBUG_LOG_KEEP, rotate_to, sizeof rotate_to);
+        remove(rotate_to);
+        for (int n = DEBUG_LOG_KEEP - 1; n > 0; n--)
+        {
+            old_path(id, n, rotate_path, sizeof rotate_path);
+            rename(rotate_path, rotate_to);
+            strcpy(rotate_to, rotate_path);
+        }
+        rename(log_info[id].path, rotate_to);
         mutex_unlock(&rotate_lock);
         fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd >= 0)
@@ -508,14 +514,15 @@ unsigned long debug_log_files_size(void)
 
     for (int id = 0; id < DEBUG_LOG_COUNT; id++)
     {
-        const char *paths[2] = { log_info[id].path, old };
-
         if (!log_info[id].path)
             continue;
-        old_path(id, old, sizeof old);
-        for (int i = 0; i < 2; i++)
+        for (int n = 0; n <= DEBUG_LOG_KEEP; n++)
         {
-            int fd = open(paths[i], O_RDONLY);
+            int fd;
+
+            if (n)
+                old_path(id, n, old, sizeof old);
+            fd = open(n ? old : log_info[id].path, O_RDONLY);
 
             if (fd >= 0)
             {

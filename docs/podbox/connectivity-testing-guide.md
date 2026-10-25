@@ -16,8 +16,8 @@ one that does.
 2. For a dock, also turn on `Settings > System > Show Debug Menu`
 3. Connect to the accessory and repeat the problem
 4. For a dock, take a photo of `System > Debug > Serial iAP` while docked.
-5. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
-   one), then turn `USB and Accessory Log` off - it slows every USB
+5. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log` to `usb.4.log`,
+   the older ones, if there are any), then turn `USB and Accessory Log` off - it slows every USB
    connection. If you forget, it switches itself off after
    `Settings > System > Debug Logs > Switch Off After`, 24 hours by default.
 
