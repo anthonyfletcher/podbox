@@ -21,6 +21,8 @@ struct iap_chapter_info {
     uint32_t elapsed_ms;
     const char *name;
 };
+/* 0 for none; only the playing track's cue sheet is loaded */
+uint32_t iap_chapter_count(const struct mp3entry *id3);
 bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
                     struct iap_chapter_info *chapter);
 /* False with nothing playing, or a track with no chapters */

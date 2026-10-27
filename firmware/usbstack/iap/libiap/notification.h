@@ -8,6 +8,7 @@ struct _IAPNotifyState {
     uint32_t           track_playback_index;
     uint32_t           track_caps; /* IAPIPodStateTrackCapBits */
     uint32_t           tracks_count;
+    uint32_t           chapter_index; /* 0xFFFFFFFF for none */
     uint8_t            play_status; /* IAPIPodStatePlayStatus */
     uint8_t            mute_state;
     uint8_t            volume;

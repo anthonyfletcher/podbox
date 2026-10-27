@@ -5,6 +5,7 @@
  * handlers call it from the iAP thread, platform.c from the USB thread.
  *
  * Parts, in order:
+ *   - iap_chapter_count(): how many a track's cue sheet has
  *   - iap_chapter_at(): one chapter of a track's cue sheet
  *   - iap_current_chapter(): the playing one
  *   - iap_set_chapter(), iap_skip_chapter(): seeking to one
@@ -14,6 +15,13 @@
 #include "metadata.h"
 #include "metadata/cuesheet.h"
 #include "iap-chapters.h"
+
+uint32_t iap_chapter_count(const struct mp3entry *id3)
+{
+    if (!id3 || !id3->cuesheet || id3->cuesheet->track_count <= 0)
+        return 0;
+    return id3->cuesheet->track_count;
+}
 
 bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
                     struct iap_chapter_info *chapter)

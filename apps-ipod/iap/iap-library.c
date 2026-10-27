@@ -209,7 +209,8 @@ static uint32_t list_count;
 /* The database commit the lists and the selection were read under */
 static int32_t lists_commit = -1;
 
-enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_PREFETCH, EV_LIST, EV_EXIT };
+enum { EV_PLAY = 1, EV_MIX, EV_START, EV_ARTWORK, EV_PREFETCH, EV_LIST,
+       EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
@@ -257,6 +258,8 @@ static void worker(void)
             play_tracks(ev.data);
         else if (ev.id == EV_MIX)
             play_mix(ev.data);
+        else if (ev.id == EV_START && !leaving)
+            playlist_start(ev.data, 0, 0);
         building = false;
     }
 }
@@ -1158,6 +1161,15 @@ bool iap_library_tracks_are_queue(void)
 bool iap_library_building(void)
 {
     return building;
+}
+
+bool iap_library_start(int index)
+{
+    if (building || index < 0 || index >= playlist_amount()
+        || !open_block(false))
+        return false;
+    start_work(EV_START, index);
+    return true;
 }
 
 bool iap_library_queue_lent(void)

@@ -35,7 +35,6 @@ struct Platform {
     struct IAPAllocResult            malloc_results[4]; /* allow up to 4 mallocs */
     struct IAPPlatformPendingControl pending_control;
     bool                             control_pending;
-    long                             pending_tick;
 
     int aa_slot;
 };
@@ -56,6 +55,9 @@ uint8_t _iap_convert_battery_level(int rb_battery_level);
 uint8_t _iap_convert_charge_status(enum charge_state_type rb_charge_state);
 void    _iap_convert_datetime(struct tm* rb_time, struct IAPDateTime* time);
 
-/* Answers a play held back once playback starts, or once the library has
- * built the Queue; true while one is still held. Called every tick. */
+/* Answers a play or a selection held back once playback starts, or once
+ * the library has the Queue; true while one is still held. Called every
+ * tick. */
 bool    iap_platform_control_waits(struct IAPContext* ctx);
+/* Each tick: the playing chapter, for the accessory to hear of a change */
+void    iap_platform_chapter_tick(struct IAPContext* ctx);

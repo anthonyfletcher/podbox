@@ -17,7 +17,7 @@ enum IAPPlatformMallocFlags {
     IAPPlatformMallocFlags_Uncached = 1 << 0,
 };
 
-/* iap_platform_get_play_status */
+/* iap_platform_get_play_status; stopped, all but state and track_count 0 */
 struct IAPPlatformPlayStatus {
     uint32_t track_total_ms;
     uint32_t track_pos_ms;
@@ -68,18 +68,21 @@ struct IAPPlatformPowerStatus {
 /* iap_platform_get_indexed_track_info */
 struct IAPPlatformTrackInfo {
     uint32_t*           total_ms;
-    uint32_t*           caps; /* IAPIPodStateTrackCapBits */
-    struct IAPDateTime* release_date;
+    uint32_t*           caps;          /* IAPIPodStateTrackCapBits */
+    uint16_t*           chapter_count; /* the playing track's only */
+    struct IAPDateTime* release_date;  /* all 0 for none */
     struct IAPSpan*     artist;
     struct IAPSpan*     composer;
     struct IAPSpan*     album;
     struct IAPSpan*     title;
+    struct IAPSpan*     genre;
 };
 
 /* iap_platform_get_chapter */
 struct IAPPlatformChapter {
     uint32_t        index;
     uint32_t        count;
+    uint32_t        offset_ms;
     uint32_t        length_ms;
     uint32_t        elapsed_ms;
     struct IAPSpan* name; /* user, may be NULL */
@@ -119,9 +122,15 @@ IAPBool iap_platform_get_date_time(struct IAPContext* iap_ctx, struct IAPDateTim
 IAPBool iap_platform_get_backlight_level(struct IAPContext* iap_ctx, uint8_t* level);
 IAPBool iap_platform_get_hold_switch_state(struct IAPContext* iap_ctx, IAPBool* state);
 IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used);
+/* the track position, while playing */
+IAPBool iap_platform_set_position(struct IAPContext* iap_ctx, uint32_t pos_ms);
+/* volume as IAPPlatformVolumeStatus's; muted, the volume is ignored */
+void    iap_platform_set_volume(struct IAPContext* iap_ctx, uint8_t volume, IAPBool muted);
+uint32_t iap_platform_get_track_count(struct IAPContext* iap_ctx);
 /* the disk's size and free space, in bytes */
 IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* total, uint64_t* avail);
 IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformTrackInfo* info);
+/* stopped, playback starts there */
 IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t index);
 /* whether open_artwork would find the track's art; never reads the disk for the playing track */
 IAPBool iap_platform_track_has_art(struct IAPContext* iap_ctx, uint32_t index);
@@ -134,10 +143,15 @@ IAPBool iap_platform_get_db_record(struct IAPContext* iap_ctx, uint8_t type /* I
 /* an index of 0xFFFFFFFF steps back up a level; sort is SelectSortDBRecord's, 0xFF for none */
 IAPBool iap_platform_select_db_record(struct IAPContext* iap_ctx, uint8_t type /* IAPDatabaseType */, uint32_t index, uint8_t sort);
 void    iap_platform_reset_db_selection(struct IAPContext* iap_ctx);
+/* true when the platform answers the selection itself, with pending, once
+ * the library has the Queue it chose */
+IAPBool iap_platform_hold_selection(struct IAPContext* iap_ctx, struct IAPPlatformPendingControl pending);
 /* the playing track's chapter at index, or its current one for 0xFFFFFFFF;
  * false with no such chapter */
 IAPBool iap_platform_get_chapter(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformChapter* chapter);
 IAPBool iap_platform_set_chapter(struct IAPContext* iap_ctx, uint32_t index);
+/* a track's chapter at index; only the playing track's are known */
+IAPBool iap_platform_get_track_chapter(struct IAPContext* iap_ctx, uint32_t track, uint32_t index, struct IAPPlatformChapter* chapter);
 
 /* other callbacks */
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs);

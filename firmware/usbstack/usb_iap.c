@@ -793,6 +793,7 @@ static void usb_iap_notify_event(intptr_t data) {
         watch_report(ctx);
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
+        iap_platform_chapter_tick(ctx);
         if(iap_platform_control_waits(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();

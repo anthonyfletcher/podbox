@@ -119,6 +119,7 @@ IAPBool iap_platform_get_chapter(struct IAPContext* iap_ctx, uint32_t index, str
     }
     chapter->index      = info.index;
     chapter->count      = info.count;
+    chapter->offset_ms  = info.offset_ms;
     chapter->length_ms  = info.length_ms;
     chapter->elapsed_ms = info.elapsed_ms;
     if(chapter->name != NULL) {
@@ -216,10 +217,27 @@ IAPBool iap_platform_track_has_art(struct IAPContext* iap_ctx, uint32_t index) {
     return index < (uint32_t)playlist_amount() && has_art(iap_ctx->platform, index);
 }
 
+/* The tags carry a release year at most */
+static uint32_t track_caps(struct Platform* plt, uint32_t index, const struct mp3entry* id3) {
+    uint32_t caps = 0;
+    if(has_art(plt, index)) {
+        caps |= IAPIPodStateTrackCapBits_HasAlbumArts;
+    }
+    if(iap_chapter_count(id3) > 0) {
+        caps |= IAPIPodStateTrackCapBits_HasChapters;
+    }
+    if(id3->year > 0) {
+        caps |= IAPIPodStateTrackCapBits_HasReleaseDate;
+    }
+    return caps;
+}
+
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
     struct Platform* plt = iap_ctx->platform;
 
-    status->state = _iap_convert_play_status(audio_status());
+    memset(status, 0, sizeof(*status));
+    status->state       = _iap_convert_play_status(audio_status());
+    status->track_count = playlist_amount();
     if(status->state == IAPIPodStatePlayStatus_PlaybackStopped) {
         return iap_true;
     }
@@ -232,40 +250,43 @@ IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatf
         status->track_pos_ms = remote_seek_position();
         status->state        = remote_seek_direction() > 0 ? IAPIPodStatePlayStatus_FastForward : IAPIPodStatePlayStatus_FastRewind;
     }
-    status->track_index    = playlist_get_display_index() - 1;
-    status->track_count    = playlist_amount();
-    status->track_caps     = IAPIPodStateTrackCapBits_HasReleaseDate;
-    if(has_art(plt, status->track_index)) {
-        status->track_caps |= IAPIPodStateTrackCapBits_HasAlbumArts;
-    }
+    status->track_index = playlist_get_display_index() - 1;
+    status->track_caps  = track_caps(plt, status->track_index, id3);
 
     return iap_true;
 }
 
-static bool library_play_held;
+uint32_t iap_platform_get_track_count(struct IAPContext* iap_ctx) {
+    (void)iap_ctx;
+    return playlist_amount();
+}
+
+/* Answered with pending once the library is done with the Queue */
+static void hold_for_library(struct Platform* plt, struct IAPPlatformPendingControl pending) {
+    plt->control_pending = true;
+    plt->pending_control = pending;
+}
+
+IAPBool iap_platform_hold_selection(struct IAPContext* iap_ctx, struct IAPPlatformPendingControl pending) {
+    struct Platform* plt = iap_ctx->platform;
+    if(!iap_library_building() || plt->control_pending) {
+        return iap_false;
+    }
+    hold_for_library(plt, pending);
+    return iap_true;
+}
 
 bool iap_platform_control_waits(struct IAPContext* ctx) {
     struct Platform* plt = ctx->platform;
-    bool             ok  = true;
     if(!plt->control_pending) {
         return false;
     }
-    if(library_play_held) {
-        if(iap_library_building()) {
-            return true;
-        }
-        /* playback starting has usually answered it already, but not where
-         * it was playing before and the stream never stopped */
-        library_play_held = false;
-    } else if(!(audio_status() & AUDIO_STATUS_PLAY)) {
-        /* the iAP sink's play answers it first; playback on the built-in
-         * sink, or none at all, is answered from here */
-        if(!TIME_AFTER(current_tick, plt->pending_tick + 5 * HZ)) {
-            return true;
-        }
-        ok = false;
+    if(iap_library_building()) {
+        return true;
     }
-    check_act(iap_control_response(ctx, plt->pending_control, ok), );
+    /* playback starting has usually answered it already, but not where
+     * it was playing before and the stream never stopped */
+    check_act(iap_control_response(ctx, plt->pending_control, iap_true), );
     plt->control_pending = false;
     return false;
 }
@@ -280,21 +301,30 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
         iap_platform_seek_stop(iap_ctx);
     }
     long button = BUTTON_NONE;
+    if(control == IAPPlatformControl_Play || (control == IAPPlatformControl_TogglePlayPause && !(audio_status() & AUDIO_STATUS_PLAY))) {
+        if(iap_library_building()) {
+            /* The library starts playback once the Queue is built, and an
+             * accessory told before then asks about a Queue half made */
+            hold_for_library(plt, pending);
+            return;
+        }
+        /* Stopped, the play key would act on the screen with focus, and
+         * outside the WPS open the highlighted row */
+        if(!(audio_status() & AUDIO_STATUS_PLAY)) {
+            if(!iap_library_start(playlist_get_current()->index)) {
+                ret = iap_false;
+                goto exit;
+            }
+            hold_for_library(plt, pending);
+            return;
+        }
+    }
     switch(control) {
     case IAPPlatformControl_TogglePlayPause:
         button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         break;
     case IAPPlatformControl_Play:
-        if(iap_library_building()) {
-            /* The library starts playback once the Queue is built, and an
-             * accessory told before then asks about a Queue half made */
-            plt->control_pending = true;
-            plt->pending_control = pending;
-            plt->pending_tick    = current_tick;
-            library_play_held    = true;
-            return;
-        }
-        if(!(audio_status() & AUDIO_STATUS_PLAY) || (audio_status() & AUDIO_STATUS_PAUSE)) {
+        if(audio_status() & AUDIO_STATUS_PAUSE) {
             button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         }
         break;
@@ -350,15 +380,6 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
         goto exit;
     }
     check_act(button_queue_try_post(button, 0), ret = false);
-    if(ret && button == BUTTON_MULTIMEDIA_PLAYPAUSE && audio_status() == 0) {
-        /* we are transitioning to stopped to playing, which may take time.
-         * to maintain synchronization with accessories, do not send an ack until playback actually begins. */
-        plt->control_pending = true;
-        plt->pending_control = pending;
-        plt->pending_tick    = current_tick;
-        library_play_held    = false;
-        return;
-    }
 exit:
     check_act(iap_control_response(iap_ctx, pending, ret), );
 }
@@ -522,18 +543,22 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
         *info->total_ms = id3.length;
     }
     if(info->caps != NULL) {
-        *info->caps = IAPIPodStateTrackCapBits_HasReleaseDate;
-        if(has_art(plt, index)) {
-            *info->caps |= IAPIPodStateTrackCapBits_HasAlbumArts;
-        }
+        *info->caps = track_caps(plt, index, &id3);
+    }
+    if(info->chapter_count != NULL) {
+        *info->chapter_count = iap_chapter_count(&id3);
     }
     if(info->release_date != NULL) {
-        info->release_date->year    = id3.year;
-        info->release_date->month   = 0;
-        info->release_date->day     = 0;
-        info->release_date->hour    = 0;
-        info->release_date->minute  = 0;
-        info->release_date->seconds = 0;
+        /* a year only, as 1 January */
+        const bool year = id3.year > 0;
+        memset(info->release_date, 0, sizeof(*info->release_date));
+        info->release_date->year  = year ? id3.year : 0;
+        info->release_date->month = year ? 1 : 0;
+        info->release_date->day   = year ? 1 : 0;
+    }
+    if(info->genre != NULL) {
+        const char* s = id3.genre_string ? id3.genre_string : "";
+        check_act(iap_span_append(info->genre, s, strlen(s) + 1), return iap_false);
     }
     /* A tag the track does not carry is NULL, and goes as an empty string */
     if(info->artist != NULL) {
@@ -559,7 +584,11 @@ IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t inde
     (void)iap_ctx;
     /* audio_skip() locks up on an offset past the end rather than refusing it */
     check_act(index < (uint32_t)playlist_amount(), return iap_false);
-    audio_skip((int)index - playlist_next(0));
+    /* stopped, a skip has nothing to move, and audio_skip() drops it */
+    if(!(audio_status() & AUDIO_STATUS_PLAY)) {
+        return iap_library_start((playlist_get_first_index(NULL) + index) % playlist_amount());
+    }
+    audio_skip((int)index - (playlist_get_display_index() - 1));
     return iap_true;
 }
 
@@ -599,6 +628,52 @@ IAPBool iap_platform_select_db_record(struct IAPContext* iap_ctx, uint8_t type, 
 void iap_platform_reset_db_selection(struct IAPContext* iap_ctx) {
     (void)iap_ctx;
     iap_library_reset();
+}
+
+IAPBool iap_platform_set_position(struct IAPContext* iap_ctx, uint32_t pos_ms) {
+    (void)iap_ctx;
+    if(!(audio_status() & AUDIO_STATUS_PLAY)) {
+        return iap_false;
+    }
+    audio_pre_ff_rewind();
+    audio_ff_rewind(pos_ms);
+    return iap_true;
+}
+
+/* Muted is the lowest volume, until the next change of volume */
+void iap_platform_set_volume(struct IAPContext* iap_ctx, uint8_t volume, IAPBool muted) {
+    (void)iap_ctx;
+    const int min = sound_min(SOUND_VOLUME);
+    const int max = sound_max(SOUND_VOLUME);
+    if(muted) {
+        sound_set_volume(min);
+        return;
+    }
+    global_status.volume = min + (volume * (max - min) + 127) / 255;
+    setvol();
+}
+
+IAPBool iap_platform_get_track_chapter(struct IAPContext* iap_ctx, uint32_t track, uint32_t index, struct IAPPlatformChapter* chapter) {
+    (void)iap_ctx;
+    struct iap_chapter_info info;
+    if(!(audio_status() & AUDIO_STATUS_PLAY) || (int)track != playlist_get_display_index() - 1 ||
+       !iap_chapter_at(audio_current_track(), index, &info)) {
+        return iap_false;
+    }
+    chapter->index      = info.index;
+    chapter->count      = info.count;
+    chapter->offset_ms  = info.offset_ms;
+    chapter->length_ms  = info.length_ms;
+    chapter->elapsed_ms = info.elapsed_ms;
+    if(chapter->name != NULL) {
+        return iap_span_append(chapter->name, info.name, strlen(info.name) + 1);
+    }
+    return iap_true;
+}
+
+void iap_platform_chapter_tick(struct IAPContext* ctx) {
+    struct iap_chapter_info info;
+    iap_notify_chapter_index(ctx, iap_current_chapter(&info) ? info.index : 0xFFFFFFFF);
 }
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {
@@ -737,15 +812,8 @@ uint8_t _iap_convert_repeat_state(int rb_state) {
 #endif
     };
 
-    if(rb_state == REPEAT_OFF && global_settings.next_folder) {
-        /* when repeat is off and next folder is enabled, report repeat all.
-         * without this hack, the accessory will likely set repeat to all,
-         * resulting in trapping us in the current directory. */
-        return IAPIPodStateRepeatSettingState_All;
-    } else {
-        check_act(rb_state < ARRAY_SIZE(table), return iap_false);
-        return table[rb_state];
-    }
+    check_act(rb_state < ARRAY_SIZE(table), return iap_false);
+    return table[rb_state];
 }
 
 uint8_t _iap_convert_battery_level(int rb_battery_level) {

@@ -29,7 +29,19 @@ void iap_notify_tracks_count(struct IAPContext* ctx, uint32_t count) {
     ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_PlaybackEngineContentsChanged;
 }
 
+void iap_notify_chapter_index(struct IAPContext* ctx, uint32_t index) {
+    if(index == ctx->notification_data.chapter_index) {
+        return;
+    }
+    ctx->notification_data.chapter_index = index;
+    ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_ChapterIndex;
+}
+
+/* only a change goes to the accessory */
 void iap_notify_play_status(struct IAPContext* ctx, uint8_t status) {
+    if(status == ctx->notification_data.play_status) {
+        return;
+    }
     ctx->notification_data.play_status = status;
     ctx->notifications_3 |= 1 << IAPIPodStateType_PlayStatus;
     ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_PlaybackStatusExtended;
@@ -177,6 +189,9 @@ IAPBool _iap_flush_notification(struct IAPContext* ctx) {
     send_notify_4(IAPPlayStatusChangeNotificationTrackIndexPayload,
                   IAPStatusChangeNotificationType_TrackIndex,
                   payload->index = swap_32(ctx->notification_data.track_playback_index));
+    send_notify_4(IAPPlayStatusChangeNotificationChapterIndexPayload,
+                  IAPStatusChangeNotificationType_ChapterIndex,
+                  payload->index = swap_32(ctx->notification_data.chapter_index));
     send_notify_4(IAPPlayStatusChangeNotificationTrackTimeOffsetMSecPayload,
                   IAPStatusChangeNotificationType_TrackTimeOffsetMSec,
                   payload->offset_ms = swap_32(ctx->notification_data.track_time_position_ms));

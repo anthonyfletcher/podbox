@@ -147,6 +147,7 @@ IAPBool iap_init_ctx(struct IAPContext* ctx, struct IAPOpts opts, void* platform
     check_ret(ctx->send_buf != NULL, iap_false);
     ctx->handling_trans_id    = -1;
     ctx->trans_id_support     = TransIDUnknown;
+    ctx->notification_data.chapter_index = 0xFFFFFFFF;
     ctx->hid_send_staging_buf = iap_platform_malloc(ctx, max_input_hid_desc_size + 1 /* report id */, IAPPlatformMallocFlags_Uncached);
     check_ret(ctx->hid_send_staging_buf != NULL, iap_false);
     ctx->phase = IAPPhase_Connected;
@@ -191,6 +192,9 @@ static uint32_t play_stage_change_notification_set_mask_to_type_mask(uint32_t ma
     }
     if(mask & IAPStatusChangeNotificationBits_TrackTimeOffsetSec) {
         ret |= 1 << IAPStatusChangeNotificationType_TrackTimeOffsetSec;
+    }
+    if(mask & IAPStatusChangeNotificationBits_ChapterIndex) {
+        ret |= 1 << IAPStatusChangeNotificationType_ChapterIndex;
     }
     if(mask & IAPStatusChangeNotificationBits_PlaybackEngineContentsChanged) {
         ret |= 1 << IAPStatusChangeNotificationType_PlaybackEngineContentsChanged;
@@ -255,11 +259,15 @@ static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
     return iap_false;
 }
 
+/* The time is ignored, as a track has one image; a request for another
+ * track's ends the transfer under way */
 static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
     read_request(IAPGetTrackArtworkDataPayload);
     check_ret(swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID, -IAPAckStatus_EBadParameter);
-    check_ret(request->offset_ms == 0, -IAPAckStatus_EBadParameter);
-    check_ret(!ctx->artwork.valid, -IAPAckStatus_EBadParameter);
+    if(ctx->artwork.valid) {
+        iap_platform_close_artwork(ctx, &ctx->artwork);
+        ctx->artwork.valid = iap_false;
+    }
 
     check_ret(iap_platform_open_artwork(ctx, swap_32(request->track_index), &ctx->artwork), -IAPAckStatus_EBadParameter);
     ctx->artwork.valid       = iap_true;
@@ -274,6 +282,19 @@ static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* reques
         ctx->artwork_data_command = IAPDisplayRemoteCommandID_RetTrackArtworkData;
     }
     check_ret(send_artwork_chunk_cb(ctx), -IAPAckStatus_ECommandFailed);
+    return 0;
+}
+
+/* A track's one image is at its start; none, no times */
+static int32_t put_artwork_times(struct IAPContext* ctx, struct IAPSpan* request_span, struct IAPSpan* response_span) {
+    read_request(IAPGetTrackArtworkTimesPayload);
+    if(request->artwork_index == 0 && request->artwork_count != 0 &&
+       swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID &&
+       iap_platform_track_has_art(ctx, swap_32(request->track_index))) {
+        uint32_t* time = iap_span_alloc(response_span, sizeof(*time));
+        check_ret(time != NULL, -IAPAckStatus_EOutOfResource);
+        *time = 0;
+    }
     return 0;
 }
 
@@ -305,6 +326,23 @@ static int32_t ipod_ack_ext(uint16_t command, enum IAPAckStatus status, struct I
     response->id     = swap_16(command);
     response->status = status;
     return IAPExtendedInterfaceCommandID_IPodAck;
+}
+
+/* A song list being made into the Queue is acked when it is done, or the
+ * accessory asks about a Queue half made */
+static int32_t select_db_record(struct IAPContext* ctx, uint16_t command, uint8_t type, uint32_t index, uint8_t sort, struct IAPSpan* response_span) {
+    check_ret(iap_platform_select_db_record(ctx, type, index, sort), -IAPAckStatus_EBadParameter);
+    const struct IAPPlatformPendingControl pending = {
+        .req_command = command,
+        .ack_command = IAPExtendedInterfaceCommandID_IPodAck,
+        .trans_id    = ctx->handling_trans_id,
+        .lingo       = IAPLingoID_ExtendedInterface,
+    };
+    if(iap_platform_hold_selection(ctx, pending)) {
+        response_span->ptr = NULL;
+        return 0;
+    }
+    return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
 }
 
 static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t command, struct IAPSpan* request_span, struct IAPSpan* response_span) {
@@ -419,19 +457,16 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 response->bits = swap_64(IAPRetIPodOptionsForLingoSimpleRemoteBits_ContextSpecificControls |
                                          IAPRetIPodOptionsForLingoSimpleRemoteBits_AudioMediaControls);
                 break;
-            case IAPLingoID_DisplayRemote:
+            case IAPLingoID_DisplayRemote: /* bit 0 as the serial side's */
+                response->bits = swap_64(1 << 0);
+                break;
             case IAPLingoID_ExtendedInterface:
             case IAPLingoID_DigitalAudio:
             case IAPLingoID_Storage: /* caps and free space; no iTunes Tagging */
                 response->bits = 0;
                 break;
-            case IAPLingoID_USBHostMode:
-            case IAPLingoID_RFTuner:
-            case IAPLingoID_Sports:
-            case IAPLingoID_IPodOut:
-            case IAPLingoID_Location: { /* not supported */
+            default: /* not supported */
                 return -IAPAckStatus_EBadParameter;
-            }
             }
             return IAPGeneralCommandID_RetIPodOptionsForLingo;
         } break;
@@ -506,11 +541,12 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             case IAPIPodStateType_ChapterIndex: {
                 struct IAPPlatformPlayStatus status;
                 check_ret(iap_platform_get_play_status(ctx, &status), -IAPAckStatus_ECommandFailed);
+                struct IAPPlatformChapter chapter = {0};
+                const IAPBool             has     = iap_platform_get_chapter(ctx, 0xFFFFFFFF, &chapter);
                 alloc_response(IAPIPodStateChapterIndexPayload);
-                response->index = swap_32(status.track_index);
-                /* no chapters */
-                response->chapter_count = 0;
-                response->chapter_index = -1;
+                response->index         = swap_32(status.track_index);
+                response->chapter_count = swap_16(has ? chapter.count : 0);
+                response->chapter_index = swap_16(has ? chapter.index : 0xFFFF);
                 return IAPDisplayRemoteCommandID_RetIPodStateInfo;
             } break;
             case IAPIPodStateType_PlayStatus: {
@@ -623,10 +659,74 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             }
         } break;
         case IAPDisplayRemoteCommandID_SetIPodStateInfo: {
-            /* play status only; some head units send Playing every few
-             * seconds while playing and hold their audio until it is acked */
+            check_ret(request_span->size >= 1, -IAPAckStatus_EBadParameter);
+            switch(request_span->ptr[0]) {
+            case IAPIPodStateType_TrackTimePositionMSec: {
+                read_request(IAPIPodStateTrackTimePositionMSecPayload);
+                check_ret(iap_platform_set_position(ctx, swap_32(request->position_ms)), -IAPAckStatus_ECommandFailed);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_TrackTimePositionSec: {
+                read_request(IAPIPodStateTrackTimePositionSecPayload);
+                check_ret(iap_platform_set_position(ctx, 1000 * (uint32_t)swap_16(request->position_s)), -IAPAckStatus_ECommandFailed);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_TrackPlaybackIndex: {
+                read_request(IAPIPodStateTrackPlaybackIndexPayload);
+                check_ret(iap_platform_set_playing_track(ctx, swap_32(request->index)), -IAPAckStatus_EBadParameter);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_ChapterIndex: {
+                /* the chapter alone: the track is the playing one */
+                check_ret(request_span->size >= 3, -IAPAckStatus_EBadParameter);
+                const uint16_t index = (uint16_t)request_span->ptr[1] << 8 | request_span->ptr[2];
+                check_ret(iap_platform_set_chapter(ctx, index), -IAPAckStatus_ECommandFailed);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_Volume: {
+                read_request(IAPIPodStateVolumePayload);
+                iap_platform_set_volume(ctx, request->ui_volume, request->mute_state != 0);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_AbsoluteVolume: {
+                /* a UI volume of 0 defers to the absolute one */
+                read_request(IAPIPodStateAbsoluteVolumePayload);
+                iap_platform_set_volume(ctx, request->ui_volume ? request->ui_volume : request->absolute_volume, request->mute_state != 0);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_EQSetting: {
+                /* the one profile */
+                read_request(IAPIPodStateEQSettingPayload);
+                return ipod_ack(command, request->eq_index == 0 ? IAPAckStatus_Success : IAPAckStatus_EBadParameter, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_ShuffleSetting: {
+                /* tracks for albums too: the player has no album shuffle */
+                read_request(IAPIPodStateShuffleSettingPayload);
+                check_ret(request->shuffle_state <= IAPIPodStateShuffleSettingState_Albums, -IAPAckStatus_EBadParameter);
+                check_ret(iap_platform_set_shuffle_setting(ctx, request->shuffle_state ? IAPIPodStateShuffleSettingState_Tracks : IAPIPodStateShuffleSettingState_Off), -IAPAckStatus_ECommandFailed);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_RepeatSetting: {
+                read_request(IAPIPodStateRepeatSettingPayload);
+                check_ret(request->repeat_state <= IAPIPodStateRepeatSettingState_All, -IAPAckStatus_EBadParameter);
+                check_ret(iap_platform_set_repeat_setting(ctx, request->repeat_state), -IAPAckStatus_ECommandFailed);
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            } break;
+            case IAPIPodStateType_DateTimeSetting:
+            case IAPIPodStateType_AlarmSetting:
+            case IAPIPodStateType_BacklightLevel:
+            case IAPIPodStateType_SoundCheckState:
+            case IAPIPodStateType_AudiobookSpeeed:
+                /* the player's own to set */
+                return -IAPAckStatus_ECommandFailed;
+            case IAPIPodStateType_PlayStatus:
+                break;
+            default:
+                return -IAPAckStatus_EBadParameter;
+            }
+            /* some head units send Playing every few seconds while playing
+             * and hold their audio until it is acked */
             read_request(IAPIPodStatePlayStatusPayload);
-            check_ret(request->type == IAPIPodStateType_PlayStatus, -IAPAckStatus_EBadParameter);
             int control;
             switch(request->status) {
             case IAPIPodStatePlayStatus_PlaybackStopped:
@@ -648,7 +748,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 control = IAPPlatformControl_EndFFRew;
                 break;
             default:
-                return -IAPAckStatus_EBadParameter;
+                return -IAPAckStatus_ECommandFailed;
             }
             const struct IAPPlatformPendingControl pending = {
                 .req_command = command,
@@ -672,22 +772,32 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPDisplayRemoteCommandID_GetIndexedPlayingTrackInfo: {
             read_request(IAPGetIndexedPlayingTrackInfoPayload);
+            check_ret(swap_32(request->track_index) < iap_platform_get_track_count(ctx), -IAPAckStatus_EBadParameter);
             check_ret(response_span->size > sizeof(struct IAPRetIndexedPlayingTrackInfoPayload), -IAPAckStatus_EBadParameter);
             ((struct IAPRetIndexedPlayingTrackInfoPayload*)response_span->ptr)->type = request->type;
             switch(request->type) {
             case IAPIndexedPlayingTrackInfoType_TrackCapsInfo: {
                 uint32_t                    length;
                 uint32_t                    caps;
-                struct IAPPlatformTrackInfo info = {.total_ms = &length, .caps = &caps};
+                uint16_t                    chapters;
+                struct IAPPlatformTrackInfo info = {.total_ms = &length, .caps = &caps, .chapter_count = &chapters};
                 check_ret(iap_platform_get_indexed_track_info(ctx, swap_32(request->track_index), &info), -IAPAckStatus_EBadParameter);
                 alloc_response(IAPRetIndexedPlayingTrackInfoTrackCapsInfoPayload);
                 response->track_caps     = swap_32(caps);
                 response->track_total_ms = swap_32(length);
-                response->chapter_count  = 0;
+                response->chapter_count  = swap_16(chapters);
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
             case IAPIndexedPlayingTrackInfoType_ChapterTimeName: {
-                return -IAPAckStatus_EBadParameter;
+                /* a chapter not known goes as 0 and no name */
+                alloc_response(IAPRetIndexedPlayingTrackInfoChapterTimeNamePayload);
+                struct IAPPlatformChapter chapter = {.name = response_span};
+                const IAPBool             has     = iap_platform_get_track_chapter(ctx, swap_32(request->track_index), swap_16(request->chapter_index), &chapter);
+                response->offset_ms               = swap_32(has ? chapter.offset_ms : 0);
+                if(!has) {
+                    check_ret(iap_span_append(response_span, "", 1), -IAPAckStatus_EOutOfResource);
+                }
+                return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
             case IAPIndexedPlayingTrackInfoType_ArtistName: {
                 alloc_response(IAPRetIndexedPlayingTrackInfoArtistNamePayload);
@@ -702,8 +812,9 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
             case IAPIndexedPlayingTrackInfoType_GenreName: {
-                alloc_response_extra(IAPRetIndexedPlayingTrackInfoGenreNamePayload, 1);
-                response->name[0] = '\0';
+                alloc_response(IAPRetIndexedPlayingTrackInfoGenreNamePayload);
+                struct IAPPlatformTrackInfo info = {.genre = response_span};
+                check_ret(iap_platform_get_indexed_track_info(ctx, swap_32(request->track_index), &info), -IAPAckStatus_EBadParameter);
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
             case IAPIndexedPlayingTrackInfoType_TrackTitle: {
@@ -726,11 +837,17 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
             case IAPIndexedPlayingTrackInfoType_ArtworkCount: {
-                alloc_response_extra(IAPRetIndexedPlayingTrackInfoArtworkCountPayload, sizeof(struct IAPArtworkCount));
-                response->data[0].format = swap_16(IAP_ARTWORK_FORMAT_ID);
-                response->data[0].count  = swap_16(1);
+                /* no counts at all for a track without art */
+                const IAPBool art = iap_platform_track_has_art(ctx, swap_32(request->track_index));
+                alloc_response_extra(IAPRetIndexedPlayingTrackInfoArtworkCountPayload, art ? sizeof(struct IAPArtworkCount) : 0);
+                if(art) {
+                    response->data[0].format = swap_16(IAP_ARTWORK_FORMAT_ID);
+                    response->data[0].count  = swap_16(1);
+                }
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;
+            default:
+                return -IAPAckStatus_EBadParameter;
             }
         } break;
         case IAPDisplayRemoteCommandID_GetArtworkFormats: {
@@ -764,13 +881,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             return IAPDisplayRemoteCommandID_RetPowerBatteryState;
         } break;
         case IAPDisplayRemoteCommandID_GetTrackArtworkTimes: {
-            read_request(IAPGetTrackArtworkTimesPayload);
-            const uint16_t count = swap_16(request->artwork_count);
-            check_ret(count == 0 || count == 1, -IAPAckStatus_ECommandFailed, "not implemented");
-
-            void* payload = iap_span_alloc(response_span, sizeof(uint32_t) * count);
-            check_ret(payload != NULL, iap_false);
-            memset(payload, 0, sizeof(uint32_t) * count);
+            const int32_t ret = put_artwork_times(ctx, request_span, response_span);
+            check_ret(ret == 0, ret);
             return IAPDisplayRemoteCommandID_RetTrackArtworkTimes;
         } break;
         }
@@ -787,6 +899,9 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_SetCurrentPlayingTrackChapter: {
             read_request(IAPSetCurrentPlayingTrackChapterPayload);
+            struct IAPPlatformPlayStatus status;
+            check_ret(iap_platform_get_play_status(ctx, &status), -IAPAckStatus_ECommandFailed);
+            check_ret(status.state != IAPIPodStatePlayStatus_PlaybackStopped, -IAPAckStatus_ECommandFailed);
             check_ret(iap_platform_set_chapter(ctx, swap_32(request->index)), -IAPAckStatus_EBadParameter);
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
@@ -830,9 +945,9 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_ResetDBSelectionHierarchy: {
             read_request(IAPResetDBSelectionHierarchyPayload);
-            /* the library has music only */
-            check_ret(request->selection == IAPResetDBSelectionHierarchySelection_Audio, -IAPAckStatus_ECommandFailed);
+            /* the library has music only, which it goes back to anyway */
             iap_platform_reset_db_selection(ctx);
+            check_ret(request->selection == IAPResetDBSelectionHierarchySelection_Audio, -IAPAckStatus_EBadParameter);
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
         case IAPExtendedInterfaceCommandID_GetAudiobookSpeed: {
@@ -842,25 +957,27 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_GetIndexedPlayingTrackInfo: {
             read_request(IAPExtendedGetIndexedPlayingTrackInfoPayload);
+            check_ret(swap_32(request->track_index) < iap_platform_get_track_count(ctx), -IAPAckStatus_EBadParameter);
             check_ret(response_span->size > sizeof(struct IAPExtendedRetIndexedPlayingTrackInfoPayload), -IAPAckStatus_EBadParameter);
             ((struct IAPExtendedRetIndexedPlayingTrackInfoPayload*)response_span->ptr)->type = request->type;
             switch(request->type) {
             case IAPExtendedIndexedPlayingTrackInfoType_TrackCapsInfo: {
                 uint32_t                    length;
                 uint32_t                    caps;
-                struct IAPPlatformTrackInfo info = {.total_ms = &length, .caps = &caps};
+                uint16_t                    chapters;
+                struct IAPPlatformTrackInfo info = {.total_ms = &length, .caps = &caps, .chapter_count = &chapters};
                 check_ret(iap_platform_get_indexed_track_info(ctx, swap_32(request->track_index), &info), -IAPAckStatus_EBadParameter);
                 alloc_response(IAPExtendedRetIndexedPlayingTrackInfoTrackCapsInfoPayload);
                 response->track_caps     = swap_32(caps);
                 response->track_total_ms = swap_32(length);
-                response->chapter_count  = 0;
+                response->chapter_count  = swap_16(chapters);
                 return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
             } break;
-            case IAPExtendedIndexedPlayingTrackInfoType_PodcastName: {
-                alloc_response_extra(IAPExtendedRetIndexedPlayingTrackInfoPodcastNamePayload, 1);
-                response->name[0] = '\0';
-                return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
-            } break;
+            case IAPExtendedIndexedPlayingTrackInfoType_PodcastName:
+            case IAPExtendedIndexedPlayingTrackInfoType_TrackDescription:
+            case IAPExtendedIndexedPlayingTrackInfoType_TrackSongLyrics:
+                /* none of these the player has */
+                return -IAPAckStatus_EBadParameter;
             case IAPExtendedIndexedPlayingTrackInfoType_TrackReleaseDate: {
                 struct IAPDateTime          time;
                 struct IAPPlatformTrackInfo info = {.release_date = &time};
@@ -875,23 +992,10 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 response->weekday = 0; /* TODO: set weekday? */
                 return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
             } break;
-            case IAPExtendedIndexedPlayingTrackInfoType_TrackDescription: {
-                alloc_response_extra(IAPExtendedRetIndexedPlayingTrackInfoTrackDescriptionPayload, 1);
-                response->info_bits      = 0;
-                response->index          = 0;
-                response->description[0] = '\0';
-                return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
-            } break;
-            case IAPExtendedIndexedPlayingTrackInfoType_TrackSongLyrics: {
-                alloc_response_extra(IAPExtendedRetIndexedPlayingTrackInfoTrackSongLyricsPayload, 1);
-                response->info_bits = 0;
-                response->index     = 0;
-                response->lyrics[0] = '\0';
-                return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
-            } break;
             case IAPExtendedIndexedPlayingTrackInfoType_TrackGenre: {
-                alloc_response_extra(IAPExtendedRetIndexedPlayingTrackInfoTrackGenrePayload, 1);
-                response->genre[0] = '\0';
+                alloc_response(IAPExtendedRetIndexedPlayingTrackInfoTrackGenrePayload);
+                struct IAPPlatformTrackInfo info = {.genre = response_span};
+                check_ret(iap_platform_get_indexed_track_info(ctx, swap_32(request->track_index), &info), -IAPAckStatus_EBadParameter);
                 return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackInfo;
             } break;
             case IAPExtendedIndexedPlayingTrackInfoType_TrackComposer: {
@@ -921,6 +1025,11 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             check_ret(ret == IAPDisplayRemoteCommandID_RetArtworkFormats, ret);
             return IAPExtendedInterfaceCommandID_RetArtworkFormats;
         } break;
+        case IAPExtendedInterfaceCommandID_GetTrackArtworkTimes: {
+            const int32_t ret = put_artwork_times(ctx, request_span, response_span);
+            check_ret(ret == 0, ret);
+            return IAPExtendedInterfaceCommandID_RetTrackArtworkTimes;
+        } break;
         case IAPExtendedInterfaceCommandID_GetTrackArtworkData: {
             const int32_t ret = start_artwork_data(ctx, request_span, iap_true);
             check_ret(ret == 0, ret);
@@ -934,13 +1043,11 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_SelectDBRecord: {
             read_request(IAPSelectDBRecord);
-            check_ret(iap_platform_select_db_record(ctx, request->type, swap_32(request->index), 0xFF), -IAPAckStatus_EBadParameter);
-            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+            return select_db_record(ctx, command, request->type, swap_32(request->index), 0xFF, response_span);
         } break;
         case IAPExtendedInterfaceCommandID_SelectSortDBRecord: {
             read_request(IAPSelectSortDBRecordPayload);
-            check_ret(iap_platform_select_db_record(ctx, request->type, swap_32(request->index), request->sort), -IAPAckStatus_EBadParameter);
-            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+            return select_db_record(ctx, command, request->type, swap_32(request->index), request->sort, response_span);
         } break;
         case IAPExtendedInterfaceCommandID_RetrieveCategorizedDatabaseRecords: {
             read_request(IAPRetrieveCategorizedDatabaseRecordsPayload);
@@ -953,7 +1060,11 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             if(count > total - index) {
                 count = total - index;
             }
-            check_ret(count > 0, -IAPAckStatus_EBadParameter);
+            if(count == 0) {
+                /* none asked for, none sent */
+                response_span->ptr = NULL;
+                return 0;
+            }
             ctx->db_record_type     = request->type;
             ctx->db_record_index    = index;
             ctx->db_record_end      = index + count;
@@ -979,7 +1090,9 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             struct IAPPlatformPlayStatus status;
             check_ret(iap_platform_get_play_status(ctx, &status), -IAPAckStatus_ECommandFailed);
             alloc_response(IAPExtendedRetPlayStatusPayload);
-            response->state          = status.state; /* TODO: convert enum */
+            /* the states it has are stopped, playing and paused: a scan plays */
+            const IAPBool scanning   = status.state == IAPIPodStatePlayStatus_FastForward || status.state == IAPIPodStatePlayStatus_FastRewind;
+            response->state          = scanning ? IAPIPodStatePlayStatus_Playing : status.state;
             response->track_pos_ms   = swap_32(status.track_pos_ms);
             response->track_total_ms = swap_32(status.track_total_ms);
             return IAPExtendedInterfaceCommandID_ReturnPlayStatus;
@@ -1010,8 +1123,13 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             return IAPExtendedInterfaceCommandID_ReturnIndexedPlayingTrackAlbumName;
         } break;
         case IAPExtendedInterfaceCommandID_SetPlayStatusChangeNotification: {
-            if(request_span->size == sizeof(struct IAPSetPlayStatusChangeNotification1BytePayload)) {
+            /* the four-byte mask, or one byte: 0 or 1 */
+            if(request_span->size >= sizeof(struct IAPSetPlayStatusChangeNotification4BytesPayload)) {
+                read_request(IAPSetPlayStatusChangeNotification4BytesPayload);
+                ctx->enabled_notifications_4 = play_stage_change_notification_set_mask_to_type_mask(swap_32(request->mask));
+            } else {
                 read_request(IAPSetPlayStatusChangeNotification1BytePayload);
+                check_ret(request->enable <= 1, -IAPAckStatus_EBadParameter);
                 ctx->notifications_4 = 0;
                 if(request->enable) {
                     ctx->enabled_notifications_4 = 1 << IAPStatusChangeNotificationType_PlaybackStopped |
@@ -1023,9 +1141,6 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 } else {
                     ctx->enabled_notifications_4 = 0;
                 }
-            } else if(request_span->size == sizeof(struct IAPSetPlayStatusChangeNotification4BytesPayload)) {
-                read_request(IAPSetPlayStatusChangeNotification4BytesPayload);
-                ctx->enabled_notifications_4 = play_stage_change_notification_set_mask_to_type_mask(swap_32(request->mask));
             }
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
@@ -1091,6 +1206,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_SetShuffle: {
             read_request(IAPSetShufflePayload);
+            /* off or tracks; the player has no album shuffle */
+            check_ret(request->mode <= IAPIPodStateShuffleSettingState_Tracks, -IAPAckStatus_EBadParameter);
             check_ret(iap_platform_set_shuffle_setting(ctx, request->mode), -IAPAckStatus_ECommandFailed);
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
@@ -1101,6 +1218,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_SetRepeat: {
             read_request(IAPSetRepeatPayload);
+            check_ret(request->mode <= IAPIPodStateRepeatSettingState_All, -IAPAckStatus_EBadParameter);
             check_ret(iap_platform_set_repeat_setting(ctx, request->mode), -IAPAckStatus_ECommandFailed);
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;

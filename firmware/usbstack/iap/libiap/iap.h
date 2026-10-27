@@ -34,6 +34,7 @@ void iap_notify_track_time_position(struct IAPContext* ctx, uint32_t pos_ms);
 void iap_notify_track_playback_index(struct IAPContext* ctx, uint32_t index);
 void iap_notify_track_caps(struct IAPContext* ctx, uint32_t caps);
 void iap_notify_tracks_count(struct IAPContext* ctx, uint32_t count);
+void iap_notify_chapter_index(struct IAPContext* ctx, uint32_t index);
 void iap_notify_play_status(struct IAPContext* ctx, uint8_t status /* IAPIPodStatePlayStatus */);
 void iap_notify_volume(struct IAPContext* ctx, uint8_t volume, IAPBool muted);
 void iap_notify_power_state(struct IAPContext* ctx, uint8_t state /* IAPIPodStatePowerState */, uint8_t battery_level);

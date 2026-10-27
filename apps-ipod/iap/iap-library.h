@@ -32,6 +32,11 @@ bool iap_library_tracks_are_queue(void);
 /* Whether a chosen song list is still being made into the Queue; it plays
  * when that finishes, so there is nothing to press Play on meanwhile. */
 bool iap_library_building(void);
+/* Plays the Queue from its track at index, a playlist index, on the
+ * library's worker: playlist_start() waits on the playlist's lock and the
+ * disk, and a thread an accessory waits on must not. Building until it has.
+ * False with nothing to play, or no worker. */
+bool iap_library_start(int index);
 /* Whether the Music Quiz has the Queue, which an accessory must then neither
  * replace nor reorder. */
 bool iap_library_queue_lent(void);
