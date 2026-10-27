@@ -17,14 +17,14 @@
 #define STRB  256
 
 typedef struct {
-    const ts_io *io;
-    ts_stream   *win;      /* file window over the stream body   */
-    ts_stream   *filt;     /* ASCII85 / ASCIIHex de-armouring    */
-    ts_stream   *infl;
+    const bs_io *io;
+    bs_stream   *win;      /* file window over the stream body   */
+    bs_stream   *filt;     /* ASCII85 / ASCIIHex de-armouring    */
+    bs_stream   *infl;
 
     /* raw scanner */
     uint8_t  sbuf[SBUF];
-    ts_off_t sbase;
+    bs_off_t sbase;
     size_t   slen, spos;
     int      s_eof;
 
@@ -33,7 +33,7 @@ typedef struct {
 
     /* current stream */
     int      in_stream, flate, tried_raw;
-    ts_off_t data_off, data_len;
+    bs_off_t data_off, data_len;
     uint8_t  dbuf[DBUF];
     size_t   dblen, dbpos;
 
@@ -74,7 +74,7 @@ static int scan_refill(pdf_st *s)
 
     if (s->spos < s->slen) return 1;
     if (s->s_eof) return 0;
-    s->sbase += (ts_off_t)s->slen;
+    s->sbase += (bs_off_t)s->slen;
     s->spos = s->slen = 0;
     if (s->io->seek(s->io->ctx, s->sbase, SEEK_SET) < 0) return -1;
     got = s->io->read(s->io->ctx, s->sbuf, SBUF);
@@ -94,9 +94,9 @@ static int scan_byte(pdf_st *s, uint8_t *b)
     return 1;
 }
 
-static ts_off_t scan_tell(pdf_st *s) { return s->sbase + (ts_off_t)s->spos; }
+static bs_off_t scan_tell(pdf_st *s) { return s->sbase + (bs_off_t)s->spos; }
 
-static void scan_seek(pdf_st *s, ts_off_t pos)
+static void scan_seek(pdf_st *s, bs_off_t pos)
 {
     s->sbase = pos;
     s->spos = s->slen = 0;
@@ -190,11 +190,11 @@ static long dict_int(const char *d, const char *key)
  * reference. */
 
 typedef struct {
-    ts_stream *src;
+    bs_stream *src;
     int      mode, eof, begun, held_lt;
     uint8_t  in[256];
     size_t   ipos, ilen;
-    ts_off_t pulled;
+    bs_off_t pulled;
     uint32_t tuple;
     int      count;
     ts_pend  out;
@@ -206,11 +206,11 @@ static int filt_byte(filt_st *s, uint8_t *b)
         size_t got = 0;
         int rc;
         s->ipos = s->ilen = 0;
-        rc = ts_pull(s->src, s->in, sizeof s->in, &got);
-        if (rc != TS_OK) return rc;
+        rc = bs_pull(s->src, s->in, sizeof s->in, &got);
+        if (rc != BS_OK) return rc;
         if (!got) { s->eof = 1; return 0; }
         s->ilen = got;
-        s->pulled += (ts_off_t)got;
+        s->pulled += (bs_off_t)got;
     }
     *b = s->in[s->ipos++];
     return 1;
@@ -230,7 +230,7 @@ static void a85_flush(filt_st *s, int partial)
     s->count = 0;
 }
 
-static int filt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int filt_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     filt_st *s = st->st;
     size_t done = 0;
@@ -245,10 +245,10 @@ static int filt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
 
         if (s->mode == TS_FILT_RAW) {              /* straight copy, no buffering */
             size_t got = 0;
-            rc = ts_pull(s->src, buf + done, n - done, &got);
-            if (rc != TS_OK) return rc;
+            rc = bs_pull(s->src, buf + done, n - done, &got);
+            if (rc != BS_OK) return rc;
             if (!got) { s->eof = 1; break; }
-            s->pulled += (ts_off_t)got;
+            s->pulled += (bs_off_t)got;
             done += got;
             continue;
         }
@@ -293,13 +293,13 @@ static int filt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         }
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-void ts_filt_restart(ts_stream *st, int mode)
+void ts_filt_restart(bs_stream *st, int mode)
 {
     filt_st *s = st->st;
-    ts_stream *src = s->src;
+    bs_stream *src = s->src;
 
     memset(s, 0, sizeof *s);
     s->src = src;
@@ -307,16 +307,16 @@ void ts_filt_restart(ts_stream *st, int mode)
 }
 
 /* Bytes of the file consumed, ignoring what is still sitting in our buffer. */
-ts_off_t ts_filt_used(ts_stream *st)
+bs_off_t ts_filt_used(bs_stream *st)
 {
     filt_st *s = st->st;
-    return s->pulled - (ts_off_t)(s->ilen - s->ipos);
+    return s->pulled - (bs_off_t)(s->ilen - s->ipos);
 }
 
-ts_stream *ts_filt_stream(ts_arena *a, ts_stream *src)
+bs_stream *ts_filt_stream(bs_arena *a, bs_stream *src)
 {
-    ts_stream *st = ts_alloc(a, sizeof *st);
-    filt_st *s = ts_alloc(a, sizeof *s);
+    bs_stream *st = bs_alloc(a, sizeof *st);
+    filt_st *s = bs_alloc(a, sizeof *s);
 
     if (!st || !s) return NULL;
     s->src = src;
@@ -698,7 +698,7 @@ static int next_stream(pdf_st *s)
     for (;;) {
         uint8_t p;
         int rc = scan_byte(s, &c);
-        if (rc < 0) return TS_ERR_IO;
+        if (rc < 0) return BS_ERR_IO;
         if (rc == 0) return 0;
         p = prev;
         prev = c;
@@ -706,14 +706,14 @@ static int next_stream(pdf_st *s)
         if (c == kw[match] && (match || !((p >= 'A' && p <= 'Z') ||
                                           (p >= 'a' && p <= 'z')))) {
             if (++match == 6) {
-                ts_off_t data;
+                bs_off_t data;
                 long len;
                 int flate;
 
                 match = 0;
                 /* the keyword is followed by CRLF or LF, never CR alone */
                 rc = scan_byte(s, &c);
-                if (rc <= 0) return rc < 0 ? TS_ERR_IO : 0;
+                if (rc <= 0) return rc < 0 ? BS_ERR_IO : 0;
                 if (c == '\r') { rc = scan_byte(s, &c); if (rc <= 0) return 0; }
                 if (c != '\n') continue;
                 data = scan_tell(s);
@@ -749,10 +749,10 @@ static int next_stream(pdf_st *s)
                 /* Compressed and armoured streams end on their own marker, so
                  * they don't need a length -- which is just as well, because
                  * /Length is often an indirect reference we can't resolve. */
-                ts_file_stream_retarget(s->win, data,
+                bs_file_stream_retarget(s->win, data,
                                         (!flate && armour == TS_FILT_RAW) ? len : -1);
                 ts_filt_restart(s->filt, armour);
-                if (flate) ts_inflate_restart(s->infl, TS_INFLATE_ZLIB);
+                if (flate) bs_inflate_restart(s->infl, BS_INFLATE_ZLIB);
 
                 s->flate = flate;
                 s->tried_raw = 0;
@@ -782,7 +782,7 @@ static int next_stream(pdf_st *s)
 
 /* ---- pull ------------------------------------------------------------ */
 
-static int pdf_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int pdf_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     pdf_st *s = st->st;
     size_t done = 0;
@@ -805,23 +805,23 @@ static int pdf_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
 
         if (s->dbpos >= s->dblen) {
             size_t got = 0;
-            ts_stream *src = s->flate ? s->infl : s->filt;
-            ts_off_t used;
+            bs_stream *src = s->flate ? s->infl : s->filt;
+            bs_off_t used;
 
             s->dbpos = s->dblen = 0;
-            rc = ts_pull(src, s->dbuf, DBUF, &got);
+            rc = bs_pull(src, s->dbuf, DBUF, &got);
 
             /* Some generators write bare deflate where the spec demands a
              * zlib wrapper. If nothing at all came out, try again raw. */
-            if (s->flate && !s->tried_raw && rc != TS_OK && !got) {
+            if (s->flate && !s->tried_raw && rc != BS_OK && !got) {
                 s->tried_raw = 1;
-                ts_file_stream_retarget(s->win, s->data_off, -1);
+                bs_file_stream_retarget(s->win, s->data_off, -1);
                 ts_filt_restart(s->filt, ((filt_st *)s->filt->st)->mode);
-                ts_inflate_restart(s->infl, TS_INFLATE_RAW);
+                bs_inflate_restart(s->infl, BS_INFLATE_RAW);
                 continue;
             }
 
-            if (rc != TS_OK || !got) {
+            if (rc != BS_OK || !got) {
                 /* Truncated, encrypted or otherwise undecodable: resume the
                  * scan past whatever the decoder managed to read. */
                 /* Resume past a stream we decoded cleanly; one that failed
@@ -832,7 +832,7 @@ static int pdf_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
                  * so ts_filt_used() overshoots the true end by up to a buffer
                  * -- enough to step over the whole of the next object and
                  * silently lose a page. */
-                if (rc != TS_OK) used = 0;
+                if (rc != BS_OK) used = 0;
                 else if (s->data_len > 0) used = s->data_len;
                 else used = ts_filt_used(s->filt);
                 if (used < 1) used = 1;
@@ -846,14 +846,14 @@ static int pdf_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         tok_feed(s, s->dbuf[s->dbpos++]);
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int pdf_reset(ts_stream *st)
+static int pdf_reset(bs_stream *st)
 {
     pdf_st *s = st->st;
-    const ts_io *io = s->io;
-    ts_stream *win = s->win, *filt = s->filt, *infl = s->infl;
+    const bs_io *io = s->io;
+    bs_stream *win = s->win, *filt = s->filt, *infl = s->infl;
     ts_pdffonts *fonts = s->fonts;
 
     memset(s, 0, sizeof *s);
@@ -861,23 +861,23 @@ static int pdf_reset(ts_stream *st)
     s->fonts = fonts;
     s->hex_hi = -1;
     s->cur_obj = -1;
-    return TS_OK;
+    return BS_OK;
 }
 
-int ts_open_pdf(ts_ctx *c, ts_stream **out)
+int ts_open_pdf(ts_ctx *c, bs_stream **out)
 {
-    ts_stream *st = ts_alloc(c->arena, sizeof *st);
-    pdf_st *s = ts_alloc(c->arena, sizeof *s);
+    bs_stream *st = bs_alloc(c->arena, sizeof *st);
+    pdf_st *s = bs_alloc(c->arena, sizeof *s);
 
-    if (!st || !s) return TS_ERR_NOMEM;
+    if (!st || !s) return BS_ERR_NOMEM;
 
     s->io = c->io;
-    s->win = ts_file_stream(c->arena, c->io, 0, -1);
-    if (!s->win) return TS_ERR_NOMEM;
+    s->win = bs_file_stream(c->arena, c->io, 0, -1);
+    if (!s->win) return BS_ERR_NOMEM;
     s->filt = ts_filt_stream(c->arena, s->win);
-    if (!s->filt) return TS_ERR_NOMEM;
-    s->infl = ts_inflate_stream(c->arena, s->filt, TS_INFLATE_ZLIB);
-    if (!s->infl) return TS_ERR_NOMEM;
+    if (!s->filt) return BS_ERR_NOMEM;
+    s->infl = bs_inflate_stream(c->arena, s->filt, BS_INFLATE_ZLIB);
+    if (!s->infl) return BS_ERR_NOMEM;
     s->hex_hi = -1;
     s->cur_obj = -1;
 
@@ -887,11 +887,11 @@ int ts_open_pdf(ts_ctx *c, ts_stream **out)
     {
         int rc = ts_pdffonts_build(&s->fonts, c->arena, c->io,
                                    s->win, s->filt, s->infl);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
     }
 
     st->pull = pdf_pull; st->reset = pdf_reset; st->st = s;
     c->detected = TS_CS_UTF8;
     *out = st;
-    return TS_OK;
+    return BS_OK;
 }

@@ -36,14 +36,14 @@ struct ts_pdffonts {
 #endif
 
 typedef struct {
-    const ts_io *io;
+    const bs_io *io;
     uint8_t  buf[512];
     size_t   pos, len;
-    ts_off_t base;
+    bs_off_t base;
     int      eof;
 } rd;
 
-static void rd_init(rd *r, const ts_io *io)
+static void rd_init(rd *r, const bs_io *io)
 {
     memset(r, 0, sizeof *r);
     r->io = io;
@@ -54,7 +54,7 @@ static int rd_byte(rd *r)
     if (r->pos >= r->len) {
         long got;
         if (r->eof) return -1;
-        r->base += (ts_off_t)r->len;
+        r->base += (bs_off_t)r->len;
         r->pos = r->len = 0;
         if (r->io->seek(r->io->ctx, r->base, SEEK_SET) < 0) { r->eof = 1; return -1; }
         got = r->io->read(r->io->ctx, r->buf, sizeof r->buf);
@@ -71,7 +71,7 @@ static int rd_peek(rd *r)
     return c;
 }
 
-static ts_off_t rd_tell(rd *r) { return r->base + (ts_off_t)r->pos; }
+static bs_off_t rd_tell(rd *r) { return r->base + (bs_off_t)r->pos; }
 
 /* ---- tokenizer ------------------------------------------------------- */
 
@@ -193,7 +193,7 @@ static void add_res(ts_pdffonts *F, const char *name, int fobj)
     e->fobj = fobj;
 }
 
-static int scan_structure(ts_pdffonts *F, const ts_io *io)
+static int scan_structure(ts_pdffonts *F, const bs_io *io)
 {
     rd r;
     tok t;
@@ -283,7 +283,7 @@ static int scan_structure(ts_pdffonts *F, const ts_io *io)
             continue;
         }
     }
-    return TS_OK;
+    return BS_OK;
 }
 
 /* ---- pass 2: cmaps --------------------------------------------------- */
@@ -301,7 +301,7 @@ static int hexval(int c)
 typedef struct { uint32_t v[4]; int nv, digits; } hexs;
 
 typedef struct {
-    ts_stream *src;
+    bs_stream *src;
     uint8_t buf[256];
     size_t  pos, len;
     int     eof;
@@ -312,7 +312,7 @@ static int cs_byte(cs *c)
     if (c->pos >= c->len) {
         size_t got = 0;
         if (c->eof) return -1;
-        if (ts_pull(c->src, c->buf, sizeof c->buf, &got) != TS_OK || !got)
+        if (bs_pull(c->src, c->buf, sizeof c->buf, &got) != BS_OK || !got)
             { c->eof = 1; return -1; }
         c->pos = 0; c->len = got;
     }
@@ -375,16 +375,16 @@ static void hex_to_uni(const hexs *h, uint32_t *d0, uint32_t *d1)
     }
 }
 
-static bfr *cmap_add(ts_arena *a, cmap_t *cm)
+static bfr *cmap_add(bs_arena *a, cmap_t *cm)
 {
-    bfr *e = ts_alloc(a, sizeof *e);
+    bfr *e = bs_alloc(a, sizeof *e);
     if (!e) return NULL;
     if (!cm->nr) cm->r = e;      /* bump allocation keeps these contiguous */
     cm->nr++;
     return e;
 }
 
-static int parse_cmap(ts_arena *a, cmap_t *cm, ts_stream *src)
+static int parse_cmap(bs_arena *a, cmap_t *cm, bs_stream *src)
 {
     cs c;
     hexs h, lo;
@@ -422,7 +422,7 @@ static int parse_cmap(ts_arena *a, cmap_t *cm, ts_stream *src)
             if (phase == 0) { lo = h; phase = 1; }
             else {
                 bfr *e = cmap_add(a, cm);
-                if (!e) return TS_ERR_NOMEM;
+                if (!e) return BS_ERR_NOMEM;
                 e->lo = e->hi = lo.v[0];
                 hex_to_uni(&h, &e->d0, &e->d1);
                 phase = 0;
@@ -432,7 +432,7 @@ static int parse_cmap(ts_arena *a, cmap_t *cm, ts_stream *src)
         case 3:                                   /* bfrange: <lo> <hi> <dst|[..]> */
             if (arr) {                            /* one destination per code */
                 bfr *e = cmap_add(a, cm);
-                if (!e) return TS_ERR_NOMEM;
+                if (!e) return BS_ERR_NOMEM;
                 e->lo = e->hi = rlo++;
                 hex_to_uni(&h, &e->d0, &e->d1);
                 break;
@@ -441,7 +441,7 @@ static int parse_cmap(ts_arena *a, cmap_t *cm, ts_stream *src)
             else if (phase == 1) { rhi = h.v[0]; phase = 2; }
             else {
                 bfr *e = cmap_add(a, cm);
-                if (!e) return TS_ERR_NOMEM;
+                if (!e) return BS_ERR_NOMEM;
                 e->lo = rlo; e->hi = rhi;
                 hex_to_uni(&h, &e->d0, &e->d1);
                 phase = 0;
@@ -452,7 +452,7 @@ static int parse_cmap(ts_arena *a, cmap_t *cm, ts_stream *src)
             break;
         }
     }
-    return TS_OK;
+    return BS_OK;
 }
 
 static int needs_cmap(ts_pdffonts *F, int obj)
@@ -470,8 +470,8 @@ static void attach_cmap(ts_pdffonts *F, int obj, int idx)
         if (F->f[i].tou == obj) F->f[i].cmap = idx;
 }
 
-static int scan_cmaps(ts_pdffonts *F, ts_arena *a, const ts_io *io,
-                      ts_stream *win, ts_stream *filt, ts_stream *infl)
+static int scan_cmaps(ts_pdffonts *F, bs_arena *a, const bs_io *io,
+                      bs_stream *win, bs_stream *filt, bs_stream *infl)
 {
     rd r;
     tok t;
@@ -499,7 +499,7 @@ static int scan_cmaps(ts_pdffonts *F, ts_arena *a, const ts_io *io,
             continue;
         }
         if (!strcmp(t.name, "stream")) {
-            ts_off_t data;
+            bs_off_t data;
             int c;
 
             if (!want) { skip_stream(&r); continue; }
@@ -514,13 +514,13 @@ static int scan_cmaps(ts_pdffonts *F, ts_arena *a, const ts_io *io,
                 cmap_t *cm = &F->c[F->nc];
                 int rc;
 
-                ts_file_stream_retarget(win, data, -1);
+                bs_file_stream_retarget(win, data, -1);
                 ts_filt_restart(filt, armour);
-                if (flate) ts_inflate_restart(infl, TS_INFLATE_ZLIB);
+                if (flate) bs_inflate_restart(infl, BS_INFLATE_ZLIB);
 
                 cm->obj = cur;
                 rc = parse_cmap(a, cm, flate ? infl : filt);
-                if (rc != TS_OK) return rc;
+                if (rc != BS_OK) return rc;
                 if (cm->nr) { attach_cmap(F, cur, F->nc); F->nc++; }
             }
             /* the reader's buffer is stale after the stream was consumed */
@@ -532,34 +532,34 @@ static int scan_cmaps(ts_pdffonts *F, ts_arena *a, const ts_io *io,
         }
         if (!strcmp(t.name, "endobj")) { cur = -1; want = 0; continue; }
     }
-    return TS_OK;
+    return BS_OK;
 }
 
 /* ---- api ------------------------------------------------------------- */
 
-int ts_pdffonts_build(ts_pdffonts **out, ts_arena *a, const ts_io *io,
-                      ts_stream *win, ts_stream *filt, ts_stream *infl)
+int ts_pdffonts_build(ts_pdffonts **out, bs_arena *a, const bs_io *io,
+                      bs_stream *win, bs_stream *filt, bs_stream *infl)
 {
-    ts_pdffonts *F = ts_alloc(a, sizeof *F);
+    ts_pdffonts *F = bs_alloc(a, sizeof *F);
     int rc;
 
     *out = NULL;
-    if (!F) return TS_ERR_NOMEM;
+    if (!F) return BS_ERR_NOMEM;
 
-    F->f = ts_alloc(a, sizeof(font_t) * MAX_FONT);
-    F->p = ts_alloc(a, sizeof(page_t) * MAX_PAGE);
-    F->r = ts_alloc(a, sizeof(res_t)  * MAX_RES);
-    F->c = ts_alloc(a, sizeof(cmap_t) * MAX_FONT);
-    if (!F->f || !F->p || !F->r || !F->c) return TS_ERR_NOMEM;
+    F->f = bs_alloc(a, sizeof(font_t) * MAX_FONT);
+    F->p = bs_alloc(a, sizeof(page_t) * MAX_PAGE);
+    F->r = bs_alloc(a, sizeof(res_t)  * MAX_RES);
+    F->c = bs_alloc(a, sizeof(cmap_t) * MAX_FONT);
+    if (!F->f || !F->p || !F->r || !F->c) return BS_ERR_NOMEM;
 
     rc = scan_structure(F, io);
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
     if (F->nf) {
         rc = scan_cmaps(F, a, io, win, filt, infl);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
     }
     *out = F;
-    return TS_OK;
+    return BS_OK;
 }
 
 const void *ts_pdffonts_cmap(ts_pdffonts *F, int content_obj, const char *name)

@@ -86,7 +86,7 @@ that belongs to no single domain.
 | `database/` | The tag databases themselves: tagcache, and the sound index the Playlist Engine matches on (`sound_index`, `sound_mix`, `sound_mood`). `path_key` is the one key that names a file to the sound index, the tagcache's path index and an iAP2 car. The database *browser* is `screens/browse/browser_db.c` — a screen backend, not a data layer. |
 | `playlist/` | Playlists in memory and on disk, plus the playlist viewer, the catalog, and the mood and journey pickers. |
 | `metadata/` | Per-track data: album art, the art cache (album **and** artist), cuesheets, multi-file ID3 aggregation. |
-| `files/` | The disk seen as files rather than as music: what each extension opens, file operations, the flat document and image indexes, path lists. |
+| `files/` | The disk seen as files rather than as music: what each extension opens, file operations, the flat document and image indexes, path lists, and the byte streams (`bs_stream`, inflate) that read compressed or encoded data out of a file. |
 
 ### The interface
 

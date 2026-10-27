@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Implements the engine's ts_io abstraction over the core file API. The
+ * Implements the engine's bs_io abstraction over the core file API. The
  * only file in the engine that knows about Rockbox.
  ****************************************************************************/
 
@@ -24,7 +24,7 @@ static long coreio_read(void *ctx, void *buf, size_t n)
     return got;
 }
 
-static ts_off_t coreio_seek(void *ctx, ts_off_t off, int whence)
+static bs_off_t coreio_seek(void *ctx, bs_off_t off, int whence)
 {
     struct ts_core_file *f = ctx;
     off_t r;
@@ -33,19 +33,19 @@ static ts_off_t coreio_seek(void *ctx, ts_off_t off, int whence)
         return off;                          /* already there */
 
     r = lseek(f->fd, (off_t)off, whence);
-    f->pos = (r < 0) ? -1 : (ts_off_t)r;
-    return (ts_off_t)r;
+    f->pos = (r < 0) ? -1 : (bs_off_t)r;
+    return (bs_off_t)r;
 }
 
-static ts_off_t coreio_size(void *ctx)
+static bs_off_t coreio_size(void *ctx)
 {
     struct ts_core_file *f = ctx;
     off_t cur = lseek(f->fd, 0, SEEK_CUR);
     off_t end = lseek(f->fd, 0, SEEK_END);
 
     lseek(f->fd, cur, SEEK_SET);
-    f->pos = (cur < 0) ? -1 : (ts_off_t)cur;
-    return (ts_off_t)end;
+    f->pos = (cur < 0) ? -1 : (bs_off_t)cur;
+    return (bs_off_t)end;
 }
 
 static void coreio_close(void *ctx)
@@ -57,11 +57,11 @@ static void coreio_close(void *ctx)
     f->pos = -1;
 }
 
-int ts_io_core(ts_io *io, struct ts_core_file *f, const char *path)
+int ts_io_core(bs_io *io, struct ts_core_file *f, const char *path)
 {
     int fd = open(path, O_RDONLY);
 
-    if (fd < 0) return TS_ERR_IO;
+    if (fd < 0) return BS_ERR_IO;
     f->fd = fd;
     f->pos = 0;
     io->read  = coreio_read;
@@ -69,5 +69,5 @@ int ts_io_core(ts_io *io, struct ts_core_file *f, const char *path)
     io->size  = coreio_size;
     io->close = coreio_close;
     io->ctx   = f;
-    return TS_OK;
+    return BS_OK;
 }

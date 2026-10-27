@@ -14,7 +14,7 @@
 
 /* Calls cb() with the raw text of each tag (without the angle brackets).
  * Returning non-zero from cb stops the scan early. */
-static int scan_tags(ts_stream *src, int (*cb)(void *, const char *), void *ud)
+static int scan_tags(bs_stream *src, int (*cb)(void *, const char *), void *ud)
 {
     char tag[TAGBUF];
     uint8_t buf[256];
@@ -23,8 +23,8 @@ static int scan_tags(ts_stream *src, int (*cb)(void *, const char *), void *ud)
 
     for (;;) {
         size_t got = 0;
-        int rc = ts_pull(src, buf, sizeof buf, &got);
-        if (rc != TS_OK) return rc;
+        int rc = bs_pull(src, buf, sizeof buf, &got);
+        if (rc != BS_OK) return rc;
         if (!got) break;
 
         for (i = 0; i < got && !stop; i++) {
@@ -45,7 +45,7 @@ static int scan_tags(ts_stream *src, int (*cb)(void *, const char *), void *ud)
         }
         if (stop) break;
     }
-    return TS_OK;
+    return BS_OK;
 }
 
 static int tag_is(const char *tag, const char *name)
@@ -157,7 +157,7 @@ typedef struct mitem {
 } mitem;
 
 typedef struct {
-    ts_arena *a;
+    bs_arena *a;
     ts_zip   *z;
     const char *opf;
     mitem    *manifest;
@@ -167,10 +167,10 @@ typedef struct {
     int       nomem;
 } opf_ctx;
 
-static char *dup_str(ts_arena *a, const char *s)
+static char *dup_str(bs_arena *a, const char *s)
 {
     size_t n = strlen(s) + 1;
-    char *p = ts_alloc(a, n);
+    char *p = bs_alloc(a, n);
     if (p) memcpy(p, s, n);
     return p;
 }
@@ -198,7 +198,7 @@ static int opf_tag(void *ud, const char *tag)
             zi = ts_zip_find(o->z, full);
             if (zi < 0) return 0;               /* manifest lies; skip it */
 
-            m = ts_alloc(o->a, sizeof *m);
+            m = bs_alloc(o->a, sizeof *m);
             if (!m) { o->nomem = 1; return 1; }
             m->id = dup_str(o->a, id);
             if (!m->id) { o->nomem = 1; return 1; }
@@ -237,7 +237,7 @@ static int container_tag(void *ud, const char *tag)
 
 typedef struct {
     ts_zip    *z;
-    ts_stream *cs, *tags;
+    bs_stream *cs, *tags;
     int       *spine;
     int        nspine, cur;
     int        opened;
@@ -245,19 +245,19 @@ typedef struct {
 
 static int sp_next(sp_st *s)
 {
-    ts_stream *member;
+    bs_stream *member;
     int rc;
 
     if (s->cur >= s->nspine) return 0;
     rc = ts_zip_member(s->z, s->spine[s->cur++], &member);
-    if (rc != TS_OK) return rc;               /* negative, or 0 */
+    if (rc != BS_OK) return rc;               /* negative, or 0 */
     ts_charset_restart(s->cs, member, TS_CS_AUTO);
     ts_tags_restart(s->tags, s->cs);
     s->opened = 1;
     return 1;
 }
 
-static int sp_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int sp_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     sp_st *s = st->st;
     size_t done = 0;
@@ -269,31 +269,31 @@ static int sp_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         if (!s->opened) {
             rc = sp_next(s);
             /* A member that will not open is skipped, like a damaged one. */
-            if (rc == TS_ERR_FORMAT || rc == TS_ERR_UNSUP) continue;
+            if (rc == BS_ERR_FORMAT || rc == BS_ERR_UNSUP) continue;
             if (rc < 0) return rc;
             if (rc == 0) break;               /* spine exhausted */
         }
-        rc = ts_pull(s->tags, buf + done, n - done, &got);
-        if (rc != TS_OK) {
+        rc = bs_pull(s->tags, buf + done, n - done, &got);
+        if (rc != BS_OK) {
             /* A damaged chapter shouldn't cost the reader the whole book. */
-            if (rc == TS_ERR_FORMAT) { s->opened = 0; continue; }
+            if (rc == BS_ERR_FORMAT) { s->opened = 0; continue; }
             return rc;
         }
         if (!got) { s->opened = 0; continue; }
         done += got;
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int sp_reset(ts_stream *st)
+static int sp_reset(bs_stream *st)
 {
     sp_st *s = st->st;
 
     s->cur = 0;
     s->opened = 0;
     ts_tags_rewind(s->tags);
-    return TS_OK;
+    return BS_OK;
 }
 
 /* ---- entry point ----------------------------------------------------- */
@@ -304,10 +304,10 @@ static int ends_with(const char *s, const char *suf)
     return a >= b && ts_ascii_casecmp(s + a - b, suf) == 0;
 }
 
-int ts_open_epub(ts_ctx *c, ts_stream **out)
+int ts_open_epub(ts_ctx *c, bs_stream **out)
 {
     ts_zip *z;
-    ts_stream *st, *member;
+    bs_stream *st, *member;
     sp_st *sp;
     int rc, i, idx;
     char opf[256];
@@ -315,12 +315,12 @@ int ts_open_epub(ts_ctx *c, ts_stream **out)
     int *spine;
 
     rc = ts_zip_open(&z, c->arena, c->io);
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
 
-    spine = ts_alloc(c->arena, sizeof(int) * MAX_SPINE);
-    st = ts_alloc(c->arena, sizeof *st);
-    sp = ts_alloc(c->arena, sizeof *sp);
-    if (!spine || !st || !sp) return TS_ERR_NOMEM;
+    spine = bs_alloc(c->arena, sizeof(int) * MAX_SPINE);
+    st = bs_alloc(c->arena, sizeof *st);
+    sp = bs_alloc(c->arena, sizeof *sp);
+    if (!spine || !st || !sp) return BS_ERR_NOMEM;
 
     sp->z = z; sp->spine = spine; sp->nspine = 0; sp->cur = 0; sp->opened = 0;
 
@@ -338,21 +338,21 @@ int ts_open_epub(ts_ctx *c, ts_stream **out)
 
         opf[0] = 0;
         rc = ts_zip_member(z, idx, &member);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
         rc = scan_tags(member, container_tag, opf);
-        if (rc != TS_OK) return rc;
-        if (!opf[0]) return TS_ERR_FORMAT;
+        if (rc != BS_OK) return rc;
+        if (!opf[0]) return BS_ERR_FORMAT;
 
         idx = ts_zip_find(z, opf);
-        if (idx < 0) return TS_ERR_FORMAT;
+        if (idx < 0) return BS_ERR_FORMAT;
         rc = ts_zip_member(z, idx, &member);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
 
         memset(&o, 0, sizeof o);
         o.a = c->arena; o.z = z; o.opf = opf; o.spine = spine;
         rc = scan_tags(member, opf_tag, &o);
-        if (rc != TS_OK) return rc;
-        if (o.nomem) return TS_ERR_NOMEM;
+        if (rc != BS_OK) return rc;
+        if (o.nomem) return BS_ERR_NOMEM;
         sp->nspine = o.nspine;
 
         /* No usable spine: fall back to every xhtml member, in zip order. */
@@ -372,22 +372,22 @@ int ts_open_epub(ts_ctx *c, ts_stream **out)
                 c->resolved = TS_FMT_FB2;
                 break;
             }
-        if (!sp->nspine) return TS_ERR_UNSUP;
+        if (!sp->nspine) return BS_ERR_UNSUP;
     }
 
-    if (!sp->nspine) return TS_ERR_FORMAT;
+    if (!sp->nspine) return BS_ERR_FORMAT;
 
     /* One charset+markup pipeline, re-pointed at each spine document. The
      * inner charset stage is fed by ts_tags_restart via the tags stage. */
     sp->cs = ts_charset_stream(c->arena, NULL, TS_CS_UTF8);
-    if (!sp->cs) return TS_ERR_NOMEM;
+    if (!sp->cs) return BS_ERR_NOMEM;
     sp->tags = ts_tags_stream(c->arena, sp->cs, prof, c->cfg);
-    if (!sp->tags) return TS_ERR_NOMEM;
+    if (!sp->tags) return BS_ERR_NOMEM;
 
     st->pull = sp_pull; st->reset = sp_reset; st->st = sp;
     c->detected = TS_CS_UTF8;      /* XML in OCF/OOXML containers is Unicode */
     *out = st;
-    return TS_OK;
+    return BS_OK;
 }
 
-int ts_open_docx(ts_ctx *c, ts_stream **out) { return ts_open_epub(c, out); }
+int ts_open_docx(ts_ctx *c, bs_stream **out) { return ts_open_epub(c, out); }

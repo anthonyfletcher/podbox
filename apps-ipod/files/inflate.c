@@ -2,11 +2,12 @@
  * GNU General Public License (version 2+)
  *
  * Streaming DEFLATE and zlib decompressor, used by the zip-backed document
- * formats.
+ * formats and the PDF reader.
  ****************************************************************************/
 
-#include "ts_internal.h"
 #include <stddef.h>   /* offsetof */
+#include <string.h>
+#include "byte_stream.h"
 
 #define WBITS 15
 #define WSIZE (1u << WBITS)
@@ -21,13 +22,13 @@ typedef struct {
 } huff;
 
 typedef struct {
-    ts_stream *src;
+    bs_stream *src;
     int wrapper;
 
     uint8_t  in[INBUF];
     size_t   ipos, ilen;
     int      src_eof;
-    ts_off_t pulled;
+    bs_off_t pulled;
 
     uint32_t bitbuf;
     int      bitcnt;
@@ -49,10 +50,10 @@ static int nextbyte(inf_st *s)
         size_t got = 0;
         int rc;
         if (s->src_eof) return -1;
-        rc = ts_pull(s->src, s->in, INBUF, &got);
-        if (rc != TS_OK) { s->err = rc; return -1; }
+        rc = bs_pull(s->src, s->in, INBUF, &got);
+        if (rc != BS_OK) { s->err = rc; return -1; }
         if (!got) { s->src_eof = 1; return -1; }
-        s->ipos = 0; s->ilen = got; s->pulled += (ts_off_t)got;
+        s->ipos = 0; s->ilen = got; s->pulled += (bs_off_t)got;
     }
     return s->in[s->ipos++];
 }
@@ -63,7 +64,7 @@ static int bits(inf_st *s, int need)
 
     while (s->bitcnt < need) {
         int b = nextbyte(s);
-        if (b < 0) { if (!s->err) s->err = TS_ERR_FORMAT; return -1; }
+        if (b < 0) { if (!s->err) s->err = BS_ERR_FORMAT; return -1; }
         val |= (uint32_t)b << s->bitcnt;
         s->bitcnt += 8;
     }
@@ -114,7 +115,7 @@ static int decode(inf_st *s, const huff *h)
             code <<= 1;
         }
     }
-    s->err = TS_ERR_FORMAT;
+    s->err = BS_ERR_FORMAT;
     return -1;
 }
 
@@ -143,7 +144,7 @@ static int dynamic_tables(inf_st *s)
     nlen  = bits(s, 5); ndist = bits(s, 5); ncode = bits(s, 4);
     if (nlen < 0 || ndist < 0 || ncode < 0) return -1;
     nlen += 257; ndist += 1; ncode += 4;
-    if (nlen > 286 || ndist > 30) { s->err = TS_ERR_FORMAT; return -1; }
+    if (nlen > 286 || ndist > 30) { s->err = BS_ERR_FORMAT; return -1; }
 
     for (index = 0; index < ncode; index++) {
         int v = bits(s, 3);
@@ -153,7 +154,7 @@ static int dynamic_tables(inf_st *s)
     for (; index < 19; index++) lengths[order[index]] = 0;
 
     err = construct(&s->lencode, lengths, 19);
-    if (err) { s->err = TS_ERR_FORMAT; return -1; }
+    if (err) { s->err = BS_ERR_FORMAT; return -1; }
 
     index = 0;
     while (index < nlen + ndist) {
@@ -165,7 +166,7 @@ static int dynamic_tables(inf_st *s)
         }
         if (symbol == 16) {
             int r;
-            if (!index) { s->err = TS_ERR_FORMAT; return -1; }
+            if (!index) { s->err = BS_ERR_FORMAT; return -1; }
             len = lengths[index - 1];
             r = bits(s, 2); if (r < 0) return -1;
             symbol = 3 + r;
@@ -176,17 +177,17 @@ static int dynamic_tables(inf_st *s)
             int r = bits(s, 7); if (r < 0) return -1;
             symbol = 11 + r;
         }
-        if (index + symbol > nlen + ndist) { s->err = TS_ERR_FORMAT; return -1; }
+        if (index + symbol > nlen + ndist) { s->err = BS_ERR_FORMAT; return -1; }
         while (symbol--) lengths[index++] = (short)len;
     }
-    if (!lengths[256]) { s->err = TS_ERR_FORMAT; return -1; }
+    if (!lengths[256]) { s->err = BS_ERR_FORMAT; return -1; }
 
     err = construct(&s->lencode, lengths, nlen);
     if (err && (err < 0 || nlen != s->lencode.count[0] + s->lencode.count[1]))
-        { s->err = TS_ERR_FORMAT; return -1; }
+        { s->err = BS_ERR_FORMAT; return -1; }
     err = construct(&s->distcode, lengths + nlen, ndist);
     if (err && (err < 0 || ndist != s->distcode.count[0] + s->distcode.count[1]))
-        { s->err = TS_ERR_FORMAT; return -1; }
+        { s->err = BS_ERR_FORMAT; return -1; }
     return 0;
 }
 
@@ -212,7 +213,7 @@ static const short dbase[30] = {
 static const short dext[30] = {
     0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13 };
 
-static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
+static int inf_pull(bs_stream *st, uint8_t *out, size_t cap, size_t *outn)
 {
     inf_st *s = st->st;
     size_t n = 0;
@@ -221,10 +222,10 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
 
     if (!s->started) {
         s->started = 1;
-        if (s->wrapper == TS_INFLATE_ZLIB) {
+        if (s->wrapper == BS_INFLATE_ZLIB) {
             int cmf = nextbyte(s), flg = nextbyte(s);
-            if (cmf < 0 || flg < 0) return s->err ? s->err : TS_ERR_FORMAT;
-            if ((cmf & 0x0F) != 8 || ((cmf << 8 | flg) % 31)) return TS_ERR_FORMAT;
+            if (cmf < 0 || flg < 0) return s->err ? s->err : BS_ERR_FORMAT;
+            if ((cmf & 0x0F) != 8 || ((cmf << 8 | flg) % 31)) return BS_ERR_FORMAT;
             if (flg & 0x20) { int i; for (i = 0; i < 4; i++) nextbyte(s); }
         }
     }
@@ -236,7 +237,7 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
             int type;
             s->last = bits(s, 1);
             type = bits(s, 2);
-            if (s->last < 0 || type < 0) return s->err ? s->err : TS_ERR_FORMAT;
+            if (s->last < 0 || type < 0) return s->err ? s->err : BS_ERR_FORMAT;
 
             if (type == 0) {
                 int i, b[4], len, nlen;
@@ -246,11 +247,11 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
                  * must be an error, not a leap into the unknown. */
                 for (i = 0; i < 4; i++)
                     if ((b[i] = nextbyte(s)) < 0)
-                        return s->err ? s->err : TS_ERR_FORMAT;
+                        return s->err ? s->err : BS_ERR_FORMAT;
                 len  = b[0] | (b[1] << 8);
                 nlen = b[2] | (b[3] << 8);
                 if (s->err) return s->err;
-                if ((len & 0xFFFF) != ((~nlen) & 0xFFFF)) return TS_ERR_FORMAT;
+                if ((len & 0xFFFF) != ((~nlen) & 0xFFFF)) return BS_ERR_FORMAT;
                 s->stored_left = (unsigned)(len & 0xFFFF);
                 s->state = ST_STORED;
                 (void)i;
@@ -258,10 +259,10 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
                 fixed_tables(s);
                 s->state = ST_BLOCK;
             } else if (type == 2) {
-                if (dynamic_tables(s) < 0) return s->err ? s->err : TS_ERR_FORMAT;
+                if (dynamic_tables(s) < 0) return s->err ? s->err : BS_ERR_FORMAT;
                 s->state = ST_BLOCK;
             } else {
-                return TS_ERR_FORMAT;
+                return BS_ERR_FORMAT;
             }
             break;
         }
@@ -269,7 +270,7 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
         case ST_STORED:
             while (n < cap && s->stored_left) {
                 int b = nextbyte(s);
-                if (b < 0) return s->err ? s->err : TS_ERR_FORMAT;
+                if (b < 0) return s->err ? s->err : BS_ERR_FORMAT;
                 put(s, (uint8_t)b, out, &n);
                 s->stored_left--;
             }
@@ -290,7 +291,7 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
                 }
 
                 symbol = decode(s, &s->lencode);
-                if (symbol < 0) return s->err ? s->err : TS_ERR_FORMAT;
+                if (symbol < 0) return s->err ? s->err : BS_ERR_FORMAT;
 
                 if (symbol < 256) {
                     put(s, (uint8_t)symbol, out, &n);
@@ -301,19 +302,19 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
                     break;
                 }
                 symbol -= 257;
-                if (symbol >= 29) return TS_ERR_FORMAT;
+                if (symbol >= 29) return BS_ERR_FORMAT;
                 {
                     int e = bits(s, lext[symbol]);
                     int d;
-                    if (e < 0) return s->err ? s->err : TS_ERR_FORMAT;
+                    if (e < 0) return s->err ? s->err : BS_ERR_FORMAT;
                     s->copy_len = (unsigned)(lbase[symbol] + e);
 
                     d = decode(s, &s->distcode);
-                    if (d < 0 || d >= 30) return s->err ? s->err : TS_ERR_FORMAT;
+                    if (d < 0 || d >= 30) return s->err ? s->err : BS_ERR_FORMAT;
                     e = bits(s, dext[d]);
-                    if (e < 0) return s->err ? s->err : TS_ERR_FORMAT;
+                    if (e < 0) return s->err ? s->err : BS_ERR_FORMAT;
                     s->copy_dist = (unsigned)(dbase[d] + e);
-                    if (s->copy_dist > s->wpos) return TS_ERR_FORMAT;
+                    if (s->copy_dist > s->wpos) return BS_ERR_FORMAT;
                 }
             }
             break;
@@ -321,23 +322,23 @@ static int inf_pull(ts_stream *st, uint8_t *out, size_t cap, size_t *outn)
     }
 
     *outn = n;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int inf_reset(ts_stream *st)
+static int inf_reset(bs_stream *st)
 {
     inf_st *s = st->st;
-    int rc = s->src->reset ? s->src->reset(s->src) : TS_ERR_UNSUP;
+    int rc = s->src->reset ? s->src->reset(s->src) : BS_ERR_UNSUP;
 
-    if (rc != TS_OK) return rc;
-    ts_inflate_restart(st, s->wrapper);
-    return TS_OK;
+    if (rc != BS_OK) return rc;
+    bs_inflate_restart(st, s->wrapper);
+    return BS_OK;
 }
 
-ts_stream *ts_inflate_stream(ts_arena *a, ts_stream *src, int wrapper)
+bs_stream *bs_inflate_stream(bs_arena *a, bs_stream *src, int wrapper)
 {
-    ts_stream *st = ts_alloc(a, sizeof *st);
-    inf_st *s = ts_alloc(a, sizeof *s);
+    bs_stream *st = bs_alloc(a, sizeof *st);
+    inf_st *s = bs_alloc(a, sizeof *s);
 
     if (!st || !s || !src) return NULL;
     s->src = src;
@@ -346,16 +347,16 @@ ts_stream *ts_inflate_stream(ts_arena *a, ts_stream *src, int wrapper)
     return st;
 }
 
-int ts_inflate_finished(const ts_stream *st)
+int bs_inflate_finished(const bs_stream *st)
 {
     const inf_st *s = st->st;
     return s->state == ST_DONE || s->err;
 }
 
-ts_off_t ts_inflate_src_used(const ts_stream *st)
+bs_off_t bs_inflate_src_used(const bs_stream *st)
 {
     const inf_st *s = st->st;
-    ts_off_t buffered = (ts_off_t)(s->ilen - s->ipos) + s->bitcnt / 8;
+    bs_off_t buffered = (bs_off_t)(s->ilen - s->ipos) + s->bitcnt / 8;
     return s->pulled - buffered;
 }
 
@@ -366,10 +367,10 @@ ts_off_t ts_inflate_src_used(const ts_stream *st)
  * over bytes this stream has already written (copy_dist > wpos is rejected),
  * so stale history is unreachable. Clearing it would memset 32 KiB per
  * stream, which on a document with hundreds of streams is pure waste. */
-void ts_inflate_restart(ts_stream *st, int wrapper)
+void bs_inflate_restart(bs_stream *st, int wrapper)
 {
     inf_st *s = st->st;
-    ts_stream *src = s->src;
+    bs_stream *src = s->src;
 
     memset(s, 0, offsetof(inf_st, win));
     s->wpos = 0;

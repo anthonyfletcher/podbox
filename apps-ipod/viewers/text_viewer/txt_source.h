@@ -8,23 +8,13 @@
 #define TXT_SOURCE_H
 
 #include <stddef.h>
+#include "files/byte_stream.h"   /* bs_off_t, BS_OK and the errors, bs_io */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef long long ts_off_t;   /* map to off_t on Rockbox targets */
-
 /* ---- errors ---------------------------------------------------------- */
-
-enum {
-    TS_OK          =  0,
-    TS_ERR_IO      = -1,   /* read/seek failed                            */
-    TS_ERR_NOMEM   = -2,   /* arena too small                             */
-    TS_ERR_FORMAT  = -3,   /* file is corrupt or not what it claimed      */
-    TS_ERR_UNSUP   = -4,   /* recognised, but this variant isn't handled  */
-    TS_ERR_INVAL   = -5    /* bad argument                                */
-};
 
 const char *ts_strerror(int err);
 
@@ -61,18 +51,6 @@ typedef enum {
     TS_CS_CP1251
 } ts_charset;
 
-/* ---- I/O vtable ------------------------------------------------------ */
-
-/* How the engine reaches a file. ts_io_core() (ts_io_core.c) is the only
- * implementation here; a port supplies its own. */
-typedef struct ts_io {
-    long      (*read )(void *ctx, void *buf, size_t n);      /* <0 on error  */
-    ts_off_t  (*seek )(void *ctx, ts_off_t off, int whence); /* SEEK_* codes */
-    ts_off_t  (*size )(void *ctx);
-    void      (*close)(void *ctx);
-    void       *ctx;
-} ts_io;
-
 /* ---- configuration --------------------------------------------------- */
 
 typedef struct {
@@ -101,7 +79,7 @@ ts_config ts_config_default(void);
  *
  * Only the zip formats scale with the document, at roughly 100 bytes per
  * archive member (the central directory index and the manifest ids). If the
- * arena is too small ts_open returns TS_ERR_NOMEM before reading anything,
+ * arena is too small ts_open returns BS_ERR_NOMEM before reading anything,
  * so a caller with memory to spare can simply retry with a larger one. */
 #define TS_ARENA_PLAIN        (12 * 1024)   /* also markdown, html, rtf, fb2 */
 #define TS_ARENA_MARKUP       (12 * 1024)
@@ -116,10 +94,10 @@ typedef struct ts_source ts_source;
 /* `io` is copied; the engine takes ownership of io->ctx and will call
  * io->close on ts_close(). `name` is used only for extension-based probing
  * and may be NULL. `arena` must stay valid and untouched until ts_close(). */
-int  ts_open(ts_source **out, const ts_io *io, const char *name,
+int  ts_open(ts_source **out, const bs_io *io, const char *name,
              void *arena, size_t arena_size, const ts_config *cfg);
 
-/* Returns bytes written (>0), 0 at end of document, or a negative TS_ERR_*.
+/* Returns bytes written (>0), 0 at end of document, or a negative BS_ERR_*.
  * Never splits a UTF-8 sequence across calls. `n` must be >= 8. */
 long ts_read(ts_source *s, char *buf, size_t n);
 

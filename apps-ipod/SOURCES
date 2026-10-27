@@ -146,6 +146,8 @@ files/file_ops.c
 files/file_index.c
 files/filetypes.c
 files/path_list.c
+files/byte_stream.c
+files/inflate.c
 screens/shortcuts.c
 screens/system/time_set.c
 screens/playback/sound_props.c
@@ -231,7 +233,6 @@ viewers/lyric_viewer/lyric_viewer.c
 viewers/text_viewer/text_viewer.c
 viewers/text_viewer/ts_charset.c
 viewers/text_viewer/ts_core.c
-viewers/text_viewer/ts_inflate.c
 viewers/text_viewer/ts_io_core.c
 viewers/text_viewer/ts_lyrics.c
 viewers/text_viewer/ts_markup.c

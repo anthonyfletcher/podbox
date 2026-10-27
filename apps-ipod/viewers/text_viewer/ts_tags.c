@@ -126,7 +126,7 @@ enum { ST_TEXT, ST_TAG, ST_COMMENT, ST_CDATA, ST_ENT };
 #define TIN    256
 
 typedef struct {
-    ts_stream    *src;
+    bs_stream    *src;
     ts_tag_profile prof;
     const rule   *rules;
     int           collapse, max_nl;
@@ -342,20 +342,20 @@ static void feed(tg_st *s, uint8_t c)
 
 static int fill(tg_st *s)
 {
-    if (s->ipos < s->ilen) return TS_OK;
-    if (s->src_eof) return TS_OK;
+    if (s->ipos < s->ilen) return BS_OK;
+    if (s->src_eof) return BS_OK;
     s->ipos = s->ilen = 0;
     {
         size_t got = 0;
-        int rc = ts_pull(s->src, s->in, TIN, &got);
-        if (rc != TS_OK) return rc;
+        int rc = bs_pull(s->src, s->in, TIN, &got);
+        if (rc != BS_OK) return rc;
         if (!got) s->src_eof = 1;
         s->ilen = got;
     }
-    return TS_OK;
+    return BS_OK;
 }
 
-static int tg_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int tg_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     tg_st *s = st->st;
     size_t done = 0;
@@ -367,7 +367,7 @@ static int tg_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         if (ts_pend_free(&s->out) < 16) continue;
 
         rc = fill(s);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
         if (s->ipos >= s->ilen) {           /* end of input */
             done += ts_pend_take(&s->out, buf + done, n - done);
             break;
@@ -375,28 +375,28 @@ static int tg_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         feed(s, s->in[s->ipos++]);
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int tg_reset(ts_stream *st)
+static int tg_reset(bs_stream *st)
 {
     tg_st *s = st->st;
-    ts_stream *src = s->src;
+    bs_stream *src = s->src;
     ts_tag_profile prof = s->prof;
     const rule *rules = s->rules;
     int collapse = s->collapse, max_nl = s->max_nl;
-    int rc = src->reset ? src->reset(src) : TS_ERR_UNSUP;
+    int rc = src->reset ? src->reset(src) : BS_ERR_UNSUP;
 
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
     memset(s, 0, sizeof *s);
     s->src = src; s->prof = prof; s->rules = rules;
     s->collapse = collapse; s->max_nl = max_nl;
-    return TS_OK;
+    return BS_OK;
 }
 
 /* Lets a container back end point the same filter at the next document in a
  * spine without reallocating (and without losing the emitted-text state). */
-void ts_tags_restart(ts_stream *st, ts_stream *src)
+void ts_tags_restart(bs_stream *st, bs_stream *src)
 {
     tg_st *s = st->st;
 
@@ -412,7 +412,7 @@ void ts_tags_restart(ts_stream *st, ts_stream *src)
 
 /* Clears the between-documents state so a container back end can start its
  * spine over from the top without reallocating. */
-void ts_tags_rewind(ts_stream *st)
+void ts_tags_rewind(bs_stream *st)
 {
     tg_st *s = st->st;
 
@@ -421,11 +421,11 @@ void ts_tags_rewind(ts_stream *st)
     ts_pend_reset(&s->out);     /* text not yet taken would shift offsets */
 }
 
-ts_stream *ts_tags_stream(ts_arena *a, ts_stream *src, ts_tag_profile p,
+bs_stream *ts_tags_stream(bs_arena *a, bs_stream *src, ts_tag_profile p,
                           const ts_config *cfg)
 {
-    ts_stream *st = ts_alloc(a, sizeof *st);
-    tg_st *s = ts_alloc(a, sizeof *s);
+    bs_stream *st = bs_alloc(a, sizeof *st);
+    tg_st *s = bs_alloc(a, sizeof *s);
 
     if (!st || !s) return NULL;
     s->src = src;

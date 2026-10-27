@@ -1,8 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The engine core: arena allocation, the file stream, format probing, and
- * the public entry points from txt_source.h.
+ * The engine core: format probing, the shared helpers, and the public entry
+ * points from txt_source.h.
  ****************************************************************************/
 
 #include "ts_internal.h"
@@ -13,31 +13,17 @@
 #define SEEK_END 2
 #endif
 
-/* ---- arena ----------------------------------------------------------- */
-
-void *ts_alloc(ts_arena *a, size_t n)
-{
-    size_t align = sizeof(void *);
-    size_t start = (a->used + align - 1) & ~(align - 1);
-
-    if (n > a->size || start > a->size - n)
-        return NULL;
-    a->used = start + n;
-    memset(a->base + start, 0, n);
-    return a->base + start;
-}
-
 /* ---- misc helpers ---------------------------------------------------- */
 
 const char *ts_strerror(int err)
 {
     switch (err) {
-    case TS_OK:         return "ok";
-    case TS_ERR_IO:     return "I/O error";
-    case TS_ERR_NOMEM:  return "arena exhausted";
-    case TS_ERR_FORMAT: return "malformed file";
-    case TS_ERR_UNSUP:  return "unsupported variant";
-    case TS_ERR_INVAL:  return "invalid argument";
+    case BS_OK:         return "ok";
+    case BS_ERR_IO:     return "I/O error";
+    case BS_ERR_NOMEM:  return "arena exhausted";
+    case BS_ERR_FORMAT: return "malformed file";
+    case BS_ERR_UNSUP:  return "unsupported variant";
+    case BS_ERR_INVAL:  return "invalid argument";
     }
     return "unknown error";
 }
@@ -137,62 +123,6 @@ size_t ts_pend_take(ts_pend *p, uint8_t *dst, size_t n)
     return i;
 }
 
-/* ---- file stream ----------------------------------------------------- */
-
-typedef struct {
-    const ts_io *io;
-    ts_off_t start, len, pos;
-} file_st;
-
-static int file_pull(ts_stream *s, uint8_t *buf, size_t n, size_t *out)
-{
-    file_st *f = s->st;
-    long got;
-
-    if (f->len >= 0 && f->pos >= f->len) return TS_OK;
-    if (f->len >= 0 && (ts_off_t)n > f->len - f->pos)
-        n = (size_t)(f->len - f->pos);
-    if (!n) return TS_OK;
-
-    /* Always seek: several readers share one descriptor (the scanner, the
-     * font pre-pass and this window all move it), so no stream may assume it
-     * knows where the file is positioned. Eliding the redundant seeks is the
-     * io backend's job -- it is the only layer that sees every one. */
-    if (f->io->seek(f->io->ctx, f->start + f->pos, SEEK_SET) < 0)
-        return TS_ERR_IO;
-    got = f->io->read(f->io->ctx, buf, n);
-    if (got < 0) return TS_ERR_IO;
-    f->pos += got;
-    *out = (size_t)got;
-    return TS_OK;
-}
-
-static int file_reset(ts_stream *s)
-{
-    ((file_st *)s->st)->pos = 0;
-    return TS_OK;
-}
-
-ts_stream *ts_file_stream(ts_arena *a, const ts_io *io,
-                          ts_off_t start, ts_off_t len)
-{
-    ts_stream *s = ts_alloc(a, sizeof *s);
-    file_st *f = ts_alloc(a, sizeof *f);
-
-    if (!s || !f) return NULL;
-    f->io = io; f->start = start; f->len = len; f->pos = 0;
-    s->pull = file_pull; s->reset = file_reset; s->st = f;
-    return s;
-}
-
-int ts_file_stream_retarget(ts_stream *s, ts_off_t start, ts_off_t len)
-{
-    file_st *f = s->st;
-    if (s->pull != file_pull) return TS_ERR_INVAL;
-    f->start = start; f->len = len; f->pos = 0;
-    return TS_OK;
-}
-
 /* ---- probing --------------------------------------------------------- */
 
 static const char *ext_of(const char *name)
@@ -290,10 +220,10 @@ static ts_format probe(const uint8_t *raw, size_t rawn, const char *name,
 #define HEAD_MAX 4096
 
 struct ts_source {
-    ts_arena   arena;
-    ts_io      io;
+    bs_arena   arena;
+    bs_io      io;
     ts_config  cfg;
-    ts_stream *pipe;
+    bs_stream *pipe;
     ts_format  fmt;
     ts_charset cs;
     uint8_t    hold[4];      /* partial UTF-8 carried between ts_read calls */
@@ -301,33 +231,33 @@ struct ts_source {
     int        eof, err;
 };
 
-int ts_open(ts_source **out, const ts_io *io, const char *name,
+int ts_open(ts_source **out, const bs_io *io, const char *name,
             void *arena, size_t arena_size, const ts_config *cfg)
 {
     ts_source *s;
-    ts_arena a;
+    bs_arena a;
     uint8_t *head, *scratch;
     long got;
     size_t bom = 0;
     ts_ctx ctx;
     int rc;
 
-    if (!out || !io || !arena) return TS_ERR_INVAL;
+    if (!out || !io || !arena) return BS_ERR_INVAL;
     *out = NULL;
 
     a.base = arena; a.size = arena_size; a.used = 0;
-    s = ts_alloc(&a, sizeof *s);
-    head = ts_alloc(&a, HEAD_MAX);
-    scratch = ts_alloc(&a, HEAD_MAX);
-    if (!s || !head || !scratch) return TS_ERR_NOMEM;
+    s = bs_alloc(&a, sizeof *s);
+    head = bs_alloc(&a, HEAD_MAX);
+    scratch = bs_alloc(&a, HEAD_MAX);
+    if (!s || !head || !scratch) return BS_ERR_NOMEM;
 
     s->io  = *io;
     s->cfg = cfg ? *cfg : ts_config_default();
     if (s->cfg.max_blank_lines < 1) s->cfg.max_blank_lines = 1;
 
-    if (io->seek(io->ctx, 0, SEEK_SET) < 0) return TS_ERR_IO;
+    if (io->seek(io->ctx, 0, SEEK_SET) < 0) return BS_ERR_IO;
     got = io->read(io->ctx, head, HEAD_MAX);
-    if (got < 0) return TS_ERR_IO;
+    if (got < 0) return BS_ERR_IO;
 
     s->cs = (s->cfg.charset != TS_CS_AUTO)
           ? s->cfg.charset
@@ -354,9 +284,9 @@ int ts_open(ts_source **out, const ts_io *io, const char *name,
     case TS_FMT_LYRICS: rc = ts_open_lyrics(&ctx, &s->pipe);       break;
     case TS_FMT_EPUB:
     case TS_FMT_DOCX:   rc = ts_open_epub(&ctx, &s->pipe);         break;
-    default:            rc = TS_ERR_UNSUP;                         break;
+    default:            rc = BS_ERR_UNSUP;                         break;
     }
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
 
     /* A container probe may have resolved EPUB vs DOCX vs zipped FB2, and a
      * markup back end may have found a declared encoding. */
@@ -368,7 +298,7 @@ int ts_open(ts_source **out, const ts_io *io, const char *name,
     s->eof = s->err = 0;
     s->hold_n = 0;
     *out = s;
-    return TS_OK;
+    return BS_OK;
 }
 
 /* Length of the UTF-8 sequence starting with `b`, or 0 if it's a stray
@@ -402,7 +332,7 @@ long ts_read(ts_source *s, char *buf, size_t n)
     size_t total = 0, keep;
     int rc;
 
-    if (!s || !buf || n < 8) return TS_ERR_INVAL;
+    if (!s || !buf || n < 8) return BS_ERR_INVAL;
     if (s->err) return s->err;
 
     if (s->hold_n) {
@@ -414,8 +344,8 @@ long ts_read(ts_source *s, char *buf, size_t n)
     while (total < n) {
         size_t got = 0;
         if (s->eof) break;
-        rc = ts_pull(s->pipe, p + total, n - total, &got);
-        if (rc != TS_OK) { s->err = rc; return rc; }
+        rc = bs_pull(s->pipe, p + total, n - total, &got);
+        if (rc != BS_OK) { s->err = rc; return rc; }
         if (!got) { s->eof = 1; break; }
         total += got;
     }
@@ -434,13 +364,13 @@ long ts_read(ts_source *s, char *buf, size_t n)
 int ts_rewind(ts_source *s)
 {
     int rc;
-    if (!s) return TS_ERR_INVAL;
-    if (!s->pipe->reset) return TS_ERR_UNSUP;
+    if (!s) return BS_ERR_INVAL;
+    if (!s->pipe->reset) return BS_ERR_UNSUP;
     rc = s->pipe->reset(s->pipe);
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
     s->eof = s->err = 0;
     s->hold_n = 0;
-    return TS_OK;
+    return BS_OK;
 }
 
 void ts_close(ts_source *s)

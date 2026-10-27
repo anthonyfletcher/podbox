@@ -45,7 +45,7 @@ enum {
 };
 
 typedef struct {
-    ts_stream *src;
+    bs_stream *src;
     uint8_t in[LIN];
     size_t   ipos, ilen;
     int      src_eof;
@@ -254,18 +254,18 @@ static int ly_fill(ly_st *s)
     int rc;
 
     if (s->ipos < s->ilen || s->src_eof)
-        return TS_OK;
+        return BS_OK;
     s->ipos = s->ilen = 0;
-    rc = ts_pull(s->src, s->in, LIN, &got);
-    if (rc != TS_OK)
+    rc = bs_pull(s->src, s->in, LIN, &got);
+    if (rc != BS_OK)
         return rc;
     if (!got)
         s->src_eof = 1;
     s->ilen = got;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int ly_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int ly_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     ly_st *s = st->st;
     size_t done = 0;
@@ -282,7 +282,7 @@ static int ly_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
             continue;
 
         rc = ly_fill(s);
-        if (rc != TS_OK)
+        if (rc != BS_OK)
             return rc;
         if (s->ipos >= s->ilen) {
             /* End of input while still holding something back: it was never a
@@ -306,38 +306,38 @@ static int ly_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         ly_feed(s, s->in[s->ipos++]);
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int ly_reset(ts_stream *st)
+static int ly_reset(bs_stream *st)
 {
     ly_st *s = st->st;
-    ts_stream *src = s->src;
-    int rc = src->reset? src->reset(src): TS_ERR_UNSUP;
+    bs_stream *src = s->src;
+    int rc = src->reset? src->reset(src): BS_ERR_UNSUP;
 
-    if (rc != TS_OK)
+    if (rc != BS_OK)
         return rc;
     memset(s, 0, sizeof *s);
     s->src = src;
-    return TS_OK;
+    return BS_OK;
 }
 
-int ts_open_lyrics(ts_ctx *c, ts_stream **out)
+int ts_open_lyrics(ts_ctx *c, bs_stream **out)
 {
-    ts_stream *file = ts_file_stream(c->arena, c->io, 0, -1);
-    ts_stream *st = ts_alloc(c->arena, sizeof *st);
-    ly_st *s = ts_alloc(c->arena, sizeof *s);
+    bs_stream *file = bs_file_stream(c->arena, c->io, 0, -1);
+    bs_stream *st = bs_alloc(c->arena, sizeof *st);
+    ly_st *s = bs_alloc(c->arena, sizeof *s);
 
     if (!file || !st || !s)
-        return TS_ERR_NOMEM;
+        return BS_ERR_NOMEM;
 
     s->src = ts_charset_stream(c->arena, file, c->detected);
     if (!s->src)
-        return TS_ERR_NOMEM;
+        return BS_ERR_NOMEM;
 
     st->pull = ly_pull;
     st->reset = ly_reset;
     st->st = s;
     *out = st;
-    return TS_OK;
+    return BS_OK;
 }

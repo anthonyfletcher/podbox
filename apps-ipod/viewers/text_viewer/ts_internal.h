@@ -1,8 +1,9 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Shared internals of the ts_* engine -- stream types and per-stage
- * restart hooks. Not part of the public API.
+ * Shared internals of the ts_* engine -- the stages and back ends, and
+ * their restart hooks. Not part of the public API. The arena, the stream
+ * and inflate are in files/byte_stream.h.
  ****************************************************************************/
 #ifndef TS_INTERNAL_H
 #define TS_INTERNAL_H
@@ -11,44 +12,10 @@
 #include <stdint.h>
 #include <string.h>
 
-/* ---- bump arena ------------------------------------------------------ */
-
-typedef struct {
-    uint8_t *base;
-    size_t   size, used;
-} ts_arena;
-
-void *ts_alloc(ts_arena *a, size_t n);          /* pointer-aligned, zeroed */
-
-/* ---- byte stream ----------------------------------------------------- */
-
-/* pull() fills up to n bytes. *out == 0 means clean EOF. Returns TS_OK or a
- * negative error. Streams are chained; each stage owns bounded state in the
- * arena, so a whole pipeline costs a fixed number of kilobytes regardless of
- * how large the document is. */
-typedef struct ts_stream {
-    int (*pull)(struct ts_stream *s, uint8_t *buf, size_t n, size_t *out);
-    int (*reset)(struct ts_stream *s);          /* may be NULL */
-    void *st;
-} ts_stream;
-
-static inline int ts_pull(ts_stream *s, uint8_t *b, size_t n, size_t *o)
-{
-    *o = 0;
-    return s->pull(s, b, n, o);
-}
-
-/* ---- file-backed stream --------------------------------------------- */
-
-/* Reads [start, start+len) of the file. len < 0 means "to end of file". */
-ts_stream *ts_file_stream(ts_arena *a, const ts_io *io,
-                          ts_off_t start, ts_off_t len);
-int ts_file_stream_retarget(ts_stream *s, ts_off_t start, ts_off_t len);
-
 /* ---- charset stage --------------------------------------------------- */
 
-ts_stream *ts_charset_stream(ts_arena *a, ts_stream *src, ts_charset cs);
-void ts_charset_restart(ts_stream *s, ts_stream *src, ts_charset cs);
+bs_stream *ts_charset_stream(bs_arena *a, bs_stream *src, ts_charset cs);
+void ts_charset_restart(bs_stream *s, bs_stream *src, ts_charset cs);
 /* Sniffs `head` (typically 4 KiB from offset 0). Sets *bom_skip to the number
  * of BOM bytes to drop. Never returns TS_CS_AUTO. */
 ts_charset ts_charset_sniff(const uint8_t *head, size_t n,
@@ -57,25 +24,14 @@ uint32_t   ts_sb_to_cp(ts_charset cs, uint8_t b);
 ts_charset ts_charset_from_name(const char *name);
 ts_charset ts_charset_decl(const uint8_t *head, size_t n, ts_charset current);
 
-/* ---- inflate stage --------------------------------------------------- */
-
-#define TS_INFLATE_RAW  0
-#define TS_INFLATE_ZLIB 1
-ts_stream *ts_inflate_stream(ts_arena *a, ts_stream *src, int wrapper);
-int  ts_inflate_finished(const ts_stream *s);
-void ts_inflate_restart(ts_stream *s, int wrapper);   /* reuse, no realloc */
-/* Bytes of the source consumed so far -- lets the PDF scanner resume after a
- * stream whose /Length was an indirect reference. */
-ts_off_t ts_inflate_src_used(const ts_stream *s);
-
 /* ---- pdf ascii armour ------------------------------------------------ */
 
 #define TS_FILT_RAW 0
 #define TS_FILT_A85 1
 #define TS_FILT_AHX 2
-ts_stream *ts_filt_stream(ts_arena *a, ts_stream *src);
-void       ts_filt_restart(ts_stream *s, int mode);
-ts_off_t   ts_filt_used(ts_stream *s);     /* source bytes consumed */
+bs_stream *ts_filt_stream(bs_arena *a, bs_stream *src);
+void       ts_filt_restart(bs_stream *s, int mode);
+bs_off_t   ts_filt_used(bs_stream *s);     /* source bytes consumed */
 
 /* ---- pdf fonts ------------------------------------------------------- */
 
@@ -84,8 +40,8 @@ ts_off_t   ts_filt_used(ts_stream *s);     /* source bytes consumed */
  * dictionaries, their CMaps and the page resource maps that name them. */
 typedef struct ts_pdffonts ts_pdffonts;
 
-int ts_pdffonts_build(ts_pdffonts **out, ts_arena *a, const ts_io *io,
-                      ts_stream *win, ts_stream *filt, ts_stream *infl);
+int ts_pdffonts_build(ts_pdffonts **out, bs_arena *a, const bs_io *io,
+                      bs_stream *win, bs_stream *filt, bs_stream *infl);
 /* NULL when the content stream's page or font resource isn't known. */
 const void *ts_pdffonts_cmap(ts_pdffonts *f, int content_obj, const char *name);
 /* 1 when this object is a page's content stream (or when no page structure
@@ -99,14 +55,14 @@ int ts_cmap_map(const void *cmap, uint32_t code, uint32_t *u0, uint32_t *u1);
 
 typedef struct ts_zip ts_zip;
 
-int  ts_zip_open(ts_zip **out, ts_arena *a, const ts_io *io);
+int  ts_zip_open(ts_zip **out, bs_arena *a, const bs_io *io);
 /* Case-sensitive exact match on the stored path. */
-int  ts_zip_find(ts_zip *z, const char *path);      /* index, or TS_ERR_FORMAT */
+int  ts_zip_find(ts_zip *z, const char *path);      /* index, or BS_ERR_FORMAT */
 const char *ts_zip_name(ts_zip *z, int idx);
 int  ts_zip_count(ts_zip *z);
 /* Opens member `idx` as a stream. The returned stream is owned by `z` and is
  * invalidated by the next ts_zip_member() call. */
-int  ts_zip_member(ts_zip *z, int idx, ts_stream **out);
+int  ts_zip_member(ts_zip *z, int idx, bs_stream **out);
 
 /* ---- markup stage ---------------------------------------------------- */
 
@@ -116,19 +72,19 @@ typedef enum {
     TS_TAGS_DOCX
 } ts_tag_profile;
 
-ts_stream *ts_tags_stream(ts_arena *a, ts_stream *src,
+bs_stream *ts_tags_stream(bs_arena *a, bs_stream *src,
                           ts_tag_profile p, const ts_config *cfg);
 /* Re-point the filter at the next document of a spine, keeping the arena. */
-void ts_tags_restart(ts_stream *s, ts_stream *src);
-void ts_tags_rewind(ts_stream *s);      /* forget the document-boundary state */
+void ts_tags_restart(bs_stream *s, bs_stream *src);
+void ts_tags_rewind(bs_stream *s);      /* forget the document-boundary state */
 
 /* ---- format back ends ------------------------------------------------ */
 
 /* Each returns the head of a finished pipeline emitting UTF-8. `head`/`hlen`
  * is the probe buffer already read from offset 0. */
 typedef struct {
-    ts_arena       *arena;
-    const ts_io    *io;
+    bs_arena       *arena;
+    const bs_io    *io;
     const ts_config *cfg;
     const uint8_t  *head;
     size_t          hlen;
@@ -136,13 +92,13 @@ typedef struct {
     ts_format       resolved;   /* set by container back ends (epub/docx/fb2z) */
 } ts_ctx;
 
-int ts_open_text (ts_ctx *c, ts_format fmt, ts_stream **out);  /* plain/md/rtf */
-int ts_open_html (ts_ctx *c, ts_stream **out);
-int ts_open_fb2  (ts_ctx *c, ts_stream **out);
-int ts_open_epub (ts_ctx *c, ts_stream **out);
-int ts_open_docx (ts_ctx *c, ts_stream **out);
-int ts_open_pdf  (ts_ctx *c, ts_stream **out);
-int ts_open_lyrics(ts_ctx *c, ts_stream **out);
+int ts_open_text (ts_ctx *c, ts_format fmt, bs_stream **out);  /* plain/md/rtf */
+int ts_open_html (ts_ctx *c, bs_stream **out);
+int ts_open_fb2  (ts_ctx *c, bs_stream **out);
+int ts_open_epub (ts_ctx *c, bs_stream **out);
+int ts_open_docx (ts_ctx *c, bs_stream **out);
+int ts_open_pdf  (ts_ctx *c, bs_stream **out);
+int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 
 /* ---- small helpers --------------------------------------------------- */
 

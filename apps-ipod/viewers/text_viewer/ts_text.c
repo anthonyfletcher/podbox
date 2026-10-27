@@ -13,7 +13,7 @@
 
 typedef struct flt_st flt_st;
 struct flt_st {
-    ts_stream *src;
+    bs_stream *src;
     uint8_t in[TIN];
     size_t ipos, ilen;
     int    src_eof;
@@ -35,16 +35,16 @@ static int flt_fill(flt_st *s)
     size_t got = 0;
     int rc;
 
-    if (s->ipos < s->ilen || s->src_eof) return TS_OK;
+    if (s->ipos < s->ilen || s->src_eof) return BS_OK;
     s->ipos = s->ilen = 0;
-    rc = ts_pull(s->src, s->in, TIN, &got);
-    if (rc != TS_OK) return rc;
+    rc = bs_pull(s->src, s->in, TIN, &got);
+    if (rc != BS_OK) return rc;
     if (!got) s->src_eof = 1;
     s->ilen = got;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int flt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int flt_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     flt_st *s = st->st;
     size_t done = 0;
@@ -56,7 +56,7 @@ static int flt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         if (ts_pend_free(&s->out) < 16) continue;
 
         rc = flt_fill(s);
-        if (rc != TS_OK) return rc;
+        if (rc != BS_OK) return rc;
         if (s->ipos >= s->ilen) {
             if (s->eos && !s->eos_done) { s->eos_done = 1; s->eos(s); continue; }
             done += ts_pend_take(&s->out, buf + done, n - done);
@@ -65,30 +65,30 @@ static int flt_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         s->feed(s, s->in[s->ipos++]);
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int flt_reset(ts_stream *st)
+static int flt_reset(bs_stream *st)
 {
     flt_st *s = st->st;
-    ts_stream *src = s->src;
+    bs_stream *src = s->src;
     void (*feed)(flt_st *, uint8_t) = s->feed;
     void (*eos)(flt_st *) = s->eos;
     ts_charset cp = s->cp;
-    int rc = src->reset ? src->reset(src) : TS_ERR_UNSUP;
+    int rc = src->reset ? src->reset(src) : BS_ERR_UNSUP;
 
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
     memset(s, 0, sizeof *s);
     s->src = src; s->feed = feed; s->eos = eos; s->cp = cp;
     s->at_bol = 1; s->uc_skip = 1;
-    return TS_OK;
+    return BS_OK;
 }
 
-static ts_stream *flt_new(ts_arena *a, ts_stream *src,
+static bs_stream *flt_new(bs_arena *a, bs_stream *src,
                           void (*feed)(flt_st *, uint8_t), flt_st **sp)
 {
-    ts_stream *st = ts_alloc(a, sizeof *st);
-    flt_st *s = ts_alloc(a, sizeof *s);
+    bs_stream *st = bs_alloc(a, sizeof *st);
+    flt_st *s = bs_alloc(a, sizeof *s);
 
     if (!st || !s || !src) return NULL;
     s->src = src;
@@ -345,29 +345,29 @@ static void rtf_feed_outer(flt_st *s, uint8_t c)
 
 /* ===================== entry point ==================================== */
 
-int ts_open_text(ts_ctx *c, ts_format fmt, ts_stream **out)
+int ts_open_text(ts_ctx *c, ts_format fmt, bs_stream **out)
 {
-    ts_stream *file = ts_file_stream(c->arena, c->io, 0, -1);
-    ts_stream *st;
+    bs_stream *file = bs_file_stream(c->arena, c->io, 0, -1);
+    bs_stream *st;
     flt_st *s = NULL;
 
-    if (!file) return TS_ERR_NOMEM;
+    if (!file) return BS_ERR_NOMEM;
 
     if (fmt == TS_FMT_RTF) {
         /* RTF is 7-bit ASCII on the wire; the filter does its own decoding. */
         st = flt_new(c->arena, file, rtf_feed_outer, &s);
-        if (!st) return TS_ERR_NOMEM;
+        if (!st) return BS_ERR_NOMEM;
         s->cp = (c->cfg->charset != TS_CS_AUTO) ? c->cfg->charset : TS_CS_CP1252;
         *out = st;
-        return TS_OK;
+        return BS_OK;
     }
 
     st = ts_charset_stream(c->arena, file, c->detected);
-    if (!st) return TS_ERR_NOMEM;
+    if (!st) return BS_ERR_NOMEM;
 
     st = flt_new(c->arena, st,
                  (fmt == TS_FMT_MARKDOWN) ? md_feed : plain_feed, &s);
-    if (!st) return TS_ERR_NOMEM;
+    if (!st) return BS_ERR_NOMEM;
     *out = st;
-    return TS_OK;
+    return BS_OK;
 }

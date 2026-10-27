@@ -1009,7 +1009,7 @@ do {\
  * decode path indexes pub[] from a negative offset as well.
  *
  * The bookkeeping is DEFLATE's, and the same this tree already uses in
- * ts_inflate.c's construct(): every length doubles the codes available and
+ * files/inflate.c's construct(): every length doubles the codes available and
  * spends what the table asks for, so going negative means it asked for more
  * than exist. An incomplete table (left > 0) is left alone -- it decodes, and
  * refusing it would reject files that work.

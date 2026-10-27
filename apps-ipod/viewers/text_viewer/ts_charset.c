@@ -223,7 +223,7 @@ ts_charset ts_charset_decl(const uint8_t *h, size_t n, ts_charset current)
 #define CS_IN 256
 
 typedef struct {
-    ts_stream *src;
+    bs_stream *src;
     ts_charset cs;
     uint8_t    in[CS_IN];
     size_t     ipos, ilen;
@@ -234,7 +234,7 @@ typedef struct {
 /* Ensures at least `want` bytes are buffered unless the source is dry. */
 static int cs_need(cs_st *s, size_t want)
 {
-    if (s->ilen - s->ipos >= want) return TS_OK;
+    if (s->ilen - s->ipos >= want) return BS_OK;
 
     if (s->ipos) {
         memmove(s->in, s->in + s->ipos, s->ilen - s->ipos);
@@ -243,12 +243,12 @@ static int cs_need(cs_st *s, size_t want)
     }
     while (!s->src_eof && s->ilen < want) {
         size_t got = 0;
-        int rc = ts_pull(s->src, s->in + s->ilen, CS_IN - s->ilen, &got);
-        if (rc != TS_OK) return rc;
+        int rc = bs_pull(s->src, s->in + s->ilen, CS_IN - s->ilen, &got);
+        if (rc != BS_OK) return rc;
         if (!got) { s->src_eof = 1; break; }
         s->ilen += got;
     }
-    return TS_OK;
+    return BS_OK;
 }
 
 static void cs_skip_bom(cs_st *s)
@@ -273,8 +273,8 @@ static int cs_step(cs_st *s, int *err)
     int rc = cs_need(s, 4);
     size_t avail;
 
-    *err = TS_OK;
-    if (rc != TS_OK) { *err = rc; return 0; }
+    *err = BS_OK;
+    if (rc != BS_OK) { *err = rc; return 0; }
     if (!s->bom_done) cs_skip_bom(s);
 
     avail = s->ilen - s->ipos;
@@ -326,7 +326,7 @@ static int cs_step(cs_st *s, int *err)
     return 1;
 }
 
-static int cs_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
+static int cs_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     cs_st *s = st->st;
     size_t done = 0;
@@ -337,29 +337,29 @@ static int cs_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
         if (done == n) break;
         if (ts_pend_free(&s->out) < 4) continue;
         if (!cs_step(s, &err)) {
-            if (err != TS_OK) return err;
+            if (err != BS_OK) return err;
             done += ts_pend_take(&s->out, buf + done, n - done);
             break;                              /* end of input */
         }
     }
     *out = done;
-    return TS_OK;
+    return BS_OK;
 }
 
-static int cs_reset(ts_stream *st)
+static int cs_reset(bs_stream *st)
 {
     cs_st *s = st->st;
-    int rc = s->src->reset ? s->src->reset(s->src) : TS_ERR_UNSUP;
+    int rc = s->src->reset ? s->src->reset(s->src) : BS_ERR_UNSUP;
 
-    if (rc != TS_OK) return rc;
+    if (rc != BS_OK) return rc;
     s->ipos = s->ilen = 0;
     s->src_eof = s->bom_done = 0;
     ts_pend_reset(&s->out);
-    return TS_OK;
+    return BS_OK;
 }
 
 /* Re-point at the next member of a container without touching the arena. */
-void ts_charset_restart(ts_stream *st, ts_stream *src, ts_charset cs)
+void ts_charset_restart(bs_stream *st, bs_stream *src, ts_charset cs)
 {
     cs_st *s = st->st;
 
@@ -370,10 +370,10 @@ void ts_charset_restart(ts_stream *st, ts_stream *src, ts_charset cs)
     ts_pend_reset(&s->out);
 }
 
-ts_stream *ts_charset_stream(ts_arena *a, ts_stream *src, ts_charset cs)
+bs_stream *ts_charset_stream(bs_arena *a, bs_stream *src, ts_charset cs)
 {
-    ts_stream *st = ts_alloc(a, sizeof *st);
-    cs_st *s = ts_alloc(a, sizeof *s);
+    bs_stream *st = bs_alloc(a, sizeof *st);
+    cs_st *s = bs_alloc(a, sizeof *s);
 
     if (!st || !s) return NULL;
     s->src = src;

@@ -595,7 +595,7 @@ static bool tv_reach(off_t target)
         cpu_boost(true);
         rc = ts_rewind(tv.src);
         cpu_boost(false);
-        if (rc != TS_OK)
+        if (rc != BS_OK)
             return false;
         tv.win_start = 0;
         tv.win_len = 0;
@@ -884,7 +884,7 @@ bool text_viewer_convert_places(const char *text_file)
 static bool tv_open(const char *file)
 {
     ts_config cfg = ts_config_default();
-    ts_io io;
+    bs_io io;
     void *arena;
     int rc;
 
@@ -914,7 +914,7 @@ static bool tv_open(const char *file)
     tv.stack = core_get_data(tv.stack_handle);
     tv.sp = 0;
 
-    if (ts_io_core(&io, &tv.file, file) != TS_OK)
+    if (ts_io_core(&io, &tv.file, file) != BS_OK)
         return false;
 
     /* Through the vtable rather than ffilesize(): coreio_size() restores the
@@ -925,7 +925,7 @@ static bool tv_open(const char *file)
     cpu_boost(true);
     rc = ts_open(&tv.src, &io, file, arena, TS_ARENA_RECOMMENDED, &cfg);
     cpu_boost(false);
-    if (rc != TS_OK)
+    if (rc != BS_OK)
     {
         /* ts_open() takes the fd on success only, so close it ourselves. */
         io.close(io.ctx);
