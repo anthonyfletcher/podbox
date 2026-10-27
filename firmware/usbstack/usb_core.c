@@ -1084,7 +1084,6 @@ static int usb_core_do_set_config(uint8_t new_config)
 
     /* activate new config */
     if(usb_config != 0) {
-        usb_log_sync();
         init_deinit_endpoints(usb_config, true);
         for(int i = 0; i < USB_NUM_DRIVERS; i++) {
             if(!is_active(drivers[i])) {

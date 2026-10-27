@@ -163,7 +163,7 @@ iAP2.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/logs/usb.log` while the debug screen is open or **System → Debug Logs → USB and Accessory Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
+| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/logs/usb.log` while the debug screen is open or **System → Debug Logs → USB and Accessory Log** is on; `usb_log_sync()` waits for the file before a stream start | A USB fault is gone by the time anything could look at it. Not before a configuration change: the host allows that 50 ms, and a Volvo XC60 resent it after a second and reset the bus. |
 | `export/usb.h`, `usb.c` | The insertion record and waypoints | **Debug → USB info**: whether a connect that did nothing was charging-only or a stuck handover. |
 | `usbstack/usb_core.c` | `usb_log()` calls and waypoints in the handlers | Not on the notify path: the ARC driver calls `usb_core_bus_reset()` from its ISR and posts nothing. |
 | `usbstack/usb_core.c`, `export/usb_log.h` | A control response with no request waiting for it is logged (`USB_LOG_RESP_LATE`) and dropped | Upstream panics. A handler that outlasts the host's five seconds answers a request the host has abandoned, and a car then crashed the player. |
