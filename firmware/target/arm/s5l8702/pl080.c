@@ -466,6 +466,19 @@ void dmac_ch_stop(struct dmac_ch* ch)
     restore_irq(flags);
 }
 
+/* With interrupts off, the channel's finished task is taken here as
+ * dmac_callback() would take it */
+void dmac_ch_poll(struct dmac_ch *ch)
+{
+    uint32_t baddr = ch->dmac->baddr;
+
+    if (DMACINTTCSTS(baddr) & (1 << ch->prio))
+    {
+        DMACINTTCCLR(baddr) = 1 << ch->prio;
+        dmac_ch_callback(ch);
+    }
+}
+
 bool dmac_ch_running(struct dmac_ch *ch)
 {
     PANIC_DEBUG_CHANNEL(ch);

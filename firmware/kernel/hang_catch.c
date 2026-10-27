@@ -77,8 +77,8 @@ static const struct thread_entry *hang_thread;
 static uint32_t hang_pc, hang_sp, hang_lr;
 
 /* The report goes to the USB log first, and waits up to three seconds for
- * the log's writer: drawing on the 6G yields while the LCD's DMA runs, and
- * the screen it was drawing can then be drawn over. */
+ * the log's writer: once interrupts are off for the screen, nothing else
+ * runs. */
 static void hang_log(const struct thread_entry *t, const uint32_t *calls,
                      int n)
 {
@@ -99,8 +99,8 @@ static void hang_log(const struct thread_entry *t, const uint32_t *calls,
 }
 
 /* Entered by the stuck thread itself, as the tick returned it here rather
- * than to its loop: drawing from the tick would wait on the 6G's LCD DMA,
- * which does not finish inside an interrupt. */
+ * than to its loop: the report waits on the log's writer, which an
+ * interrupt cannot. */
 static void NORETURN_ATTR hang_show(void)
 {
     const struct thread_entry *t = hang_thread;

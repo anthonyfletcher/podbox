@@ -398,11 +398,24 @@ static void displaylcd_dma(int pixels)
 }
 
 // TODO: wait if there is a DMA transfer in progress
+/* With interrupts off, as a panic or a crash draws, no completion
+ * interrupt comes and no other thread may run: the end is polled for, for
+ * 50 ms, ten times a full screen's transfer, and a channel that has not
+ * finished by then is stopped, as the crash may be the DMA's own */
 static void displaylcd_wait_dma(void) ICODE_ATTR;
 static void displaylcd_wait_dma(void)
 {
+    unsigned long stop = USEC_TIMER + 50000;
+
     while (dmac_ch_running(&lcd_dma_ch))
-        yield();
+    {
+        if (irq_enabled())
+            yield();
+        else if (TIME_BEFORE(USEC_TIMER, stop))
+            dmac_ch_poll(&lcd_dma_ch);
+        else
+            dmac_ch_stop(&lcd_dma_ch);
+    }
 }
 
 /* Update a fraction of the display. */
@@ -415,9 +428,11 @@ void lcd_update_rect(int x, int y, int width, int height)
 #endif
     fb_data* p = FBADDR(x,y);
     uint16_t* out = lcd_dblbuf[0];
+    /* the lock's holder cannot run with interrupts off */
+    bool lock = irq_enabled();
 
-    /* FIXME: ISR()->panicf()->lcd_update() blocks forever */
-    mutex_lock(&lcd_mutex);
+    if (lock)
+        mutex_lock(&lcd_mutex);
     if (lcd_ispowered)
     {
         // XXX: We contemplate the case where the LCD has entered SLEEP,
@@ -449,7 +464,8 @@ void lcd_update_rect(int x, int y, int width, int height)
 #endif
         displaylcd_dma(pixels);
     }
-    mutex_unlock(&lcd_mutex);
+    if (lock)
+        mutex_unlock(&lcd_mutex);
 }
 
 /* Line write helper function for lcd_yuv_blit. Writes two lines of yuv420. */
