@@ -1481,11 +1481,14 @@ int text_viewer_contents(void)
 /* When the volume shown over the page is due to go, or 0 when none is */
 static long tv_volume_until;
 
-/* The wheel sets the volume, of Read Aloud or of music playing behind the
- * book, and shows it over the page for a second. */
+/* With Read Aloud on, the wheel sets the volume and shows it over the page
+ * for a second; otherwise it does nothing. */
 static void tv_volume(int steps)
 {
     char val[32];
+
+    if (global_settings.text_viewer_read_aloud == TV_READ_OFF)
+        return;
 
     adjust_volume(steps);
     setvol();
