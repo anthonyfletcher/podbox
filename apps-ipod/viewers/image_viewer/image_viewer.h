@@ -132,6 +132,10 @@ extern bool iv_slideshow_enabled;   /* run slideshow */
  * size, and DS_FIT is then never asked for. */
 extern int iv_fit_width, iv_fit_height;
 
+/* AA_FLAG_ID3_UNSYNC or AA_FLAG_VORBIS_BASE64 when the image being loaded is
+ * art embedded in a track whose bytes need undoing; 0 for an image file. */
+extern unsigned iv_src_flags;
+
 /* For decoders that cannot scale to an arbitrary size in one pass: the integer
  * downscale to render before resampling down to the fit size. */
 int iv_fit_source_ds(int x_size, int y_size);

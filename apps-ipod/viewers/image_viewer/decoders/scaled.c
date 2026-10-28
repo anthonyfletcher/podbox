@@ -4,8 +4,10 @@
  * BMP image viewer (core build, ported from the imageviewer plugin).
  * GNU General Public License (version 2+)
  *
- * BMP back end for the image viewer, wrapping the core BMP reader in the
- * decoder vtable.
+ * The image viewer's back end for every image the core readers decode
+ * through image_load(): BMP and PNG files, and now-playing art embedded in
+ * a track, whatever its format. The image is decoded once, halved until it
+ * fits the buffer, and the other zoom levels are made from that bitmap.
  ****************************************************************************/
 
 #include <string.h>
@@ -14,8 +16,9 @@
 #include "file.h"
 #include "kernel.h"
 #include "logf.h"
-#include "draw/bmp.h"        /* struct bitmap, read_bmp_fd, FORMAT_* */
+#include "draw/bmp.h"        /* struct bitmap, FORMAT_* */
 #include "draw/resize.h"     /* format_native */
+#include "draw/image_load.h"
 #include "../image_viewer.h"
 
 /************************* Types ***************************/
@@ -67,8 +70,7 @@ static int load_image(char *filename, struct image_info *info,
                       unsigned char *buf, ssize_t *buf_size,
                       int offset, int filesize)
 {
-    (void)filesize;
-    int fd;
+    struct image_src src;
     int size;
     int format = FORMAT_NATIVE;
     const struct custom_format *cformat = &format_native;
@@ -81,21 +83,23 @@ static int load_image(char *filename, struct image_info *info,
         *buf_size -= 4-((intptr_t)buf&3);
         buf += 4-((intptr_t)buf&3);
     }
-    fd = open(filename, O_RDONLY);
-    if (fd < 0)
+    src.fd = open(filename, O_RDONLY);
+    if (src.fd < 0)
     {
-        logf("bmp: open failed, %d", fd);
+        logf("scaled: open failed, %d", src.fd);
         splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
-    if (offset)
-    {
-        lseek(fd, offset, SEEK_SET);
-    }
+    src.pos = offset;
+    src.len = offset ? filesize : -1;
+    src.flags = iv_src_flags;
 
     int ds = 1;
-    /* check size of image needed to load image. */
-    size = read_bmp_fd(fd, &bmp, 0, format | FORMAT_RETURN_SIZE, cformat);
+    /* check size of image needed to load image. The readers work in the
+     * buffer even to answer this, so it is passed. */
+    bmp.data = buf;
+    size = image_load(&src, &bmp, *buf_size, format | FORMAT_RETURN_SIZE,
+                      cformat);
     while (size > *buf_size && bmp.width >= 2 && bmp.height >= 2 && ds < 8)
     {
         /* too large for the buffer. resize on load. */
@@ -103,36 +107,32 @@ static int load_image(char *filename, struct image_info *info,
         ds *= 2;
         bmp.width /= 2;
         bmp.height /= 2;
-        lseek(fd, 0, SEEK_SET);
-        size = read_bmp_fd(fd, &bmp, 0, format | FORMAT_RETURN_SIZE, cformat);
+        size = image_load(&src, &bmp, *buf_size, format | FORMAT_RETURN_SIZE,
+                          cformat);
     }
     if (size <= 0)
     {
-        close(fd);
-        logf("bmp: size probe failed, %d", size);
+        close(src.fd);
+        logf("scaled: size probe failed, %d", size);
         splashf(HZ * 3, "Could not read %s", filename);
         return PLUGIN_ERROR;
     }
 
     if (size > *buf_size)
     {
-        close(fd);
+        close(src.fd);
         return PLUGIN_OUTOFMEM;
     }
 
-    /* allocate bitmap buffer */
-    bmp.data = buf;
-
     /* actual loading */
-    lseek(fd, 0, SEEK_SET);
     cpu_boost(true);
-    size = read_bmp_fd(fd, &bmp, *buf_size, format, cformat);
+    size = image_load(&src, &bmp, *buf_size, format, cformat);
     cpu_boost(false);
-    close(fd);
+    close(src.fd);
 
     if (size <= 0)
     {
-        logf("bmp: decode failed, %d", size);
+        logf("scaled: decode failed, %d", size);
         splashf(HZ * 3, "Could not decode %s", filename);
         return PLUGIN_ERROR;
     }
@@ -206,7 +206,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     return PLUGIN_OK;
 }
 
-const struct image_decoder bmp_decoder = {
+const struct image_decoder scaled_decoder = {
     true,
     img_mem,
     load_image,

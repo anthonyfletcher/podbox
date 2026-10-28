@@ -69,7 +69,8 @@
 #include "events.h"          /* add_event/remove_event, SYS_EVENT_USB_INSERTED */
 #include "audio.h"           /* audio_current_track, audio_status, audio_hard_stop */
 #include "metadata/albumart.h"        /* search_albumart_files */
-#include "metadata.h"        /* AA_TYPE_*, AA_CLEAR_FLAGS_MASK */
+#include "metadata.h"        /* AA_CLEAR_FLAGS_MASK */
+#include "draw/image_load.h"  /* image_embedded_usable */
 #include "image_viewer.h"
 #include "image_viewer_pub.h"
 #include "image_decoder.h"
@@ -118,6 +119,7 @@ static struct image_info image_info;
 
 /* Size of the DS_FIT rendering; 0 when this picture has no fit rung. */
 int iv_fit_width = 0, iv_fit_height = 0;
+unsigned iv_src_flags;
 
 /* Zoom / Pan mode: false is the navigation key map, where Left and Right move
  * between pictures and a tap of Menu leaves. Session state, kept across a move
@@ -1104,32 +1106,24 @@ reload_decoder:
     return status;
 }
 
+/* The playing track's art: what it embeds, or an image file beside it when
+ * it embeds none the readers take or image files are preferred. Embedded art
+ * goes through image_load(), which undoes its encoding and reads it as what
+ * it is. */
 static bool find_album_art(int *offset, int *filesize, int *status)
 {
     struct mp3entry *current_track = audio_current_track();
+    bool embedded;
 
     if (current_track == NULL)
     {
         return false;
     }
 
-    switch (current_track->albumart.type & AA_CLEAR_FLAGS_MASK)
-    {
-        case AA_TYPE_BMP:
-            (*status) = IMAGE_BMP;
-            break;
-        case AA_TYPE_PNG:
-            (*status) = IMAGE_PNG;
-            break;
-        case AA_TYPE_JPG:
-            (*status) = IMAGE_JPEG;
-            break;
-        default:
-            (*status) = IMAGE_UNKNOWN;
-    }
-
-    if (IMAGE_UNKNOWN == *status
-        || AA_PREFER_IMAGE_FILE == global_settings.album_art)
+    embedded = current_track->has_embedded_albumart
+               && image_embedded_usable(current_track->albumart.type);
+    iv_src_flags = 0;
+    if (!embedded || AA_PREFER_IMAGE_FILE == global_settings.album_art)
     {
         if (search_albumart_files(current_track, "", np_file, MAX_PATH))
         {
@@ -1137,12 +1131,14 @@ static bool find_album_art(int *offset, int *filesize, int *status)
             return true;
         }
 
-        if (*status == IMAGE_UNKNOWN)
+        if (!embedded)
             return false;
     }
     strcpy(np_file, current_track->path);
     (*offset) = current_track->albumart.pos;
     (*filesize) = current_track->albumart.size;
+    iv_src_flags = current_track->albumart.type & ~AA_CLEAR_FLAGS_MASK;
+    (*status) = IMAGE_EMBEDDED;
     return true;
 }
 
@@ -1314,6 +1310,7 @@ int image_viewer(const char *file)
     }
     else
     {
+        iv_src_flags = 0;
         strlcpy(np_file, file, sizeof(np_file));
         if ((status = get_image_type(np_file, false)) == IMAGE_UNKNOWN)
         {

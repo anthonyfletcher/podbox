@@ -19,12 +19,13 @@
 /* Static decoder table, indexed by enum image_type. IMAGE_JPEG_PROGRESSIVE is
  * reached from the baseline decoder when it detects a progressive stream. */
 static const struct image_decoder * const decoders[MAX_IMAGE_TYPES] = {
-    [IMAGE_BMP]              = &bmp_decoder,
+    [IMAGE_BMP]              = &scaled_decoder,
     [IMAGE_JPEG]             = &jpeg_decoder,
-    [IMAGE_PNG]              = &png_decoder,
+    [IMAGE_PNG]              = &scaled_decoder,
     [IMAGE_PPM]             = &ppm_decoder,
     [IMAGE_GIF]              = &gif_decoder,
     [IMAGE_JPEG_PROGRESSIVE] = &jpegp_decoder,
+    [IMAGE_EMBEDDED]         = &scaled_decoder,
 };
 
 const struct image_decoder *get_image_decoder(enum image_type type)
@@ -61,7 +62,7 @@ enum image_type get_image_type(const char *name, bool quiet)
         enum image_type type;
     } magic_list[] = {
         { "BM", 2, IMAGE_BMP },
-        { "\xff\xd8\xff\xe0", 4, IMAGE_JPEG },
+        { "\xff\xd8\xff", 3, IMAGE_JPEG },        /* JFIF, Exif or bare */
         { "\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", 8, IMAGE_PNG },
         { "P3", 2, IMAGE_PPM },
         { "P6", 2, IMAGE_PPM },
