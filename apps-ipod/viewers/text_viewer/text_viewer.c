@@ -1467,16 +1467,21 @@ static int tv_menu(void)
 {
     int sel = 0, ret;
 
+    /* The menu silences the page, and the page is read again from its top
+     * once the menu closes, so the menu also pauses Read Aloud */
+    talk_force_shutup();
+    tv_reading = false;
     viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
     push_current_activity(ACTIVITY_CONTEXTMENU);
     ret = do_menu(&text_viewer_menu, &sel, NULL, false);
     pop_current_activity();
     viewportmanager_theme_undo(SCREEN_MAIN, false);
 
+    if (ret == MENU_ATTACHED_USB)
+        return ret;
     tv_apply_settings();
     tv_draw();
-    if (ret == 1)
-        tv_speak_page();            /* a chapter picked from the contents */
+    tv_speak_page();
     return ret;
 }
 
