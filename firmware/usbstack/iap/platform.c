@@ -783,6 +783,21 @@ void iap_platform_on_audio_attrs_ack(struct IAPContext* iap_ctx, IAPBool success
     iap_audio_attrs_ack(success);
 }
 
+/* Into the USB log eight bytes a line, hex and text, to read an accessory's
+ * name and versions in place */
+void iap_platform_on_acc_info(struct IAPContext* iap_ctx, const struct IAPSpan* info) {
+    (void)iap_ctx;
+    const size_t n = MIN(info->size, 64);
+    for(size_t off = 0; off < n; off += 8) {
+        uint32_t c = 0, d = 0;
+        for(size_t i = 0; i < 4; i++) {
+            c = c << 8 | (off + i < n ? info->ptr[off + i] : 0);
+            d = d << 8 | (off + 4 + i < n ? info->ptr[off + 4 + i] : 0);
+        }
+        usb_log(USB_LOG_IAP2_PARAMS, MIN(n - off, 8), off, c, d);
+    }
+}
+
 uint8_t _iap_convert_play_status(int rb_audio_status) {
     if(rb_audio_status & AUDIO_STATUS_PAUSE) {
         return IAPIPodStatePlayStatus_PlaybackPaused;

@@ -156,6 +156,8 @@ IAPBool iap_platform_get_track_chapter(struct IAPContext* iap_ctx, uint32_t trac
 /* other callbacks */
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs);
 void    iap_platform_on_audio_attrs_ack(struct IAPContext* iap_ctx, IAPBool success);
+/* RetAccessoryInfo's payload, whole, before it is read */
+void    iap_platform_on_acc_info(struct IAPContext* iap_ctx, const struct IAPSpan* info);
 
 /* debugging */
 void iap_platform_dump_hex(const void* ptr, size_t size);

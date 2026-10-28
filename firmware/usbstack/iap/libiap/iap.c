@@ -360,6 +360,32 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
              * until acked; extended mode is always on, so both succeed */
             return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
+        case IAPGeneralCommandID_RetAccessoryInfo: {
+            /* the strings in it are for the log alone */
+            iap_platform_on_acc_info(ctx, request_span);
+            uint8_t type;
+            check_ret(iap_span_read_8(request_span, &type), -IAPAckStatus_EBadParameter);
+            if(type == IAPAccInfoType_AccInfoCaps) {
+                uint32_t caps;
+                check_ret(iap_span_read_32(request_span, &caps), -IAPAckStatus_EBadParameter);
+                /* name, firmware, hardware, manufacturer, model, serial
+                 * number and payload size: the items asked with no
+                 * argument */
+                const uint32_t simple = 1 << IAPAccInfoType_AccName |
+                                        0x1F << IAPAccInfoType_FirmwareVersion |
+                                        1 << IAPAccInfoType_MaxPayloadSize;
+                ctx->acc_info_caps = caps & simple;
+            }
+            const uint32_t left = ctx->acc_info_caps & ~ctx->acc_info_asked;
+            if(left == 0) {
+                response_span->ptr = NULL;
+                return 0;
+            }
+            alloc_response(IAPGetAccInfoPayload);
+            response->type = __builtin_ctz(left);
+            ctx->acc_info_asked |= 1 << response->type;
+            return IAPGeneralCommandID_GetAccessoryInfo;
+        } break;
         case IAPGeneralCommandID_RequestIPodName: {
             check_ret(
                 iap_platform_get_ipod_name(ctx, response_span),
@@ -1296,6 +1322,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
 }
 
 static IAPBool send_sample_rate_caps_cb(struct IAPContext* ctx);
+static IAPBool send_acc_info_caps_cb(struct IAPContext* ctx);
 
 static IAPBool transition_idps_to_auth_cb(struct IAPContext* ctx) {
     print("starting accessory authentication");
@@ -1310,6 +1337,10 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
         switch(command) {
         case IAPGeneralCommandID_IdentifyDeviceLingoes: {
             read_request(IAPIdentifyDeviceLingoesPayload);
+            ctx->by_lingoes     = iap_true;
+            ctx->display_remote = (swap_32(request->lingoes_bits) & IAPIdentifyDeviceLingoesLingoBits_DisplayRemote) != 0;
+            ctx->acc_info_caps  = 0;
+            ctx->acc_info_asked = 0;
             switch(swap_32(request->options) & IAPIdentifyDeviceLingoesOptions_AuthMask) {
             case IAPIdentifyDeviceLingoesOptions_NoAuth:
                 /* The rates are asked for once authenticated, so digital
@@ -1395,6 +1426,39 @@ static IAPBool send_sample_rate_caps_cb(struct IAPContext* ctx) {
     return iap_true;
 }
 
+/* A Display Remote that identified by IdentifyDeviceLingoes is told the
+ * volume once authenticated, unasked, as RetIPodStateInfo: a speaker dock
+ * that never subscribes plays nothing until told. Trap: a
+ * RemoteEventNotification it did not subscribe to makes the dock reset the
+ * bus. */
+static IAPBool send_volume_cb(struct IAPContext* ctx) {
+    struct IAPPlatformVolumeStatus status;
+    check_ret(iap_platform_get_volume(ctx, &status), iap_false);
+    struct IAPSpan                    request = _iap_get_buffer_for_send_payload(ctx);
+    struct IAPIPodStateVolumePayload* payload = iap_span_alloc(&request, sizeof(*payload));
+    check_ret(payload != NULL, iap_false);
+    payload->type       = IAPIPodStateType_Volume;
+    payload->mute_state = status.muted;
+    payload->ui_volume  = status.volume;
+    check_ret(_iap_send_packet(ctx, IAPLingoID_DisplayRemote, IAPDisplayRemoteCommandID_RetIPodStateInfo, _iap_next_trans_id(ctx), request.ptr), iap_false);
+    ctx->on_send_complete = send_acc_info_caps_cb;
+    return iap_true;
+}
+
+/* An accessory that identified by IdentifyDeviceLingoes is asked what it
+ * can say about itself, as the serial side asks one, before the rates; each
+ * RetAccessoryInfo then asks for the next item it offers. */
+static IAPBool send_acc_info_caps_cb(struct IAPContext* ctx) {
+    struct IAPSpan               request = _iap_get_buffer_for_send_payload(ctx);
+    struct IAPGetAccInfoPayload* payload = iap_span_alloc(&request, sizeof(*payload));
+    check_ret(payload != NULL, iap_false);
+    payload->type        = IAPAccInfoType_AccInfoCaps;
+    ctx->acc_info_asked |= 1 << IAPAccInfoType_AccInfoCaps;
+    check_ret(_iap_send_packet(ctx, IAPLingoID_General, IAPGeneralCommandID_GetAccessoryInfo, _iap_next_trans_id(ctx), request.ptr), iap_false);
+    ctx->on_send_complete = send_sample_rate_caps_cb;
+    return iap_true;
+}
+
 static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t command, struct IAPSpan* request_span, struct IAPSpan* response_span) {
     switch(lingo) {
     case IAPLingoID_General:
@@ -1438,7 +1502,9 @@ static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             response->status = IAPAckStatus_Success;
 
             ctx->phase            = IAPPhase_Authed;
-            ctx->on_send_complete = send_sample_rate_caps_cb;
+            ctx->on_send_complete = ctx->display_remote ? send_volume_cb
+                                  : ctx->by_lingoes     ? send_acc_info_caps_cb
+                                                        : send_sample_rate_caps_cb;
 
             return IAPGeneralCommandID_AckAccessoryAuthenticationStatus;
         } break;
