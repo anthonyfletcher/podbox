@@ -651,10 +651,12 @@ static void batch_xfer_complete(void) {
     batch_get_and_send();
 }
 
-void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed)
+void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed,
+                               uint32_t *buffer_errors)
 {
     const int irq = disable_irq_save();
     *ran_empty = 0;
+    *buffer_errors = 0;
     *failed = batch_failed;
     batch_failed = 0;
     restore_irq(irq);

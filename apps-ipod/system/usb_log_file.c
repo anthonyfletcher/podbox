@@ -238,7 +238,8 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
             snprintf(p, size, "audio: %lu USB packets failed", d);
 #else
             snprintf(p, size, "audio: the USB queue ran empty %lu times, "
-                     "%lu USB packets failed", c, d);
+                     "%lu USB packets failed, %u of them not read from "
+                     "memory in time", c, d, e->b);
 #endif
             break;
         case USB_LOG_IAP2_RECONNECT:

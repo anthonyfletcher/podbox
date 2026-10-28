@@ -265,7 +265,8 @@ static inline void usb_log_iap_error_args(int unused, ...)
                                      * packets of silence, d = how far the
                                      * track's position moved, ms */
 #define USB_LOG_IAP2_AUDIO_USB   18 /* c = times the USB queue ran empty,
-                                     * d = packets that failed */
+                                     * d = packets that failed, b = of
+                                     * those, buffer errors */
 
 #define USB_LOG_IAP_ART_REPORTED 0 /* told the accessory whether it has art */
 #define USB_LOG_IAP_ART_SENT     1 /* the accessory asked, and it is sent */

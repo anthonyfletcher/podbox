@@ -1442,7 +1442,7 @@ static uint8_t batch_ep = 0;
 static uint8_t batch_write_cursor;
 static bool batch_stopped;
 static usb_drv_batch_get_more batch_get_more;
-static volatile uint32_t batch_ran_empty, batch_failed;
+static volatile uint32_t batch_ran_empty, batch_failed, batch_buffer_errors;
 
 static int ep_to_pipe_index(uint8_t ep) {
     const int ep_num = EP_NUM(ep);
@@ -1489,6 +1489,8 @@ static int batch_fill_tds(void) {
         struct transfer_descriptor* td = &batch_td_array[batch_write_cursor];
         if(td->size_ioc_sts & DTD_ERROR_MASK)
             batch_failed++;
+        if(td->size_ioc_sts & DTD_STATUS_DATA_BUFF_ERR)
+            batch_buffer_errors++;
         td_set_buf_ptr(td, ptr);
         td->size_ioc_sts = (len << DTD_LENGTH_BIT_POS) | DTD_STATUS_ACTIVE;
         batch_write_cursor = (batch_write_cursor + 1)  % USB_BATCH_SLOTS;
@@ -1550,12 +1552,14 @@ int usb_drv_batch_stop(void) {
     return 0;
 }
 
-void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed)
+void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed,
+                               uint32_t *buffer_errors)
 {
     const int irq = disable_irq_save();
     *ran_empty = batch_ran_empty;
     *failed = batch_failed;
-    batch_ran_empty = batch_failed = 0;
+    *buffer_errors = batch_buffer_errors;
+    batch_ran_empty = batch_failed = batch_buffer_errors = 0;
     restore_irq(irq);
 }
 

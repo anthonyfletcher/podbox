@@ -364,18 +364,18 @@ static void watch_report(const struct IAPContext* ctx) {
  * zeros: the host is not reading it. */
 static void log_audio_counts(void) {
     struct iap_audio_counts c;
-    uint32_t                ran_empty, failed;
+    uint32_t                ran_empty, failed, buffer_errors;
     if(!TIME_AFTER(current_tick, counts_tick + 5 * HZ)) {
         return;
     }
     const struct mp3entry* id3     = audio_current_track();
     const unsigned long    elapsed = id3 ? id3->elapsed : 0;
     iap_audio_take_counts(&c);
-    usb_drv_batch_take_counts(&ran_empty, &failed);
+    usb_drv_batch_take_counts(&ran_empty, &failed, &buffer_errors);
     if(c.bytes || c.silent || c.on) {
         usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_TAKEN, MIN((current_tick - counts_tick) * 1000 / HZ, 0xffff), c.bytes, c.chunks);
         usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_GAPS, MIN(c.odd, 0xffff), c.silent, elapsed - counts_elapsed);
-        usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_USB, 0, ran_empty, failed);
+        usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_USB, MIN(buffer_errors, 0xffff), ran_empty, failed);
     }
     counts_tick    = current_tick;
     counts_elapsed = elapsed;

@@ -282,9 +282,11 @@ int usb_drv_batch_start(void);
 /* stop processing */
 int usb_drv_batch_stop(void);
 /* since the last call: times every queued packet had gone out before the
- * queue was refilled (always 0 where only one packet is queued), and
- * packets the controller finished with an error */
-void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed);
+ * queue was refilled (always 0 where only one packet is queued), packets
+ * the controller finished with an error, and of those, how many it could
+ * not read from memory in time (0 where it does not say) */
+void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed,
+                               uint32_t *buffer_errors);
 
 /* USB_STRING_INITIALIZER(u"Example String") */
 #define USB_STRING_INITIALIZER(S) { \
