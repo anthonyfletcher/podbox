@@ -9,24 +9,36 @@
  * One libfile of marks that each say their length, newest first. Marks are
  * made by hand, so every change simply rewrites the file.
  *
+ * Rockbox's own bookmarks are carried over once, the first time the store is
+ * used with the database in RAM and no file of its own yet: the database is
+ * what says which book a bookmarked track belongs to.
+ *
  * Parts, in order:
  *   - the record, and reading marks out of the file
  *   - rewriting the file
+ *   - carrying over Rockbox's bookmarks
  *   - adding, listing and deleting
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "config.h"
 #include "kernel.h"
 #include "file.h"
+#include "dir.h"
+#include "rbpaths.h"
 #include "string-extra.h"
 #include "metadata.h"
 #include "database/libfile.h"
+#include "database/path_key.h"
+#include "database/tagcache.h"
 #include "metadata/book_marks.h"
 #include "metadata/book_resume.h"
+#include "settings/settings.h"
 #include "system/format_time.h"
 #include "system/library_files.h"
+#include "system/strutil.h"     /* read_line */
 
 #define MARKS_FILE  LIB_BOOKMARKS_FILE
 
@@ -177,6 +189,232 @@ static void lock(void)
 }
 
 /* ------------------------------------------------------------------ *
+ * carrying over Rockbox's bookmarks                                  *
+ * ------------------------------------------------------------------ */
+
+/* Rockbox kept a bookmark file beside each folder or playlist it bookmarked,
+ * named after it with ".bmark" added, and the newest few in one more. A line
+ * is ">flags;index;offset;seed;elapsed;repeat;shuffle;", then the pitch and
+ * the speed where the flags say so, then the playlist and the track. A line
+ * with no '>' is the older form, with one more number after the seed. The
+ * track is a name in the playlist's folder when the playlist is a folder,
+ * ending in '/', and a full path otherwise. */
+#define BMARK_RECENT    ROCKBOX_DIR "/most-recent.bmark"
+#define BMARK_ROOT      "/root_dir.bmark"
+#define BMARK_PITCH     0x01
+#define BMARK_SPEED     0x02
+#define BMARK_NUMBERS   7
+
+/* The files found, read once the database search that finds them is over */
+#define BMARK_FILES_MAX 32
+static char bmark_files[BMARK_FILES_MAX][MAX_PATH];
+static int bmark_file_ct;
+
+static struct tagcache_search_clause spoken_clause = {
+    .tag = tag_virt_spoken,
+    .type = clause_is,
+    .numeric = true,
+    .source = source_constant,
+    .numeric_data = 1,
+};
+
+static void note_bmark(const char *path)
+{
+    if (bmark_file_ct < BMARK_FILES_MAX && file_exists(path))
+        strmemccpy(bmark_files[bmark_file_ct++], path, MAX_PATH);
+}
+
+static void find_bmarks(void)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    char last[MAX_PATH] = "";
+    char file[MAX_PATH];
+    const char *dirname = global_settings.playlist_catalog_dir[0]
+                          ? (const char *)global_settings.playlist_catalog_dir
+                          : PLAYLIST_CATALOG_DEFAULT_DIR;
+    struct dirent *de;
+    DIR *dir;
+
+    bmark_file_ct = 0;
+    note_bmark(BMARK_RECENT);
+    note_bmark(BMARK_ROOT);
+
+    /* Beside each book's folder: one check a folder, no walk of the disk */
+    if (tagcache_search(&tcs, tag_filename))
+    {
+        tagcache_search_add_clause(&tcs, &spoken_clause);
+        while (tagcache_get_next(&tcs, path, sizeof(path)))
+        {
+            char *slash = strrchr(path, '/');
+
+            if (slash == NULL || slash == path)
+                continue;
+            *slash = '\0';
+            if (strcmp(path, last) == 0)
+                continue;
+            strmemccpy(last, path, sizeof(last));
+            snprintf(file, sizeof(file), "%s.bmark", path);
+            note_bmark(file);
+        }
+        tagcache_search_finish(&tcs);
+    }
+
+    /* Beside the saved playlists */
+    dir = opendir(dirname);
+    if (dir == NULL)
+        return;
+    while ((de = readdir(dir)) != NULL)
+    {
+        size_t len = strlen(de->d_name);
+
+        if (len > 6 && strcasecmp(de->d_name + len - 6, ".bmark") == 0)
+        {
+            snprintf(file, sizeof(file), "%s/%s", dirname, de->d_name);
+            note_bmark(file);
+        }
+    }
+    closedir(dir);
+}
+
+/* The next ';'-separated field, consuming it; NULL when there is none */
+static char *bmark_field(char **p)
+{
+    char *field = *p;
+    char *sep;
+
+    if (field == NULL)
+        return NULL;
+    sep = strchr(field, ';');
+    if (sep != NULL)
+    {
+        *sep = '\0';
+        *p = sep + 1;
+    }
+    else
+        *p = NULL;
+    return field;
+}
+
+/* The book the track at 'path' is in, and the track's title; 0 if it is in
+ * none. A book's tracks are all spoken word, which an album of music with
+ * one spoken track is not. */
+static uint64_t book_of_track(const char *path, char *title, size_t size)
+{
+    struct tagcache_search tcs;
+    struct tagcache_album al;
+    char id[BOOK_ID_MAX];
+    int idx = tagcache_find_path(path);
+
+    if (idx < 0 || !tagcache_album_get(tagcache_album_of(idx), &al)
+        || al.spoken != al.tracks
+        || !book_resume_id_of(al.album_seek, al.artist_seek, id, sizeof(id)))
+        return 0;
+
+    title[0] = '\0';
+    if (tagcache_search(&tcs, tag_title))
+    {
+        tagcache_retrieve(&tcs, idx, tag_title, title, size);
+        tagcache_search_finish(&tcs);
+    }
+    if (strcmp(title, UNTAGGED) == 0)
+        title[0] = '\0';
+
+    /* A track with no album is a book of its own, keyed by its path */
+    return strncmp(id, UNTAGGED "\t", sizeof(UNTAGGED)) == 0
+           ? path_key(path) : book_resume_key(id);
+}
+
+/* The bookmarks in one .bmark file that are in a book, as marks. How many. */
+static int import_file(const char *file)
+{
+    static char line[2 * MAX_PATH];
+    char track[MAX_PATH];
+    char title[BOOK_MARK_LABEL_MAX];
+    int fd = open(file, O_RDONLY);
+    int added = 0;
+
+    if (fd < 0)
+        return 0;
+
+    while (read_line(fd, line, sizeof(line)) > 0)
+    {
+        bool newer = line[0] == '>';
+        char *p = line + newer;
+        char *num[BMARK_NUMBERS + 2];
+        char *playlist;
+        int want = BMARK_NUMBERS;
+        int i;
+        uint64_t book;
+
+        for (i = 0; i < want; i++)
+        {
+            num[i] = bmark_field(&p);
+            if (num[i] == NULL)
+                break;
+            if (i == 0 && newer)
+            {
+                int flags = atoi(num[0]);
+
+                want += !!(flags & BMARK_PITCH) + !!(flags & BMARK_SPEED);
+            }
+        }
+        playlist = bmark_field(&p);
+        if (i < want || playlist == NULL || p == NULL || *p == '\0')
+            continue;
+
+        if (playlist[0] != '\0' && playlist[strlen(playlist) - 1] == '/')
+            snprintf(track, sizeof(track), "%s%s", playlist, p);
+        else
+            strmemccpy(track, p, sizeof(track));
+
+        book = book_of_track(track, title, sizeof(title));
+        if (book != 0
+            && book_marks_add(book, track, strtoul(num[4], NULL, 10),
+                              strtoul(num[newer ? 2 : 1], NULL, 10), title))
+            added++;
+    }
+
+    close(fd);
+    return added;
+}
+
+/* Once: Rockbox's bookmarks in books become marks. The file is written even
+ * with none, so that its being there says this has been done. A mark made
+ * before the database is first in RAM writes the file too, and the carry-over
+ * is then skipped; that is the first moments of the first boot only. */
+static void import_once(void)
+{
+    static bool checked;
+    struct copy_ctx none = { .path = "" };
+    int added = 0;
+
+    if (checked || tagcache_album_count() == 0)
+        return;
+    checked = true;
+    if (file_exists(MARKS_FILE))
+        return;
+
+    find_bmarks();
+    for (int i = 0; i < bmark_file_ct; i++)
+    {
+        int n = import_file(bmark_files[i]);
+
+        library_files_log("bookmarks: %d from %s", n, bmark_files[i]);
+        added += n;
+    }
+    if (!file_exists(MARKS_FILE))
+    {
+        lock();
+        rewrite(&none, NULL);
+        mutex_unlock(&marks_mutex);
+    }
+    if (bmark_file_ct > 0)
+        library_files_log("bookmarks: %d carried over from %d files", added,
+                          bmark_file_ct);
+}
+
+/* ------------------------------------------------------------------ *
  * adding, listing and deleting                                       *
  * ------------------------------------------------------------------ */
 
@@ -214,6 +452,7 @@ bool book_marks_add_playing(void)
     unsigned long elapsed, offset;
     struct mp3entry *id3 = book_resume_loaded(id, sizeof(id));
 
+    import_once();
     if (id3 == NULL)
         return false;
     strmemccpy(path, id3->path, sizeof(path));
@@ -246,6 +485,7 @@ void book_marks_each(const char *book, book_marks_fn fn, void *data)
 {
     struct each_ctx ctx = { book_resume_key(book), fn, data, false };
 
+    import_once();
     lock();
     scan(each_one, &ctx);
     mutex_unlock(&marks_mutex);
@@ -255,6 +495,7 @@ bool book_marks_any(const char *book)
 {
     struct each_ctx ctx = { book_resume_key(book), NULL, NULL, false };
 
+    import_once();
     lock();
     scan(each_one, &ctx);
     mutex_unlock(&marks_mutex);
@@ -268,6 +509,7 @@ bool book_marks_delete(const char *book, const char *path,
                             .elapsed = elapsed };
     bool ok;
 
+    import_once();
     lock();
     ok = rewrite(&ctx, NULL) && ctx.dropped;
     mutex_unlock(&marks_mutex);

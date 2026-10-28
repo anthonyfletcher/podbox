@@ -116,6 +116,8 @@ their own.
   - A book with bookmarks has a `Bookmarks` row in its menu, in Now Playing's `More...` and when
     you hold `Select` on the book. Choosing one plays the book from there; hold `Select` on one to
     delete it
+  - Bookmarks Rockbox made in a book (`.bmark` files beside its folder or your playlists) are
+    carried over once, the first time bookmarks are opened
 - See the chapters of a book held in a single file
   - Off by default. `Settings > Playback > Chapter Marks`
   - Reads the chapter marks in `.m4b` books and the chapter frames in `.mp3` ones

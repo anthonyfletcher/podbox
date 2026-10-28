@@ -105,6 +105,9 @@
 #define LIB_UNREADABLE_MAGIC 0x44524e55u    /* "UNRD" */
 #define LIB_UNREADABLE_VERSION 1
 
+/* One line in logs/upgrade.log, for a carry-over made outside the steps */
+void library_files_log(const char *fmt, ...);
+
 /* Whether this boot has files to move into the layout above */
 bool library_files_need_upgrade(void);
 

@@ -84,7 +84,7 @@ static bool write_format(void)
     return true;
 }
 
-static void upgrade_log(const char *fmt, ...)
+void library_files_log(const char *fmt, ...)
 {
     char line[2 * MAX_PATH + 32];
     va_list ap;
@@ -117,15 +117,15 @@ static bool move_file(const char *from, const char *to)
         return true;
     if (exists(to))
     {
-        upgrade_log("kept %s: %s already there", from, to);
+        library_files_log("kept %s: %s already there", from, to);
         return true;
     }
     if (rename(from, to) < 0)
     {
-        upgrade_log("FAILED %s -> %s (%d)", from, to, errno);
+        library_files_log("FAILED %s -> %s (%d)", from, to, errno);
         return false;
     }
-    upgrade_log("moved %s -> %s", from, to);
+    library_files_log("moved %s -> %s", from, to);
     return true;
 }
 
@@ -142,7 +142,7 @@ static bool move_folder(const char *from, const char *to)
     if (!exists(to))
         return move_file(from, to);
 
-    upgrade_log("merging %s into %s", from, to);
+    library_files_log("merging %s into %s", from, to);
     do
     {
         DIR *dir = opendir(from);
@@ -171,7 +171,7 @@ static bool move_folder(const char *from, const char *to)
             {
                 /* Stop rather than scan the folder again for ever */
                 closedir(dir);
-                upgrade_log("FAILED %s -> %s (%d)", src, dst, errno);
+                library_files_log("FAILED %s -> %s (%d)", src, dst, errno);
                 return false;
             }
             moved = true;
@@ -337,7 +337,7 @@ static bool move_database_from(const char *dir, enum db_move how)
     bool ok = true;
     bool started = !has_db_file(dir, 0);
 
-    upgrade_log("database in %s: %s", dir, how == DB_REPLACE ? "moving"
+    library_files_log("database in %s: %s", dir, how == DB_REPLACE ? "moving"
                 : how == DB_FINISH ? "finishing the move" : "stale, dropped");
     for (int k = 0; k < 34; k++)
     {
@@ -469,7 +469,7 @@ static bool convert_stamps(void)
         ok = libfile_write(&w, buf, n & ~7, n / 8);
     close(fd);
     ok = libfile_finish(&w, ok);
-    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert", path);
+    library_files_log("%s %s", ok ? "converted" : "FAILED to convert", path);
     return ok;
 }
 
@@ -498,7 +498,7 @@ static bool convert_badges(void)
         /* Too short to hold what it claims: no earned date is trustworthy */
         close(fd);
         remove(LIB_BADGES_FILE);
-        upgrade_log("dropped unreadable %s", LIB_BADGES_FILE);
+        library_files_log("dropped unreadable %s", LIB_BADGES_FILE);
         return true;
     }
     if (!libfile_begin(&w, LIB_BADGES_FILE, LIB_BADGES_MAGIC,
@@ -518,7 +518,7 @@ static bool convert_badges(void)
             close(fd);
             libfile_finish(&w, false);
             remove(LIB_BADGES_FILE);
-            upgrade_log("dropped unreadable %s", LIB_BADGES_FILE);
+            library_files_log("dropped unreadable %s", LIB_BADGES_FILE);
             return true;
         }
         memcpy(rec, &when, sizeof(when));
@@ -527,7 +527,7 @@ static bool convert_badges(void)
     }
     close(fd);
     ok = libfile_finish(&w, ok);
-    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert",
+    library_files_log("%s %s", ok ? "converted" : "FAILED to convert",
                 LIB_BADGES_FILE);
     return ok;
 }
@@ -538,7 +538,7 @@ static void drop_old_moves(void)
     if (first_word(LIB_REPORT_MOVES_FILE) == 0x50564d31u)   /* "PVM1" */
     {
         remove(LIB_REPORT_MOVES_FILE);
-        upgrade_log("removed old %s", LIB_REPORT_MOVES_FILE);
+        library_files_log("removed old %s", LIB_REPORT_MOVES_FILE);
     }
 }
 
@@ -557,17 +557,17 @@ static bool convert_text(const char *const old[2], const char *dat,
             continue;
         if (file_exists(dat))
         {
-            upgrade_log("kept %s: %s already there", old[i], dat);
+            library_files_log("kept %s: %s already there", old[i], dat);
             continue;
         }
         if (convert(old[i]))
         {
             remove(old[i]);
-            upgrade_log("converted %s -> %s", old[i], dat);
+            library_files_log("converted %s -> %s", old[i], dat);
         }
         else
         {
-            upgrade_log("FAILED to convert %s", old[i]);
+            library_files_log("FAILED to convert %s", old[i]);
             ok = false;
         }
     }
@@ -656,7 +656,7 @@ static void remove_dead(void)
     for (unsigned i = 0; i < ARRAYLEN(dead); i++)
     {
         if (file_exists(dead[i]) && remove(dead[i]) == 0)
-            upgrade_log("removed %s", dead[i]);
+            library_files_log("removed %s", dead[i]);
     }
     rmdir(ROCKBOX_DIR "/carousel");     /* only if now empty */
 }
@@ -682,7 +682,7 @@ void library_files_init(void (*progress)(int done, int total))
     if (!library_files_need_upgrade())
         return;
 
-    upgrade_log("upgrade from layout %d to %d", read_format(), LIBRARY_FORMAT);
+    library_files_log("upgrade from layout %d to %d", read_format(), LIBRARY_FORMAT);
 
     for (unsigned i = 0; i < ARRAYLEN(moves); i++)
     {
@@ -718,7 +718,7 @@ void library_files_init(void (*progress)(int done, int total))
         progress(++done, total);
 
     if (ok && write_format())
-        upgrade_log("done");
+        library_files_log("done");
     else
-        upgrade_log("incomplete: the rest at the next boot");
+        library_files_log("incomplete: the rest at the next boot");
 }
