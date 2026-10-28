@@ -338,6 +338,16 @@ static unsigned int track_event_flags = TEF_NONE; /* (A, O-) */
  * the change is scheduled, acted on when it completes. */
 static bool pause_on_track_change = false;
 
+/* Sleep Timer's End of Chapter: pause where the playing chapter ends, at the
+ * next automatic track change or, in a file with chapter marks, where play
+ * crosses the next mark. Cleared once it pauses and when playback starts.
+ * Written by the UI, read in the PCM callback. */
+static volatile bool pause_at_chapter_end = false;
+/* The position the PCM callback last reported, to tell play crossing a
+ * chapter mark from a seek across one */
+static unsigned long chapter_last_elapsed;
+static bool chapter_last_known;
+
 /* Pending manual track skip offset */
 static int skip_offset = 0; /* (A, O) */
 
@@ -2979,6 +2989,10 @@ static inline char* single_mode_get_id3_tag(struct mp3entry *id3)
 
 static bool single_mode_do_pause(int id3_hid)
 {
+    if (pause_at_chapter_end && (skip_pending == TRACK_SKIP_AUTO
+                                 || skip_pending == TRACK_SKIP_AUTO_NEW_PLAYLIST))
+        return true;
+
     if (global_settings.single_mode != SINGLE_MODE_OFF && global_settings.party_mode == 0 &&
         ((skip_pending == TRACK_SKIP_AUTO) || (skip_pending == TRACK_SKIP_AUTO_NEW_PLAYLIST))) {
 
@@ -3066,6 +3080,7 @@ static void audio_finalise_track_change(void)
             iap_on_play_status(play_status);
             pcmbuf_pause(true);
             pause_on_track_change = false;
+            pause_at_chapter_end = false;
         }
     }
     /* Sync the next track information */
@@ -4194,6 +4209,36 @@ void audio_codec_seek_complete(void)
 
 /** Pcmbuf callbacks **/
 
+/* The chapter mark at or before 'pos' in 'cue' */
+static int chapter_at(const struct cuesheet *cue, unsigned long pos)
+{
+    int i = 0;
+
+    while (i + 1 < cue->track_count && cue->tracks[i + 1].offset <= pos)
+        i++;
+    return i;
+}
+
+/* End of Chapter inside one file: play has just crossed a chapter mark. A
+ * jump of over two seconds is a seek, which moves the chapter rather than
+ * ending it. */
+static void chapter_end_check(const struct mp3entry *id3,
+                              unsigned long elapsed)
+{
+    const struct cuesheet *cue = id3->cuesheet;
+
+    if (chapter_last_known && cue != NULL && cue->track_count > 1
+        && elapsed >= chapter_last_elapsed
+        && elapsed - chapter_last_elapsed < 2000
+        && chapter_at(cue, elapsed) != chapter_at(cue, chapter_last_elapsed))
+    {
+        pause_at_chapter_end = false;
+        audio_queue_post(Q_AUDIO_PAUSE, true);
+    }
+    chapter_last_elapsed = elapsed;
+    chapter_last_known = true;
+}
+
 /* Update the elapsed and offset from the information cached during the
    PCM buffer insert */
 void audio_pcmbuf_position_callback(unsigned long elapsed, off_t offset,
@@ -4205,6 +4250,8 @@ void audio_pcmbuf_position_callback(unsigned long elapsed, off_t offset,
         id3->elapsed = elapsed;
         id3->offset = offset;
         iap_on_track_time_position(elapsed);
+        if (pause_at_chapter_end)
+            chapter_end_check(id3, elapsed);
     }
 }
 
@@ -4332,10 +4379,23 @@ struct mp3entry * audio_next_track(void)
     return id3;
 }
 
+void audio_pause_at_chapter_end(bool on)
+{
+    chapter_last_known = false;
+    pause_at_chapter_end = on;
+}
+
+bool audio_pausing_at_chapter_end(void)
+{
+    return pause_at_chapter_end;
+}
+
 /* Start playback at the specified elapsed time or offset */
 void audio_play(unsigned long elapsed, unsigned long offset)
 {
     logf("audio_play");
+
+    audio_pause_at_chapter_end(false);
 
     /* Truncate any existing voice output so we don't have spelling
      * etc. over the first part of the played track */

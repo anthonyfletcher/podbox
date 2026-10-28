@@ -18087,6 +18087,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SLEEP_END_OF_CHAPTER
+  desc: sleep timer: pause where the playing chapter ends
+  user: core
+  <source>
+    *: "End of Chapter"
+  </source>
+  <dest>
+    *: "Kapitlets slut"
+  </dest>
+  <voice>
+    *: "Kapitlets slut"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

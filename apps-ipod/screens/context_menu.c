@@ -83,6 +83,7 @@
 #include "metadata/book_resume.h"
 #include "metadata/book_marks.h"
 #include "audio/spoken_speed.h"    /* spoken_speed_playing */
+#include "audio/playback.h"        /* audio_pause_at_chapter_end */
 #include "screens/browse/listen_progress.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
@@ -580,8 +581,12 @@ MENUITEM_FUNCTION(winddown_item, 0, ID2P(LANG_WINDDOWN),
 
 /* Sleep Timer from the now-playing screen: a length to start it with, Sleep
  * Timer Duration's own preselected, and Cancel first while one is running.
- * Choosing a length starts the timer and leaves the setting as it was. */
-#define SLEEP_CHOICES_MAX 8     /* Cancel, the lengths, and the setting's */
+ * While spoken word plays, End of Chapter comes next: it pauses where the
+ * chapter ends instead of counting minutes. Choosing either replaces the
+ * other, and leaves the setting as it was. */
+#define SLEEP_CHOICES_MAX 9     /* Cancel, End of Chapter, the lengths, and
+                                   the setting's */
+#define SLEEP_CHAPTER     (-1)
 
 static int sleep_minutes[SLEEP_CHOICES_MAX];    /* 0 is Cancel */
 
@@ -592,6 +597,8 @@ static const char *sleep_choice_name(int selected_item, void *data,
 
     if (sleep_minutes[selected_item] == 0)
         return str(LANG_SLEEP_TIMER_CANCEL_CURRENT);
+    if (sleep_minutes[selected_item] == SLEEP_CHAPTER)
+        return str(LANG_SLEEP_END_OF_CHAPTER);
     return format_sleeptimer(buffer, buffer_len, sleep_minutes[selected_item],
                              NULL);
 }
@@ -604,8 +611,10 @@ static int sleep_timer_run(void)
     bool placed = false;
     int count = 0, choice = 0;
 
-    if (get_sleep_timer() > 0)
+    if (get_sleep_timer() > 0 || audio_pausing_at_chapter_end())
         sleep_minutes[count++] = 0;
+    if (spoken_speed_playing())
+        sleep_minutes[count++] = SLEEP_CHAPTER;
 
     for (size_t i = 0; i < ARRAYLEN(lengths); i++)
     {
@@ -631,11 +640,17 @@ static int sleep_timer_run(void)
         return ONPLAY_MAINMENU;
 
     if (info.selection >= 0)
-        set_sleeptimer_duration(sleep_minutes[info.selection]);
+    {
+        int minutes = sleep_minutes[info.selection];
+
+        audio_pause_at_chapter_end(minutes == SLEEP_CHAPTER);
+        set_sleeptimer_duration(minutes == SLEEP_CHAPTER ? 0 : minutes);
+    }
     return ONPLAY_OK;
 }
 
-/* "Sleep Timer", or with one running, the time it has left. */
+/* "Sleep Timer", or with one running, the time it has left or End of
+ * Chapter. */
 static char *sleep_timer_name(int selected_item, void *data,
                               char *buffer, size_t buffer_len)
 {
@@ -644,6 +659,13 @@ static char *sleep_timer_name(int selected_item, void *data,
 
     (void)selected_item;
     (void)data;
+
+    if (audio_pausing_at_chapter_end())
+    {
+        snprintf(buffer, buffer_len, "%s (%s)", str(LANG_SLEEP_TIMER),
+                 str(LANG_SLEEP_END_OF_CHAPTER));
+        return buffer;
+    }
 
     if (left <= 0)
         return (char *)str(LANG_SLEEP_TIMER);

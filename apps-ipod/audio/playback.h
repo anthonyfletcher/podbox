@@ -68,6 +68,9 @@ unsigned int audio_track_count(void);
 long audio_filebufused(void);
 void audio_pre_ff_rewind(void);
 void audio_skip(int direction);
+/* Sleep Timer's End of Chapter: pause where the playing chapter ends, once */
+void audio_pause_at_chapter_end(bool on);
+bool audio_pausing_at_chapter_end(void);
 
 void audio_set_cuesheet(void);
 void audio_set_crossfade(int enable);
