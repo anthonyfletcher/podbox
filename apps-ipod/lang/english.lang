@@ -18161,6 +18161,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_LARGER
+  desc: core text viewer: the next larger size of its font
+  user: core
+  <source>
+    *: "Larger Text"
+  </source>
+  <dest>
+    *: "Larger Text"
+  </dest>
+  <voice>
+    *: "Larger Text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_SMALLER
+  desc: core text viewer: the next smaller size of its font
+  user: core
+  <source>
+    *: "Smaller Text"
+  </source>
+  <dest>
+    *: "Smaller Text"
+  </dest>
+  <voice>
+    *: "Smaller Text"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

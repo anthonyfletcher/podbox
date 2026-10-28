@@ -6,7 +6,12 @@
  ****************************************************************************/
 
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "config.h"
+#include "dir.h"
+#include "string-extra.h"
 #include "lang.h"
 #include "settings/settings.h"
 #include "widgets/menu.h"
@@ -114,6 +119,92 @@ MENUITEM_FUNCTION(text_viewer_font_reset_item, 0,
                   ID2P(LANG_TEXT_VIEWER_FONT_DEFAULT),
                   text_viewer_font_reset, NULL, Icon_Font);
 
+/* The installed size of the reader's font family next to its own, going
+ * 'step' (+1 larger, -1 smaller): fonts are named "NN-family". Its name in
+ * 'out', or false when there is none that way, or the reader uses the UI
+ * font. */
+static bool font_size_step(int step, char *out, size_t size)
+{
+    const char *cur = (const char *)global_settings.text_viewer_font_file;
+    const char *family = strchr(cur, '-');
+    int have = atoi(cur), best = 0;
+    struct dirent *de;
+    DIR *dir;
+
+    if (!cur[0] || family == NULL || have <= 0)
+        return false;
+    dir = opendir(FONT_DIR);
+    if (dir == NULL)
+        return false;
+    while ((de = readdir(dir)) != NULL)
+    {
+        const char *dash = strchr(de->d_name, '-');
+        size_t len = strlen(de->d_name);
+        int n = atoi(de->d_name);
+
+        if (n <= 0 || dash == NULL || len < 4
+            || strcasecmp(de->d_name + len - 4, ".fnt") != 0
+            || (size_t)(de->d_name + len - 4 - dash) != strlen(family)
+            || strncasecmp(dash, family, strlen(family)) != 0)
+            continue;
+        if (step > 0 ? n > have && (!best || n < best)
+                     : n < have && n > best)
+        {
+            best = n;
+            snprintf(out, size, "%d%s", n, family);
+        }
+    }
+    closedir(dir);
+    return best > 0;
+}
+
+/* Larger Text and Smaller Text close the menu, so the page shows the
+ * result */
+static int font_size_set(int step)
+{
+    char name[MAX_FILENAME];
+
+    if (!font_size_step(step, name, sizeof name))
+        return 0;
+    strmemccpy((char *)global_settings.text_viewer_font_file, name,
+               sizeof global_settings.text_viewer_font_file);
+    settings_save();
+    return 1;
+}
+
+static int text_viewer_larger(void)
+{
+    return font_size_set(1);
+}
+
+static int text_viewer_smaller(void)
+{
+    return font_size_set(-1);
+}
+
+/* Shown only when there is a size to step to */
+static int font_size_callback(int action, const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list);
+MENUITEM_FUNCTION(text_viewer_larger_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_TEXT_VIEWER_LARGER), text_viewer_larger,
+                  font_size_callback, Icon_Font);
+MENUITEM_FUNCTION(text_viewer_smaller_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_TEXT_VIEWER_SMALLER), text_viewer_smaller,
+                  font_size_callback, Icon_Font);
+
+static int font_size_callback(int action, const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    char name[MAX_FILENAME];
+
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !font_size_step(this_item == &text_viewer_larger_item ? 1 : -1,
+                           name, sizeof name))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 /* Only inside the reader, with a book of chapters open: the same menu is
  * also reached from Settings */
 static int contents_callback(int action, const struct menu_item_ex *this_item,
@@ -140,5 +231,7 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_line_spacing,
           &text_viewer_footer,
           &text_viewer_read_aloud,
+          &text_viewer_larger_item,
+          &text_viewer_smaller_item,
           &text_viewer_font_item,
           &text_viewer_font_reset_item);

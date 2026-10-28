@@ -18095,6 +18095,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_LARGER
+  desc: core text viewer: the next larger size of its font
+  user: core
+  <source>
+    *: "Larger Text"
+  </source>
+  <dest>
+    *: "Texto maior"
+  </dest>
+  <voice>
+    *: "Texto maior"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_SMALLER
+  desc: core text viewer: the next smaller size of its font
+  user: core
+  <source>
+    *: "Smaller Text"
+  </source>
+  <dest>
+    *: "Texto menor"
+  </dest>
+  <voice>
+    *: "Texto menor"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

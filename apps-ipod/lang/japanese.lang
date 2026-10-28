@@ -18086,6 +18086,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_LARGER
+  desc: core text viewer: the next larger size of its font
+  user: core
+  <source>
+    *: "Larger Text"
+  </source>
+  <dest>
+    *: "文字を大きく"
+  </dest>
+  <voice>
+    *: "文字を大きく"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_SMALLER
+  desc: core text viewer: the next smaller size of its font
+  user: core
+  <source>
+    *: "Smaller Text"
+  </source>
+  <dest>
+    *: "文字を小さく"
+  </dest>
+  <voice>
+    *: "文字を小さく"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

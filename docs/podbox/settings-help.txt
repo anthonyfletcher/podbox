@@ -1610,6 +1610,14 @@ leaving the rest of the interface alone.
 
 Bigger fonts fit fewer rows on screen and slow scrolling slightly.
 
+[action: Larger Text]
+Switches the reader to the next larger size of its font, where one is
+installed, and goes back to the page to show it.
+
+[action: Smaller Text]
+Switches the reader to the next smaller size of its font, where one is
+installed, and goes back to the page to show it.
+
 [action: Use UI Font]
 Drops this viewer's own font and goes back to the one the rest of the interface
 uses.
