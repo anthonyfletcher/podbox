@@ -36,6 +36,13 @@ int book_shelf_run(void);
  * from its saved position. True if a mark was made. */
 bool book_shelf_mark_menu(const char *book, int current);
 
+/* The bookmarks of book id 'book', listed to choose from or delete. True if
+ * one was chosen: book_shelf_play_mark() then plays the book from it, which
+ * the shelf does only once it has let go of the app buffer. *to_root is set
+ * when the list was left for the main menu. */
+bool book_shelf_pick_mark(const char *book, bool *to_root);
+int book_shelf_play_mark(void);
+
 /* Whether the file whose path_key() is 'track' is the last track of the book
  * 'book' -- its album -- in the order the shelf plays it. False where either
  * is not found. */

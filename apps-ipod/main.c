@@ -57,6 +57,7 @@
 #include "dircache.h"
 #include "metadata/tag_trim.h"
 #include "metadata/book_resume.h"
+#include "metadata/book_marks.h"
 #include "database/tagcache.h"
 #include "system/library_files.h"
 #include "metadata/art_cache.h"
@@ -762,6 +763,7 @@ static void init(void)
     filetype_init();
     tag_trim_init();
     book_resume_init();
+    book_marks_init();
 
     shortcuts_init();
 

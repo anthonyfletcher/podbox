@@ -709,6 +709,20 @@ static struct mp3entry *loaded_book(const char **name, uint64_t *book)
     return id3;
 }
 
+struct mp3entry *book_resume_loaded(char *buf, size_t size)
+{
+    struct mp3entry *id3;
+    const char *name;
+    uint64_t book;
+
+    mutex_lock(&book_mutex);
+    id3 = loaded_book(&name, &book);
+    if (id3 != NULL)
+        strmemccpy(buf, name, size);
+    mutex_unlock(&book_mutex);
+    return id3;
+}
+
 /* The loaded book cannot be marked from under itself: the next save would
  * write its position straight over the mark. In progress takes that position
  * as it is; the other two stop the book, the way finishing it would. */

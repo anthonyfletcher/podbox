@@ -82,6 +82,7 @@
 #include "screens/browse/browser_db.h"
 #include "screens/browse/book_shelf.h"
 #include "metadata/book_resume.h"
+#include "metadata/book_marks.h"
 #include "screens/browse/listen_progress.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
@@ -1559,6 +1560,75 @@ static int mark_book_run(void)
 MENUITEM_FUNCTION(mark_book_item, 0, ID2P(LANG_BOOK_MARK_AS),
                   mark_book_run, mark_book_callback, Icon_NOICON);
 
+/* A book's bookmarks, from the browser or Now Playing; choosing one plays it */
+static char marks_book[BOOK_ID_MAX];
+
+static int book_marks_run(void)
+{
+    bool to_root;
+
+    if (book_shelf_pick_mark(marks_book, &to_root))
+    {
+        if (book_shelf_play_mark() == GO_TO_WPS)
+            context_menu_result = ONPLAY_START_PLAY;
+    }
+    else if (to_root)
+        context_menu_result = ONPLAY_MAINMENU;
+    return 0;
+}
+
+static int book_marks_callback(int action,
+                               const struct menu_item_ex *this_item,
+                               struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(in_book_list()
+             && browser_db_get_book(c, c->selected_item,
+                                    marks_book, sizeof(marks_book))
+             && book_marks_any(marks_book)))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(book_marks_item, 0, ID2P(LANG_BOOKMARK_MENU),
+                  book_marks_run, book_marks_callback, Icon_Bookmark);
+
+/* The playing book's: Create Bookmark, and its list once it has marks */
+static int wps_mark_create(void)
+{
+    splash(HZ, book_marks_add_playing() ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
+                                         : ID2P(LANG_BOOKMARK_CREATE_FAILURE));
+    return 0;
+}
+
+static int wps_marks_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list);
+
+MENUITEM_FUNCTION(wps_mark_create_item, 0, ID2P(LANG_BOOKMARK_MENU_CREATE),
+                  wps_mark_create, wps_marks_callback, Icon_Bookmark);
+MENUITEM_FUNCTION(wps_marks_item, 0, ID2P(LANG_BOOKMARK_MENU),
+                  book_marks_run, wps_marks_callback, Icon_Bookmark);
+
+static int wps_marks_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+    if (!global_settings.segregate_audiobooks
+        || book_resume_loaded(marks_book, sizeof(marks_book)) == NULL)
+        return ACTION_EXIT_MENUITEM;
+    if (this_item != &wps_mark_create_item && !book_marks_any(marks_book))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 static bool prepare_database_sel(void *param)
 {
     if (selected_file.context == CONTEXT_ID3DB)
@@ -2001,6 +2071,8 @@ MAKE_ONPLAYMENU( wps_more_menu, ID2P(LANG_MORE),
            &wps_album_art_item,
            &winddown_item,
            &bookmark_menu,
+           &wps_mark_create_item,
+           &wps_marks_item,
            &view_cue_item,
            &view_chapters_item,
            &equalizer_menu,
@@ -2027,6 +2099,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
 MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            context_menu_callback, Icon_file_view_menu,
            &mark_book_item,
+           &book_marks_item,
            &listen_book_item,
            &view_playlist_item,
            &replace_pl_item, &replace_shuf_pl_item,

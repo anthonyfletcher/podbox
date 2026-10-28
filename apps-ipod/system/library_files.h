@@ -41,6 +41,7 @@
 #define LIB_PLAYBACK_LOG    LIB_USER_DIR "/playback.log"
 #define LIB_PLAYBACK_STEM   LIB_USER_DIR "/playback"
 #define LIB_AUDIOBOOKS_FILE LIB_USER_DIR "/audiobooks.dat"
+#define LIB_BOOKMARKS_FILE  LIB_USER_DIR "/bookmarks.dat"
 #define LIB_BADGES_FILE     LIB_USER_DIR "/report_badges.dat"
 #define LIB_QUIZ_FILE       LIB_USER_DIR "/quiz_scores.dat"
 #define LIB_SPIKE_FILE      LIB_USER_DIR "/spike_scores.dat"
@@ -90,6 +91,8 @@
 #define LIB_PLAYS_VERSION   1
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */
 #define LIB_BOOKS_VERSION   2       /* 1: books keyed by album alone */
+#define LIB_MARKS_MAGIC     0x4b52414du     /* "MARK" */
+#define LIB_MARKS_VERSION   1
 #define LIB_QUIZ_MAGIC      0x5a495551u     /* "QUIZ" */
 #define LIB_QUIZ_VERSION    1
 #define LIB_SPIKE_MAGIC     0x534b5053u     /* "SPKS"; and the run, "SPKR" */

@@ -97,6 +97,12 @@ bool book_resume_find(const char *book, struct book_resume *pos);
  * this one's file; the first boot of a new layout calls it. */
 bool book_resume_convert(const char *text_file);
 
+/* The id of the book loaded for playback, playing or paused, into 'buf';
+ * NULL if what is loaded is not a book. The entry is the live one, so copy
+ * what is needed from it at once. */
+struct mp3entry;
+struct mp3entry *book_resume_loaded(char *buf, size_t size);
+
 /* Every saved book, most recently played first, ended and marked ones
  * included. 'path' is the file for a book keyed by its path, NULL for one
  * keyed by its album. 'fn' returns false to stop early. */

@@ -265,7 +265,9 @@ in none of them. A book stopped in the last 2% of its last chapter counts as
 Finished, so the closing credits need not play out. A book's context menu, on a shelf or in any Audiobooks list,
 offers ways to queue it, Add to Playlist, its info, Listening Progress, Show in
 Files and Mark as..., which moves it to any of the three until it is played
-again, though not for a podcast. A list with no books in it has no row. The
+again, though not for a podcast. Now Playing's More... has Create Bookmark
+while a book plays, and a book with bookmarks has a Bookmarks row there and in
+its own menu: choosing one plays the book from that place. A list with no books in it has no row. The
 Audiobooks lists have no <All Tracks> or <Random> rows.
 
 

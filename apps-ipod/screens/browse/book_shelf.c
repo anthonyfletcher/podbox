@@ -26,7 +26,8 @@
  * the beginning. A book's context menu is the one it has in the browser:
  * Add to Queue, Add to Playlist, Show Track Info, Show in Files, and Mark as,
  * which marks it Finished, Not started or In progress by hand and moves it to
- * that shelf until it is played again.
+ * that shelf until it is played again. A book with bookmarks has a Bookmarks
+ * row too, and choosing a mark plays the book from there.
  *
  * Parts, in order:
  *   - the arena and what it holds
@@ -34,6 +35,7 @@
  *   - deciding each book's state
  *   - the list
  *   - playing a book
+ *   - a book's bookmarks
  *   - a book's context menu
  *   - the way in
  ****************************************************************************/
@@ -55,6 +57,7 @@
 #include "widgets/list.h"
 #include "widgets/menu.h"             /* MENUITEM_STRINGLIST, do_menu */
 #include "widgets/splash.h"
+#include "widgets/yesno.h"
 #include "settings/settings.h"
 #include "system/activity.h"
 #include "system/app_buffer.h"
@@ -63,6 +66,7 @@
 #include "database/db_spoken.h"
 #include "database/path_key.h"
 #include "metadata/book_resume.h"
+#include "metadata/book_marks.h"
 #include "playlist/playlist.h"
 #include "screens/context_menu.h"     /* the book's menu */
 #include "system/strutil.h"           /* open_utf8 */
@@ -832,6 +836,148 @@ static int play_chosen(void)
 }
 
 /* ------------------------------------------------------------------ *
+ * a book's bookmarks                                                 *
+ * ------------------------------------------------------------------ */
+
+/* The newest marks a book's list shows. Held here rather than in the arena,
+ * which the shelf has claimed while its own menu opens this list. */
+#define MARKS_SHOWN 64
+
+static char shown[MARKS_SHOWN][BOOK_MARK_LABEL_MAX];
+static int shown_ct;
+static const char *shown_book;
+static bool shown_deleted;
+
+static bool collect_mark(const struct book_mark *m, void *data)
+{
+    (void)data;
+    strmemccpy(shown[shown_ct], m->label, sizeof(shown[0]));
+    return ++shown_ct < MARKS_SHOWN;
+}
+
+struct nth_mark
+{
+    int n;
+    struct book_mark *out;
+    char *path;
+};
+
+static bool find_nth(const struct book_mark *m, void *data)
+{
+    struct nth_mark *ctx = data;
+
+    if (ctx->n-- > 0)
+        return true;
+    strmemccpy(ctx->path, m->path, MAX_PATH);
+    *ctx->out = *m;
+    ctx->out->path = ctx->path;
+    ctx->out->label = NULL;
+    return false;
+}
+
+/* Mark 'n' of the list as it is in the file now, its path into 'path' */
+static bool shown_mark(int n, struct book_mark *m, char *path)
+{
+    struct nth_mark ctx = { n, m, path };
+
+    m->path = NULL;
+    book_marks_each(shown_book, find_nth, &ctx);
+    return m->path != NULL;
+}
+
+static const char *marks_get_name(int n, void *data, char *buffer,
+                                  size_t buffer_len)
+{
+    (void)data;
+    (void)buffer;
+    (void)buffer_len;
+    return shown[n];
+}
+
+/* Context: delete the mark, after asking. The list is then read again. */
+static int marks_action_cb(int action, struct gui_synclist *lists)
+{
+    char path[MAX_PATH];
+    struct book_mark m;
+    int n;
+
+    if (action != ACTION_STD_CONTEXT)
+        return action;
+
+    n = gui_synclist_get_sel_pos(lists);
+    if (n < 0 || n >= shown_ct || !yesno_pop(ID2P(LANG_REALLY_DELETE)))
+        return ACTION_REDRAW;
+    if (shown_mark(n, &m, path))
+        book_marks_delete(shown_book, path, m.elapsed);
+    shown_deleted = true;
+    return ACTION_STD_CANCEL;
+}
+
+/* The chosen book is 'book' from mark 'm': the album its chapter is on, or
+ * the file alone for a book keyed by its path. */
+static void choose_mark(const char *book, const struct book_mark *m)
+{
+    struct tagcache_album al;
+    int idx;
+
+    memset(&chosen, 0, sizeof(chosen));
+    chosen.seek = -1;
+    chosen.track = path_key(m->path);
+    chosen.elapsed = m->elapsed;
+    chosen.offset = m->offset;
+
+    idx = book[0] == '/' ? -1 : tagcache_find_path(m->path);
+    if (idx >= 0 && tagcache_album_get(tagcache_album_of(idx), &al))
+    {
+        chosen.seek = al.album_seek;
+        chosen.artist_seek = al.artist_seek;
+    }
+    else
+        strmemccpy(chosen.path, m->path, sizeof(chosen.path));
+}
+
+bool book_shelf_pick_mark(const char *book, bool *to_root)
+{
+    struct simplelist_info info;
+    char path[MAX_PATH];
+    struct book_mark m;
+    int selection = 0;
+
+    *to_root = false;
+    shown_book = book;
+    do
+    {
+        shown_deleted = false;
+        shown_ct = 0;
+        book_marks_each(book, collect_mark, NULL);
+        if (shown_ct == 0)
+            return false;
+
+        simplelist_info_init(&info, str(LANG_BOOKMARK_MENU), shown_ct, NULL);
+        info.get_name = marks_get_name;
+        info.action_callback = marks_action_cb;
+        info.selection = MIN(selection, shown_ct - 1);
+        if (simplelist_show_list(&info))
+        {
+            *to_root = true;
+            return false;
+        }
+        selection = info.selection;
+    } while (shown_deleted);
+
+    if (info.selection < 0 || info.selection >= shown_ct
+        || !shown_mark(info.selection, &m, path))
+        return false;
+    choose_mark(book, &m);
+    return true;
+}
+
+int book_shelf_play_mark(void)
+{
+    return play_chosen();
+}
+
+/* ------------------------------------------------------------------ *
  * a book's context menu                                              *
  * ------------------------------------------------------------------ */
 
@@ -896,6 +1042,9 @@ static int menu_exit;
 /* Listening Progress was chosen for the menu book, and runs once the list is
  * down and the arena released */
 static bool menu_progress;
+
+/* A bookmark was chosen, and plays once the arena is released */
+static bool menu_mark_picked;
 static char menu_name[BOOK_KEY_MAX];
 
 /* The menu book's tracks to 'fn'. Sorted in the arena's free tail, since the
@@ -1006,24 +1155,45 @@ static int menu_mark(void)
     return ONPLAY_OK;
 }
 
+static int menu_bookmarks(void)
+{
+    bool to_root;
+
+    menu_mark_picked = book_shelf_pick_mark(menu_book, &to_root);
+    if (menu_mark_picked)
+        menu_exit = GO_TO_WPS;
+    else if (to_root)
+        menu_exit = GO_TO_ROOT;
+    return ONPLAY_OK;
+}
+
 /* The menu a book in the browser has, its rows run for the book's tracks.
  * 'book' is its id, 'name' what it is called. True if the book was marked. */
 static bool book_menu(const char *book, const char *name)
 {
-    static const struct context_menu_row rows[] = {
-        { LANG_BOOK_MARK_AS,     menu_mark,            false },
-        { LANG_LISTEN_PROGRESS,  menu_listen_progress, false },
+    static const struct context_menu_row mark =
+        { LANG_BOOK_MARK_AS,     menu_mark,            false };
+    static const struct context_menu_row marks =
+        { LANG_BOOKMARK_MENU,    menu_bookmarks,       false };
+    static const struct context_menu_row progress =
+        { LANG_LISTEN_PROGRESS,  menu_listen_progress, false };
+    static const struct context_menu_row tail[] = {
         { LANG_BOOK_INFO,        menu_info,            false },
         { LANG_SHOW_IN_FILES,    menu_show_in_files,   true },
     };
-    /* A file with no album has no figures for Listening Progress to give */
-    static const struct context_menu_row file_rows[] = {
-        { LANG_BOOK_MARK_AS,     menu_mark,            false },
-        { LANG_BOOK_INFO,        menu_info,            false },
-        { LANG_SHOW_IN_FILES,    menu_show_in_files,   true },
-    };
+    struct context_menu_row rows[5];
     char sel[MAX_PATH];
+    int n = 0;
     int ret;
+
+    rows[n++] = mark;
+    if (book_marks_any(book))
+        rows[n++] = marks;
+    /* A file with no album has no figures for Listening Progress to give */
+    if (menu_seek >= 0)
+        rows[n++] = progress;
+    rows[n++] = tail[0];
+    rows[n++] = tail[1];
 
     /* Led by a slash, as the browser does, so a new playlist is offered the
      * book's name */
@@ -1031,14 +1201,8 @@ static bool book_menu(const char *book, const char *name)
     menu_book = book;
     menu_marked = false;
 
-    if (menu_seek < 0)
-        ret = context_menu_show_item(sel, ATTR_DIRECTORY, true, false,
-                                     menu_insert, menu_add_to_playlist,
-                                     file_rows, ARRAYLEN(file_rows));
-    else
-        ret = context_menu_show_item(sel, ATTR_DIRECTORY, true, false,
-                                     menu_insert, menu_add_to_playlist,
-                                     rows, ARRAYLEN(rows));
+    ret = context_menu_show_item(sel, ATTR_DIRECTORY, true, false,
+                                 menu_insert, menu_add_to_playlist, rows, n);
 
     if (ret == ONPLAY_MAINMENU)
         menu_exit = GO_TO_ROOT;
@@ -1209,6 +1373,7 @@ int book_shelf_run(void)
      * and after Listening Progress. */
     menu_exit = GO_TO_PREVIOUS;
     menu_progress = false;
+    menu_mark_picked = false;
     do
     {
         marked_row = -1;
@@ -1278,7 +1443,7 @@ int book_shelf_run(void)
     if (held)
         release();
 
-    if (picked)
+    if (picked || menu_mark_picked)
         ret = play_chosen();
     return ret;
 }
