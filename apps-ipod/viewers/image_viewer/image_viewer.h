@@ -22,22 +22,6 @@
 #include "widgets/splash.h"     /* splashf (decoders report errors) */
 #include "draw/bmp.h"        /* struct bitmap */
 
-/* JPEG colour/dither iv_settings (were in jpeg/yuv2rgb.h in the plugin). */
-enum color_modes
-{
-    COLOURMODE_COLOUR = 0,
-    COLOURMODE_GRAY,
-    COLOUR_NUM_MODES
-};
-
-enum dither_modes
-{
-    DITHER_NONE = 0,    /* No dithering */
-    DITHER_ORDERED,     /* Bayer ordered */
-    DITHER_DIFFUSION,   /* Floyd/Steinberg error diffusion */
-    DITHER_NUM_MODES
-};
-
 /* Slideshow times */
 #define SS_MIN_TIMEOUT      1
 #define SS_MAX_TIMEOUT      20
@@ -55,7 +39,6 @@ enum {
     PLUGIN_OTHER = 0x200,
     PLUGIN_ABORT,
     PLUGIN_OUTOFMEM,
-    PLUGIN_JPEG_PROGRESSIVE,
 
     ZOOM_IN,
     ZOOM_OUT,
@@ -72,11 +55,8 @@ enum {
  * that is the one index the decoders' disp[9] caches never used. */
 #define DS_FIT 0
 
-/* Settings. jpeg needs these */
 struct imgview_settings
 {
-    int jpeg_colour_mode;
-    int jpeg_dither_mode;
     int ss_timeout;
 };
 

@@ -16,15 +16,13 @@
 #include "image_viewer.h"
 #include "image_decoder.h"
 
-/* Static decoder table, indexed by enum image_type. IMAGE_JPEG_PROGRESSIVE is
- * reached from the baseline decoder when it detects a progressive stream. */
+/* Static decoder table, indexed by enum image_type */
 static const struct image_decoder * const decoders[MAX_IMAGE_TYPES] = {
     [IMAGE_BMP]              = &scaled_decoder,
-    [IMAGE_JPEG]             = &jpeg_decoder,
+    [IMAGE_JPEG]             = &scaled_decoder,
     [IMAGE_PNG]              = &scaled_decoder,
     [IMAGE_PPM]             = &ppm_decoder,
     [IMAGE_GIF]              = &gif_decoder,
-    [IMAGE_JPEG_PROGRESSIVE] = &jpegp_decoder,
     [IMAGE_EMBEDDED]         = &scaled_decoder,
 };
 

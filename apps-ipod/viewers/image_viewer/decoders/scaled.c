@@ -5,8 +5,8 @@
  * GNU General Public License (version 2+)
  *
  * The image viewer's back end for every image the core readers decode
- * through image_load(): BMP and PNG files, and now-playing art embedded in
- * a track, whatever its format. The image is decoded once, halved until it
+ * through image_load(): JPEG, BMP and PNG files, and now-playing art
+ * embedded in a track, whatever its format, with ordered dithering. The image is decoded once, halved until it
  * fits the buffer, and the other zoom levels are made from that bitmap.
  ****************************************************************************/
 
@@ -72,7 +72,7 @@ static int load_image(char *filename, struct image_info *info,
 {
     struct image_src src;
     int size;
-    int format = FORMAT_NATIVE;
+    int format = FORMAT_NATIVE | FORMAT_DITHER;
     const struct custom_format *cformat = &format_native;
 
     memset(&disp, 0, sizeof(disp));

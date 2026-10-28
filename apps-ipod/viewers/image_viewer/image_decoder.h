@@ -22,7 +22,6 @@ enum image_type {
     IMAGE_PNG,
     IMAGE_PPM,
     IMAGE_GIF,
-    IMAGE_JPEG_PROGRESSIVE,
     IMAGE_EMBEDDED,             /* art inside a track, any format */
 
     MAX_IMAGE_TYPES
@@ -35,8 +34,6 @@ const struct image_decoder *get_image_decoder(enum image_type type);
 
 /* Each decoder exports its own struct image_decoder. */
 extern const struct image_decoder scaled_decoder;
-extern const struct image_decoder jpeg_decoder;
-extern const struct image_decoder jpegp_decoder;
 extern const struct image_decoder ppm_decoder;
 extern const struct image_decoder gif_decoder;
 

@@ -87,15 +87,10 @@
  * in image_viewer.h). Session-scoped; not persisted across launches. */
 struct imgview_settings iv_settings =
 {
-    COLOURMODE_COLOUR,
-    DITHER_NONE,
     SS_DEFAULT_TIMEOUT
 };
 bool iv_slideshow_enabled = false;
 bool iv_running_slideshow = false;
-
-static fb_data rgb_linebuf[LCD_WIDTH];  /* Line buffer for scrolling when
-                                           DITHER_DIFFUSION is set        */
 
 /* the buffer for loaded+resized images and the file list */
 static int buf_handle = 0;
@@ -454,13 +449,6 @@ static void pan_view_up(struct image_info *info)
     {
         xlcd_scroll_down(move); /* scroll down */
         info->y -= move;
-        if (image_type == IMAGE_JPEG
-         && iv_settings.jpeg_dither_mode == DITHER_DIFFUSION)
-        {
-            /* Draw over the band at the top of the last update
-               caused by lack of error history on line zero. */
-            move = MIN(move + 1, info->y + info->height);
-        }
         imgdec->draw_image_rect(info, 0, 0, info->width-info->x, move);
         lcd_update();
     }
@@ -470,7 +458,6 @@ static void pan_view_up(struct image_info *info)
    the bottom */
 static void pan_view_down(struct image_info *info)
 {
-    fb_data *lcd_fb = get_framebuffer(NULL, NULL);
     int move;
 
     move = MIN(VSCROLL, info->height - info->y - LCD_HEIGHT);
@@ -478,30 +465,8 @@ static void pan_view_down(struct image_info *info)
     {
         xlcd_scroll_up(move); /* scroll up */
         info->y += move;
-        if (image_type == IMAGE_JPEG
-         && iv_settings.jpeg_dither_mode == DITHER_DIFFUSION)
-        {
-            /* Save the line that was on the last line of the display
-               and draw one extra line above then recover the line with
-               image data that had an error history when it was drawn.
-             */
-            move++, info->y--;
-            memcpy(rgb_linebuf,
-                    lcd_fb + (LCD_HEIGHT - move)*LCD_WIDTH,
-                    LCD_WIDTH*sizeof (fb_data));
-        }
-
         imgdec->draw_image_rect(info, 0, LCD_HEIGHT - move,
                                 info->width-info->x, move);
-
-        if (image_type == IMAGE_JPEG
-         && iv_settings.jpeg_dither_mode == DITHER_DIFFUSION)
-        {
-            /* Cover the first row drawn with previous image data. */
-            memcpy(lcd_fb + (LCD_HEIGHT - move)*LCD_WIDTH,
-                        rgb_linebuf, LCD_WIDTH*sizeof (fb_data));
-            info->y++;
-        }
         lcd_update();
     }
 }
@@ -878,7 +843,6 @@ static int load_and_show(char *filename, struct image_info *info,
         return change_filename(direction);
     }
 
-reload_decoder:
     /* Note: the screen is deliberately NOT cleared here -- the previous image
      * stays up while the next one decodes, with the progress dialog over it. */
 
@@ -917,12 +881,6 @@ reload_decoder:
         status = PLUGIN_ABORT;
     else
         status = imgdec->load_image(filename, info, buf, &remaining, offset, filesize);
-
-    if (status == PLUGIN_JPEG_PROGRESSIVE)
-    {
-        status = IMAGE_JPEG_PROGRESSIVE;
-        goto reload_decoder;
-    }
 
     if (status == PLUGIN_OUTOFMEM)
     {
@@ -1154,7 +1112,6 @@ static int show_menu(void)
         MIID_ZOOM_PAN = 0,
         MIID_TOGGLE_SS_MODE,
         MIID_CHANGE_SS_MODE,
-        MIID_DITHERING,
         MIID_QUIT,
     };
 
@@ -1170,23 +1127,16 @@ static int show_menu(void)
     MENUITEM_STRINGLIST(menu, ID2P(LANG_IMAGE_VIEWER), NULL,
                         ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
-                        ID2P(LANG_SLIDESHOW_TIME),
-                        ID2P(LANG_DITHERING));
+                        ID2P(LANG_SLIDESHOW_TIME));
     MENUITEM_STRINGLIST(menu_zoom, ID2P(LANG_IMAGE_VIEWER), NULL,
                         ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME),
-                        ID2P(LANG_DITHERING),
                         ID2P(LANG_MENU_QUIT));
 
     static const struct opt_items slideshow[2] = {
         { STR(LANG_OFF) },
         { STR(LANG_ON) },
-    };
-    static const struct opt_items dithering[DITHER_NUM_MODES] = {
-        [DITHER_NONE]      = { STR(LANG_OFF) },
-        [DITHER_ORDERED]   = { STR(LANG_ORDERED) },
-        [DITHER_DIFFUSION] = { STR(LANG_DIFFUSION) },
     };
 
     /* re-enable the theme for the menu chrome, then hand the screen back to
@@ -1210,10 +1160,6 @@ static int show_menu(void)
             set_int(str(LANG_SLIDESHOW_TIME), "s", UNIT_SEC,
                     &iv_settings.ss_timeout, NULL, 1,
                     SS_MIN_TIMEOUT, SS_MAX_TIMEOUT, NULL);
-            break;
-        case MIID_DITHERING:
-            set_option(str(LANG_DITHERING), &iv_settings.jpeg_dither_mode, RB_INT,
-                       dithering, DITHER_NUM_MODES, NULL);
             break;
     }
 

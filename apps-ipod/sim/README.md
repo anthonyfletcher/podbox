@@ -20,7 +20,7 @@ a symbol that was merely missing:
 
 | Where | Why a shim could not do it |
 |---|---|
-| `draw/jpeg_load.c`, `viewers/image_viewer/decoders/jpeg_decoder.c`, `system/fracmul.h` | inline ARM assembly with the `CPU_ARM` guard stripped. `sim.h` sets `CONFIG_CPU 0`, so `ARCH != ARCH_ARM` and `CPU_ARM` is never defined — the assembler sees ARM opcodes on x86. Upstream's C fallbacks restored |
+| `draw/jpeg_load.c`, `system/fracmul.h` | inline ARM assembly with the `CPU_ARM` guard stripped. `sim.h` sets `CONFIG_CPU 0`, so `ARCH != ARCH_ARM` and `CPU_ARM` is never defined — the assembler sees ARM opcodes on x86. Upstream's C fallbacks restored |
 | `draw/jpeg_load.c` | the 1/2/4/8-point IDCT passes come from `jpeg_idct_arm.S`, which `SOURCES` builds under `CPU_ARM`. Upstream's `#ifndef CPU_ARM` C versions restored |
 | `audio/codecs.c`, `audio/codec_thread.c` | `codec_load_buf()` needs `lc_open_from_mem()`, which exists only for `BINFMT_ROCK`. Upstream's `HAVE_CODEC_BUFFERING` guard restored; the sim loads codecs from file, which the caller already falls back to |
 | `audio/codecs.c` | `CACHEALIGN_SIZE` exists only on targets with a CPU cache, and `cpu.h` refuses to let anything else define it. Changed to upstream's `MEM_ALIGN_SIZE`, which is the same value on both targets |

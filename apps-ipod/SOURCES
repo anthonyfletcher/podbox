@@ -273,22 +273,14 @@ viewers/image_viewer/image_viewer.c
 viewers/image_viewer/resize.c
 viewers/image_viewer/tlsf.c
 viewers/image_viewer/xlcd.c
-viewers/image_viewer/decoders/BUFFILEGETC.c
 viewers/image_viewer/decoders/scaled.c
 viewers/image_viewer/decoders/dgif_lib.c
 viewers/image_viewer/decoders/gif.c
 viewers/image_viewer/decoders/gif_decoder.c
 viewers/image_viewer/decoders/gif_err.c
 viewers/image_viewer/decoders/gifalloc.c
-viewers/image_viewer/decoders/idct.c
-viewers/image_viewer/decoders/jpeg.c
-viewers/image_viewer/decoders/jpeg81.c
-viewers/image_viewer/decoders/jpeg_decoder.c
-viewers/image_viewer/decoders/jpegp.c
-viewers/image_viewer/decoders/mempool.c
 viewers/image_viewer/decoders/ppm.c
 viewers/image_viewer/decoders/ppm_decoder.c
-viewers/image_viewer/decoders/yuv2rgb.c
 #endif
 
 skin/custom_tags.c
