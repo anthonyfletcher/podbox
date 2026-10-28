@@ -10,7 +10,8 @@
  * One walk produces both lists. Classifying a file is a lookup on its
  * extension (filetype_get_attr()), so having found a file it is as cheap to
  * ask both questions as one; walking twice would double the only expensive
- * part.
+ * part. The same walk keeps the book index (book_index.c) current, handing
+ * it each book with the size and time its directory entry already gave.
  *
  * The lists are plain text, one path per line, written to a .tmp and renamed
  * only on a completed walk -- so an interrupted one leaves the previous list
@@ -49,6 +50,7 @@
 #include "system/debug_log.h"
 #include "files/filetypes.h"
 #include "files/path_list.h"
+#include "files/book_index.h"
 #include "file_index.h"
 
 #define FILE_INDEX_DOCS   LIB_DOCUMENTS_FILE
@@ -205,6 +207,7 @@ static void fi_walk(int depth)
             {
                 case FILE_ATTR_TXT:
                     path_list_write_record(&fi_docs, fi_path);
+                    book_index_found(fi_path, info.size, info.mtime);
                     break;
                 case FILE_ATTR_IMG:
                     if (!fi_is_cover_art((char *)entry->d_name))
@@ -245,10 +248,14 @@ static void fi_run_scan(void)
 
     debug_log(DEBUG_LOG_TASKS, "%s: walk started", file_index_task.name);
     started = current_tick;
+    book_index_begin();
     strcpy(fi_path, "/");
     fi_walk(0);
 
     completed = !fi_abort;
+    if (book_index_end(completed))
+        debug_log(DEBUG_LOG_TASKS, "%s: book index changed",
+                  file_index_task.name);
     debug_log(DEBUG_LOG_TASKS, "%s: walk %s after %ld s",
               file_index_task.name, completed ? "done" : "interrupted",
               (long)(current_tick - started) / HZ);
@@ -295,6 +302,7 @@ struct bg_task file_index_task =
 {
     .name    = "documents & images",
     .rank    = BG_RANK_FILES,
+    .work_bytes = BOOK_INDEX_WORK_BYTES,
     .request = fi_request,
     .tick    = fi_tick,
 };

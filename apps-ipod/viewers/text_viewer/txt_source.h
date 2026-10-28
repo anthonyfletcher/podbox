@@ -123,6 +123,31 @@ int  ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
 
 void ts_close(ts_source *s);
 
+/* ---- a book's details ------------------------------------------------ */
+
+#define TS_BOOK_TITLE  128
+#define TS_BOOK_AUTHOR 96
+
+/* What the book index keeps of an EPUB: its title and first author, empty
+ * where it names none, its spine count, and where its cover image lies in
+ * the file -- cover_at is -1 when it has none. The cover is found as
+ * reading.md 6 orders it, the first three ways (the cover page's first
+ * image is not looked for). */
+typedef struct {
+    char     title[TS_BOOK_TITLE];
+    char     author[TS_BOOK_AUTHOR];
+    int      parts;
+    long     cover_at;
+    uint32_t cover_csize, cover_usize;
+    int      cover_method;          /* 0 stored, 8 deflated */
+} ts_book;
+
+/* Reads `io`'s details into `out`, with `arena` for working memory
+ * (TS_ARENA_ZIP). BS_OK, or an error for a file that is not an EPUB. Does
+ * not close `io`. */
+int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
+                 ts_book *out);
+
 ts_format ts_source_format(const ts_source *s);
 ts_charset ts_source_charset(const ts_source *s);   /* as detected */
 size_t     ts_arena_used(const ts_source *s);       /* for tuning */

@@ -64,6 +64,10 @@ int  ts_zip_count(ts_zip *z);
 /* Opens member `idx` as a stream. The returned stream is owned by `z` and is
  * invalidated by the next ts_zip_member() call. */
 int  ts_zip_member(ts_zip *z, int idx, bs_stream **out);
+/* Where member `idx`'s data starts in the file, its stored and unpacked
+ * sizes and its method (0 stored, 8 deflated). Reads its local header. */
+int  ts_zip_extent(ts_zip *z, int idx, bs_off_t *data, uint32_t *csize,
+                   uint32_t *usize, int *method);
 
 /* ---- markup stage ---------------------------------------------------- */
 

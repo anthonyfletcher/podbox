@@ -169,6 +169,25 @@ int ts_zip_find(ts_zip *z, const char *path)
     return BS_ERR_FORMAT;
 }
 
+int ts_zip_extent(ts_zip *z, int idx, bs_off_t *data, uint32_t *csize,
+                  uint32_t *usize, int *method)
+{
+    uint8_t loc[30];
+    zent *e;
+    int rc;
+
+    if (idx < 0 || idx >= z->count) return BS_ERR_INVAL;
+    e = &z->ent[idx];
+    rc = read_at(z->io, e->lho, loc, sizeof loc);
+    if (rc != BS_OK) return rc;
+    if (ts_le32(loc) != LOC_SIG) return BS_ERR_FORMAT;
+    *data = (bs_off_t)e->lho + 30 + ts_le16(loc + 26) + ts_le16(loc + 28);
+    *csize = e->csize;
+    *usize = e->usize;
+    *method = e->method;
+    return BS_OK;
+}
+
 int ts_zip_member(ts_zip *z, int idx, bs_stream **out)
 {
     uint8_t loc[30];

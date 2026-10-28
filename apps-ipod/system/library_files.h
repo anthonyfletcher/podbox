@@ -59,6 +59,7 @@
 #define LIB_REPORT_MOVES_FILE LIB_CACHE_DIR "/report_moves.dat"
 #define LIB_DOCUMENTS_FILE  LIB_CACHE_DIR "/documents.dat"
 #define LIB_IMAGES_FILE     LIB_CACHE_DIR "/images.dat"
+#define LIB_BOOK_INDEX_FILE LIB_CACHE_DIR "/books.dat"
 #define LIB_SPIKE_RUN_FILE  LIB_CACHE_DIR "/spike_run.dat"
 #define LIB_UNREADABLE_FILE LIB_CACHE_DIR "/unreadable.dat"
 #define LIB_UNREADABLE_LIST LIB_CACHE_DIR "/unreadable.txt"
@@ -91,6 +92,8 @@
 #define LIB_PLAYS_VERSION   1
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */
 #define LIB_BOOKS_VERSION   2       /* 1: books keyed by album alone */
+#define LIB_BOOK_INDEX_MAGIC 0x58444e49u    /* "INDX" */
+#define LIB_BOOK_INDEX_VERSION 1
 #define LIB_MARKS_MAGIC     0x4b52414du     /* "MARK" */
 #define LIB_MARKS_VERSION   1
 #define LIB_QUIZ_MAGIC      0x5a495551u     /* "QUIZ" */

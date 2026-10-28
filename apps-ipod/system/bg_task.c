@@ -158,10 +158,17 @@ size_t bg_task_reserve_bytes(void)
     size_t most = 0;
     int i;
 
+    /* One thread runs them all, one at a time: the largest is the most any
+     * holds at once */
     for (i = 0; i < bg_tasks_count; i++)
     {
         if (bg_tasks[i]->work_bytes > most)
             most = bg_tasks[i]->work_bytes;
+    }
+    for (i = 0; i < bg_steps_count; i++)
+    {
+        if (bg_steps[i]->work_bytes > most)
+            most = bg_steps[i]->work_bytes;
     }
 
     return most;

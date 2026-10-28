@@ -8,6 +8,7 @@
  *   OPF parsing   - the manifest, the spine, and where the contents are
  *   spine stream  - every part in order, or one part alone
  *   contents      - an EPUB's nav document or NCX, as (title, part) pairs
+ *   book details  - title, author and cover, for the book index
  ****************************************************************************/
 
 #include "ts_internal.h"
@@ -601,3 +602,164 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
 }
 
 int ts_open_docx(ts_ctx *c, bs_stream **out) { return ts_open_epub(c, out); }
+
+/* ---- book details ---------------------------------------------------- */
+
+#define BOOK_IMAGES 32      /* image items remembered for a cover lookup */
+
+typedef struct {
+    char id[64];
+    char href[256];
+} book_img;
+
+typedef struct {
+    ts_book  *out;
+    int       in_meta;
+    char      cover_meta[64];     /* <meta name="cover" content=...> */
+    char      cover_prop[256];    /* the item marked cover-image */
+    char      cover_named[256];   /* an image item called cover */
+    book_img *img;
+    int       nimg;
+} book_ctx;
+
+/* `src` into `dst` of `cap` bytes, cut short if it must be */
+static void book_copy(char *dst, const char *src, size_t cap)
+{
+    size_t n = strlen(src);
+
+    if (n >= cap) n = cap - 1;
+    memcpy(dst, src, n);
+    dst[n] = 0;
+}
+
+/* Text between tags into `dst`: entities decoded, runs of space folded,
+ * trimmed */
+static void book_text(char *dst, size_t cap, const char *src)
+{
+    size_t n = 0, len = strlen(src);
+    int space = 0;
+    size_t i;
+
+    for (i = 0; i < len && n + 5 < cap; i++) {
+        uint32_t cp;
+        size_t used;
+        char c = src[i];
+
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            space = n > 0;
+            continue;
+        }
+        if (space) { dst[n++] = ' '; space = 0; }
+        if (c == '&' && (used = ts_entity(src + i + 1, len - i - 1, &cp))) {
+            n += ts_utf8_put((uint8_t *)dst + n, cp);
+            i += used + 1;
+            continue;
+        }
+        dst[n++] = c;
+    }
+    dst[n] = 0;
+}
+
+static int book_tag(void *ud, const char *tag, const char *text)
+{
+    book_ctx *b = ud;
+    char id[64], href[256], type[64], value[64];
+
+    if (tag_is(tag, "metadata")) { b->in_meta = tag[0] != '/'; return 0; }
+
+    if (b->in_meta && tag[0] == '/') {
+        const char *name = tag + 1;
+        if (tag_is(name, "title") && !b->out->title[0])
+            book_text(b->out->title, sizeof b->out->title, text);
+        else if (tag_is(name, "creator") && !b->out->author[0])
+            book_text(b->out->author, sizeof b->out->author, text);
+        return 0;
+    }
+
+    if (tag_is(tag, "meta") && attr(tag, "name", value, sizeof value) &&
+        !ts_ascii_casecmp(value, "cover"))
+        attr(tag, "content", b->cover_meta, sizeof b->cover_meta);
+
+    if (tag_is(tag, "item") && attr(tag, "href", href, sizeof href) &&
+        attr(tag, "media-type", type, sizeof type) &&
+        !ts_ascii_ncasecmp(type, "image/", 6)) {
+        if (!attr(tag, "id", id, sizeof id)) id[0] = 0;
+        if (attr(tag, "properties", type, sizeof type) &&
+            strstr(type, "cover-image") && !b->cover_prop[0])
+            book_copy(b->cover_prop, href, sizeof b->cover_prop);
+        if (!b->cover_named[0] && (strstr(id, "cover") || strstr(href, "cover")))
+            book_copy(b->cover_named, href, sizeof b->cover_named);
+        if (b->nimg < BOOK_IMAGES) {
+            book_copy(b->img[b->nimg].id, id, sizeof b->img[0].id);
+            book_copy(b->img[b->nimg].href, href, sizeof b->img[0].href);
+            b->nimg++;
+        }
+    }
+
+    if (tag_is(tag, "itemref") && tag[0] != '/')
+        b->out->parts++;
+    return 0;
+}
+
+int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
+                 ts_book *out)
+{
+    bs_arena a;
+    ts_zip *z;
+    bs_stream *member;
+    book_ctx b;
+    char opf[256], full[320];
+    const char *href = NULL;
+    bs_off_t at;
+    int rc, idx, i;
+
+    memset(out, 0, sizeof *out);
+    out->cover_at = -1;
+    a.base = arena; a.size = arena_size; a.used = 0;
+
+    rc = ts_zip_open(&z, &a, io);
+    if (rc != BS_OK) return rc;
+    idx = ts_zip_find(z, "META-INF/container.xml");
+    if (idx < 0) return BS_ERR_FORMAT;
+    opf[0] = 0;
+    rc = ts_zip_member(z, idx, &member);
+    if (rc != BS_OK) return rc;
+    rc = scan_tags(member, container_tag, opf);
+    if (rc != BS_OK) return rc;
+    if (!opf[0] || (idx = ts_zip_find(z, opf)) < 0) return BS_ERR_FORMAT;
+
+    memset(&b, 0, sizeof b);
+    b.out = out;
+    b.img = bs_alloc(&a, sizeof(book_img) * BOOK_IMAGES);
+    if (!b.img) return BS_ERR_NOMEM;
+    rc = ts_zip_member(z, idx, &member);
+    if (rc != BS_OK) return rc;
+    rc = scan_markup(member, book_tag, &b);
+    if (rc != BS_OK) return rc;
+
+    /* EPUB 3's cover-image, then EPUB 2's meta, then an image called cover */
+    if (b.cover_prop[0])
+        href = b.cover_prop;
+    else if (b.cover_meta[0]) {
+        for (i = 0; i < b.nimg; i++)
+            if (!strcmp(b.img[i].id, b.cover_meta)) href = b.img[i].href;
+    }
+    if (!href && b.cover_named[0])
+        href = b.cover_named;
+    if (!href)
+        return BS_OK;
+
+    {
+        char unescaped[256];
+        book_copy(unescaped, href, sizeof unescaped);
+        url_unescape(unescaped);
+        path_join(opf, unescaped, full, sizeof full);
+    }
+    idx = ts_zip_find(z, full);
+    if (idx < 0 ||
+        ts_zip_extent(z, idx, &at, &out->cover_csize, &out->cover_usize,
+                      &out->cover_method) != BS_OK)
+        return BS_OK;
+    out->cover_at = (long)at;
+    return BS_OK;
+}
