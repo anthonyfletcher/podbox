@@ -1032,6 +1032,9 @@ retry_with_limit:
 
                 /* found a tag matching one in tagList */
                 tag = buffer + bufferpos;
+                /* Where the frame's bytes start: read_unsynched() consumes
+                 * more of the file than it returns, by the zeros it drops */
+                off_t frame_pos = lseek(fd, 0, SEEK_CUR);
 
                 if(global_unsynch && version <= ID3_VER_2_3)
                     bytesread = read_unsynched(fd, tag, framelen);
@@ -1149,7 +1152,7 @@ retry_with_limit:
                     ((tr->tag_length == 4 && !memcmp( header, "APIC", 4)) ||
                      (tr->tag_length == 3 && !memcmp( header, "PIC" , 3))))
                 {
-                    entry->albumart.pos = lseek(fd, 0, SEEK_CUR) - framelen;
+                    entry->albumart.pos = frame_pos;
                     entry->albumart.size = totframelen;
                     entry->albumart.type = (unsynch || (global_unsynch && version <= ID3_VER_2_3))
                                            ? AA_FLAG_ID3_UNSYNC

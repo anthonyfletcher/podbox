@@ -28,11 +28,11 @@
  * earlier, the image starts 1-3 bytes into what is decoded. */
 #define B64_BACK 4
 
-/* id3tags.c places an unsynchronised image by counting decoded bytes
- * against raw ones, so its position can be a few bytes off either way, and
- * its length does not limit the bytes read. Decoding starts UNSYNC_BACK
- * bytes early, and the image is looked for in the first UNSYNC_SLACK. */
-#define UNSYNC_BACK  16
+/* id3tags.c places an unsynchronised image at its frame's start plus the
+ * frame header's decoded length, so a header unsync added a zero to (a
+ * UTF-16 description's byte order mark) leaves the image a little further
+ * on. It is looked for in the first UNSYNC_SLACK bytes. The length counts
+ * decoded bytes, so it does not limit the raw read either. */
 #define UNSYNC_SLACK 64
 
 enum image_kind { IMAGE_UNKNOWN, IMAGE_JPEG, IMAGE_PNG, IMAGE_BMP };
@@ -85,12 +85,10 @@ static int ogg_pull(bs_stream *s, uint8_t *buf, size_t n, size_t *out)
     return BS_OK;
 }
 
-/* The bytes of src, decoded, from B64_BACK characters early for base64 and
- * UNSYNC_BACK bytes early for unsync */
+/* The bytes of src, decoded, from B64_BACK characters early for base64 */
 static bs_stream *image_stream(bs_arena *a, const struct image_src *src)
 {
     bs_stream *s = bs_alloc(a, sizeof *s);
-    off_t pos = src->pos;
 
     if (!s)
         return NULL;
@@ -121,9 +119,7 @@ static bs_stream *image_stream(bs_arena *a, const struct image_src *src)
     }
 
     struct fd_st *f = bs_alloc(a, sizeof *f);
-    if (src->flags & AA_FLAG_ID3_UNSYNC)
-        pos = MAX(0, pos - UNSYNC_BACK);
-    if (!f || lseek(src->fd, pos, SEEK_SET) != pos)
+    if (!f || lseek(src->fd, src->pos, SEEK_SET) != src->pos)
         return NULL;
     f->fd = src->fd;
     f->left = (src->flags & AA_FLAG_ID3_UNSYNC) ? -1 : src->len;
