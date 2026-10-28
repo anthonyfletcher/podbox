@@ -114,4 +114,8 @@ void book_resume_each(book_resume_fn fn, void *data);
  * out from the file until this changes. */
 unsigned book_resume_writes(void);
 
+/* Saves the playing book each time the disk is about to spin down. Once,
+ * before bg_task_start(). */
+void book_resume_idle_init(void);
+
 #endif /* _BOOK_RESUME_H */

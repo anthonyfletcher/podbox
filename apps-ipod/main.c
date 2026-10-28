@@ -540,6 +540,7 @@ static void init_tagcache(void)
     tagcache_init();
     file_index_init();
     art_cache_init();
+    book_resume_idle_init();
     bg_task_start();
 
     while (!tagcache_is_initialized())

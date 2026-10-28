@@ -16,7 +16,8 @@
  * path carries the path as well, since playing it needs the file and not just
  * its key. Nothing is held in RAM between calls and every save rewrites the
  * file, which happens when a book stops being listened to rather than while it
- * plays.
+ * plays -- and once each time the disk is about to spin down, so a flat
+ * battery or a crash loses no more than was heard since the disk last ran.
  *
  * The two text formats an older firmware wrote are read only to convert them,
  * at the first boot of a new layout (book_resume_convert()).
@@ -32,6 +33,7 @@
  *   - positions keyed by the album alone, rekeyed
  *   - the track that ended, noted on the audio thread
  *   - writing: what is worth saving, marks, and the swap
+ *   - saving before the disk spins down
  ****************************************************************************/
 
 #include <stdio.h>
@@ -56,6 +58,8 @@
 #include "screens/browse/book_shelf.h"   /* book_shelf_near_end */
 #include "settings/settings.h"
 #include "system/strutil.h"     /* read_line */
+#include "system/bg_task.h"     /* the save at spin-down runs there */
+#include "ata_idle_notify.h"
 
 #define BOOK_RESUME_FILE  LIB_AUDIOBOOKS_FILE
 
@@ -820,4 +824,76 @@ void book_resume_save(void)
         rewrite(&e);
     }
     mutex_unlock(&book_mutex);
+}
+
+/* ------------------------------------------------------------------ *
+ * saving before the disk spins down                                  *
+ * ------------------------------------------------------------------ */
+
+/* The storage thread runs the idle callbacks just before the disk sleeps,
+ * on a stack of two kilobytes, too small for a save that walks the database
+ * and rewrites a file. So it hands the save to the background thread and
+ * waits for it, for a while: a write after the disk sleeps would wake it
+ * again. Past the wait the disk sleeps anyway and the save lands later. */
+#define IDLE_SAVE_WAIT  (HZ * 2)
+#define IDLE_SAVE_EVENT 1
+
+static struct semaphore idle_saved;
+static volatile bool idle_armed;
+
+static bool book_playing(void)
+{
+    const struct mp3entry *id3;
+
+    if (!global_settings.segregate_audiobooks
+        || !(audio_status() & AUDIO_STATUS_PLAY))
+        return false;
+    id3 = audio_current_track();
+    return id3 != NULL && db_spoken_is_spoken_genre(id3->genre_string);
+}
+
+static void idle_save_event(const struct queue_event *ev);
+static void idle_save_tick(void);
+static void idle_save_request(bool rebuild) { (void)rebuild; }
+
+static struct bg_task idle_save_task = {
+    .name = "book position",
+    .handle_event = idle_save_event,
+    .request = idle_save_request,
+    .tick = idle_save_tick,
+};
+
+/* Storage thread. The callback is one-shot, so the tick arms it again. */
+static void storage_idle(void)
+{
+    idle_armed = false;
+    if (!book_playing())
+        return;
+    bg_task_post(&idle_save_task, IDLE_SAVE_EVENT);
+    semaphore_wait(&idle_saved, IDLE_SAVE_WAIT);
+}
+
+/* Background thread */
+static void idle_save_event(const struct queue_event *ev)
+{
+    (void)ev;
+    book_resume_save();
+    semaphore_release(&idle_saved);
+}
+
+/* Background thread, every few seconds: a book playing gets a save at the
+ * next spin-down */
+static void idle_save_tick(void)
+{
+    if (!idle_armed && book_playing())
+    {
+        idle_armed = true;
+        register_storage_idle_func(storage_idle);
+    }
+}
+
+void book_resume_idle_init(void)
+{
+    semaphore_init(&idle_saved, 1, 0);
+    bg_task_init(&idle_save_task);
 }
