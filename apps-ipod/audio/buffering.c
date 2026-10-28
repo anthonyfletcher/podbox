@@ -49,7 +49,7 @@
 #include "draw/bmp.h"
 #include "metadata/albumart.h"
 #include "metadata/art_cache.h"
-#include "draw/jpeg_load.h"
+#include "draw/image_load.h"
 #include "playback.h"
 #include "buffering.h"
 #include "linked_list.h"
@@ -1006,14 +1006,15 @@ static int load_image(int fd, const char *path,
          * %Cl that loads it. */
         rc = art_cache_load_aat(fd, bmp, (int)max_size, NULL);
     }
-    else if (aa != NULL) {
-        lseek(fd, aa->pos, SEEK_SET);
-        rc = clip_jpeg_fd(fd, aa->type, aa->size, bmp, (int)max_size, format, NULL);
+    else {
+        struct image_src src = {
+            .fd = fd,
+            .pos = aa ? aa->pos : 0,
+            .len = aa ? aa->size : -1,
+            .flags = aa ? aa->type & ~AA_CLEAR_FLAGS_MASK : 0,
+        };
+        rc = image_load(&src, bmp, (int)max_size, format, NULL);
     }
-    else if (strcmp(path + strlen(path) - 4, ".bmp"))
-        rc = read_jpeg_fd(fd, bmp, (int)max_size, format, NULL);
-    else
-        rc = read_bmp_fd(fd, bmp, (int)max_size, format, NULL);
 
     return rc + (rc > 0 ? sizeof(struct bitmap) : 0);
 }
@@ -1125,9 +1126,9 @@ int bufopen(const char *file, off_t offset, enum data_type type,
         size = BM_SIZE(aa->dim->width, aa->dim->height, FORMAT_NATIVE, false);
         size += sizeof(struct bitmap);
 
-        /* JPEG loading requires extra memory
+        /* JPEG and PNG loading require extra memory
          * TODO: don't add unncessary overhead for .bmp images! */
-        size += JPEG_DECODE_OVERHEAD;
+        size += IMAGE_DECODE_OVERHEAD;
        /* resize_on_load requires space for 1 line + 2 spare lines */
         size += sizeof(struct uint32_argb) * 3 * aa->dim->width;
     }

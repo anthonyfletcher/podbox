@@ -76,6 +76,7 @@
 
 #include "metadata/albumart.h"
 #include "metadata/art_cache.h"
+#include "draw/image_load.h"       /* image_embedded_usable() */
 #include "skin/skin_albumart_color.h"   /* art loads invalidate the %Cl guard */
 
 #include "pcm_mixer.h"
@@ -2215,10 +2216,10 @@ static int audio_load_albumart(struct track_info *infop,
             checked_image_file = true;
         }
 
-        /* We can only decode jpeg for embedded AA */
+        /* We can only decode JPEG and PNG for embedded AA */
         if (!artist_art && global_settings.album_art != AA_OFF &&
             hid < 0 && hid != ERR_BUFFER_FULL &&
-            track_id3->has_embedded_albumart && (track_id3->albumart.type & AA_CLEAR_FLAGS_MASK) == AA_TYPE_JPG)
+            track_id3->has_embedded_albumart && image_embedded_usable(track_id3->albumart.type))
         {
             /* Tracks on the same album (same album+albumartist+discnum tags)
              * typically carry byte-identical embedded art -- reuse the

@@ -45,7 +45,7 @@
 #include "draw/bmp.h"
 #include "draw/img_filter.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
-#include "draw/jpeg_load.h"
+#include "draw/image_load.h"
 #include "events.h"
 #include "system/appevents.h"
 #include "audio.h"
@@ -100,10 +100,12 @@ struct aa_stamp
  * thumbnails a pass adopts as they stand rather than regenerating -- the case
  * for every folder cached before stamps existed, and after the stamp file is
  * lost. EMBEDDED is art from a track's tags. NO_EMBED is a folder whose track
- * was read and held no art, so a pass does not read it again. */
+ * was read and held no art, so a pass does not read it again. 2 is NO_EMBED
+ * as recorded when only JPEG was looked for: a pass takes it for neither, and
+ * reads the folder again for PNG. */
 #define AA_STAMP_NONE     0u
 #define AA_STAMP_EMBEDDED 1u
-#define AA_STAMP_NO_EMBED 2u
+#define AA_STAMP_NO_EMBED 3u
 
 /* tagcache_entry_key() of the last entry the marks cover, folded to 32 bits;
  * 0 for none. Read with the table. */
@@ -871,7 +873,7 @@ static unsigned int aa_art_stamp(const char *path)
 
     /* never one of the stamps that are not an image's */
     if (stamp <= AA_STAMP_NO_EMBED)
-        stamp += 3;
+        stamp += AA_STAMP_NO_EMBED + 1;
     return stamp;
 }
 
@@ -907,15 +909,15 @@ static void aa_remove_thumbs(unsigned int dh)
     }
 }
 
-/* Where an album-art image comes from: a file on disk (folder art), or a JPEG
- * blob embedded in an audio file (emb_pos >= 0, reusing metadata already parsed
- * by playback -- see aa_track_change_cb()). */
+/* Where an album-art image comes from: a file on disk (folder art), or an
+ * image embedded in an audio file (emb_pos >= 0, reusing metadata already
+ * parsed by playback -- see aa_track_change_cb()). */
 struct aa_src
 {
     const char   *path;      /* file to read: the folder image, or the track */
-    off_t         emb_pos;   /* embedded JPEG offset, or -1 for a whole file */
-    unsigned long emb_size;  /* embedded JPEG blob length (embedded only) */
-    int           emb_flags; /* embedded aa type/flags for clip_jpeg_fd */
+    off_t         emb_pos;   /* embedded image offset, or -1 for a whole file */
+    unsigned long emb_size;  /* embedded image length (embedded only) */
+    int           emb_flags; /* embedded mp3_albumart type and flags */
 };
 
 /* Read the source image into `bm` with `fmt`, requesting a `w` x `h` target (the
@@ -930,27 +932,19 @@ static int aa_read_source(const struct aa_src *src, struct bitmap *bm, int fmt,
     bm->height = h;
     bm->format = FORMAT_NATIVE;
 
-    if (src->emb_pos >= 0)
-    {
-        /* Embedded art -- always JPEG in Rockbox. lseek + clip_jpeg_fd is how
-         * the WPS decodes it, and it handles the ID3-unsync flag in emb_flags. */
-        int fd = open(src->path, O_RDONLY);
-        int rc;
-        if (fd < 0)
-            return -1;
-        lseek(fd, src->emb_pos, SEEK_SET);
-        rc = clip_jpeg_fd(fd, src->emb_flags, src->emb_size, bm,
-                          (int)workbuf_sz, fmt, NULL);
-        close(fd);
-        return rc;
-    }
+    struct image_src is = {
+        .fd = open(src->path, O_RDONLY),
+        .pos = src->emb_pos >= 0 ? src->emb_pos : 0,
+        .len = src->emb_pos >= 0 ? (off_t)src->emb_size : -1,
+        .flags = src->emb_pos >= 0 ? src->emb_flags & ~AA_CLEAR_FLAGS_MASK : 0,
+    };
+    int rc;
 
-    size_t namelen = strlen(src->path);
-    if (namelen >= 4 && strcmp(src->path + namelen - 4, ".bmp") != 0)
-    {
-        return read_jpeg_file(src->path, bm, (int)workbuf_sz, fmt, NULL);
-    }
-    return read_bmp_file(src->path, bm, (int)workbuf_sz, fmt, NULL);
+    if (is.fd < 0)
+        return -1;
+    rc = image_load(&is, bm, (int)workbuf_sz, fmt, NULL);
+    close(is.fd);
+    return rc;
 }
 
 /* Target size for an AA_FIT_COVER decode: scale so the SHORTER side lands on
@@ -1333,13 +1327,12 @@ static bool aa_find_file(const char *probe_path, bool artist)
            && aa_art_is_folders(probe_path, aa_artpath, artist);
 }
 
-/* Find the JPEG embedded in the track at `path`. Only JPEG: it is all the WPS
- * shows from a track's tags too. */
+/* Find the JPEG or PNG embedded in the track at `path` */
 static bool aa_find_embedded(const char *path, struct aa_src *src)
 {
     if (!get_metadata_ex(&aa_id3, -1, path, METADATA_EXCLUDE_ID3_PATH)
         || !aa_id3.has_embedded_albumart
-        || (aa_id3.albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
+        || !image_embedded_usable(aa_id3.albumart.type))
         return false;
     src->path = path;
     src->emb_pos = aa_id3.albumart.pos;
@@ -1487,7 +1480,7 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
     if (slot->stamp == AA_STAMP_EMBEDDED || slot->stamp > AA_STAMP_NO_EMBED)
         aa_remove_thumbs(dh);
     aa_miss = !embedded ? "no image file"
-              : aa_reread_tags ? "no image file or embedded JPEG"
+              : aa_reread_tags ? "no image file or embedded image"
               : "no image file; tags not read again until an Update";
     aa_miss_src = NULL;
     slot->stamp = embedded ? AA_STAMP_NO_EMBED : AA_STAMP_NONE;
@@ -1559,7 +1552,7 @@ static size_t aa_work_bytes(void)
 {
     return BM_SCALED_SIZE(ART_CACHE_MAX_DIM * ART_CACHE_COVER_MAX_ASPECT,
                           ART_CACHE_MAX_DIM, FORMAT_NATIVE, 0)
-           + JPEG_DECODE_OVERHEAD;
+           + IMAGE_DECODE_OVERHEAD;
 }
 
 static enum bg_result aa_run_pass(void)
@@ -1865,7 +1858,7 @@ static void aa_handle_offer(void)
     core_free(wh);
 }
 
-/* Playback thread: a track became current. If it carries embedded JPEG art, hand
+/* Playback thread: a track became current. If it carries embedded art, hand
  * its location to the aa thread (reusing the metadata playback already parsed) --
  * no decoding here. */
 static void aa_track_change_cb(unsigned short id, void *event_data)
@@ -1875,7 +1868,7 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     if (global_settings.art_cache_album_source == ART_SOURCE_FILES)
         return;
     if (!id3 || !id3->has_embedded_albumart ||
-        (id3->albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
+        !image_embedded_usable(id3->albumart.type))
         return;
 
     strlcpy(aa_offer.path, id3->path, sizeof(aa_offer.path));

@@ -2,8 +2,8 @@
  * GNU General Public License (version 2+)
  *
  * The byte-stream primitives from byte_stream.h, except inflate
- * (inflate.c): the arena, the file stream, and the ID3 unsync and base64
- * decoding stages.
+ * (inflate.c): the arena, exact reads and skips, the file stream, and the
+ * ID3 unsync and base64 decoding stages.
  ****************************************************************************/
 
 #include <string.h>
@@ -25,6 +25,36 @@ void *bs_alloc(bs_arena *a, size_t n)
     a->used = start + n;
     memset(a->base + start, 0, n);
     return a->base + start;
+}
+
+/* ---- reading -------------------------------------------------------- */
+
+int bs_read(bs_stream *s, void *buf, size_t n)
+{
+    uint8_t *p = buf;
+
+    while (n) {
+        size_t got;
+        int rc = bs_pull(s, p, n, &got);
+        if (rc != BS_OK) return rc;
+        if (!got) return BS_ERR_FORMAT;
+        p += got;
+        n -= got;
+    }
+    return BS_OK;
+}
+
+int bs_skip(bs_stream *s, unsigned long n)
+{
+    uint8_t tmp[64];
+
+    while (n) {
+        size_t k = n < sizeof tmp ? n : sizeof tmp;
+        int rc = bs_read(s, tmp, k);
+        if (rc != BS_OK) return rc;
+        n -= k;
+    }
+    return BS_OK;
 }
 
 /* ---- file stream ----------------------------------------------------- */

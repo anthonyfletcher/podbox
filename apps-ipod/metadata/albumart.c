@@ -22,6 +22,7 @@
 #include "art_cache.h"
 #include "settings/settings.h"
 #include "screens/playback/wps.h"
+#include "draw/image_load.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -63,11 +64,12 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
 }
 
 /* Whether an image the search has found can be drawn. The JPEG decoder takes
- * baseline and progressive Huffman-coded images only, and one it cannot read
- * must not stop the search: an arithmetic-coded cover.jpg would otherwise
- * hide a folder.jpg beside it, which the search only reaches later. Reads the
- * markers up to the frame header, and leaves anything it cannot place for
- * the decoder to judge. */
+ * baseline and progressive Huffman-coded images only, and the PNG reader no
+ * interlaced or very wide ones; one they cannot read must not stop the
+ * search: an arithmetic-coded cover.jpg would otherwise hide a folder.jpg
+ * beside it, which the search only reaches later. Reads a JPEG's markers up
+ * to the frame header, or a PNG's header, by content whatever the name, and
+ * leaves anything it cannot place for the decoder to judge. */
 static bool art_file_usable(const char *path)
 {
     unsigned char b[4];
@@ -77,13 +79,17 @@ static bool art_file_usable(const char *path)
 
     if (!file_exists(path))
         return false;
-    if (!ext || (strcasecmp(ext, ".jpg") && strcasecmp(ext, ".jpeg")))
+    if (!ext || (strcasecmp(ext, ".jpg") && strcasecmp(ext, ".jpeg")
+                 && strcasecmp(ext, ".png")))
         return true;
 
     fd = open(path, O_RDONLY);
     if (fd < 0)
         return false;
-    if (read(fd, b, 2) == 2 && b[0] == 0xff && b[1] == 0xd8)
+    i = read(fd, b, 2);
+    if (i == 2 && b[0] == 0x89 && b[1] == 'P')
+        usable = png_usable(fd);
+    else if (i == 2 && b[0] == 0xff && b[1] == 0xd8)
     {
         for (i = 0; i < 64 && read(fd, b, 4) == 4 && b[0] == 0xff; i++)
         {
@@ -105,8 +111,8 @@ static bool art_file_usable(const char *path)
     return usable;
 }
 
-static const char * const extensions[] = { "jpeg", "jpg", "bmp" };
-static const unsigned char extension_lens[] = { 4, 3, 3 };
+static const char * const extensions[] = { "jpeg", "jpg", "bmp", "png" };
+static const unsigned char extension_lens[] = { 4, 3, 3, 3 };
 /* Try checking for several file extensions, return true if a file is found and
  * leaving the path modified to include the matching extension.
  *
@@ -118,7 +124,7 @@ static const unsigned char extension_lens[] = { 4, 3, 3 };
 static bool try_exts(char *path, int len)
 {
     int i;
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < (int)ARRAYLEN(extensions); i++)
     {
         if (extension_lens[i] + len > MAX_PATH)
             continue;
@@ -129,20 +135,30 @@ static bool try_exts(char *path, int len)
     return false;
 }
 
+/* folder.jpg, then folder.png, in dir */
+static bool try_folder(char *path, size_t size, const char *dir)
+{
+    snprintf(path, size, "%sfolder.jpg", dir);
+    if (art_file_usable(path))
+        return true;
+    snprintf(path, size, "%sfolder.png", dir);
+    return art_file_usable(path);
+}
+
 /* Deliberately empty: it marks where an extension goes in the path-building
  * format strings below, e.g. "%scover%s." EXT builds "...cover.100x100."
  * for try_exts() to complete. */
 #define EXT
 
 /* Look for the first matching album art bitmap in the following list:
- *  ./<trackname><size>.{jpeg,jpg,bmp}
- *  ./<albumname><size>.{jpeg,jpg,bmp}
+ *  ./<trackname><size>.{jpeg,jpg,bmp,png}
+ *  ./<albumname><size>.{jpeg,jpg,bmp,png}
  *  ./cover<size>.bmp
- *  ./folder.jpg
- *  ../<albumname><size>.{jpeg,jpg,bmp}
- *  ../cover<size>.{jpeg,jpg,bmp}
- *  ../folder.jpg
- *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp}
+ *  ./folder.{jpg,png}
+ *  ../<albumname><size>.{jpeg,jpg,bmp,png}
+ *  ../cover<size>.{jpeg,jpg,bmp,png}
+ *  ../folder.{jpg,png}
+ *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png}
  * <size> is the value of the size_string parameter, <trackname> and
  * <albumname> are read from the ID3 metadata.
  * If a matching bitmap is found, its filename is stored in buf.
@@ -218,10 +234,7 @@ bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
         }
 
         if (!found && !*size_string)
-        {
-            snprintf (path, sizeof(path), "%sfolder.jpg", dir);
-            found = art_file_usable(path);
-        }
+            found = try_folder(path, sizeof(path), dir);
 
         artist = id3->albumartist != NULL ? id3->albumartist : id3->artist;
 
@@ -270,10 +283,7 @@ bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
             }
 
             if (!found && !*size_string)
-            {
-                snprintf(path, sizeof(path), "%sfolder.jpg", dir);
-                found = art_file_usable(path);
-            }
+                found = try_folder(path, sizeof(path), dir);
         }
         if (found)
             break;
@@ -323,7 +333,7 @@ static bool try_source(const struct mp3entry *id3, int kind, bool as_stored,
             return false;
         /* Unsynchronised or base64 bytes are not a JPEG until decoded */
         if (as_stored ? id3->albumart.type != AA_TYPE_JPG
-                      : (id3->albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
+                      : !image_embedded_usable(id3->albumart.type))
             return false;
         strmemccpy(src->path, id3->path, sizeof(src->path));
         src->pos = id3->albumart.pos;

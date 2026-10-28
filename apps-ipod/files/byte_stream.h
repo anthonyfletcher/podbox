@@ -65,6 +65,10 @@ static inline int bs_pull(bs_stream *s, uint8_t *b, size_t n, size_t *o)
     return s->pull(s, b, n, o);
 }
 
+/* Exactly n bytes, or BS_ERR_FORMAT if the stream ends first */
+int bs_read(bs_stream *s, void *buf, size_t n);
+int bs_skip(bs_stream *s, unsigned long n);
+
 /* ---- file-backed stream --------------------------------------------- */
 
 /* Reads [start, start+len) of the file. len < 0 means "to end of file". */
