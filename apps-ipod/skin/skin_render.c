@@ -148,7 +148,9 @@ get_child(OFFSETTYPE(struct skin_element**) children, int child)
  * point write_line() has drawn the row's background, so a rounded corner
  * blends with the row rather than with whatever was there before it. Only a
  * plain native bitmap can take the rounded path -- a mono or already-alpha'd
- * one needs bmp_part()'s own dispatch. */
+ * one needs bmp_part()'s own dispatch. A cover narrower or shorter than the
+ * box, a book's, is centred in it with the row showing at its sides, and
+ * drawn square-cornered: the corner mask is cut for the whole box. */
 static void draw_pending_aa(struct screen *display,
                             const struct viewport *vp,
                             const struct skin_draw_info *info)
@@ -157,8 +159,12 @@ static void draw_pending_aa(struct screen *display,
     const struct listitem *li = info->pending_aa_item;
     int aw = MIN(bmp->width, vp->width);
     int ah = MIN(bmp->height, vp->height);
+    int ax = (vp->width - aw) / 2;
+    int ay = (vp->height - ah) / 2;
+    bool whole = bmp->width == bmp->height;
 
-    if (li && li->radius && bmp->format == FORMAT_NATIVE && !bmp->alpha_offset)
+    if (li && li->radius && whole && bmp->format == FORMAT_NATIVE
+        && !bmp->alpha_offset)
     {
         display->set_drawmode(DRMODE_FG);
         bitmap_part_round(display, (const fb_data *)bmp->data,
@@ -169,7 +175,7 @@ static void draw_pending_aa(struct screen *display,
     else
     {
         display->set_drawmode(DRMODE_SOLID);
-        display->bmp_part(bmp, 0, 0, 0, 0, aw, ah);
+        display->bmp_part(bmp, 0, 0, whole ? 0 : ax, whole ? 0 : ay, aw, ah);
     }
     display->set_drawmode(DRMODE_SOLID);
 }

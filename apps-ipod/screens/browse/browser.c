@@ -329,6 +329,7 @@ static struct buflib_callbacks browser_aa_ops = {
 static struct {
     int      item;          /* -1 when empty */
     int      dim;
+    int      w, h;          /* the thumbnail's own: a book cover is narrower */
     uint32_t filter_hash;
 } browser_aa_slot[TREE_AA_SLOTS];
 
@@ -418,17 +419,19 @@ static bool browser_aa_ready(int want)
  *
  * Copied in whole, so it has to be stored the way it is drawn: rows. The list
  * size is (art_sizes.h), but that is checked rather than assumed -- a size
- * stored by columns would otherwise load without complaint and draw mirrored. */
+ * stored by columns would otherwise load without complaint and draw mirrored.
+ * A thumbnail fitted at its own shape, a book's cover, has one side at the
+ * size and the other short of it. */
 static bool browser_aa_load(const char *path, int slot,
                             const struct img_filter *filter)
 {
     struct art_cache_header hdr;
-    /* What this thumbnail occupies, against where the slot starts. The two
-     * differ whenever the size in use is below the ceiling the store was cut
-     * for, and reading with the wrong one lands every slot but the first on
-     * top of its neighbour. */
-    size_t bytes  = (size_t)browser_aa_dim * browser_aa_dim * FB_DATA_SZ;
+    /* Where the slot starts. It differs from what the thumbnail occupies
+     * whenever the size in use is below the ceiling the store was cut for,
+     * and reading with the wrong one lands every slot but the first on top
+     * of its neighbour. */
     size_t stride = browser_aa_slot_bytes();
+    size_t bytes;
     bool ok = false;
     int fd = open(path, O_RDONLY);
 
@@ -439,14 +442,20 @@ static bool browser_aa_load(const char *path, int slot,
         hdr.magic == ART_CACHE_MAGIC &&
         hdr.version == ART_CACHE_FORMAT_VERSION &&
         hdr.layout == AA_ROWS &&
-        hdr.width == browser_aa_dim && hdr.height == browser_aa_dim)
+        hdr.width > 0 && hdr.height > 0 &&
+        hdr.width <= browser_aa_dim && hdr.height <= browser_aa_dim &&
+        (hdr.width == browser_aa_dim || hdr.height == browser_aa_dim))
     {
         char *store = core_get_data_pinned(browser_aa_handle);
+
+        bytes = (size_t)hdr.width * hdr.height * FB_DATA_SZ;
         ok = read(fd, store + (size_t)slot * stride, bytes) == (ssize_t)bytes;
         if (ok && filter)
             img_filter_apply_banded((fb_data *)(store + (size_t)slot * stride),
-                                    browser_aa_dim, browser_aa_dim, filter);
+                                    hdr.width, hdr.height, filter);
         core_put_data_pinned(store);
+        browser_aa_slot[slot].w = hdr.width;
+        browser_aa_slot[slot].h = hdr.height;
     }
 
     close(fd);
@@ -509,14 +518,17 @@ const struct bitmap *browser_art_row(int selected_item, void *data,
     browser_aa_slot[slot].filter_hash = filter_hash;
 
 hit:
-    browser_aa_bm.width  = browser_aa_dim;
-    browser_aa_bm.height = browser_aa_dim;
+    browser_aa_bm.width  = browser_aa_slot[slot].w;
+    browser_aa_bm.height = browser_aa_slot[slot].h;
     browser_aa_bm.format = FORMAT_NATIVE;
     browser_aa_bm.data   = (unsigned char *)core_get_data(browser_aa_handle) +
                         (size_t)slot * browser_aa_slot_bytes();
     /* The size actually drawn, which the renderer clips to its viewport. */
     if (size)
-        size->width = size->height = browser_aa_dim;
+    {
+        size->width = browser_aa_bm.width;
+        size->height = browser_aa_bm.height;
+    }
     return &browser_aa_bm;
 }
 
