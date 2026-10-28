@@ -605,6 +605,17 @@ static const struct bitmap *shelf_get_albumart(int n, void *data,
                            filter_hash);
 }
 
+/* %Lr: how far through an In progress book, for a theme's gauge */
+static int shelf_get_range(int n, void *data)
+{
+    int v = rows[n];
+    (void)data;
+
+    if (ROW_IS_RESUME(v) || shelf_kind != BOOK_SHELF_IN_PROGRESS)
+        return -1;
+    return book_percent(&books[v]);
+}
+
 /* A book, as it is in the database browser's list of books. */
 static enum list_row_kind shelf_get_kind(int n, void *data)
 {
@@ -1220,6 +1231,7 @@ int book_shelf_run(void)
                              NULL);
         info.get_name = shelf_get_name;
         info.get_kind = shelf_get_kind;
+        info.get_range = shelf_get_range;
         /* Behind the setting that gives the browser's book list its covers.
          * The thumbnails are cached by row, and every round has new rows. */
         browser_albumart_invalidate();
