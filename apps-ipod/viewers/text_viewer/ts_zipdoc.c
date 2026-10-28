@@ -241,6 +241,7 @@ typedef struct {
     int       *spine;
     int        nspine, cur;
     int        opened;
+    int        part;          /* the one spine item read, or -1 for all */
 } sp_st;
 
 static int sp_next(sp_st *s)
@@ -267,6 +268,8 @@ static int sp_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
         int rc;
 
         if (!s->opened) {
+            if (s->part >= 0 && s->cur > s->part)
+                break;                        /* end of the chapter */
             rc = sp_next(s);
             /* A member that will not open is skipped, like a damaged one. */
             if (rc == BS_ERR_FORMAT || rc == BS_ERR_UNSUP) continue;
@@ -286,14 +289,29 @@ static int sp_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
     return BS_OK;
 }
 
+/* Back to the start of the chapter being read, or of the book */
 static int sp_reset(bs_stream *st)
 {
     sp_st *s = st->st;
 
-    s->cur = 0;
+    s->cur = s->part >= 0 ? s->part : 0;
     s->opened = 0;
     ts_tags_rewind(s->tags);
     return BS_OK;
+}
+
+int ts_zipdoc_seek_part(bs_stream *st, int part)
+{
+    sp_st *s = st->st;
+
+    if (part < 0 || part >= s->nspine) return BS_ERR_INVAL;
+    s->part = part;
+    return sp_reset(st);
+}
+
+int ts_zipdoc_parts(const bs_stream *st)
+{
+    return ((const sp_st *)st->st)->nspine;
 }
 
 /* ---- entry point ----------------------------------------------------- */
@@ -323,6 +341,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     if (!spine || !st || !sp) return BS_ERR_NOMEM;
 
     sp->z = z; sp->spine = spine; sp->nspine = 0; sp->cur = 0; sp->opened = 0;
+    sp->part = -1;
 
     /* --- which flavour of zip is this? --- */
     idx = ts_zip_find(z, "word/document.xml");
@@ -385,6 +404,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     if (!sp->tags) return BS_ERR_NOMEM;
 
     st->pull = sp_pull; st->reset = sp_reset; st->st = sp;
+    c->parts = st;
     c->detected = TS_CS_UTF8;      /* XML in OCF/OOXML containers is Unicode */
     *out = st;
     return BS_OK;

@@ -101,8 +101,15 @@ int  ts_open(ts_source **out, const bs_io *io, const char *name,
  * Never splits a UTF-8 sequence across calls. `n` must be >= 8. */
 long ts_read(ts_source *s, char *buf, size_t n);
 
-/* Restart from the beginning. Cheap for every format. */
+/* Restart from the beginning, or from the start of the part being read after
+ * ts_seek_part(). Cheap for every format. */
 int  ts_rewind(ts_source *s);
+
+/* Parts: an EPUB's spine items, each its own chapter file. 0 for a format
+ * without them. ts_seek_part() makes ts_read() return part `part` alone,
+ * from its first byte to its end; BS_ERR_UNSUP without parts. */
+int  ts_part_count(const ts_source *s);
+int  ts_seek_part(ts_source *s, int part);
 
 void ts_close(ts_source *s);
 

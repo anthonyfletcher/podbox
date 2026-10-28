@@ -12,6 +12,12 @@
  * almost always means "the page I just read", so the window absorbs
  * essentially all backward navigation at a flat cost. Only a jump behind the
  * window falls back to a rewind and re-extract.
+ *
+ * A book in parts (an EPUB's chapter files) is read one part at a time:
+ * ts_seek_part() starts any chapter as cheaply as the first, each chapter
+ * starts a new page, and the window, the offsets and the page stack all
+ * belong to the chapter on screen. Opening at a saved place, or paging back
+ * into the chapter before, then lays out one chapter at most.
  */
 
 #include <stdbool.h>
@@ -99,6 +105,9 @@ struct tv_state
     bool   eof;              /* extraction reached the end of the document */
 
     off_t  file_size;        /* of the document on disk, for resume staleness */
+
+    int    part;             /* the chapter on screen, which offsets count in */
+    int    nparts;           /* chapters, or 0 for a document without parts */
 
     off_t  pos;              /* first byte of the page on screen */
     off_t  next;             /* first byte of the page after it */
@@ -575,6 +584,12 @@ static void tv_show_loading(void)
 
 /* ---- navigation ------------------------------------------------------- */
 
+/* Past any offset a chapter can reach: tv_resume_to() to it lays out to the
+ * chapter's last page. */
+#define TV_OFF_MAX ((off_t)0x7fffffff)
+
+static void tv_resume_to(off_t target);
+
 /* True once the page on screen is the last one: nothing left to extract, and
  * the page after it starts at or past the final byte. */
 static bool tv_at_end(void)
@@ -609,26 +624,105 @@ static bool tv_reach(off_t target)
     return true;
 }
 
+/* Starts chapter `part` at its first byte, with an empty window and page
+ * stack. False if it has no text to show. */
+static bool tv_enter_part(int part)
+{
+    int rc;
+
+    cpu_boost(true);
+    rc = ts_seek_part(tv.src, part);
+    cpu_boost(false);
+    tv.part = part;
+    tv.win_start = 0;
+    tv.win_len = 0;
+    tv.eof = false;
+    tv.pos = tv.next = 0;
+    tv.sp = 0;
+    if (rc != BS_OK)
+        return false;
+    tv_ensure(0, 1);
+    return tv.win_len > 0;
+}
+
+/* The first page of the next chapter with text */
+static bool tv_next_part(void)
+{
+    int part;
+
+    for (part = tv.part + 1; part < tv.nparts; part++)
+        if (tv_enter_part(part))
+            return true;
+    return false;
+}
+
+/* The last page of the chapter before with text, laid out from its start */
+static bool tv_prev_part(void)
+{
+    int part;
+
+    for (part = tv.part - 1; part >= 0; part--)
+        if (tv_enter_part(part))
+        {
+            tv_resume_to(TV_OFF_MAX);
+            return true;
+        }
+    return false;
+}
+
+/* The next page, crossing into the next chapter from the last page of one.
+ * False at the end of the document, leaving the last page where it was. */
+static bool tv_advance(void)
+{
+    int part = tv.part;
+    off_t pos = tv.pos;
+
+    if (!tv_at_end())
+    {
+        if (tv.sp < TV_MAX_PAGES)
+            tv.stack[tv.sp++] = tv.pos;
+        tv.pos = tv.next;
+        return true;
+    }
+    if (!tv.nparts || part == tv.nparts - 1)
+        return false;
+    if (tv_next_part())
+        return true;
+    /* Nothing after it has text: back to where the reader was */
+    tv_enter_part(part);
+    tv_resume_to(pos);
+    return false;
+}
+
 static void tv_next_page(void)
 {
-    if (tv_at_end())
+    if (!tv_advance())
         return;
-
-    if (tv.sp < TV_MAX_PAGES)
-        tv.stack[tv.sp++] = tv.pos;
-    tv.pos = tv.next;
     tv_draw();
     tv_speak_page();
 }
 
 static void tv_prev_page(void)
 {
-    if (tv.sp == 0)
-        return;                              /* first page */
+    int part = tv.part;
 
-    if (!tv_reach(tv.stack[tv.sp - 1]))
-        return;
-    tv.sp--;
+    if (tv.sp == 0)
+    {
+        /* first page of the chapter: the last of the one before */
+        if (!tv.nparts || part == 0)
+            return;
+        if (!tv_prev_part())
+        {
+            tv_enter_part(part);       /* every chapter before is empty */
+            return;
+        }
+    }
+    else
+    {
+        if (!tv_reach(tv.stack[tv.sp - 1]))
+            return;
+        tv.sp--;
+    }
     tv_draw();
     tv_speak_page();
 }
@@ -637,16 +731,22 @@ static void tv_prev_page(void)
  * the rest of it behind what is still being said. */
 static void tv_turn_page(void)
 {
-    if (tv_at_end())
+    int part = tv.part;
+
+    if (!tv_advance())
     {
         tv_reading = false;
         return;
     }
-    if (tv.sp < TV_MAX_PAGES)
-        tv.stack[tv.sp++] = tv.pos;
-    tv.pos = tv.next;
     tv_draw();
     reset_poweroff_timer();     /* listening is not idle */
+    if (tv.part != part)
+    {
+        /* A new chapter: what was queued counted in the last one, and has
+         * all been said, as the page turns only when the voice is done */
+        tv_speak_page();
+        return;
+    }
     tv_queue_parts(tv_read_upto > tv.pos ? tv_read_upto : tv.pos, tv.next);
 }
 
@@ -704,9 +804,10 @@ static void tv_resume_to(off_t target)
     {
         off_t next = tv_page(tv.pos, false);
 
-        if (next <= tv.pos || next > target)
-            break;                           /* end of document, or target is
-                                              * on the page we are on */
+        if (next <= tv.pos || next > target
+            || (tv.eof && next >= tv.win_start + (off_t)tv.win_len))
+            break;                           /* the last page, or target is on
+                                              * the page we are on */
         if (tv.sp < TV_MAX_PAGES)
             tv.stack[tv.sp++] = tv.pos;
         tv.pos = next;
@@ -716,23 +817,78 @@ static void tv_resume_to(off_t target)
 
 /* ---- resume ----------------------------------------------------------- */
 
-/* One document's place, a record of TV_RESUME_FILE. `size` is the
- * document's length when the offset was recorded: offsets index the extracted
- * text, so a document that has changed on disk invalidates them, and the
- * length is the cheap half of noticing. (It cannot catch an edit that
- * preserves the length, nor a layout change -- page boundaries also move with
- * the font and spacing.) */
+/* One document's place, a record of TV_RESUME_FILE: a chapter, and an
+ * offset into its extracted text (the whole document's, without parts).
+ * `size` is the document's length when the offset was recorded: offsets
+ * index the extracted text, so a document that has changed on disk
+ * invalidates them, and the length is the cheap half of noticing. (It
+ * cannot catch an edit that preserves the length. A layout change moves the
+ * page boundaries, but the offset still points into the same sentence.) */
 struct tv_place
+{
+    int32_t part;            /* TV_PART_UNKNOWN: `off` counts from the start */
+    int32_t off;
+    int32_t size;
+    char path[MAX_PATH];
+};
+
+/* A place recorded before documents had parts, or by the text conversion */
+#define TV_PART_UNKNOWN (-1)
+
+/* Version 1 of the record, before parts */
+struct tv_place_v1
 {
     int32_t off;
     int32_t size;
     char path[MAX_PATH];
 };
 
+/* Version 1's places as version 2's, their chapters unknown */
+static void tv_places_upgrade(void)
+{
+    struct libfile_header h;
+    struct libfile_writer w;
+    struct tv_place_v1 old;
+    struct tv_place p;
+    bool ok;
+    int fd = libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC, 1,
+                          sizeof(old), &h, NULL);
+
+    if (fd < 0)
+        return;
+    ok = libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
+                       LIB_READING_VERSION, sizeof(p), NULL);
+    for (uint32_t i = 0; ok && i < h.count; i++)
+    {
+        if (read(fd, &old, sizeof(old)) != (ssize_t)sizeof(old))
+            break;
+        old.path[sizeof(old.path) - 1] = '\0';
+        memset(&p, 0, sizeof(p));
+        p.part = TV_PART_UNKNOWN;
+        p.off = old.off;
+        p.size = old.size;
+        strmemccpy(p.path, old.path, sizeof(p.path));
+        ok = libfile_write(&w, &p, sizeof(p), 1);
+    }
+    close(fd);
+    if (ok)
+        libfile_finish(&w, true);
+}
+
 static int tv_places_open(struct libfile_header *h)
 {
-    return libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC,
-                        LIB_READING_VERSION, sizeof(struct tv_place), h, NULL);
+    int fd = libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC,
+                          LIB_READING_VERSION, sizeof(struct tv_place), h,
+                          NULL);
+
+    if (fd == LIBFILE_BAD)
+    {
+        tv_places_upgrade();
+        fd = libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC,
+                          LIB_READING_VERSION, sizeof(struct tv_place), h,
+                          NULL);
+    }
+    return fd;
 }
 
 static bool tv_places_begin(struct libfile_writer *w)
@@ -751,22 +907,26 @@ static bool tv_place_read(int fd, struct tv_place *p)
 }
 
 /* Zeroed past the path, so the same places are the same bytes */
-static void tv_place_set(struct tv_place *p, off_t off, off_t size,
+static void tv_place_set(struct tv_place *p, int part, off_t off, off_t size,
                          const char *path)
 {
     memset(p, 0, sizeof(*p));
+    p->part = part;
     p->off = off;
     p->size = size;
     strmemccpy(p->path, path, sizeof(p->path));
 }
 
-static off_t tv_resume_load(const char *file, off_t size)
+/* The saved place in `file`, 0 and 0 if none; *part may be
+ * TV_PART_UNKNOWN */
+static off_t tv_resume_load(const char *file, off_t size, int *part)
 {
     struct libfile_header h;
     struct tv_place p;
     off_t off = 0;
     int fd = tv_places_open(&h);
 
+    *part = 0;
     if (fd < 0)
         return 0;
 
@@ -775,7 +935,10 @@ static off_t tv_resume_load(const char *file, off_t size)
         if (strcmp(p.path, file))
             continue;
         if ((off_t)p.size == size)
+        {
+            *part = p.part;
             off = p.off;
+        }
         break;                               /* first hit is the newest */
     }
 
@@ -785,7 +948,8 @@ static off_t tv_resume_load(const char *file, off_t size)
 
 /* Rewrites the list with `file` at the front, streaming the old records past
  * a single buffer rather than holding them all on the stack. */
-static void tv_resume_save(const char *file, off_t off, off_t size)
+static void tv_resume_save(const char *file, int part, off_t off,
+                           off_t size)
 {
     struct libfile_writer w;
     struct libfile_header h;
@@ -802,7 +966,7 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
     if (!tv_places_begin(&w))
         return;
 
-    tv_place_set(&p, off, size, file);
+    tv_place_set(&p, part, off, size, file);
     ok = libfile_write(&w, &p, sizeof(p), 1);
 
     old = tv_places_open(&h);
@@ -870,7 +1034,8 @@ bool text_viewer_convert_places(const char *text_file)
         if (!end_size || end_size[1] == '\0')
             continue;
         *end_size = '\0';
-        tv_place_set(&p, atoi(line), atoi(end_off + 1), end_size + 1);
+        tv_place_set(&p, TV_PART_UNKNOWN, atoi(line), atoi(end_off + 1),
+                     end_size + 1);
         ok = libfile_write(&w, &p, sizeof(p), 1);
         kept++;
     }
@@ -938,6 +1103,8 @@ static bool tv_open(const char *file)
     tv.eof = false;
     tv.pos = 0;
     tv.next = 0;
+    tv.part = 0;
+    tv.nparts = ts_part_count(tv.src);
     return true;
 }
 
@@ -1080,13 +1247,58 @@ static int tv_menu(void)
 static void tv_event_save(void *param)
 {
     (void)param;
-    tv_resume_save(tv.path, tv.pos, tv.file_size);
+    tv_resume_save(tv.path, tv.part, tv.pos, tv.file_size);
+}
+
+/* The chapter holding `off`, an offset into the whole book's text, which
+ * becomes an offset into that chapter's. Reads the book up to it once. */
+static int tv_find_part(off_t *off)
+{
+    for (int part = 0; part < tv.nparts; part++)
+    {
+        off_t len;
+
+        if (!tv_enter_part(part))
+            continue;
+        tv.pos = *off;          /* the window keeps its margin behind this */
+        tv_ensure(*off, 1);
+        len = tv.win_start + (off_t)tv.win_len;
+        if (*off < len)
+            return part;
+        *off -= len;
+    }
+    *off = 0;
+    return 0;
+}
+
+/* Opens at the saved place: in a book with parts, the chapter it is in,
+ * laid out from that chapter's start */
+static void tv_open_at(int part, off_t off)
+{
+    if (!tv.nparts)
+    {
+        if (off > 0)
+            tv_resume_to(off);
+        return;
+    }
+    if (part == TV_PART_UNKNOWN)
+    {
+        tv_splash_loading();
+        part = tv_find_part(&off);
+    }
+    if (part < 0 || part >= tv.nparts)
+        part = off = 0;
+    if (!tv_enter_part(part) && !tv_next_part())
+        tv_enter_part(0);       /* nothing after it has text */
+    else if (off > 0 && tv.part == part)
+        tv_resume_to(off);
 }
 
 int text_viewer(const char *file)
 {
     int ret = GO_TO_PREVIOUS;
     off_t resume;
+    int part;
 
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;
@@ -1106,9 +1318,8 @@ int text_viewer(const char *file)
         return GO_TO_PREVIOUS;
     }
 
-    resume = tv_resume_load(file, tv.file_size);
-    if (resume > 0)
-        tv_resume_to(resume);
+    resume = tv_resume_load(file, tv.file_size, &part);
+    tv_open_at(part, resume);
 
     tv_draw();
     tv_speak_page();
@@ -1161,7 +1372,7 @@ int text_viewer(const char *file)
 
   done:
     talk_shutup();             /* the page stops with the viewer */
-    tv_resume_save(file, tv.pos, tv.file_size);
+    tv_resume_save(file, tv.part, tv.pos, tv.file_size);
     tv_close();
     viewportmanager_theme_undo(SCREEN_MAIN, false);
     pop_current_activity();

@@ -224,6 +224,7 @@ struct ts_source {
     bs_io      io;
     ts_config  cfg;
     bs_stream *pipe;
+    bs_stream *parts;        /* the zip formats' spine stream, else NULL */
     ts_format  fmt;
     ts_charset cs;
     uint8_t    hold[4];      /* partial UTF-8 carried between ts_read calls */
@@ -273,6 +274,7 @@ int ts_open(ts_source **out, const bs_io *io, const char *name,
     ctx.arena = &a; ctx.io = &s->io; ctx.cfg = &s->cfg;
     ctx.head = head; ctx.hlen = (size_t)got; ctx.detected = s->cs;
     ctx.resolved = TS_FMT_UNKNOWN;
+    ctx.parts = NULL;
 
     switch (s->fmt) {
     case TS_FMT_PLAIN:
@@ -293,6 +295,7 @@ int ts_open(ts_source **out, const bs_io *io, const char *name,
     if (ctx.resolved != TS_FMT_UNKNOWN)
         s->fmt = ctx.resolved;
     s->cs = ctx.detected;
+    s->parts = ctx.parts;
 
     s->arena = a;
     s->eof = s->err = 0;
@@ -367,6 +370,24 @@ int ts_rewind(ts_source *s)
     if (!s) return BS_ERR_INVAL;
     if (!s->pipe->reset) return BS_ERR_UNSUP;
     rc = s->pipe->reset(s->pipe);
+    if (rc != BS_OK) return rc;
+    s->eof = s->err = 0;
+    s->hold_n = 0;
+    return BS_OK;
+}
+
+int ts_part_count(const ts_source *s)
+{
+    return s && s->parts ? ts_zipdoc_parts(s->parts) : 0;
+}
+
+int ts_seek_part(ts_source *s, int part)
+{
+    int rc;
+
+    if (!s) return BS_ERR_INVAL;
+    if (!s->parts) return BS_ERR_UNSUP;
+    rc = ts_zipdoc_seek_part(s->parts, part);
     if (rc != BS_OK) return rc;
     s->eof = s->err = 0;
     s->hold_n = 0;

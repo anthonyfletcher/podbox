@@ -90,6 +90,7 @@ typedef struct {
     size_t          hlen;
     ts_charset      detected;
     ts_format       resolved;   /* set by container back ends (epub/docx/fb2z) */
+    bs_stream      *parts;      /* the spine stream, for a zip back end */
 } ts_ctx;
 
 int ts_open_text (ts_ctx *c, ts_format fmt, bs_stream **out);  /* plain/md/rtf */
@@ -97,6 +98,10 @@ int ts_open_html (ts_ctx *c, bs_stream **out);
 int ts_open_fb2  (ts_ctx *c, bs_stream **out);
 int ts_open_epub (ts_ctx *c, bs_stream **out);
 int ts_open_docx (ts_ctx *c, bs_stream **out);
+/* On the stream ts_open_epub() returns: read spine item `part` alone, from its
+ * start, until another seek; and how many there are. */
+int ts_zipdoc_seek_part(bs_stream *st, int part);
+int ts_zipdoc_parts(const bs_stream *st);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);
 int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 
