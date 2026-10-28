@@ -878,6 +878,7 @@ struct user_settings
                                      player's own timeout, 0 always on */
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_align;        /* TV_ALIGN_* */
+    bool text_viewer_wheel_scrub; /* the wheel moves through the book */
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */
     int  text_viewer_footer;  /* TV_FOOTER_*: what the foot of the page shows */

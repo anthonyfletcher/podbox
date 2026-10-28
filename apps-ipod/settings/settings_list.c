@@ -1790,6 +1790,8 @@ const struct settings_list settings[] = {
         INT(LCD_RGBPACK(0xfa, 0xf3, 0xdc)), "text viewer page colour", UNUSED},
     OFFON_SETTING(0, text_viewer_margin, LANG_TEXT_VIEWER_MARGIN, true,
                   "text viewer margin", NULL),
+    OFFON_SETTING(0, text_viewer_wheel_scrub, LANG_TEXT_VIEWER_WHEEL_SCRUB,
+                  false, "text viewer wheel scrubs", NULL),
     CHOICE_SETTING(0, text_viewer_align, LANG_LYRICS_ALIGN, 0,
                    "text viewer alignment", "left,justified", NULL, 2,
                    ID2P(LANG_LEFT), ID2P(LANG_TEXT_VIEWER_JUSTIFIED)),

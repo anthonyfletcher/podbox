@@ -1127,6 +1127,11 @@ What the line at the foot of the page shows. Page counts the pages of the
 chapter; Chapter Progress shows the chapter and roughly how many pages are
 left in it; Book Progress shows how far through the book you are.
 
+[text viewer wheel scrubs]
+Turning the wheel moves through the book a percent at a time, showing the
+chapter and percentage it would go to; Select goes there, and Previous or
+Menu stays put. Off, the wheel sets Read Aloud's volume.
+
 [text viewer read aloud]
 Reads the text aloud in the synthesised voice, whether or not Speak Aloud is
 on. Each Page reads the page you turn to, finishing the sentence it ends in;

@@ -1649,8 +1649,89 @@ int text_viewer_contents(void)
 /* When the volume shown over the page is due to go, or 0 when none is */
 static long tv_volume_until;
 
-/* With Read Aloud on, the wheel sets the volume and shows it over the page
- * for a second; otherwise it does nothing. */
+/* ---- scrubbing with the wheel ------------------------------------------ */
+
+/* Wheel Scrubs: the wheel moves a target through the book a percent a click,
+ * shown over the page; Select jumps there, and Previous, Menu or a few idle
+ * seconds put the page back. Placed by the chapters' stored sizes, as Book
+ * Progress counts them. */
+#define TV_SCRUB_IDLE (HZ * 4)
+
+static int tv_scrub_pct = -1;   /* the target, or -1 when not scrubbing */
+static long tv_scrub_until;
+
+/* The chapter `pct` percent into the book falls in, and how far into it, in
+ * thousandths, in *within */
+static int tv_scrub_part(int pct, int *within)
+{
+    long total = 0, before = 0, size, at;
+    int i;
+
+    *within = 0;
+    for (i = 0; i < tv.nparts; i++)
+        total += ts_part_size(tv.src, i);
+    at = (long)((int64_t)total * pct / 100);
+    for (i = 0; i < tv.nparts - 1; i++)
+    {
+        size = ts_part_size(tv.src, i);
+        if (before + size > at)
+            break;
+        before += size;
+    }
+    size = ts_part_size(tv.src, i);
+    if (size > 0)
+        *within = (int)((int64_t)(at - before) * 1000 / size);
+    return i;
+}
+
+static void tv_scrub_show(void)
+{
+    int within;
+
+    if (tv.nparts > 1)
+        splashf(0, "%d/%d \xc2\xb7 %d%%",
+                tv_scrub_part(tv_scrub_pct, &within) + 1, tv.nparts,
+                tv_scrub_pct);
+    else
+        splashf(0, "%d%%", tv_scrub_pct);
+}
+
+static void tv_scrub(int step)
+{
+    if (tv_scrub_pct < 0)
+        tv_scrub_pct = tv_book_percent();
+    tv_scrub_pct = MIN(MAX(tv_scrub_pct + step, 0), 100);
+    tv_scrub_until = current_tick + TV_SCRUB_IDLE;
+    tv_scrub_show();
+}
+
+/* Ends the scrub, jumping to its target when `go` */
+static void tv_scrub_end(bool go)
+{
+    int pct = tv_scrub_pct, within;
+
+    tv_scrub_pct = -1;
+    if (go && !tv.nparts)
+        tv_resume_to((off_t)((int64_t)tv_text_len() * pct / 100));
+    else if (go)
+    {
+        int part = tv_scrub_part(pct, &within);
+
+        if (tv_enter_part(part) || tv_next_part())
+        {
+            if (tv.part == part && within > 0)
+                tv_resume_to((off_t)((int64_t)tv_text_len() * within / 1000));
+        }
+        else
+            tv_enter_part(0);
+    }
+    tv_draw();
+    if (go)
+        tv_speak_page();
+}
+
+/* With Read Aloud on and Wheel Scrubs off, the wheel sets the volume and
+ * shows it over the page for a second; otherwise it does nothing. */
 static void tv_volume(int steps)
 {
     char val[32];
@@ -1750,6 +1831,7 @@ int text_viewer(const char *file)
     tv.user_font = -1;           /* no font override loaded yet */
     tv.footer_font = -1;
     tv_volume_until = 0;
+    tv_scrub_pct = -1;
 
     /* Take the screen (theme off) and put up a clean loading frame before the
      * slow open -- the name splash for the container formats, a cleared
@@ -1776,7 +1858,17 @@ int text_viewer(const char *file)
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
         int action = get_action(CONTEXT_STD, continuous || tv_volume_until
+                                             || tv_scrub_pct >= 0
                                              ? HZ/10 : TIMEOUT_BLOCK);
+
+        /* A scrub takes the buttons that end it */
+        if (tv_scrub_pct >= 0 && (action == ACTION_STD_OK
+                                  || action == ACTION_STD_CANCEL
+                                  || action == ACTION_STD_MENU))
+        {
+            tv_scrub_end(action == ACTION_STD_OK);
+            continue;
+        }
 
         switch (action)
         {
@@ -1787,17 +1879,28 @@ int text_viewer(const char *file)
                     tv_volume_until = 0;
                     tv_draw();
                 }
+                if (tv_scrub_pct >= 0
+                    && TIME_AFTER(current_tick, tv_scrub_until))
+                    tv_scrub_end(false);
                 tv_read_on();
                 break;
 
+            /* The wheel scrubs when Wheel Scrubs is on, and otherwise sets
+             * the volume */
             case ACTION_STD_NEXT:
             case ACTION_STD_NEXTREPEAT:
-                tv_volume(1);
+                if (global_settings.text_viewer_wheel_scrub)
+                    tv_scrub(1);
+                else
+                    tv_volume(1);
                 break;
 
             case ACTION_STD_PREV:
             case ACTION_STD_PREVREPEAT:
-                tv_volume(-1);
+                if (global_settings.text_viewer_wheel_scrub)
+                    tv_scrub(-1);
+                else
+                    tv_volume(-1);
                 break;
 
             case ACTION_STD_OK:          /* forward button (>>|) */

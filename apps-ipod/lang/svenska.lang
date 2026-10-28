@@ -18143,6 +18143,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_WHEEL_SCRUB
+  desc: core text viewer: the wheel moves through the book
+  user: core
+  <source>
+    *: "Wheel Scrubs"
+  </source>
+  <dest>
+    *: "Hjulet bläddrar i boken"
+  </dest>
+  <voice>
+    *: "Hjulet bläddrar i boken"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

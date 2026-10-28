@@ -68,6 +68,8 @@ MENUITEM_SETTING(text_viewer_brightness,
 MENUITEM_SETTING(text_viewer_backlight,
                  &global_settings.text_viewer_backlight, NULL);
 MENUITEM_SETTING(text_viewer_align, &global_settings.text_viewer_align, NULL);
+MENUITEM_SETTING(text_viewer_wheel_scrub,
+                 &global_settings.text_viewer_wheel_scrub, NULL);
 MENUITEM_SETTING(text_viewer_margin,
                  &global_settings.text_viewer_margin, NULL);
 MENUITEM_SETTING(text_viewer_line_spacing,
@@ -232,6 +234,7 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_align,
           &text_viewer_line_spacing,
           &text_viewer_footer,
+          &text_viewer_wheel_scrub,
           &text_viewer_read_aloud,
           &text_viewer_larger_item,
           &text_viewer_smaller_item,
