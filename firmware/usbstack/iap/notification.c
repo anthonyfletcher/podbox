@@ -111,3 +111,12 @@ void iap_on_repeat_state(int state) {
     struct IAPContext* ctx = _iap_acquire_ctx(false);
     iap_notify_repeat_state(ctx, _iap_convert_repeat_state(state));
 }
+
+void iap_on_power_off(void) {
+    if(!iap_initialized) {
+        return;
+    }
+
+    struct IAPContext* ctx = _iap_acquire_ctx(false);
+    iap_notify_power_off(ctx);
+}

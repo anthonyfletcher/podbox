@@ -389,10 +389,8 @@ static uint8_t normalize_8(int val, int min, int max) {
 }
 
 IAPBool iap_platform_get_volume(struct IAPContext* iap_ctx, struct IAPPlatformVolumeStatus* status) {
-    (void)iap_ctx;
-
-    status->volume = _iap_convert_volume(global_status.volume);
-    status->muted  = iap_false;
+    status->muted  = iap_ctx->notification_data.mute_state;
+    status->volume = status->muted ? 0 : _iap_convert_volume(global_status.volume);
     return iap_true;
 }
 
@@ -640,13 +638,14 @@ IAPBool iap_platform_set_position(struct IAPContext* iap_ctx, uint32_t pos_ms) {
     return iap_true;
 }
 
-/* Muted is the lowest volume, until the next change of volume */
+/* Muted is the lowest volume, until the next change of volume, and is
+ * reported as level 0, muted, as the serial side reports it */
 void iap_platform_set_volume(struct IAPContext* iap_ctx, uint8_t volume, IAPBool muted) {
-    (void)iap_ctx;
     const int min = sound_min(SOUND_VOLUME);
     const int max = sound_max(SOUND_VOLUME);
     if(muted) {
         sound_set_volume(min);
+        iap_notify_volume(iap_ctx, 0, iap_true);
         return;
     }
     global_status.volume = min + (volume * (max - min) + 127) / 255;
@@ -673,7 +672,8 @@ IAPBool iap_platform_get_track_chapter(struct IAPContext* iap_ctx, uint32_t trac
 
 void iap_platform_chapter_tick(struct IAPContext* ctx) {
     struct iap_chapter_info info;
-    iap_notify_chapter_index(ctx, iap_current_chapter(&info) ? info.index : 0xFFFFFFFF);
+    const bool              has = iap_current_chapter(&info);
+    iap_notify_chapter_index(ctx, has ? info.index : 0xFFFFFFFF, has ? info.count : 0);
 }
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {

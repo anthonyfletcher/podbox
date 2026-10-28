@@ -3,6 +3,7 @@
 #include "iap.h"
 #include "macros.h"
 #include "spec/iap.h"
+#include "spec/lingoes/general/notify-ipod-state-change.h"
 
 void iap_notify_track_time_position(struct IAPContext* ctx, uint32_t pos_ms) {
     ctx->notification_data.track_time_position_ms = pos_ms;
@@ -15,6 +16,9 @@ void iap_notify_track_time_position(struct IAPContext* ctx, uint32_t pos_ms) {
 void iap_notify_track_playback_index(struct IAPContext* ctx, uint32_t index) {
     ctx->notification_data.track_playback_index = index;
     ctx->notifications_3 |= 1 << IAPIPodStateType_TrackPlaybackIndex;
+    /* Display Remote's chapter event names the track too, as the serial
+     * side's does */
+    ctx->notifications_3 |= 1 << IAPIPodStateType_ChapterIndex;
     ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_TrackIndex;
 }
 
@@ -29,11 +33,13 @@ void iap_notify_tracks_count(struct IAPContext* ctx, uint32_t count) {
     ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_PlaybackEngineContentsChanged;
 }
 
-void iap_notify_chapter_index(struct IAPContext* ctx, uint32_t index) {
-    if(index == ctx->notification_data.chapter_index) {
+void iap_notify_chapter_index(struct IAPContext* ctx, uint32_t index, uint16_t count) {
+    if(index == ctx->notification_data.chapter_index && count == ctx->notification_data.chapter_count) {
         return;
     }
     ctx->notification_data.chapter_index = index;
+    ctx->notification_data.chapter_count = count;
+    ctx->notifications_3 |= 1 << IAPIPodStateType_ChapterIndex;
     ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_ChapterIndex;
 }
 
@@ -55,6 +61,15 @@ void iap_notify_volume(struct IAPContext* ctx, uint8_t volume, IAPBool muted) {
     ctx->notification_data.volume     = volume;
     ctx->notification_data.mute_state = muted;
     ctx->notifications_3 |= 1 << IAPIPodStateType_Volume;
+    ctx->notifications_3 |= 1 << IAPIPodStateType_AbsoluteVolume;
+}
+
+/* For an accessory that identified by IdentifyDeviceLingoes, as the serial
+ * side tells one */
+void iap_notify_power_off(struct IAPContext* ctx) {
+    if(ctx->lingoes != 0) {
+        ctx->power_off_pending = iap_true;
+    }
 }
 
 void iap_notify_power_state(struct IAPContext* ctx, uint8_t state, uint8_t battery_level) {
@@ -141,6 +156,15 @@ static uint8_t play_status_to_extended(uint8_t status) {
 IAPBool _iap_flush_notification(struct IAPContext* ctx) {
     struct IAPSpan request = _iap_get_buffer_for_send_payload(ctx);
 
+    if(ctx->power_off_pending) {
+        struct IAPNotifyIPodStateChangePayload* payload = iap_span_alloc(&request, sizeof(*payload));
+        check_ret(payload != NULL, iap_false);
+        payload->state = IAPNotifyIPodStateChangeState_LostContextHibernate;
+        check_ret(_iap_send_packet(ctx, IAPLingoID_General, IAPGeneralCommandID_NotifyIPodStateChange, _iap_next_trans_id(ctx), request.ptr), iap_false);
+        ctx->power_off_pending = iap_false;
+        return iap_true;
+    }
+
     /* [1] P.257:
      *  Notifications for enabled events are sent every 500 ms,
      *  with the exception of volume change notifications, which are sent every 100 ms.
@@ -155,6 +179,11 @@ IAPBool _iap_flush_notification(struct IAPContext* ctx) {
     send_notify_3(IAPIPodStateTrackPlaybackIndexPayload,
                   IAPIPodStateType_TrackPlaybackIndex,
                   payload->index = swap_32(ctx->notification_data.track_playback_index));
+    send_notify_3(IAPIPodStateChapterIndexPayload,
+                  IAPIPodStateType_ChapterIndex,
+                  payload->index         = swap_32(ctx->notification_data.track_playback_index);
+                  payload->chapter_count = swap_16(ctx->notification_data.chapter_count);
+                  payload->chapter_index = swap_16((uint16_t)ctx->notification_data.chapter_index));
     send_notify_3(IAPIPodStateTrackCapsPayload,
                   IAPIPodStateType_TrackCaps,
                   payload->caps = swap_32(ctx->notification_data.track_caps));
@@ -184,6 +213,9 @@ IAPBool _iap_flush_notification(struct IAPContext* ctx) {
                   payload->day    = ctx->notification_data.time_setting.day;
                   payload->hour   = ctx->notification_data.time_setting.hour;
                   payload->minute = ctx->notification_data.time_setting.minute);
+    send_notify_3(IAPIPodStateHoldSwitchStatePayload,
+                  IAPIPodStateType_HoldSwitchState,
+                  payload->state = ctx->notification_data.hold_switch_state);
     send_notify_4(IAPPlayStatusChangeNotificationPlaybackStoppedPayload,
                   IAPStatusChangeNotificationType_PlaybackStopped, );
     send_notify_4(IAPPlayStatusChangeNotificationTrackIndexPayload,
@@ -209,6 +241,11 @@ freq_events:
                   IAPIPodStateType_Volume,
                   payload->mute_state = ctx->notification_data.mute_state;
                   payload->ui_volume  = ctx->notification_data.volume);
+    send_notify_3(IAPIPodStateAbsoluteVolumePayload,
+                  IAPIPodStateType_AbsoluteVolume,
+                  payload->mute_state      = ctx->notification_data.mute_state;
+                  payload->ui_volume       = ctx->notification_data.volume;
+                  payload->absolute_volume = ctx->notification_data.volume);
 
     ctx->flushing_notifications = iap_false;
     return iap_true;

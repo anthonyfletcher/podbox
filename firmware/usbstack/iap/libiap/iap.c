@@ -368,22 +368,31 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             if(type == IAPAccInfoType_AccInfoCaps) {
                 uint32_t caps;
                 check_ret(iap_span_read_32(request_span, &caps), -IAPAckStatus_EBadParameter);
-                /* name, firmware, hardware, manufacturer, model, serial
-                 * number and payload size: the items asked with no
-                 * argument */
-                const uint32_t simple = 1 << IAPAccInfoType_AccName |
-                                        0x1F << IAPAccInfoType_FirmwareVersion |
-                                        1 << IAPAccInfoType_MaxPayloadSize;
-                ctx->acc_info_caps = caps & simple;
+                /* the items from name (1) to payload size (9), as the
+                 * serial side asks */
+                ctx->acc_info_caps = caps & 0x3FE;
             }
             const uint32_t left = ctx->acc_info_caps & ~ctx->acc_info_asked;
             if(left == 0) {
                 response_span->ptr = NULL;
                 return 0;
             }
-            alloc_response(IAPGetAccInfoPayload);
-            response->type = __builtin_ctz(left);
-            ctx->acc_info_asked |= 1 << response->type;
+            const uint8_t next = __builtin_ctz(left);
+            ctx->acc_info_asked |= 1 << next;
+            check_ret(iap_span_write_8(response_span, next), -IAPAckStatus_EOutOfResource);
+            if(next == IAPAccInfoType_MinDeviceFirmwareVersion) {
+                /* the model, then the version ReturnIPodSoftwareVersion
+                 * reports */
+                uint8_t        buf[64];
+                struct IAPSpan model = {buf, sizeof(buf)};
+                check_ret(iap_platform_get_ipod_model_num(ctx, &model), -IAPAckStatus_ECommandFailed);
+                check_ret(iap_span_append(response_span, buf, 4), -IAPAckStatus_EOutOfResource);
+                check_ret(iap_span_write_8(response_span, 18), -IAPAckStatus_EOutOfResource);
+                check_ret(iap_span_write_8(response_span, 7), -IAPAckStatus_EOutOfResource);
+                check_ret(iap_span_write_8(response_span, 2), -IAPAckStatus_EOutOfResource);
+            } else if(next == IAPAccInfoType_MinLingoVersion) {
+                check_ret(iap_span_write_8(response_span, IAPLingoID_General), -IAPAckStatus_EOutOfResource);
+            }
             return IAPGeneralCommandID_GetAccessoryInfo;
         } break;
         case IAPGeneralCommandID_RequestIPodName: {
@@ -1337,8 +1346,7 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
         switch(command) {
         case IAPGeneralCommandID_IdentifyDeviceLingoes: {
             read_request(IAPIdentifyDeviceLingoesPayload);
-            ctx->by_lingoes     = iap_true;
-            ctx->display_remote = (swap_32(request->lingoes_bits) & IAPIdentifyDeviceLingoesLingoBits_DisplayRemote) != 0;
+            ctx->lingoes        = swap_32(request->lingoes_bits);
             ctx->acc_info_caps  = 0;
             ctx->acc_info_asked = 0;
             switch(swap_32(request->options) & IAPIdentifyDeviceLingoesOptions_AuthMask) {
@@ -1346,11 +1354,14 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
                 /* The rates are asked for once authenticated, so digital
                  * audio without authentication would never hear one: one
                  * with a device ID is authenticated all the same, as
-                 * ipod-gadget does, and one without is asked at once */
-                if(!(swap_32(request->lingoes_bits) & IAPIdentifyDeviceLingoesLingoBits_DigitalAudio)) {
-                    break;
+                 * ipod-gadget does. Any other is asked about itself at
+                 * once, as the serial side asks, then for its rates if
+                 * it takes digital audio. */
+                if((ctx->lingoes & IAPIdentifyDeviceLingoesLingoBits_DigitalAudio) && request->device_id != 0) {
+                    ctx->on_send_complete = transition_idps_to_auth_cb;
+                } else {
+                    ctx->on_send_complete = send_acc_info_caps_cb;
                 }
-                ctx->on_send_complete = request->device_id != 0 ? transition_idps_to_auth_cb : send_sample_rate_caps_cb;
                 break;
             /* deferred is "when the iPod asks", which may be now */
             case IAPIdentifyDeviceLingoesOptions_DeferAuth:
@@ -1361,7 +1372,8 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
             return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
         case IAPGeneralCommandID_StartIDPS: {
-            ctx->phase = IAPPhase_IDPS;
+            ctx->lingoes = 0;
+            ctx->phase   = IAPPhase_IDPS;
             return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
         }
@@ -1446,8 +1458,9 @@ static IAPBool send_volume_cb(struct IAPContext* ctx) {
 }
 
 /* An accessory that identified by IdentifyDeviceLingoes is asked what it
- * can say about itself, as the serial side asks one, before the rates; each
- * RetAccessoryInfo then asks for the next item it offers. */
+ * can say about itself, as the serial side asks one, then for its rates if
+ * it is authenticated or takes digital audio; each RetAccessoryInfo then
+ * asks for the next item it offers. */
 static IAPBool send_acc_info_caps_cb(struct IAPContext* ctx) {
     struct IAPSpan               request = _iap_get_buffer_for_send_payload(ctx);
     struct IAPGetAccInfoPayload* payload = iap_span_alloc(&request, sizeof(*payload));
@@ -1455,7 +1468,9 @@ static IAPBool send_acc_info_caps_cb(struct IAPContext* ctx) {
     payload->type        = IAPAccInfoType_AccInfoCaps;
     ctx->acc_info_asked |= 1 << IAPAccInfoType_AccInfoCaps;
     check_ret(_iap_send_packet(ctx, IAPLingoID_General, IAPGeneralCommandID_GetAccessoryInfo, _iap_next_trans_id(ctx), request.ptr), iap_false);
-    ctx->on_send_complete = send_sample_rate_caps_cb;
+    if(ctx->phase == IAPPhase_Authed || (ctx->lingoes & IAPIdentifyDeviceLingoesLingoBits_DigitalAudio)) {
+        ctx->on_send_complete = send_sample_rate_caps_cb;
+    }
     return iap_true;
 }
 
@@ -1502,9 +1517,9 @@ static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             response->status = IAPAckStatus_Success;
 
             ctx->phase            = IAPPhase_Authed;
-            ctx->on_send_complete = ctx->display_remote ? send_volume_cb
-                                  : ctx->by_lingoes     ? send_acc_info_caps_cb
-                                                        : send_sample_rate_caps_cb;
+            ctx->on_send_complete = ctx->lingoes & IAPIdentifyDeviceLingoesLingoBits_DisplayRemote ? send_volume_cb
+                                  : ctx->lingoes != 0                                            ? send_acc_info_caps_cb
+                                                                                                 : send_sample_rate_caps_cb;
 
             return IAPGeneralCommandID_AckAccessoryAuthenticationStatus;
         } break;

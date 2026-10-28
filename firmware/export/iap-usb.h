@@ -13,6 +13,7 @@ void iap_on_play_status(int status /* AUDIO_STATUS_* */);
 void iap_on_volume(int volume);
 void iap_on_shuffle_state(bool state);
 void iap_on_repeat_state(int state);
+void iap_on_power_off(void);
 #else
 static inline void iap_on_track_time_position(uint32_t pos_ms) {
     (void)pos_ms;
@@ -35,5 +36,7 @@ static inline void iap_on_shuffle_state(bool state) {
 }
 static inline void iap_on_repeat_state(int state) {
     (void)state;
+}
+static inline void iap_on_power_off(void) {
 }
 #endif

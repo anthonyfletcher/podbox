@@ -102,8 +102,7 @@ struct IAPContext {
     uint8_t                      db_record_type;
     uint8_t                      trans_id_support; /* TransIDSupport */
     uint8_t                      auth_major;       /* accessory's auth protocol */
-    IAPBool                      by_lingoes;       /* identified by IdentifyDeviceLingoes */
-    IAPBool                      display_remote;   /* IdentifyDeviceLingoes named it */
+    uint32_t                     lingoes;          /* IdentifyDeviceLingoes' bits, 0 by IDPS */
     uint32_t                     acc_info_caps;    /* RetAccessoryInfo's, those we ask */
     uint32_t                     acc_info_asked;   /* GetAccessoryInfo types sent */
     /* notification.c */
@@ -121,6 +120,7 @@ struct IAPContext {
     IAPBool  send_busy : 1;
     IAPBool  flushing_notifications : 1;
     IAPBool  waiting_for_audio_attrs_ack : 1;
+    IAPBool  power_off_pending : 1; /* NotifyIPodStateChange to send */
 
     uint8_t phase; /* IAPPhase */
 };

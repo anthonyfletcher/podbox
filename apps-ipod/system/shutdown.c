@@ -26,6 +26,7 @@
 #include "audio/playback.h" /* add_playbacklog */
 #include "storage.h"
 #include "usb_core.h"       /* usb_core_host_wrote_storage */
+#include "iap-usb.h"        /* iap_on_power_off */
 #include "ata_idle_notify.h"
 #include "dircache.h"
 #include "sound.h"
@@ -121,6 +122,10 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             splashf(0, "%s %s", str(LANG_WARNING_BATTERY_EMPTY),
                                 str(LANG_SHUTTINGDOWN));
         }
+
+        /* A USB dock is told now, while the saves below give the USB
+         * thread time to send it */
+        iap_on_power_off();
 
         if (batt_safe) /* do not save on critical battery */
         {
