@@ -110,6 +110,9 @@ int  ts_rewind(ts_source *s);
  * from its first byte to its end; BS_ERR_UNSUP without parts. */
 int  ts_part_count(const ts_source *s);
 int  ts_seek_part(ts_source *s, int part);
+/* A part's size as stored, its markup and all: known from the start, so a
+ * guide to how much of the book it is, not to its text. 0 without parts. */
+long ts_part_size(const ts_source *s, int part);
 
 /* The book's own table of contents: cb() gets each entry's title and the
  * part it starts in, in book order, and stops the walk by returning

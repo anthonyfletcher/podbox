@@ -381,6 +381,11 @@ int ts_part_count(const ts_source *s)
     return s && s->parts ? ts_zipdoc_parts(s->parts) : 0;
 }
 
+long ts_part_size(const ts_source *s, int part)
+{
+    return s && s->parts ? ts_zipdoc_part_size(s->parts, part) : 0;
+}
+
 int ts_seek_part(ts_source *s, int part)
 {
     int rc;

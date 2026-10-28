@@ -899,7 +899,7 @@ struct user_settings
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */
-    bool text_viewer_page_number; /* show the page number at the foot */
+    int  text_viewer_footer;  /* TV_FOOTER_*: what the foot of the page shows */
     int text_viewer_read_aloud;   /* TV_READ_* in text_viewer.h */
     /* Synchronised lyrics viewer (apps-ipod/viewers/lyric_viewer). */
     int lyric_colour_mode;        /* as text_viewer_colour_mode */

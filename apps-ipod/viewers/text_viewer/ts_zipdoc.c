@@ -356,6 +356,13 @@ int ts_zipdoc_parts(const bs_stream *st)
     return ((const sp_st *)st->st)->nspine;
 }
 
+long ts_zipdoc_part_size(const bs_stream *st, int part)
+{
+    const sp_st *s = st->st;
+    return (part >= 0 && part < s->nspine)
+           ? (long)ts_zip_size(s->z, s->spine[part]) : 0;
+}
+
 /* ---- contents -------------------------------------------------------- */
 
 #define TITLE_MAX 128

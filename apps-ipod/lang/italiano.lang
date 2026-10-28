@@ -17940,6 +17940,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_FOOTER
+  desc: core text viewer, what the line at the foot of the page shows
+  user: core
+  <source>
+    *: "Footer"
+  </source>
+  <dest>
+    *: "Piè di pagina"
+  </dest>
+  <voice>
+    *: "Piè di pagina"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_CHAPTER_PROGRESS
+  desc: core text viewer footer, chapter number and pages left in it
+  user: core
+  <source>
+    *: "Chapter Progress"
+  </source>
+  <dest>
+    *: "Avanzamento capitolo"
+  </dest>
+  <voice>
+    *: "Avanzamento capitolo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_BOOK_PROGRESS
+  desc: core text viewer footer, how far through the book
+  user: core
+  <source>
+    *: "Book Progress"
+  </source>
+  <dest>
+    *: "Avanzamento libro"
+  </dest>
+  <voice>
+    *: "Avanzamento libro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGES_LEFT
+  desc: core text viewer footer, pages left in the chapter
+  user: core
+  <source>
+    *: "Pages left: %d"
+  </source>
+  <dest>
+    *: "Pagine rimaste: %d"
+  </dest>
+  <voice>
+    *: "Pagine rimaste"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_LICENSE
   desc: in system menu, opens docs/COPYING (the GNU GPL)
   user: core

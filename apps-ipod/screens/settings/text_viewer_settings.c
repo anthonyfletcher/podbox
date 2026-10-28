@@ -23,8 +23,8 @@ MENUITEM_SETTING(text_viewer_margin,
                  &global_settings.text_viewer_margin, NULL);
 MENUITEM_SETTING(text_viewer_line_spacing,
                  &global_settings.text_viewer_line_spacing, NULL);
-MENUITEM_SETTING(text_viewer_page_number,
-                 &global_settings.text_viewer_page_number, NULL);
+MENUITEM_SETTING(text_viewer_footer,
+                 &global_settings.text_viewer_footer, NULL);
 /* Read Aloud means nothing without the synthesiser */
 static int read_aloud_callback(int action,
                                const struct menu_item_ex *this_item,
@@ -103,7 +103,7 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_colour_mode,
           &text_viewer_margin,
           &text_viewer_line_spacing,
-          &text_viewer_page_number,
+          &text_viewer_footer,
           &text_viewer_read_aloud,
           &text_viewer_font_item,
           &text_viewer_font_reset_item);

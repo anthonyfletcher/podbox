@@ -1108,8 +1108,10 @@ cost of a few characters per line.
 Extra pixels between lines. A little space makes a wall of text much easier to
 follow.
 
-[text viewer page number]
-Shows a page counter at the foot.
+[text viewer footer]
+What the line at the foot of the page shows. Page counts the pages of the
+chapter; Chapter Progress shows the chapter and roughly how many pages are
+left in it; Book Progress shows how far through the book you are.
 
 [text viewer read aloud]
 Reads the text aloud in the synthesised voice; shown while Speak Aloud is on

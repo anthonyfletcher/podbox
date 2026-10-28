@@ -329,7 +329,7 @@ static const struct tag_row tag_rows[] = {
 { "text viewer colour mode",  TAG_APPEARANCE,                    "text viewer colors" },
 { "text viewer margin",       TAG_APPEARANCE,                    "text viewer" },
 { "text viewer line spacing", TAG_ADVANCED|TAG_APPEARANCE,       "text viewer leading" },
-{ "text viewer page number",  TAG_APPEARANCE,                    "text viewer" },
+{ "text viewer footer",       TAG_APPEARANCE,                    "text viewer" },
 { "text viewer read aloud",   TAG_VOICE,                         "text viewer speak read book" },
 { "text viewer font",         TAG_APPEARANCE,                    "text viewer typeface" },
 { "lyric colour mode",        TAG_APPEARANCE,                    "lyrics colors" },

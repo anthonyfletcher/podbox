@@ -17932,6 +17932,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_FOOTER
+  desc: core text viewer, what the line at the foot of the page shows
+  user: core
+  <source>
+    *: "Footer"
+  </source>
+  <dest>
+    *: "フッター"
+  </dest>
+  <voice>
+    *: "フッター"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_CHAPTER_PROGRESS
+  desc: core text viewer footer, chapter number and pages left in it
+  user: core
+  <source>
+    *: "Chapter Progress"
+  </source>
+  <dest>
+    *: "章の進捗"
+  </dest>
+  <voice>
+    *: "章の進捗"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_BOOK_PROGRESS
+  desc: core text viewer footer, how far through the book
+  user: core
+  <source>
+    *: "Book Progress"
+  </source>
+  <dest>
+    *: "本の進捗"
+  </dest>
+  <voice>
+    *: "本の進捗"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGES_LEFT
+  desc: core text viewer footer, pages left in the chapter
+  user: core
+  <source>
+    *: "Pages left: %d"
+  </source>
+  <dest>
+    *: "残りページ: %d"
+  </dest>
+  <voice>
+    *: "残りページ"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_LICENSE
   desc: in system menu, opens docs/COPYING (the GNU GPL)
   user: core

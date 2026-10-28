@@ -156,6 +156,11 @@ const char *ts_zip_name(ts_zip *z, int i)
     return (i >= 0 && i < z->count) ? z->ent[i].name : NULL;
 }
 
+uint32_t ts_zip_size(ts_zip *z, int i)
+{
+    return (i >= 0 && i < z->count) ? z->ent[i].usize : 0;
+}
+
 int ts_zip_find(ts_zip *z, const char *path)
 {
     int i;

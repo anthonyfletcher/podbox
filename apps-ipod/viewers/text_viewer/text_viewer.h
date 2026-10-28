@@ -33,6 +33,15 @@ bool text_viewer_last_document(char *buf, size_t bufsize);
  * libfile, at the first boot of a new layout */
 bool text_viewer_convert_places(const char *text_file);
 
+/* text_viewer_footer */
+enum
+{
+    TV_FOOTER_OFF = 0,
+    TV_FOOTER_PAGE,
+    TV_FOOTER_CHAPTER,       /* chapter number and pages left in it */
+    TV_FOOTER_BOOK,          /* how far through the book */
+};
+
 /* text_viewer_read_aloud */
 enum
 {

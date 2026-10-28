@@ -299,14 +299,15 @@ static size_t tv_line_break(unsigned char *s, size_t avail, int width,
     return i;
 }
 
-/* Lays out one page from `start`, drawing it when `render` is set. Returns the
- * offset of the next page. */
-/* One line is reserved at the foot of the page for the page number. */
+/* One line is reserved at the foot of the page for the footer. */
 static int tv_footer_height(void)
 {
-    return global_settings.text_viewer_page_number ? tv.line_height : 0;
+    return global_settings.text_viewer_footer != TV_FOOTER_OFF
+           ? tv.line_height : 0;
 }
 
+/* Lays out one page from `start`, drawing it when `render` is set. Returns the
+ * offset of the next page. */
 static off_t tv_page(off_t start, bool render)
 {
     off_t off = start;
@@ -371,18 +372,77 @@ static void tv_fullscreen_vp(struct viewport *vp)
     vp->bg_pattern = tv.vp.bg_pattern;
 }
 
-/* The page number, right-aligned on the reserved bottom line. Drawn with
- * tv.vp current, so it uses the reading font and colours. */
+/* The text of the chapter, or of a document without chapters: exact once it
+ * has all been extracted, which for most chapters is at their first page,
+ * and until then no less than the size it is stored at, which bounds it */
+static off_t tv_text_len(void)
+{
+    off_t end = tv.win_start + (off_t)tv.win_len;
+    off_t stored = tv.nparts ? ts_part_size(tv.src, tv.part) : tv.file_size;
+
+    return tv.eof || stored < end ? end : stored;
+}
+
+/* Pages from the one after this to the end of the chapter, at the average
+ * page so far */
+static int tv_pages_left(void)
+{
+    off_t len = tv_text_len();
+    off_t per_page = tv.next / (tv.sp + 1);
+
+    if (tv.next >= len || per_page <= 0)
+        return 0;
+    return (len - tv.next + per_page - 1) / per_page;
+}
+
+/* How far through the book the page on screen ends, in percent: by the
+ * stored sizes of the chapters before it and the part of this one read */
+static int tv_book_percent(void)
+{
+    long before = 0, total = 0, size;
+    off_t len = tv_text_len();
+
+    if (!tv.nparts)
+        return len ? (int)((int64_t)tv.next * 100 / len) : 100;
+    for (int i = 0; i < tv.nparts; i++)
+    {
+        size = ts_part_size(tv.src, i);
+        if (i < tv.part)
+            before += size;
+        total += size;
+    }
+    size = ts_part_size(tv.src, tv.part);
+    if (len)
+        before += (long)((int64_t)size * MIN(tv.next, len) / len);
+    return total ? (int)((int64_t)before * 100 / total) : 0;
+}
+
+/* The footer, right-aligned on the reserved bottom line. Drawn with tv.vp
+ * current, so it uses the reading font and colours. */
 static void tv_draw_footer(void)
 {
     struct screen *d = &screens[SCREEN_MAIN];
-    char buf[16];
-    int tw, th;
+    char buf[64];
+    int tw, th, n = 0;
 
-    if (!global_settings.text_viewer_page_number)
+    switch (global_settings.text_viewer_footer)
+    {
+    case TV_FOOTER_PAGE:
+        snprintf(buf, sizeof buf, "%d", tv.sp + 1);
+        break;
+    case TV_FOOTER_CHAPTER:
+        if (tv.nparts > 1)
+            n = snprintf(buf, sizeof buf, "%d/%d \xc2\xb7 ",
+                         tv.part + 1, tv.nparts);
+        snprintf(buf + n, sizeof buf - n, str(LANG_TEXT_VIEWER_PAGES_LEFT),
+                 tv_pages_left());
+        break;
+    case TV_FOOTER_BOOK:
+        snprintf(buf, sizeof buf, "%d%%", tv_book_percent());
+        break;
+    default:
         return;
-
-    snprintf(buf, sizeof buf, "%d", tv.sp + 1);
+    }
     d->getstringsize((unsigned char *)buf, &tw, &th);
     d->putsxy(tv.vp.width - tw, tv.vp.height - tv.line_height,
               (unsigned char *)buf);

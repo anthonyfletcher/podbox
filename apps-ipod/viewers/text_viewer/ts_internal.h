@@ -59,6 +59,7 @@ int  ts_zip_open(ts_zip **out, bs_arena *a, const bs_io *io);
 /* Case-sensitive exact match on the stored path. */
 int  ts_zip_find(ts_zip *z, const char *path);      /* index, or BS_ERR_FORMAT */
 const char *ts_zip_name(ts_zip *z, int idx);
+uint32_t ts_zip_size(ts_zip *z, int idx);           /* uncompressed */
 int  ts_zip_count(ts_zip *z);
 /* Opens member `idx` as a stream. The returned stream is owned by `z` and is
  * invalidated by the next ts_zip_member() call. */
@@ -102,6 +103,7 @@ int ts_open_docx (ts_ctx *c, bs_stream **out);
  * start, until another seek; and how many there are. */
 int ts_zipdoc_seek_part(bs_stream *st, int part);
 int ts_zipdoc_parts(const bs_stream *st);
+long ts_zipdoc_part_size(const bs_stream *st, int part);
 int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
                   void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);
