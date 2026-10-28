@@ -84,6 +84,7 @@
 #include "metadata.h"
 #include "skin/wps_internals.h"
 #include "speech/talk.h"
+#include "audio/spoken_speed.h"   /* spoken_word_track */
 
 #define FF_REWIND_MAX_PERCENT 3 /* cap ff/rewind step size at max % of file */
                                 /* 3% of 30min file == 54s step size */
@@ -441,7 +442,11 @@ static void play_hop(int direction)
 {
     struct wps_state *state = get_wps_state();
     struct cuesheet *cue = state->id3->cuesheet;
-    long step = global_settings.skip_length*1000;
+    int length = global_settings.spoken_skip_length != -2
+                 && spoken_word_track(state->id3)
+                 ? global_settings.spoken_skip_length
+                 : global_settings.skip_length;
+    long step = length*1000;
     long elapsed = state->id3->elapsed;
     long remaining = state->id3->length - elapsed;
 

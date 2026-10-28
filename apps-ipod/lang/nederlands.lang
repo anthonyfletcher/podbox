@@ -18060,6 +18060,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPOKEN_SKIP_LENGTH
+  desc: skip length for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Skip Length"
+  </source>
+  <dest>
+    *: "Spronglengte gesproken woord"
+  </dest>
+  <voice>
+    *: "Spronglengte gesproken woord"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SAME_AS_MUSIC
+  desc: spoken word skip length: use the music skip length
+  user: core
+  <source>
+    *: "Same as Music"
+  </source>
+  <dest>
+    *: "Zelfde als muziek"
+  </dest>
+  <voice>
+    *: "Zelfde als muziek"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

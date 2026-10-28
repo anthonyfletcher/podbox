@@ -135,6 +135,7 @@ static const struct tag_row tag_rows[] = {
 { "chapter marks",       TAG_ADVANCED|TAG_PLAYBACK,        "chapter audiobook book m4b" },
 { "folder navigation",   TAG_PLAYBACK,                           "auto change directory next folder random constrain start" },
 { "skip length",         TAG_ADVANCED|TAG_PLAYBACK,                           "podcast jump" },
+{ "spoken word skip length", TAG_PLAYBACK,                                    "audiobook podcast jump" },
 { "spoken word speed",   TAG_PLAYBACK,                                        "audiobook podcast faster slower tempo" },
 { "prevent track skip",  TAG_ADVANCED|TAG_PLAYBACK,              "lock kiosk" },
 { "rewind across tracks",TAG_ADVANCED|TAG_PLAYBACK,              "rewind previous" },

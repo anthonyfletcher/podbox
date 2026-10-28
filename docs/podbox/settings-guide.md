@@ -124,6 +124,7 @@ Settings
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | No | **Adv** |
 | Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files and .mp3 files with chapter frames, and a book of more than 99 chapters lists the first 99 of them. | No | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | Skip Track | **Adv** |
+| Spoken Word Skip Length | Skip Length for audiobooks and podcasts alone, so a book can skip 30 seconds while music skips whole tracks. Same as Music uses Skip Length. | Same as Music |  |
 | Spoken Word Speed | Plays audiobooks and podcasts faster or slower without changing the voice's pitch; music always plays at its own speed. Also in Now Playing's menu while spoken word plays. The first change from 100% restarts the playing track once. | 100% |  |
 | Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | No | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | Auto | **Adv** |

@@ -587,6 +587,7 @@ struct user_settings
     unsigned char playlist_catalog_dir[MAX_PATHNAME+1];
     int skip_length; /* skip length */
     int spoken_speed; /* percent, for spoken word only */
+    int spoken_skip_length; /* skip_length for spoken word; -2 the same */
     int max_files_in_dir; /* Max entries in directory (file browser) */
     int max_files_in_playlist; /* Max entries in playlist */
     int volume_type;   /* how volume is displayed: 0=graphic, 1=percent */

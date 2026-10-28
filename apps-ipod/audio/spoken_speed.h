@@ -16,4 +16,9 @@ void spoken_speed_set(int pct);
 /* Whether the playing track is spoken word, which the speed applies to */
 bool spoken_speed_playing(void);
 
+struct mp3entry;
+/* Whether 'id3' is spoken word, by its genre: what Spoken Word Speed and
+ * Spoken Word Skip Length apply to */
+bool spoken_word_track(const struct mp3entry *id3);
+
 #endif /* _SPOKEN_SPEED_H_ */

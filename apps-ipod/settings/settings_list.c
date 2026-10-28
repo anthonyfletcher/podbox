@@ -224,6 +224,9 @@ static const char off_number_spell[] = "off,number,spell";
 /* Reading Backlight's: the player's own timeout, always on, then the
  * timeouts long enough to read a page by */
 static const int tv_backlight_times[] = {-1, 0, 30, 60, 120, 300, 600};
+/* Spoken Word Skip Length's: Same as Music, then Skip Length's own */
+static const int spoken_skip_times[] = {-2,-1,0,5,10,15,20,25,30,45,60,90,
+                                        120,180,240,300,600,900};
 static const int timeout_sec_common[] = {-1,0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,
                                         45,60,90,120,180,240,300,600,900,1200,
                                         1500,1800,2700,3600,4500,5400,6300,7200};
@@ -399,6 +402,22 @@ static int32_t getlang_time_unit_0_is_skip_track(int value, int unit)
         return LANG_SKIP_TRACK;
     else
         return talk_time_intervals(value, unit, false);
+}
+
+static const char* formatter_spoken_skip(char *buffer, size_t buffer_size,
+                                         int val, const char *unit)
+{
+    if (val == -2)
+        return str(LANG_SAME_AS_MUSIC);
+    return formatter_time_unit_0_is_skip_track(buffer, buffer_size, val,
+                                               unit);
+}
+
+static int32_t getlang_spoken_skip(int value, int unit)
+{
+    if (value == -2)
+        return LANG_SAME_AS_MUSIC;
+    return getlang_time_unit_0_is_skip_track(value, unit);
 }
 
 static const char* formatter_time_unit_0_is_eternal(char *buffer,
@@ -1844,6 +1863,10 @@ const struct settings_list settings[] = {
                   UNIT_SEC, formatter_time_unit_0_is_skip_track,
                   getlang_time_unit_0_is_skip_track, NULL,
                   25, timeout_sec_common),
+    TABLE_SETTING_LIST(F_TIME_SETTING, spoken_skip_length,
+                  LANG_SPOKEN_SKIP_LENGTH, -2, "spoken word skip length",
+                  "music,outro,track", UNIT_SEC, formatter_spoken_skip,
+                  getlang_spoken_skip, NULL, 18, spoken_skip_times),
     INT_SETTING(F_NO_WRAP, spoken_speed, LANG_SPOKEN_WORD_SPEED, 100,
                 "spoken word speed", UNIT_PERCENT, 50, 250, 5,
                 NULL, NULL, spoken_speed_set),

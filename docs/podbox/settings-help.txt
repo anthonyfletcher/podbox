@@ -333,6 +333,10 @@ twenty.
 Makes skip jump a fixed amount of time instead of a whole track. For long
 podcasts and mixes, where a track is an hour.
 
+[spoken word skip length]
+Skip Length for audiobooks and podcasts alone, so a book can skip 30 seconds
+while music skips whole tracks. Same as Music uses Skip Length.
+
 [spoken word speed]
 Plays audiobooks and podcasts faster or slower without changing the voice's
 pitch; music always plays at its own speed. Also in Now Playing's menu while

@@ -156,6 +156,8 @@ MAKE_MENU(unplug_menu, ID2P(LANG_HEADPHONE_UNPLUG), 0, Icon_NOICON,
           &unplug_mode, &unplug_autoresume);
 
 MENUITEM_SETTING(skip_length, &global_settings.skip_length, NULL);
+MENUITEM_SETTING(spoken_skip_length, &global_settings.spoken_skip_length,
+                 NULL);
 MENUITEM_SETTING(spoken_speed, &global_settings.spoken_speed, NULL);
 MENUITEM_SETTING(prevent_skip, &global_settings.prevent_skip, NULL);
 MENUITEM_SETTING(play_frequency, &global_settings.play_frequency, NULL);
@@ -175,7 +177,7 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
 
           &next_folder, &cuesheet, &chapter_marks
          ,&unplug_menu
-         ,&skip_length, &spoken_speed, &prevent_skip
+         ,&skip_length, &spoken_skip_length, &spoken_speed, &prevent_skip
           ,&play_frequency
         ,&playback_log
           /* All three were under General Settings, which is where anything

@@ -23,7 +23,7 @@
 #include "database/db_spoken.h"
 #include "spoken_speed.h"
 
-static bool is_spoken(const struct mp3entry *id3)
+bool spoken_word_track(const struct mp3entry *id3)
 {
     return id3 != NULL && db_spoken_is_spoken_genre(id3->genre_string);
 }
@@ -31,13 +31,13 @@ static bool is_spoken(const struct mp3entry *id3)
 bool spoken_speed_playing(void)
 {
     return (audio_status() & AUDIO_STATUS_PLAY)
-           && is_spoken(audio_current_track());
+           && spoken_word_track(audio_current_track());
 }
 
 /* The factor for 'id3': a no-op until the buffers are taken */
 static void apply(const struct mp3entry *id3)
 {
-    int pct = is_spoken(id3) ? global_settings.spoken_speed : 100;
+    int pct = spoken_word_track(id3) ? global_settings.spoken_speed : 100;
 
     dsp_set_timestretch(pct * PITCH_SPEED_PRECISION);
 }
