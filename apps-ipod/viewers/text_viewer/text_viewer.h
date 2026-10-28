@@ -33,6 +33,21 @@ bool text_viewer_last_document(char *buf, size_t bufsize);
  * libfile, at the first boot of a new layout */
 bool text_viewer_convert_places(const char *text_file);
 
+/* text_viewer_colour_mode; new ones go at the end, after the cfg names */
+enum
+{
+    TV_COLOUR_THEME = 0,
+    TV_COLOUR_INVERTED,
+    TV_COLOUR_BOW,           /* black on white */
+    TV_COLOUR_WOB,           /* white on black */
+    TV_COLOUR_CREAM,
+    TV_COLOUR_PEACH,
+    TV_COLOUR_YELLOW,
+    TV_COLOUR_SEPIA,
+    TV_COLOUR_NIGHT,
+    TV_COLOUR_CUSTOM,        /* text_viewer_fg on text_viewer_bg */
+};
+
 /* text_viewer_footer */
 enum
 {

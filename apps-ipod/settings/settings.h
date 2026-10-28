@@ -894,8 +894,9 @@ struct user_settings
     unsigned char bold_font_file[MAX_FILENAME+1];
     int glyphs_to_cache; /* default font allocation size in glyphs */
     /* Core text viewer (viewers/text_viewer). */
-    int text_viewer_colour_mode;  /* 0 theme, 1 inverted, 2 black-on-white,
-                                     3 white-on-black */
+    int text_viewer_colour_mode;  /* TV_COLOUR_* */
+    int text_viewer_fg;           /* TV_COLOUR_CUSTOM's text, native */
+    int text_viewer_bg;           /* and its page */
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */

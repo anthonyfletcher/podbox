@@ -1097,8 +1097,16 @@ Holding left or right scrolls a list rather than repeating whatever those
 buttons do on the current screen.
 
 [text viewer colour mode]
-Whether the text viewer follows the theme, inverts it, or uses plain black on
-white or white on black.
+Whether the text viewer follows the theme, inverts it, uses plain black on
+white or white on black, or a reading scheme: Cream, Peach, Yellow and Sepia
+are softer on the eyes than white, and Night is dim amber on black for a dark
+room. Custom uses a Text Colour and a Page Colour of your own.
+
+[action: Text Colour]
+The colour of the text when Colour Mode is Custom.
+
+[action: Page Colour]
+The colour behind the text when Colour Mode is Custom.
 
 [text viewer margin]
 Insets the text from the edges of the screen, which is easier to read at the

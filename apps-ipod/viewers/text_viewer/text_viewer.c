@@ -81,14 +81,6 @@
 /* Inset on each edge when the margin setting is on. */
 #define TV_MARGIN       15
 
-/* text_viewer_colour_mode values. */
-enum {
-    TV_COLOUR_THEME = 0,
-    TV_COLOUR_INVERTED,
-    TV_COLOUR_BOW,           /* black on white */
-    TV_COLOUR_WOB            /* white on black */
-};
-
 struct tv_state
 {
     struct ts_core_file file;
@@ -1253,6 +1245,31 @@ static void tv_apply_settings(void)
         case TV_COLOUR_WOB:
             tv.vp.fg_pattern = LCD_WHITE;
             tv.vp.bg_pattern = LCD_BLACK;
+            break;
+        /* The reading schemes: reading.md §5.1 has where each comes from */
+        case TV_COLOUR_CREAM:
+            tv.vp.fg_pattern = LCD_RGBPACK(0x33, 0x33, 0x33);
+            tv.vp.bg_pattern = LCD_RGBPACK(0xfa, 0xf3, 0xdc);
+            break;
+        case TV_COLOUR_PEACH:
+            tv.vp.fg_pattern = LCD_BLACK;
+            tv.vp.bg_pattern = LCD_RGBPACK(0xed, 0xd1, 0xb0);
+            break;
+        case TV_COLOUR_YELLOW:
+            tv.vp.fg_pattern = LCD_BLACK;
+            tv.vp.bg_pattern = LCD_RGBPACK(0xf8, 0xfd, 0x89);
+            break;
+        case TV_COLOUR_SEPIA:
+            tv.vp.fg_pattern = LCD_RGBPACK(0x5b, 0x46, 0x36);
+            tv.vp.bg_pattern = LCD_RGBPACK(0xf4, 0xec, 0xd8);
+            break;
+        case TV_COLOUR_NIGHT:
+            tv.vp.fg_pattern = LCD_RGBPACK(0xc8, 0xa0, 0x60);
+            tv.vp.bg_pattern = LCD_BLACK;
+            break;
+        case TV_COLOUR_CUSTOM:
+            tv.vp.fg_pattern = global_settings.text_viewer_fg;
+            tv.vp.bg_pattern = global_settings.text_viewer_bg;
             break;
         case TV_COLOUR_THEME:
         default:

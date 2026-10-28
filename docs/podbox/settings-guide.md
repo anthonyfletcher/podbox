@@ -481,7 +481,7 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Text Viewer ▸ Colour Mode | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | White on Black |  |
+| Text Viewer ▸ Colour Mode | Whether the text viewer follows the theme, inverts it, uses plain black on white or white on black, or a reading scheme: Cream, Peach, Yellow and Sepia are softer on the eyes than white, and Night is dim amber on black for a dark room. Custom uses a Text Colour and a Page Colour of your own. | White on Black |  |
 | Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
 | Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
 | Text Viewer ▸ Footer | What the line at the foot of the page shows. Page counts the pages of the chapter; Chapter Progress shows the chapter and roughly how many pages are left in it; Book Progress shows how far through the book you are. | No |  |

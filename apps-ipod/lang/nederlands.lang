@@ -17892,6 +17892,118 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_CREAM
+  desc: core text viewer colour mode: dark grey on cream
+  user: core
+  <source>
+    *: "Cream"
+  </source>
+  <dest>
+    *: "Crème"
+  </dest>
+  <voice>
+    *: "Crème"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_PEACH
+  desc: core text viewer colour mode: black on peach
+  user: core
+  <source>
+    *: "Peach"
+  </source>
+  <dest>
+    *: "Perzik"
+  </dest>
+  <voice>
+    *: "Perzik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_YELLOW
+  desc: core text viewer colour mode: black on yellow
+  user: core
+  <source>
+    *: "Yellow"
+  </source>
+  <dest>
+    *: "Geel"
+  </dest>
+  <voice>
+    *: "Geel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_SEPIA
+  desc: core text viewer colour mode: brown on parchment
+  user: core
+  <source>
+    *: "Sepia"
+  </source>
+  <dest>
+    *: "Sepia"
+  </dest>
+  <voice>
+    *: "Sepia"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_NIGHT
+  desc: core text viewer colour mode: dim amber on black
+  user: core
+  <source>
+    *: "Night"
+  </source>
+  <dest>
+    *: "Nacht"
+  </dest>
+  <voice>
+    *: "Nacht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_CUSTOM
+  desc: core text viewer colour mode: the reader picks both colours
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Aangepast"
+  </dest>
+  <voice>
+    *: "Aangepast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_TEXT_COLOUR
+  desc: core text viewer, the custom colour of the text
+  user: core
+  <source>
+    *: "Text Colour"
+  </source>
+  <dest>
+    *: "Tekstkleur"
+  </dest>
+  <voice>
+    *: "Tekstkleur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGE_COLOUR
+  desc: core text viewer, the custom colour of the page
+  user: core
+  <source>
+    *: "Page Colour"
+  </source>
+  <dest>
+    *: "Paginakleur"
+  </dest>
+  <voice>
+    *: "Paginakleur"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core
