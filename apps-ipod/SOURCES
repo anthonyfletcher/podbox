@@ -20,6 +20,7 @@ audio/pcmbuf.c
 audio/play_status.c
 audio/playback.c
 audio/remote_seek.c
+audio/spoken_speed.c
 audio/rbcodec_helpers.c
 audio/voice_thread.c
 #ifndef HAVE_HARDWARE_BEEP

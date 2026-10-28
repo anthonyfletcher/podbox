@@ -94,6 +94,10 @@ int core_load_bmp(const char *filename, struct bitmap *bm, const int bmformat,
     return 1;
 }
 
+/* bmp.c reports each row to the image readers' progress hook, which lives in
+ * resize.c; nothing here sets it. */
+bool (*image_row_hook)(int done, int rows);
+
 /* The parse buffer, which the parser asks the application layer for. Twice the
  * 5G's 512KB, because a parsed skin is about twice its size here: a 64-bit
  * host stores the parser's offsets as pointers, eight bytes where the player
@@ -342,6 +346,7 @@ void lcd_scroll_speed(int speed) { (void)speed; }
 void lcd_scroll_step(int pixels) { (void)pixels; }
 void lcd_set_sleep_after_backlight_off(int seconds) { (void)seconds; }
 void lineout_set(bool on) { (void)on; }
+void spoken_speed_set(int pct) { (void)pct; }
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
 void tv_out_size_set(int size) { (void)size; }
 #ifdef HAVE_VIDEOOUT_STANDARD

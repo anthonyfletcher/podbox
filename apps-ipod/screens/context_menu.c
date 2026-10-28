@@ -82,6 +82,7 @@
 #include "screens/browse/book_shelf.h"
 #include "metadata/book_resume.h"
 #include "metadata/book_marks.h"
+#include "audio/spoken_speed.h"    /* spoken_speed_playing */
 #include "screens/browse/listen_progress.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
@@ -1358,6 +1359,21 @@ MENUITEM_FUNCTION(delete_dir_item, 0, ID2P(LANG_DELETE_DIR),
 MENUITEM_FUNCTION(create_dir_item, 0, ID2P(LANG_CREATE_DIR),
                   clipboard_create_dir, clipboard_callback, Icon_NOICON);
 
+/* Spoken Word Speed, offered only while spoken word plays: music is not
+ * affected by it */
+static int wps_speed_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !spoken_speed_playing())
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_SETTING(wps_speed_item, &global_settings.spoken_speed,
+                 wps_speed_callback);
+
 static bool prepare_database_sel(void *param);
 
 /* Leave for the file browser, opened on the selected file. From the database
@@ -2049,6 +2065,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
            &go_to_album_item, &go_to_artist_item,
            &lyrics_item,
            &sleep_timer_item,
+           &wps_speed_item,
            &sound_mix_item,
            &spike_run_item,
            &wps_playlist_menu, &cat_playlist_menu,

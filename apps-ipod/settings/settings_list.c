@@ -73,6 +73,7 @@
 #include "database/sound_mix.h"         /* SOUND_MIX_MAX */
 
 #include "audio/voice_thread.h"
+#include "audio/spoken_speed.h"         /* spoken_speed_set */
 
 
 #define UNUSED {.RESERVED=NULL}
@@ -1843,6 +1844,9 @@ const struct settings_list settings[] = {
                   UNIT_SEC, formatter_time_unit_0_is_skip_track,
                   getlang_time_unit_0_is_skip_track, NULL,
                   25, timeout_sec_common),
+    INT_SETTING(F_NO_WRAP, spoken_speed, LANG_SPOKEN_WORD_SPEED, 100,
+                "spoken word speed", UNIT_PERCENT, 50, 250, 5,
+                NULL, NULL, spoken_speed_set),
     CHOICE_SETTING(F_CB_ON_SELECT_ONLY, start_in_screen, LANG_START_SCREEN, 1,
                    "start in screen", "previous,root,files,"
 #define START_DB_COUNT 1

@@ -18039,6 +18039,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPOKEN_WORD_SPEED
+  desc: playback speed of audiobooks and podcasts, in percent
+  user: core
+  <source>
+    *: "Spoken Word Speed"
+  </source>
+  <dest>
+    *: "Velocidade da palavra falada"
+  </dest>
+  <voice>
+    *: "Velocidade da palavra falada"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core
