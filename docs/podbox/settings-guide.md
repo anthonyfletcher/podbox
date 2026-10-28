@@ -252,7 +252,7 @@ it from its start. A book held in a single file has a chapter list only when Cha
 Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are
-in none of them. A book stopped in the last 2% of its last chapter counts as
+in none of them. A book stopped in its last 2% counts as
 Finished, so the closing credits need not play out. A book's context menu, on a shelf or in any Audiobooks list,
 offers ways to queue it, Add to Playlist, its info, Listening Progress, Show in
 Files and Mark as..., which moves it to any of the three until it is played

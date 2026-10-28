@@ -284,6 +284,55 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
     return found && mine == last;
 }
 
+bool book_shelf_near_end(const char *book, int disc, int tracknum,
+                         unsigned long elapsed)
+{
+    /* The book's length and what comes before the track, kept for the next
+     * call: the book is saved at every pause, and the track rarely changes */
+    static uint64_t had_book;
+    static uint32_t had_key;
+    static unsigned long long total, before;
+    struct tagcache_search tcs;
+    static char file[MAX_PATH];
+    static char id[BOOK_ID_MAX];
+    struct tagcache_album al;
+    uint64_t want = book_resume_key(book);
+    uint32_t mine = (uint32_t)(((disc < 0 ? 0 : disc & 0x7fff) << 16)
+                               | (tracknum < 0 ? 0 : tracknum & 0xffff));
+
+    if (want != had_book || mine != had_key)
+    {
+        had_book = 0;
+        total = before = 0;
+        if (!tagcache_search(&tcs, tag_filename))
+            return false;
+        tagcache_search_add_clause(&tcs, &spoken_clause);
+
+        while (tagcache_get_next(&tcs, file, sizeof(file)))
+        {
+            long length;
+
+            if (!tagcache_album_get(tagcache_album_of(tcs.idx_id), &al)
+                || !book_resume_id_of(al.album_seek, al.artist_seek, id,
+                                      sizeof(id))
+                || book_resume_key(id) != want)
+                continue;
+
+            length = tagcache_get_numeric(&tcs, tag_length);
+            if (length < 0)
+                length = 0;
+            total += (unsigned long)length;
+            if (track_key(&tcs) < mine)
+                before += (unsigned long)length;
+        }
+        tagcache_search_finish(&tcs);
+        had_book = want;
+        had_key = mine;
+    }
+
+    return total > 0 && (before + elapsed) * 50 >= total * 49;
+}
+
 /* Every album-table row that is a book, in table order for find_book().
  * Needs the database in RAM, where the tables are. */
 static bool collect_books(void)

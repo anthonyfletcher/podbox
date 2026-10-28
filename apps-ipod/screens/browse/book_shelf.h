@@ -55,4 +55,10 @@ int book_shelf_playing_marks(void);
  * is not found. */
 bool book_shelf_is_last_track(const char *book, uint64_t track);
 
+/* Whether 'elapsed' ms into the track numbered 'disc' and 'tracknum' is in
+ * the last 2% of the book 'book', counting every track of it. False where the
+ * book is not found. */
+bool book_shelf_near_end(const char *book, int disc, int tracknum,
+                         unsigned long elapsed);
+
 #endif /* _BOOK_SHELF_H */
