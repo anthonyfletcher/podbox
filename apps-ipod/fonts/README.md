@@ -20,6 +20,18 @@ the full faces it reads are in this tree -- `.build/` is a scratch directory
 -- which is why the built files are committed: a fresh clone has no way to
 make them.
 
+## `18-`, `20-`, `24-` and `28-noto-serif.fnt`
+
+The reader's other sizes, beside the 22 point that Scrim brings as its
+default, so Larger Text and Smaller Text have somewhere to go: those two step
+through whatever sizes of the reading font are installed. Full Noto Serif,
+as the 22 is -- every glyph the sans set has, so a book in any script the
+interface reads stays readable at every size -- which is why each is 2.5 to
+5 MB.
+
+Built by `.build/fonts/mkserif.py`, which, like the masters it reads, is not
+in this tree; hence the built files are committed.
+
 ## `24-spun-badges.fnt`
 
 The plate icons on Spun's badge cards: thirteen Material Symbols at 24x24,
@@ -43,6 +55,6 @@ these have to stand on their own.
 - Material Design Icons (`24-spun-badges`)
   - Created by Google (https://fonts.google.com/icons)
   - Apache License Version 2.0 — `LICENSE-Material-Design-Icons.txt`
-- Noto Serif (`NN-noto-serif-figures`)
+- Noto Serif (`NN-noto-serif-figures`, `NN-noto-serif`)
   - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
   - SIL Open Font License, Version 1.1 — `LICENSE-Noto.txt`
