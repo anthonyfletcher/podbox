@@ -52,7 +52,7 @@
 #include "ts_io_core.h"
 #include "text_viewer.h"
 #include "speech/talk.h"
-#include "speech/speech.h"     /* speech_enabled */
+#include "speech/speech.h"     /* speech_enabled, speech_reader */
 #include "audio/voice_thread.h" /* voice_is_playing */
 #include "powermgmt.h"   /* reset_poweroff_timer */
 #include "backlight.h"   /* backlight_set_brightness */
@@ -81,6 +81,10 @@
 
 /* Inset on each edge when the margin setting is on. */
 #define TV_MARGIN       15
+
+/* The footer's face, which every build ships (bundle-theme.sh). Without it
+ * the footer is drawn in the page's font. */
+#define TV_FOOTER_FONT  FONT_DIR "/12-noto-sans.fnt"
 
 struct tv_state
 {
@@ -111,6 +115,7 @@ struct tv_state
 
     int font;
     int user_font;           /* loaded font override, or -1 for the UI font */
+    int footer_font;         /* TV_FOOTER_FONT, or -1 to use tv.font */
     int line_height;
     struct viewport vp;
 };
@@ -292,11 +297,22 @@ static size_t tv_line_break(unsigned char *s, size_t avail, int width,
     return i;
 }
 
-/* One line is reserved at the foot of the page for the footer. */
+/* The footer's font: the small one where it is smaller than the page's */
+static int tv_footer_fid(void)
+{
+    if (tv.footer_font >= 0
+        && font_get(tv.footer_font)->height < font_get(tv.font)->height)
+        return tv.footer_font;
+    return tv.font;
+}
+
+/* One line of the footer's font is reserved at the foot of the page. */
 static int tv_footer_height(void)
 {
-    return global_settings.text_viewer_footer != TV_FOOTER_OFF
-           ? tv.line_height : 0;
+    if (global_settings.text_viewer_footer == TV_FOOTER_OFF)
+        return 0;
+    return tv_footer_fid() == tv.font ? tv.line_height
+                                      : (int)font_get(tv.footer_font)->height;
 }
 
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
@@ -411,7 +427,7 @@ static int tv_book_percent(void)
 }
 
 /* The footer, right-aligned on the reserved bottom line. Drawn with tv.vp
- * current, so it uses the reading font and colours. */
+ * current, so it uses the reading colours. */
 static void tv_draw_footer(void)
 {
     struct screen *d = &screens[SCREEN_MAIN];
@@ -436,9 +452,11 @@ static void tv_draw_footer(void)
     default:
         return;
     }
+    tv.vp.font = tv_footer_fid();
     d->getstringsize((unsigned char *)buf, &tw, &th);
-    d->putsxy(tv.vp.width - tw, tv.vp.height - tv.line_height,
+    d->putsxy(tv.vp.width - tw, tv.vp.height - tv_footer_height(),
               (unsigned char *)buf);
+    tv.vp.font = tv.font;
 }
 
 static void tv_draw(void)
@@ -1165,11 +1183,17 @@ static bool tv_open(const char *file)
 static void tv_close(void)
 {
     backlight_set_brightness(global_settings.brightness);
+    speech_reader(false);
 
     if (tv.user_font >= 0)
     {
         font_unload(tv.user_font);
         tv.user_font = -1;
+    }
+    if (tv.footer_font >= 0)
+    {
+        font_unload(tv.footer_font);
+        tv.footer_font = -1;
     }
 
     if (tv.src)
@@ -1222,6 +1246,9 @@ static void tv_apply_font(void)
     tv.user_font = fid;
     tv.font = (fid >= 0) ? fid : screens[SCREEN_MAIN].getuifont();
     tv.vp.font = tv.font;
+
+    if (tv.footer_font < 0)
+        tv.footer_font = font_load(TV_FOOTER_FONT);
 }
 
 /* (Re)reads the viewer settings into the viewport: font, colours, page margin
@@ -1234,7 +1261,8 @@ static void tv_apply_settings(void)
     int margin;
 
     tv_apply_font();
-    /* Put back in tv_close() */
+    /* Put back in tv_close(), as is the reader's claim on the voice */
+    speech_reader(global_settings.text_viewer_read_aloud != TV_READ_OFF);
     backlight_set_brightness(global_settings.text_viewer_brightness
                              ? global_settings.text_viewer_brightness
                              : global_settings.brightness);
@@ -1513,6 +1541,7 @@ int text_viewer(const char *file)
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;
     tv.user_font = -1;           /* no font override loaded yet */
+    tv.footer_font = -1;
 
     /* Take the screen (theme off) and put up a clean loading frame before the
      * slow open -- the name splash for the container formats, a cleared

@@ -1110,10 +1110,11 @@ chapter; Chapter Progress shows the chapter and roughly how many pages are
 left in it; Book Progress shows how far through the book you are.
 
 [text viewer read aloud]
-Reads the text aloud in the synthesised voice; shown while Speak Aloud is on
-with a voice other than Voice File Only. Each Page reads the page you turn to,
-finishing the sentence it ends in; Continuously turns the page itself and
-carries on, until the last page or until you leave.
+Reads the text aloud in the synthesised voice, whether or not Speak Aloud is
+on. Each Page reads the page you turn to, finishing the sentence it ends in;
+Continuously turns the page itself and carries on, until the last page or
+until you leave. With Speak Aloud off, opening a book with it on restarts the
+playing song once, to make room for the voice.
 
 [text viewer font]
 A font used only by the text viewer, so reading can use a different typeface

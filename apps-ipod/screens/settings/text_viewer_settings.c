@@ -9,7 +9,6 @@
 #include "config.h"
 #include "lang.h"
 #include "settings/settings.h"
-#include "speech/speech.h"
 #include "widgets/menu.h"
 #include "screens/browse/browser.h"            /* browse_context, rockbox_browse */
 #include "files/filetypes.h"       /* SHOW_FONT */
@@ -67,20 +66,8 @@ MENUITEM_SETTING(text_viewer_line_spacing,
                  &global_settings.text_viewer_line_spacing, NULL);
 MENUITEM_SETTING(text_viewer_footer,
                  &global_settings.text_viewer_footer, NULL);
-/* Read Aloud means nothing without the synthesiser */
-static int read_aloud_callback(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM
-        && !speech_wanted())
-        return ACTION_EXIT_MENUITEM;
-    return action;
-}
 MENUITEM_SETTING(text_viewer_read_aloud,
-                 &global_settings.text_viewer_read_aloud, read_aloud_callback);
+                 &global_settings.text_viewer_read_aloud, NULL);
 
 /* Pick a .fnt from the fonts folder, storing just its name in the setting;
  * unlike the theme's own font item this does not touch the global UI font. */

@@ -480,7 +480,7 @@ Shadow Colour only while there is a shadow to colour.
 | Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
 | Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
 | Text Viewer ▸ Footer | What the line at the foot of the page shows. Page counts the pages of the chapter; Chapter Progress shows the chapter and roughly how many pages are left in it; Book Progress shows how far through the book you are. | No |  |
-| Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice; shown while Speak Aloud is on with a voice other than Voice File Only. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. | Each Page |  |
+| Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice, whether or not Speak Aloud is on. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. With Speak Aloud off, opening a book with it on restarts the playing song once, to make room for the voice. | Each Page |  |
 | Text Viewer ▸ Font | A font used only by the text viewer, so reading can use a different typeface from the menus. It starts as 22-noto-serif; Use UI Font switches to the interface font. | 22-noto-serif |  |
 | Lyrics Viewer ▸ Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | Theme |  |
 | Lyrics Viewer ▸ Alignment | Whether lyric lines are aligned left, centred or right. | Centre |  |

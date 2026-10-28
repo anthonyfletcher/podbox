@@ -19,8 +19,13 @@
  * already holds the memory. */
 void speech_apply_settings(void);
 /* Speak Aloud is on with a voice the synthesiser speaks, or with Voice File
- * Only and no voice file to speak it */
+ * Only and no voice file to speak it; or a reader wants it */
 bool speech_wanted(void);
+
+/* A book is open with Read Aloud on, which wants the synthesiser whatever
+ * Speak Aloud says; false when it closes. Loads or frees it as
+ * speech_apply_settings() does. */
+void speech_reader(bool on);
 
 /* True while the synthesiser can speak. */
 bool speech_enabled(void);

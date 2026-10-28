@@ -62,7 +62,7 @@ cp "$ROOT/apps-ipod/fonts/"LICENSE-*.txt "$STAGE/.rockbox/fonts/"
 # the theme stopped using it, and the screen that named it falls back to the
 # system font without saying so. The check makes that a build failure instead.
 CORE_FONTS="26-noto-sans-medium.fnt 18-noto-sans-bold.fnt 18-noto-sans.fnt
-            24x24-icons.fnt 24-seven-fifteen.fnt"
+            12-noto-sans.fnt 24x24-icons.fnt 24-seven-fifteen.fnt"
 for font in $CORE_FONTS; do
     if [ ! -f "$ROOT/themes/scrim/.rockbox/fonts/$font" ]; then
         echo "bundle-theme.sh: the core loads $font; scrim dropped it" >&2
