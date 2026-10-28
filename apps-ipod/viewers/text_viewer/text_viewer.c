@@ -214,27 +214,75 @@ static int tv_width(unsigned char *s, size_t n)
     return w;
 }
 
-/* Bytes of `s` that fit in `width`, breaking at the last space. `*draw` gets
- * the length to render, excluding the break character; the return value is
- * what the line consumes, including it. Rockbox bitmap fonts have no kerning
- * -- font_getstringnsize() just sums per-glyph widths -- so accumulating word
- * widths is exact and avoids re-measuring the line prefix per word. */
-static size_t tv_line_break(unsigned char *s, size_t avail, int width,
-                            size_t *draw)
+/* A soft hyphen, U+00AD, is two bytes in UTF-8. It is invisible and takes
+ * no width, and a line may break at it with a '-' drawn. */
+static bool tv_is_shy(const unsigned char *s, size_t n)
+{
+    return n >= 2 && s[0] == 0xc2 && s[1] == 0xad;
+}
+
+/* tv_width() of `n` bytes at `s`, soft hyphens left out */
+static int tv_text_width(unsigned char *s, size_t n)
+{
+    size_t i = 0, start = 0;
+    int w = 0;
+
+    while (i < n)
+    {
+        if (tv_is_shy(s + i, n - i))
+        {
+            w += tv_width(s + start, i - start);
+            i += 2;
+            start = i;
+        }
+        else
+            i++;
+    }
+    return w + tv_width(s + start, n - start);
+}
+
+/* Width of a string constant, which tv_width() cannot be given: it writes
+ * past the end of what it measures */
+static int tv_literal_width(const char *s)
+{
+    int w;
+
+    font_getstringsize((const unsigned char *)s, &w, NULL, tv.font);
+    return w;
+}
+
+/* One line of the page, as tv_line_break() found it */
+struct tv_line
+{
+    size_t used;    /* bytes the line consumes, its break included */
+    size_t draw;    /* bytes it draws */
+    int width;      /* pixels they take */
+    bool hyphen;    /* broken at a soft hyphen: a '-' follows */
+    bool full;      /* ended because the next word did not fit */
+};
+
+/* The bytes of `s` that fit in `width`, breaking at the last space, or at a
+ * soft hyphen inside the word that does not fit. Rockbox bitmap fonts have no
+ * kerning -- font_getstringnsize() just sums per-glyph widths -- so
+ * accumulating word widths is exact and avoids re-measuring the line prefix
+ * per word. */
+static void tv_line_break(unsigned char *s, size_t avail, int width,
+                          struct tv_line *ln)
 {
     size_t i = 0;
     int used = 0;
 
+    ln->used = ln->draw = 0;
+    ln->width = 0;
+    ln->hyphen = ln->full = false;
+
     if (avail == 0)
-    {
-        *draw = 0;
-        return 0;
-    }
+        return;
 
     if (s[0] == '\n')                        /* explicit blank line */
     {
-        *draw = 0;
-        return 1;
+        ln->used = 1;
+        return;
     }
 
     while (i < avail)
@@ -245,10 +293,34 @@ static size_t tv_line_break(unsigned char *s, size_t avail, int width,
         while (word_end < avail && s[word_end] != ' ' && s[word_end] != '\n')
             word_end++;
 
-        word_w = tv_width(s + i, word_end - i);
+        word_w = tv_text_width(s + i, word_end - i);
 
         if (used + word_w > width)
         {
+            int dash_w = tv_literal_width("-");
+            size_t p;
+
+            ln->full = true;
+
+            /* The last soft hyphen in the word whose part fits, dash and
+             * all */
+            for (p = word_end; p-- > i; )
+            {
+                int part_w;
+
+                if (!tv_is_shy(s + p, word_end - p))
+                    continue;
+                part_w = tv_text_width(s + i, p - i);
+                if (used + part_w + dash_w <= width)
+                {
+                    ln->draw = p;
+                    ln->used = p + 2;
+                    ln->width = used + part_w + dash_w;
+                    ln->hyphen = true;
+                    return;
+                }
+            }
+
             if (i == 0)
             {
                 /* A single word too wide for the line: break inside it at the
@@ -264,28 +336,31 @@ static size_t tv_line_break(unsigned char *s, size_t avail, int width,
                     while (k < word_end && (s[k] & 0xc0) == 0x80)
                         k++;                 /* to the next codepoint start */
 
-                    cw = tv_width(s + j, k - j);
+                    cw = tv_text_width(s + j, k - j);
                     if (w + cw > width && j > 0)
                         break;
                     w += cw;
                     j = k;
                 }
-                *draw = j;
-                return j;
+                ln->draw = ln->used = j;
+                ln->width = w;
+                return;
             }
             break;                           /* line ends before this word */
         }
 
         used += word_w;
         i = word_end;
+        ln->width = used;
 
         if (i >= avail)
             break;
 
         if (s[i] == '\n')                    /* hard break ends the line */
         {
-            *draw = i;
-            return i + 1;
+            ln->draw = i;
+            ln->used = i + 1;
+            return;
         }
 
         /* s[i] is a space: it only stays if a word follows it on this line */
@@ -294,8 +369,89 @@ static size_t tv_line_break(unsigned char *s, size_t avail, int width,
     }
 
     /* Trim the trailing space from what is drawn, but still consume it. */
-    *draw = (i > 0 && s[i - 1] == ' ') ? i - 1 : i;
-    return i;
+    ln->draw = (i > 0 && s[i - 1] == ' ') ? i - 1 : i;
+    ln->used = i;
+}
+
+/* Draws `n` bytes of one word at x, soft hyphens left out; returns the x
+ * after it */
+static int tv_put_word(unsigned char *s, size_t n, int x, int y)
+{
+    size_t i = 0, start = 0;
+
+    while (i <= n)
+    {
+        if (i == n || tv_is_shy(s + i, n - i))
+        {
+            unsigned char save = s[i];
+
+            s[i] = '\0';
+            screens[SCREEN_MAIN].putsxy(x, y, s + start);
+            s[i] = save;
+            x += tv_width(s + start, i - start);
+            i += 2;
+            start = i;
+        }
+        else
+            i++;
+    }
+    return x;
+}
+
+/* Draws a line at y. With Alignment Justified, a full line's leftover pixels
+ * are shared out between its spaces; a paragraph's last line stays left.
+ * A line with neither that nor a soft hyphen in it is drawn in one call. */
+static void tv_draw_line(unsigned char *s, const struct tv_line *ln, int y)
+{
+    bool justify = global_settings.text_viewer_align == TV_ALIGN_JUSTIFIED
+                   && ln->full;
+    bool shy = false;
+    int gaps = 0, gap = 0, extra = 0, space_w, x = 0;
+    size_t i;
+
+    for (i = 0; i < ln->draw; i++)
+    {
+        if (s[i] == ' ')
+            gaps++;
+        else if (tv_is_shy(s + i, ln->draw - i))
+            shy = true;
+    }
+
+    if (!shy && !ln->hyphen && (!justify || gaps == 0))
+    {
+        unsigned char save = s[ln->draw];
+
+        s[ln->draw] = '\0';
+        screens[SCREEN_MAIN].putsxy(0, y, s);
+        s[ln->draw] = save;
+        return;
+    }
+
+    space_w = tv_literal_width(" ");
+    if (justify)
+        extra = tv.vp.width - ln->width;
+
+    i = 0;
+    while (i < ln->draw)
+    {
+        size_t j = i;
+
+        if (s[i] == ' ')
+        {
+            x += space_w;
+            if (justify)
+                x += extra * (gap + 1) / gaps - extra * gap / gaps;
+            gap++;
+            i++;
+            continue;
+        }
+        while (j < ln->draw && s[j] != ' ')
+            j++;
+        x = tv_put_word(s + i, j - i, x, y);
+        i = j;
+    }
+    if (ln->hyphen)
+        screens[SCREEN_MAIN].putsxy(x, y, (unsigned char *)"-");
 }
 
 /* The footer's font: the small one where it is smaller than the page's */
@@ -326,7 +482,8 @@ static off_t tv_page(off_t start, bool render)
     while (y + tv.line_height <= tv.vp.height - tv_footer_height())
     {
         unsigned char *s;
-        size_t avail, draw, used;
+        size_t avail;
+        struct tv_line ln;
 
         if (!tv_ensure(off, TV_PAGE_MAX))
             break;
@@ -336,20 +493,14 @@ static off_t tv_page(off_t start, bool render)
             break;                           /* end of document */
 
         s = tv.win + (off - tv.win_start);
-        used = tv_line_break(s, avail, tv.vp.width, &draw);
-        if (used == 0)
+        tv_line_break(s, avail, tv.vp.width, &ln);
+        if (ln.used == 0)
             break;
 
-        if (render && draw > 0)
-        {
-            unsigned char save = s[draw];
+        if (render && ln.draw > 0)
+            tv_draw_line(s, &ln, y);
 
-            s[draw] = '\0';
-            screens[SCREEN_MAIN].putsxy(0, y, s);
-            s[draw] = save;
-        }
-
-        off += used;
+        off += ln.used;
         y += tv.line_height;
     }
 
@@ -525,6 +676,22 @@ static off_t tv_part_end(off_t from, off_t limit, bool *stop)
 
 /* Queue the parts from `from` that start before `page_end`, the last
  * running on to its own end. */
+/* Drops the soft hyphens from `n` bytes at `s`, which would split a word
+ * for the voice; the length left */
+static size_t tv_strip_shy(unsigned char *s, size_t n)
+{
+    size_t r = 0, w = 0;
+
+    while (r < n)
+    {
+        if (tv_is_shy(s + r, n - r))
+            r += 2;
+        else
+            s[w++] = s[r++];
+    }
+    return w;
+}
+
 static void tv_queue_parts(off_t from, off_t page_end)
 {
     static char text[TV_READ_AHEAD + 2];
@@ -551,6 +718,7 @@ static void tv_queue_parts(off_t from, off_t page_end)
             stop = false;
         }
         memcpy(text, tv.win + (from - tv.win_start), n);
+        n = tv_strip_shy((unsigned char *)text, n);
         while (n > 0 && (text[n - 1] == ' ' || text[n - 1] == '\n'
                          || text[n - 1] == '\r' || text[n - 1] == '\t'))
             n--;

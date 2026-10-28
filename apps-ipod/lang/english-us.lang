@@ -18117,6 +18117,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_JUSTIFIED
+  desc: core text viewer alignment: lines spread to both edges
+  user: core
+  <source>
+    *: "Justified"
+  </source>
+  <dest>
+    *: "Justified"
+  </dest>
+  <voice>
+    *: "Justified"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

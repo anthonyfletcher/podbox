@@ -57,6 +57,13 @@ enum
     TV_FOOTER_BOOK,          /* how far through the book */
 };
 
+/* text_viewer_align */
+enum
+{
+    TV_ALIGN_LEFT = 0,
+    TV_ALIGN_JUSTIFIED,
+};
+
 /* text_viewer_read_aloud */
 enum
 {

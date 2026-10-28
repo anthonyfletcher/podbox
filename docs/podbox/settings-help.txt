@@ -1110,6 +1110,10 @@ How long the backlight stays on after the last button press while the text
 viewer is open, put back to the player's own Backlight when you leave it.
 Always keeps it lit, which costs battery if the player is set down mid-page.
 
+[text viewer alignment]
+Justified spreads each full line across the page, as a printed book does;
+a paragraph's last line stays left. Left leaves a ragged right edge.
+
 [text viewer margin]
 Insets the text from the edges of the screen, which is easier to read at the
 cost of a few characters per line.
