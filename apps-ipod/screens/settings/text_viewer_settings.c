@@ -60,6 +60,8 @@ MENUITEM_FUNCTION_W_PARAM(text_viewer_page_colour, 0,
 
 MENUITEM_SETTING(text_viewer_brightness,
                  &global_settings.text_viewer_brightness, NULL);
+MENUITEM_SETTING(text_viewer_backlight,
+                 &global_settings.text_viewer_backlight, NULL);
 MENUITEM_SETTING(text_viewer_margin,
                  &global_settings.text_viewer_margin, NULL);
 MENUITEM_SETTING(text_viewer_line_spacing,
@@ -133,6 +135,7 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_text_colour,
           &text_viewer_page_colour,
           &text_viewer_brightness,
+          &text_viewer_backlight,
           &text_viewer_margin,
           &text_viewer_line_spacing,
           &text_viewer_footer,

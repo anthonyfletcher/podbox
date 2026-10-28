@@ -18031,6 +18031,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_BACKLIGHT
+  desc: core text viewer, how long the backlight stays on while reading
+  user: core
+  <source>
+    *: "Reading Backlight"
+  </source>
+  <dest>
+    *: "阅读背光"
+  </dest>
+  <voice>
+    *: "阅读背光"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

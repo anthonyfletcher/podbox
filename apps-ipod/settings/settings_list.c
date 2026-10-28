@@ -220,6 +220,9 @@ static const char off[] = "off";
 static const char off_on[] = "off,on";
 static const char off_on_ask[] = "off,on,ask";
 static const char off_number_spell[] = "off,number,spell";
+/* Reading Backlight's: the player's own timeout, always on, then the
+ * timeouts long enough to read a page by */
+static const int tv_backlight_times[] = {-1, 0, 30, 60, 120, 300, 600};
 static const int timeout_sec_common[] = {-1,0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,
                                         45,60,90,120,180,240,300,600,900,1200,
                                         1500,1800,2700,3600,4500,5400,6300,7200};
@@ -450,6 +453,28 @@ static int32_t getlang_brightness_0_is_player(int value, int unit)
     if (value == 0)
         return LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER;
     return TALK_ID(value, unit);
+}
+
+static const char* formatter_reading_backlight(char *buffer,
+                                               size_t buffer_size,
+                                               int val, const char *unit)
+{
+    (void)buffer_size;
+    (void)unit;
+    if (val == -1)
+        return str(LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER);
+    if (val == 0)
+        return str(LANG_ALWAYS);
+    return buffer;
+}
+
+static int32_t getlang_reading_backlight(int value, int unit)
+{
+    if (value == -1)
+        return LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER;
+    if (value == 0)
+        return LANG_ALWAYS;
+    return talk_time_intervals(value, unit, false);
 }
 
 static void crossfeed_cross_set(int val)
@@ -1733,6 +1758,11 @@ const struct settings_list settings[] = {
                 0, MAX_BRIGHTNESS_SETTING, 1,
                 formatter_brightness_0_is_player,
                 getlang_brightness_0_is_player, NULL),
+    TABLE_SETTING_LIST(F_TIME_SETTING, text_viewer_backlight,
+                       LANG_TEXT_VIEWER_BACKLIGHT, -1, "text viewer backlight",
+                       "player,always", UNIT_SEC, formatter_reading_backlight,
+                       getlang_reading_backlight, NULL,
+                       7, tv_backlight_times),
     /* Custom's pair, set with the colour picker from the reader's menu */
     {F_T_INT|F_RGB, &global_settings.text_viewer_fg, -1,
         INT(LCD_RGBPACK(0, 0, 0)), "text viewer text colour", UNUSED},

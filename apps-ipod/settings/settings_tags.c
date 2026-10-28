@@ -324,6 +324,7 @@ static const struct tag_row tag_rows[] = {
 /* --- the viewers --------------------------------------------------------- */
 { "text viewer colour mode",  TAG_APPEARANCE,                    "text viewer colors" },
 { "text viewer brightness",   TAG_APPEARANCE,                    "text viewer backlight" },
+{ "text viewer backlight",    TAG_BATTERY|TAG_APPEARANCE,        "text viewer light screen timeout" },
 { "text viewer margin",       TAG_APPEARANCE,                    "text viewer" },
 { "text viewer line spacing", TAG_ADVANCED|TAG_APPEARANCE,       "text viewer leading" },
 { "text viewer footer",       TAG_APPEARANCE,                    "text viewer" },

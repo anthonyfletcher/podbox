@@ -55,7 +55,8 @@
 #include "speech/speech.h"     /* speech_enabled, speech_reader */
 #include "audio/voice_thread.h" /* voice_is_playing */
 #include "powermgmt.h"   /* reset_poweroff_timer */
-#include "backlight.h"   /* backlight_set_brightness */
+#include "backlight.h"   /* backlight_set_brightness, backlight_set_timeout */
+#include "system/volume.h"   /* adjust_volume, format_sound_value */
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -1183,6 +1184,8 @@ static bool tv_open(const char *file)
 static void tv_close(void)
 {
     backlight_set_brightness(global_settings.brightness);
+    backlight_set_timeout(global_settings.backlight_timeout);
+    backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);
     speech_reader(false);
 
     if (tv.user_font >= 0)
@@ -1261,11 +1264,23 @@ static void tv_apply_settings(void)
     int margin;
 
     tv_apply_font();
-    /* Put back in tv_close(), as is the reader's claim on the voice */
+    /* Put back in tv_close(), as are the reader's claim on the voice and
+     * the backlight timeout */
     speech_reader(global_settings.text_viewer_read_aloud != TV_READ_OFF);
     backlight_set_brightness(global_settings.text_viewer_brightness
                              ? global_settings.text_viewer_brightness
                              : global_settings.brightness);
+    if (global_settings.text_viewer_backlight != -1)
+    {
+        backlight_set_timeout(global_settings.text_viewer_backlight);
+        backlight_set_timeout_plugged(global_settings.text_viewer_backlight);
+    }
+    else
+    {
+        backlight_set_timeout(global_settings.backlight_timeout);
+        backlight_set_timeout_plugged(
+            global_settings.backlight_timeout_plugged);
+    }
 
     switch (global_settings.text_viewer_colour_mode)
     {
@@ -1463,6 +1478,22 @@ int text_viewer_contents(void)
     return target >= 0;
 }
 
+/* When the volume shown over the page is due to go, or 0 when none is */
+static long tv_volume_until;
+
+/* The wheel sets the volume, of Read Aloud or of music playing behind the
+ * book, and shows it over the page for a second. */
+static void tv_volume(int steps)
+{
+    char val[32];
+
+    adjust_volume(steps);
+    setvol();
+    format_sound_value(val, sizeof val, SOUND_VOLUME, global_status.volume);
+    splashf(0, "%s: %s", str(LANG_VOLUME), val);
+    tv_volume_until = current_tick + HZ;
+}
+
 static int tv_menu(void)
 {
     int sel = 0, ret;
@@ -1547,6 +1578,7 @@ int text_viewer(const char *file)
     tv.path = file;
     tv.user_font = -1;           /* no font override loaded yet */
     tv.footer_font = -1;
+    tv_volume_until = 0;
 
     /* Take the screen (theme off) and put up a clean loading frame before the
      * slow open -- the name splash for the container formats, a cleared
@@ -1572,13 +1604,29 @@ int text_viewer(const char *file)
     {
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
-        int action = get_action(CONTEXT_STD,
-                                continuous ? HZ/10 : TIMEOUT_BLOCK);
+        int action = get_action(CONTEXT_STD, continuous || tv_volume_until
+                                             ? HZ/10 : TIMEOUT_BLOCK);
 
         switch (action)
         {
             case ACTION_NONE:
+                if (tv_volume_until
+                    && TIME_AFTER(current_tick, tv_volume_until))
+                {
+                    tv_volume_until = 0;
+                    tv_draw();
+                }
                 tv_read_on();
+                break;
+
+            case ACTION_STD_NEXT:
+            case ACTION_STD_NEXTREPEAT:
+                tv_volume(1);
+                break;
+
+            case ACTION_STD_PREV:
+            case ACTION_STD_PREVREPEAT:
+                tv_volume(-1);
                 break;
 
             case ACTION_STD_OK:          /* forward button (>>|) */
@@ -1601,9 +1649,7 @@ int text_viewer(const char *file)
                 break;
 
             default:
-                /* The scroll wheel (ACTION_STD_NEXT/PREV) is deliberately
-                 * ignored -- paging is on the forward/back buttons. Still let
-                 * the framework handle USB and other system events. */
+                /* The framework handles USB and other system events */
                 if (default_event_handler_ex(action, tv_event_save, NULL)
                     == SYS_USB_CONNECTED)
                 {
