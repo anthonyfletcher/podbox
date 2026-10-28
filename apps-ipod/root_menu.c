@@ -43,7 +43,6 @@
 #include "screens/browse/browser.h"
 #include "screens/browse/browser_db.h"
 #include "screens/playback/wps.h"
-#include "screens/bookmark.h"
 #include "playlist/playlist.h"
 #include "database/sound_mix.h"
 #include "playlist/viewer.h"
@@ -568,7 +567,8 @@ static int browser(void* param)
  * change, and an unlisted items[] entry silently zero-initializes to a
  * NULL function pointer -- load_screen() would call through it and crash.
  * This stub exists purely so that stale reference redirects safely to the
- * root menu instead. */
+ * root menu instead. GO_TO_RECENTBMARKS, Rockbox's Recent Bookmarks, is gone
+ * the same way and takes the same stub. */
 static int plugins_browser_removed(void* param)
 {
     (void)param;
@@ -696,14 +696,6 @@ static int playlist_view(void * param)
         case PLAYLIST_VIEWER_OK:
             return GO_TO_PREVIOUS;
     }
-    return GO_TO_PREVIOUS;
-}
-
-static int load_bmarks(void* param)
-{
-    (void)param;
-    if(bookmark_mrb_load())
-        return GO_TO_WPS;
     return GO_TO_PREVIOUS;
 }
 
@@ -870,7 +862,7 @@ static const struct root_items items[] = {
     [GO_TO_MAINMENU] =      { settings_scrn, NULL, &manage_settings },
 
 
-    [GO_TO_RECENTBMARKS] =  { load_bmarks, NULL, &bookmark_settings_menu },
+    [GO_TO_RECENTBMARKS] =  { plugins_browser_removed, NULL, NULL },
     [GO_TO_BROWSEPLUGINS] = { plugins_browser_removed, NULL, NULL },
     [GO_TO_PLAYLISTS_SCREEN] = { playlist_view_catalog, NULL,
                                                         &playlist_options },
@@ -1027,9 +1019,6 @@ MENUITEM_RETURNVALUE_DYNTEXT(wps_item, GO_TO_WPS, item_callback,
                                 NULL, NULL, Icon_Playback_menu);
 MENUITEM_RETURNVALUE(menu_, ID2P(LANG_SETTINGS), GO_TO_MAINMENU,
                         NULL, Icon_Submenu_Entered);
-MENUITEM_RETURNVALUE(bookmarks, ID2P(LANG_BOOKMARK_MENU_RECENT_BOOKMARKS),
-                        GO_TO_RECENTBMARKS,  item_callback,
-                        Icon_Bookmark);
 MENUITEM_RETURNVALUE(playlists, ID2P(LANG_PLAYLISTS), GO_TO_PLAYLISTS_SCREEN,
                      NULL, Icon_Playlist);
 /* The dynamic playlist -- what playing an album built, not a saved .m3u. Named
@@ -1587,12 +1576,7 @@ static int item_callback(int action,
         case ACTION_TREE_STOP:
             return ACTION_REDRAW;
         case ACTION_REQUEST_MENUITEM:
-            if (this_item == &bookmarks)
-            {
-                if (global_settings.usemrb == 0)
-                    return ACTION_EXIT_MENUITEM;
-            }
-            else if (this_item == &wps_item)
+            if (this_item == &wps_item)
             {
                 /* Hide the row when choosing it could only report "nothing to
                  * resume". These are wpsscrn()'s own three ways of producing a

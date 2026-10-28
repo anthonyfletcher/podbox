@@ -449,22 +449,6 @@ more.
 Crossfade dips both tracks through the join. Mix holds the total level roughly
 constant, which sounds fuller but muddier where both tracks are busy.
 
-[autocreate bookmarks]
-Saves your position when you stop, so you can come back to it. Ask prompts each
-time; the recent-only settings save without adding a bookmark file to the
-folder.
-
-[autoupdate bookmarks]
-Overwrites the existing bookmark for a folder instead of adding another, so the
-list stays one entry per book rather than one per session.
-
-[autoload bookmarks]
-Offers the saved position when you next open a folder that has one.
-
-[use most-recent-bookmarks]
-Keeps a list of the last places you stopped, reachable from the main menu, as
-well as bookmarks stored beside the music.
-
 [autoresume next track]
 Whether an automatic position is also remembered when a track changes on its
 own. Custom limits it to folders you nominate, which is how to keep it for

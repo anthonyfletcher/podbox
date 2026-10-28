@@ -157,11 +157,7 @@ static const struct tag_row tag_rows[] = {
 { "crossfade fade out duration",   TAG_ADVANCED|TAG_PLAYBACK,    "crossfade" },
 { "crossfade fade out mode",       TAG_ADVANCED|TAG_PLAYBACK,    "crossfade mix" },
 
-/* bookmarks and automatic resume */
-{ "autocreate bookmarks", TAG_ADVANCED|TAG_PLAYBACK,                          "bookmark on stop" },
-{ "autoupdate bookmarks", TAG_ADVANCED|TAG_PLAYBACK,             "bookmark" },
-{ "autoload bookmarks",   TAG_ADVANCED|TAG_PLAYBACK,                          "bookmark load" },
-{ "use most-recent-bookmarks", TAG_ADVANCED|TAG_PLAYBACK,        "bookmark recent" },
+/* automatic resume */
 { "autoresume enable",    TAG_PLAYBACK,                          "resume position" },
 { "autoresume next track",TAG_ADVANCED|TAG_PLAYBACK,             "resume" },
 

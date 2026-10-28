@@ -67,7 +67,6 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "opx",  FILE_ATTR_OPX   },
     { "fnt",  FILE_ATTR_FONT  },
     { "kbd",  FILE_ATTR_KBD   },
-    { "bmark",FILE_ATTR_BMARK },
     { "cue",  FILE_ATTR_CUE   },
     { "sbs",  FILE_ATTR_SBS   },
 #ifdef BOOTFILE_EXT
@@ -117,7 +116,6 @@ static const struct fileattr_icon_voice inbuilt_attr_icons_voices[] = {
     { FILE_ATTR_OPX,   Icon_Plugin,    VOICE_EXT_ROCK },
     { FILE_ATTR_FONT,  Icon_Font,      VOICE_EXT_FONT },
     { FILE_ATTR_KBD,   Icon_Keyboard,  VOICE_EXT_KBD },
-    { FILE_ATTR_BMARK, Icon_Bookmark,  VOICE_EXT_BMARK },
     { FILE_ATTR_CUE,   Icon_Bookmark,  VOICE_EXT_CUESHEET },
     { FILE_ATTR_SBS,   Icon_Wps,       VOICE_EXT_SBS },
 #if defined(BOOTFILE_EXT) || defined(BOOTFILE_EXT2)

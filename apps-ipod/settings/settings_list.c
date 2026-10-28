@@ -1287,25 +1287,6 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, recursive_dir_insert, LANG_RECURSE_DIRECTORY , RECURSE_ON,
                    "recursive directory insert", off_on_ask, NULL , 3 ,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_ASK)),
-    /* bookmarks */
-    CHOICE_SETTING(0, autocreatebookmark, LANG_BOOKMARK_SETTINGS_AUTOCREATE,
-                   BOOKMARK_NO, "autocreate bookmarks",
-                   "off,on,ask,recent only - on,recent only - ask", NULL, 5,
-                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES),
-                   ID2P(LANG_ASK), ID2P(LANG_BOOKMARK_SETTINGS_RECENT_ONLY_YES),
-                   ID2P(LANG_BOOKMARK_SETTINGS_RECENT_ONLY_ASK)),
-    OFFON_SETTING(0, autoupdatebookmark, LANG_BOOKMARK_SETTINGS_AUTOUPDATE,
-                   false, "autoupdate bookmarks", NULL),
-    CHOICE_SETTING(0, autoloadbookmark, LANG_BOOKMARK_SETTINGS_AUTOLOAD,
-                   BOOKMARK_NO, "autoload bookmarks", off_on_ask, NULL, 3,
-                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES),
-                   ID2P(LANG_ASK)),
-    CHOICE_SETTING(0, usemrb, LANG_BOOKMARK_SETTINGS_MAINTAIN_RECENT_BOOKMARKS,
-                   BOOKMARK_NO, "use most-recent-bookmarks",
-                   "off,on,unique only,one per track", NULL, 4, ID2P(LANG_SET_BOOL_NO),
-                   ID2P(LANG_SET_BOOL_YES),
-                   ID2P(LANG_BOOKMARK_SETTINGS_ONE_PER_PLAYLIST),
-                   ID2P(LANG_BOOKMARK_SETTINGS_ONE_PER_TRACK)),
     /* peak meter */
     TABLE_SETTING_LIST(F_TIME_SETTING | F_ALLOW_ARBITRARY_VALS, peak_meter_clip_hold,
                   LANG_PM_CLIP_HOLD, 60, "peak meter clip hold", "eternal",
@@ -1836,15 +1817,13 @@ const struct settings_list settings[] = {
                    "start in screen", "previous,root,files,"
 #define START_DB_COUNT 1
                    "db,"
-                   "wps,menu,"
-                   "bookmarks"
+                   "wps,menu"
                    , NULL,
-    (6 + START_DB_COUNT),
+    (5 + START_DB_COUNT),
                    ID2P(LANG_PREVIOUS_SCREEN), ID2P(LANG_MAIN_MENU),
                    ID2P(LANG_DIR_BROWSER),
                    ID2P(LANG_MUSIC_BROWSER),
-                   ID2P(LANG_RESUME_PLAYBACK), ID2P(LANG_SETTINGS),
-                   ID2P(LANG_BOOKMARK_MENU_RECENT_BOOKMARKS)
+                   ID2P(LANG_RESUME_PLAYBACK), ID2P(LANG_SETTINGS)
                   ),
     CHOICE_SETTING(0, wps_select_action, LANG_WPS_SELECT_ACTION, 0,
                    "wps select action",

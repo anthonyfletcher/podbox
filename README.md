@@ -96,7 +96,7 @@ replaced by a single-line editor driven by the click wheel.
 
 <img src="docs/podbox/images/ss_grid_audio_books.png"/>
 
-Audiobooks remember where you stopped, with no bookmarks to manage, and can live in a menu of
+Audiobooks remember where you stopped, with nothing to save by hand, and can live in a menu of
 their own.
 
 - Give audiobooks their own main menu entry, and keep them out of Music and the carousels

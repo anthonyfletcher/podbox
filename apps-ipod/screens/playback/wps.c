@@ -52,8 +52,8 @@
 #include "playlist/playlist.h"
 #include "draw/icon_bitmaps.h"
 #include "lang.h"
-#include "screens/bookmark.h"
 #include "metadata/book_resume.h"
+#include "screens/browse/book_shelf.h"   /* the bookmark actions */
 #include "system/activity.h"
 #include "system/app_util.h"
 #include "audio/sound_feedback.h"
@@ -592,12 +592,10 @@ static void gwps_enter_wps(bool theme_enabled)
     send_event(GUI_EVENT_ACTIONUPDATE, (void*)1);
 }
 
-static long do_wps_exit(long action, bool bookmark)
+static long do_wps_exit(long action)
 {
     audio_pause();
     update_non_static();
-    if (bookmark)
-        bookmark_autobookmark(true);
     book_resume_save();
     audio_stop();
 
@@ -703,7 +701,6 @@ long gui_wps_show(void)
     long button = 0;
     bool restore = true;
     bool exit = false;
-    bool bookmark = false;
     bool update = false;
     bool theme_enabled = true;
     long last_left = 0, last_right = 0;
@@ -764,7 +761,7 @@ long gui_wps_show(void)
 
         if (exit)
         {
-            return do_wps_exit(button, bookmark);
+            return do_wps_exit(button);
         }
 
         if (button && !IS_SYSEVENT(button) )
@@ -1063,18 +1060,17 @@ long gui_wps_show(void)
                 }
                 break;
 
+            /* Bound only by a keymap file of the user's own */
             case ACTION_WPS_LIST_BOOKMARKS:
                 gwps_leave_wps(true);
-                if (bookmark_load_menu() == BOOKMARK_USB_CONNECTED)
-                {
+                if (book_shelf_playing_marks() == GO_TO_ROOT)
                     return GO_TO_ROOT;
-                }
                 restore = true;
                 break;
 
             case ACTION_WPS_CREATE_BOOKMARK:
                 gwps_leave_wps(true);
-                bookmark_create_menu();
+                book_shelf_create_mark();
                 restore = true;
                 break;
 

@@ -43,6 +43,13 @@ bool book_shelf_mark_menu(const char *book, int current);
 bool book_shelf_pick_mark(const char *book, bool *to_root);
 int book_shelf_play_mark(void);
 
+/* Create Bookmark where the loaded book is playing, saying how it went */
+void book_shelf_create_mark(void);
+
+/* The loaded book's bookmarks, played from the one chosen. A GO_TO_* code:
+ * GO_TO_WPS once one plays. */
+int book_shelf_playing_marks(void);
+
 /* Whether the file whose path_key() is 'track' is the last track of the book
  * 'book' -- its album -- in the order the shelf plays it. False where either
  * is not found. */

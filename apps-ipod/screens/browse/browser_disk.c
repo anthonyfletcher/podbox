@@ -32,7 +32,6 @@
 #include <debug.h>
 #include <font.h>
 #include <limits.h>
-#include "screens/bookmark.h"
 #include "browser.h"
 #include "core_alloc.h"
 #include "settings/settings.h"
@@ -136,15 +135,9 @@ int browser_disk_build_playlist(struct browser_context* c, int start_index)
     return start_index;
 }
 
-/* Start playback of a playlist, checking for bookmark autoload, modified
- * playlists, etc., as required. Returns false if playback wasn't started,
- * or started via bookmark autoload, true otherwise.
- *
- * Pointers to both the full pathname and the separated parts needed to
- * avoid allocating yet another path buffer on the stack (and save some
- * code; the caller typically needs to create the full pathname anyway)...
- */
-bool browser_disk_play_playlist(char* pathname, char* dirname, char* filename)
+/* Start playback of a playlist, checking for modified playlists, etc., as
+ * required. Returns false if playback wasn't started, true otherwise. */
+bool browser_disk_play_playlist(char* dirname, char* filename)
 {
     if (global_settings.party_mode && audio_status())
     {
@@ -152,8 +145,7 @@ bool browser_disk_play_playlist(char* pathname, char* dirname, char* filename)
         return false;
     }
 
-    int res =  bookmark_autoload(pathname);
-    if (res == BOOKMARK_CANCEL || res == BOOKMARK_DO_RESUME || !warn_on_pl_erase())
+    if (!warn_on_pl_erase())
         return false;
 
     /* Single exit so the indicator is cleared on both outcomes */
@@ -676,7 +668,7 @@ int browser_disk_enter(struct browser_context* c)
                                         == FILE_ATTR_JOURNEYS);
 
             case FILE_ATTR_M3U:
-                play = browser_disk_play_playlist(buf, c->currdir, file->name);
+                play = browser_disk_play_playlist(c->currdir, file->name);
 
                 if (play)
                 {
@@ -687,10 +679,6 @@ int browser_disk_enter(struct browser_context* c)
 
             case FILE_ATTR_AUDIO:
             {
-                int res = bookmark_autoload(c->currdir);
-                if (res == BOOKMARK_CANCEL || res == BOOKMARK_DO_RESUME)
-                    break;
-
                 ui_set_working(true);
 
                 /* about to create a new current playlist...
@@ -741,12 +729,6 @@ int browser_disk_enter(struct browser_context* c)
                     break;
                 splash(HZ, ID2P(LANG_SETTINGS_LOADED));
                 browser_disk_repaint_after_splash();
-                break;
-
-            case FILE_ATTR_BMARK:
-                ui_set_working(true);
-                bookmark_load(buf, false);
-                rc = GO_TO_FILEBROWSER;
                 break;
 
             case FILE_ATTR_LNG:

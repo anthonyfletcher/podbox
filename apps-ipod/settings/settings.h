@@ -83,25 +83,6 @@ enum {
     ALBUM_YEAR_AFTER,           /* "Album – 2004" */
 };
 
-/* Shared by all bookmark parameters */
-enum {
-    BOOKMARK_NO = 0,
-    BOOKMARK_YES = 1,
-};
-
-/* Auto create bookmark */
-enum {
-    BOOKMARK_ASK = 2,
-    BOOKMARK_RECENT_ONLY_YES = 3,
-    BOOKMARK_RECENT_ONLY_ASK = 4,
-};
-
-/* Most recent bookmark */
-enum {
-    BOOKMARK_ONE_PER_PLAYLIST = 2,
-    BOOKMARK_ONE_PER_TRACK = 3,
-};
-
 /* global_settings.dialog_colors -- what a modal dialog does about colour.
  *
  * OFF and ON are the two the setting has always had, in the order it wrote
@@ -634,13 +615,6 @@ struct user_settings
     int  scroll_delay;     /* delay (in 1/10s) before starting scroll */
     int  scroll_step;      /* pixels to advance per update */
     bool scrolling_enabled; /* off: text that would scroll is cut to fit */
-
-    /* auto bookmark settings */
-    int autoloadbookmark;   /* auto load option: 0=off, 1=ask, 2=on */
-    int autocreatebookmark; /* auto create option: 0=off, 1=ask, 2=on */
-    bool autoupdatebookmark;/* auto update option */
-    int usemrb;             /* use MRB list: 0=No, 1=Yes, 2=One per playlist,
-                                             3=One per playlist and track */
 
     bool dircache;          /* enable directory cache */
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */

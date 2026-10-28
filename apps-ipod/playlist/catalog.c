@@ -34,7 +34,6 @@
 #include "catalog.h"
 #include "speech/talk.h"
 #include "viewer.h"
-#include "screens/bookmark.h"
 #include "screens/system/playlist_search.h"
 #include "root_menu.h"
 #include "general.h"
@@ -220,34 +219,25 @@ restart:
             reopen_last_playlist = false;
         }
 
-        if (view) /* display playlist contents or resume bookmark */
+        if (view) /* display playlist contents */
         {
-
-            int res = bookmark_autoload(selected_playlist);
-            if (res == BOOKMARK_DO_RESUME)
-               result = 0;
-            else if (res == BOOKMARK_CANCEL)
-                goto restart;
-            else
-            {
-                switch (playlist_viewer_ex(selected_playlist, &most_recent_selection)) {
-                    case PLAYLIST_VIEWER_OK:
-                    {
-                        reopen_last_playlist = true;
-                        result = 0;
-                        break;
-                    }
-                    case PLAYLIST_VIEWER_CANCEL:
-                    {
-                        goto restart;
-                    }
-                    case PLAYLIST_VIEWER_USB:
-                    case PLAYLIST_VIEWER_MAINMENU:
-                    /* Fall through */
-                    default:
-                        reopen_last_playlist = true;
-                        break;
+            switch (playlist_viewer_ex(selected_playlist, &most_recent_selection)) {
+                case PLAYLIST_VIEWER_OK:
+                {
+                    reopen_last_playlist = true;
+                    result = 0;
+                    break;
                 }
+                case PLAYLIST_VIEWER_CANCEL:
+                {
+                    goto restart;
+                }
+                case PLAYLIST_VIEWER_USB:
+                case PLAYLIST_VIEWER_MAINMENU:
+                /* Fall through */
+                default:
+                    reopen_last_playlist = true;
+                    break;
             }
         }
         else /* we're just adding something to a playlist */
@@ -424,7 +414,6 @@ static int remove_extension(char* path)
 bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
                                     const char* curr_pl_name)
 {
-    char bmark_file[MAX_PATH + 7];
     char dir[MAX_PATH];
     char name[MAX_PATH];
     size_t dirlen, max_name;
@@ -486,18 +475,9 @@ bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
         apply_playlist_extension(pl_name, buf_size);
 
         /* warn before overwriting existing (different) playlist */
-        if (do_save && (!curr_pl_name || strcmp(curr_pl_name, pl_name)))
-        {
-            if (file_exists(pl_name))
-                do_save = yesno_pop(ID2P(LANG_REALLY_OVERWRITE));
-
-            if (do_save) /* delete bookmark file unrelated to new playlist */
-            {
-                snprintf(bmark_file, sizeof(bmark_file), "%s.bmark", pl_name);
-                if (file_exists(bmark_file))
-                    remove(bmark_file);
-            }
-        }
+        if (do_save && (!curr_pl_name || strcmp(curr_pl_name, pl_name))
+            && file_exists(pl_name))
+            do_save = yesno_pop(ID2P(LANG_REALLY_OVERWRITE));
     }
     return do_save;
 }

@@ -862,36 +862,6 @@ MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
             &usb_charging);
 
 
-/** Bookmark menu **/
-static int bmark_callback(int action,
-                          const struct menu_item_ex *this_item,
-                          struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-    switch (action)
-    {
-        case ACTION_EXIT_MENUITEM: /* on exit */
-            if(global_settings.autocreatebookmark ==  BOOKMARK_RECENT_ONLY_YES ||
-               global_settings.autocreatebookmark ==  BOOKMARK_RECENT_ONLY_ASK)
-            {
-                if(global_settings.usemrb == BOOKMARK_NO)
-                    global_settings.usemrb = BOOKMARK_YES;
-
-            }
-            break;
-    }
-    return action;
-}
-MENUITEM_SETTING(autocreatebookmark,
-                 &global_settings.autocreatebookmark, bmark_callback);
-MENUITEM_SETTING(autoupdatebookmark, &global_settings.autoupdatebookmark, NULL);
-MENUITEM_SETTING(autoloadbookmark, &global_settings.autoloadbookmark, NULL);
-MENUITEM_SETTING(usemrb, &global_settings.usemrb, NULL);
-MAKE_MENU(bookmark_settings_menu, ID2P(LANG_BOOKMARK_SETTINGS), 0,
-          Icon_Bookmark,
-          &autocreatebookmark, &autoupdatebookmark, &autoloadbookmark, &usemrb);
-
 /** Autoresume menu **/
 
 static int autoresume_nexttrack_callback(int action,

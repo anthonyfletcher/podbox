@@ -2224,7 +2224,7 @@ static bool exclude_spoken_wanted(void)
 /* A book's track list opens with a row that picks it up where it was left,
  * and that row is the whole of how a book played from the shelf is resumed:
  * its playlist is built out of the database, so there is no directory and no
- * playlist file for a bookmark to be keyed to. Choosing a chapter by hand
+ * playlist file for a position to be keyed to. Choosing a chapter by hand
  * still plays it from its start, which is the only way left to hear one
  * again.
  *

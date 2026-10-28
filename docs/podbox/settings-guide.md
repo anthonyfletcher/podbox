@@ -33,7 +33,7 @@ Settings
 ├─ Search…                     find a setting by name, or by what it is about
 ├─ Sound                       levels, tone, and the DSP effects
 ├─ Playback                    what happens as music plays, the now-playing
-│                              screen, and playlists, bookmarks and resume
+│                              screen, and playlists and resume
 ├─ Library                     the browsers, the database, artwork, the viewers,
 │                              and Maintenance
 ├─ Appearance                  themes, fonts, colours, scrolling and the menus
@@ -177,15 +177,6 @@ Settings
 | Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |
 | Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | Yes | **Adv** |
 | Queue ▸ Show Shuffled Adding Options | Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder, album or playlist. | Yes | **Adv** |
-
-### Playback — Bookmarking
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Bookmark on Stop | Saves your position when you stop, so you can come back to it. Ask prompts each time; the recent-only settings save without adding a bookmark file to the folder. | No | **Adv** |
-| Update on Stop | Overwrites the existing bookmark for a folder instead of adding another, so the list stays one entry per book rather than one per session. | No | **Adv** |
-| Load Last Bookmark | Offers the saved position when you next open a folder that has one. | No | **Adv** |
-| Maintain a List of Recent Bookmarks? | Keeps a list of the last places you stopped, reachable from the main menu, as well as bookmarks stored beside the music. | No | **Adv** |
 
 ### Playback — Automatic Resume
 

@@ -16,7 +16,7 @@ int browser_disk_exit(struct browser_context* c);
 int browser_disk_assemble_path(char *buf, size_t bufsz,
                       const char* currdir, const char* filename);
 int browser_disk_build_playlist(struct browser_context* c, int start_index);
-bool browser_disk_play_playlist(char* pathname, char* dirname, char* filename);
+bool browser_disk_play_playlist(char* dirname, char* filename);
 
 /* The top row a freshly loaded directory wants shown, or -1 for no preference:
  * a root carrying the Search row opens scrolled past it. Clears the request.

@@ -23,7 +23,7 @@
  *   - Now Playing's own rows, and the sound-engine rows
  *   - playlist operations: play, play next, later and last, play once, add to
  *     a named or new playlist
- *   - bookmark, playback and rating items with their visibility callbacks
+ *   - playback and rating items with their visibility callbacks
  *   - file operations: cut, copy, paste, delete, rename, properties
  *   - Show in Files, and Go to Album and Go to Artist
  *   - Now Playing's rows for the playing file
@@ -71,7 +71,6 @@
 #include "viewers/properties.h"
 #include "viewers/playing_time.h"
 #include "files/file_ops.h"
-#include "bookmark.h"
 #include "input/action.h"
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
@@ -171,54 +170,6 @@ static bool clipboard_clip(struct clipboard *clip, const char *path,
         clipboard_clear_selection(clip);
         return false;
     }
-}
-
-/* ----------------------------------------------------------------------- */
-/* Displays the bookmark menu options for the user to decide.  This is an  */
-/* interface function.                                                     */
-/* ----------------------------------------------------------------------- */
-
-
-static int bookmark_load_menu_wrapper(void)
-{
-    if (get_current_activity() == ACTIVITY_CONTEXTMENU)  /* get rid of parent activity */
-        pop_current_activity_without_refresh();          /* when called from ctxt menu */
-
-    return bookmark_load_menu();
-}
-
-static int bookmark_menu_callback(int action,
-                                  const struct menu_item_ex *this_item,
-                                  struct gui_synclist *this_list);
-MENUITEM_FUNCTION(bookmark_create_menu_item, 0,
-                  ID2P(LANG_BOOKMARK_MENU_CREATE),
-                  bookmark_create_menu,
-                  bookmark_menu_callback, Icon_Bookmark);
-MENUITEM_FUNCTION(bookmark_load_menu_item, 0,
-                  ID2P(LANG_BOOKMARK_MENU_LIST),
-                  bookmark_load_menu_wrapper,
-                  bookmark_menu_callback, Icon_Bookmark);
-MAKE_ONPLAYMENU(bookmark_menu, ID2P(LANG_BOOKMARK_MENU),
-                bookmark_menu_callback, Icon_Bookmark,
-                &bookmark_create_menu_item, &bookmark_load_menu_item);
-static int bookmark_menu_callback(int action,
-                                  const struct menu_item_ex *this_item,
-                                  struct gui_synclist *this_list)
-{
-    (void) this_list;
-    if (action == ACTION_REQUEST_MENUITEM)
-    {
-        /* hide loading bookmarks menu if no bookmarks exist */
-        if (this_item == &bookmark_load_menu_item)
-        {
-            if (!bookmark_exists())
-                return ACTION_EXIT_MENUITEM;
-        }
-    }
-    else if (action == ACTION_EXIT_MENUITEM)
-        settings_save();
-
-    return action;
 }
 
 /* CONTEXT_WPS playlist options */
@@ -1600,9 +1551,19 @@ MENUITEM_FUNCTION(book_marks_item, 0, ID2P(LANG_BOOKMARK_MENU),
 /* The playing book's: Create Bookmark, and its list once it has marks */
 static int wps_mark_create(void)
 {
-    splash(HZ, book_marks_add_playing() ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
-                                         : ID2P(LANG_BOOKMARK_CREATE_FAILURE));
+    book_shelf_create_mark();
     return 0;
+}
+
+/* The bookmark hotkey's list: the playing book's marks */
+static int hotkey_book_marks(void)
+{
+    switch (book_shelf_playing_marks())
+    {
+        case GO_TO_WPS:  return ONPLAY_START_PLAY;
+        case GO_TO_ROOT: return ONPLAY_MAINMENU;
+    }
+    return ONPLAY_OK;
 }
 
 static int wps_marks_callback(int action,
@@ -2070,7 +2031,6 @@ MAKE_ONPLAYMENU( wps_more_menu, ID2P(LANG_MORE),
            &wps_reveal_item,
            &wps_album_art_item,
            &winddown_item,
-           &bookmark_menu,
            &wps_mark_create_item,
            &wps_marks_item,
            &view_cue_item,
@@ -2245,14 +2205,14 @@ static const struct hotkey_assignment hotkey_items[] = {
       .icon = Icon_Queued },
     { .action = HOTKEY_BOOKMARK,
       .lang_id = LANG_BOOKMARK_MENU_CREATE,
-      .func = HOTKEY_FUNC(bookmark_create_menu, NULL),
+      .func = HOTKEY_FUNC(wps_mark_create, NULL),
       .return_code = ONPLAY_OK,
       .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
       .icon = Icon_Bookmark },
     { .action = HOTKEY_BOOKMARK_LIST,
-      .lang_id = LANG_BOOKMARK_MENU_LIST,
-      .func = HOTKEY_FUNC(bookmark_load_menu, NULL),
-      .return_code = ONPLAY_START_PLAY,
+      .lang_id = LANG_BOOKMARK_MENU,
+      .func = HOTKEY_FUNC(hotkey_book_marks, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_Bookmark },
     { .action = HOTKEY_PROPERTIES,

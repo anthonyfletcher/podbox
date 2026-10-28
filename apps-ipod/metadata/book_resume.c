@@ -4,10 +4,8 @@
  * Where each audiobook was left.
  *
  * A book played from the Audiobooks shelf is a dynamic playlist built out of
- * the database, so it has neither a directory nor a playlist file -- and a
- * .bmark is keyed by one or the other, which is why bookmark.c turns a
- * playlist like this one away (bookmark_is_bookmarkable_state()). The key
- * here is the book itself: its album and album artist, which is how the
+ * the database, so it has neither a directory nor a playlist file to key a
+ * position to. The key here is the book itself: its album and album artist, which is how the
  * database tells albums apart, or the file's path for a single-file book with
  * no album tag to name it. A position saved under the album alone, as an
  * older firmware keyed them, is rekeyed once the database is in RAM.

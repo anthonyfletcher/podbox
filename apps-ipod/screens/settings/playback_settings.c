@@ -25,7 +25,7 @@
 #include "audio/playback.h"
 #include "pcm_sampr.h"
 #include "speech/talk.h"
-#include "exported_settings.h"   /* the playlist, bookmark and resume menus */
+#include "exported_settings.h"   /* the playlist and resume menus */
 
 static int setcrossfadeonexit_callback(int action,
                                        const struct menu_item_ex *this_item,
@@ -182,7 +182,6 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
              behaviour: what the player does with a queue, and where it picks
              up from. */
           ,&playlist_settings
-          ,&bookmark_settings_menu
           ,&autoresume_menu
           /* The screen you watch music on, and it belongs with the music. It
              was under Appearance, where only its artwork row was about how

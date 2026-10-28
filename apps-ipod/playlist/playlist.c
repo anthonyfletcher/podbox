@@ -4416,8 +4416,7 @@ int playlist_save(struct playlist_info* playlist, char *filename)
         goto error;
     }
 
-    /* Ask if queued tracks should be removed, so that
-    playlist can be bookmarked after it's been saved */
+    /* Ask if queued tracks should be removed before the playlist is saved */
     for (int i = playlist->amount - 1; i >= 0; i--)
         if (playlist->indices[i] & PLAYLIST_QUEUED)
         {

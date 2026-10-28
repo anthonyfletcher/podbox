@@ -977,6 +977,23 @@ int book_shelf_play_mark(void)
     return play_chosen();
 }
 
+void book_shelf_create_mark(void)
+{
+    splash(HZ, book_marks_add_playing() ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
+                                         : ID2P(LANG_BOOKMARK_CREATE_FAILURE));
+}
+
+int book_shelf_playing_marks(void)
+{
+    char book[BOOK_ID_MAX];
+    bool to_root = false;
+
+    if (book_resume_loaded(book, sizeof(book)) != NULL
+        && book_shelf_pick_mark(book, &to_root))
+        return book_shelf_play_mark();
+    return to_root ? GO_TO_ROOT : GO_TO_PREVIOUS;
+}
+
 /* ------------------------------------------------------------------ *
  * a book's context menu                                              *
  * ------------------------------------------------------------------ */

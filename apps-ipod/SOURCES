@@ -129,7 +129,6 @@ widgets/color_picker.c
 widgets/mask_select.c
 #endif
 
-screens/bookmark.c
 screens/browse/browser.c
 screens/browse/browser_disk.c
 screens/browse/browser_flat.c

@@ -15,7 +15,6 @@
 extern const struct menu_item_ex
         playback_settings,          /* playback_menu.c  */
         sound_settings,             /* sound_menu.c     */
-        bookmark_settings_menu,
         playlist_settings,          /* playlist_menu.c  */
         viewer_settings_menu,       /* playlist_menu.c  */
         equalizer_menu,             /* eq_menu.c        */

@@ -24,9 +24,9 @@
  * it. Long-lived holders claim and release around their screen's lifetime;
  * transient callers, which finish before returning to the UI loop, only assert
  * that nobody is holding it. That asymmetry is deliberate: a transient caller
- * cannot reliably release, because at least one of them (the bookmark list)
- * hands a pointer into this buffer back to *its* caller, so the region stays
- * live past the function that acquired it. Requiring a release there would
+ * cannot reliably release, because one may hand a pointer into this buffer
+ * back to *its* caller, so the region stays live past the function that
+ * acquired it. Requiring a release there would
  * mean threading ownership through every transient call site for no gain --
  * and a missed release would panic during ordinary use, which is a worse
  * failure than the one being prevented.

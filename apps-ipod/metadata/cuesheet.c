@@ -33,7 +33,6 @@
 #include "screens/playback/wps.h"
 #include "string-extra.h"
 #include "rbunicode.h"
-#include "screens/bookmark.h"
 #include "screens/browse/browser.h"
 #include "speech/talk.h"
 #include "pathfuncs.h"

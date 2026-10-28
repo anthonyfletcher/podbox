@@ -16,7 +16,6 @@
 /* using attribute bits not used by FAT (FAT uses lower 7) */
 #define FILE_ATTR_THUMBNAIL 0x0080 /* corresponding .talk file exists */
 /* (this also reflects the sort order if by type) */
-#define FILE_ATTR_BMARK 0x0100 /* book mark file */
 #define FILE_ATTR_M3U   0x0200 /* playlist */
 #define FILE_ATTR_AUDIO 0x0300 /* audio file */
 #define FILE_ATTR_CFG   0x0400 /* config file */

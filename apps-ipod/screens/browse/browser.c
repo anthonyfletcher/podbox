@@ -26,7 +26,8 @@
  *   - current-file and current-directory tracking, including getcwd wrapping
  *   - dirbrowse(): the browse loop and its actions
  *   - rockbox_browse(): the entry point other screens call
- *   - resuming a bookmark, playing a file or directory, and flush/restore
+ *   - resuming a playlist at a place, playing a file or directory, and
+ *     flush/restore
  ****************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,7 +58,6 @@
 #include "draw/icon_bitmaps.h"
 #include "lang.h"
 #include "widgets/keyboard.h"
-#include "screens/bookmark.h"
 #include "screens/context_menu.h"
 #include "core_alloc.h"
 #include "draw/img_filter.h"   /* the row chain the skin hands down */
