@@ -300,6 +300,27 @@ void backlight_set_fade_out(int value) { (void)value; }
 void backlight_set_on_button_hold(int index) { (void)index; }
 void backlight_set_timeout(int value) { (void)value; }
 void backlight_set_timeout_plugged(int value) { (void)value; }
+
+bool context_hidden_is_changed(void *setting, void *defaultval)
+{
+    (void)setting; (void)defaultval; return false;
+}
+
+void context_hidden_load_from_cfg(void *setting, char *value)
+{
+    (void)setting; (void)value;
+}
+
+void context_hidden_set_default(void *setting, void *defaultval)
+{
+    (void)setting; (void)defaultval;
+}
+
+char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len)
+{
+    (void)setting; (void)buf_len; return buf;
+}
+
 void debug_log_apply(void) { }
 /* skin_parser.c logs each load; CheckWPS reports on its own */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
@@ -407,6 +428,8 @@ bool sound_scan_screen(bool rebuild) { (void)rebuild; return false; }
 void sound_set_channels(int value) { (void)value; }
 void tag_trim_init(void) { }
 bool tagcache_is_usable(void) { return false; }
+
+void talk_speech_changed(void) { }
 
 int talk_time_intervals(long time, int unit_idx, bool enqueue)
 {
