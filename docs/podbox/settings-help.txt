@@ -1108,6 +1108,10 @@ The colour of the text when Colour Mode is Custom.
 [action: Page Colour]
 The colour behind the text when Colour Mode is Custom.
 
+[text viewer brightness]
+The backlight's brightness while the text viewer is open, put back to the
+player's own Brightness when you leave it. Same as Player changes nothing.
+
 [text viewer margin]
 Insets the text from the edges of the screen, which is easier to read at the
 cost of a few characters per line.

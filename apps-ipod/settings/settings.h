@@ -897,6 +897,7 @@ struct user_settings
     int text_viewer_colour_mode;  /* TV_COLOUR_* */
     int text_viewer_fg;           /* TV_COLOUR_CUSTOM's text, native */
     int text_viewer_bg;           /* and its page */
+    int text_viewer_brightness;   /* while reading; 0 is the player's own */
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */

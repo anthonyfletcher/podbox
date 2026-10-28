@@ -55,6 +55,7 @@
 #include "speech/speech.h"     /* speech_enabled */
 #include "audio/voice_thread.h" /* voice_is_playing */
 #include "powermgmt.h"   /* reset_poweroff_timer */
+#include "backlight.h"   /* backlight_set_brightness */
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -1163,6 +1164,8 @@ static bool tv_open(const char *file)
 
 static void tv_close(void)
 {
+    backlight_set_brightness(global_settings.brightness);
+
     if (tv.user_font >= 0)
     {
         font_unload(tv.user_font);
@@ -1231,6 +1234,10 @@ static void tv_apply_settings(void)
     int margin;
 
     tv_apply_font();
+    /* Put back in tv_close() */
+    backlight_set_brightness(global_settings.text_viewer_brightness
+                             ? global_settings.text_viewer_brightness
+                             : global_settings.brightness);
 
     switch (global_settings.text_viewer_colour_mode)
     {

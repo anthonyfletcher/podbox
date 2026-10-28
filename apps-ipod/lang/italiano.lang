@@ -17996,6 +17996,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_BRIGHTNESS
+  desc: core text viewer, the backlight level while reading
+  user: core
+  <source>
+    *: "Reading Brightness"
+  </source>
+  <dest>
+    *: "Luminosità lettura"
+  </dest>
+  <voice>
+    *: "Luminosità lettura"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER
+  desc: core text viewer brightness: the player brightness setting
+  user: core
+  <source>
+    *: "Same as Player"
+  </source>
+  <dest>
+    *: "Come il lettore"
+  </dest>
+  <voice>
+    *: "Come il lettore"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

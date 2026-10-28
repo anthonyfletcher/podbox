@@ -433,6 +433,25 @@ static int32_t getlang_unit_0_is_off(int value, int unit)
         return TALK_ID(value,unit);
 }
 
+/* Reading Brightness: 0 leaves the player's Brightness as it is */
+static const char* formatter_brightness_0_is_player(char *buffer,
+                                                    size_t buffer_size,
+                                                    int val, const char *unit)
+{
+    (void)unit;
+    if (val == 0)
+        return str(LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER);
+    snprintf(buffer, buffer_size, "%d", val);
+    return buffer;
+}
+
+static int32_t getlang_brightness_0_is_player(int value, int unit)
+{
+    if (value == 0)
+        return LANG_TEXT_VIEWER_BRIGHTNESS_PLAYER;
+    return TALK_ID(value, unit);
+}
+
 static void crossfeed_cross_set(int val)
 {
    (void)val;
@@ -1728,6 +1747,11 @@ const struct settings_list settings[] = {
                    ID2P(LANG_TEXT_VIEWER_COLOUR_SEPIA),
                    ID2P(LANG_TEXT_VIEWER_COLOUR_NIGHT),
                    ID2P(LANG_TEXT_VIEWER_COLOUR_CUSTOM)),
+    INT_SETTING(F_NO_WRAP, text_viewer_brightness, LANG_TEXT_VIEWER_BRIGHTNESS,
+                0, "text viewer brightness", UNIT_INT,
+                0, MAX_BRIGHTNESS_SETTING, 1,
+                formatter_brightness_0_is_player,
+                getlang_brightness_0_is_player, NULL),
     /* Custom's pair, set with the colour picker from the reader's menu */
     {F_T_INT|F_RGB, &global_settings.text_viewer_fg, -1,
         INT(LCD_RGBPACK(0, 0, 0)), "text viewer text colour", UNUSED},
