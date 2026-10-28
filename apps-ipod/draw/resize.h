@@ -82,6 +82,11 @@ struct rowset;
 
 extern const struct custom_format format_native;
 
+/* Called by every image reader after each row it writes, with the rows
+ * written so far and the bitmap's height; false stops the decode, which then
+ * fails. NULL, as it is unless a caller sets it, lets every decode finish. */
+extern bool (*image_row_hook)(int done, int rows);
+
 int recalc_dimension(struct dim *dst, struct dim *src);
 
 int resize_on_load(struct bitmap *bm, bool dither,

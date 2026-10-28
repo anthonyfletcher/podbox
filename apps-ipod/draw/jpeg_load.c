@@ -2930,6 +2930,8 @@ int clip_jpeg_fd(int fd, int flags,
         struct img_part *part;
         for (row = 0; row < bm->height; row++)
         {
+            if (image_row_hook && !image_row_hook(row, bm->height))
+                return 0;
             part = store_row_jpeg(p_jpeg);
             if (p_jpeg->blocks > 1 && !p_jpeg->rgb)
             {

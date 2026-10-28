@@ -402,6 +402,15 @@ static bool assemble(struct png *p, int passes, int step, uint8_t *grid,
                      int gw, struct uint8_rgb *conv)
 {
     int pass, pw, ph, r, i, k;
+    int done = 0, rows = 0;
+
+    for (pass = 0; pass < passes; pass++)
+    {
+        const uint8_t *a = adam7[pass];
+
+        if (p->h.height > a[1])
+            rows += (p->h.height - a[1] + a[3] - 1) / a[3];
+    }
 
     for (pass = 0; pass < passes; pass++)
     {
@@ -414,6 +423,8 @@ static bool assemble(struct png *p, int passes, int step, uint8_t *grid,
             uint8_t *g = grid + (size_t)((a[1] + r * a[3]) / step) * gw * 3;
 
             if (!next_row(p))
+                return false;
+            if (image_row_hook && !image_row_hook(++done, rows))
                 return false;
             for (i = 0; i < pw; i += PART_PIXELS)
             {
@@ -650,7 +661,11 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
 
         for (row = 0; row < bm->height; row++)
         {
-            struct img_part *part = store_part_png(p);
+            struct img_part *part;
+
+            if (image_row_hook && !image_row_hook(row, bm->height))
+                return -9;
+            part = store_part_png(p);
             if (!part)
                 return -9;
             output_row_8(row, part->buf, &ctx);

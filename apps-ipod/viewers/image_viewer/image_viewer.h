@@ -116,12 +116,15 @@ extern int iv_fit_width, iv_fit_height;
  * art embedded in a track whose bytes need undoing; 0 for an image file. */
 extern unsigned iv_src_flags;
 
-/* For decoders that cannot scale to an arbitrary size in one pass: the integer
- * downscale to render before resampling down to the fit size. */
-int iv_fit_source_ds(int x_size, int y_size);
-
 /* callback updating a progress meter while image decoding (image_viewer.c) */
 void cb_progress(int current, int total);
+
+/* The image readers' row hook while the viewer decodes: draws progress, and
+ * stops the decode for Menu or USB, leaving PLUGIN_ABORT or
+ * PLUGIN_USB_CONNECTED in iv_decode_stop. iv_decode_begin() clears it. */
+extern int iv_decode_stop;
+void iv_decode_begin(void);
+bool iv_decode_row(int done, int rows);
 
 /* ---- support helpers ported alongside the viewer -------------------------- */
 

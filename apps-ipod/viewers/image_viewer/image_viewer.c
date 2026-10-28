@@ -402,6 +402,54 @@ void cb_progress(int current, int total)
     yield(); /* be nice to the other threads */
 }
 
+int iv_decode_stop;
+
+/* The hook is global, and the art cache decodes on its own thread while the
+ * viewer's decode yields: its rows pass straight through. */
+static unsigned int iv_decode_thread;
+
+void iv_decode_begin(void)
+{
+    iv_decode_stop = 0;
+    iv_decode_thread = thread_self();
+}
+
+/* A press of Menu stops a decode in either key map: nothing else can be
+ * done until it is over. */
+bool iv_decode_row(int done, int rows)
+{
+    long button;
+
+    if (thread_self() != iv_decode_thread)
+        return true;
+    cb_progress(done, rows);
+    button = button_get(false);
+    if (button == SYS_USB_CONNECTED)
+        iv_decode_stop = PLUGIN_USB_CONNECTED;
+    else if (button == BUTTON_MENU)
+        iv_decode_stop = PLUGIN_ABORT;
+    else if (button & SYS_EVENT)
+        default_event_handler(button);
+    return !iv_decode_stop;
+}
+
+/* After a decode stopped: USB is let in, with the buffer gone first as in
+ * scroll_bmp(), and the press of Menu that stopped it is let go of before
+ * anything reads its release. PLUGIN_USB_CONNECTED or PLUGIN_ABORT. */
+static int iv_decode_stopped(void)
+{
+    if (iv_decode_stop == PLUGIN_USB_CONNECTED)
+    {
+        iv_release_buffer();
+        default_event_handler(SYS_USB_CONNECTED);
+        return PLUGIN_USB_CONNECTED;
+    }
+    while (button_status() & BUTTON_MENU)
+        sleep(HZ/50);
+    button_clear_queue();
+    return PLUGIN_ABORT;
+}
+
 #define VSCROLL (LCD_HEIGHT/8)
 #define HSCROLL (LCD_WIDTH/10)
 
@@ -758,24 +806,6 @@ static int ds_above_fit(struct image_info *info)
     return downscale;
 }
 
-/* The integer rung a decoder that cannot scale freely should render before
- * resampling down to the fit size: the smallest rendering that is still at
- * least as big as the fit one, so the resample only ever shrinks. Clamped to
- * what memory allows, which can make it smaller -- a slightly soft picture
- * beats refusing to show one. */
-int iv_fit_source_ds(int x_size, int y_size)
-{
-    int downscale = 8;
-
-    while (downscale > 1 && (x_size/downscale < iv_fit_width
-                          || y_size/downscale < iv_fit_height))
-    {
-        downscale /= 2;
-    }
-
-    return MAX(downscale, ds_min);
-}
-
 /* Whether a rung's rendering fits in what loading left. A decoder short of
  * room starts again from the root of that space, so a rung larger than it is
  * written past the end of the buffer. */
@@ -946,12 +976,29 @@ static int load_and_show(char *filename, struct image_info *info,
 
     /* used to loop through subimages in animated gifs */
     int frame = 0;
+    bool shown = false;
     do  /* loop the image prepare and decoding when zoomed */
     {
         /* Hold the progress dialog back for 250ms, so an image that decodes
          * quickly never flashes one up. */
         splash_progress_set_delay(HZ/4);
         status = imgdec->get_image(info, frame, ds); /* decode or fetch from cache */
+        if (status == PLUGIN_ABORT || status == PLUGIN_USB_CONNECTED)
+        {
+            status = iv_decode_stopped();
+            if (status == PLUGIN_USB_CONNECTED)
+                return status;
+            /* A zoom that is stopped goes back to the whole picture, which
+             * is kept; stopping the first decode leaves the viewer. */
+            if (!shown || !iv_fit_width || ds == DS_FIT)
+            {
+                splash(HZ, "Cancelled");
+                return PLUGIN_OK;
+            }
+            ds = DS_FIT;
+            scaled_centre(info, ds, &cx, &cy);
+            continue;
+        }
         if (status == PLUGIN_OUTOFMEM && ds == DS_FIT)
         {
             /* A fit rendering made from a larger rung needs room for both,
@@ -979,6 +1026,7 @@ static int load_and_show(char *filename, struct image_info *info,
         imgdec->draw_image_rect(info, 0, 0,
                         info->width-info->x, info->height-info->y);
         lcd_update();
+        shown = true;
 
         /* drawing is now finished, play around with scrolling
          * until you press OFF or connect USB

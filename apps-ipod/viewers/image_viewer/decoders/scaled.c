@@ -6,8 +6,15 @@
  *
  * The image viewer's back end for every image the core readers decode
  * through image_load(): JPEG, BMP and PNG files, and now-playing art
- * embedded in a track, whatever its format, with ordered dithering. The image is decoded once, halved until it
- * fits the buffer, and the other zoom levels are made from that bitmap.
+ * embedded in a track, whatever its format, with ordered dithering.
+ *
+ * Opening reads only the image's size. Each zoom level is decoded from the
+ * file at its own size when it is first shown, so a large photo opens at the
+ * cost of a screenful -- a JPEG decodes at 1/8 scale, an interlaced PNG reads
+ * its first pass -- and only a zoom pays for detail. The fit rendering has a
+ * slot of its own at the front of the buffer and is never discarded; the
+ * other levels share the rest, and all of them go when a new one does not
+ * fit beside them.
  ****************************************************************************/
 
 #include <string.h>
@@ -16,8 +23,9 @@
 #include "file.h"
 #include "kernel.h"
 #include "logf.h"
+#include "string-extra.h"    /* strmemccpy */
 #include "draw/bmp.h"        /* struct bitmap, FORMAT_* */
-#include "draw/resize.h"     /* format_native */
+#include "draw/resize.h"     /* format_native, image_row_hook */
 #include "draw/image_load.h"
 #include "../image_viewer.h"
 
@@ -30,19 +38,23 @@ struct t_disp
 
 /************************* Globals ***************************/
 
-/* decompressed image in the possible sizes: DS_FIT and 1,2,4,8, wasting the
- * other slots */
+/* the renderings: DS_FIT and 1,2,4,8, wasting the other slots */
 static struct t_disp disp[9];
 
-/* the root of the images, hereafter are decompresed ones */
+/* The fit rendering's slot, then the space the other levels share */
+#define FIT_SLOT (LCD_WIDTH * LCD_HEIGHT * (int)sizeof (fb_data))
+static unsigned char* buf_fit;
 static unsigned char* buf_root;
 static int root_size;
 
-/* up to here currently used by image(s) */
+/* up to here currently used by the other levels */
 static unsigned char* buf_images;
 static ssize_t buf_images_size;
 
-static struct bitmap bmp;
+/* where the image is, to read it again for each level */
+static char src_name[MAX_PATH];
+static struct image_src src;
+static int src_width, src_height;
 
 /************************* Implementation ***************************/
 
@@ -63,26 +75,72 @@ static int img_mem(int ds)
     if (ds == DS_FIT)
         return iv_fit_width * iv_fit_height * sizeof (fb_data);
 
-    return (bmp.width/ds) * (bmp.height/ds) * sizeof (fb_data);
+    return (src_width/ds) * (src_height/ds) * sizeof (fb_data);
+}
+
+/* Decodes the image at w x h into 'out', with 'size' bytes there for the
+ * bitmap and the decode's working memory, and puts the bitmap's size in
+ * *used. PLUGIN_OK, or the status that stopped it. */
+static int decode(unsigned char *out, int size, int w, int h, int *used)
+{
+    int format = FORMAT_NATIVE | FORMAT_DITHER;
+    struct bitmap bm = { .width = w, .height = h, .data = out };
+    int ret;
+
+    if (w != src_width || h != src_height)
+        format |= FORMAT_RESIZE;
+
+    src.fd = open(src_name, O_RDONLY);
+    if (src.fd < 0)
+        return PLUGIN_ERROR;
+    if (image_load(&src, &bm, size, format | FORMAT_RETURN_SIZE,
+                   &format_native) > size)
+    {
+        close(src.fd);
+        return PLUGIN_OUTOFMEM;
+    }
+
+    iv_decode_begin();
+    image_row_hook = iv_decode_row;
+    cpu_boost(true);
+    ret = image_load(&src, &bm, size, format, &format_native);
+    cpu_boost(false);
+    image_row_hook = NULL;
+    close(src.fd);
+
+    if (iv_decode_stop)
+        return iv_decode_stop;
+    if (ret <= 0)
+    {
+        logf("scaled: decode failed, %d", ret);
+        splashf(HZ * 3, "Could not decode %s", src_name);
+        return PLUGIN_ERROR;
+    }
+    *used = ret;
+    return PLUGIN_OK;
 }
 
 static int load_image(char *filename, struct image_info *info,
                       unsigned char *buf, ssize_t *buf_size,
                       int offset, int filesize)
 {
-    struct image_src src;
+    struct bitmap bm = { .data = buf };
     int size;
-    int format = FORMAT_NATIVE | FORMAT_DITHER;
-    const struct custom_format *cformat = &format_native;
 
     memset(&disp, 0, sizeof(disp));
-    memset(&bmp, 0, sizeof(bmp)); /* clear info struct */
 
     if ((intptr_t)buf & 3)
     {
         *buf_size -= 4-((intptr_t)buf&3);
         buf += 4-((intptr_t)buf&3);
     }
+    strmemccpy(src_name, filename, sizeof(src_name));
+    src.pos = offset;
+    src.len = offset ? filesize : -1;
+    src.flags = iv_src_flags;
+
+    /* The image's own size. The readers work in the buffer even to answer
+     * this, so it is passed. */
     src.fd = open(filename, O_RDONLY);
     if (src.fd < 0)
     {
@@ -90,67 +148,40 @@ static int load_image(char *filename, struct image_info *info,
         splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
-    src.pos = offset;
-    src.len = offset ? filesize : -1;
-    src.flags = iv_src_flags;
-
-    int ds = 1;
-    /* check size of image needed to load image. The readers work in the
-     * buffer even to answer this, so it is passed. */
-    bmp.data = buf;
-    size = image_load(&src, &bmp, *buf_size, format | FORMAT_RETURN_SIZE,
-                      cformat);
-    while (size > *buf_size && bmp.width >= 2 && bmp.height >= 2 && ds < 8)
+    bm.data = buf;
+    size = image_load(&src, &bm, *buf_size, FORMAT_NATIVE | FORMAT_RETURN_SIZE,
+                      &format_native);
+    close(src.fd);
+    if (size <= 0 || bm.width < 1 || bm.height < 1)
     {
-        /* too large for the buffer. resize on load. */
-        format |= FORMAT_RESIZE|FORMAT_KEEP_ASPECT;
-        ds *= 2;
-        bmp.width /= 2;
-        bmp.height /= 2;
-        size = image_load(&src, &bmp, *buf_size, format | FORMAT_RETURN_SIZE,
-                          cformat);
-    }
-    if (size <= 0)
-    {
-        close(src.fd);
         logf("scaled: size probe failed, %d", size);
         splashf(HZ * 3, "Could not read %s", filename);
         return PLUGIN_ERROR;
     }
+    src_width = bm.width;
+    src_height = bm.height;
 
-    if (size > *buf_size)
-    {
-        close(src.fd);
+    if (*buf_size <= FIT_SLOT)
         return PLUGIN_OUTOFMEM;
-    }
+    buf_fit = buf;
+    buf_images = buf_root = buf + FIT_SLOT;
+    buf_images_size = root_size = *buf_size - FIT_SLOT;
 
-    /* actual loading */
-    cpu_boost(true);
-    size = image_load(&src, &bmp, *buf_size, format, cformat);
-    cpu_boost(false);
-    close(src.fd);
+    info->x_size = src_width;
+    info->y_size = src_height;
 
-    if (size <= 0)
-    {
-        logf("scaled: decode failed, %d", size);
-        splashf(HZ * 3, "Could not decode %s", filename);
-        return PLUGIN_ERROR;
-    }
-
-    /* we can start the resized images behind it */
-    buf_images = buf_root = buf + size;
-    buf_images_size = root_size = *buf_size - size;
-
-    info->x_size = bmp.width;
-    info->y_size = bmp.height;
-    *buf_size = buf_images_size;
-    return PLUGIN_OK;
+    /* What the levels may take, less what decoding the widest one needs
+     * beside its bitmap */
+    *buf_size = root_size - IMAGE_DECODE_OVERHEAD
+                - 3 * (int)sizeof(struct uint32_argb) * src_width;
+    return *buf_size > 0 ? PLUGIN_OK : PLUGIN_OUTOFMEM;
 }
 
 static int get_image(struct image_info *info, int frame, int ds)
 {
     (void)frame;
     struct t_disp* p_disp = &disp[ds]; /* short cut */
+    int status, size;
 
     if (ds == DS_FIT)
     {
@@ -159,55 +190,52 @@ static int get_image(struct image_info *info, int frame, int ds)
     }
     else
     {
-        info->width = bmp.width/ds;
-        info->height = bmp.height/ds;
+        info->width = src_width/ds;
+        info->height = src_height/ds;
     }
     info->data = p_disp;
 
     if (p_disp->bitmap != NULL)
+        return PLUGIN_OK;   /* we still have it */
+
+    if (ds == DS_FIT)
     {
-        /* we still have it */
-        return PLUGIN_OK;
+        /* Its working memory runs on into the shared space */
+        for (int i = 1; i <= 8; i++)
+            disp[i].bitmap = NULL;
+        buf_images = buf_root;
+        buf_images_size = root_size;
+        status = decode(buf_fit, FIT_SLOT + root_size,
+                        info->width, info->height, &size);
+        if (status == PLUGIN_OK)
+            p_disp->bitmap = buf_fit;
+        return status;
     }
 
-    /* assign image buffer */
-    if (ds != 1)
+    status = decode(buf_images, buf_images_size, info->width, info->height,
+                    &size);
+    if (status == PLUGIN_OUTOFMEM && buf_images != buf_root)
     {
-        int size; /* resized image size */
-        struct bitmap bmp_dst;
-
-        size = img_mem(ds);
-        if (buf_images_size <= size)
-        {
-            /* have to discard the current */
-            int i;
-            for (i=0; i<=8; i++)
-                disp[i].bitmap = NULL; /* invalidate all bitmaps */
-            buf_images = buf_root; /* start again from the beginning of the buffer */
-            buf_images_size = root_size;
-        }
-
-        p_disp->bitmap = buf_images;
-        buf_images += size;
-        buf_images_size -= size;
-
-        bmp_dst.width = info->width;
-        bmp_dst.height = info->height;
-        bmp_dst.data = p_disp->bitmap;
-        cpu_boost(true);
-        smooth_resize_bitmap(&bmp, &bmp_dst);
-        cpu_boost(false);
+        /* no room beside the others: drop them and use it all */
+        for (int i = 1; i <= 8; i++)
+            disp[i].bitmap = NULL;
+        buf_images = buf_root;
+        buf_images_size = root_size;
+        status = decode(buf_images, buf_images_size,
+                        info->width, info->height, &size);
     }
-    else
-    {
-        p_disp->bitmap = bmp.data;
-    }
+    if (status != PLUGIN_OK)
+        return status;
 
+    p_disp->bitmap = buf_images;
+    size = ALIGN_UP(size, 4);
+    buf_images += size;
+    buf_images_size -= size;
     return PLUGIN_OK;
 }
 
 const struct image_decoder scaled_decoder = {
-    true,
+    false,
     img_mem,
     load_image,
     get_image,

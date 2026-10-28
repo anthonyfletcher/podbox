@@ -189,6 +189,7 @@ static inline bool scale_v_area(struct rowset *rset, struct scaler_context *ctx)
     uint32_t mul, oy, iy, oye;
     const uint32_t v_i_val = ctx->v_i_val,
                    v_o_val = ctx->v_o_val;
+    int done = 0;
 
     /* Set up rounding and scale factors */
     mul = 0;
@@ -225,6 +226,8 @@ static inline bool scale_v_area(struct rowset *rset, struct scaler_context *ctx)
                 rowacc_px++, rowtmp_px++)
                 *rowacc_px += mul * *rowtmp_px;
             ctx->output_row(oy, (void*)rowacc, ctx);
+            if (image_row_hook && !image_row_hook(++done, ctx->bm->height))
+                return false;
             /* clear accumulator row, store partial coverage for next row */
             memset((void *)rowacc, 0, ctx->bm->width * sizeof(uint32_t) * CHANNEL_BYTES);
             mul = oye;
@@ -332,6 +335,7 @@ static inline bool scale_v_linear(struct rowset *rset,
 {
     uint32_t iy, iye;
     int32_t oy;
+    int done = 0;
     const uint32_t v_i_val = ctx->v_i_val,
                    v_o_val = ctx->v_o_val;
     /* Set up our buffers, to store the increment and current value for each
@@ -377,6 +381,8 @@ static inline bool scale_v_linear(struct rowset *rset,
                 rowinc_px++, rowval_px++)
                 *rowval_px += *rowinc_px;
         ctx->output_row(oy, (void*)rowval, ctx);
+        if (image_row_hook && !image_row_hook(++done, ctx->bm->height))
+            return false;
         iye += v_i_val;
     }
     return true;
@@ -464,6 +470,8 @@ unsigned int get_size_native(struct bitmap *bm)
 {
     return BM_SIZE(bm->width,bm->height,FORMAT_NATIVE,0);
 }
+
+bool (*image_row_hook)(int done, int rows);
 
 const struct custom_format format_native = {
     .output_row_8 = output_row_8_native,
