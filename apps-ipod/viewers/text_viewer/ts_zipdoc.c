@@ -3,6 +3,11 @@
  *
  * The zip-backed documents: EPUB, DOCX and .fb2.zip. Finds the content
  * parts inside the container and feeds them through the markup path.
+ *
+ *   tag scanner   - tags, and the text between them, from a member
+ *   OPF parsing   - the manifest, the spine, and where the contents are
+ *   spine stream  - every part in order, or one part alone
+ *   contents      - an EPUB's nav document or NCX, as (title, part) pairs
  ****************************************************************************/
 
 #include "ts_internal.h"
@@ -12,13 +17,17 @@
 
 /* ---- tiny XML tag scanner -------------------------------------------- */
 
-/* Calls cb() with the raw text of each tag (without the angle brackets).
- * Returning non-zero from cb stops the scan early. */
-static int scan_tags(bs_stream *src, int (*cb)(void *, const char *), void *ud)
+#define TEXTBUF   256
+
+/* Calls cb() with the raw text of each tag (without the angle brackets) and
+ * the text before it since the last tag, cut at TEXTBUF. Returning non-zero
+ * from cb stops the scan early. */
+static int scan_markup(bs_stream *src,
+                       int (*cb)(void *, const char *, const char *), void *ud)
 {
-    char tag[TAGBUF];
+    char tag[TAGBUF], text[TEXTBUF];
     uint8_t buf[256];
-    size_t n = 0, i;
+    size_t n = 0, t = 0, i;
     int in_tag = 0, quote = 0, stop = 0;
 
     for (;;) {
@@ -31,14 +40,17 @@ static int scan_tags(bs_stream *src, int (*cb)(void *, const char *), void *ud)
             char c = (char)buf[i];
             if (!in_tag) {
                 if (c == '<') { in_tag = 1; n = 0; quote = 0; }
+                else if (t < TEXTBUF - 1) text[t++] = c;
                 continue;
             }
             if (quote) { if (c == quote) quote = 0; }
             else if (c == '"' || c == '\'') quote = c;
             else if (c == '>') {
                 tag[n] = 0;
+                text[t] = 0;
                 in_tag = 0;
-                if (cb(ud, tag)) stop = 1;
+                t = 0;
+                if (cb(ud, tag, text)) stop = 1;
                 continue;
             }
             if (n < TAGBUF - 1) tag[n++] = c;
@@ -46,6 +58,25 @@ static int scan_tags(bs_stream *src, int (*cb)(void *, const char *), void *ud)
         if (stop) break;
     }
     return BS_OK;
+}
+
+typedef struct {
+    int (*cb)(void *, const char *);
+    void *ud;
+} tags_only;
+
+static int tags_only_cb(void *ud, const char *tag, const char *text)
+{
+    tags_only *t = ud;
+    (void)text;
+    return t->cb(t->ud, tag);
+}
+
+/* scan_markup() for a caller that wants the tags alone */
+static int scan_tags(bs_stream *src, int (*cb)(void *, const char *), void *ud)
+{
+    tags_only t = { cb, ud };
+    return scan_markup(src, tags_only_cb, &t);
 }
 
 static int tag_is(const char *tag, const char *name)
@@ -165,6 +196,8 @@ typedef struct {
     int       nspine;
     int       in_spine;
     int       nomem;
+    int       nav_zi;         /* EPUB 3's contents, or -1 */
+    char      toc_id[64];     /* the spine's NCX, by manifest id */
 } opf_ctx;
 
 static char *dup_str(bs_arena *a, const char *s)
@@ -205,11 +238,18 @@ static int opf_tag(void *ud, const char *tag)
             m->zi = zi;
             m->next = o->manifest;
             o->manifest = m;
+            if (attr(tag, "properties", type, sizeof type) &&
+                strstr(type, "nav"))
+                o->nav_zi = zi;
         }
         return 0;
     }
 
-    if (tag_is(tag, "spine")) { o->in_spine = (tag[0] != '/'); return 0; }
+    if (tag_is(tag, "spine")) {
+        o->in_spine = (tag[0] != '/');
+        if (o->in_spine) attr(tag, "toc", o->toc_id, sizeof o->toc_id);
+        return 0;
+    }
 
     if (o->in_spine && tag_is(tag, "itemref") &&
         attr(tag, "idref", id, sizeof id)) {
@@ -242,6 +282,8 @@ typedef struct {
     int        nspine, cur;
     int        opened;
     int        part;          /* the one spine item read, or -1 for all */
+    int        toc_zi;        /* the contents' member, or -1 */
+    int        toc_nav;       /* it is a nav document, not an NCX */
 } sp_st;
 
 static int sp_next(sp_st *s)
@@ -314,6 +356,135 @@ int ts_zipdoc_parts(const bs_stream *st)
     return ((const sp_st *)st->st)->nspine;
 }
 
+/* ---- contents -------------------------------------------------------- */
+
+#define TITLE_MAX 128
+
+typedef struct {
+    sp_st *sp;
+    const char *base;         /* the contents member's own path */
+    int (*cb)(void *, const char *, int);
+    void *ud;
+    int in_toc;               /* inside <nav epub:type="toc"> */
+    int in_title;             /* gathering a title */
+    char href[256];
+    char title[TITLE_MAX];
+    size_t tlen;
+    int stop;
+} toc_ctx;
+
+/* Appends `text` to the title, decoding entities and folding white space */
+static void title_add(toc_ctx *t, const char *text)
+{
+    size_t n = strlen(text), i = 0;
+
+    while (i < n) {
+        uint32_t cp = (unsigned char)text[i];
+        uint8_t u[4];
+        size_t ul, used = 1;
+
+        if (cp == '&') {
+            size_t e = ts_entity(text + i + 1, n - i - 1, &cp);
+            if (e) used = e + 1;
+        }
+        i += used;
+        /* A new character only with room for all of it */
+        if (t->tlen >= TITLE_MAX - 5 && !(used == 1 && cp >= 0x80 && cp < 0xc0))
+            return;
+        if (cp == ' ' || cp == '\t' || cp == '\r' || cp == '\n') {
+            if (t->tlen && t->title[t->tlen - 1] != ' ' &&
+                t->tlen < TITLE_MAX - 1)
+                t->title[t->tlen++] = ' ';
+            continue;
+        }
+        if (cp >= 0x80 && used == 1) {
+            /* a UTF-8 byte: copied as it is */
+            if (t->tlen < TITLE_MAX - 1) t->title[t->tlen++] = (char)cp;
+            continue;
+        }
+        ul = ts_utf8_put(u, cp);
+        if (t->tlen + ul < TITLE_MAX) {
+            memcpy(t->title + t->tlen, u, ul);
+            t->tlen += ul;
+        }
+    }
+}
+
+/* Hands the gathered title on, with the part its href names */
+static void title_emit(toc_ctx *t, const char *href)
+{
+    char full[320];
+    int zi, part;
+
+    while (t->tlen && t->title[t->tlen - 1] == ' ') t->tlen--;
+    t->title[t->tlen] = 0;
+    path_join(t->base, href, full, sizeof full);
+    zi = ts_zip_find(t->sp->z, full);
+    for (part = 0; zi >= 0 && part < t->sp->nspine; part++)
+        if (t->sp->spine[part] == zi) {
+            if (t->tlen && t->cb(t->ud, t->title, part)) t->stop = 1;
+            break;
+        }
+    t->tlen = 0;
+}
+
+static int toc_tag(void *ud, const char *tag, const char *text)
+{
+    toc_ctx *t = ud;
+    int end = tag[0] == '/';
+    const char *name = tag + end;     /* tag_is() takes no closing slash */
+    char type[64];
+
+    if (t->in_title) title_add(t, text);
+
+    if (t->sp->toc_nav) {
+        if (tag_is(name, "nav")) {
+            if (end) t->in_toc = 0;
+            else t->in_toc = attr(tag, "epub:type", type, sizeof type) &&
+                             strstr(type, "toc");
+        } else if (t->in_toc && tag_is(name, "a")) {
+            if (!end) {
+                t->in_title = attr(tag, "href", t->href, sizeof t->href);
+                t->tlen = 0;
+            } else if (t->in_title) {
+                t->in_title = 0;
+                title_emit(t, t->href);
+            }
+        }
+    } else {
+        if (tag_is(name, "text")) {
+            if (!end) { t->in_title = 1; t->tlen = 0; }
+            else t->in_title = 0;
+        } else if (!end && tag_is(name, "content") &&
+                   attr(tag, "src", t->href, sizeof t->href)) {
+            title_emit(t, t->href);
+        }
+    }
+    return t->stop;
+}
+
+int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
+                  void *ud)
+{
+    sp_st *s = st->st;
+    bs_stream *member;
+    toc_ctx t;
+    int rc;
+
+    if (s->toc_zi < 0) return BS_ERR_UNSUP;
+    memset(&t, 0, sizeof t);
+    t.sp = s;
+    t.base = ts_zip_name(s->z, s->toc_zi);
+    t.cb = cb;
+    t.ud = ud;
+    rc = ts_zip_member(s->z, s->toc_zi, &member);
+    /* The member the spine was reading is gone: a read now ends the part */
+    s->opened = 0;
+    if (s->part >= 0) s->cur = s->part + 1;
+    if (rc != BS_OK) return rc;
+    return scan_markup(member, toc_tag, &t);
+}
+
 /* ---- entry point ----------------------------------------------------- */
 
 static int ends_with(const char *s, const char *suf)
@@ -342,6 +513,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
 
     sp->z = z; sp->spine = spine; sp->nspine = 0; sp->cur = 0; sp->opened = 0;
     sp->part = -1;
+    sp->toc_zi = -1;
 
     /* --- which flavour of zip is this? --- */
     idx = ts_zip_find(z, "word/document.xml");
@@ -369,10 +541,21 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
 
         memset(&o, 0, sizeof o);
         o.a = c->arena; o.z = z; o.opf = opf; o.spine = spine;
+        o.nav_zi = -1;
         rc = scan_tags(member, opf_tag, &o);
         if (rc != BS_OK) return rc;
         if (o.nomem) return BS_ERR_NOMEM;
         sp->nspine = o.nspine;
+
+        /* The contents: EPUB 3's nav document, else the spine's NCX */
+        if (o.nav_zi >= 0) {
+            sp->toc_zi = o.nav_zi;
+            sp->toc_nav = 1;
+        } else if (o.toc_id[0]) {
+            mitem *m;
+            for (m = o.manifest; m; m = m->next)
+                if (!strcmp(m->id, o.toc_id)) sp->toc_zi = m->zi;
+        }
 
         /* No usable spine: fall back to every xhtml member, in zip order. */
         if (!sp->nspine) {

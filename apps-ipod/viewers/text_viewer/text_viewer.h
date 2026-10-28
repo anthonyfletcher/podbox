@@ -17,6 +17,13 @@
  * reopening a file resumes it with no help from the caller. */
 int text_viewer(const char *file);
 
+/* Whether a book with more than one chapter is open, for the reader's menu */
+bool text_viewer_has_contents(void);
+
+/* The open book's contents as a list; picking an entry goes to that chapter.
+ * Returns 1 after a pick, which closes the menu it was opened from. */
+int text_viewer_contents(void);
+
 /* Path of the most recently read document, for a caller that wants to reopen
  * it. False if nothing has been read, or the record is unusable. The document
  * may since have been deleted; the caller checks. */

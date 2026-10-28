@@ -15,6 +15,7 @@
 #include "files/filetypes.h"       /* SHOW_FONT */
 #include "rbpaths.h"         /* FONT_DIR */
 #include "draw/icon_bitmaps.h"
+#include "viewers/text_viewer/text_viewer.h"   /* contents */
 
 MENUITEM_SETTING(text_viewer_colour_mode,
                  &global_settings.text_viewer_colour_mode, NULL);
@@ -82,7 +83,23 @@ MENUITEM_FUNCTION(text_viewer_font_reset_item, 0,
                   ID2P(LANG_TEXT_VIEWER_FONT_DEFAULT),
                   text_viewer_font_reset, NULL, Icon_Font);
 
+/* Only inside the reader, with a book of chapters open: the same menu is
+ * also reached from Settings */
+static int contents_callback(int action, const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !text_viewer_has_contents())
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_FUNCTION(text_viewer_contents_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_BROWSE_CHAPTERS), text_viewer_contents,
+                  contents_callback, Icon_NOICON);
+
 MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
+          &text_viewer_contents_item,
           &text_viewer_colour_mode,
           &text_viewer_margin,
           &text_viewer_line_spacing,

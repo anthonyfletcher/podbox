@@ -111,6 +111,13 @@ int  ts_rewind(ts_source *s);
 int  ts_part_count(const ts_source *s);
 int  ts_seek_part(ts_source *s, int part);
 
+/* The book's own table of contents: cb() gets each entry's title and the
+ * part it starts in, in book order, and stops the walk by returning
+ * non-zero. BS_ERR_UNSUP when the book has none. Reading the contents ends
+ * the part being read, so seek a part before reading on. */
+int  ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
+            void *ud);
+
 void ts_close(ts_source *s);
 
 ts_format ts_source_format(const ts_source *s);

@@ -46,6 +46,7 @@
 #include "system/strutil.h"
 #include "root_menu.h"       /* GO_TO_*, MENU_ATTACHED_USB */
 #include "widgets/menu.h"            /* do_menu */
+#include "widgets/list.h"            /* simplelist */
 #include "screens/settings/exported_settings.h" /* text_viewer_menu */
 #include "txt_source.h"
 #include "ts_io_core.h"
@@ -1227,6 +1228,129 @@ static void tv_setup_screen(void)
 /* Hold-Menu settings menu, shared with Library > Viewers > Text Viewer.
  * Re-enables the theme just for the menu chrome, then drops back to our own
  * full-screen drawing and re-applies whatever the reader changed. */
+/* ---- contents --------------------------------------------------------- */
+
+/* Rows the contents list holds, and the bytes of each title kept */
+#define TV_TOC_MAX   320
+#define TV_TOC_TITLE 46
+
+struct tv_toc_entry
+{
+    int16_t part;
+    char title[TV_TOC_TITLE];
+};
+
+struct tv_toc
+{
+    struct tv_toc_entry *e;
+    int n;
+};
+
+/* ts_toc()'s callback. Sections within one chapter file collapse into its
+ * first entry: a jump goes to the start of a file. */
+static int tv_toc_add(void *ud, const char *title, int part)
+{
+    struct tv_toc *t = ud;
+    char *d;
+    size_t n;
+
+    if (t->n && t->e[t->n - 1].part == part)
+        return 0;
+    if (t->n == TV_TOC_MAX)
+        return 1;
+    d = t->e[t->n].title;
+    n = strlen(title);
+    if (n > TV_TOC_TITLE - 1)
+    {
+        n = TV_TOC_TITLE - 1;
+        while (n > 0 && ((unsigned char)title[n] & 0xc0) == 0x80)
+            n--;                    /* not through a character */
+    }
+    memcpy(d, title, n);
+    d[n] = '\0';
+    t->e[t->n++].part = part;
+    return 0;
+}
+
+static const char *tv_toc_name(int item, void *data, char *buf, size_t len)
+{
+    (void)buf;
+    (void)len;
+    return ((struct tv_toc *)data)->e[item].title;
+}
+
+bool text_viewer_has_contents(void)
+{
+    return tv.src && tv.nparts > 1;
+}
+
+/* The book's contents, from its own table of contents, or one row per
+ * chapter file with text without one; a pick opens that chapter. Reading the contents
+ * ends the chapter being read, so without a pick the page on screen is laid
+ * out again. Returns 1 to close the menu after a pick. */
+int text_viewer_contents(void)
+{
+    struct simplelist_info info;
+    struct tv_toc toc = { NULL, 0 };
+    int handle, part = tv.part, sel = 0, target = -1, i, rc;
+    off_t pos = tv.pos;
+
+    handle = core_alloc(TV_TOC_MAX * sizeof(struct tv_toc_entry));
+    if (handle <= 0)
+        return 0;
+    toc.e = core_get_data_pinned(handle);
+
+    cpu_boost(true);
+    rc = ts_toc(tv.src, tv_toc_add, &toc);
+    if (rc != BS_OK || !toc.n)
+    {
+        /* No contents of its own: each chapter file by its first line, and
+         * those with no text, such as a cover, left out */
+        tv_splash_loading();
+        toc.n = 0;
+        for (i = 0; i < tv.nparts && toc.n < TV_TOC_MAX; i++)
+        {
+            char line[TV_TOC_TITLE + 8], *s, *nl;
+            long got;
+
+            if (ts_seek_part(tv.src, i) != BS_OK)
+                break;
+            got = ts_read(tv.src, line, sizeof(line) - 1);
+            if (got <= 0)
+                continue;
+            line[got] = '\0';
+            for (s = line; *s == '\n' || *s == ' '; s++)
+                ;
+            nl = strchr(s, '\n');
+            if (nl)
+                *nl = '\0';
+            if (!*s)
+                continue;
+            tv_toc_add(&toc, s, i);
+        }
+    }
+    cpu_boost(false);
+
+    for (i = 0; i < toc.n; i++)
+        if (toc.e[i].part <= part)
+            sel = i;                /* the entry the page on screen is in */
+    simplelist_info_init(&info, str(LANG_BROWSE_CHAPTERS), toc.n, &toc);
+    info.get_name = tv_toc_name;
+    info.selection = sel;
+    simplelist_show_list(&info);
+    if (info.selection >= 0)
+        target = toc.e[info.selection].part;
+
+    core_unpin(handle);
+    core_free(handle);
+
+    if (target >= 0 && (tv_enter_part(target) || tv_next_part()))
+        return 1;
+    tv_enter_part(part);
+    tv_resume_to(pos);
+    return target >= 0;
+}
+
 static int tv_menu(void)
 {
     int sel = 0, ret;
@@ -1239,6 +1363,8 @@ static int tv_menu(void)
 
     tv_apply_settings();
     tv_draw();
+    if (ret == 1)
+        tv_speak_page();            /* a chapter picked from the contents */
     return ret;
 }
 

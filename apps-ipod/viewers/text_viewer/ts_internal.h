@@ -102,6 +102,8 @@ int ts_open_docx (ts_ctx *c, bs_stream **out);
  * start, until another seek; and how many there are. */
 int ts_zipdoc_seek_part(bs_stream *st, int part);
 int ts_zipdoc_parts(const bs_stream *st);
+int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
+                  void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);
 int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 

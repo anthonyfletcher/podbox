@@ -394,6 +394,14 @@ int ts_seek_part(ts_source *s, int part)
     return BS_OK;
 }
 
+int ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
+           void *ud)
+{
+    if (!s) return BS_ERR_INVAL;
+    if (!s->parts) return BS_ERR_UNSUP;
+    return ts_zipdoc_toc(s->parts, cb, ud);
+}
+
 void ts_close(ts_source *s)
 {
     if (!s) return;
