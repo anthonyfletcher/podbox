@@ -41,6 +41,8 @@
 #include "database/tagcache.h"
 #include "database/sound_index.h"
 #include "metadata/art_cache.h"
+#include "viewers/text_viewer/txt_source.h"
+#include "viewers/text_viewer/ts_io_core.h"
 #include "artcache_pb.h"
 
 struct user_settings global_settings;
@@ -294,6 +296,21 @@ bool bg_task_should_stop(const struct bg_task *task)
 void bg_task_init(struct bg_task *task)
 {
     (void)task;
+}
+
+/* The book index is only read here; writing it is the player's documents
+ * walk, which opens books with the reader's engine */
+int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
+                 ts_book *out)
+{
+    (void)io; (void)arena; (void)arena_size; (void)out;
+    return BS_ERR_UNSUP;
+}
+
+int ts_io_core(bs_io *io, struct ts_core_file *f, const char *path)
+{
+    (void)io; (void)f; (void)path;
+    return BS_ERR_IO;
 }
 
 void bg_task_post(struct bg_task *task, long id)

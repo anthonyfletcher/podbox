@@ -1,12 +1,15 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Disk cache for cover art -- BOTH album art and artist art. Pre-scales each
+ * Disk cache for cover art -- album art, artist art and ebook covers. Pre-scales each
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder's image or a
  * track's embedded art, as the album art source setting orders them; artist
  * art from an image in its parent or, failing that, the folder above. Each has
- * its own placeholder for when nothing is found.
+ * its own placeholder for when nothing is found. A book's cover, keyed by the
+ * book's own path, is an image named after the book or the one inside it, and
+ * keeps its shape rather than being cropped square: a cover is taller than
+ * wide.
  *
  * A pass after a library update that only added tracks visits the folders of
  * those tracks alone. One after a deletion, an Update, a Rebuild or a change
@@ -39,6 +42,8 @@
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "system/bg_task.h"         /* the caching pass runs as one */
+#include "files/book_index.h"       /* the books the pass visits */
+#include "files/byte_stream.h"      /* a deflated cover, inflated */
 #include "files/path_list.h"        /* the "found nothing" lists */
 #include "system/strutil.h"         /* is_disc_folder() */
 #include "lcd.h"
@@ -920,6 +925,9 @@ struct aa_src
     int           emb_flags; /* embedded mp3_albumart type and flags */
 };
 
+/* Rendering a book's cover: fitted at its own shape, never cropped */
+static bool aa_book;
+
 /* Read the source image into `bm` with `fmt`, requesting a `w` x `h` target (the
  * readers treat that as the resize target, or overwrite it with the source's own
  * dimensions when `fmt` carries no FORMAT_RESIZE). Returns the reader's result. */
@@ -1069,7 +1077,7 @@ static bool aa_generate_one(const struct aa_src *src, int size_index,
                             size_t workbuf_sz)
 {
     int dim = art_sizes[size_index].dim;
-    bool cover = art_sizes[size_index].fit == AA_FIT_COVER;
+    bool cover = art_sizes[size_index].fit == AA_FIT_COVER && !aa_book;
     struct bitmap bm;
     int fmt = FORMAT_NATIVE | FORMAT_RESIZE | FORMAT_DITHER;
     int tw = dim, th = dim;
@@ -1151,7 +1159,7 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
     int order[ART_CACHE_NUM_SIZES];
     int i;
 
-    if (art_sizes[size_index].fit != AA_FIT_COVER)
+    if (art_sizes[size_index].fit != AA_FIT_COVER || aa_book)
         return false;
 
     aa_sizes_largest_first(order);
@@ -1555,6 +1563,151 @@ static size_t aa_work_bytes(void)
            + IMAGE_DECODE_OVERHEAD;
 }
 
+/* ---- books ---- */
+
+#define AA_COVER_TMP LIB_CACHE_DIR "/cover.tmp"
+
+static long aa_fd_read(void *ctx, void *buf, size_t n)
+{
+    return read(*(int *)ctx, buf, n);
+}
+
+static bs_off_t aa_fd_seek(void *ctx, bs_off_t off, int whence)
+{
+    return lseek(*(int *)ctx, off, whence);
+}
+
+static bs_off_t aa_fd_size(void *ctx)
+{
+    return ffilesize(*(int *)ctx);
+}
+
+/* A deflated cover, unpacked into AA_COVER_TMP with `workbuf` as the
+ * inflater's memory, before the decode needs it: a progressive JPEG seeks
+ * back, which a stream being inflated cannot. */
+static bool aa_inflate_cover(const struct book_entry *e, void *workbuf,
+                             size_t worksz)
+{
+    static uint8_t chunk[512];
+    int in = open(e->path, O_RDONLY), out;
+    bs_io io = { aa_fd_read, aa_fd_seek, aa_fd_size, NULL, &in };
+    bs_arena a = { workbuf, worksz, 0 };
+    bs_stream *s;
+    uint32_t left = e->cover_usize;
+    bool ok = false;
+
+    if (in < 0)
+        return false;
+    s = bs_file_stream(&a, &io, e->cover_at, e->cover_csize);
+    if (s)
+        s = bs_inflate_stream(&a, s, BS_INFLATE_RAW);
+    out = s ? open(AA_COVER_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666) : -1;
+    if (out >= 0)
+    {
+        while (left > 0)
+        {
+            size_t got;
+
+            if (bs_pull(s, chunk, MIN(sizeof chunk, left), &got) != BS_OK
+                || got == 0 || write(out, chunk, got) != (ssize_t)got)
+                break;
+            left -= got;
+        }
+        ok = left == 0;
+        close(out);
+    }
+    close(in);
+    return ok;
+}
+
+/* An image named after the book, `<book>.jpg` and so on, into aa_artpath:
+ * how a cover is given to a book without one, or replaced. A folder.jpg
+ * beside it is the author's, not this book's. */
+static bool aa_book_file(const char *path)
+{
+    static const char * const exts[] = { ".jpg", ".jpeg", ".png", ".bmp" };
+    const char *dot = strrchr(path, '.');
+    size_t stem = dot ? (size_t)(dot - path) : strlen(path);
+    unsigned i;
+
+    for (i = 0; i < ARRAYLEN(exts); i++)
+    {
+        if (stem + strlen(exts[i]) >= sizeof(aa_artpath))
+            return false;
+        memcpy(aa_artpath, path, stem);
+        strcpy(aa_artpath + stem, exts[i]);
+        if (file_exists(aa_artpath))
+            return true;
+    }
+    return false;
+}
+
+struct aa_books_ctx
+{
+    void *workbuf;
+    size_t worksz;
+    bool *aborted;
+};
+
+/* One book of the index: a visit, as a folder has one */
+static bool aa_book_visit(const struct book_entry *e, void *data)
+{
+    struct aa_books_ctx *c = data;
+    unsigned int bh = aa_hash(e->path);
+    struct aa_stamp *slot;
+    struct aa_src src = { .emb_pos = -1 };
+    unsigned int stamp;
+    bool tmp = false;
+
+    if (aa_check_abort() || tagcache_is_busy())
+    {
+        *c->aborted = true;
+        return false;
+    }
+    if (!(slot = aa_visit(bh)))
+        return true;
+    if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(bh))
+        return true;
+
+    if (aa_book_file(e->path))
+    {
+        src.path = aa_artpath;
+        stamp = aa_art_stamp(aa_artpath);
+    }
+    else if (e->cover_at >= 0 && e->cover_method == 0)
+    {
+        src.path = e->path;
+        src.emb_pos = e->cover_at;
+        src.emb_size = e->cover_csize;
+        stamp = aa_art_stamp(e->path);
+    }
+    else if (e->cover_at >= 0 && e->cover_method == 8)
+    {
+        stamp = aa_art_stamp(e->path);
+        if (slot->stamp != stamp || !aa_thumbs_exist(bh))
+        {
+            if (!aa_inflate_cover(e, c->workbuf, c->worksz))
+                return true;
+            tmp = true;
+        }
+        src.path = AA_COVER_TMP;
+    }
+    else
+    {
+        if (slot->stamp > AA_STAMP_NO_EMBED)
+            aa_remove_thumbs(bh);
+        slot->stamp = AA_STAMP_NONE;
+        return true;
+    }
+
+    aa_book = true;
+    aa_fill(&src, stamp, bh, slot, c->workbuf, c->worksz, c->aborted);
+    aa_book = false;
+    if (tmp)
+        remove(AA_COVER_TMP);
+    return !*c->aborted;
+}
+
 static enum bg_result aa_run_pass(void)
 {
     struct tagcache_search tcs;
@@ -1721,6 +1874,14 @@ static enum bg_result aa_run_pass(void)
         aborted = true;
     failed = !aborted && tcs.failed;
     tagcache_search_finish(&tcs);
+
+    /* Every book in the index, which the orphan sweep below then spares */
+    if (!aborted)
+    {
+        struct aa_books_ctx books = { workbuf, worksz, &aborted };
+
+        book_index_each(aa_book_visit, &books);
+    }
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:

@@ -51,6 +51,7 @@
 #include "files/filetypes.h"
 #include "files/path_list.h"
 #include "files/book_index.h"
+#include "metadata/art_cache.h"     /* new covers want a pass */
 #include "file_index.h"
 
 #define FILE_INDEX_DOCS   LIB_DOCUMENTS_FILE
@@ -254,8 +255,11 @@ static void fi_run_scan(void)
 
     completed = !fi_abort;
     if (book_index_end(completed))
+    {
         debug_log(DEBUG_LOG_TASKS, "%s: book index changed",
                   file_index_task.name);
+        bg_task_update(&art_cache_task);
+    }
     debug_log(DEBUG_LOG_TASKS, "%s: walk %s after %ld s",
               file_index_task.name, completed ? "done" : "interrupted",
               (long)(current_tick - started) / HZ);
