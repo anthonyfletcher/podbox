@@ -9,12 +9,16 @@
  *                 the inflater reads
  *   rows        - each row inflated, unfiltered against the one before, and
  *                 handed to the scaler as RGB in short parts
+ *   Adam7       - an interlaced image is read only as far as the passes the
+ *                 target size needs: pass 1 streams like a plain image, more
+ *                 passes are assembled at reduced size first
  *
  * Chunk CRCs, the zlib checksum, gamma, colour profiles and text are not
  * read. An animated PNG shows its IDAT image, which is its first frame.
  ****************************************************************************/
 
 #include <string.h>
+#include "kernel.h"
 #include "system.h"
 #include "file.h"
 #include "bmp.h"
@@ -39,7 +43,9 @@ struct png_hdr {
     int    depth, ctype;
     int    channels;
     size_t rowbytes;        /* one row's samples, without the filter byte */
+    int    bits;            /* bits per pixel */
     int    bpp;             /* bytes per pixel for the filters, at least 1 */
+    bool   interlaced;
 };
 
 struct png {
@@ -49,7 +55,11 @@ struct png {
     uint32_t idat_left;     /* payload left in the current IDAT */
     bool     idat_end;
     uint8_t *cur, *prev;    /* a filter byte and a row, each */
-    int      x;             /* pixels of cur handed out */
+    size_t   rowbytes;      /* of the rows being read: a pass's are shorter */
+    int      pw;            /* pixels in a row handed to the scaler */
+    int      x;             /* of them, handed out */
+    uint8_t *grid;          /* an assembled reduced image, RGB, or NULL */
+    int      gy;            /* its row being handed out */
     bool     has_trns;
     unsigned trns[3];       /* the transparent grey or RGB, at the depth */
     int      npal;
@@ -81,7 +91,7 @@ static bool parse_ihdr(const uint8_t *d, struct png_hdr *h)
     /* the scaler's dimensions are shorts */
     if (w < 1 || ht < 1 || w > 32767 || ht > 32767)
         return false;
-    if (d[10] != 0 || d[11] != 0 || d[12] != 0) /* deflate, filter, no Adam7 */
+    if (d[10] != 0 || d[11] != 0 || d[12] > 1)  /* deflate, filter, Adam7 */
         return false;
     switch (ctype)
     {
@@ -112,7 +122,9 @@ static bool parse_ihdr(const uint8_t *d, struct png_hdr *h)
     h->depth = depth;
     h->ctype = ctype;
     h->rowbytes = (w * bits + 7) / 8;
+    h->bits = bits;
     h->bpp = bits >= 8 ? bits / 8 : 1;
+    h->interlaced = d[12];
     return 1 + h->rowbytes <= PNG_MAX_ROW_BYTES;
 }
 
@@ -215,8 +227,8 @@ static bool next_row(struct png *p)
     p->prev = p->cur;
     p->cur = t;
     p->x = 0;
-    return bs_read(p->z, p->cur, 1 + p->h.rowbytes) == BS_OK
-           && unfilter(p->cur, p->prev, p->h.rowbytes, p->h.bpp);
+    return bs_read(p->z, p->cur, 1 + p->rowbytes) == BS_OK
+           && unfilter(p->cur, p->prev, p->rowbytes, p->h.bpp);
 }
 
 /* Sample c of pixel x at the image's depth: 1, 2 and 4 bits have one */
@@ -327,16 +339,99 @@ static void convert(const struct png *p, int x, int n, struct uint8_rgb *o)
 static struct img_part *store_part_png(void *args)
 {
     struct png *p = args;
-    int n;
+    int n, i;
 
-    if (p->x == p->h.width && !next_row(p))
-        return NULL;
-    n = MIN(p->out_len, p->h.width - p->x);
-    convert(p, p->x, n, p->out);
+    if (p->x == p->pw)
+    {
+        if (p->grid)
+        {
+            p->gy++;
+            p->x = 0;
+        }
+        else if (!next_row(p))
+            return NULL;
+    }
+    n = MIN(p->out_len, p->pw - p->x);
+    if (p->grid)
+    {
+        const uint8_t *g = p->grid + ((size_t)p->gy * p->pw + p->x) * 3;
+        for (i = 0; i < n; i++, g += 3)
+        {
+            p->out[i].red = g[0];
+            p->out[i].green = g[1];
+            p->out[i].blue = g[2];
+            p->out[i].alpha = 255;
+        }
+    }
+    else
+        convert(p, p->x, n, p->out);
     p->x += n;
     p->part.len = n;
     p->part.buf = p->out;
     return &p->part;
+}
+
+/* ---- Adam7 ----------------------------------------------------------- */
+
+/* Each pass's first column and row, and its steps */
+static const uint8_t adam7[7][4] = {
+    { 0, 0, 8, 8 }, { 4, 0, 8, 8 }, { 0, 4, 4, 8 }, { 2, 0, 4, 4 },
+    { 0, 2, 2, 4 }, { 1, 0, 2, 2 }, { 0, 1, 1, 2 },
+};
+
+/* Readies the rows of pass `pass`, whose size goes in *pw and *ph. False
+ * for a pass with no pixels, which has no data either. */
+static bool begin_pass(struct png *p, int pass, int *pw, int *ph)
+{
+    const uint8_t *a = adam7[pass];
+
+    *pw = p->h.width > a[0] ? (p->h.width - a[0] + a[2] - 1) / a[2] : 0;
+    *ph = p->h.height > a[1] ? (p->h.height - a[1] + a[3] - 1) / a[3] : 0;
+    if (!*pw || !*ph)
+        return false;
+    p->rowbytes = ((size_t)*pw * p->h.bits + 7) / 8;
+    p->pw = *pw;
+    memset(p->prev, 0, 1 + p->rowbytes);
+    memset(p->cur, 0, 1 + p->rowbytes);
+    return true;
+}
+
+/* Passes 1 to `passes`, which together are every `step`th pixel of every
+ * `step`th row, into grid as RGB: gw pixels a row. */
+static bool assemble(struct png *p, int passes, int step, uint8_t *grid,
+                     int gw, struct uint8_rgb *conv)
+{
+    int pass, pw, ph, r, i, k;
+
+    for (pass = 0; pass < passes; pass++)
+    {
+        const uint8_t *a = adam7[pass];
+
+        if (!begin_pass(p, pass, &pw, &ph))
+            continue;
+        for (r = 0; r < ph; r++)
+        {
+            uint8_t *g = grid + (size_t)((a[1] + r * a[3]) / step) * gw * 3;
+
+            if (!next_row(p))
+                return false;
+            for (i = 0; i < pw; i += PART_PIXELS)
+            {
+                int n = MIN(PART_PIXELS, pw - i);
+
+                convert(p, i, n, conv);
+                for (k = 0; k < n; k++)
+                {
+                    uint8_t *d = g + (a[0] + (i + k) * a[2]) / step * 3;
+                    d[0] = conv[k].red;
+                    d[1] = conv[k].green;
+                    d[2] = conv[k].blue;
+                }
+            }
+            yield();
+        }
+    }
+    return true;
 }
 
 /* ---- header ---------------------------------------------------------- */
@@ -456,17 +551,20 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
         bm->width = src_dim.width;
         bm->height = src_dim.height;
     }
-    if (bm->width == src_dim.width && bm->height == src_dim.height)
-        resize = false;
     bm->alpha_offset = 0;
     if (cformat)
         bm_size = cformat->get_size(bm);
     else
         bm_size = BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
 
-    /* The scaler's line buffers, or one whole row of RGB without it */
-    lines = resize ? (int)sizeof(struct uint32_argb) * 3 * bm->width
-                   : (int)sizeof(struct uint8_rgb) * bm->width;
+    /* The scaler's line buffers, or one whole row of RGB without it. An
+     * interlaced image may be read at a reduced size, which then needs the
+     * scaler whatever the format asked. */
+    if (bm->width != src_dim.width || bm->height != src_dim.height
+        || p->h.interlaced)
+        lines = (int)sizeof(struct uint32_argb) * 3 * bm->width;
+    else
+        lines = (int)sizeof(struct uint8_rgb) * bm->width;
     if (format & FORMAT_RETURN_SIZE)
         return bm_size + lines + sizeof(long) + (int)a->size;
 
@@ -481,19 +579,58 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     p->z = bs_inflate_stream(a, idat, BS_INFLATE_ZLIB);
     p->cur = bs_alloc(a, 1 + p->h.rowbytes);
     p->prev = bs_alloc(a, 1 + p->h.rowbytes);
-    if (resize)
+    p->out = bs_alloc(a, PART_PIXELS * sizeof(struct uint8_rgb));
+    if (!p->z || !p->cur || !p->prev || !p->out)
+        return -1;
+    p->rowbytes = p->h.rowbytes;
+    p->pw = p->h.width;
+
+    if (p->h.interlaced)
     {
-        p->out = bs_alloc(a, PART_PIXELS * sizeof(struct uint8_rgb));
-        p->out_len = PART_PIXELS;
+        /* The fewest passes whose reduced image is at least the target,
+         * then fewer while that does not fit beside the scaler's lines.
+         * Pass 1 alone needs no room: its rows stream. */
+        int passes = 7, step = 1, pw, ph;
+        size_t grid_bytes;
+
+        while (step < 8 && (p->h.width + 2 * step - 1) / (2 * step)
+                               >= bm->width
+               && (p->h.height + 2 * step - 1) / (2 * step) >= bm->height)
+        {
+            step *= 2;
+            passes -= 2;
+        }
+        for (;;)
+        {
+            src_dim.width = (p->h.width + step - 1) / step;
+            src_dim.height = (p->h.height + step - 1) / step;
+            grid_bytes = (size_t)src_dim.width * src_dim.height * 3;
+            if (step == 8 || grid_bytes + lines <= (size_t)free_len)
+                break;
+            step *= 2;
+            passes -= 2;
+        }
+        if (step == 8)
+            begin_pass(p, 0, &pw, &ph);
+        else
+        {
+            p->grid = free_start + lines;
+            if (!assemble(p, passes, step, p->grid, src_dim.width, p->out))
+                return -9;
+            p->pw = src_dim.width;
+            p->gy = -1;
+        }
     }
+    if (bm->width == src_dim.width && bm->height == src_dim.height)
+        resize = false;
+    if (resize)
+        p->out_len = PART_PIXELS;
     else
     {
         p->out = (struct uint8_rgb *)free_start;
         p->out_len = bm->width;
     }
-    if (!p->z || !p->cur || !p->prev || !p->out)
-        return -1;
-    p->x = p->h.width;
+    p->x = p->pw;
 
     if (resize)
     {

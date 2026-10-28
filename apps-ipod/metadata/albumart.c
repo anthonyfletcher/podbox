@@ -65,7 +65,7 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
 
 /* Whether an image the search has found can be drawn. The JPEG decoder takes
  * baseline and progressive Huffman-coded images only, and the PNG reader no
- * interlaced or very wide ones; one they cannot read must not stop the
+ * very wide ones; one they cannot read must not stop the
  * search: an arithmetic-coded cover.jpg would otherwise hide a folder.jpg
  * beside it, which the search only reaches later. Reads a JPEG's markers up
  * to the frame header, or a PNG's header, by content whatever the name, and
