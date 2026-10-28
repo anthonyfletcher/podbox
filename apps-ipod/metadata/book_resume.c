@@ -55,6 +55,7 @@
 #include "database/tagcache.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
+#include "screens/browse/book_shelf.h"   /* book_shelf_is_last_track */
 #include "settings/settings.h"
 #include "system/strutil.h"     /* read_line */
 
@@ -792,6 +793,15 @@ void book_resume_save(void)
                 .left    = BOOK_LEFT_PARTWAY,
             },
         };
+
+        /* Stopped in the last 2% of the book's last track, the credits or an
+         * outro: finished, as if it had played out. A book keyed by its file
+         * is that one track. */
+        if (id3->length > 0
+            && (unsigned long long)id3->elapsed * 50
+               >= (unsigned long long)id3->length * 49
+            && (e.path != NULL || book_shelf_is_last_track(name, e.pos.track)))
+            e.pos.left = BOOK_LEFT_ENDED;
 
         rewrite(&e);
     }
