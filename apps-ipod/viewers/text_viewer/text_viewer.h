@@ -57,6 +57,14 @@ enum
     TV_FOOTER_BOOK,          /* how far through the book */
 };
 
+/* text_viewer_orientation, and text_viewer_last_hand's two */
+enum
+{
+    TV_ORIENT_UPRIGHT = 0,
+    TV_ORIENT_RIGHT,         /* sideways, the top of the player to the left */
+    TV_ORIENT_LEFT,          /* sideways, the top to the right */
+};
+
 /* text_viewer_align */
 enum
 {

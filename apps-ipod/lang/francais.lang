@@ -18176,6 +18176,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_ORIENTATION
+  desc: core text viewer: upright, or sideways in one hand
+  user: core
+  <source>
+    *: "Reading Orientation"
+  </source>
+  <dest>
+    *: "Orientation de lecture"
+  </dest>
+  <voice>
+    *: "Orientation de lecture"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_UPRIGHT
+  desc: core text viewer orientation: the usual way up
+  user: core
+  <source>
+    *: "Upright"
+  </source>
+  <dest>
+    *: "Droit"
+  </dest>
+  <voice>
+    *: "Droit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_RIGHT_HAND
+  desc: core text viewer orientation: sideways, held in the right hand
+  user: core
+  <source>
+    *: "Right Hand"
+  </source>
+  <dest>
+    *: "Main droite"
+  </dest>
+  <voice>
+    *: "Main droite"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_LEFT_HAND
+  desc: core text viewer orientation: sideways, held in the left hand
+  user: core
+  <source>
+    *: "Left Hand"
+  </source>
+  <dest>
+    *: "Main gauche"
+  </dest>
+  <voice>
+    *: "Main gauche"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

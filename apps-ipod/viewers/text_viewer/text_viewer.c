@@ -509,6 +509,71 @@ static off_t tv_page(off_t start, bool render)
 
 /* A whole-screen viewport filled with the reading background. Used to wipe the
  * margin border and any loading splash before the page is drawn inset. */
+/* ---- the page held sideways ------------------------------------------ */
+
+/* Sideways the page is 240 x 320: drawn into a buffer of that shape and
+ * copied a quarter turn into the screen's framebuffer. Held only while the
+ * reader is sideways. */
+#if LCD_STRIDEFORMAT != HORIZONTAL_STRIDE
+#error the sideways copy assumes a framebuffer stored by rows
+#endif
+static struct frame_buffer_t tv_side_fb;
+static int tv_side_handle;
+static bool tv_side;
+
+static bool tv_side_alloc(void)
+{
+    if (tv_side_handle > 0)
+        return true;
+    tv_side_handle = core_alloc(LCD_WIDTH * LCD_HEIGHT * sizeof(fb_data));
+    if (tv_side_handle <= 0)
+    {
+        tv_side_handle = 0;
+        return false;
+    }
+    core_pin(tv_side_handle);
+    tv_side_fb.fb_ptr = core_get_data(tv_side_handle);
+    tv_side_fb.get_address_fn = NULL;   /* the default, through this stride */
+    tv_side_fb.stride = LCD_HEIGHT;
+    tv_side_fb.elems = LCD_WIDTH * LCD_HEIGHT;
+    return true;
+}
+
+static void tv_side_free(void)
+{
+    if (tv_side_handle > 0)
+    {
+        core_unpin(tv_side_handle);
+        core_free(tv_side_handle);
+    }
+    tv_side_handle = 0;
+    tv_side = false;
+}
+
+/* The page's (u, v) lands at (319 - v, u) with the top of the iPod to the
+ * left, the right hand's way, and at (v, 239 - u) the left hand's. */
+static void tv_side_push(void)
+{
+    /* lcd_set_viewport() answers the viewport it replaces: the second call
+     * hands back the default one, whose buffer is the screen's */
+    struct viewport *prev = lcd_set_viewport(NULL);
+    fb_data *dst = lcd_set_viewport(prev)->buffer->fb_ptr;
+    const fb_data *src = tv_side_fb.fb_ptr;
+    bool right = global_settings.text_viewer_orientation == TV_ORIENT_RIGHT;
+    int u, v;
+
+    for (v = 0; v < LCD_WIDTH; v++)
+    {
+        fb_data *d = right ? dst + (LCD_WIDTH - 1 - v)
+                           : dst + (LCD_HEIGHT - 1) * LCD_WIDTH + v;
+        int step = right ? LCD_WIDTH : -LCD_WIDTH;
+
+        for (u = 0; u < LCD_HEIGHT; u++, d += step)
+            *d = *src++;
+    }
+    lcd_update();
+}
+
 static void tv_fullscreen_vp(struct viewport *vp)
 {
     /* Both fields must be set before viewport_set_fullscreen(), which writes
@@ -531,6 +596,12 @@ static void tv_fullscreen_vp(struct viewport *vp)
     vp->flags = VP_DEFAULT_FLAGS;
     viewport_set_fullscreen(vp, SCREEN_MAIN);
     vp->bg_pattern = tv.vp.bg_pattern;
+    if (tv_side)
+    {
+        vp->buffer = &tv_side_fb;
+        vp->width = LCD_HEIGHT;
+        vp->height = LCD_WIDTH;
+    }
 }
 
 /* The text of the chapter, or of a document without chapters: exact once it
@@ -625,7 +696,10 @@ static void tv_draw(void)
     tv_draw_footer();
 
     display->set_viewport(&full);
-    display->update_viewport();              /* push the whole screen */
+    if (tv_side)
+        tv_side_push();
+    else
+        display->update_viewport();          /* push the whole screen */
     display->set_viewport(last);
 }
 
@@ -816,7 +890,10 @@ static void tv_show_loading(void)
     tv_fullscreen_vp(&full);
     last = d->set_viewport(&full);
     d->clear_viewport();
-    d->update_viewport();
+    if (tv_side)
+        tv_side_push();     /* update_viewport() would reach off the screen */
+    else
+        d->update_viewport();
     d->set_viewport(last);
 
     if (tv_slow_open(tv.path))
@@ -1351,6 +1428,7 @@ static bool tv_open(const char *file)
 
 static void tv_close(void)
 {
+    tv_side_free();
     backlight_set_brightness(global_settings.brightness);
     backlight_set_timeout(global_settings.backlight_timeout);
     backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);
@@ -1496,11 +1574,21 @@ static void tv_apply_settings(void)
             break;
     }
 
+    /* Sideways where memory allows it; upright otherwise */
+    tv_side = global_settings.text_viewer_orientation != TV_ORIENT_UPRIGHT
+              && tv_side_alloc();
+    if (!tv_side)
+        tv_side_free();
+    else
+        global_settings.text_viewer_last_hand =
+            global_settings.text_viewer_orientation;
+
     margin = global_settings.text_viewer_margin ? TV_MARGIN : 0;
     tv.vp.x = margin;
     tv.vp.y = margin;
-    tv.vp.width  = d->lcdwidth  - 2 * margin;
-    tv.vp.height = d->lcdheight - 2 * margin;
+    tv.vp.width  = (tv_side ? LCD_HEIGHT : d->lcdwidth)  - 2 * margin;
+    tv.vp.height = (tv_side ? LCD_WIDTH : d->lcdheight) - 2 * margin;
+    tv.vp.buffer = tv_side ? &tv_side_fb : NULL;
 
     tv.line_height = font_get(tv.font)->height
                    + global_settings.text_viewer_line_spacing;
@@ -1746,6 +1834,123 @@ static void tv_volume(int steps)
     tv_volume_until = current_tick + HZ;
 }
 
+/* The wheel: scrubbing with Wheel Scrubs on, the volume otherwise */
+static void tv_wheel(int step)
+{
+    if (global_settings.text_viewer_wheel_scrub)
+        tv_scrub(step);
+    else
+        tv_volume(step);
+}
+
+/* What the loop does when no key came: overlays time out, and Continuously
+ * reads on */
+static void tv_idle(void)
+{
+    if (tv_volume_until && TIME_AFTER(current_tick, tv_volume_until))
+    {
+        tv_volume_until = 0;
+        tv_draw();
+    }
+    if (tv_scrub_pct >= 0 && TIME_AFTER(current_tick, tv_scrub_until))
+        tv_scrub_end(false);
+    tv_read_on();
+}
+
+/* Turns the page sideways or upright, laid out again from its first
+ * character. Remembered, so the next book opens the same way. */
+static void tv_orient(int orientation)
+{
+    global_settings.text_viewer_orientation = orientation;
+    settings_save();
+    tv_apply_settings();
+    tv_draw();
+}
+
+/* A second click within this is a double-click */
+#define TV_DOUBLE_CLICK (HZ * 4 / 10)
+
+enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_LEAVE, TV_KEY_USB };
+
+static void tv_event_save(void *param);
+
+/* A raw button while sideways (reading.md 4.1). Forward is the button on the
+ * right as the player is held, and Select; back is the one on the left, and
+ * a second click of it within TV_DOUBLE_CLICK turns forward again and swaps
+ * hands. The button now at the top goes upright on a double-click and opens
+ * the settings when held; held Select leaves. */
+static enum tv_key tv_side_button(long b)
+{
+    static long held, last_click;
+    static long last_tick;
+    bool right = global_settings.text_viewer_orientation == TV_ORIENT_RIGHT;
+    long fwd = right ? BUTTON_PLAY : BUTTON_MENU;
+    long back = right ? BUTTON_MENU : BUTTON_PLAY;
+    long top = right ? BUTTON_RIGHT : BUTTON_LEFT;
+    long base = b & ~(BUTTON_REPEAT | BUTTON_REL);
+    bool twice;
+
+    if (b == BUTTON_NONE)
+    {
+        tv_idle();
+        return TV_KEY_NONE;
+    }
+    if (b & SYS_EVENT)
+        return default_event_handler_ex(b, tv_event_save, NULL)
+               == SYS_USB_CONNECTED ? TV_KEY_USB : TV_KEY_NONE;
+
+    if (base == BUTTON_SCROLL_FWD || base == BUTTON_SCROLL_BACK)
+    {
+        if (!(b & BUTTON_REL))
+            tv_wheel(base == BUTTON_SCROLL_FWD ? 1 : -1);
+        return TV_KEY_NONE;
+    }
+
+    if (b & BUTTON_REPEAT)
+    {
+        if (held == base)
+            return TV_KEY_NONE;
+        held = base;
+        if (base == BUTTON_SELECT)
+            return TV_KEY_LEAVE;
+        if (base == top)
+            return TV_KEY_MENU;
+        return TV_KEY_NONE;
+    }
+    if (!(b & BUTTON_REL))
+        return TV_KEY_NONE;             /* a press: acted on at its release */
+    if (held == base)
+    {
+        held = 0;                       /* the end of a hold, not a click */
+        return TV_KEY_NONE;
+    }
+
+    twice = base == last_click && TIME_BEFORE(current_tick,
+                                              last_tick + TV_DOUBLE_CLICK);
+    last_click = twice ? 0 : base;
+    last_tick = current_tick;
+
+    if (tv_scrub_pct >= 0)
+    {
+        if (base == BUTTON_SELECT || base == back)
+            tv_scrub_end(base == BUTTON_SELECT);
+        return TV_KEY_NONE;
+    }
+
+    if (base == BUTTON_SELECT || base == fwd)
+        tv_next_page();
+    else if (base == back && twice)
+    {
+        tv_next_page();
+        tv_orient(right ? TV_ORIENT_LEFT : TV_ORIENT_RIGHT);
+    }
+    else if (base == back)
+        tv_prev_page();
+    else if (base == top && twice)
+        tv_orient(TV_ORIENT_UPRIGHT);
+    return TV_KEY_NONE;
+}
+
 static int tv_menu(void)
 {
     int sel = 0, ret;
@@ -1825,6 +2030,7 @@ int text_viewer(const char *file)
     int ret = GO_TO_PREVIOUS;
     off_t resume;
     int part;
+    long play_tick = current_tick - TV_DOUBLE_CLICK;  /* PLAY's last tap */
 
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;
@@ -1857,9 +2063,36 @@ int text_viewer(const char *file)
     {
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
-        int action = get_action(CONTEXT_STD, continuous || tv_volume_until
-                                             || tv_scrub_pct >= 0
-                                             ? HZ/10 : TIMEOUT_BLOCK);
+        int timeout = continuous || tv_volume_until || tv_scrub_pct >= 0
+                      ? HZ/10 : TIMEOUT_BLOCK;
+        int action;
+
+        if (tv_side)
+        {
+            long b = timeout == TIMEOUT_BLOCK ? button_get(true)
+                                              : button_get_w_tmo(timeout);
+
+            switch (tv_side_button(b))
+            {
+                case TV_KEY_LEAVE:
+                    goto done;
+                case TV_KEY_USB:
+                    ret = GO_TO_ROOT;
+                    goto done;
+                case TV_KEY_MENU:
+                    if (tv_menu() == MENU_ATTACHED_USB)
+                    {
+                        ret = GO_TO_ROOT;
+                        goto done;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            continue;
+        }
+
+        action = get_action(CONTEXT_STD, timeout);
 
         /* A scrub takes the buttons that end it */
         if (tv_scrub_pct >= 0 && (action == ACTION_STD_OK
@@ -1873,34 +2106,28 @@ int text_viewer(const char *file)
         switch (action)
         {
             case ACTION_NONE:
-                if (tv_volume_until
-                    && TIME_AFTER(current_tick, tv_volume_until))
-                {
-                    tv_volume_until = 0;
-                    tv_draw();
-                }
-                if (tv_scrub_pct >= 0
-                    && TIME_AFTER(current_tick, tv_scrub_until))
-                    tv_scrub_end(false);
-                tv_read_on();
+                tv_idle();
                 break;
 
-            /* The wheel scrubs when Wheel Scrubs is on, and otherwise sets
-             * the volume */
             case ACTION_STD_NEXT:
             case ACTION_STD_NEXTREPEAT:
-                if (global_settings.text_viewer_wheel_scrub)
-                    tv_scrub(1);
-                else
-                    tv_volume(1);
+                tv_wheel(1);
                 break;
 
             case ACTION_STD_PREV:
             case ACTION_STD_PREVREPEAT:
-                if (global_settings.text_viewer_wheel_scrub)
-                    tv_scrub(-1);
+                tv_wheel(-1);
+                break;
+
+            /* PLAY twice goes sideways, to the hand last used */
+            case ACTION_TREE_WPS:
+                if (TIME_BEFORE(current_tick, play_tick + TV_DOUBLE_CLICK))
+                {
+                    play_tick = current_tick - TV_DOUBLE_CLICK;
+                    tv_orient(global_settings.text_viewer_last_hand);
+                }
                 else
-                    tv_volume(-1);
+                    play_tick = current_tick;
                 break;
 
             case ACTION_STD_OK:          /* forward button (>>|) */

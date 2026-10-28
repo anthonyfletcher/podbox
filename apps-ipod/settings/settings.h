@@ -879,6 +879,8 @@ struct user_settings
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_align;        /* TV_ALIGN_* */
     bool text_viewer_wheel_scrub; /* the wheel moves through the book */
+    int text_viewer_orientation;  /* TV_ORIENT_* */
+    int text_viewer_last_hand;    /* the sideways one last read in */
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */
     int  text_viewer_footer;  /* TV_FOOTER_*: what the foot of the page shows */

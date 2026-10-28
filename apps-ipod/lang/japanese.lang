@@ -18142,6 +18142,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_ORIENTATION
+  desc: core text viewer: upright, or sideways in one hand
+  user: core
+  <source>
+    *: "Reading Orientation"
+  </source>
+  <dest>
+    *: "読書の向き"
+  </dest>
+  <voice>
+    *: "読書の向き"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_UPRIGHT
+  desc: core text viewer orientation: the usual way up
+  user: core
+  <source>
+    *: "Upright"
+  </source>
+  <dest>
+    *: "縦向き"
+  </dest>
+  <voice>
+    *: "縦向き"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_RIGHT_HAND
+  desc: core text viewer orientation: sideways, held in the right hand
+  user: core
+  <source>
+    *: "Right Hand"
+  </source>
+  <dest>
+    *: "右手"
+  </dest>
+  <voice>
+    *: "右手"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_LEFT_HAND
+  desc: core text viewer orientation: sideways, held in the left hand
+  user: core
+  <source>
+    *: "Left Hand"
+  </source>
+  <dest>
+    *: "左手"
+  </dest>
+  <voice>
+    *: "左手"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core
