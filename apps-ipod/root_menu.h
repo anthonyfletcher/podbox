@@ -124,6 +124,8 @@ enum {
     /* The Music Quiz (games/quiz/). Reached from the Music menu's built-in
      * row, so it has no root-menu entry of its own. */
     GO_TO_MUSIC_QUIZ,
+    /* The Books screen (screens/browse/ebook_shelf.c) */
+    GO_TO_BOOKS,
 };
 extern struct menu_item_ex root_menu_;
 

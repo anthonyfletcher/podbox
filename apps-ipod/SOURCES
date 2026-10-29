@@ -51,6 +51,7 @@ screens/browse/album_charts.c
 screens/browse/featured_artists.c
 screens/browse/listen_progress.c
 screens/browse/book_shelf.c
+screens/browse/ebook_shelf.c
 #endif
 
 playlist/catalog.c

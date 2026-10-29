@@ -42,6 +42,7 @@
 
 #include "screens/browse/browser.h"
 #include "screens/browse/browser_db.h"
+#include "screens/browse/ebook_shelf.h"
 #include "screens/playback/wps.h"
 #include "playlist/playlist.h"
 #include "database/sound_mix.h"
@@ -807,6 +808,12 @@ static int images_scrn(void* param)
     return browser_flat(true);
 }
 
+static int books_scrn(void* param)
+{
+    (void)param;
+    return ebook_shelf_run();
+}
+
 /* Spun.
  *
  * It has to be a root-menu screen to work at all now that a card can be
@@ -881,6 +888,7 @@ static const struct root_items items[] = {
     [GO_TO_FEATURED_TRACKS] = { featured_tracks_scrn, NULL, &music_menu },
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
+    [GO_TO_BOOKS] = { books_scrn, NULL, &text_viewer_menu },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
     [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
@@ -941,6 +949,8 @@ MENUITEM_RETURNVALUE(db_search_item, ID2P(LANG_DB_SEARCH), GO_TO_DB_SEARCH,
 MENUITEM_RETURNVALUE(documents_item, ID2P(LANG_DOCUMENTS), GO_TO_DOCUMENTS,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
+                        NULL, Icon_Font);
+MENUITEM_RETURNVALUE(books_item, ID2P(LANG_EBOOKS), GO_TO_BOOKS,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
                         NULL, Icon_Audio);
@@ -1048,6 +1058,7 @@ static struct menu_table menu_table[] = {
     { "search", &db_search_item },
     { "docs", &documents_item },
     { "images", &images_item },
+    { "books", &books_item },
     { "spun", &spun_item },
     { "playlists", &playlists },
     { "currentplaylist", &current_playlist },
@@ -1093,7 +1104,7 @@ static void root_menu_set_count(unsigned count)
 static void root_menu_apply_canonical_order(void)
 {
     static const struct menu_item_ex * const before_tagnavi[] = {
-        &wps_item, &continue_reading,
+        &wps_item, &continue_reading, &books_item,
         &db_browser, &album_covers_item, &artist_portraits_item,
         &random_album_item,
     };

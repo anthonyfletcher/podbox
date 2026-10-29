@@ -18232,6 +18232,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_EBOOKS
+  desc: main menu: the Books screen, every ebook by title
+  user: core
+  <source>
+    *: "Books"
+  </source>
+  <dest>
+    *: "Livres"
+  </dest>
+  <voice>
+    *: "Livres"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

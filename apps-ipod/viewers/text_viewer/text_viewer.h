@@ -48,6 +48,19 @@ enum
     TV_COLOUR_CUSTOM,        /* text_viewer_fg on text_viewer_bg */
 };
 
+/* The reading places, newest first: each document's path, the chapter it
+ * was left in (-1 when not known) and whether it was read to its end, until
+ * `fn` returns false */
+typedef bool (*text_viewer_place_fn)(const char *path, int part,
+                                     bool finished, void *data);
+void text_viewer_each_place(text_viewer_place_fn fn, void *data);
+
+/* Marks `path` as the Books shelf's Mark as does: In progress keeps its
+ * place (or gives it one at its start), Finished as well and flags it,
+ * Not started forgets it. False if the file could not be written. */
+enum { TV_MARK_IN_PROGRESS, TV_MARK_NOT_STARTED, TV_MARK_FINISHED };
+bool text_viewer_mark_place(const char *path, int state);
+
 /* text_viewer_footer */
 enum
 {

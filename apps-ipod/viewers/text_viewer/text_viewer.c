@@ -78,7 +78,8 @@
 
 /* Most recently read documents and where the reader got to, newest first. */
 #define TV_RESUME_FILE  LIB_READING_FILE
-#define TV_RESUME_MAX   16
+/* Places kept, the Books shelf's In progress and Finished among them */
+#define TV_RESUME_MAX   256
 
 /* Inset on each edge when the margin setting is on. */
 #define TV_MARGIN       15
@@ -1147,6 +1148,19 @@ struct tv_place
     int32_t part;            /* TV_PART_UNKNOWN: `off` counts from the start */
     int32_t off;
     int32_t size;
+    int32_t flags;           /* TV_PLACE_* */
+    char path[MAX_PATH];
+};
+
+/* Read to its last page, or marked Finished */
+#define TV_PLACE_FINISHED 0x1
+
+/* Version 2 of the record, before the flags */
+struct tv_place_v2
+{
+    int32_t part;
+    int32_t off;
+    int32_t size;
     char path[MAX_PATH];
 };
 
@@ -1161,7 +1175,39 @@ struct tv_place_v1
     char path[MAX_PATH];
 };
 
-/* Version 1's places as version 2's, their chapters unknown */
+/* Version 2's places as version 3's, none of them finished */
+static void tv_places_upgrade_v2(void)
+{
+    struct libfile_header h;
+    struct libfile_writer w;
+    struct tv_place_v2 old;
+    struct tv_place p;
+    bool ok;
+    int fd = libfile_open(TV_RESUME_FILE, LIB_READING_MAGIC, 2,
+                          sizeof(old), &h, NULL);
+
+    if (fd < 0)
+        return;
+    ok = libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
+                       LIB_READING_VERSION, sizeof(p), NULL);
+    for (uint32_t i = 0; ok && i < h.count; i++)
+    {
+        if (read(fd, &old, sizeof(old)) != (ssize_t)sizeof(old))
+            break;
+        old.path[sizeof(old.path) - 1] = '\0';
+        memset(&p, 0, sizeof(p));
+        p.part = old.part;
+        p.off = old.off;
+        p.size = old.size;
+        strmemccpy(p.path, old.path, sizeof(p.path));
+        ok = libfile_write(&w, &p, sizeof(p), 1);
+    }
+    close(fd);
+    if (ok)
+        libfile_finish(&w, true);
+}
+
+/* Version 1's places as version 3's, their chapters unknown */
 static void tv_places_upgrade(void)
 {
     struct libfile_header h;
@@ -1173,7 +1219,10 @@ static void tv_places_upgrade(void)
                           sizeof(old), &h, NULL);
 
     if (fd < 0)
+    {
+        tv_places_upgrade_v2();
         return;
+    }
     ok = libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
                        LIB_READING_VERSION, sizeof(p), NULL);
     for (uint32_t i = 0; ok && i < h.count; i++)
@@ -1235,6 +1284,12 @@ static void tv_place_set(struct tv_place *p, int part, off_t off, off_t size,
     strmemccpy(p->path, path, sizeof(p->path));
 }
 
+/* The page on screen is the book's last: its last chapter's last page */
+static bool tv_at_book_end(void)
+{
+    return (!tv.nparts || tv.part == tv.nparts - 1) && tv_at_end();
+}
+
 /* The saved place in `file`, 0 and 0 if none; *part may be
  * TV_PART_UNKNOWN */
 static off_t tv_resume_load(const char *file, off_t size, int *part)
@@ -1285,6 +1340,8 @@ static void tv_resume_save(const char *file, int part, off_t off,
         return;
 
     tv_place_set(&p, part, off, size, file);
+    if (tv_at_book_end())
+        p.flags |= TV_PLACE_FINISHED;
     ok = libfile_write(&w, &p, sizeof(p), 1);
 
     old = tv_places_open(&h);
@@ -1301,6 +1358,70 @@ static void tv_resume_save(const char *file, int part, off_t off,
         close(old);
     }
     libfile_finish(&w, ok);
+}
+
+void text_viewer_each_place(text_viewer_place_fn fn, void *data)
+{
+    struct libfile_header h;
+    struct tv_place p;
+    int fd = tv_places_open(&h);
+
+    if (fd < 0)
+        return;
+    for (uint32_t i = 0; i < h.count && tv_place_read(fd, &p); i++)
+    {
+        if (!fn(p.path, p.part, p.flags & TV_PLACE_FINISHED, data))
+            break;
+    }
+    close(fd);
+}
+
+bool text_viewer_mark_place(const char *path, int state)
+{
+    struct libfile_writer w;
+    struct libfile_header h;
+    struct tv_place p;
+    bool found = false, ok;
+    int old = tv_places_open(&h), kept = 0;
+
+    if (!tv_places_begin(&w))
+    {
+        if (old >= 0)
+            close(old);
+        return false;
+    }
+    ok = true;
+    /* A book with no place yet gets one at its start, newest */
+    if (state != TV_MARK_NOT_STARTED && old >= 0)
+    {
+        for (uint32_t i = 0; i < h.count && tv_place_read(old, &p); i++)
+            found = found || !strcmp(p.path, path);
+        lseek(old, sizeof(h), SEEK_SET);
+    }
+    if (state != TV_MARK_NOT_STARTED && !found)
+    {
+        tv_place_set(&p, 0, 0, 0, path);
+        p.flags = state == TV_MARK_FINISHED ? TV_PLACE_FINISHED : 0;
+        ok = libfile_write(&w, &p, sizeof(p), 1);
+        kept++;
+    }
+    if (old >= 0)
+    {
+        for (uint32_t i = 0; ok && kept < TV_RESUME_MAX && i < h.count
+                             && tv_place_read(old, &p); i++)
+        {
+            if (!strcmp(p.path, path))
+            {
+                if (state == TV_MARK_NOT_STARTED)
+                    continue;
+                p.flags = state == TV_MARK_FINISHED ? TV_PLACE_FINISHED : 0;
+            }
+            ok = libfile_write(&w, &p, sizeof(p), 1);
+            kept++;
+        }
+        close(old);
+    }
+    return libfile_finish(&w, ok);
 }
 
 /* The document on the newest record, for the main menu's "Continue reading".
