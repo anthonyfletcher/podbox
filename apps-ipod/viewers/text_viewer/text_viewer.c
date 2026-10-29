@@ -59,6 +59,7 @@
 #include "draw/image_load.h"     /* a book's pictures */
 #include "draw/resize.h"         /* format_native */
 #include "files/zip_member.h"
+#include "crc32.h"
 #include "system/volume.h"   /* adjust_volume, format_sound_value */
 
 /* Extracted text kept resident, and how much of it sits behind the current
@@ -479,9 +480,9 @@ static int tv_footer_height(void)
 /* ---- pictures ---------------------------------------------------------- */
 
 /* A picture reaches the text as a line of its own: TS_PICTURE_OPEN, its href,
- * TS_PICTURE_CLOSE, three bytes each in UTF-8. With Pictures on it is a page
- * by itself, fitted inside the page above the footer; off, the line is
- * passed over. */
+ * TS_PICTURE_CLOSE, three bytes each in UTF-8. Shown, it is a page by itself,
+ * fitted inside the margins with no footer; otherwise the line is passed
+ * over, as it is once it has failed to decode. */
 #define TV_PIC_OPEN   "\xee\x80\x80"
 #define TV_PIC_CLOSE  "\xee\x80\x81"
 #define TV_PIC_TMP    LIB_CACHE_DIR "/picture.tmp"
@@ -495,6 +496,13 @@ static int tv_footer_height(void)
 static bool tv_is_picture(const unsigned char *s, size_t n)
 {
     return n >= 3 && !memcmp(s, TV_PIC_OPEN, 3);
+}
+
+/* Read Aloud passes over pictures, as Pictures off does */
+static bool tv_pictures_shown(void)
+{
+    return global_settings.text_viewer_pictures
+           && global_settings.text_viewer_read_aloud == TV_READ_OFF;
 }
 
 /* The white space at `s`, newlines and no-break spaces included */
@@ -543,6 +551,32 @@ static char tv_pic_href[TV_PIC_HREF];
 static struct bitmap tv_pic_bm;
 static bool tv_pic_ok;
 
+/* Pictures of the open book that failed to decode, by chapter and href; a
+ * picture past the last slot is tried again each time its page is drawn */
+#define TV_PIC_FAILED 16
+static uint32_t tv_pic_failed[TV_PIC_FAILED];
+static int tv_pic_nfailed;
+
+/* The page on screen is a picture page, so it has no footer */
+static bool tv_pic_page;
+/* A press stopped the page's decode: drawn again when the reader is idle */
+static bool tv_pic_pending;
+
+static uint32_t tv_picture_key(const char *href)
+{
+    return crc_32(href, strlen(href), 0xffffffff) ^ (uint32_t)tv.part;
+}
+
+static bool tv_picture_failed(const char *href)
+{
+    uint32_t key = tv_picture_key(href);
+
+    for (int i = 0; i < tv_pic_nfailed; i++)
+        if (tv_pic_failed[i] == key)
+            return true;
+    return false;
+}
+
 static void tv_picture_free(void)
 {
     if (tv_pic_handle > 0)
@@ -552,6 +586,51 @@ static void tv_picture_free(void)
     }
     tv_pic_handle = 0;
     tv_pic_part = -1;
+    tv_pic_nfailed = 0;
+}
+
+/* The decode's progress, as a bar across the middle of the page once it has
+ * taken a moment; a button newly pressed stops it, and is then acted on.
+ * Drawn with tv.vp current. */
+#define TV_PIC_BAR_AFTER (HZ / 4)
+static bool tv_side;
+static void tv_side_push(void);
+static unsigned int tv_pic_thread;
+static long tv_pic_start;
+static int tv_pic_held, tv_pic_drawn;
+static bool tv_pic_stopped;
+
+static bool tv_picture_row(int done, int rows)
+{
+    struct screen *d = &screens[SCREEN_MAIN];
+    int held, w, x, y, fill;
+
+    if (thread_self() != tv_pic_thread)
+        return true;                    /* the art cache, on its own thread */
+    held = button_status();
+    if (held & ~tv_pic_held)
+    {
+        tv_pic_stopped = true;
+        return false;
+    }
+    tv_pic_held &= held;                /* let go of, so pressed again stops */
+
+    if (rows <= 0 || TIME_BEFORE(current_tick, tv_pic_start + TV_PIC_BAR_AFTER))
+        return true;
+    w = tv.vp.width / 2;
+    fill = (int)((long)w * done / rows);
+    if (fill == tv_pic_drawn)
+        return true;
+    tv_pic_drawn = fill;
+    x = (tv.vp.width - w) / 2;
+    y = tv.vp.height / 2 - 2;
+    d->drawrect(x, y, w, 5);
+    d->fillrect(x, y, fill, 5);
+    if (tv_side)
+        tv_side_push();
+    else
+        d->update_viewport();
+    return true;
 }
 
 /* Picture `href` of the chapter on screen, decoded to fit w x h */
@@ -605,29 +684,51 @@ static bool tv_picture_decode(const char *href, int w, int h)
     tv_pic_bm.width = w;
     tv_pic_bm.height = h;
     tv_pic_bm.data = buf;
+    tv_pic_thread = thread_self();
+    tv_pic_start = current_tick;
+    tv_pic_held = button_status();
+    tv_pic_drawn = -1;
+    tv_pic_stopped = false;
+    image_row_hook = tv_picture_row;
     cpu_boost(true);
     rc = image_load(&src, &tv_pic_bm, TV_PIC_BYTES,
                     FORMAT_NATIVE | FORMAT_RESIZE | FORMAT_KEEP_ASPECT
                     | FORMAT_DITHER, &format_native);
     cpu_boost(false);
+    image_row_hook = NULL;
     close(src.fd);
     if (method == 8)
         remove(TV_PIC_TMP);
+    if (tv_pic_stopped)
+        tv_pic_part = -1;               /* nothing kept: decoded again */
     tv_pic_ok = rc > 0 && tv_pic_bm.width > 0 && tv_pic_bm.height > 0;
     return tv_pic_ok;
 }
 
-/* The page's picture, centred in the page above the footer. One that will
- * not decode leaves the page blank. Drawn with tv.vp current. */
-static void tv_draw_picture(const char *href)
+/* The page's picture, centred inside the margins. False when it will not
+ * decode, which is remembered so the page is laid out without it; a decode
+ * stopped by a press leaves the page blank until it is drawn again. Drawn
+ * with tv.vp current. */
+static bool tv_draw_picture(const char *href)
 {
-    int w = tv.vp.width, h = tv.vp.height - tv_footer_height();
+    int w = tv.vp.width, h = tv.vp.height;
 
     if (w > 0 && h > 0 && tv_picture_decode(href, w, h))
+    {
         screens[SCREEN_MAIN].bitmap((const fb_data *)tv_pic_bm.data,
                                     (w - tv_pic_bm.width) / 2,
                                     (h - tv_pic_bm.height) / 2,
                                     tv_pic_bm.width, tv_pic_bm.height);
+        return true;
+    }
+    if (tv_pic_stopped)
+    {
+        tv_pic_pending = true;
+        return true;
+    }
+    if (tv_pic_nfailed < TV_PIC_FAILED)
+        tv_pic_failed[tv_pic_nfailed++] = tv_picture_key(href);
+    return false;
 }
 
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
@@ -668,15 +769,19 @@ static off_t tv_page(off_t start, bool render)
             char href[TV_PIC_HREF];
             size_t used = tv_picture_line(s, avail, href, sizeof(href));
 
-            if (!global_settings.text_viewer_pictures)
+            if (!tv_pictures_shown() || tv_picture_failed(href))
             {
                 off += used;
                 continue;
             }
             if (y > 0)
                 break;                       /* a page of its own */
-            if (render)
-                tv_draw_picture(href);
+            if (render && !tv_draw_picture(href))
+            {
+                off += used;
+                continue;
+            }
+            tv_pic_page = render;
             off += used;
             break;
         }
@@ -880,8 +985,11 @@ static void tv_draw(void)
     display->clear_viewport();               /* whole screen -> background */
 
     display->set_viewport(&tv.vp);
+    tv_pic_page = false;
+    tv_pic_pending = false;
     tv.next = tv_page(tv.pos, true);         /* the page, inset by the margin */
-    tv_draw_footer();
+    if (!tv_pic_page)
+        tv_draw_footer();
 
     display->set_viewport(&full);
     if (tv_side)
@@ -1135,13 +1243,13 @@ static bool tv_reach(off_t target)
     return true;
 }
 
-/* Whether the chapter's window holds anything to show: with Pictures off, a
- * cover page that is a picture alone has nothing */
+/* Whether the chapter's window holds anything to show: with pictures passed
+ * over, a cover page that is a picture alone has nothing */
 static bool tv_has_page(void)
 {
     size_t i = 0;
 
-    if (global_settings.text_viewer_pictures)
+    if (tv_pictures_shown())
         return true;
     while (i < tv.win_len)
     {
@@ -2185,6 +2293,8 @@ static void tv_wheel(int step)
  * reads on */
 static void tv_idle(void)
 {
+    if (tv_pic_pending)
+        tv_draw();
     if (tv_volume_until && TIME_AFTER(current_tick, tv_volume_until))
     {
         tv_volume_until = 0;
@@ -2402,7 +2512,7 @@ int text_viewer(const char *file)
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
         int timeout = continuous || tv_volume_until || tv_scrub_pct >= 0
-                      ? HZ/10 : TIMEOUT_BLOCK;
+                      || tv_pic_pending ? HZ/10 : TIMEOUT_BLOCK;
         int action;
 
         if (tv_side)
