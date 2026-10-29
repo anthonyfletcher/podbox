@@ -341,7 +341,8 @@ static void process_tag(tg_st *s)
             s->head_wait = s->head_out = 0;
         }
     }
-    if (r->flags & R_PRE) s->pre_depth += close ? -1 : 1;
+    /* An empty <pre/> holds nothing to keep the spacing of */
+    if ((r->flags & R_PRE) && !self) s->pre_depth += close ? -1 : 1;
     if (s->pre_depth < 0) s->pre_depth = 0;
 
     if (r->flags & R_BLANK) { want_nl(s, 2); return; }
