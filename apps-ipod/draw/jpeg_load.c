@@ -2017,6 +2017,7 @@ static int prog_index(struct jpeg *p_jpeg, char *top, char *floor)
     struct prog *pr = &p_jpeg->prog;
     const unsigned char *cur_dc[2] = { NULL, NULL };
     const unsigned char *cur_ac[2] = { NULL, NULL };
+    uint64_t want[3], done[3] = { 0, 0, 0 };
     int seen_gen = -1;
     unsigned char *tbl;
     int i, j;
@@ -2030,10 +2031,16 @@ static int prog_index(struct jpeg *p_jpeg, char *top, char *floor)
     pr->end_pos = lseek(p_jpeg->fd, 0, SEEK_CUR) + p_jpeg->len;
     pr->nscans = 0;
     memset(pr->refines, 0, sizeof(pr->refines));
+    for (i = 0; i < 3; i++)
+    {
+        int kn = p_jpeg->k_need[!!i];
+        want[i] = kn == 64 ? ~(uint64_t)0 : ((uint64_t)1 << kn) - 1;
+    }
 
     while (true)
     {
         struct prog_scan *sc;
+        uint64_t band;
         int status;
 
         if (pr->nscans == PROG_MAX_SCANS)
@@ -2090,6 +2097,20 @@ static int prog_index(struct jpeg *p_jpeg, char *top, char *floor)
         sc->restart_interval = p_jpeg->restart_interval;
         sc->restart = p_jpeg->restart_interval;
         sc->pos = jpeg_tell(p_jpeg);
+
+        /* A coefficient's last bits come in a scan with Al = 0, and nothing
+         * after that scan can change it: once every coefficient the scale
+         * keeps has had its last bits, no further scan is needed or read.
+         * A smaller scale chosen after indexing keeps fewer. */
+        band = (((uint64_t)2 << sc->se) - 1) & ~(((uint64_t)1 << sc->ss) - 1);
+        if (sc->al == 0)
+            for (i = 0; i < sc->comps; i++)
+                done[sc->comp[i]] |= band;
+        for (i = 0; i < p_jpeg->ncomp; i++)
+            if ((done[i] & want[i]) != want[i])
+                break;
+        if (i == p_jpeg->ncomp)
+            break;
 
         i = prog_skip_scan(p_jpeg);
         if (i < 0)
@@ -2271,17 +2292,74 @@ INLINE bool prog_nonzero(const int16_t *coef, const uint32_t *nz, int n, int k)
     return nz && ((nz[k >> 5] >> (k & 31)) & 1);
 }
 
-/* Read a refinement scan's correction bit for a non-zero coefficient. */
-INLINE void prog_correct(struct jpeg *p_jpeg, int16_t *coef, int n, int k,
-                         int p1)
+/* Read a refinement scan's correction bit for a non-zero coefficient, over
+ * the bit buffer's locals. */
+#define PROG_CORRECT(k) do {     BITS_FILL();     if (BITS_PEEK(1) && (k) < n && !(coef[k] & p1))         coef[k] += coef[k] >= 0 ? p1 : -p1;     bits--; } while (0)
+
+INLINE int popcount32(uint32_t w)
 {
-    check_bit_buffer(p_jpeg, 1);
-    if (get_bits(p_jpeg, 1) && k < n && !(coef[k] & p1))
-        coef[k] += coef[k] >= 0 ? p1 : -p1;
+    w = w - ((w >> 1) & 0x55555555);
+    w = (w & 0x33333333) + ((w >> 2) & 0x33333333);
+    w = (w + (w >> 4)) & 0x0f0f0f0f;
+    return (w * 0x01010101) >> 24;
 }
 
-/* Decode one block of a scan into stripe block `b` of the scan's i'th
- * component: Annex G.1.2, in the shape of IJG's jdphuff.c. */
+/* The correction bits of coefficients k to se, all at or past the stored
+ * ones: one for each that is already non-zero. */
+static int prog_corrections(const uint32_t *nz, int k, int se)
+{
+    int count = 0, w;
+
+    for (w = k >> 5; w <= se >> 5; w++)
+    {
+        uint32_t set = nz[w];
+
+        if (w == k >> 5)
+            set &= ~0u << (k & 31);
+        if (w == se >> 5 && (se & 31) != 31)
+            set &= (2u << (se & 31)) - 1;
+        count += popcount32(set);
+    }
+    return count;
+}
+
+/* Decode one block of a DC scan into stripe block `b` of the scan's i'th
+ * component: Annex G.1.2, in the shape of IJG's jdphuff.c. The bit buffer
+ * is the caller's locals, and stays in registers once this is inlined. */
+static FORCE_INLINE void prog_decode_dc(struct jpeg *p_jpeg,
+                                        struct prog_scan *sc, int i, int b,
+                                        unsigned long *bitbufp, int *bitsp)
+{
+    struct prog *pr = &p_jpeg->prog;
+    int c = sc->comp[i];
+    int16_t *coef = pr->coef[c] + b * pr->nstore[c];
+    unsigned long bitbuf = *bitbufp;
+    int bits = *bitsp;
+    int r, s;
+
+    BITS_FILL();
+    if (sc->ah == 0)
+    {
+        BITS_HUFF(&p_jpeg->dc_derived_tbls[sc->dc_sel[i]], s);
+        s &= 15;
+        r = BITS_PEEK(s);
+        bits -= s;
+        if (s)
+            p_jpeg->last_dc_val[c] += HUFF_EXTEND(r, s);
+        coef[0] = p_jpeg->last_dc_val[c] * (1 << sc->al);
+    }
+    else
+    {
+        if (BITS_PEEK(1))
+            coef[0] |= 1 << sc->al;
+        bits--;
+    }
+    *bitbufp = bitbuf;
+    *bitsp = bits;
+}
+
+/* The same for an AC scan: a band of one component's coefficients. It
+ * takes the bit buffer from the struct and puts it back. */
 static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
                               int i, int b)
 {
@@ -2291,26 +2369,9 @@ static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
     int16_t *coef = pr->coef[c] + b * n;
     uint32_t *nz = pr->nz[c] ? pr->nz[c] + 2 * b : NULL;
     struct derived_tbl *actbl = &p_jpeg->ac_derived_tbls[sc->ac_sel[i]];
+    unsigned long bitbuf = p_jpeg->bitbuf;
+    int bits = p_jpeg->bitbuf_bits;
     int k, r, s, p1;
-
-    if (sc->ss == 0)
-    {
-        if (sc->ah == 0)
-        {
-            huff_decode_dc(p_jpeg, &p_jpeg->dc_derived_tbls[sc->dc_sel[i]],
-                           s, r);
-            if (s)
-                p_jpeg->last_dc_val[c] += HUFF_EXTEND(r, s);
-            coef[0] = p_jpeg->last_dc_val[c] * (1 << sc->al);
-        }
-        else
-        {
-            check_bit_buffer(p_jpeg, 1);
-            if (get_bits(p_jpeg, 1))
-                coef[0] |= 1 << sc->al;
-        }
-        return;
-    }
 
     if (sc->ah == 0)
     {
@@ -2321,14 +2382,15 @@ static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
         }
         for (k = sc->ss; k <= sc->se; k++)
         {
-            huff_decode_ac(p_jpeg, actbl, s);
+            BITS_FILL();
+            BITS_HUFF(actbl, s);
             r = s >> 4;
             s &= 15;
             if (s)
             {
                 k += r;
-                check_bit_buffer(p_jpeg, s);
-                r = get_bits(p_jpeg, s);
+                r = BITS_PEEK(s);
+                bits -= s;
                 if (k > sc->se)
                     break;
                 if (k < n)
@@ -2340,15 +2402,12 @@ static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
                 k += 15;
             else
             {
-                pr->eobrun = (1 << r) - 1;
-                if (r)
-                {
-                    check_bit_buffer(p_jpeg, r);
-                    pr->eobrun += get_bits(p_jpeg, r);
-                }
+                pr->eobrun = (1 << r) - 1 + BITS_PEEK(r);
+                bits -= r;
                 break;
             }
         }
+        BITS_OUT();
         return;
     }
 
@@ -2361,28 +2420,25 @@ static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
     {
         for (; k <= sc->se; k++)
         {
-            huff_decode_ac(p_jpeg, actbl, s);
+            BITS_FILL();
+            BITS_HUFF(actbl, s);
             r = s >> 4;
             s &= 15;
             if (s)
             {
-                check_bit_buffer(p_jpeg, 1);
-                s = get_bits(p_jpeg, 1) ? p1 : -p1;
+                s = BITS_PEEK(1) ? p1 : -p1;
+                bits--;
             }
             else if (r != 15)
             {
-                pr->eobrun = 1 << r;
-                if (r)
-                {
-                    check_bit_buffer(p_jpeg, r);
-                    pr->eobrun += get_bits(p_jpeg, r);
-                }
+                pr->eobrun = (1 << r) + BITS_PEEK(r);
+                bits -= r;
                 break;
             }
             do
             {
                 if (prog_nonzero(coef, nz, n, k))
-                    prog_correct(p_jpeg, coef, n, k, p1);
+                    PROG_CORRECT(k);
                 else if (--r < 0)
                     break;
                 k++;
@@ -2398,12 +2454,30 @@ static void prog_decode_block(struct jpeg *p_jpeg, struct prog_scan *sc,
     }
     if (pr->eobrun)
     {
-        for (; k <= sc->se; k++)
-            if (prog_nonzero(coef, nz, n, k))
-                prog_correct(p_jpeg, coef, n, k, p1);
+        for (; k <= sc->se && k < n; k++)
+            if (coef[k])
+                PROG_CORRECT(k);
+        if (nz && k <= sc->se)
+        {
+            int count = prog_corrections(nz, k, sc->se);
+
+            while (count > 0)
+            {
+                int c = MIN(count, 16);
+
+                BITS_FILL();
+                bits -= c;
+                count -= c;
+            }
+        }
         pr->eobrun--;
     }
+    BITS_OUT();
 }
+
+/* The calls in prog_scan_row() that read the bit buffer in the struct. */
+#define PROG_RESTART() do {     if (sc->restart_interval)     {         BITS_OUT();         prog_restart(p_jpeg, sc);         BITS_IN();     } } while (0)
+#define PROG_DECODE_AC(i, b) do {     BITS_OUT();     prog_decode_block(p_jpeg, sc, (i), (b));     BITS_IN(); } while (0)
 
 /* Decode the stripe's MCU row from one scan. An interleaved scan codes
  * whole MCUs, padding blocks included; a single-component one codes only
@@ -2413,14 +2487,17 @@ static void prog_scan_row(struct jpeg *p_jpeg, struct prog_scan *sc)
     struct prog *pr = &p_jpeg->prog;
     int h0 = p_jpeg->frameheader[0].horizontal_sampling;
     int v0 = p_jpeg->frameheader[0].vertical_sampling;
+    unsigned long bitbuf;
+    int bits;
     int i, x, v, h;
 
     prog_resume(p_jpeg, sc);
+    BITS_IN();
     if (sc->comps > 1)
     {
         for (x = 0; x < p_jpeg->x_mbl; x++)
         {
-            prog_restart(p_jpeg, sc);
+            PROG_RESTART();
             for (i = 0; i < sc->comps; i++)
             {
                 int c = sc->comp[i];
@@ -2428,8 +2505,14 @@ static void prog_scan_row(struct jpeg *p_jpeg, struct prog_scan *sc)
 
                 for (v = 0; v < vs; v++)
                     for (h = 0; h < hs; h++)
-                        prog_decode_block(p_jpeg, sc, i,
-                            v * pr->stripe_w[c] + x * hs + h);
+                    {
+                        int b = v * pr->stripe_w[c] + x * hs + h;
+
+                        if (sc->ss == 0)
+                            prog_decode_dc(p_jpeg, sc, i, b, &bitbuf, &bits);
+                        else
+                            PROG_DECODE_AC(i, b);
+                    }
             }
         }
     }
@@ -2442,10 +2525,16 @@ static void prog_scan_row(struct jpeg *p_jpeg, struct prog_scan *sc)
         for (v = 0; v < rows; v++)
             for (x = 0; x < pr->bw[c]; x++)
             {
-                prog_restart(p_jpeg, sc);
-                prog_decode_block(p_jpeg, sc, 0, v * pr->stripe_w[c] + x);
+                int b = v * pr->stripe_w[c] + x;
+
+                PROG_RESTART();
+                if (sc->ss == 0)
+                    prog_decode_dc(p_jpeg, sc, 0, b, &bitbuf, &bits);
+                else
+                    PROG_DECODE_AC(0, b);
             }
     }
+    BITS_OUT();
     prog_suspend(p_jpeg, sc);
 }
 
@@ -2466,27 +2555,6 @@ static void prog_decode_row(struct jpeg *p_jpeg)
     pr->row++;
 }
 
-/* Fill the IDCT's input for block `blkn` of MCU `x` from the stripe, exactly
- * as the baseline decode below fills it from the bitstream. */
-static void prog_fill_block(struct jpeg *p_jpeg, int16_t *block, int blkn,
-                            int x, int ci, bool transpose)
-{
-    struct prog *pr = &p_jpeg->prog;
-    int h0 = ci ? 1 : p_jpeg->frameheader[0].horizontal_sampling;
-    int b = ci ? x : (blkn / h0) * pr->stripe_w[0] + x * h0 + blkn % h0;
-    const int16_t *coef = pr->coef[ci] + b * pr->nstore[ci];
-    const int16_t *q =
-        p_jpeg->quanttable[p_jpeg->frameheader[ci].quanttable_select];
-    int k;
-
-    block[0] = MULTIPLY16(coef[0], q[0]);
-    if (p_jpeg->zero_need[!!ci]) /* none at 1/8, and a call to skip */
-        MEMSET(block + 1, 0, p_jpeg->zero_need[!!ci] * sizeof(int));
-    for (k = 1; k < p_jpeg->k_need[!!ci]; k++)
-        if (coef[k])
-            block[zag[transpose ? k : k + 64]] = MULTIPLY16(coef[k], q[k]);
-}
-
 /* What one block of an MCU needs, the same for every MCU in the image. */
 struct block_plan
 {
@@ -2500,8 +2568,8 @@ struct block_plan
     int out_offs;                   /* bytes into the MCU's output */
     int k_need;
     int zero_bytes;
-    int ci;
-    bool transpose;
+    const int16_t *coef;            /* progressive: MCU 0's block in the */
+    int coef_step;                  /* stripe, and the step to the next */
 };
 
 static void plan_blocks(struct jpeg *p_jpeg, struct block_plan *plan,
@@ -2517,25 +2585,51 @@ static void plan_blocks(struct jpeg *p_jpeg, struct block_plan *plan,
         int idct_cols = BIT_N(MIN(hs, 3));
         int idct_rows = BIT_N(vs);
 
-        bp->ci = ci;
-        bp->transpose = vs > 2;
+        bool transpose = vs > 2;
+
         bp->dc = &p_jpeg->dc_derived_tbls[p_jpeg->scanheader[ci].DC_select];
         bp->ac = &p_jpeg->ac_derived_tbls[p_jpeg->scanheader[ci].AC_select];
         bp->qt = p_jpeg->quanttable[p_jpeg->frameheader[ci].quanttable_select];
-        bp->order = bp->transpose ? zag : zag + 64;
+        bp->order = transpose ? zag : zag + 64;
         bp->last_dc = &p_jpeg->last_dc_val[ci];
         bp->k_need = p_jpeg->k_need[!!ci];
         bp->zero_bytes = p_jpeg->zero_need[!!ci] * sizeof(int);
         bp->v_idct = idct_tbl[vs].v_idct;
-        bp->v_end = bp->transpose ? block + 8 * idct_cols : block + idct_cols;
+        bp->v_end = transpose ? block + 8 * idct_cols : block + idct_cols;
         bp->h_idct = idct_tbl[hs].h_idct;
-        bp->h_ws = bp->transpose ? block + 64 : block;
+        bp->h_ws = transpose ? block + 64 : block;
         bp->h_end = bp->h_ws + idct_rows * 8;
         /* Y, Cb, Cr go to bytes 0-2 for the YUV conversion;
            R, G, B to their places in struct uint8_rgb */
         bp->out_offs = (p_jpeg->rgb ? 2 - ci : ci)
             + store_offs[p_jpeg->mcu_pos[blkn]];
+        if (p_jpeg->progressive)
+        {
+            struct prog *pr = &p_jpeg->prog;
+            int h0 = ci ? 1 : p_jpeg->frameheader[0].horizontal_sampling;
+
+            bp->coef = pr->coef[ci] + pr->nstore[ci] *
+                (ci ? 0 : (blkn / h0) * pr->stripe_w[0] + blkn % h0);
+            bp->coef_step = h0 * pr->nstore[ci];
+        }
     }
+}
+
+/* Fill the IDCT's input for one block of MCU `x` from the stripe, exactly
+ * as decode_block() fills it from the bitstream. */
+static void prog_fill_block(int16_t *block, const struct block_plan *bp,
+                            int x)
+{
+    const int16_t *coef = bp->coef + x * bp->coef_step;
+    const int16_t *q = bp->qt;
+    int k;
+
+    block[0] = MULTIPLY16(coef[0], q[0]);
+    if (bp->zero_bytes) /* none at 1/8, and a call to skip */
+        MEMSET(block + 1, 0, bp->zero_bytes);
+    for (k = 1; k < bp->k_need; k++)
+        if (coef[k])
+            block[bp->order[k]] = MULTIPLY16(coef[k], q[k]);
 }
 
 /* Decode one baseline block into `block`, dequantised and in the IDCT's
@@ -2652,8 +2746,7 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
             {
                 const struct block_plan *bp = &plan[blkn];
                 if (p_jpeg->progressive)
-                    prog_fill_block(p_jpeg, block, blkn, x, bp->ci,
-                                    bp->transpose);
+                    prog_fill_block(block, bp, x);
                 else
                     decode_block(p_jpeg, block, bp);
                 if (bp->v_idct)
