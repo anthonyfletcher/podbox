@@ -59,13 +59,24 @@ struct prose
     int  sel;           /* 0 = cancel, 1 = accept */
 };
 
+static int prose_wrap(const char *body, int w, int font);
+
+/* As tall as the text and the button row need, up to PROSE_H_PCT of the
+ * screen; past that the text scrolls */
 static void prose_measure(struct dialog *d, struct screen *s,
                           struct viewport *box, void *data)
 {
-    (void)d; (void)data;
+    struct prose *p = data;
+    struct dialog_insets in;
+    int fh = font_get(box->font)->height, need, max;
 
+    dialog_get_insets(&d->style, &in);
     box->width  = s->lcdwidth * PROSE_W_PCT / 100;
-    box->height = s->lcdheight * PROSE_H_PCT / 100;
+    max = s->lcdheight * PROSE_H_PCT / 100;
+    need = prose_wrap(p->body, box->width - in.left - in.right
+                               - PROSE_BAR_W - PROSE_BAR_GAP, box->font) * fh
+           + fh / 2 + fh + 8 + in.top + in.bottom;
+    box->height = MIN(need, max);
     box->x = (s->lcdwidth - box->width) / 2;
     box->y = (s->lcdheight - box->height) / 2;
 }
