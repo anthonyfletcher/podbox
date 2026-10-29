@@ -70,7 +70,20 @@ static int book_ct, row_ct;
 
 /* -1 for the top level: the three lists' rows, then every book */
 static int showing;
-#define TOP_ROWS 3
+
+/* The top level's list rows, as the Audiobooks list has them: those with a
+ * book in, in this order */
+static const struct
+{
+    int lang_id;
+    enum book_shelf kind;
+} top_row[] = {
+    { LANG_BOOK_SHELF_ROW_FINISHED, BOOK_SHELF_FINISHED },
+    { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
+    { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
+};
+static int top_kinds[3];
+static int top_ct;
 
 static bool claim(void)
 {
@@ -161,10 +174,20 @@ static void load(void)
     names_used = 0;
     book_index_each(collect_book, NULL);
     text_viewer_each_place(collect_place, NULL);
+    int counts[3] = { 0, 0, 0 };
+
     for (int i = 0; i < book_ct; i++)
+    {
+        counts[books[i].state]++;
         if (showing < 0 || books[i].state == showing)
             rows[row_ct++] = i;
+    }
     qsort(rows, row_ct, sizeof(*rows), compare_rows);
+
+    top_ct = 0;
+    for (size_t k = 0; showing < 0 && k < ARRAYLEN(top_row); k++)
+        if (counts[top_row[k].kind] > 0)
+            top_kinds[top_ct++] = k;
 }
 
 /* ------------------------------------------------------------------ *
@@ -173,7 +196,7 @@ static void load(void)
 
 static int top_rows(void)
 {
-    return showing < 0 ? TOP_ROWS : 0;
+    return showing < 0 ? top_ct : 0;
 }
 
 static int list_lang(int which)
@@ -199,7 +222,7 @@ static const char *get_name(int n, void *data, char *buffer, size_t len)
     (void)data;
 
     if (b < 0)
-        return str(list_lang(n));
+        return str(top_row[top_kinds[n]].lang_id);
     if (books[b].state != BOOK_SHELF_IN_PROGRESS || books[b].pct < 0)
         return names + books[b].title;
     snprintf(buffer, len, str(LANG_BOOK_SHELF_ROW), names + books[b].title,
@@ -330,7 +353,7 @@ static int show(char *path, size_t size, int *selection, int *list)
             if (b >= 0)
                 strmemccpy(path, names + books[b].path, size);
             else
-                *list = info.selection;  /* its enum book_shelf */
+                *list = top_row[top_kinds[info.selection]].kind;
         }
         if (marked_row >= 0)
             *selection = marked_row;
