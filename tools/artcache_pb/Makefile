@@ -50,6 +50,7 @@ SRC := artcache_pb.c stubs.c \
        $(APPS)/files/inflate.c \
        $(APPS)/files/path_list.c \
        $(APPS)/files/book_index.c \
+       $(APPS)/files/zip_member.c \
        $(APPS)/database/tagcache.c \
        $(APPS)/database/libfile.c \
        $(APPS)/database/path_key.c \

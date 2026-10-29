@@ -108,6 +108,11 @@ int ts_open_docx (ts_ctx *c, bs_stream **out);
 int ts_zipdoc_seek_part(bs_stream *st, int part);
 int ts_zipdoc_parts(const bs_stream *st);
 long ts_zipdoc_part_size(const bs_stream *st, int part);
+int  ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
+                       bs_off_t *at, uint32_t *csize, uint32_t *usize,
+                       int *method);
+/* Pictures become TS_PICTURE_OPEN lines; off unless asked for */
+void ts_tags_pictures(bs_stream *s, int on);
 int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
                   void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);

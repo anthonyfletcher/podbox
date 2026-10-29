@@ -149,6 +149,7 @@ screens/system/debug_menu.c
 files/file_ops.c
 files/file_index.c
 files/book_index.c
+files/zip_member.c
 files/filetypes.c
 files/path_list.c
 files/byte_stream.c

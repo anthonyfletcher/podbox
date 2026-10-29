@@ -878,6 +878,7 @@ struct user_settings
                                      player's own timeout, 0 always on */
     bool text_viewer_margin;      /* inset the page by a small border */
     int text_viewer_align;        /* TV_ALIGN_* */
+    bool text_viewer_pictures;    /* a book's pictures, each on its own page */
     bool text_viewer_wheel_scrub; /* the wheel moves through the book */
     int text_viewer_orientation;  /* TV_ORIENT_* */
     int text_viewer_last_hand;    /* the sideways one last read in */

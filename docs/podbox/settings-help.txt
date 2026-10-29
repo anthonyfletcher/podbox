@@ -1127,6 +1127,11 @@ What the line at the foot of the page shows. Page counts the pages of the
 chapter; Chapter Progress shows the chapter and roughly how many pages are
 left in it; Book Progress shows how far through the book you are.
 
+[text viewer pictures]
+Shows a book's pictures, its cover among them, each on a page of its own,
+fitted inside the page above the footer. Off, they are passed over. EPUB
+books only.
+
 [text viewer orientation]
 Holds the page sideways, taller than wide, for reading in one hand. Right
 Hand turns pages with PLAY and MENU, Left Hand with MENU and PLAY. Double-click

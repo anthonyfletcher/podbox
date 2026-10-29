@@ -386,6 +386,18 @@ long ts_part_size(const ts_source *s, int part)
     return s && s->parts ? ts_zipdoc_part_size(s->parts, part) : 0;
 }
 
+int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
+                      uint32_t *csize, uint32_t *usize, int *method)
+{
+    bs_off_t data;
+    int rc;
+
+    if (!s || !s->parts || s->fmt != TS_FMT_EPUB) return BS_ERR_UNSUP;
+    rc = ts_zipdoc_picture(s->parts, part, href, &data, csize, usize, method);
+    if (rc == BS_OK) *at = (long)data;
+    return rc;
+}
+
 int ts_seek_part(ts_source *s, int part)
 {
     int rc;

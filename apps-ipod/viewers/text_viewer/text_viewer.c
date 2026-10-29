@@ -56,6 +56,9 @@
 #include "audio/voice_thread.h" /* voice_is_playing */
 #include "powermgmt.h"   /* reset_poweroff_timer */
 #include "backlight.h"   /* backlight_set_brightness, backlight_set_timeout */
+#include "draw/image_load.h"     /* a book's pictures */
+#include "draw/resize.h"         /* format_native */
+#include "files/zip_member.h"
 #include "system/volume.h"   /* adjust_volume, format_sound_value */
 
 /* Extracted text kept resident, and how much of it sits behind the current
@@ -473,6 +476,160 @@ static int tv_footer_height(void)
                                       : (int)font_get(tv.footer_font)->height;
 }
 
+/* ---- pictures ---------------------------------------------------------- */
+
+/* A picture reaches the text as a line of its own: TS_PICTURE_OPEN, its href,
+ * TS_PICTURE_CLOSE, three bytes each in UTF-8. With Pictures on it is a page
+ * by itself, fitted inside the page above the footer; off, the line is
+ * passed over. */
+#define TV_PIC_OPEN   "\xee\x80\x80"
+#define TV_PIC_CLOSE  "\xee\x80\x81"
+#define TV_PIC_TMP    LIB_CACHE_DIR "/picture.tmp"
+#define TV_PIC_HREF   256
+/* A screenful of bitmap, and the decoder's room after it -- which also holds
+ * the inflater, before the decode starts, for a deflated picture */
+#define TV_PIC_BYTES  (LCD_WIDTH * LCD_HEIGHT * (int)sizeof(fb_data) \
+                       + MAX((int)IMAGE_DECODE_OVERHEAD, ZIP_MEMBER_WORK) \
+                       + 32 * 1024)
+
+static bool tv_is_picture(const unsigned char *s, size_t n)
+{
+    return n >= 3 && !memcmp(s, TV_PIC_OPEN, 3);
+}
+
+/* The white space at `s`, newlines and no-break spaces included */
+static size_t tv_blank_run(const unsigned char *s, size_t n)
+{
+    size_t i = 0;
+
+    while (i < n)
+    {
+        if (s[i] == '\n' || s[i] == ' ' || s[i] == '\t' || s[i] == '\r')
+            i++;
+        else if (n - i >= 2 && s[i] == 0xc2 && s[i + 1] == 0xa0)
+            i += 2;
+        else
+            break;
+    }
+    return i;
+}
+
+/* The bytes of the picture line at `s`, its newline included, and its href
+ * into `href` */
+static size_t tv_picture_line(const unsigned char *s, size_t n, char *href,
+                              size_t cap)
+{
+    size_t i = 3, j = 0;
+
+    while (i < n && s[i] != '\n')
+    {
+        if (n - i >= 3 && !memcmp(s + i, TV_PIC_CLOSE, 3))
+        {
+            i += 3;
+            continue;
+        }
+        if (j < cap - 1)
+            href[j++] = s[i];
+        i++;
+    }
+    href[j] = '\0';
+    return i < n ? i + 1 : i;
+}
+
+/* The picture last decoded, kept while its page is redrawn */
+static int tv_pic_handle;
+static int tv_pic_part = -1;
+static char tv_pic_href[TV_PIC_HREF];
+static struct bitmap tv_pic_bm;
+static bool tv_pic_ok;
+
+static void tv_picture_free(void)
+{
+    if (tv_pic_handle > 0)
+    {
+        core_unpin(tv_pic_handle);
+        core_free(tv_pic_handle);
+    }
+    tv_pic_handle = 0;
+    tv_pic_part = -1;
+}
+
+/* Picture `href` of the chapter on screen, decoded to fit w x h */
+static bool tv_picture_decode(const char *href, int w, int h)
+{
+    struct image_src src = { .pos = 0, .len = -1, .flags = 0 };
+    uint32_t csize, usize;
+    unsigned char *buf;
+    int method, rc;
+    long at;
+
+    if (tv_pic_part == tv.part && !strcmp(tv_pic_href, href)
+        && tv_pic_bm.width <= w && tv_pic_bm.height <= h)
+        return tv_pic_ok;
+    tv_pic_part = tv.part;
+    strmemccpy(tv_pic_href, href, sizeof(tv_pic_href));
+    tv_pic_ok = false;
+
+    if (tv_pic_handle <= 0)
+    {
+        tv_pic_handle = core_alloc(TV_PIC_BYTES);
+        if (tv_pic_handle <= 0)
+        {
+            tv_pic_handle = 0;
+            return false;
+        }
+        core_pin(tv_pic_handle);
+    }
+    buf = core_get_data(tv_pic_handle);
+
+    if (ts_picture_extent(tv.src, tv.part, href, &at, &csize, &usize,
+                          &method) != BS_OK)
+        return false;
+    if (method == 8)
+    {
+        if (!zip_member_to_file(tv.path, at, csize, usize, TV_PIC_TMP,
+                                buf, TV_PIC_BYTES))
+            return false;
+        src.fd = open(TV_PIC_TMP, O_RDONLY);
+    }
+    else
+    {
+        src.fd = open(tv.path, O_RDONLY);
+        src.pos = at;
+        src.len = csize;
+    }
+    if (src.fd < 0)
+        return false;
+
+    memset(&tv_pic_bm, 0, sizeof(tv_pic_bm));
+    tv_pic_bm.width = w;
+    tv_pic_bm.height = h;
+    tv_pic_bm.data = buf;
+    cpu_boost(true);
+    rc = image_load(&src, &tv_pic_bm, TV_PIC_BYTES,
+                    FORMAT_NATIVE | FORMAT_RESIZE | FORMAT_KEEP_ASPECT
+                    | FORMAT_DITHER, &format_native);
+    cpu_boost(false);
+    close(src.fd);
+    if (method == 8)
+        remove(TV_PIC_TMP);
+    tv_pic_ok = rc > 0 && tv_pic_bm.width > 0 && tv_pic_bm.height > 0;
+    return tv_pic_ok;
+}
+
+/* The page's picture, centred in the page above the footer. One that will
+ * not decode leaves the page blank. Drawn with tv.vp current. */
+static void tv_draw_picture(const char *href)
+{
+    int w = tv.vp.width, h = tv.vp.height - tv_footer_height();
+
+    if (w > 0 && h > 0 && tv_picture_decode(href, w, h))
+        screens[SCREEN_MAIN].bitmap((const fb_data *)tv_pic_bm.data,
+                                    (w - tv_pic_bm.width) / 2,
+                                    (h - tv_pic_bm.height) / 2,
+                                    tv_pic_bm.width, tv_pic_bm.height);
+}
+
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
  * offset of the next page. */
 static off_t tv_page(off_t start, bool render)
@@ -494,6 +651,36 @@ static off_t tv_page(off_t start, bool render)
             break;                           /* end of document */
 
         s = tv.win + (off - tv.win_start);
+
+        /* Blank lines before a picture go with it, and so do lines of
+         * white space alone: books space pictures with <p>&nbsp;</p> */
+        {
+            size_t ws = tv_blank_run(s, avail);
+
+            if (ws > 0 && tv_is_picture(s + ws, avail - ws))
+            {
+                off += ws;
+                continue;
+            }
+        }
+        if (tv_is_picture(s, avail))
+        {
+            char href[TV_PIC_HREF];
+            size_t used = tv_picture_line(s, avail, href, sizeof(href));
+
+            if (!global_settings.text_viewer_pictures)
+            {
+                off += used;
+                continue;
+            }
+            if (y > 0)
+                break;                       /* a page of its own */
+            if (render)
+                tv_draw_picture(href);
+            off += used;
+            break;
+        }
+
         tv_line_break(s, avail, tv.vp.width, &ln);
         if (ln.used == 0)
             break;
@@ -751,8 +938,8 @@ static off_t tv_part_end(off_t from, off_t limit, bool *stop)
 
 /* Queue the parts from `from` that start before `page_end`, the last
  * running on to its own end. */
-/* Drops the soft hyphens from `n` bytes at `s`, which would split a word
- * for the voice; the length left */
+/* Drops what the voice should not read from `n` bytes at `s`: soft hyphens,
+ * which would split a word, and picture lines. The length left. */
 static size_t tv_strip_shy(unsigned char *s, size_t n)
 {
     size_t r = 0, w = 0;
@@ -761,6 +948,11 @@ static size_t tv_strip_shy(unsigned char *s, size_t n)
     {
         if (tv_is_shy(s + r, n - r))
             r += 2;
+        else if (tv_is_picture(s + r, n - r))
+        {
+            while (r < n && s[r] != '\n')
+                r++;
+        }
         else
             s[w++] = s[r++];
     }
@@ -943,6 +1135,30 @@ static bool tv_reach(off_t target)
     return true;
 }
 
+/* Whether the chapter's window holds anything to show: with Pictures off, a
+ * cover page that is a picture alone has nothing */
+static bool tv_has_page(void)
+{
+    size_t i = 0;
+
+    if (global_settings.text_viewer_pictures)
+        return true;
+    while (i < tv.win_len)
+    {
+        unsigned char c = tv.win[i];
+        char href[TV_PIC_HREF];
+
+        if (tv_is_picture(tv.win + i, tv.win_len - i))
+            i += tv_picture_line(tv.win + i, tv.win_len - i, href,
+                                 sizeof(href));
+        else if (c == '\n' || c == ' ' || c == '\t' || c == '\r')
+            i++;
+        else
+            return true;
+    }
+    return false;
+}
+
 /* Starts chapter `part` at its first byte, with an empty window and page
  * stack. False if it has no text to show. */
 static bool tv_enter_part(int part)
@@ -961,7 +1177,7 @@ static bool tv_enter_part(int part)
     if (rc != BS_OK)
         return false;
     tv_ensure(0, 1);
-    return tv.win_len > 0;
+    return tv.win_len > 0 && tv_has_page();
 }
 
 /* The first page of the next chapter with text */
@@ -1550,6 +1766,7 @@ static bool tv_open(const char *file)
 static void tv_close(void)
 {
     tv_side_free();
+    tv_picture_free();
     backlight_set_brightness(global_settings.brightness);
     backlight_set_timeout(global_settings.backlight_timeout);
     backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);

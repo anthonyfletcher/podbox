@@ -328,6 +328,7 @@ static const struct tag_row tag_rows[] = {
 { "text viewer brightness",   TAG_APPEARANCE,                    "text viewer backlight" },
 { "text viewer backlight",    TAG_BATTERY|TAG_APPEARANCE,        "text viewer light screen timeout" },
 { "text viewer margin",       TAG_APPEARANCE,                    "text viewer" },
+{ "text viewer pictures",     TAG_APPEARANCE,                    "text viewer images cover illustrations" },
 { "text viewer orientation",  TAG_APPEARANCE,                    "text viewer sideways rotate hand" },
 { "text viewer wheel scrubs", TAG_APPEARANCE,                    "text viewer scroll wheel seek jump" },
 { "text viewer alignment",    TAG_APPEARANCE,                    "text viewer justify" },

@@ -18228,6 +18228,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_PICTURES
+  desc: core text viewer: show a book's pictures on pages of their own
+  user: core
+  <source>
+    *: "Pictures"
+  </source>
+  <dest>
+    *: "Imágenes"
+  </dest>
+  <voice>
+    *: "Imágenes"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

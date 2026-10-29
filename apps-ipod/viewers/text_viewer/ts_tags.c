@@ -121,7 +121,7 @@ size_t ts_entity(const char *s, size_t n, uint32_t *cp)
 
 enum { ST_TEXT, ST_TAG, ST_COMMENT, ST_CDATA, ST_ENT };
 
-#define TAGBUF 96
+#define TAGBUF 384      /* an <img> carries a path, and often alt text */
 #define ENTBUF 16
 #define TIN    256
 
@@ -146,6 +146,7 @@ typedef struct {
     char  skip_name[TAGBUF];
 
     int   nl_pending, sp_pending, started;
+    int   pictures;                /* TS_PICTURE_OPEN lines for pictures */
     ts_pend out;
 } tg_st;
 
@@ -202,6 +203,39 @@ static void want_nl(tg_st *s, int count)
     s->sp_pending = 0;
 }
 
+/* The value of attribute `name` in tag body `t`, or 0 */
+static int tag_attr(const char *t, const char *name, char *out, size_t cap)
+{
+    size_t l = strlen(name);
+    const char *p;
+
+    for (p = t; *p; p++) {
+        size_t j = 0;
+        char q;
+
+        if (p != t && p[-1] != ' ' && p[-1] != '\t' && p[-1] != '\n')
+            continue;
+        if (ts_ascii_ncasecmp(p, name, l) || p[l] != '=') continue;
+        q = p[l + 1];
+        if (q != '"' && q != '\'') continue;
+        for (p += l + 2; *p && *p != q && j < cap - 1; p++) out[j++] = *p;
+        out[j] = 0;
+        return 1;
+    }
+    return 0;
+}
+
+/* A picture, on a line of its own */
+static void out_picture(tg_st *s, const char *href)
+{
+    if (s->started && s->nl_pending < 1) s->nl_pending = 1;
+    s->sp_pending = 0;
+    out_cp(s, TS_PICTURE_OPEN);
+    for (; *href; href++) out_byte(s, (uint8_t)*href);
+    out_cp(s, TS_PICTURE_CLOSE);
+    want_nl(s, 1);
+}
+
 static void process_tag(tg_st *s)
 {
     char name[TAGBUF];
@@ -222,6 +256,25 @@ static void process_tag(tg_st *s)
     }
     name[n] = 0;
     if (!n) return;
+
+    /* A picture: <img src>, or the <image> an <svg> wraps */
+    if (s->pictures && !close) {
+        char href[256];
+
+        if ((!s->skip_depth && ts_ascii_casecmp(name, "img") == 0 &&
+             tag_attr(t, "src", href, sizeof href)) ||
+            (s->skip_depth && ts_ascii_casecmp(s->skip_name, "svg") == 0 &&
+             ts_ascii_casecmp(name, "image") == 0 &&
+             (tag_attr(t, "xlink:href", href, sizeof href) ||
+              tag_attr(t, "href", href, sizeof href)))) {
+            int depth = s->skip_depth;
+
+            s->skip_depth = 0;          /* out_picture writes */
+            out_picture(s, href);
+            s->skip_depth = depth;
+            return;
+        }
+    }
 
     /* Inside a skipped element only its own close tag matters. */
     if (s->skip_depth) {
@@ -412,6 +465,11 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
 
 /* Clears the between-documents state so a container back end can start its
  * spine over from the top without reallocating. */
+void ts_tags_pictures(bs_stream *st, int on)
+{
+    ((tg_st *)st->st)->pictures = on;
+}
+
 void ts_tags_rewind(bs_stream *st)
 {
     tg_st *s = st->st;

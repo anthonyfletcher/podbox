@@ -43,7 +43,7 @@
 #include "database/tagcache.h"
 #include "system/bg_task.h"         /* the caching pass runs as one */
 #include "files/book_index.h"       /* the books the pass visits */
-#include "files/byte_stream.h"      /* a deflated cover, inflated */
+#include "files/zip_member.h"       /* a deflated cover, inflated */
 #include "files/path_list.h"        /* the "found nothing" lists */
 #include "system/strutil.h"         /* is_disc_folder() */
 #include "lcd.h"
@@ -1567,59 +1567,6 @@ static size_t aa_work_bytes(void)
 
 #define AA_COVER_TMP LIB_CACHE_DIR "/cover.tmp"
 
-static long aa_fd_read(void *ctx, void *buf, size_t n)
-{
-    return read(*(int *)ctx, buf, n);
-}
-
-static bs_off_t aa_fd_seek(void *ctx, bs_off_t off, int whence)
-{
-    return lseek(*(int *)ctx, off, whence);
-}
-
-static bs_off_t aa_fd_size(void *ctx)
-{
-    return ffilesize(*(int *)ctx);
-}
-
-/* A deflated cover, unpacked into AA_COVER_TMP with `workbuf` as the
- * inflater's memory, before the decode needs it: a progressive JPEG seeks
- * back, which a stream being inflated cannot. */
-static bool aa_inflate_cover(const struct book_entry *e, void *workbuf,
-                             size_t worksz)
-{
-    static uint8_t chunk[512];
-    int in = open(e->path, O_RDONLY), out;
-    bs_io io = { aa_fd_read, aa_fd_seek, aa_fd_size, NULL, &in };
-    bs_arena a = { workbuf, worksz, 0 };
-    bs_stream *s;
-    uint32_t left = e->cover_usize;
-    bool ok = false;
-
-    if (in < 0)
-        return false;
-    s = bs_file_stream(&a, &io, e->cover_at, e->cover_csize);
-    if (s)
-        s = bs_inflate_stream(&a, s, BS_INFLATE_RAW);
-    out = s ? open(AA_COVER_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666) : -1;
-    if (out >= 0)
-    {
-        while (left > 0)
-        {
-            size_t got;
-
-            if (bs_pull(s, chunk, MIN(sizeof chunk, left), &got) != BS_OK
-                || got == 0 || write(out, chunk, got) != (ssize_t)got)
-                break;
-            left -= got;
-        }
-        ok = left == 0;
-        close(out);
-    }
-    close(in);
-    return ok;
-}
-
 /* An image named after the book, `<book>.jpg` and so on, into aa_artpath:
  * how a cover is given to a book without one, or replaced. A folder.jpg
  * beside it is the author's, not this book's. */
@@ -1686,7 +1633,10 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
         stamp = aa_art_stamp(e->path);
         if (slot->stamp != stamp || !aa_thumbs_exist(bh))
         {
-            if (!aa_inflate_cover(e, c->workbuf, c->worksz))
+            /* Before the decode needs the work buffer */
+            if (!zip_member_to_file(e->path, e->cover_at, e->cover_csize,
+                                    e->cover_usize, AA_COVER_TMP,
+                                    c->workbuf, c->worksz))
                 return true;
             tmp = true;
         }

@@ -364,6 +364,25 @@ long ts_zipdoc_part_size(const bs_stream *st, int part)
            ? (long)ts_zip_size(s->z, s->spine[part]) : 0;
 }
 
+int ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
+                      bs_off_t *at, uint32_t *csize, uint32_t *usize,
+                      int *method)
+{
+    const sp_st *s = st->st;
+    char unescaped[256], full[320];
+    size_t n = strlen(href);
+    int idx;
+
+    if (part < 0 || part >= s->nspine || n >= sizeof unescaped)
+        return BS_ERR_INVAL;
+    memcpy(unescaped, href, n + 1);
+    url_unescape(unescaped);
+    path_join(ts_zip_name(s->z, s->spine[part]), unescaped, full, sizeof full);
+    idx = ts_zip_find(s->z, full);
+    if (idx < 0) return BS_ERR_FORMAT;
+    return ts_zip_extent(s->z, idx, at, csize, usize, method);
+}
+
 /* ---- contents -------------------------------------------------------- */
 
 #define TITLE_MAX 128
@@ -593,6 +612,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     if (!sp->cs) return BS_ERR_NOMEM;
     sp->tags = ts_tags_stream(c->arena, sp->cs, prof, c->cfg);
     if (!sp->tags) return BS_ERR_NOMEM;
+    if (c->resolved == TS_FMT_EPUB) ts_tags_pictures(sp->tags, 1);
 
     st->pull = sp_pull; st->reset = sp_reset; st->st = sp;
     c->parts = st;

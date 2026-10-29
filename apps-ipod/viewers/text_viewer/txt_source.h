@@ -123,6 +123,20 @@ int  ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
 
 void ts_close(ts_source *s);
 
+/* ---- pictures -------------------------------------------------------- */
+
+/* An EPUB's pictures reach the text as a line of their own: TS_PICTURE_OPEN,
+ * the picture's href as the chapter wrote it, TS_PICTURE_CLOSE. Both are
+ * private-use codepoints, three bytes each in UTF-8. */
+#define TS_PICTURE_OPEN  0xE000
+#define TS_PICTURE_CLOSE 0xE001
+
+/* Where the picture `href`, written in chapter `part`, lies in the file:
+ * the offset of its data, its stored and unpacked sizes, and its method
+ * (0 stored, 8 deflated). BS_OK, or an error when there is no such member. */
+int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
+                      uint32_t *csize, uint32_t *usize, int *method);
+
 /* ---- a book's details ------------------------------------------------ */
 
 #define TS_BOOK_TITLE  128
