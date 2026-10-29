@@ -913,7 +913,9 @@ static void tv_side_free(void)
 static void tv_side_push(void)
 {
     /* lcd_set_viewport() answers the viewport it replaces: the second call
-     * hands back the default one, whose buffer is the screen's */
+     * hands back the default one, whose buffer is the screen's. The update
+     * reads through the current viewport's buffer, so the default one is
+     * current for it. */
     struct viewport *prev = lcd_set_viewport(NULL);
     fb_data *dst = lcd_set_viewport(prev)->buffer->fb_ptr;
     const fb_data *src = tv_side_fb.fb_ptr;
@@ -929,7 +931,9 @@ static void tv_side_push(void)
         for (u = 0; u < LCD_HEIGHT; u++, d += step)
             *d = *src++;
     }
+    lcd_set_viewport(NULL);
     lcd_update();
+    lcd_set_viewport(prev);
 }
 
 static void tv_fullscreen_vp(struct viewport *vp)
