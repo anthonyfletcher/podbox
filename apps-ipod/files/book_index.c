@@ -77,7 +77,9 @@ bool book_index_is_book(const char *path)
                            || strcasecmp(dot, ".fb2") == 0
                            || strcasecmp(dot, ".mobi") == 0
                            || strcasecmp(dot, ".prc") == 0
-                           || strcasecmp(dot, ".azw") == 0);
+                           || strcasecmp(dot, ".azw") == 0
+                           || strcasecmp(dot, ".azw3") == 0
+                           || strcasecmp(dot, ".pdb") == 0);
 }
 
 void book_index_each(book_index_fn fn, void *data)

@@ -34,7 +34,7 @@ typedef enum {
     TS_FMT_DOCX,
     TS_FMT_PDF,
     TS_FMT_LYRICS,       /* .lrc / .lrc8 / .snc, read without the timing */
-    TS_FMT_MOBI          /* .mobi / .prc / .azw, MOBI 6 */
+    TS_FMT_MOBI          /* .mobi / .prc / .azw / .azw3, and PalmDOC .pdb */
 } ts_format;
 
 const char *ts_format_name(ts_format f);

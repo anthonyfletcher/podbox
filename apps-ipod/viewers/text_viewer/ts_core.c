@@ -189,7 +189,8 @@ static ts_format probe_ext(const char *name)
     if (!ts_ascii_casecmp(e, "docx"))                     return TS_FMT_DOCX;
     if (!ts_ascii_casecmp(e, "pdf"))                      return TS_FMT_PDF;
     if (!ts_ascii_casecmp(e, "mobi") || !ts_ascii_casecmp(e, "prc") ||
-        !ts_ascii_casecmp(e, "azw"))                      return TS_FMT_MOBI;
+        !ts_ascii_casecmp(e, "azw") || !ts_ascii_casecmp(e, "azw3") ||
+        !ts_ascii_casecmp(e, "pdb"))                      return TS_FMT_MOBI;
     /* By extension only. A lyrics file is plain text with tags in it, so a
      * content sniff would claim .txt files that merely start with a bracket. */
     if (!ts_ascii_casecmp(e, "lrc") || !ts_ascii_casecmp(e, "lrc8") ||
@@ -223,7 +224,8 @@ static ts_format probe(const uint8_t *raw, size_t rawn, const char *name,
     ts_format e;
 
     if (starts(raw, rawn, "%PDF"))          return TS_FMT_PDF;
-    if (rawn >= 68 && !memcmp(raw + 60, "BOOKMOBI", 8)) return TS_FMT_MOBI;
+    if (rawn >= 68 && (!memcmp(raw + 60, "BOOKMOBI", 8) ||
+                       !memcmp(raw + 60, "TEXtREAd", 8))) return TS_FMT_MOBI;
     if (starts(raw, rawn, "{\\rtf"))        return TS_FMT_RTF;
     if (starts(raw, rawn, "PK\x03\x04") ||
         starts(raw, rawn, "PK\x05\x06"))    return TS_FMT_EPUB; /* refined later */

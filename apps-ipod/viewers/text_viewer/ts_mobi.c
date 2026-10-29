@@ -1,21 +1,28 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Back end for MOBI books (.mobi, .prc, .azw): a Palm database whose first
- * record holds the PalmDOC and MOBI headers, then the text in records that
- * each decompress alone, then the images.
+ * Back end for MOBI books (.mobi, .prc, .azw, .azw3) and PalmDOC text
+ * (.pdb): a Palm database whose first record holds the PalmDOC header and,
+ * but for PalmDOC, the MOBI header, then the text in records that each
+ * decompress alone, then the images.
  *
  *   container - the record table, the headers, EXTH
  *   records   - a text record read, its trailing entries cut, decompressed
  *   loading   - every text record once: where each starts in the text, the
- *               parts (split at <mbp:pagebreak>) and the guide's contents
+ *               parts (split at <mbp:pagebreak>, or a KF8 book's files) and
+ *               the guide's contents
  *   stream    - the text of one part, or the whole book, through the
  *               charset and HTML stages
  *   contents  - the guide's toc page, a list of filepos links
  *   details   - title, author and cover for the book index
  *
- * A locked book is refused (TS_ERR_LOCKED), as is HUFF/CDIC compression and
- * a KF8-only book; a joint MOBI/KF8 file is read through its MOBI half.
+ * A locked book is refused (TS_ERR_LOCKED), as is HUFF/CDIC compression. A
+ * joint MOBI/KF8 file is read through its MOBI half. A KF8 book (.azw3) is
+ * its files' XHTML one after another, each a skeleton and then the fragments
+ * that go into it, which read in order as the text does; the files are its
+ * parts, and its flow table (FDST) says where the text ends and the
+ * stylesheets begin. PalmDOC is plain text, through the charset stage
+ * alone.
  ****************************************************************************/
 
 #include "ts_internal.h"
@@ -39,6 +46,9 @@ typedef struct {
     uint16_t  extra;        /* the trailing-entry flags */
     uint32_t  first_image;  /* the first image record, or ~0 */
     ts_charset cs;
+    bool      plain;        /* PalmDOC text, not HTML */
+    bool      kf8;
+    uint32_t  fdst;         /* a KF8 book's flow table record, or ~0 */
     uint32_t *text_at;      /* where text record i starts in the text */
     uint32_t *part_at;      /* where part i starts; part_at[nparts] = end */
     int       nparts;
@@ -90,11 +100,13 @@ static int open_container(mobi_st *m, bs_arena *a, const bs_io *io,
 
     m->io = io;
     m->first_image = ~0u;
+    m->fdst = ~0u;
     m->toc_at = ~0u;
     m->cs = TS_CS_CP1252;
     if (io->seek(io->ctx, 0, SEEK_SET) < 0 || io->read(io->ctx, h, 78) != 78)
         return BS_ERR_IO;
-    if (memcmp(h + 60, "BOOKMOBI", 8))
+    m->plain = !memcmp(h + 60, "TEXtREAd", 8);
+    if (!m->plain && memcmp(h + 60, "BOOKMOBI", 8))
         return BS_ERR_FORMAT;
     m->nrec = be16(h + 76);
     if (m->nrec < 2)
@@ -128,16 +140,17 @@ static int open_container(mobi_st *m, bs_arena *a, const bs_io *io,
     if (m->ntext < 1 || m->ntext >= m->nrec)
         return BS_ERR_FORMAT;
 
-    if (len >= 132 && !memcmp(r0 + 16, "MOBI", 4))
+    if (!m->plain && len >= 132 && !memcmp(r0 + 16, "MOBI", 4))
     {
         uint32_t hl = be32(r0 + 20);
 
-        if (be32(r0 + 36) >= 8)
-            return BS_ERR_UNSUP;                /* KF8 alone */
+        m->kf8 = be32(r0 + 36) >= 8;
         m->cs = be32(r0 + 28) == 65001 ? TS_CS_UTF8 : TS_CS_CP1252;
         m->first_image = be32(r0 + 108);
         if (hl >= 0xe4 && 16 + 0xe4 <= len)
             m->extra = be16(r0 + 16 + 0xe2);
+        if (m->kf8 && len >= 0xc4)
+            m->fdst = be32(r0 + 0xc0);
     }
     *r0len = len;
     return BS_OK;
@@ -285,14 +298,33 @@ static void guide_tag(mobi_st *m, const char *tag)
     m->toc_at = v;
 }
 
+/* Where a KF8 book's text ends: the first flow of its flow table, or ~0 */
+static uint32_t flow_end(mobi_st *m)
+{
+    if (m->fdst >= (uint32_t)m->nrec || read_rec(m, m->fdst) < 20
+        || memcmp(m->raw, "FDST", 4) || be32(m->raw + 8) < 1)
+        return ~0u;
+    m->cur = 0;
+    return be32(m->raw + 16);
+}
+
+/* A part from `start`, if it is past the last one and before the end */
+static void add_part(mobi_st *m, uint32_t start, uint32_t end)
+{
+    if (start > m->part_at[m->nparts - 1] && start < end
+        && m->nparts < PARTS_MAX)
+        m->part_at[m->nparts++] = start;
+}
+
 /* Every text record once: where each starts, the parts at each
- * <mbp:pagebreak>, and the guide's toc */
+ * <mbp:pagebreak> or KF8 file, and the guide's toc */
 static int load_text_map(mobi_st *m, bs_arena *a)
 {
-    static const char brk[] = "<mbp:pagebreak", ref[] = "<reference";
+    static const char brk[] = "<mbp:pagebreak", ref[] = "<reference",
+                      xml[] = "<?xml", html[] = "<html";
     char tag[TAG_MAX];
-    uint32_t at = 0;
-    int i, kb = 0, kr = 0, t = -1;
+    uint32_t at = 0, end = m->kf8 ? flow_end(m) : ~0u, last_xml = ~0u;
+    int i, kb = 0, kr = 0, kx = 0, kh = 0, t = -1;
 
     m->text_at = bs_alloc(a, (m->ntext + 2) * sizeof *m->text_at);
     m->part_at = bs_alloc(a, (PARTS_MAX + 1) * sizeof *m->part_at);
@@ -324,12 +356,16 @@ static int load_text_map(mobi_st *m, bs_arena *a)
                     tag[t++] = c;
             }
             if (match(brk, &kb, c))
+                add_part(m, at + j + 1 - (sizeof brk - 1), end);
+            /* A KF8 file starts at its <?xml, or at its <html without one */
+            if (m->kf8 && match(xml, &kx, c))
+                last_xml = at + j + 1 - (sizeof xml - 1);
+            if (m->kf8 && match(html, &kh, c))
             {
-                uint32_t start = at + j + 1 - (sizeof brk - 1);
+                uint32_t start = at + j + 1 - (sizeof html - 1);
 
-                if (start > m->part_at[m->nparts - 1]
-                    && m->nparts < PARTS_MAX)
-                    m->part_at[m->nparts++] = start;
+                add_part(m, last_xml != ~0u && start - last_xml < 128
+                            ? last_xml : start, end);
             }
             if (match(ref, &kr, c))
                 t = 0;
@@ -337,7 +373,7 @@ static int load_text_map(mobi_st *m, bs_arena *a)
         at += m->dec_len;
     }
     m->text_at[m->ntext + 1] = at;
-    m->part_at[m->nparts] = at;
+    m->part_at[m->nparts] = at < end ? at : end;
     return BS_OK;
 }
 
@@ -382,8 +418,18 @@ static int text_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
         if (k > n - done)
             k = n - done;
         memcpy(buf + done, m->dec + off, k);
-        done += k;
         m->pos += k;
+        if (m->plain)
+        {
+            /* CR LF as plain text has it: the CR goes */
+            uint32_t r, w;
+
+            for (r = w = 0; r < k; r++)
+                if (buf[done + r] != '\r')
+                    buf[done + w++] = buf[done + r];
+            k = w;
+        }
+        done += k;
     }
     *out = done;
     return BS_OK;
@@ -395,8 +441,11 @@ static void read_range(mobi_st *m, uint32_t from, uint32_t to)
     m->pos = from;
     m->end = to;
     ts_charset_restart(m->cs_st, &m->text, m->cs);
-    ts_tags_restart(m->tags, m->cs_st);
-    ts_tags_rewind(m->tags);
+    if (m->tags != m->cs_st)
+    {
+        ts_tags_restart(m->tags, m->cs_st);
+        ts_tags_rewind(m->tags);
+    }
 }
 
 static int mobi_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
@@ -440,15 +489,32 @@ long ts_mobi_part_size(const bs_stream *st, int part)
            ? (long)(m->part_at[part + 1] - m->part_at[part]) : 0;
 }
 
-/* A picture's href is its recindex: the image record, counted from 1 */
+/* A picture's href is its recindex, or KF8's kindle:embed:NNNN in base 32
+ * with a ?mime= after it: the image record, counted from 1 */
 int ts_mobi_picture(const bs_stream *st, const char *href, bs_off_t *at,
                     uint32_t *csize)
 {
     const mobi_st *m = st->st;
     uint32_t n = 0, r;
 
-    for (; *href >= '0' && *href <= '9'; href++)
-        n = n * 10 + (*href - '0');
+    if (!strncmp(href, "kindle:embed:", 13))
+    {
+        for (href += 13; *href && *href != '?'; href++)
+        {
+            int d = *href >= '0' && *href <= '9' ? *href - '0'
+                  : (*href | 0x20) >= 'a' && (*href | 0x20) <= 'v'
+                    ? (*href | 0x20) - 'a' + 10 : -1;
+
+            if (d < 0)
+                return BS_ERR_FORMAT;
+            n = n * 32 + d;
+        }
+        if (*href == '?')
+            href += strlen(href);
+    }
+    else
+        for (; *href >= '0' && *href <= '9'; href++)
+            n = n * 10 + (*href - '0');
     if (*href || !n || m->first_image == ~0u)
         return BS_ERR_FORMAT;
     r = m->first_image + n - 1;
@@ -480,10 +546,14 @@ int ts_open_mobi(ts_ctx *c, bs_stream **out)
     m->cs_st = ts_charset_stream(c->arena, &m->text, m->cs);
     if (!m->cs_st)
         return BS_ERR_NOMEM;
-    m->tags = ts_tags_stream(c->arena, m->cs_st, TS_TAGS_HTML, c->cfg);
-    if (!m->tags)
-        return BS_ERR_NOMEM;
-    ts_tags_pictures(m->tags, 1);
+    m->tags = m->cs_st;
+    if (!m->plain)
+    {
+        m->tags = ts_tags_stream(c->arena, m->cs_st, TS_TAGS_HTML, c->cfg);
+        if (!m->tags)
+            return BS_ERR_NOMEM;
+        ts_tags_pictures(m->tags, 1);
+    }
     m->part = -1;
 
     st->pull = mobi_pull;
@@ -643,8 +713,27 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
     rc = open_container(m, &a, io, &len);
     if (rc != BS_OK)
         return rc;
+    if (m->plain)
+    {
+        uint8_t name[32];
+
+        /* the database's own name, with _ for its spaces */
+        if (io->seek(io->ctx, 0, SEEK_SET) >= 0
+            && io->read(io->ctx, name, 32) == 32)
+        {
+            uint32_t n = 0;
+
+            while (n < 32 && name[n])
+            {
+                if (name[n] == '_')
+                    name[n] = ' ';
+                n++;
+            }
+            book_str(out->title, TS_BOOK_TITLE, name, n, m->cs);
+        }
+    }
     r0 = m->raw;
-    if (len >= 132 && !memcmp(r0 + 16, "MOBI", 4))
+    if (!m->plain && len >= 132 && !memcmp(r0 + 16, "MOBI", 4))
     {
         uint32_t hl = be32(r0 + 20), name_at = be32(r0 + 84),
                  name_len = be32(r0 + 88);

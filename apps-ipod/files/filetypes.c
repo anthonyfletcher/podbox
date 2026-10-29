@@ -85,6 +85,8 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "mobi", FILE_ATTR_TXT },
     { "prc",  FILE_ATTR_TXT },
     { "azw",  FILE_ATTR_TXT },
+    { "azw3", FILE_ATTR_TXT },
+    { "pdb",  FILE_ATTR_TXT },
     { "docx", FILE_ATTR_TXT },
     { "pdf",  FILE_ATTR_TXT },
     /* Lyrics read as words here, with the timing stripped (ts_lyrics.c). The
