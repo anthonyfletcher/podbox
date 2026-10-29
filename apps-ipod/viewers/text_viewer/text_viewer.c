@@ -799,6 +799,14 @@ static off_t tv_page(off_t start, bool render)
 
         s = tv.win + (off - tv.win_start);
 
+        /* A page starts with its first line of text, not the blank line
+         * that sets a heading apart from the page before */
+        if (y == 0 && s[0] == '\n')
+        {
+            off++;
+            continue;
+        }
+
         /* Blank lines before a picture go with it, and so do lines of
          * white space alone: books space pictures with <p>&nbsp;</p> */
         {
@@ -838,6 +846,12 @@ static off_t tv_page(off_t start, bool render)
             int indent = global_settings.text_viewer_indent && !head
                          && s[0] != '\n' && tv_paragraph_start(off)
                          ? tv_literal_width("M") : 0;
+
+            /* A heading starts a page that has room for it, the blank line
+             * after it and a line of what it heads */
+            if (head && !heading && y > 0
+                && y + 3 * tv.line_height > tv.vp.height - tv_footer_height())
+                break;
 
             tv_line_break(s, avail, tv.vp.width - indent, &ln);
             if (ln.used == 0)

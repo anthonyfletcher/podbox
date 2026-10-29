@@ -351,7 +351,8 @@ static void process_tag(tg_st *s)
         if (s->prof == TS_TAGS_DOCX && !close && !self &&
             ts_ascii_casecmp(name, "w:p") == 0)
             return;                          /* break after the paragraph only */
-        want_nl(s, 1);
+        /* a heading stands apart: a blank line before it and after */
+        want_nl(s, (r->flags & R_HEAD) && !self ? 2 : 1);
     }
     /* A tab separates cells, so it is pointless at the head of a line. */
     if ((r->flags & R_TAB) && !close && s->started && !s->nl_pending)
