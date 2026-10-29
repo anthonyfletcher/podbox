@@ -14,9 +14,9 @@
  * 8-bit RGB, 5119 of RGBA, 2559 of 16-bit RGBA. */
 #define PNG_MAX_ROW_BYTES (20 * 1024)
 
-/* The arena read_png_stream() needs: the inflater (about 35 KiB), its own
+/* The arena read_png_stream() needs: the inflater (about 37 KiB), its own
  * state and two rows. */
-#define PNG_DECODE_OVERHEAD (38 * 1024 + 2 * PNG_MAX_ROW_BYTES)
+#define PNG_DECODE_OVERHEAD (40 * 1024 + 2 * PNG_MAX_ROW_BYTES)
 
 /* Decodes the PNG that `in` yields, from its signature on, into bm, with the
  * arguments and results of read_jpeg_fd(). Its state goes in `a`, which must

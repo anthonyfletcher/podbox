@@ -2,7 +2,11 @@
  * GNU General Public License (version 2+)
  *
  * Streaming DEFLATE and zlib decompressor, used by the zip-backed document
- * formats and the PDF reader.
+ * formats, the PDF reader and PNG.
+ *
+ * A code is found by one lookup of the next TBITS bits in a table built for
+ * each block; only a code longer than that is read a bit at a time, against
+ * the canonical counts that also validate the block's code lengths.
  ****************************************************************************/
 
 #include <stddef.h>   /* offsetof */
@@ -16,9 +20,15 @@
 
 enum { ST_HDR, ST_STORED, ST_BLOCK, ST_DONE };
 
+/* A table entry: the symbol << 4 | its code's length, or 0 for a code
+ * longer than TBITS */
+#define TBITS 9
+#define TSIZE (1u << TBITS)
+
 typedef struct {
     short count[16];
     short symbol[288];
+    uint16_t table[TSIZE];
 } huff;
 
 typedef struct {
@@ -73,6 +83,20 @@ static int bits(inf_st *s, int need)
     return (int)(val & ((1u << need) - 1));
 }
 
+/* At least `need` bits in bitbuf where the input has them; at its end,
+ * fewer, and no error */
+static inline void fill(inf_st *s, int need)
+{
+    while (s->bitcnt < need) {
+        int b;
+
+        if (s->ipos < s->ilen) b = s->in[s->ipos++];
+        else if ((b = nextbyte(s)) < 0) return;
+        s->bitbuf |= (uint32_t)b << s->bitcnt;
+        s->bitcnt += 8;
+    }
+}
+
 /* ---- huffman --------------------------------------------------------- */
 
 static int construct(huff *h, const short *length, int n)
@@ -98,7 +122,36 @@ static int construct(huff *h, const short *length, int n)
     return left;
 }
 
-static int decode(inf_st *s, const huff *h)
+/* The lookup table for the codes construct() has just counted: each code of
+ * TBITS or fewer bits, reversed as it arrives, fills every entry whose low
+ * bits it matches */
+static void build_table(huff *h, const short *length, int n)
+{
+    unsigned next[16];
+    unsigned code = 0;
+    int len, symbol;
+
+    memset(h->table, 0, sizeof h->table);
+    for (len = 1; len < 16; len++) {
+        next[len] = code;
+        code = (code + h->count[len]) << 1;
+    }
+    for (symbol = 0; symbol < n; symbol++) {
+        unsigned c, rev = 0, i;
+        int l = length[symbol];
+
+        if (!l) continue;
+        c = next[l]++;
+        if (l > TBITS) continue;
+        for (i = 0; i < (unsigned)l; i++) rev |= ((c >> i) & 1) << (l - 1 - i);
+        for (i = rev; i < TSIZE; i += 1u << l)
+            h->table[i] = (uint16_t)(symbol << 4 | l);
+    }
+}
+
+/* A code a bit at a time: one longer than TBITS, or one at the end of the
+ * input */
+static int decode_slow(inf_st *s, const huff *h)
 {
     int code = 0, first = 0, index = 0, len;
 
@@ -119,6 +172,20 @@ static int decode(inf_st *s, const huff *h)
     return -1;
 }
 
+static inline int decode(inf_st *s, const huff *h)
+{
+    unsigned e;
+
+    fill(s, TBITS);
+    e = h->table[s->bitbuf & (TSIZE - 1)];
+    if (e && (int)(e & 15) <= s->bitcnt) {
+        s->bitbuf >>= e & 15;
+        s->bitcnt -= e & 15;
+        return (int)(e >> 4);
+    }
+    return decode_slow(s, h);
+}
+
 static void fixed_tables(inf_st *s)
 {
     short len[288];
@@ -129,9 +196,11 @@ static void fixed_tables(inf_st *s)
     for (; i < 280; i++)        len[i] = 7;
     for (; i < 288; i++)        len[i] = 8;
     construct(&s->lencode, len, 288);
+    build_table(&s->lencode, len, 288);
 
     for (i = 0; i < 30; i++) len[i] = 5;
     construct(&s->distcode, len, 30);
+    build_table(&s->distcode, len, 30);
 }
 
 static int dynamic_tables(inf_st *s)
@@ -155,6 +224,7 @@ static int dynamic_tables(inf_st *s)
 
     err = construct(&s->lencode, lengths, 19);
     if (err) { s->err = BS_ERR_FORMAT; return -1; }
+    build_table(&s->lencode, lengths, 19);
 
     index = 0;
     while (index < nlen + ndist) {
@@ -185,15 +255,17 @@ static int dynamic_tables(inf_st *s)
     err = construct(&s->lencode, lengths, nlen);
     if (err && (err < 0 || nlen != s->lencode.count[0] + s->lencode.count[1]))
         { s->err = BS_ERR_FORMAT; return -1; }
+    build_table(&s->lencode, lengths, nlen);
     err = construct(&s->distcode, lengths + nlen, ndist);
     if (err && (err < 0 || ndist != s->distcode.count[0] + s->distcode.count[1]))
         { s->err = BS_ERR_FORMAT; return -1; }
+    build_table(&s->distcode, lengths + nlen, ndist);
     return 0;
 }
 
 /* ---- output ---------------------------------------------------------- */
 
-static void put(inf_st *s, uint8_t b, uint8_t *out, size_t *n)
+static inline void put(inf_st *s, uint8_t b, uint8_t *out, size_t *n)
 {
     s->win[s->wpos & WMASK] = b;
     s->wpos++;
@@ -212,6 +284,110 @@ static const short dbase[30] = {
     1025,1537,2049,3073,4097,6145,8193,12289,16385,24577 };
 static const short dext[30] = {
     0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13 };
+
+/* Literals and whole matches while there is room in `out` for the longest
+ * match and input for the longest symbol, with the decoder's state in
+ * locals. It stops before a code longer than TBITS, the end of the block or
+ * a bad symbol, leaving that one to the loop in inf_pull(). The bytes go to
+ * the window alone, and are copied out at the end, so a call writes less
+ * than half a window. BS_OK, or an error. */
+static int inflate_fast(inf_st *s, uint8_t *out, size_t *outn, size_t cap)
+{
+    const uint16_t *lt = s->lencode.table, *dt = s->distcode.table;
+    const uint8_t *in = s->in + s->ipos, *in_end = s->in + s->ilen - 8;
+    uint8_t *win = s->win;
+    uint32_t bb = s->bitbuf, wp = s->wpos, start = wp, end;
+    int bc = s->bitcnt, rc = BS_OK;
+    size_t room = cap - *outn;
+
+    if (room > WSIZE / 2)
+        room = WSIZE / 2;
+    end = start + (uint32_t)room - 258;
+    while ((int32_t)(end - wp) >= 0 && in <= in_end) {
+        unsigned e, sym, l, le, len, d, dl, de, dist;
+
+        while (bc <= 24) {
+            bb |= (uint32_t)*in++ << bc;
+            bc += 8;
+        }
+        e = lt[bb & (TSIZE - 1)];
+        if (!e)
+            break;
+        sym = e >> 4;
+        l = e & 15;
+        if (sym < 256) {
+            bb >>= l;
+            bc -= l;
+            win[wp++ & WMASK] = (uint8_t)sym;
+            continue;
+        }
+        if (sym == 256 || sym - 257 >= 29)
+            break;
+        sym -= 257;
+
+        /* the distance code is looked at before the length is taken, so a
+         * long one stops the loop with nothing consumed */
+        le = lext[sym];
+        e = dt[(bb >> (l + le)) & (TSIZE - 1)];
+        if (!e)
+            break;
+        len = lbase[sym] + ((bb >> l) & ((1u << le) - 1));
+        d = e >> 4;
+        dl = e & 15;
+        if (d >= 30) {
+            rc = BS_ERR_FORMAT;
+            break;
+        }
+        bb >>= l + le + dl;
+        bc -= l + le + dl;
+        while (bc <= 24) {
+            bb |= (uint32_t)*in++ << bc;
+            bc += 8;
+        }
+        de = dext[d];
+        dist = dbase[d] + (bb & ((1u << de) - 1));
+        bb >>= de;
+        bc -= de;
+        if (dist > wp) {
+            rc = BS_ERR_FORMAT;
+            break;
+        }
+        {
+            unsigned to = wp & WMASK, from = (wp - dist) & WMASK;
+
+            wp += len;
+            if (to + len <= WSIZE && from + len <= WSIZE) {
+                uint8_t *dst = win + to;
+                const uint8_t *src = win + from;
+
+                /* forwards a byte at a time, so a match that overlaps the
+                 * bytes it is writing repeats them */
+                do *dst++ = *src++; while (--len);
+            } else {
+                do {
+                    win[to] = win[from];
+                    to = (to + 1) & WMASK;
+                    from = (from + 1) & WMASK;
+                } while (--len);
+            }
+        }
+    }
+
+    /* out to the caller, in two pieces where the window wrapped */
+    {
+        unsigned a = start & WMASK, total = wp - start;
+        unsigned first = total < WSIZE - a ? total : WSIZE - a;
+
+        memcpy(out + *outn, win + a, first);
+        memcpy(out + *outn + first, win, total - first);
+        *outn += total;
+    }
+    s->bitbuf = bb;
+    s->bitcnt = bc;
+    s->wpos = wp;
+    s->ipos = (size_t)(in - s->in);
+    return rc;
+}
 
 static int inf_pull(bs_stream *st, uint8_t *out, size_t cap, size_t *outn)
 {
@@ -241,12 +417,14 @@ static int inf_pull(bs_stream *st, uint8_t *out, size_t cap, size_t *outn)
 
             if (type == 0) {
                 int i, b[4], len, nlen;
-                s->bitbuf = 0; s->bitcnt = 0;       /* discard to byte edge */
-                /* Each byte is checked before use: nextbyte() returns -1 at
+                /* to the byte edge: whole bytes read ahead stay in bitbuf */
+                s->bitbuf >>= s->bitcnt & 7;
+                s->bitcnt &= ~7;
+                /* Each byte is checked before use: bits() returns -1 at
                  * EOF, and shifting that left is undefined. A truncated file
                  * must be an error, not a leap into the unknown. */
                 for (i = 0; i < 4; i++)
-                    if ((b[i] = nextbyte(s)) < 0)
+                    if ((b[i] = bits(s, 8)) < 0)
                         return s->err ? s->err : BS_ERR_FORMAT;
                 len  = b[0] | (b[1] << 8);
                 nlen = b[2] | (b[3] << 8);
@@ -269,7 +447,7 @@ static int inf_pull(bs_stream *st, uint8_t *out, size_t cap, size_t *outn)
 
         case ST_STORED:
             while (n < cap && s->stored_left) {
-                int b = nextbyte(s);
+                int b = s->bitcnt ? bits(s, 8) : nextbyte(s);
                 if (b < 0) return s->err ? s->err : BS_ERR_FORMAT;
                 put(s, (uint8_t)b, out, &n);
                 s->stored_left--;
@@ -281,6 +459,11 @@ static int inf_pull(bs_stream *st, uint8_t *out, size_t cap, size_t *outn)
             while (n < cap) {
                 int symbol;
 
+                if (!s->copy_len && cap - n >= 258 && s->ilen - s->ipos >= 8) {
+                    int rc = inflate_fast(s, out, &n, cap);
+                    if (rc < 0) return rc;
+                    if (n >= cap) break;
+                }
                 if (s->copy_len) {              /* resume an interrupted match */
                     while (n < cap && s->copy_len) {
                         put(s, s->win[(s->wpos - s->copy_dist) & WMASK], out, &n);
