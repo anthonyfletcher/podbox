@@ -477,19 +477,19 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Text Viewer ▸ Font | A font used only by the text viewer, so reading can use a different typeface from the menus. It starts as 22-noto-serif; the interface's own font is in the list too. | 22-noto-serif |  |
+| Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
+| Text Viewer ▸ Alignment | Justified spreads each full line across the page, as a printed book does; a paragraph's last line stays left. Left leaves a ragged right edge. | Left |  |
+| Text Viewer ▸ Paragraph Indent | Indents the first line of each paragraph, as a printed book does, so that paragraphs are easy to tell apart. Headings are never indented. | Off |  |
+| Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
+| Text Viewer ▸ Footer | What the line at the foot of the page shows. Page counts the pages of the chapter; Chapter Progress shows the chapter and roughly how many pages are left in it; Book Progress shows how far through the book you are. | No |  |
+| Text Viewer ▸ Pictures | Shows a book's pictures, its cover among them, each on a page of its own, fitted inside the margins with no footer. Off, or while Read Aloud is on, they are passed over, as is a picture that will not open. EPUB and FB2 books only. | Yes |  |
 | Text Viewer ▸ Colour Mode | Whether the text viewer follows the theme, inverts it, uses plain black on white or white on black, or a reading scheme: Cream, Peach, Yellow and Sepia are softer on the eyes than white, and Night is dim amber on black for a dark room. Custom uses a Text Colour and a Page Colour of your own. | White on Black |  |
 | Text Viewer ▸ Reading Brightness | The backlight's brightness while the text viewer is open, put back to the player's own Brightness when you leave it. Same as Player changes nothing. | Same as Player |  |
 | Text Viewer ▸ Reading Backlight | How long the backlight stays on after the last button press while the text viewer is open, put back to the player's own Backlight when you leave it. Always keeps it lit, which costs battery if the player is set down mid-page. | Same as Player |  |
-| Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
-| Text Viewer ▸ Alignment | Justified spreads each full line across the page, as a printed book does; a paragraph's last line stays left. Left leaves a ragged right edge. | Left |  |
-| Text Viewer ▸ Paragraph Indent | Indents the first line of each paragraph, as a printed book does, so that paragraphs are easy to tell apart. Headings are never indented. | Off |  |
-| Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
-| Text Viewer ▸ Footer | What the line at the foot of the page shows. Page counts the pages of the chapter; Chapter Progress shows the chapter and roughly how many pages are left in it; Book Progress shows how far through the book you are. | No |  |
-| Text Viewer ▸ Pictures | Shows a book's pictures, its cover among them, each on a page of its own, fitted inside the margins with no footer. Off, or while Read Aloud is on, they are passed over, as is a picture that will not open. EPUB and FB2 books only. | Yes |  |
 | Text Viewer ▸ Reading Orientation | Holds the page sideways, taller than wide, for reading in one hand. Right Hand turns pages with PLAY and MENU, Left Hand with MENU and PLAY. Double-click PLAY on an upright page to turn it, the button now at the top to go back. | Upright |  |
 | Text Viewer ▸ Wheel Scrubs | Turning the wheel moves through the book a percent at a time, showing the chapter and percentage it would go to; Select goes there, and Previous or Menu stays put. Off, the wheel sets Read Aloud's volume. | No |  |
 | Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice, whether or not Speak Aloud is on. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. With Speak Aloud off, opening a book with it on restarts the playing song once, to make room for the voice. | Off |  |
-| Text Viewer ▸ Font | A font used only by the text viewer, so reading can use a different typeface from the menus. It starts as 22-noto-serif; Use UI Font switches to the interface font. | 22-noto-serif |  |
 | Lyrics Viewer ▸ Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | Theme |  |
 | Lyrics Viewer ▸ Alignment | Whether lyric lines are aligned left, centred or right. | Centre |  |
 | Lyrics Viewer ▸ Line Spacing | Extra pixels between lyric lines. | 2 | **Adv** |

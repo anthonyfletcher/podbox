@@ -1156,8 +1156,8 @@ playing song once, to make room for the voice.
 
 [text viewer font]
 A font used only by the text viewer, so reading can use a different typeface
-from the menus. It starts as 22-noto-serif; Use UI Font switches to the
-interface font.
+from the menus. It starts as 22-noto-serif; the interface's own font is in
+the list too.
 
 [lyric colour mode]
 Whether the lyrics screen follows the theme, inverts it, or uses plain black on

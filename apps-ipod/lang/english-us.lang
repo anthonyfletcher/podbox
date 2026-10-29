@@ -18299,20 +18299,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_TEXT_VIEWER_FONT_DEFAULT
-  desc: core text viewer, revert font override to the UI font
-  user: core
-  <source>
-    *: "Use UI Font"
-  </source>
-  <dest>
-    *: "Use UI Font"
-  </dest>
-  <voice>
-    *: "Use UI Font"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_TEXT_VIEWER_PAGE_NUMBER
   desc: core text viewer, show the page number at the foot
   user: core

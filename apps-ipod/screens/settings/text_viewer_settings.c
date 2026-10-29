@@ -117,17 +117,6 @@ static int text_viewer_font_pick(void)
 MENUITEM_FUNCTION(text_viewer_font_item, 0, ID2P(LANG_CUSTOM_FONT),
                   text_viewer_font_pick, NULL, Icon_Font);
 
-/* Drop back to the theme's UI font. */
-static int text_viewer_font_reset(void)
-{
-    global_settings.text_viewer_font_file[0] = '\0';
-    settings_save();
-    return 0;
-}
-MENUITEM_FUNCTION(text_viewer_font_reset_item, 0,
-                  ID2P(LANG_TEXT_VIEWER_FONT_DEFAULT),
-                  text_viewer_font_reset, NULL, Icon_Font);
-
 /* The installed size of the reader's font family next to its own, going
  * 'step' (+1 larger, -1 smaller): fonts are named "NN-family". Its name in
  * 'out', or false when there is none that way, or the reader uses the UI
@@ -229,23 +218,24 @@ MENUITEM_FUNCTION(text_viewer_contents_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_BROWSE_CHAPTERS), text_viewer_contents,
                   contents_callback, Icon_NOICON);
 
+/* The book, then the type, the page, colour and light, holding the player
+ * and listening: the rows most often wanted first in each */
 MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_contents_item,
+          &text_viewer_larger_item,
+          &text_viewer_smaller_item,
+          &text_viewer_font_item,
+          &text_viewer_line_spacing,
+          &text_viewer_align,
+          &text_viewer_indent,
+          &text_viewer_margin,
+          &text_viewer_footer,
+          &text_viewer_pictures,
           &text_viewer_colour_mode,
           &text_viewer_text_colour,
           &text_viewer_page_colour,
           &text_viewer_brightness,
           &text_viewer_backlight,
-          &text_viewer_margin,
-          &text_viewer_align,
-          &text_viewer_indent,
-          &text_viewer_line_spacing,
-          &text_viewer_footer,
-          &text_viewer_pictures,
           &text_viewer_orientation,
           &text_viewer_wheel_scrub,
-          &text_viewer_read_aloud,
-          &text_viewer_larger_item,
-          &text_viewer_smaller_item,
-          &text_viewer_font_item,
-          &text_viewer_font_reset_item);
+          &text_viewer_read_aloud);
