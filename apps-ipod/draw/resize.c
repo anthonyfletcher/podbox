@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include "general.h"
 #include "kernel.h"
@@ -100,12 +101,20 @@ int recalc_dimension(struct dim *dst, struct dim *src)
 
 /* horizontal area average scaler. Each part is taken whole into locals; a
  * pixel inside an area is three adds, and one that ends it splits between
- * that area and the next. `alpha` is a constant in each of the two callers
- * below, so the alpha channel costs nothing where nothing reads it. */
+ * that area and the next. `alpha` and `rgb24` are constants in each of the
+ * callers below, so the alpha channel costs nothing where nothing reads it,
+ * and a pixel's layout is fixed offsets from one byte pointer. */
 static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
                                           struct scaler_context *ctx,
-                                          bool accum, const bool alpha)
+                                          bool accum, const bool alpha,
+                                          const bool rgb24)
 {
+    /* a pixel's channels as byte offsets, and its size */
+    const int ro = rgb24 ? 0 : offsetof(struct uint8_rgb, red),
+              go = rgb24 ? 1 : offsetof(struct uint8_rgb, green),
+              bo = rgb24 ? 2 : offsetof(struct uint8_rgb, blue),
+              ao = offsetof(struct uint8_rgb, alpha),
+              size = rgb24 ? 3 : sizeof(struct uint8_rgb);
     SDEBUGF("scale_h_area\n");
     const uint32_t h_i_val = ctx->h_i_val,
                    h_o_val = ctx->h_o_val;
@@ -119,13 +128,13 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
     yield();
     while (left > 0)
     {
-        const struct uint8_rgb *px;
+        const uint8_t *px;
         int n;
 
         FILL_BUF(part,ctx->store_part,ctx->args);
-        px = part->buf;
+        px = (const uint8_t *)part->buf;
         n = MIN(part->len, left);
-        part->buf += n;
+        part->buf = (struct uint8_rgb *)(px + n * size);
         part->len -= n;
         left -= n;
         while (n--)
@@ -134,12 +143,12 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
             /* inside an area */
             if (oxe < h_i_val)
             {
-                r += px->red;
-                g += px->green;
-                b += px->blue;
+                r += px[ro];
+                g += px[go];
+                b += px[bo];
                 if (alpha)
-                    a += px->alpha;
-                px++;
+                    a += px[ao];
+                px += size;
                 continue;
             }
             /* end of current area: the error now represents partial
@@ -152,11 +161,11 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
             if (alpha)
                 a = a * h_o_val + ta * mul;
             /* then this pixel's partial coverage of this area */
-            tr = px->red;
-            tg = px->green;
-            tb = px->blue;
+            tr = px[ro];
+            tg = px[go];
+            tb = px[bo];
             if (alpha)
-                ta = px->alpha;
+                ta = px[ao];
             mul = h_o_val - oxe;
             r = (r + tr * mul + (1 << 21)) >> 22;
             g = (g + tg * mul + (1 << 21)) >> 22;
@@ -179,7 +188,7 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
                 out->a = a;
             r = g = b = a = 0;
             mul = oxe;
-            px++;
+            px += size;
             out++;
         }
     }
@@ -189,7 +198,7 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
 static bool scale_h_area(void *out_line_ptr, struct scaler_context *ctx,
                          bool accum)
 {
-    return scale_h_area_row(out_line_ptr, ctx, accum, false);
+    return scale_h_area_row(out_line_ptr, ctx, accum, false, false);
 }
 
 /* For a bitmap with an alpha plane: only output_row_32_native() reads the
@@ -197,7 +206,14 @@ static bool scale_h_area(void *out_line_ptr, struct scaler_context *ctx,
 static bool scale_h_area_alpha(void *out_line_ptr, struct scaler_context *ctx,
                                bool accum)
 {
-    return scale_h_area_row(out_line_ptr, ctx, accum, true);
+    return scale_h_area_row(out_line_ptr, ctx, accum, true, false);
+}
+
+/* For parts of packed R, G, B bytes (RESIZE_RGB24) */
+static bool scale_h_area_rgb24(void *out_line_ptr, struct scaler_context *ctx,
+                               bool accum)
+{
+    return scale_h_area_row(out_line_ptr, ctx, accum, false, true);
 }
 
 /* vertical area average scaler */
@@ -530,6 +546,9 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
     ctx.bm = bm;
     ctx.src = src;
     ctx.dither = dither;
+    bool rgb24 = format_index & RESIZE_RGB24;
+
+    format_index &= ~RESIZE_RGB24;
     ctx.output_row = format_index ? output_row_32_native_fromyuv
                                   : output_row_32_native;
     if (format)
@@ -541,12 +560,18 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
      * the decoders now guarantee is at least 1. */
     if (sw > dw || dw < 2)
     {
-        ctx.h_scaler = bm->alpha_offset > 0 ? scale_h_area_alpha
-                                            : scale_h_area;
+        ctx.h_scaler = rgb24 ? scale_h_area_rgb24
+                     : bm->alpha_offset > 0 ? scale_h_area_alpha
+                     : scale_h_area;
         uint32_t h_div = (1U << 24) / sw;
         ctx.h_i_val = sw * h_div;
         ctx.h_o_val = dw * h_div;
     } else {
+        if (rgb24)
+        {
+            cpu_boost(false);
+            return 0;
+        }
         ctx.h_scaler = scale_h_linear;
         uint32_t h_div = (1U << 24) / (dw - 1);
         ctx.h_i_val = (sw - 1) * h_div;

@@ -89,6 +89,12 @@ extern bool (*image_row_hook)(int done, int rows);
 
 int recalc_dimension(struct dim *dst, struct dim *src);
 
+/* Added to format_index: each part's buf is packed R, G, B bytes rather than
+ * struct uint8_rgb, and its len counts pixels. Only for a source wider than
+ * the bitmap, which the area scaler takes; resize_on_load() refuses it
+ * otherwise. */
+#define RESIZE_RGB24 2
+
 int resize_on_load(struct bitmap *bm, bool dither,
                    struct dim *src, struct rowset *tmp_row,
                    unsigned char *buf, unsigned int len,

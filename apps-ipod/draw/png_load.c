@@ -54,12 +54,14 @@ struct png {
     bs_stream *z;           /* the inflated rows */
     uint32_t idat_left;     /* payload left in the current IDAT */
     bool     idat_end;
-    uint8_t *cur, *prev;    /* a filter byte and a row, each */
+    uint8_t *cur, *prev;    /* a filter byte and a row, each; the row
+                               word-aligned */
     size_t   rowbytes;      /* of the rows being read: a pass's are shorter */
     int      pw;            /* pixels in a row handed to the scaler */
     int      x;             /* of them, handed out */
     uint8_t *grid;          /* an assembled reduced image, RGB, or NULL */
     int      gy;            /* its row being handed out */
+    bool     raw;           /* rows go to the scaler as packed RGB */
     bool     has_trns;
     unsigned trns[3];       /* the transparent grey or RGB, at the depth */
     int      npal;
@@ -176,22 +178,39 @@ static int idat_pull(bs_stream *s, uint8_t *buf, size_t n, size_t *out)
 
 /* ---- rows ------------------------------------------------------------ */
 
+typedef uint32_t __attribute__((may_alias)) word_t;
+
+/* Four bytes added to four, each lane on its own, carries dropped */
+static inline uint32_t add_lanes(uint32_t a, uint32_t b)
+{
+    return ((a & 0x7f7f7f7f) + (b & 0x7f7f7f7f)) ^ ((a ^ b) & 0x80808080);
+}
+
 static bool unfilter(uint8_t *cur, const uint8_t *prev, size_t len, int bpp)
 {
     uint8_t *r = cur + 1;
     const uint8_t *u = prev + 1;
-    size_t i;
+    size_t i = 0;
 
     switch (cur[0])
     {
     case 0:
         break;
     case 1:                                     /* Sub */
-        for (i = bpp; i < len; i++)
+        if (bpp == 4)
+            for (i = 4; i + 4 <= len; i += 4)
+                *(word_t *)(r + i) = add_lanes(*(word_t *)(r + i),
+                                               *(word_t *)(r + i - 4));
+        else
+            i = bpp;
+        for (; i < len; i++)
             r[i] += r[i - bpp];
         break;
     case 2:                                     /* Up */
-        for (i = 0; i < len; i++)
+        for (; i + 4 <= len; i += 4)
+            *(word_t *)(r + i) = add_lanes(*(word_t *)(r + i),
+                                           *(const word_t *)(u + i));
+        for (; i < len; i++)
             r[i] += u[i];
         break;
     case 3:                                     /* Average */
@@ -266,6 +285,64 @@ static void convert(const struct png *p, int x, int n, struct uint8_rgb *o)
     const uint8_t *r = p->cur + 1;
     int depth = p->h.depth;
 
+    /* the common 8-bit formats, each in a loop of its own */
+    if (depth == 8 && !p->has_trns)
+    {
+        const struct uint8_rgb *pal = p->pal;
+        int npal = p->npal;
+
+        switch (p->h.ctype)
+        {
+        case CT_RGB:
+            for (r += 3 * x; n--; r += 3, o++)
+            {
+                o->red = r[0];
+                o->green = r[1];
+                o->blue = r[2];
+                o->alpha = 255;
+            }
+            return;
+        case CT_RGBA:
+            for (r += 4 * x; n--; r += 4, o++)
+            {
+                unsigned a = r[3];
+
+                o->alpha = 255;
+                if (a == 255)
+                {
+                    o->red = r[0];
+                    o->green = r[1];
+                    o->blue = r[2];
+                }
+                else
+                {
+                    o->red = over_black(r[0], a);
+                    o->green = over_black(r[1], a);
+                    o->blue = over_black(r[2], a);
+                }
+            }
+            return;
+        case CT_GREY:
+            for (r += x; n--; r++, o++)
+            {
+                o->red = o->green = o->blue = *r;
+                o->alpha = 255;
+            }
+            return;
+        case CT_PALETTE:
+            for (r += x; n--; r++, o++)
+            {
+                if (*r < npal)
+                    *o = pal[*r];
+                else
+                {
+                    o->red = o->green = o->blue = 0;
+                    o->alpha = 255;
+                }
+            }
+            return;
+        }
+    }
     for (; n--; x++, o++)
     {
         unsigned red, green, blue, a = 255, v;
@@ -350,6 +427,17 @@ static struct img_part *store_part_png(void *args)
         }
         else if (!next_row(p))
             return NULL;
+    }
+    if (p->raw)
+    {
+        /* the rest of the row as it is */
+        n = p->pw - p->x;
+        p->part.buf = (struct uint8_rgb *)(p->grid
+            ? p->grid + ((size_t)p->gy * p->pw + p->x) * 3
+            : p->cur + 1 + (size_t)p->x * 3);
+        p->x += n;
+        p->part.len = n;
+        return &p->part;
     }
     n = MIN(p->out_len, p->pw - p->x);
     if (p->grid)
@@ -588,11 +676,14 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     idat->pull = idat_pull;
     idat->st = p;
     p->z = bs_inflate_stream(a, idat, BS_INFLATE_ZLIB);
-    p->cur = bs_alloc(a, 1 + p->h.rowbytes);
-    p->prev = bs_alloc(a, 1 + p->h.rowbytes);
+    /* bs_alloc() aligns, so 3 bytes in puts each row on a word */
+    p->cur = bs_alloc(a, 4 + p->h.rowbytes);
+    p->prev = bs_alloc(a, 4 + p->h.rowbytes);
     p->out = bs_alloc(a, PART_PIXELS * sizeof(struct uint8_rgb));
     if (!p->z || !p->cur || !p->prev || !p->out)
         return -1;
+    p->cur += 3;
+    p->prev += 3;
     p->rowbytes = p->h.rowbytes;
     p->pw = p->h.width;
 
@@ -634,6 +725,11 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     }
     if (bm->width == src_dim.width && bm->height == src_dim.height)
         resize = false;
+    /* The area scaler, which resize_on_load() picks for a narrower bitmap,
+     * reads 8-bit RGB rows and the assembled grid without a copy */
+    p->raw = resize && (src_dim.width > bm->width || bm->width < 2)
+             && (p->grid || (p->h.depth == 8 && p->h.ctype == CT_RGB
+                             && !p->has_trns));
     if (resize)
         p->out_len = PART_PIXELS;
     else
@@ -649,7 +745,8 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
         rset.rowstop = bm->height;
         rset.rowstep = 1;
         if (!resize_on_load(bm, dither, &src_dim, &rset, free_start, free_len,
-                            cformat, IF_PIX_FMT(0,) store_part_png, p))
+                            cformat, IF_PIX_FMT(p->raw ? RESIZE_RGB24 : 0,)
+                            store_part_png, p))
             return -9;
     }
     else
