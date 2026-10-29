@@ -24,6 +24,10 @@
  * not its area; scans that only carry coefficients the scale discards are
  * never decoded at all.
  *
+ * A four-component image is CMYK, or YCCK under an Adobe marker that says
+ * so: K is decoded into each pixel's spare byte, and the row turned to RGB
+ * as it is handed out.
+ *
  * Parts, in order:
  *   - IDCT: the scaled inverse DCT, vertical then horizontal pass
  *   - input: buffered reads, including the ID3 unsync and base64 variants
@@ -82,6 +86,12 @@ typedef struct uint8_rgb jpeg_pix_t;
 #define TRANSPOSE_EXTRA_IDCT_WS 64
 #define IDCT_WS_SIZE (64 + TRANSPOSE_EXTRA_IDCT_WS + COLOR_EXTRA_IDCT_WS)
 
+/* What a four-component image's C, M, Y (or Y, Cb, Cr) and K hold: Adobe's
+ * are stored inverted, 255 for no ink. */
+#define JPEG_CMYK       1
+#define JPEG_CMYK_ADOBE 2
+#define JPEG_YCCK_ADOBE 3
+
 /* process_markers() flag of this decoder's own, set only for a progressive
  * image, whose scans are indexed through to the end of the file. */
 #define EOI_SEEN 0x0100
@@ -98,16 +108,16 @@ struct prog_scan
     unsigned long bitbuf;
     int bitbuf_bits;
     int marker_val;
-    int last_dc_val[3];
+    int last_dc_val[4];
     int eobrun;                 /* blocks still to skip in an end-of-band run */
     int restart_interval;
     int restart;                /* MCUs until the next restart marker */
     const unsigned char *dc_tbl[2]; /* Huffman tables by slot, as DHT bytes */
     const unsigned char *ac_tbl[2];
     unsigned char comps;        /* components in the scan */
-    unsigned char comp[3];      /* their frame component indices */
-    unsigned char dc_sel[3];
-    unsigned char ac_sel[3];
+    unsigned char comp[4];      /* their frame component indices */
+    unsigned char dc_sel[4];
+    unsigned char ac_sel[4];
     unsigned char ss, se, ah, al; /* spectral band, successive approximation */
     int read_size;              /* bytes to refill with: about a row's */
     bool needed;
@@ -127,12 +137,12 @@ struct prog
     int restart;
     const unsigned char *loaded_dc[2]; /* tables now in the derived slots */
     const unsigned char *loaded_ac[2];
-    bool refines[3];            /* component has AC refinement scans */
-    int nstore[3];
-    int stripe_w[3];            /* blocks across the stripe */
-    int bw[3], bh[3];           /* blocks across and down the component */
-    int16_t *coef[3];
-    uint32_t *nz[3];            /* two words a block, or NULL */
+    bool refines[4];            /* component has AC refinement scans */
+    int nstore[4];
+    int stripe_w[4];            /* blocks across the stripe */
+    int bw[4], bh[4];           /* blocks across and down the component */
+    int16_t *coef[4];
+    uint32_t *nz[4];            /* two words a block, or NULL */
     void *stripe;
     size_t stripe_bytes;
 };
@@ -170,7 +180,8 @@ struct jpeg
     bool jfif; /* saw a JFIF APP0 marker */
     unsigned char adobe; /* Adobe APP14 transform flag + 1, 0 if none */
     bool rgb; /* the components are R, G, B rather than Y, Cb, Cr */
-    int last_dc_val[3];
+    unsigned char cmyk; /* JPEG_CMYK_*, 0 for three components or one */
+    int last_dc_val[4];
     int h_scale[2]; /* horizontal scalefactor = (2**N) / 8 */
     int v_scale[2]; /* same as above, for vertical direction */
     int k_need[2]; /* per component coefficients needed, in zig-zag order */
@@ -183,8 +194,8 @@ struct jpeg
     struct derived_tbl dc_derived_tbls[2]; /* Huffman-LUTs */
     struct derived_tbl ac_derived_tbls[2];
 
-    struct frame_component frameheader[3]; /* Component descriptor */
-    struct scan_component scanheader[3]; /* Huffman tables per component */
+    struct frame_component frameheader[4]; /* Component descriptor */
+    struct scan_component scanheader[4]; /* Huffman tables per component */
     int scan_comps; /* the scan header's component count, and its */
     int scan_ss, scan_se, scan_ah, scan_al; /* band and approximation */
     int ncomp; /* components in the frame */
@@ -192,8 +203,8 @@ struct jpeg
     bool progressive;
     struct prog prog;
 
-    int mcu_membership[6]; /* component of each block */
-    unsigned char mcu_pos[6]; /* position of each block in its component */
+    int mcu_membership[10]; /* component of each block */
+    unsigned char mcu_pos[10]; /* position of each block in its component */
     bool resize;
     unsigned char buf[JPEG_READ_BUF_SIZE];
     struct img_part part;
@@ -1101,7 +1112,7 @@ static int process_markers(struct jpeg* p_jpeg)
                     p_jpeg->y_size);
 
                 n = (marker_size-2-6)/3;
-                if (e_getc(p_jpeg, -1) != n || (n != 1 && n != 3))
+                if (e_getc(p_jpeg, -1) != n || n < 1 || n == 2 || n > 4)
                 {
                     return(-2); /* Unsupported SOF0 component specification */
                 }
@@ -1135,9 +1146,14 @@ static int process_markers(struct jpeg* p_jpeg)
                        luma when that is 1x2 or 2x1 (2x2 on all components
                        would exceed 10 blocks per MCU), and both chroma
                        components alike: set_idct_scale() sizes them both
-                       from the first */
+                       from the first. K may instead be sampled like luma,
+                       which comp_class() gives luma's scale. */
                     int h = p_jpeg->frameheader[i].horizontal_sampling;
                     int v = p_jpeg->frameheader[i].vertical_sampling;
+                    if (i == 3
+                     && h == p_jpeg->frameheader[0].horizontal_sampling
+                     && v == p_jpeg->frameheader[0].vertical_sampling)
+                        continue;
                     if ((h != 1 || v != 1)
                      && (h != p_jpeg->frameheader[0].horizontal_sampling
                       || v != p_jpeg->frameheader[0].vertical_sampling
@@ -1268,6 +1284,9 @@ static int process_markers(struct jpeg* p_jpeg)
                 p_jpeg->rgb = p_jpeg->ncomp == 3 && jpeg_is_rgb(p_jpeg->jfif,
                     p_jpeg->adobe, p_jpeg->frameheader[0].ID,
                     p_jpeg->frameheader[1].ID, p_jpeg->frameheader[2].ID);
+                p_jpeg->cmyk = p_jpeg->ncomp != 4 ? 0
+                             : p_jpeg->adobe == 3 ? JPEG_YCCK_ADOBE
+                             : p_jpeg->adobe ? JPEG_CMYK_ADOBE : JPEG_CMYK;
 
                 if (p_jpeg->progressive)
                 {
@@ -1307,7 +1326,7 @@ static int process_markers(struct jpeg* p_jpeg)
                 }
 
                 n = (marker_size-1-3)/2;
-                if (e_getc(p_jpeg, -1) != n || (n != 1 && n != 3)
+                if (e_getc(p_jpeg, -1) != n || n < 1 || n == 2 || n > 4
                     /* one scan with all components; multi-scan files and
                        SOS before SOF are not supported (blocks = Nf here) */
                     || n != p_jpeg->blocks)
@@ -1631,6 +1650,17 @@ static const unsigned char zig[] =
     35, 36, 48, 49, 57, 58, 62, 63
 };
 
+/* Which of h_scale[], k_need[] and the rest a component takes: 0 for luma,
+ * and for a K sampled like it; 1 for chroma. */
+INLINE int comp_class(const struct jpeg *p_jpeg, int c)
+{
+    return c && !(c == 3
+                  && p_jpeg->frameheader[3].horizontal_sampling
+                     == p_jpeg->frameheader[0].horizontal_sampling
+                  && p_jpeg->frameheader[3].vertical_sampling
+                     == p_jpeg->frameheader[0].vertical_sampling);
+}
+
 /* Reformat some image header data so that the decoder can use it properly. */
 INLINE void fix_headers(struct jpeg* p_jpeg)
 {
@@ -1654,7 +1684,7 @@ INLINE void fix_headers(struct jpeg* p_jpeg)
 
     /* Blocks in MCU order: each component's blocks in turn, H x V of them.
        Chroma is either 1x1 or sampled like luma (checked in SOF), so an MCU
-       holds at most 6 blocks. */
+       holds at most 6 blocks, and 10 with a K sampled like luma. */
     b = 0;
     for (c = 0; c < ncomp; c++)
     {
@@ -1689,8 +1719,9 @@ INLINE void fix_huff_tables(struct jpeg *p_jpeg)
 /* Pre-scale the quantization tables for the IDCT. Luma and chroma can use
  * different IDCT scales, so a table that both select is copied to a slot no
  * component selects before scaling; each component's quanttable_select is
- * rewritten to the slot it should use. There are 4 slots and at most 3
- * components, so when a table is shared a free slot always exists. */
+ * rewritten to the slot it should use. There are 4 slots and at most 4
+ * components: when component c needs a copy, at most c slots are in use and
+ * 3 - c more are wanted by the components after it, so one is free. */
 INLINE void fix_quant_tables(struct jpeg *p_jpeg)
 {
     int want[4] = { -1, -1, -1, -1 }; /* scale shift wanted for each slot */
@@ -1702,7 +1733,7 @@ INLINE void fix_quant_tables(struct jpeg *p_jpeg)
     for (c = 0; c < nc; c++)
     {
         int t = p_jpeg->frameheader[c].quanttable_select;
-        int shift = idct_tbl[p_jpeg->v_scale[!!c]].scale;
+        int shift = idct_tbl[p_jpeg->v_scale[comp_class(p_jpeg, c)]].scale;
 
         for (f = 0; f < 4; f++) /* a slot already holding t at this scale? */
             if (orig[f] == t && want[f] == shift)
@@ -2049,7 +2080,7 @@ static int prog_index(struct jpeg *p_jpeg, char *top, char *floor)
     struct prog *pr = &p_jpeg->prog;
     const unsigned char *cur_dc[2] = { NULL, NULL };
     const unsigned char *cur_ac[2] = { NULL, NULL };
-    uint64_t want[3], done[3] = { 0, 0, 0 };
+    uint64_t want[4], done[4] = { 0, 0, 0, 0 };
     int seen_gen = -1;
     unsigned char *tbl;
     int i, j;
@@ -2063,7 +2094,7 @@ static int prog_index(struct jpeg *p_jpeg, char *top, char *floor)
     pr->end_pos = lseek(p_jpeg->fd, 0, SEEK_CUR) + p_jpeg->len;
     pr->nscans = 0;
     memset(pr->refines, 0, sizeof(pr->refines));
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < 4; i++)
     {
         int kn = p_jpeg->k_need[!!i];
         want[i] = kn == 64 ? ~(uint64_t)0 : ((uint64_t)1 << kn) - 1;
@@ -2178,7 +2209,7 @@ static size_t prog_setup(struct jpeg *p_jpeg, char *buf)
     struct prog *pr = &p_jpeg->prog;
     int h0 = p_jpeg->frameheader[0].horizontal_sampling;
     int v0 = p_jpeg->frameheader[0].vertical_sampling;
-    int blocks[3];
+    int blocks[4];
     size_t bytes = 0;
     int c;
 
@@ -2227,10 +2258,10 @@ static size_t prog_setup(struct jpeg *p_jpeg, char *buf)
 static void prog_plan(struct jpeg *p_jpeg)
 {
     struct prog *pr = &p_jpeg->prog;
-    uint64_t want[3];
+    uint64_t want[4];
     int c, i, j;
 
-    for (c = 0; c < 3; c++)
+    for (c = 0; c < 4; c++)
     {
         int kn = p_jpeg->k_need[!!c];
         want[c] = kn == 64 ? ~(uint64_t)0 : ((uint64_t)1 << kn) - 1;
@@ -2316,8 +2347,7 @@ static void prog_restart(struct jpeg *p_jpeg, struct prog_scan *sc)
     if (pr->restart == 0)
     {
         search_restart(p_jpeg);
-        p_jpeg->last_dc_val[0] = p_jpeg->last_dc_val[1] =
-                                 p_jpeg->last_dc_val[2] = 0;
+        memset(p_jpeg->last_dc_val, 0, sizeof(p_jpeg->last_dc_val));
         pr->eobrun = 0;
         pr->restart = sc->restart_interval;
     }
@@ -2620,7 +2650,8 @@ static void plan_blocks(struct jpeg *p_jpeg, struct block_plan *plan,
     {
         struct block_plan *bp = &plan[blkn];
         int ci = p_jpeg->mcu_membership[blkn]; /* component index */
-        int hs = p_jpeg->h_scale[!!ci], vs = p_jpeg->v_scale[!!ci];
+        int cl = comp_class(p_jpeg, ci);
+        int hs = p_jpeg->h_scale[cl], vs = p_jpeg->v_scale[cl];
         int idct_cols = BIT_N(MIN(hs, 3));
         int idct_rows = BIT_N(vs);
 
@@ -2631,15 +2662,15 @@ static void plan_blocks(struct jpeg *p_jpeg, struct block_plan *plan,
         bp->qt = p_jpeg->quanttable[p_jpeg->frameheader[ci].quanttable_select];
         bp->order = transpose ? zag : zag + 64;
         bp->last_dc = &p_jpeg->last_dc_val[ci];
-        bp->k_need = p_jpeg->k_need[!!ci];
-        bp->zero_bytes = p_jpeg->zero_need[!!ci] * sizeof(int);
+        bp->k_need = p_jpeg->k_need[cl];
+        bp->zero_bytes = p_jpeg->zero_need[cl] * sizeof(int);
         bp->v_idct = idct_tbl[vs].v_idct;
         bp->v_end = transpose ? block + 8 * idct_cols : block + idct_cols;
         bp->h_idct = idct_tbl[hs].h_idct;
         bp->h_ws = transpose ? block + 64 : block;
         bp->h_end = bp->h_ws + idct_rows * 8;
-        /* Y, Cb, Cr go to bytes 0-2 for the YUV conversion;
-           R, G, B to their places in struct uint8_rgb */
+        /* Y, Cb, Cr (or C, M, Y) go to bytes 0-2 for the conversion, and
+           K to byte 3; R, G, B to their places in struct uint8_rgb */
         bp->out_offs = (p_jpeg->rgb ? 2 - ci : ci)
             + store_offs[p_jpeg->mcu_pos[blkn]];
         if (p_jpeg->progressive)
@@ -2750,6 +2781,43 @@ done:
     BITS_OUT();
 }
 
+/* A row of C, M, Y (or Y, Cb, Cr) and K as R, G, B, without a profile:
+ * each ink takes its share of the light the black has left. */
+static void cmyk_to_rgb(unsigned char *px, unsigned width, int kind)
+{
+    unsigned char *end = px + width * JPEG_PIX_SZ;
+
+    for (; px < end; px += JPEG_PIX_SZ)
+    {
+        unsigned c = px[0], m = px[1], y = px[2], k = px[3];
+
+        if (kind == JPEG_YCCK_ADOBE)
+        {   /* the YCC of the inverted inks, inverted again */
+            unsigned r, g, b;
+
+            yuv_to_rgb(c, m, y, &r, &g, &b);
+            c = 255 - r;
+            m = 255 - g;
+            y = 255 - b;
+        }
+        else if (kind == JPEG_CMYK)
+        {
+            c = 255 - c;
+            m = 255 - m;
+            y = 255 - y;
+            k = 255 - k;
+        }
+        /* now 255 is no ink; x * k / 255, rounded */
+        c = c * k + 128;
+        m = m * k + 128;
+        y = y * k + 128;
+        px[2] = (c + (c >> 8)) >> 8;
+        px[1] = (m + (m >> 8)) >> 8;
+        px[0] = (y + (y >> 8)) >> 8;
+        px[3] = 0;
+    }
+}
+
 static struct img_part *store_row_jpeg(void *jpeg_args)
 {
     struct jpeg *p_jpeg = (struct jpeg*) jpeg_args;
@@ -2774,7 +2842,7 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
         store_offs[p_jpeg->store_pos[3]] = store_offs[1] + store_offs[2];
         /* decoded DCT coefficients */
         int16_t block[IDCT_WS_SIZE] __attribute__((aligned(8)));
-        struct block_plan plan[6];
+        struct block_plan plan[10];
         plan_blocks(p_jpeg, plan, block, store_offs);
         if (p_jpeg->progressive)
             prog_decode_row(p_jpeg);
@@ -2815,12 +2883,14 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
             {   /* if a restart marker is due: */
                 p_jpeg->restart = p_jpeg->restart_interval; /* count again */
                 search_restart(p_jpeg); /* align the bitstream */
-                p_jpeg->last_dc_val[0] = p_jpeg->last_dc_val[1] =
-                                 p_jpeg->last_dc_val[2] = 0; /* reset decoder */
+                memset(p_jpeg->last_dc_val, 0,
+                       sizeof(p_jpeg->last_dc_val)); /* reset decoder */
             }
         }
     } /* if !p_jpeg->mcu_row */
     p_jpeg->mcu_row = (p_jpeg->mcu_row + 1) & (height - 1);
+    if (p_jpeg->cmyk)
+        cmyk_to_rgb(p_jpeg->out_ptr, width, p_jpeg->cmyk);
     p_jpeg->part.len = width;
     p_jpeg->part.buf = (jpeg_pix_t *)p_jpeg->out_ptr;
     p_jpeg->out_ptr += b_width;
@@ -3134,7 +3204,8 @@ int clip_jpeg_fd(int fd, int flags,
     if (resize)
     {
         if (resize_on_load(bm, dither, &src_dim, &rset, buf_start, maxsize,
-            cformat, IF_PIX_FMT(p_jpeg->blocks == 1 || p_jpeg->rgb ? 0 : 1,)
+            cformat, IF_PIX_FMT(p_jpeg->blocks == 1 || p_jpeg->rgb
+                                || p_jpeg->cmyk ? 0 : 1,)
             store_row_jpeg,
             p_jpeg))
             return bm_size;
@@ -3154,7 +3225,7 @@ int clip_jpeg_fd(int fd, int flags,
             if (image_row_hook && !image_row_hook(row, bm->height))
                 return 0;
             part = store_row_jpeg(p_jpeg);
-            if (p_jpeg->blocks > 1 && !p_jpeg->rgb)
+            if (p_jpeg->blocks > 1 && !p_jpeg->rgb && !p_jpeg->cmyk)
             {
                 struct uint8_rgb *qp = part->buf;
                 struct uint8_rgb *end = qp + bm->width;
