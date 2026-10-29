@@ -96,6 +96,7 @@ draw/png_load.c
 draw/jpeg_enc.c
 #ifdef CPU_ARM
 draw/jpeg_idct_arm.S
+draw/image_arm.S
 #endif
 #endif
 
@@ -154,6 +155,9 @@ files/filetypes.c
 files/path_list.c
 files/byte_stream.c
 files/inflate.c
+#ifdef CPU_ARM
+files/inflate_arm.S
+#endif
 screens/shortcuts.c
 screens/system/time_set.c
 screens/playback/sound_props.c

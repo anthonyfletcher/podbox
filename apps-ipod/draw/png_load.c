@@ -186,6 +186,16 @@ static inline uint32_t add_lanes(uint32_t a, uint32_t b)
     return ((a & 0x7f7f7f7f) + (b & 0x7f7f7f7f)) ^ ((a ^ b) & 0x80808080);
 }
 
+#ifdef CPU_ARM
+/* in image_arm.S: Up over a word-aligned row, and Average and Paeth from
+ * the (bpp+1)th byte on */
+void unfilter_up(uint8_t *r, const uint8_t *u, size_t n);
+void unfilter_avg3(uint8_t *r, const uint8_t *u, size_t n);
+void unfilter_paeth3(uint8_t *r, const uint8_t *u, size_t n);
+void unfilter_avg(uint8_t *r, const uint8_t *u, size_t n, int bpp);
+void unfilter_paeth(uint8_t *r, const uint8_t *u, size_t n, int bpp);
+#endif
+
 static bool unfilter(uint8_t *cur, const uint8_t *prev, size_t len, int bpp)
 {
     uint8_t *r = cur + 1;
@@ -207,6 +217,10 @@ static bool unfilter(uint8_t *cur, const uint8_t *prev, size_t len, int bpp)
             r[i] += r[i - bpp];
         break;
     case 2:                                     /* Up */
+#ifdef CPU_ARM
+        unfilter_up(r, u, len);
+        break;
+#endif
         for (; i + 4 <= len; i += 4)
             *(word_t *)(r + i) = add_lanes(*(word_t *)(r + i),
                                            *(const word_t *)(u + i));
@@ -216,12 +230,26 @@ static bool unfilter(uint8_t *cur, const uint8_t *prev, size_t len, int bpp)
     case 3:                                     /* Average */
         for (i = 0; i < (size_t)bpp; i++)
             r[i] += u[i] >> 1;
+#ifdef CPU_ARM
+        if (bpp == 3)
+            unfilter_avg3(r + 3, u + 3, len - 3);
+        else
+            unfilter_avg(r + bpp, u + bpp, len - bpp, bpp);
+#else
         for (; i < len; i++)
             r[i] += (r[i - bpp] + u[i]) >> 1;
+#endif
         break;
     case 4:                                     /* Paeth */
         for (i = 0; i < (size_t)bpp; i++)
             r[i] += u[i];
+#ifdef CPU_ARM
+        if (bpp == 3)
+            unfilter_paeth3(r + 3, u + 3, len - 3);
+        else
+            unfilter_paeth(r + bpp, u + bpp, len - bpp, bpp);
+        break;
+#endif
         for (; i < len; i++)
         {
             int a = r[i - bpp], b = u[i], c = u[i - bpp];

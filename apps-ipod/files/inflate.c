@@ -6,11 +6,13 @@
  *
  * A code is found by one lookup of the next TBITS bits in a table built for
  * each block; only a code longer than that is read a bit at a time, against
- * the canonical counts that also validate the block's code lengths.
+ * the canonical counts that also validate the block's code lengths. On the
+ * players inflate_fast()'s loop is inflate_arm.S.
  ****************************************************************************/
 
 #include <stddef.h>   /* offsetof */
 #include <string.h>
+#include "config.h"   /* CPU_ARM */
 #include "byte_stream.h"
 
 #define WBITS 15
@@ -285,6 +287,27 @@ static const short dbase[30] = {
 static const short dext[30] = {
     0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13 };
 
+#ifdef CPU_ARM
+/* The loop below in inflate_arm.S, which reads and writes this struct at
+ * fixed offsets */
+struct inflate_fast_regs
+{
+    uint32_t bb;
+    int bc;
+    const uint8_t *in, *in_end;
+    const uint16_t *lt, *dt;
+    uint8_t *win;
+    uint32_t wp, end;
+    const short *lbase, *lext, *dbase, *dext;
+};
+_Static_assert(offsetof(struct inflate_fast_regs, wp) == 28
+               && offsetof(struct inflate_fast_regs, lbase) == 36
+               && offsetof(struct inflate_fast_regs, dext) == 48,
+               "inflate_arm.S reads struct inflate_fast_regs by these offsets");
+
+int inflate_fast_arm(struct inflate_fast_regs *f);
+#endif
+
 /* Literals and whole matches while there is room in `out` for the longest
  * match and input for the longest symbol, with the decoder's state in
  * locals. It stops before a code longer than TBITS, the end of the block or
@@ -303,6 +326,20 @@ static int inflate_fast(inf_st *s, uint8_t *out, size_t *outn, size_t cap)
     if (room > WSIZE / 2)
         room = WSIZE / 2;
     end = start + (uint32_t)room - 258;
+#ifdef CPU_ARM
+    {
+        struct inflate_fast_regs f = {
+            bb, bc, in, in_end, lt, dt, win, wp, end,
+            lbase, lext, dbase, dext,
+        };
+
+        rc = inflate_fast_arm(&f);
+        bb = f.bb;
+        bc = f.bc;
+        in = f.in;
+        wp = f.wp;
+    }
+#else
     while ((int32_t)(end - wp) >= 0 && in <= in_end) {
         unsigned e, sym, l, le, len, d, dl, de, dist;
 
@@ -372,6 +409,7 @@ static int inflate_fast(inf_st *s, uint8_t *out, size_t *outn, size_t cap)
             }
         }
     }
+#endif
 
     /* out to the caller, in two pieces where the window wrapped */
     {

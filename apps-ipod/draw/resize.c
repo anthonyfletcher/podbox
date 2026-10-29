@@ -195,10 +195,70 @@ static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
     return true;
 }
 
+#ifdef CPU_ARM
+/* The same, with each part's pixels summed by image_arm.S, which reads its
+ * state from this struct at fixed offsets */
+struct area_run
+{
+    uint32_t r, g, b;
+    uint32_t tr, tg, tb;        /* the partial pixel an area started with */
+    uint32_t oxe, mul;
+    struct uint32_argb *out;
+    uint32_t h_i_val, h_o_val;
+    int accum;
+};
+_Static_assert(offsetof(struct area_run, tr) == 12
+               && offsetof(struct area_run, oxe) == 24
+               && offsetof(struct area_run, accum) == 44,
+               "image_arm.S reads struct area_run by these offsets");
+
+void area_run_rgb24(struct area_run *s, const uint8_t *px, int n);
+void area_run_rgb32(struct area_run *s, const uint8_t *px, int n);
+
+static FORCE_INLINE bool scale_h_area_arm(void *out_line_ptr,
+                                          struct scaler_context *ctx,
+                                          bool accum, const bool rgb24)
+{
+    struct area_run s = {
+        .out = out_line_ptr,
+        .h_i_val = ctx->h_i_val,
+        .h_o_val = ctx->h_o_val,
+        .accum = accum,
+    };
+    const int size = rgb24 ? 3 : sizeof(struct uint8_rgb);
+    int left = ctx->src->width;
+    struct img_part *part;
+    FILL_BUF_INIT(part,ctx->store_part,ctx->args);
+    /* give other tasks a chance to run */
+    yield();
+    while (left > 0)
+    {
+        const uint8_t *px;
+        int n;
+
+        FILL_BUF(part,ctx->store_part,ctx->args);
+        px = (const uint8_t *)part->buf;
+        n = MIN(part->len, left);
+        part->buf = (struct uint8_rgb *)(px + n * size);
+        part->len -= n;
+        left -= n;
+        if (rgb24)
+            area_run_rgb24(&s, px, n);
+        else
+            area_run_rgb32(&s, px, n);
+    }
+    return true;
+}
+#endif
+
 static bool scale_h_area(void *out_line_ptr, struct scaler_context *ctx,
                          bool accum)
 {
+#ifdef CPU_ARM
+    return scale_h_area_arm(out_line_ptr, ctx, accum, false);
+#else
     return scale_h_area_row(out_line_ptr, ctx, accum, false, false);
+#endif
 }
 
 /* For a bitmap with an alpha plane: only output_row_32_native() reads the
@@ -213,7 +273,11 @@ static bool scale_h_area_alpha(void *out_line_ptr, struct scaler_context *ctx,
 static bool scale_h_area_rgb24(void *out_line_ptr, struct scaler_context *ctx,
                                bool accum)
 {
+#ifdef CPU_ARM
+    return scale_h_area_arm(out_line_ptr, ctx, accum, true);
+#else
     return scale_h_area_row(out_line_ptr, ctx, accum, false, true);
+#endif
 }
 
 /* vertical area average scaler */
