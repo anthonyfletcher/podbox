@@ -2,16 +2,16 @@
  * GNU General Public License (version 2+)
  *
  * The one entry point for decoding album art: reads the image's first bytes,
- * with any ID3 unsync or Vorbis base64 undone, and hands it to the JPEG, PNG
- * or BMP reader by what those bytes are rather than by the file's name or the
- * tag's MIME type.
+ * with any ID3 unsync or Vorbis base64 undone, and hands it to the JPEG, PNG,
+ * GIF or BMP reader by what those bytes are rather than by the file's name
+ * or the tag's MIME type.
  *
  *   sources     - the image's bytes as a stream: a byte range of the file,
  *                 through the unsync stage, or Ogg packets through base64
  *   image_load  - sniffs, then dispatches
  *
- * The PNG reader's state, and the stream it reads, sit at the end of the
- * caller's buffer; the bitmap and the scaler's lines take the rest.
+ * The PNG and GIF readers' state, and the stream they read, sit at the end
+ * of the caller's buffer; the bitmap and the scaler's lines take the rest.
  ****************************************************************************/
 
 #include <string.h>
@@ -21,6 +21,7 @@
 #include "bmp.h"
 #include "jpeg_load.h"
 #include "png_load.h"
+#include "gif_load.h"
 #include "image_load.h"
 
 /* vorbis.c rounds a base64 picture's position up to a whole group of four
@@ -35,7 +36,7 @@
  * decoded bytes, so it does not limit the raw read either. */
 #define UNSYNC_SLACK 64
 
-enum image_kind { IMAGE_UNKNOWN, IMAGE_JPEG, IMAGE_PNG, IMAGE_BMP };
+enum image_kind { IMAGE_UNKNOWN, IMAGE_JPEG, IMAGE_PNG, IMAGE_GIF, IMAGE_BMP };
 
 /* ---- sources --------------------------------------------------------- */
 
@@ -150,6 +151,8 @@ static enum image_kind sniff(const uint8_t *b, int tries, int *at)
             return IMAGE_JPEG;
         if (!memcmp(p, png_sig, sizeof png_sig))
             return IMAGE_PNG;
+        if (!memcmp(p, "GIF8", 4))
+            return IMAGE_GIF;
     }
     return IMAGE_UNKNOWN;
 }
@@ -179,12 +182,13 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
     switch (kind)
     {
     case IMAGE_PNG:
+    case IMAGE_GIF:
         a.used = 0;
         s = image_stream(&a, src);
         if (!s || bs_skip(s, at) != BS_OK)
             return -1;
-        return read_png_stream(s, &a, bm, a.base - (uint8_t *)bm->data,
-                               format, cformat);
+        return (kind == IMAGE_PNG ? read_png_stream : read_gif_stream)
+                   (s, &a, bm, a.base - (uint8_t *)bm->data, format, cformat);
     case IMAGE_BMP:
         if (src->pos || src->flags)
             return -1;

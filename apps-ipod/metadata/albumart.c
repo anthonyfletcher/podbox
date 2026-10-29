@@ -111,8 +111,8 @@ static bool art_file_usable(const char *path)
     return usable;
 }
 
-static const char * const extensions[] = { "jpeg", "jpg", "bmp", "png" };
-static const unsigned char extension_lens[] = { 4, 3, 3, 3 };
+static const char * const extensions[] = { "jpeg", "jpg", "bmp", "png", "gif" };
+static const unsigned char extension_lens[] = { 4, 3, 3, 3, 3 };
 /* Try checking for several file extensions, return true if a file is found and
  * leaving the path modified to include the matching extension.
  *
@@ -135,13 +135,16 @@ static bool try_exts(char *path, int len)
     return false;
 }
 
-/* folder.jpg, then folder.png, in dir */
+/* folder.jpg, then folder.png, then folder.gif, in dir */
 static bool try_folder(char *path, size_t size, const char *dir)
 {
     snprintf(path, size, "%sfolder.jpg", dir);
     if (art_file_usable(path))
         return true;
     snprintf(path, size, "%sfolder.png", dir);
+    if (art_file_usable(path))
+        return true;
+    snprintf(path, size, "%sfolder.gif", dir);
     return art_file_usable(path);
 }
 
@@ -151,14 +154,14 @@ static bool try_folder(char *path, size_t size, const char *dir)
 #define EXT
 
 /* Look for the first matching album art bitmap in the following list:
- *  ./<trackname><size>.{jpeg,jpg,bmp,png}
- *  ./<albumname><size>.{jpeg,jpg,bmp,png}
+ *  ./<trackname><size>.{jpeg,jpg,bmp,png,gif}
+ *  ./<albumname><size>.{jpeg,jpg,bmp,png,gif}
  *  ./cover<size>.bmp
- *  ./folder.{jpg,png}
- *  ../<albumname><size>.{jpeg,jpg,bmp,png}
- *  ../cover<size>.{jpeg,jpg,bmp,png}
- *  ../folder.{jpg,png}
- *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png}
+ *  ./folder.{jpg,png,gif}
+ *  ../<albumname><size>.{jpeg,jpg,bmp,png,gif}
+ *  ../cover<size>.{jpeg,jpg,bmp,png,gif}
+ *  ../folder.{jpg,png,gif}
+ *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png,gif}
  * <size> is the value of the size_string parameter, <trackname> and
  * <albumname> are read from the ID3 metadata.
  * If a matching bitmap is found, its filename is stored in buf.

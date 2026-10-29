@@ -1,0 +1,378 @@
+/***************************************************************************
+ * GNU General Public License (version 2+)
+ *
+ * Reads a GIF's first frame into a rockbox bitmap one row at a time, scaling
+ * on load through resize.c, for album art, covers and book pictures. The
+ * image viewer has giflib for the frames of an animated one.
+ *
+ *   header - the screen, its colour table, extensions up to the first image
+ *            (a graphic control extension's transparent colour kept)
+ *   LZW    - the image's codes into palette indices, across sub-blocks
+ *   rows   - each row of indices as RGB, handed to the scaler; an
+ *            interlaced image is put together first, in the room after the
+ *            bitmap
+ *
+ * The frame is read at its own size, wherever it sits on the screen. A
+ * transparent pixel is drawn black, as a PNG's is.
+ ****************************************************************************/
+
+#include <string.h>
+#include "system.h"
+#include "bmp.h"
+#include "resize.h"
+#include "gif_load.h"
+
+#define LZW_MAX 4096
+
+struct gif {
+    bs_stream *in;
+    int w, h;
+    bool interlaced;
+    int trns;                   /* the transparent index, or -1 */
+    uint8_t pal[256][3];
+    /* LZW */
+    uint16_t prefix[LZW_MAX];
+    uint8_t suffix[LZW_MAX];
+    uint8_t stack[LZW_MAX];
+    int sp;                     /* indices waiting on the stack */
+    int min_size, size, clear, next, prev;
+    uint8_t first;
+    uint32_t bits;
+    int nbits;
+    uint8_t block[255];
+    int blen, bpos;
+    bool ended;                 /* the end code, or the data's end */
+    /* rows */
+    uint8_t *idx;               /* one row, or the whole interlaced image */
+    struct uint8_rgb *rgb;
+    int y;                      /* the next row handed out */
+    struct img_part part;
+};
+
+/* ---- header ---------------------------------------------------------- */
+
+static bool read_table(struct gif *g, int flags)
+{
+    int n = 2 << (flags & 7);
+
+    memset(g->pal, 0, sizeof g->pal);
+    return bs_read(g->in, g->pal, n * 3) == BS_OK;
+}
+
+static bool skip_blocks(bs_stream *in)
+{
+    uint8_t n;
+
+    do
+        if (bs_read(in, &n, 1) != BS_OK || bs_skip(in, n) != BS_OK)
+            return false;
+    while (n);
+    return true;
+}
+
+/* Up to the first image's data: its size, colour table and LZW code size */
+static bool read_header(struct gif *g)
+{
+    uint8_t b[10];
+
+    g->trns = -1;
+    if (bs_read(g->in, b, 6) != BS_OK || memcmp(b, "GIF8", 4)
+        || bs_read(g->in, b, 7) != BS_OK
+        || ((b[4] & 0x80) && !read_table(g, b[4])))
+        return false;
+    for (;;)
+    {
+        if (bs_read(g->in, b, 1) != BS_OK)
+            return false;
+        if (b[0] == 0x21)                       /* an extension */
+        {
+            if (bs_read(g->in, b, 1) != BS_OK)
+                return false;
+            if (b[0] == 0xf9)                   /* graphic control */
+            {
+                if (bs_read(g->in, b, 6) != BS_OK || b[0] != 4)
+                    return false;
+                g->trns = (b[1] & 1) ? b[4] : -1;
+                /* b[5] ends it, or is the length of more */
+                if (b[5] && (bs_skip(g->in, b[5]) != BS_OK
+                             || !skip_blocks(g->in)))
+                    return false;
+            }
+            else if (!skip_blocks(g->in))
+                return false;
+        }
+        else if (b[0] == 0x2c)                  /* the image */
+        {
+            if (bs_read(g->in, b, 9) != BS_OK)
+                return false;
+            g->w = b[4] | b[5] << 8;
+            g->h = b[6] | b[7] << 8;
+            g->interlaced = b[8] & 0x40;
+            if (((b[8] & 0x80) && !read_table(g, b[8]))
+                || bs_read(g->in, b, 1) != BS_OK
+                || b[0] < 2 || b[0] > 8 || g->w < 1 || g->h < 1)
+                return false;
+            g->min_size = b[0];
+            return true;
+        }
+        else
+            return false;                       /* the trailer, or worse */
+    }
+}
+
+/* ---- LZW ------------------------------------------------------------- */
+
+static void lzw_reset(struct gif *g)
+{
+    g->clear = 1 << g->min_size;
+    g->size = g->min_size + 1;
+    g->next = g->clear + 2;
+    g->prev = -1;
+}
+
+/* The next code, or -1 at the end of the data */
+static int lzw_code(struct gif *g)
+{
+    int code;
+
+    while (g->nbits < g->size)
+    {
+        if (g->bpos == g->blen)
+        {
+            uint8_t n;
+
+            if (bs_read(g->in, &n, 1) != BS_OK || !n
+                || bs_read(g->in, g->block, n) != BS_OK)
+                return -1;
+            g->blen = n;
+            g->bpos = 0;
+        }
+        g->bits |= (uint32_t)g->block[g->bpos++] << g->nbits;
+        g->nbits += 8;
+    }
+    code = g->bits & ((1 << g->size) - 1);
+    g->bits >>= g->size;
+    g->nbits -= g->size;
+    return code;
+}
+
+/* n indices into dst; past the end of the data, or a bad code, zeros */
+static void lzw_pixels(struct gif *g, uint8_t *dst, int n)
+{
+    while (n > 0)
+    {
+        int code, c;
+
+        if (g->sp)
+        {
+            *dst++ = g->stack[--g->sp];
+            n--;
+            continue;
+        }
+        if (g->ended || (code = lzw_code(g)) < 0 || code == g->clear + 1)
+        {
+            g->ended = true;
+            memset(dst, 0, n);
+            return;
+        }
+        if (code == g->clear)
+        {
+            lzw_reset(g);
+            continue;
+        }
+        if (g->prev < 0)
+        {
+            if (code >= g->clear)
+            {
+                g->ended = true;
+                continue;
+            }
+            g->prev = code;
+            g->first = code;
+            g->stack[g->sp++] = code;
+            continue;
+        }
+        if (code > g->next)
+        {
+            g->ended = true;
+            continue;
+        }
+        /* the string a code stands for, last index first; the code not yet
+         * in the table is the last string with its own first index added */
+        c = code;
+        if (code == g->next)
+        {
+            g->stack[g->sp++] = g->first;
+            c = g->prev;
+        }
+        while (c >= g->clear && g->sp < LZW_MAX - 1)
+        {
+            g->stack[g->sp++] = g->suffix[c];
+            c = g->prefix[c];
+        }
+        g->stack[g->sp++] = c;
+        g->first = c;
+        if (g->next < LZW_MAX)
+        {
+            g->prefix[g->next] = g->prev;
+            g->suffix[g->next] = g->first;
+            if (++g->next == (1 << g->size) && g->size < 12)
+                g->size++;
+        }
+        g->prev = code;
+    }
+}
+
+/* ---- rows ------------------------------------------------------------ */
+
+static void to_rgb(const struct gif *g, const uint8_t *idx)
+{
+    struct uint8_rgb *o = g->rgb;
+
+    for (int x = 0; x < g->w; x++, o++)
+    {
+        const uint8_t *c = g->pal[idx[x]];
+
+        o->alpha = 255;
+        if (idx[x] == g->trns)
+            o->red = o->green = o->blue = 0;
+        else
+        {
+            o->red = c[0];
+            o->green = c[1];
+            o->blue = c[2];
+        }
+    }
+}
+
+static struct img_part *store_part_gif(void *args)
+{
+    struct gif *g = args;
+
+    if (g->y >= g->h)
+        return NULL;
+    if (g->interlaced)
+        to_rgb(g, g->idx + (size_t)g->y * g->w);
+    else
+    {
+        lzw_pixels(g, g->idx, g->w);
+        to_rgb(g, g->idx);
+    }
+    g->y++;
+    g->part.len = g->w;
+    g->part.buf = g->rgb;
+    return &g->part;
+}
+
+/* An interlaced image's four passes, each row to its place in idx */
+static bool assemble(struct gif *g)
+{
+    static const uint8_t start[4] = { 0, 4, 2, 1 }, step[4] = { 8, 8, 4, 2 };
+    int done = 0;
+
+    for (int pass = 0; pass < 4; pass++)
+        for (int y = start[pass]; y < g->h; y += step[pass])
+        {
+            lzw_pixels(g, g->idx + (size_t)y * g->w, g->w);
+            if (image_row_hook && !image_row_hook(++done, g->h))
+                return false;
+        }
+    return true;
+}
+
+int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
+                    int maxsize, int format,
+                    const struct custom_format *cformat)
+{
+    struct gif *g = bs_alloc(a, sizeof *g);
+    bool resize = format & FORMAT_RESIZE;
+    bool dither = format & FORMAT_DITHER;
+    struct dim src_dim;
+    struct rowset rset;
+    unsigned char *free_start;
+    int bm_size, free_len, lines;
+
+    if (!g)
+        return -1;
+    g->in = in;
+    if (!read_header(g))
+        return -3;
+
+    src_dim.width = g->w;
+    src_dim.height = g->h;
+    if (resize)
+    {
+        struct dim d = { .width = bm->width, .height = bm->height };
+        if (format & FORMAT_KEEP_ASPECT)
+            recalc_dimension(&d, &src_dim);
+        bm->width = d.width;
+        bm->height = d.height;
+    }
+    else
+    {
+        bm->width = src_dim.width;
+        bm->height = src_dim.height;
+    }
+    bm->alpha_offset = 0;
+    if (cformat)
+        bm_size = cformat->get_size(bm);
+    else
+        bm_size = BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
+    if (bm->width == src_dim.width && bm->height == src_dim.height)
+        resize = false;
+
+    /* the scaler's line buffers; an interlaced image's indices after them */
+    lines = resize ? (int)sizeof(struct uint32_argb) * 3 * bm->width : 0;
+    if (format & FORMAT_RETURN_SIZE)
+        return bm_size + lines + sizeof(long) + (int)a->size
+               + (g->interlaced ? g->w * g->h : 0);
+
+    free_start = (unsigned char *)bm->data + bm_size;
+    free_len = maxsize - bm_size;
+    ALIGN_BUFFER(free_start, free_len, sizeof(uint32_t));
+    g->rgb = bs_alloc(a, g->w * sizeof(struct uint8_rgb));
+    if (g->interlaced)
+    {
+        if ((long)g->w * g->h > free_len - lines)
+            return -6;
+        g->idx = free_start + lines;
+    }
+    else
+        g->idx = bs_alloc(a, g->w);
+    if (free_len < lines || !g->rgb || !g->idx)
+        return -6;
+
+    lzw_reset(g);
+    if (g->interlaced && !assemble(g))
+        return -9;
+
+    if (resize)
+    {
+        rset.rowstart = 0;
+        rset.rowstop = bm->height;
+        rset.rowstep = 1;
+        if (!resize_on_load(bm, dither, &src_dim, &rset, free_start, free_len,
+                            cformat, IF_PIX_FMT(0,) store_part_gif, g))
+            return -9;
+    }
+    else
+    {
+        struct scaler_context ctx = { .bm = bm, .dither = dither };
+        void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
+            cformat ? cformat->output_row_8 : output_row_8_native;
+        int row;
+
+        for (row = 0; row < bm->height; row++)
+        {
+            struct img_part *part;
+
+            if (image_row_hook && !image_row_hook(row, bm->height))
+                return -9;
+            part = store_part_gif(g);
+            if (!part)
+                return -9;
+            output_row_8(row, part->buf, &ctx);
+        }
+    }
+    return bm_size;
+}

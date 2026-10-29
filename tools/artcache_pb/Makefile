@@ -43,6 +43,7 @@ SRC := artcache_pb.c stubs.c \
        $(APPS)/draw/image_load.c \
        $(APPS)/draw/jpeg_load.c \
        $(APPS)/draw/png_load.c \
+       $(APPS)/draw/gif_load.c \
        $(APPS)/draw/resize.c \
        $(APPS)/draw/bmp.c \
        $(APPS)/draw/img_filter.c \

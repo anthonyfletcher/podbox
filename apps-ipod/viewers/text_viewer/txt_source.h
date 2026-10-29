@@ -159,9 +159,9 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
  * cover image lies in the file -- cover_at is -1 when it has none. An EPUB's
  * cover is found as reading.md 6 orders it, the first three ways (the cover
  * page's first image is not looked for); an FB2's is its coverpage's; a
- * MOBI's is the image EXTH 201 names, unless it is a GIF. Its subjects, up
- * to TS_BOOK_SUBJECT_MAX of them, are one to a line: an EPUB's dc:subject,
- * an FB2's genre, a MOBI's EXTH 105. */
+ * MOBI's is the image EXTH 201 names. Its subjects, up to
+ * TS_BOOK_SUBJECT_MAX of them, are one to a line: an EPUB's dc:subject, an
+ * FB2's genre, a MOBI's EXTH 105. */
 typedef struct {
     char     title[TS_BOOK_TITLE];
     char     author[TS_BOOK_AUTHOR];

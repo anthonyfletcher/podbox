@@ -94,6 +94,7 @@ draw/resize.c
 draw/image_load.c
 draw/jpeg_load.c
 draw/png_load.c
+draw/gif_load.c
 draw/jpeg_enc.c
 #ifdef CPU_ARM
 draw/jpeg_idct_arm.S

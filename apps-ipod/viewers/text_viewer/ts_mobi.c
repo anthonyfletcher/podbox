@@ -693,8 +693,8 @@ static void book_str(char *dst, size_t cap, const uint8_t *v, uint32_t n,
 }
 
 /* A MOBI's title (EXTH 503, else the header's full name), first author
- * (EXTH 100), subjects (EXTH 105), parts, and cover image (EXTH 201, from the first image
- * record) unless it is a GIF. Reads every text record for the parts. */
+ * (EXTH 100), subjects (EXTH 105), parts, and cover image (EXTH 201, from the
+ * first image record). Reads every text record for the parts. */
 int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
                  ts_book *out)
 {
@@ -776,12 +776,9 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
     {
         int r = m->first_image + cover;
 
-        if (read_rec(m, r) >= 4 && memcmp(m->raw, "GIF8", 4))
-        {
-            out->cover_at = m->rec[r];
-            out->cover_csize = out->cover_usize = m->rec[r + 1] - m->rec[r];
-            out->cover_method = MEMBER_STORED;
-        }
+        out->cover_at = m->rec[r];
+        out->cover_csize = out->cover_usize = m->rec[r + 1] - m->rec[r];
+        out->cover_method = MEMBER_STORED;
     }
     rc = load_text_map(m, &a);
     if (rc != BS_OK)
