@@ -98,89 +98,106 @@ int recalc_dimension(struct dim *dst, struct dim *src)
 }
 
 
-/* horizontal area average scaler */
-static bool scale_h_area(void *out_line_ptr,
-                         struct scaler_context *ctx, bool accum)
+/* horizontal area average scaler. Each part is taken whole into locals; a
+ * pixel inside an area is three adds, and one that ends it splits between
+ * that area and the next. `alpha` is a constant in each of the two callers
+ * below, so the alpha channel costs nothing where nothing reads it. */
+static FORCE_INLINE bool scale_h_area_row(void *out_line_ptr,
+                                          struct scaler_context *ctx,
+                                          bool accum, const bool alpha)
 {
     SDEBUGF("scale_h_area\n");
-    unsigned int ix, ox, oxe, mul;
     const uint32_t h_i_val = ctx->h_i_val,
                    h_o_val = ctx->h_o_val;
-    struct uint32_argb rgbvalacc = { 0, 0, 0, 0 },
-                       rgbvaltmp = { 0, 0, 0, 0 },
-                      *out_line = (struct uint32_argb *)out_line_ptr;
+    struct uint32_argb *out = (struct uint32_argb *)out_line_ptr;
+    uint32_t r = 0, g = 0, b = 0, a = 0, tr = 0, tg = 0, tb = 0, ta = 0;
+    uint32_t oxe = 0, mul = 0;
+    int left = ctx->src->width;
     struct img_part *part;
     FILL_BUF_INIT(part,ctx->store_part,ctx->args);
-    ox = 0;
-    oxe = 0;
-    mul = 0;
     /* give other tasks a chance to run */
     yield();
-    for (ix = 0; ix < (unsigned int)ctx->src->width; ix++)
+    while (left > 0)
     {
-        oxe += h_o_val;
-        /* end of current area has been reached */
-        /* fill buffer if needed */
+        const struct uint8_rgb *px;
+        int n;
+
         FILL_BUF(part,ctx->store_part,ctx->args);
-        if (oxe >= h_i_val)
+        px = part->buf;
+        n = MIN(part->len, left);
+        part->buf += n;
+        part->len -= n;
+        left -= n;
+        while (n--)
         {
-            /* "reset" error, which now represents partial coverage of next
-               pixel by the next area
-            */
+            oxe += h_o_val;
+            /* inside an area */
+            if (oxe < h_i_val)
+            {
+                r += px->red;
+                g += px->green;
+                b += px->blue;
+                if (alpha)
+                    a += px->alpha;
+                px++;
+                continue;
+            }
+            /* end of current area: the error now represents partial
+               coverage of this pixel by the next area */
             oxe -= h_i_val;
-
-/* generic C math */
             /* add saved partial pixel from start of area */
-            rgbvalacc.r = rgbvalacc.r * h_o_val + rgbvaltmp.r * mul;
-            rgbvalacc.g = rgbvalacc.g * h_o_val + rgbvaltmp.g * mul;
-            rgbvalacc.b = rgbvalacc.b * h_o_val + rgbvaltmp.b * mul;
-            rgbvalacc.a = rgbvalacc.a * h_o_val + rgbvaltmp.a * mul;
-
-            /* get new pixel , then add its partial coverage to this area */
-            rgbvaltmp.r = part->buf->red;
-            rgbvaltmp.g = part->buf->green;
-            rgbvaltmp.b = part->buf->blue;
-            rgbvaltmp.a = part->buf->alpha;
+            r = r * h_o_val + tr * mul;
+            g = g * h_o_val + tg * mul;
+            b = b * h_o_val + tb * mul;
+            if (alpha)
+                a = a * h_o_val + ta * mul;
+            /* then this pixel's partial coverage of this area */
+            tr = px->red;
+            tg = px->green;
+            tb = px->blue;
+            if (alpha)
+                ta = px->alpha;
             mul = h_o_val - oxe;
-            rgbvalacc.r += rgbvaltmp.r * mul;
-            rgbvalacc.g += rgbvaltmp.g * mul;
-            rgbvalacc.b += rgbvaltmp.b * mul;
-            rgbvalacc.a += rgbvaltmp.a * mul;
-            rgbvalacc.r = (rgbvalacc.r + (1 << 21)) >> 22;
-            rgbvalacc.g = (rgbvalacc.g + (1 << 21)) >> 22;
-            rgbvalacc.b = (rgbvalacc.b + (1 << 21)) >> 22;
-            rgbvalacc.a = (rgbvalacc.a + (1 << 21)) >> 22;
+            r = (r + tr * mul + (1 << 21)) >> 22;
+            g = (g + tg * mul + (1 << 21)) >> 22;
+            b = (b + tb * mul + (1 << 21)) >> 22;
+            if (alpha)
+                a = (a + ta * mul + (1 << 21)) >> 22;
             /* store or accumulate to output row */
             if (accum)
             {
-                rgbvalacc.r += out_line[ox].r;
-                rgbvalacc.g += out_line[ox].g;
-                rgbvalacc.b += out_line[ox].b;
-                rgbvalacc.a += out_line[ox].a;
+                r += out->r;
+                g += out->g;
+                b += out->b;
+                if (alpha)
+                    a += out->a;
             }
-            out_line[ox].r = rgbvalacc.r;
-            out_line[ox].g = rgbvalacc.g;
-            out_line[ox].b = rgbvalacc.b;
-            out_line[ox].a = rgbvalacc.a;
-            /* reset accumulator */
-            rgbvalacc.r = 0;
-            rgbvalacc.g = 0;
-            rgbvalacc.b = 0;
-            rgbvalacc.a = 0;
+            out->r = r;
+            out->g = g;
+            out->b = b;
+            if (alpha)
+                out->a = a;
+            r = g = b = a = 0;
             mul = oxe;
-            ox += 1;
-        /* inside an area */
-        } else {
-            /* add pixel value to accumulator */
-            rgbvalacc.r += part->buf->red;
-            rgbvalacc.g += part->buf->green;
-            rgbvalacc.b += part->buf->blue;
-            rgbvalacc.a += part->buf->alpha;
+            px++;
+            out++;
         }
-        part->buf++;
-        part->len--;
     }
     return true;
+}
+
+static bool scale_h_area(void *out_line_ptr, struct scaler_context *ctx,
+                         bool accum)
+{
+    return scale_h_area_row(out_line_ptr, ctx, accum, false);
+}
+
+/* For a bitmap with an alpha plane: only output_row_32_native() reads the
+ * alpha it accumulates */
+static bool scale_h_area_alpha(void *out_line_ptr, struct scaler_context *ctx,
+                               bool accum)
+{
+    return scale_h_area_row(out_line_ptr, ctx, accum, true);
 }
 
 /* vertical area average scaler */
@@ -524,7 +541,8 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
      * the decoders now guarantee is at least 1. */
     if (sw > dw || dw < 2)
     {
-        ctx.h_scaler = scale_h_area;
+        ctx.h_scaler = bm->alpha_offset > 0 ? scale_h_area_alpha
+                                            : scale_h_area;
         uint32_t h_div = (1U << 24) / sw;
         ctx.h_i_val = sw * h_div;
         ctx.h_o_val = dw * h_div;
