@@ -73,6 +73,17 @@ static int file_pull(bs_stream *s, uint8_t *buf, size_t n, size_t *out)
     if (f->len >= 0 && (bs_off_t)n > f->len - f->pos)
         n = (size_t)(f->len - f->pos);
     if (!n) return BS_OK;
+    /* A long pull ends on a 4 KiB boundary of the file if it can, or a
+     * 512-byte one, so the pulls after it read whole sectors */
+    {
+        bs_off_t at = f->start + f->pos;
+        bs_off_t end = (at + (bs_off_t)n) & ~(bs_off_t)4095;
+
+        if (end <= at)
+            end = (at + (bs_off_t)n) & ~(bs_off_t)511;
+        if (end > at)
+            n = (size_t)(end - at);
+    }
 
     /* Always seek: several readers share one descriptor (the scanner, the
      * font pre-pass and this window all move it), so no stream may assume it

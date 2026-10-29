@@ -16,7 +16,7 @@
 #define WBITS 15
 #define WSIZE (1u << WBITS)
 #define WMASK (WSIZE - 1)
-#define INBUF 512
+#define INBUF 4096
 
 enum { ST_HDR, ST_STORED, ST_BLOCK, ST_DONE };
 

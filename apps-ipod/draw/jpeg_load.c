@@ -109,6 +109,7 @@ struct prog_scan
     unsigned char dc_sel[3];
     unsigned char ac_sel[3];
     unsigned char ss, se, ah, al; /* spectral band, successive approximation */
+    int read_size;              /* bytes to refill with: about a row's */
     bool needed;
 };
 
@@ -144,6 +145,7 @@ struct jpeg
     int fd;
     int buf_left;
     int buf_index;
+    int read_size; /* most bytes a refill reads */
 
     int (*read_buf)(struct jpeg* p_jpeg, size_t count);
     bool (*skip_bytes_seek)(struct jpeg* p_jpeg);
@@ -890,14 +892,30 @@ static const struct idct_entry idct_tbl[] = {
 /* JPEG decoder implementation */
 
 
+/* A read that ends on a 4 KB boundary of the file if it can, or a 512-byte
+ * one: every read after the first is then whole sectors, which the file
+ * system reads straight into the buffer rather than a sector at a time
+ * through its cache. */
 static int read_buf(struct jpeg* p_jpeg, size_t count)
 {
+    off_t pos = lseek(p_jpeg->fd, 0, SEEK_CUR);
+
+    if (pos >= 0)
+    {
+        off_t end = (pos + count) & ~(off_t)4095;
+
+        if (end <= pos)
+            end = (pos + count) & ~(off_t)511;
+        if (end > pos)
+            count = end - pos;
+    }
     return read(p_jpeg->fd, p_jpeg->buf, count);
 }
 
 INLINE void fill_buf(struct jpeg* p_jpeg)
 {
-    p_jpeg->buf_left = p_jpeg->read_buf(p_jpeg, MIN(JPEG_READ_BUF_SIZE, p_jpeg->len));
+    p_jpeg->buf_left = p_jpeg->read_buf(p_jpeg,
+        MIN((unsigned long)p_jpeg->read_size, p_jpeg->len));
     p_jpeg->buf_index = 0;
     if (p_jpeg->buf_left > 0)
         p_jpeg->len -= p_jpeg->buf_left;
@@ -2209,12 +2227,18 @@ static void prog_plan(struct jpeg *p_jpeg)
         uint64_t band = (((uint64_t)2 << sc->se) - 1)
                         & ~(((uint64_t)1 << sc->ss) - 1);
 
+        long end = i + 1 < pr->nscans ? sc[1].pos : pr->end_pos;
+
         sc->needed = false;
         for (j = 0; j < sc->comps; j++)
             if (want[sc->comp[j]] & band)
                 sc->needed = true;
         if (sc->needed && sc->ss && sc->ah)
             want[sc->comp[0]] |= band;
+        /* A scan is resumed for every row, so a refill much larger than a
+         * row's share of it is read again by the next row's resume. */
+        sc->read_size = MIN((long)JPEG_READ_BUF_SIZE,
+                            MAX(end - sc->pos, 0) / p_jpeg->y_mbl + 512);
     }
 }
 
@@ -2225,6 +2249,7 @@ static void prog_resume(struct jpeg *p_jpeg, struct prog_scan *sc)
 
     if (jpeg_tell(p_jpeg) != sc->pos && !jpeg_seek(p_jpeg, sc->pos))
         p_jpeg->len = 0;    /* read zeros rather than another scan's data */
+    p_jpeg->read_size = sc->read_size;
     p_jpeg->bitbuf = sc->bitbuf;
     p_jpeg->bitbuf_bits = sc->bitbuf_bits;
     p_jpeg->marker_val = sc->marker_val;
@@ -2896,6 +2921,7 @@ int clip_jpeg_fd(int fd, int flags,
     if ((size_t)tmp_size < sizeof(struct jpeg))
         return -1;
     memset(p_jpeg, 0, sizeof(struct jpeg));
+    p_jpeg->read_size = JPEG_READ_BUF_SIZE;
     p_jpeg->len = len;
     p_jpeg->fd = fd;
     if (p_jpeg->len == 0)

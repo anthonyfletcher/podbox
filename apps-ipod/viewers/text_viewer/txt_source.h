@@ -68,14 +68,14 @@ ts_config ts_config_default(void);
  *
  * Measured floors, not guesses (tests/run_tests.sh binary-searches them).
  * Every format pays for a 4 KiB probe buffer; anything compressed also pays
- * for deflate's mandatory 32 KiB history window.
+ * for deflate's mandatory 32 KiB history window and its 4 KiB of input.
  *
  *   plain / markdown / html / rtf / fb2      8.5 KiB
- *   pdf                                       57 KiB
- *   docx                                      50 KiB
- *   epub, 3 chapters                          50 KiB
- *   epub, 200 chapters                        65 KiB
- *   epub, 500 chapters                        96 KiB
+ *   pdf                                       61 KiB
+ *   docx                                      54 KiB
+ *   epub, 3 chapters                          54 KiB
+ *   epub, 200 chapters                        69 KiB
+ *   epub, 500 chapters                       100 KiB
  *
  * Only the zip formats scale with the document, at roughly 100 bytes per
  * archive member (the central directory index and the manifest ids). If the
@@ -84,8 +84,8 @@ ts_config ts_config_default(void);
 #define TS_ARENA_PLAIN        (12 * 1024)   /* also markdown, html, rtf, fb2 */
 #define TS_ARENA_MARKUP       (12 * 1024)
 #define TS_ARENA_PDF          (64 * 1024)
-#define TS_ARENA_ZIP          (96 * 1024)   /* EPUB / DOCX, up to ~500 parts */
-#define TS_ARENA_RECOMMENDED  (96 * 1024)   /* safe for every format         */
+#define TS_ARENA_ZIP          (100 * 1024)  /* EPUB / DOCX, up to ~500 parts */
+#define TS_ARENA_RECOMMENDED  (100 * 1024)  /* safe for every format         */
 
 /* ---- lifecycle ------------------------------------------------------- */
 
