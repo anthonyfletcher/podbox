@@ -147,6 +147,7 @@ typedef struct {
 
     int   nl_pending, sp_pending, started;
     int   pictures;                /* TS_PICTURE_OPEN lines for pictures */
+    int   cover_done;              /* an FB2's coverpage picture is out */
     ts_pend out;
 } tg_st;
 
@@ -257,18 +258,29 @@ static void process_tag(tg_st *s)
     name[n] = 0;
     if (!n) return;
 
-    /* A picture: <img src>, or the <image> an <svg> wraps */
+    /* A picture: <img src>, or the <image> an <svg> wraps; in an FB2, an
+     * <image> of the text, and the first of its coverpage, which is in
+     * the skipped <description> */
     if (s->pictures && !close) {
         char href[256];
+        int fb2 = s->prof == TS_TAGS_FB2 &&
+                  ts_ascii_casecmp(name, "image") == 0 &&
+                  (!s->skip_depth ||
+                   (!s->cover_done &&
+                    ts_ascii_casecmp(s->skip_name, "description") == 0));
 
         if ((!s->skip_depth && ts_ascii_casecmp(name, "img") == 0 &&
              tag_attr(t, "src", href, sizeof href)) ||
             (s->skip_depth && ts_ascii_casecmp(s->skip_name, "svg") == 0 &&
              ts_ascii_casecmp(name, "image") == 0 &&
              (tag_attr(t, "xlink:href", href, sizeof href) ||
-              tag_attr(t, "href", href, sizeof href)))) {
+              tag_attr(t, "href", href, sizeof href))) ||
+            (fb2 && (tag_attr(t, "l:href", href, sizeof href) ||
+                     tag_attr(t, "xlink:href", href, sizeof href) ||
+                     tag_attr(t, "href", href, sizeof href)))) {
             int depth = s->skip_depth;
 
+            if (depth && fb2) s->cover_done = 1;
             s->skip_depth = 0;          /* out_picture writes */
             out_picture(s, href);
             s->skip_depth = depth;
@@ -463,13 +475,13 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
     if (s->started) s->nl_pending = 2;      /* blank line between documents */
 }
 
-/* Clears the between-documents state so a container back end can start its
- * spine over from the top without reallocating. */
 void ts_tags_pictures(bs_stream *st, int on)
 {
     ((tg_st *)st->st)->pictures = on;
 }
 
+/* Clears the between-documents state so a container back end can start its
+ * spine over from the top without reallocating. */
 void ts_tags_rewind(bs_stream *st)
 {
     tg_st *s = st->st;

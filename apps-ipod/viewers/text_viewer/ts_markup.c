@@ -31,6 +31,10 @@ int ts_open_html(ts_ctx *c, bs_stream **out)
 
 int ts_open_fb2(ts_ctx *c, bs_stream **out)
 {
-    /* FB2 is XML; a zipped .fb2.zip arrives at the container back end instead. */
-    return open_markup(c, TS_TAGS_FB2, out);
+    /* FB2 is XML; a zipped .fb2.zip arrives at the container back end
+     * instead, and shows no pictures. */
+    int rc = open_markup(c, TS_TAGS_FB2, out);
+
+    if (rc == BS_OK) ts_tags_pictures(*out, 1);
+    return rc;
 }

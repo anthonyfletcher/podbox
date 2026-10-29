@@ -142,18 +142,18 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
 #define TS_BOOK_TITLE  128
 #define TS_BOOK_AUTHOR 96
 
-/* What the book index keeps of an EPUB: its title and first author, empty
- * where it names none, its spine count, and where its cover image lies in
- * the file -- cover_at is -1 when it has none. The cover is found as
- * reading.md 6 orders it, the first three ways (the cover page's first
- * image is not looked for). */
+/* What the book index keeps of an EPUB or FB2: its title and first author,
+ * empty where it names none, its spine count (1 for an FB2), and where its
+ * cover image lies in the file -- cover_at is -1 when it has none. An EPUB's
+ * cover is found as reading.md 6 orders it, the first three ways (the cover
+ * page's first image is not looked for); an FB2's is its coverpage's. */
 typedef struct {
     char     title[TS_BOOK_TITLE];
     char     author[TS_BOOK_AUTHOR];
     int      parts;
     long     cover_at;
     uint32_t cover_csize, cover_usize;
-    int      cover_method;          /* 0 stored, 8 deflated */
+    int      cover_method;          /* MEMBER_*, files/zip_member.h */
 } ts_book;
 
 /* Reads `io`'s details into `out`, with `arena` for working memory
@@ -161,6 +161,9 @@ typedef struct {
  * not close `io`. */
 int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
                  ts_book *out);
+/* The same for an FB2, which needs no arena. BS_OK, or an error for one that
+ * cannot be read (a UTF-16 FB2 among them). */
+int ts_fb2_book(const bs_io *io, ts_book *out);
 
 ts_format ts_source_format(const ts_source *s);
 ts_charset ts_source_charset(const ts_source *s);   /* as detected */

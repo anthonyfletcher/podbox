@@ -6,6 +6,7 @@
  ****************************************************************************/
 
 #include "ts_internal.h"
+#include "files/zip_member.h"       /* MEMBER_BASE64 */
 
 #ifndef SEEK_SET
 #define SEEK_SET 0
@@ -225,6 +226,7 @@ struct ts_source {
     ts_config  cfg;
     bs_stream *pipe;
     bs_stream *parts;        /* the zip formats' spine stream, else NULL */
+    ts_fb2_pictures *fb2;    /* a loose FB2's pictures, once looked for */
     ts_format  fmt;
     ts_charset cs;
     uint8_t    hold[4];      /* partial UTF-8 carried between ts_read calls */
@@ -392,6 +394,15 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
     bs_off_t data;
     int rc;
 
+    if (s && !s->parts && s->fmt == TS_FMT_FB2) {
+        if (!s->fb2 && !(s->fb2 = bs_alloc(&s->arena, sizeof *s->fb2)))
+            return BS_ERR_NOMEM;
+        rc = ts_fb2_picture(&s->io, s->fb2, href, &data, csize);
+        *usize = 0;
+        *method = MEMBER_BASE64;
+        if (rc == BS_OK) *at = (long)data;
+        return rc;
+    }
     if (!s || !s->parts || s->fmt != TS_FMT_EPUB) return BS_ERR_UNSUP;
     rc = ts_zipdoc_picture(s->parts, part, href, &data, csize, usize, method);
     if (rc == BS_OK) *at = (long)data;

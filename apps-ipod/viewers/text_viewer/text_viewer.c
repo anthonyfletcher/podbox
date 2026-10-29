@@ -664,10 +664,10 @@ static bool tv_picture_decode(const char *href, int w, int h)
     if (ts_picture_extent(tv.src, tv.part, href, &at, &csize, &usize,
                           &method) != BS_OK)
         return false;
-    if (method == 8)
+    if (method != MEMBER_STORED)
     {
-        if (!zip_member_to_file(tv.path, at, csize, usize, TV_PIC_TMP,
-                                buf, TV_PIC_BYTES))
+        if (!zip_member_to_file(tv.path, at, csize, usize, method,
+                                TV_PIC_TMP, buf, TV_PIC_BYTES))
             return false;
         src.fd = open(TV_PIC_TMP, O_RDONLY);
     }
@@ -697,7 +697,7 @@ static bool tv_picture_decode(const char *href, int w, int h)
     cpu_boost(false);
     image_row_hook = NULL;
     close(src.fd);
-    if (method == 8)
+    if (method != MEMBER_STORED)
         remove(TV_PIC_TMP);
     if (tv_pic_stopped)
         tv_pic_part = -1;               /* nothing kept: decoded again */

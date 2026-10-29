@@ -1628,15 +1628,15 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
         src.emb_size = e->cover_csize;
         stamp = aa_art_stamp(e->path);
     }
-    else if (e->cover_at >= 0 && e->cover_method == 8)
+    else if (e->cover_at >= 0)
     {
         stamp = aa_art_stamp(e->path);
         if (slot->stamp != stamp || !aa_thumbs_exist(bh))
         {
             /* Before the decode needs the work buffer */
             if (!zip_member_to_file(e->path, e->cover_at, e->cover_csize,
-                                    e->cover_usize, AA_COVER_TMP,
-                                    c->workbuf, c->worksz))
+                                    e->cover_usize, e->cover_method,
+                                    AA_COVER_TMP, c->workbuf, c->worksz))
                 return true;
             tmp = true;
         }

@@ -2,7 +2,8 @@
  * GNU General Public License (version 2+)
  *
  * The book index: the title, first author, spine count and cover location
- * of every EPUB on the player, for the Books shelf and the art cache.
+ * of every EPUB and FB2 on the player, for the Books shelf and the art
+ * cache.
  *
  * Opening a book to read its OPF is far too slow to do for every row of a
  * shelf, so the documents walk (file_index.c) does it once per book and the
@@ -57,7 +58,8 @@ bool book_index_is_book(const char *path)
 {
     const char *dot = strrchr(path, '.');
 
-    return dot != NULL && strcasecmp(dot, ".epub") == 0;
+    return dot != NULL && (strcasecmp(dot, ".epub") == 0
+                           || strcasecmp(dot, ".fb2") == 0);
 }
 
 void book_index_each(book_index_fn fn, void *data)
@@ -197,7 +199,12 @@ static bool write_new(const char *path, uint64_t key, unsigned long size,
     b.cover_at = -1;
     if (ts_io_core(&io, &f, path) == BS_OK)
     {
-        if (ts_book_read(&io, work->arena, sizeof(work->arena), &b) != BS_OK)
+        const char *dot = strrchr(path, '.');
+        int rc = strcasecmp(dot, ".fb2") == 0
+                 ? ts_fb2_book(&io, &b)
+                 : ts_book_read(&io, work->arena, sizeof(work->arena), &b);
+
+        if (rc != BS_OK)
         {
             memset(&b, 0, sizeof b);    /* kept, so it is not read again */
             b.cover_at = -1;

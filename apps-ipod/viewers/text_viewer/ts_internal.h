@@ -113,6 +113,15 @@ int  ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
                        int *method);
 /* Pictures become TS_PICTURE_OPEN lines; off unless asked for */
 void ts_tags_pictures(bs_stream *s, int on);
+/* An FB2's pictures, by the hash of their ids: found on the first look */
+#define TS_FB2_PICTURES 128
+typedef struct {
+    int n, scanned;
+    struct { uint32_t key, len; bs_off_t at; } pic[TS_FB2_PICTURES];
+} ts_fb2_pictures;
+/* Where the base64 text of an FB2's picture `href` ("#id") lies in `io` */
+int ts_fb2_picture(const bs_io *io, ts_fb2_pictures *p, const char *href,
+                   bs_off_t *at, uint32_t *len);
 int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
                   void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);

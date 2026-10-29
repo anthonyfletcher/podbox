@@ -672,7 +672,7 @@ static void book_text(char *dst, size_t cap, const char *src)
         if (space) { dst[n++] = ' '; space = 0; }
         if (c == '&' && (used = ts_entity(src + i + 1, len - i - 1, &cp))) {
             n += ts_utf8_put((uint8_t *)dst + n, cp);
-            i += used + 1;
+            i += used;
             continue;
         }
         dst[n++] = c;

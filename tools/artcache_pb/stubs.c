@@ -307,6 +307,12 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
     return BS_ERR_UNSUP;
 }
 
+int ts_fb2_book(const bs_io *io, ts_book *out)
+{
+    (void)io; (void)out;
+    return BS_ERR_UNSUP;
+}
+
 int ts_io_core(bs_io *io, struct ts_core_file *f, const char *path)
 {
     (void)io; (void)f; (void)path;
