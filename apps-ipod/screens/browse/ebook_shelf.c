@@ -14,7 +14,8 @@
  * is finished; a book with none is not started.
  *
  * Choosing a book opens it in the reader, at its place. Holding Select on a
- * book offers Mark as, which moves it to any of the three lists.
+ * book offers Mark As, which moves it to any of the three lists, Book Info
+ * and Show in Files.
  *
  * Parts, in order:
  *   - the arena and what it holds
@@ -472,8 +473,85 @@ static bool mark_menu(int b)
     return text_viewer_mark_place(path, marks[choice]);
 }
 
+/* Book Info's lines: what the shelf knows of the book */
+#define INFO_LINES (4 + TS_BOOK_SUBJECT_MAX)
+static char info_line[INFO_LINES][MAX_PATH];
+
+static const char *info_name(int item, void *data, char *buf, size_t len)
+{
+    (void)data;
+    (void)buf;
+    (void)len;
+    return info_line[item];
+}
+
+/* False when the screen went to the root */
+static bool book_info(int b)
+{
+    struct simplelist_info info;
+    const struct ebook *e = &books[b];
+    const char *s = names + e->subjects;
+    int n = 0;
+
+    snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_ID3_TITLE),
+             names + e->title);
+    snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_AUTHOR),
+             names + e->author);
+    for (int k = 0; k < e->nsubjects; k++, s += strlen(s) + 1)
+        snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_ID3_GENRE), s);
+    if (e->state == BOOK_SHELF_IN_PROGRESS && e->pct >= 0)
+        snprintf(info_line[n++], MAX_PATH, str(LANG_BOOK_SHELF_ROW),
+                 str(LANG_BOOKS_IN_PROGRESS), e->pct);
+    else
+        strmemccpy(info_line[n++],
+                   str(e->state == BOOK_SHELF_FINISHED ? LANG_BOOKS_FINISHED
+                       : e->state == BOOK_SHELF_NOT_STARTED
+                         ? LANG_BOOKS_NOT_STARTED : LANG_BOOKS_IN_PROGRESS),
+                   MAX_PATH);
+    snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_PROPERTIES_PATH),
+             names + e->path);
+
+    simplelist_info_init(&info, str(LANG_BOOK_INFO), n, NULL);
+    info.get_name = info_name;
+    return !simplelist_show_list(&info);
+}
+
 /* The row a mark was made on, which ends the list for a reload */
 static int marked_row;
+/* A GO_TO_* a menu row leaves the shelf with, or GO_TO_PREVIOUS */
+static int menu_exit;
+
+/* A book's menu: Mark As, Book Info, Show in Files. True when the list
+ * should end: a mark changed it, or a row leaves the shelf. */
+static bool book_menu(int b)
+{
+    int choice = 0;
+
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                        ID2P(LANG_BOOK_MARK_AS), ID2P(LANG_BOOK_INFO),
+                        ID2P(LANG_SHOW_IN_FILES));
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    choice = do_menu(&menu, &choice, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+    switch (choice)
+    {
+        case 0:
+            return mark_menu(b);
+        case 1:
+            if (!book_info(b))
+                menu_exit = GO_TO_ROOT;
+            break;
+        case 2:
+            browser_reveal_on_next_load(names + books[b].path);
+            menu_exit = GO_TO_FILEBROWSER;
+            break;
+        case MENU_ATTACHED_USB:
+            menu_exit = GO_TO_ROOT;
+            break;
+    }
+    return menu_exit != GO_TO_PREVIOUS;
+}
 
 static int action_cb(int action, struct gui_synclist *lists)
 {
@@ -483,9 +561,10 @@ static int action_cb(int action, struct gui_synclist *lists)
         return action;
     n = gui_synclist_get_sel_pos(lists);
     b = book_at(n);
-    if (b < 0 || !mark_menu(b))
+    if (b < 0 || !book_menu(b))
         return ACTION_REDRAW;
-    marked_row = n;
+    if (menu_exit == GO_TO_PREVIOUS)
+        marked_row = n;
     return ACTION_STD_CANCEL;
 }
 
@@ -507,6 +586,7 @@ static int show(char *path, size_t size, int *selection, int *list)
     do
     {
         marked_row = -1;
+        menu_exit = GO_TO_PREVIOUS;
         load();
         if (top_rows() + row_ct == 0)
         {
@@ -547,6 +627,8 @@ static int show(char *path, size_t size, int *selection, int *list)
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
+        else if (menu_exit != GO_TO_PREVIOUS)
+            ret = menu_exit;
         else if (info.selection >= 0 && marked_row < 0)
         {
             int b = book_at(info.selection);
@@ -612,7 +694,7 @@ int ebook_shelf_run(void)
                 break;
             continue;
         }
-        if (ret == GO_TO_ROOT)
+        if (ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER)
             break;
         if (list >= 0)
         {
@@ -638,5 +720,6 @@ int ebook_shelf_run(void)
         break;
     }
     pop_current_activity();
-    return ret == GO_TO_ROOT ? GO_TO_ROOT : GO_TO_PREVIOUS;
+    return ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER ? ret
+                                                         : GO_TO_PREVIOUS;
 }
