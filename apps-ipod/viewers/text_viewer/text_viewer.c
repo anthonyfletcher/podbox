@@ -843,6 +843,8 @@ static off_t tv_page(off_t start, bool render)
             if (ln.used == 0)
                 break;
             ln.indent = indent;
+            if (head)
+                ln.full = false;        /* a heading is never justified */
 
             if (render && ln.draw > 0)
             {
