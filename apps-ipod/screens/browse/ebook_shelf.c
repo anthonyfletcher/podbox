@@ -48,6 +48,7 @@
 #include "screens/browse/book_shelf.h"   /* enum book_shelf */
 #include "viewers/text_viewer/text_viewer.h"
 #include "viewers/text_viewer/txt_source.h"     /* TS_BOOK_AUTHOR */
+#include "viewers/text_viewer/reading_stats.h"
 #include "ebook_shelf.h"
 
 /* ------------------------------------------------------------------ *
@@ -89,6 +90,7 @@ static int book_ct, row_ct;
 #define SHOW_SUBJECTS 6
 #define SHOW_SUBJECT  7
 #define SHOW_SEARCH   8
+#define SHOW_STATS    9
 static int showing;
 static char author_shown[TS_BOOK_AUTHOR];
 static char subject_shown[TS_BOOK_SUBJECTS];
@@ -107,6 +109,7 @@ static const struct
     { LANG_BY_TITLE,                SHOW_TITLES },
     { LANG_BY_AUTHOR,               SHOW_AUTHORS },
     { LANG_BY_SUBJECT,              SHOW_SUBJECTS },
+    { LANG_READING_STATS,           SHOW_STATS },
 };
 static int top_kinds[ARRAYLEN(top_row)];
 static int top_ct;
@@ -521,15 +524,15 @@ static int marked_row;
 /* A GO_TO_* a menu row leaves the shelf with, or GO_TO_PREVIOUS */
 static int menu_exit;
 
-/* A book's menu: Mark As, Book Info, Show in Files. True when the list
- * should end: a mark changed it, or a row leaves the shelf. */
+/* A book's menu: Mark As, Book Info, Reading Stats, Show in Files. True
+ * when the list should end: a mark changed it, or a row leaves the shelf. */
 static bool book_menu(int b)
 {
     int choice = 0;
 
     MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
                         ID2P(LANG_BOOK_MARK_AS), ID2P(LANG_BOOK_INFO),
-                        ID2P(LANG_SHOW_IN_FILES));
+                        ID2P(LANG_READING_STATS), ID2P(LANG_SHOW_IN_FILES));
     push_current_activity(ACTIVITY_CONTEXTMENU);
     choice = do_menu(&menu, &choice, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
@@ -543,6 +546,11 @@ static bool book_menu(int b)
                 menu_exit = GO_TO_ROOT;
             break;
         case 2:
+            if (!reading_stats_show(names + books[b].path,
+                                    names + books[b].title))
+                menu_exit = GO_TO_ROOT;
+            break;
+        case 3:
             browser_reveal_on_next_load(names + books[b].path);
             menu_exit = GO_TO_FILEBROWSER;
             break;
@@ -698,6 +706,15 @@ int ebook_shelf_run(void)
             break;
         if (list >= 0)
         {
+            if (list == SHOW_STATS)
+            {
+                if (!reading_stats_show_all())
+                {
+                    ret = GO_TO_ROOT;
+                    break;
+                }
+                continue;
+            }
             /* Search asks what for first, and stays at the top without */
             if (list == SHOW_SEARCH
                 && (kbd_input(search_text, sizeof(search_text), NULL) < 0

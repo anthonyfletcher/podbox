@@ -41,6 +41,7 @@
 #include "lang.h"
 #include "widgets/splash.h"
 #include "widgets/dialog_prose.h"     /* dialog_prose_show */
+#include "reading_stats.h"
 #include "draw/viewport.h"
 #include "font.h"
 #include "system/activity.h"
@@ -1505,10 +1506,36 @@ static bool tv_advance(void)
 
 /* At the end, the page is drawn again: looking past it may have put the
  * loading box over it */
+/* The words on the page on screen, for the reading statistics */
+static int tv_page_words(void)
+{
+    const unsigned char *s = tv.win + (tv.pos - tv.win_start);
+    off_t n = tv.next - tv.pos;
+    int words = 0;
+    bool in = false;
+
+    for (off_t i = 0; i < n; i++)
+    {
+        bool gap = s[i] == ' ' || s[i] == '\n';
+
+        if (!gap && !in)
+            words++;
+        in = !gap;
+    }
+    return words;
+}
+
+/* A page read by eye counts toward the statistics; one Read Aloud says
+ * does not */
 static void tv_next_page(void)
 {
+    int words = tv_page_words();
     bool moved = tv_advance();
 
+    if (moved && global_settings.text_viewer_read_aloud == TV_READ_OFF)
+        reading_stats_page(words);
+    else
+        reading_stats_touch();
     tv_draw();
     if (moved)
         tv_speak_page();
@@ -1518,6 +1545,7 @@ static void tv_prev_page(void)
 {
     int part = tv.part;
 
+    reading_stats_touch();
     if (tv.sp == 0)
     {
         /* first page of the chapter: the last of the one before */
@@ -1545,6 +1573,7 @@ static void tv_turn_page(void)
 {
     int part = tv.part;
 
+    reading_stats_touch();
     if (!tv_advance())
     {
         tv_reading = false;
@@ -2630,6 +2659,7 @@ static int tv_menu(void)
     tv_apply_settings();
     tv_draw();
     tv_speak_page();
+    reading_stats_touch();
     return ret;
 }
 
@@ -2738,6 +2768,7 @@ static int tv_notes(void)
         tv_apply_settings();
     }
     tv_draw();
+    reading_stats_touch();
     return 0;
 }
 
@@ -2746,6 +2777,7 @@ static int tv_notes(void)
 static void tv_event_save(void *param)
 {
     (void)param;
+    reading_stats_end(tv_book_percent(), tv_at_book_end());
     tv_resume_save(tv.path, tv.part, tv.pos, tv.file_size);
 }
 
@@ -2821,6 +2853,7 @@ int text_viewer(const char *file)
         return GO_TO_PREVIOUS;
     }
 
+    reading_stats_begin(file);
     resume = tv_resume_load(file, tv.file_size, &part);
     tv_open_at(part, resume);
     tv_open_part = tv.part;
@@ -2941,6 +2974,7 @@ int text_viewer(const char *file)
 
   done:
     talk_shutup();             /* the page stops with the viewer */
+    reading_stats_end(tv_book_percent(), tv_at_book_end());
     tv_resume_save(file, tv.part, tv.pos, tv.file_size);
     tv_close();
     viewportmanager_theme_undo(SCREEN_MAIN, false);

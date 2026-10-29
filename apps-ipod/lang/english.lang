@@ -26417,6 +26417,272 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_READING_STATS
+  desc: Books: the reading statistics, of a book or all
+  user: core
+  <source>
+    *: "Reading Stats"
+  </source>
+  <dest>
+    *: "Reading Stats"
+  </dest>
+  <voice>
+    *: "Reading Stats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_NOT_READ
+  desc: Reading Stats: nothing read yet
+  user: core
+  <source>
+    *: "Not read yet"
+  </source>
+  <dest>
+    *: "Not read yet"
+  </dest>
+  <voice>
+    *: "Not read yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_TIME
+  desc: Reading Stats: time spent reading
+  user: core
+  <source>
+    *: "Time reading"
+  </source>
+  <dest>
+    *: "Time reading"
+  </dest>
+  <voice>
+    *: "Time reading"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES
+  desc: Reading Stats: pages turned forward
+  user: core
+  <source>
+    *: "Pages read"
+  </source>
+  <dest>
+    *: "Pages read"
+  </dest>
+  <voice>
+    *: "Pages read"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES_A_DAY
+  desc: Reading Stats: pages read, and on average each day read on
+  user: core
+  <source>
+    *: "%d, %d a day"
+  </source>
+  <dest>
+    *: "%d, %d a day"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SPEED
+  desc: Reading Stats: reading speed
+  user: core
+  <source>
+    *: "Speed"
+  </source>
+  <dest>
+    *: "Speed"
+  </dest>
+  <voice>
+    *: "Speed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_WPM
+  desc: Reading Stats: the speed in words a minute
+  user: core
+  <source>
+    *: "%d words a minute"
+  </source>
+  <dest>
+    *: "%d words a minute"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LONGEST
+  desc: Reading Stats: the longest sitting with the book
+  user: core
+  <source>
+    *: "Longest sitting"
+  </source>
+  <dest>
+    *: "Longest sitting"
+  </dest>
+  <voice>
+    *: "Longest sitting"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STREAK
+  desc: Reading Stats: the most days in a row read on
+  user: core
+  <source>
+    *: "Best streak"
+  </source>
+  <dest>
+    *: "Best streak"
+  </dest>
+  <voice>
+    *: "Best streak"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_DAYS
+  desc: Reading Stats: a number of days
+  user: core
+  <source>
+    *: "%d days"
+  </source>
+  <dest>
+    *: "%d days"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ONE_DAY
+  desc: Reading Stats: a number of days, when it is one
+  user: core
+  <source>
+    *: "1 day"
+  </source>
+  <dest>
+    *: "1 day"
+  </dest>
+  <voice>
+    *: "1 day"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LEFT
+  desc: Reading Stats: time to finish the book at the reader's own speed
+  user: core
+  <source>
+    *: "Time left"
+  </source>
+  <dest>
+    *: "Time left"
+  </dest>
+  <voice>
+    *: "Time left"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ABOUT
+  desc: Reading Stats: an estimate
+  user: core
+  <source>
+    *: "about %s"
+  </source>
+  <dest>
+    *: "about %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STARTED
+  desc: Reading Stats: the day the book was started
+  user: core
+  <source>
+    *: "Started"
+  </source>
+  <dest>
+    *: "Started"
+  </dest>
+  <voice>
+    *: "Started"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LAST
+  desc: Reading Stats: the day the book was last read
+  user: core
+  <source>
+    *: "Last read"
+  </source>
+  <dest>
+    *: "Last read"
+  </dest>
+  <voice>
+    *: "Last read"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_IN_DAYS
+  desc: Reading Stats: the day finished, and the days from starting
+  user: core
+  <source>
+    *: "%s, in %s"
+  </source>
+  <dest>
+    *: "%s, in %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS
+  desc: Reading Stats, all books: how many have been read in
+  user: core
+  <source>
+    *: "Books read"
+  </source>
+  <dest>
+    *: "Books read"
+  </dest>
+  <voice>
+    *: "Books read"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS_FINISHED
+  desc: Reading Stats, all books: books read in, and finished
+  user: core
+  <source>
+    *: "%d, %d finished"
+  </source>
+  <dest>
+    *: "%d, %d finished"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SINCE
+  desc: Reading Stats, all books: the day the first was started
+  user: core
+  <source>
+    *: "Reading since"
+  </source>
+  <dest>
+    *: "Reading since"
+  </dest>
+  <voice>
+    *: "Reading since"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_NOTES
   desc: text viewer: the title of the box with a page's footnotes
   user: core
