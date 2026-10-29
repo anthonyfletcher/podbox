@@ -5,7 +5,7 @@
  * GNU General Public License (version 2+)
  *
  * The image viewer's back end for every image the core readers decode
- * through image_load(): JPEG, BMP and PNG files, and now-playing art
+ * through image_load(): JPEG, BMP, PNG and WebP files, and now-playing art
  * embedded in a track, whatever its format, with ordered dithering.
  *
  * Opening reads only the image's size. Each zoom level is decoded from the

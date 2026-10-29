@@ -111,8 +111,9 @@ static bool art_file_usable(const char *path)
     return usable;
 }
 
-static const char * const extensions[] = { "jpeg", "jpg", "bmp", "png", "gif" };
-static const unsigned char extension_lens[] = { 4, 3, 3, 3, 3 };
+static const char * const extensions[] = { "jpeg", "jpg", "bmp", "png", "gif",
+                                           "webp" };
+static const unsigned char extension_lens[] = { 4, 3, 3, 3, 3, 4 };
 /* Try checking for several file extensions, return true if a file is found and
  * leaving the path modified to include the matching extension.
  *
@@ -135,7 +136,7 @@ static bool try_exts(char *path, int len)
     return false;
 }
 
-/* folder.jpg, then folder.png, then folder.gif, in dir */
+/* folder.jpg, then folder.png, folder.gif and folder.webp, in dir */
 static bool try_folder(char *path, size_t size, const char *dir)
 {
     snprintf(path, size, "%sfolder.jpg", dir);
@@ -145,6 +146,9 @@ static bool try_folder(char *path, size_t size, const char *dir)
     if (art_file_usable(path))
         return true;
     snprintf(path, size, "%sfolder.gif", dir);
+    if (art_file_usable(path))
+        return true;
+    snprintf(path, size, "%sfolder.webp", dir);
     return art_file_usable(path);
 }
 
@@ -154,14 +158,14 @@ static bool try_folder(char *path, size_t size, const char *dir)
 #define EXT
 
 /* Look for the first matching album art bitmap in the following list:
- *  ./<trackname><size>.{jpeg,jpg,bmp,png,gif}
- *  ./<albumname><size>.{jpeg,jpg,bmp,png,gif}
+ *  ./<trackname><size>.{jpeg,jpg,bmp,png,gif,webp}
+ *  ./<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
  *  ./cover<size>.bmp
- *  ./folder.{jpg,png,gif}
- *  ../<albumname><size>.{jpeg,jpg,bmp,png,gif}
- *  ../cover<size>.{jpeg,jpg,bmp,png,gif}
- *  ../folder.{jpg,png,gif}
- *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png,gif}
+ *  ./folder.{jpg,png,gif,webp}
+ *  ../<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
+ *  ../cover<size>.{jpeg,jpg,bmp,png,gif,webp}
+ *  ../folder.{jpg,png,gif,webp}
+ *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
  * <size> is the value of the size_string parameter, <trackname> and
  * <albumname> are read from the ID3 metadata.
  * If a matching bitmap is found, its filename is stored in buf.

@@ -23,6 +23,7 @@ static const struct image_decoder * const decoders[MAX_IMAGE_TYPES] = {
     [IMAGE_PNG]              = &scaled_decoder,
     [IMAGE_PPM]             = &ppm_decoder,
     [IMAGE_GIF]              = &gif_decoder,
+    [IMAGE_WEBP]             = &scaled_decoder,
     [IMAGE_EMBEDDED]         = &scaled_decoder,
 };
 
@@ -53,6 +54,7 @@ enum image_type get_image_type(const char *name, bool quiet)
         { ".png",   IMAGE_PNG  },
         { ".ppm",   IMAGE_PPM  },
         { ".gif",   IMAGE_GIF  },
+        { ".webp",  IMAGE_WEBP },
     };
     static const struct {
         char *magic;    /* magic number */
@@ -66,6 +68,7 @@ enum image_type get_image_type(const char *name, bool quiet)
         { "P6", 2, IMAGE_PPM },
         { "GIF87a", 6, IMAGE_GIF },
         { "GIF89a", 6, IMAGE_GIF },
+        { "RIFF", 4, IMAGE_WEBP },
     };
 
     enum image_type type = IMAGE_UNKNOWN;

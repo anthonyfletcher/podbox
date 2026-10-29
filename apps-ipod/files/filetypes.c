@@ -101,6 +101,7 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "png",  FILE_ATTR_IMG },
     { "ppm",  FILE_ATTR_IMG },
     { "gif",  FILE_ATTR_IMG },
+    { "webp", FILE_ATTR_IMG },
 };
 
 struct fileattr_icon_voice {

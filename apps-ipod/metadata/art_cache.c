@@ -1573,7 +1573,7 @@ static size_t aa_work_bytes(void)
 static bool aa_book_file(const char *path)
 {
     static const char * const exts[] = { ".jpg", ".jpeg", ".png", ".bmp",
-                                         ".gif" };
+                                         ".gif", ".webp" };
     const char *dot = strrchr(path, '.');
     size_t stem = dot ? (size_t)(dot - path) : strlen(path);
     unsigned i;

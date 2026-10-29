@@ -3,8 +3,9 @@
  *
  * The one entry point for decoding album art: reads the image's first bytes,
  * with any ID3 unsync or Vorbis base64 undone, and hands it to the JPEG, PNG,
- * GIF or BMP reader by what those bytes are rather than by the file's name
- * or the tag's MIME type.
+ * GIF, WebP or BMP reader by what those bytes are rather than by the file's
+ * name or the tag's MIME type. WebP, like BMP, is read from a file only,
+ * never from inside a tag.
  *
  *   sources     - the image's bytes as a stream: a byte range of the file,
  *                 through the unsync stage, or Ogg packets through base64
@@ -22,6 +23,7 @@
 #include "jpeg_load.h"
 #include "png_load.h"
 #include "gif_load.h"
+#include "webp_load.h"
 #include "image_load.h"
 
 /* vorbis.c rounds a base64 picture's position up to a whole group of four
@@ -36,7 +38,9 @@
  * decoded bytes, so it does not limit the raw read either. */
 #define UNSYNC_SLACK 64
 
-enum image_kind { IMAGE_UNKNOWN, IMAGE_JPEG, IMAGE_PNG, IMAGE_GIF, IMAGE_BMP };
+enum image_kind {
+    IMAGE_UNKNOWN, IMAGE_JPEG, IMAGE_PNG, IMAGE_GIF, IMAGE_WEBP, IMAGE_BMP
+};
 
 /* ---- sources --------------------------------------------------------- */
 
@@ -153,6 +157,8 @@ static enum image_kind sniff(const uint8_t *b, int tries, int *at)
             return IMAGE_PNG;
         if (!memcmp(p, "GIF8", 4))
             return IMAGE_GIF;
+        if (!memcmp(p, "RIFF", 4) && !memcmp(p + 8, "WEBP", 4))
+            return IMAGE_WEBP;
     }
     return IMAGE_UNKNOWN;
 }
@@ -164,7 +170,7 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
     int tries = (src->flags & AA_FLAG_VORBIS_BASE64) ? B64_BACK
                 : (src->flags & AA_FLAG_ID3_UNSYNC) ? UNSYNC_SLACK : 1;
     enum image_kind kind = IMAGE_UNKNOWN;
-    uint8_t head[8 + UNSYNC_SLACK];
+    uint8_t head[12 + UNSYNC_SLACK];
     bs_arena a;
     bs_stream *s;
     int at = 0;
@@ -175,7 +181,7 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
     if (maxsize >= (int)(PNG_DECODE_OVERHEAD + 8))
     {
         s = image_stream(&a, src);
-        if (s && bs_read(s, head, 7 + tries) == BS_OK)
+        if (s && bs_read(s, head, 11 + tries) == BS_OK)
             kind = sniff(head, tries, &at);
     }
 
@@ -189,6 +195,11 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
             return -1;
         return (kind == IMAGE_PNG ? read_png_stream : read_gif_stream)
                    (s, &a, bm, a.base - (uint8_t *)bm->data, format, cformat);
+    case IMAGE_WEBP:
+        if (src->flags)
+            return -1;
+        return read_webp_fd(src->fd, src->pos, src->len, bm, maxsize, format,
+                            cformat);
     case IMAGE_BMP:
         if (src->pos || src->flags)
             return -1;

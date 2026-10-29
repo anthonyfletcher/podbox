@@ -22,6 +22,7 @@ enum image_type {
     IMAGE_PNG,
     IMAGE_PPM,
     IMAGE_GIF,
+    IMAGE_WEBP,
     IMAGE_EMBEDDED,             /* art inside a track, any format */
 
     MAX_IMAGE_TYPES
