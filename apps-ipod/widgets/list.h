@@ -389,6 +389,8 @@ struct simplelist_info {
                           there PLAY is ignored rather than meaning "back". */
     int  timeout;
     int  selection; /* the item to select when the list is first displayed */
+    int  top_item;  /* the row shown first, or -1 for wherever the selection
+                       puts it; a short list stays at its top */
                     /* when the list is exited, this will be set to the
                        index of the last item selected, or -1 if the list
                        was exited with ACTION_STD_CANCEL                  */
@@ -429,6 +431,7 @@ void simplelist_setline(const char *text);
    members set in this function:
     info.selection_size = 1;
     info.scroll_all = false;
+    info.top_item = -1;
     info.hide_theme = false;
     info.speak_onshow = true;
     info.action_callback = NULL;

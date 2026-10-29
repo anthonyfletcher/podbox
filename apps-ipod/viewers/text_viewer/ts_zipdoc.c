@@ -693,6 +693,12 @@ static int book_tag(void *ud, const char *tag, const char *text)
             book_text(b->out->title, sizeof b->out->title, text);
         else if (tag_is(name, "creator") && !b->out->author[0])
             book_text(b->out->author, sizeof b->out->author, text);
+        else if (tag_is(name, "subject")) {
+            char s[TS_BOOK_SUBJECTS];
+
+            book_text(s, sizeof s, text);
+            ts_book_subject(b->out, s);
+        }
         return 0;
     }
 

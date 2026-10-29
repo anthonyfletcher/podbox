@@ -1,9 +1,9 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The book index: the title, first author, spine count and cover location
- * of every EPUB and FB2 on the player, for the Books shelf and the art
- * cache.
+ * The book index: the title, first author, subjects, part count and cover
+ * location of every EPUB, FB2 and MOBI on the player, for the Books shelf
+ * and the art cache.
  *
  * Opening a book to read its OPF is far too slow to do for every row of a
  * shelf, so the documents walk (file_index.c) does it once per book and the
@@ -41,7 +41,7 @@
  * the record, and reading the file                                   *
  * ------------------------------------------------------------------ */
 
-/* One book; its path, title and author follow it, unterminated */
+/* One book; its path, title, author and subjects follow it, unterminated */
 struct book_rec
 {
     uint64_t key;               /* path_key() of the path */
@@ -51,8 +51,23 @@ struct book_rec
     uint16_t parts;
     uint8_t  cover_method;
     uint8_t  pad;
-    uint16_t path_len, title_len, author_len, pad2;
+    uint16_t path_len, title_len, author_len, subjects_len;
 };
+
+bool book_index_stale(void)
+{
+    struct libfile_header h;
+    int fd;
+
+    if (!file_exists(BOOK_INDEX_FILE))
+        return false;
+    fd = libfile_open(BOOK_INDEX_FILE, LIB_BOOK_INDEX_MAGIC,
+                      LIB_BOOK_INDEX_VERSION, 1, &h, NULL);
+    if (fd < 0)
+        return true;
+    close(fd);
+    return false;
+}
 
 bool book_index_is_book(const char *path)
 {
@@ -70,7 +85,9 @@ void book_index_each(book_index_fn fn, void *data)
     static char path[MAX_PATH];
     static char title[TS_BOOK_TITLE];
     static char author[TS_BOOK_AUTHOR];
-    struct book_entry e = { .path = path, .title = title, .author = author };
+    static char subjects[TS_BOOK_SUBJECTS];
+    struct book_entry e = { .path = path, .title = title, .author = author,
+                            .subjects = subjects };
     struct libfile_header h;
     struct book_rec r;
     int fd = libfile_open(BOOK_INDEX_FILE, LIB_BOOK_INDEX_MAGIC,
@@ -82,13 +99,16 @@ void book_index_each(book_index_fn fn, void *data)
     {
         if (r.path_len >= sizeof(path) || r.title_len >= sizeof(title)
             || r.author_len >= sizeof(author)
+            || r.subjects_len >= sizeof(subjects)
             || read(fd, path, r.path_len) != r.path_len
             || read(fd, title, r.title_len) != r.title_len
-            || read(fd, author, r.author_len) != r.author_len)
+            || read(fd, author, r.author_len) != r.author_len
+            || read(fd, subjects, r.subjects_len) != r.subjects_len)
             break;
         path[r.path_len] = '\0';
         title[r.title_len] = '\0';
         author[r.author_len] = '\0';
+        subjects[r.subjects_len] = '\0';
         e.parts = r.parts;
         e.cover_at = r.cover_at;
         e.cover_csize = r.cover_csize;
@@ -119,7 +139,7 @@ struct book_work
 {
     struct book_old old[BOOK_INDEX_MAX];
     uint8_t copy[sizeof(struct book_rec) + MAX_PATH + TS_BOOK_TITLE
-                 + TS_BOOK_AUTHOR];
+                 + TS_BOOK_AUTHOR + TS_BOOK_SUBJECTS];
     uint8_t arena[TS_ARENA_ZIP];
 };
 
@@ -146,7 +166,8 @@ static void load_old(void)
     while (old_count < BOOK_INDEX_MAX
            && read(old_fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
     {
-        size_t len = sizeof(r) + r.path_len + r.title_len + r.author_len;
+        size_t len = sizeof(r) + r.path_len + r.title_len + r.author_len
+                     + r.subjects_len;
         struct book_old *o = &work->old[old_count++];
 
         if (len > sizeof(work->copy))
@@ -229,10 +250,13 @@ static bool write_new(const char *path, uint64_t key, unsigned long size,
     r.path_len = strlen(path);
     r.title_len = strlen(b.title);
     r.author_len = strlen(b.author);
+    r.subjects_len = strlen(b.subjects);
     return libfile_write(&writer, &r, sizeof(r), sizeof(r))
            && libfile_write(&writer, path, r.path_len, r.path_len)
            && libfile_write(&writer, b.title, r.title_len, r.title_len)
-           && libfile_write(&writer, b.author, r.author_len, r.author_len);
+           && libfile_write(&writer, b.author, r.author_len, r.author_len)
+           && libfile_write(&writer, b.subjects, r.subjects_len,
+                            r.subjects_len);
 }
 
 void book_index_found(const char *path, unsigned long size,

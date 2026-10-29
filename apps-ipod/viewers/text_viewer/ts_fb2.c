@@ -202,6 +202,14 @@ static int book_tag(void *ud, const char *tag, const char *text, bs_off_t end)
                 fb2_text(b->last, sizeof b->last, text, b->cs);
             else if (fb2_is(tag, "nickname"))
                 fb2_text(b->nick, sizeof b->nick, text, b->cs);
+        } else if (fb2_is(tag, "genre") && close) {
+            /* a code, such as prose_classic */
+            char s[TS_BOOK_SUBJECTS], *u;
+
+            fb2_text(s, sizeof s, text, b->cs);
+            for (u = s; *u; u++)
+                if (*u == '_') *u = ' ';
+            ts_book_subject(b->out, s);
         } else if (fb2_is(tag, "coverpage")) {
             b->in_cover = !close;
         } else if (b->in_cover && !close && fb2_is(tag, "image") &&

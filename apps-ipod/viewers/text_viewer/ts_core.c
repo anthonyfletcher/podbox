@@ -93,6 +93,26 @@ int ts_ascii_ncasecmp(const char *a, const char *b, size_t n)
     return 0;
 }
 
+void ts_book_subject(ts_book *b, const char *s)
+{
+    size_t n = strlen(s), have = strlen(b->subjects);
+    const char *p = b->subjects;
+    int count = 0;
+
+    if (!n || have + 1 + n >= sizeof b->subjects) return;
+    while (*p) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+
+        if (l == n && !memcmp(p, s, n)) return;
+        count++;
+        p += l + (e != NULL);
+    }
+    if (count >= TS_BOOK_SUBJECT_MAX) return;
+    if (have) b->subjects[have++] = '\n';
+    memcpy(b->subjects + have, s, n + 1);
+}
+
 /* ---- pending ring ---------------------------------------------------- */
 
 void ts_emit(ts_pend *p, const uint8_t *b, size_t n)

@@ -1,16 +1,17 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The Books screen: every EPUB and FB2 on the player by its title, with its
- * cover, and above them the three lists the Audiobooks shelf has -- In
- * progress, Not started and Finished -- and Authors, each opening that
- * author's books. A book that names no author is filed under its folder.
+ * The Books screen: every EPUB, FB2 and MOBI on the player, reached through
+ * Search, the three lists the Audiobooks shelf has -- Finished, Not started
+ * and In progress -- and By Title, By Author and By Subject. A book that
+ * names no author is filed under its folder; one may name several subjects,
+ * and is listed under each.
  *
  * Two sources. The book index (files/book_index.c) names every book, its
- * title and its chapter count; the reader's places (reading.dat) say which
- * books have been opened, where each was left and which were read to the
- * end. A book with a place is in progress unless it is finished; a book with
- * none is not started.
+ * title, author, subjects and chapter count; the reader's places
+ * (reading.dat) say which books have been opened, where each was left and
+ * which were read to the end. A book with a place is in progress unless it
+ * is finished; a book with none is not started.
  *
  * Choosing a book opens it in the reader, at its place. Holding Select on a
  * book offers Mark as, which moves it to any of the three lists.
@@ -32,6 +33,7 @@
 #include "file.h"
 #include "lang.h"
 #include "strnatcmp.h"
+#include "widgets/keyboard.h"
 #include "widgets/list.h"
 #include "widgets/menu.h"
 #include "widgets/splash.h"
@@ -52,15 +54,19 @@
  * ------------------------------------------------------------------ */
 
 #define EBOOKS_MAX 1024
+/* A row is a book, or in By Subject one of a book's subjects */
+#define ROWS_MAX   (EBOOKS_MAX * TS_BOOK_SUBJECT_MAX)
 
 struct ebook
 {
     uint32_t path;              /* into the names */
     uint32_t title;             /* the book's own, or its file name */
     uint32_t author;            /* the book's own, or its folder's name */
+    uint32_t subjects;          /* the first of nsubjects, one after another */
     int16_t  parts;
     int16_t  pct;               /* how far through, or -1 */
     uint8_t  state;             /* enum book_shelf */
+    uint8_t  nsubjects;
 };
 
 /* The app buffer, claimed while the screen is up: the books, the rows, and
@@ -71,33 +77,42 @@ static char *names;
 static size_t names_sz, names_used;
 static int book_ct, row_ct;
 
-/* What the list shows: the top level -- the lists' rows, then every book --
- * one of the three lists by its enum book_shelf, every author, or the books
- * of author_shown */
-#define SHOW_TOP     (-1)
-#define SHOW_AUTHORS 3
-#define SHOW_AUTHOR  4
+/* What the list shows: the top level's rows alone; one of the three lists
+ * by its enum book_shelf; every book by title; every author, or the books of
+ * author_shown; every subject, or the books of subject_shown; or the books
+ * search_text finds */
+#define SHOW_TOP      (-1)
+#define SHOW_TITLES   3
+#define SHOW_AUTHORS  4
+#define SHOW_AUTHOR   5
+#define SHOW_SUBJECTS 6
+#define SHOW_SUBJECT  7
+#define SHOW_SEARCH   8
 static int showing;
 static char author_shown[TS_BOOK_AUTHOR];
+static char subject_shown[TS_BOOK_SUBJECTS];
+static char search_text[64];
 
-/* The top level's list rows, as the Audiobooks list has them: those with a
- * book in, in this order */
+/* The top level's rows: those with a book to show, in this order */
 static const struct
 {
     int lang_id;
-    int kind;                   /* enum book_shelf, or SHOW_AUTHORS */
+    int kind;                   /* enum book_shelf, or a SHOW_ */
 } top_row[] = {
+    { LANG_DB_SEARCH,               SHOW_SEARCH },
     { LANG_BOOK_SHELF_ROW_FINISHED, BOOK_SHELF_FINISHED },
     { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
     { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
-    { LANG_BOOK_SHELF_ROW_AUTHORS,  SHOW_AUTHORS },
+    { LANG_BY_TITLE,                SHOW_TITLES },
+    { LANG_BY_AUTHOR,               SHOW_AUTHORS },
+    { LANG_BY_SUBJECT,              SHOW_SUBJECTS },
 };
 static int top_kinds[ARRAYLEN(top_row)];
 static int top_ct;
 
 static bool claim(void)
 {
-    size_t sz, fixed = EBOOKS_MAX * (sizeof(*books) + sizeof(*rows));
+    size_t sz, fixed = EBOOKS_MAX * sizeof(*books) + ROWS_MAX * sizeof(*rows);
     char *p = app_claim_buffer(&sz, "books");
 
     if (p == NULL || sz < fixed + MAX_PATH)
@@ -107,7 +122,7 @@ static bool claim(void)
         return false;
     }
     books = (struct ebook *)p;  p += EBOOKS_MAX * sizeof(*books);
-    rows = (int *)p;            p += EBOOKS_MAX * sizeof(*rows);
+    rows = (int *)p;            p += ROWS_MAX * sizeof(*rows);
     names = p;
     names_sz = sz - fixed;
     return true;
@@ -149,6 +164,28 @@ static void folder_name(const char *path, char *out, size_t size)
     strmemccpy(out, start, MIN(size, (size_t)(end - start) + 1));
 }
 
+/* The book's subjects, one line each, into the names one after another */
+static bool add_subjects(struct ebook *b, const char *s)
+{
+    char one[TS_BOOK_SUBJECTS];
+    uint32_t at;
+
+    b->nsubjects = 0;
+    while (*s && b->nsubjects < TS_BOOK_SUBJECT_MAX)
+    {
+        const char *nl = strchr(s, '\n');
+        size_t n = nl ? (size_t)(nl - s) : strlen(s);
+
+        strmemccpy(one, s, MIN(n + 1, sizeof(one)));
+        if (!add_name(one, &at))
+            return false;
+        if (b->nsubjects++ == 0)
+            b->subjects = at;
+        s += n + (nl != NULL);
+    }
+    return true;
+}
+
 static bool collect_book(const struct book_entry *e, void *data)
 {
     struct ebook *b = &books[book_ct];
@@ -164,7 +201,8 @@ static bool collect_book(const struct book_entry *e, void *data)
     if (!e->author[0])
         folder_name(e->path, folder, sizeof(folder));
     if (!add_name(e->path, &b->path) || !add_name(title, &b->title)
-        || !add_name(e->author[0] ? e->author : folder, &b->author))
+        || !add_name(e->author[0] ? e->author : folder, &b->author)
+        || !add_subjects(b, e->subjects))
         return false;
     b->parts = e->parts;
     b->pct = -1;
@@ -204,34 +242,80 @@ static int compare_authors(const void *a, const void *b)
     return c ? c : compare_rows(a, b);
 }
 
+/* By Subject's rows are the subjects themselves, as offsets into the names */
+static int compare_subjects(const void *a, const void *b)
+{
+    return strnatcasecmp(names + *(const int *)a, names + *(const int *)b);
+}
+
+static bool has_subject(const struct ebook *b, const char *subject)
+{
+    const char *s = names + b->subjects;
+
+    for (int k = 0; k < b->nsubjects; k++, s += strlen(s) + 1)
+        if (!strcasecmp(s, subject))
+            return true;
+    return false;
+}
+
 static bool shown(const struct ebook *b)
 {
     switch (showing)
     {
-        case SHOW_TOP:
+        case SHOW_TOP:     return false;
+        case SHOW_TITLES:
         case SHOW_AUTHORS: return true;
         case SHOW_AUTHOR:  return !strcmp(names + b->author, author_shown);
+        case SHOW_SUBJECT: return has_subject(b, subject_shown);
+        case SHOW_SEARCH:  return strcasestr(names + b->title, search_text)
+                                  || strcasestr(names + b->author,
+                                                search_text);
         default:           return b->state == showing;
     }
+}
+
+/* Every subject once, sorted */
+static void subject_rows(void)
+{
+    int n = 0;
+
+    for (int i = 0; i < book_ct; i++)
+    {
+        const char *s = names + books[i].subjects;
+
+        for (int k = 0; k < books[i].nsubjects && row_ct < ROWS_MAX;
+             k++, s += strlen(s) + 1)
+            rows[row_ct++] = (int)(s - names);
+    }
+    qsort(rows, row_ct, sizeof(*rows), compare_subjects);
+    for (int i = 0; i < row_ct; i++)
+        if (n == 0 || strcasecmp(names + rows[i], names + rows[n - 1]))
+            rows[n++] = rows[i];
+    row_ct = n;
 }
 
 /* Everything read afresh, and the rows of the list `showing`: for Authors,
  * one book of each author */
 static void load(void)
 {
+    int counts[3] = { 0, 0, 0 };
+    bool subjects = false;
+
     book_ct = row_ct = 0;
     names_used = 0;
     book_index_each(collect_book, NULL);
     text_viewer_each_place(collect_place, NULL);
-    int counts[3] = { 0, 0, 0 };
 
     for (int i = 0; i < book_ct; i++)
     {
         counts[books[i].state]++;
-        if (shown(&books[i]))
+        subjects |= books[i].nsubjects > 0;
+        if (showing != SHOW_SUBJECTS && shown(&books[i]))
             rows[row_ct++] = i;
     }
-    if (showing == SHOW_AUTHORS)
+    if (showing == SHOW_SUBJECTS)
+        subject_rows();
+    else if (showing == SHOW_AUTHORS)
     {
         int n = 0;
 
@@ -247,9 +331,13 @@ static void load(void)
 
     top_ct = 0;
     for (size_t k = 0; showing == SHOW_TOP && k < ARRAYLEN(top_row); k++)
-        if (top_row[k].kind == SHOW_AUTHORS ? book_ct > 0
-                                            : counts[top_row[k].kind] > 0)
+    {
+        int kind = top_row[k].kind;
+
+        if (kind == SHOW_SUBJECTS ? subjects
+            : kind >= SHOW_TITLES ? book_ct > 0 : counts[kind] > 0)
             top_kinds[top_ct++] = k;
+    }
 }
 
 /* ------------------------------------------------------------------ *
@@ -259,6 +347,12 @@ static void load(void)
 static int top_rows(void)
 {
     return showing == SHOW_TOP ? top_ct : 0;
+}
+
+/* Whether the rows are names that open a list, not books */
+static bool names_listed(void)
+{
+    return showing == SHOW_AUTHORS || showing == SHOW_SUBJECTS;
 }
 
 static int list_lang(int which)
@@ -271,11 +365,11 @@ static int list_lang(int which)
     }
 }
 
-/* The book on list row n, or -1 for one of the lists' rows or an author */
+/* The book on list row n, or -1 for one of the top level's rows or a name */
 static int book_at(int n)
 {
     n -= top_rows();
-    return showing != SHOW_AUTHORS && n >= 0 && n < row_ct ? rows[n] : -1;
+    return !names_listed() && n >= 0 && n < row_ct ? rows[n] : -1;
 }
 
 static const char *get_name(int n, void *data, char *buffer, size_t len)
@@ -285,6 +379,8 @@ static const char *get_name(int n, void *data, char *buffer, size_t len)
 
     if (showing == SHOW_AUTHORS)
         return names + books[rows[n]].author;
+    if (showing == SHOW_SUBJECTS)
+        return names + rows[n];
     if (b < 0)
         return str(top_row[top_kinds[n]].lang_id);
     if (books[b].state != BOOK_SHELF_IN_PROGRESS || books[b].pct < 0)
@@ -322,7 +418,7 @@ static int get_range(int n, void *data)
 static enum list_row_kind get_kind(int n, void *data)
 {
     (void)data;
-    if (showing == SHOW_AUTHORS)
+    if (names_listed())
         return LIST_ROW_CONTAINER;
     return book_at(n) < 0 ? LIST_ROW_COMMAND : LIST_ROW_FILE;
 }
@@ -331,10 +427,14 @@ static const char *list_title(void)
 {
     switch (showing)
     {
-        case SHOW_TOP:     return str(LANG_EBOOKS);
-        case SHOW_AUTHORS: return str(LANG_BOOKS_AUTHORS);
-        case SHOW_AUTHOR:  return author_shown;
-        default:           return str(list_lang(showing));
+        case SHOW_TOP:      return str(LANG_EBOOKS);
+        case SHOW_TITLES:   return str(LANG_BY_TITLE);
+        case SHOW_AUTHORS:  return str(LANG_BOOKS_AUTHORS);
+        case SHOW_AUTHOR:   return author_shown;
+        case SHOW_SUBJECTS: return str(LANG_BY_SUBJECT);
+        case SHOW_SUBJECT:  return subject_shown;
+        case SHOW_SEARCH:   return search_text;
+        default:            return str(list_lang(showing));
     }
 }
 
@@ -386,9 +486,9 @@ static int action_cb(int action, struct gui_synclist *lists)
  * ------------------------------------------------------------------ */
 
 /* One list, until it is left or something is chosen: a book, its path in
- * `path`; another list, what it shows in *list (an author's, with the author
- * in author_shown). A GO_TO_* code, GO_TO_PREVIOUS unless the list went to
- * the root. */
+ * `path`; another list, what it shows in *list (an author's or a subject's,
+ * with it in author_shown or subject_shown). A GO_TO_* code, GO_TO_PREVIOUS
+ * unless the list went to the root. */
 static int show(char *path, size_t size, int *selection, int *list)
 {
     struct simplelist_info info;
@@ -412,13 +512,22 @@ static int show(char *path, size_t size, int *selection, int *list)
         info.get_range = get_range;
         browser_albumart_invalidate();
         browser_set_showing_art(global_settings.db_bookart);
-        if (global_settings.db_bookart && showing != SHOW_AUTHORS)
+        if (global_settings.db_bookart && showing != SHOW_TOP
+            && !names_listed())
         {
             info.get_albumart = get_art;
             info.row_height = global_settings.db_art_row_height;
         }
         info.action_callback = action_cb;
         info.selection = MIN(*selection, top_rows() + row_ct - 1);
+        /* Opening on the top level, Search is scrolled off above the
+         * cursor, as the Music menu's is */
+        if (showing == SHOW_TOP && info.selection == 0 && top_ct > 1
+            && top_row[top_kinds[0]].kind == SHOW_SEARCH)
+        {
+            info.selection = 1;
+            info.top_item = 1;
+        }
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
@@ -433,6 +542,12 @@ static int show(char *path, size_t size, int *selection, int *list)
                            names + books[rows[info.selection]].author,
                            sizeof(author_shown));
                 *list = SHOW_AUTHOR;
+            }
+            else if (showing == SHOW_SUBJECTS)
+            {
+                strmemccpy(subject_shown, names + rows[info.selection],
+                           sizeof(subject_shown));
+                *list = SHOW_SUBJECT;
             }
             else if (b >= 0)
                 strmemccpy(path, names + books[b].path, size);
@@ -451,16 +566,18 @@ static int show(char *path, size_t size, int *selection, int *list)
 int ebook_shelf_run(void)
 {
     static char path[MAX_PATH];
-    int top_sel = 0, list_sel = 0, author_sel = 0, book_sel = 0;
+    int top_sel = 0, list_sel = 0, names_sel = 0, book_sel = 0;
     int ret, list;
 
     push_current_activity(ACTIVITY_BOOKSHELF);
     showing = SHOW_TOP;
     while (1)
     {
-        int *sel = showing == SHOW_TOP     ? &top_sel
-                 : showing == SHOW_AUTHORS ? &author_sel
-                 : showing == SHOW_AUTHOR  ? &book_sel : &list_sel;
+        int *sel = showing == SHOW_TOP ? &top_sel
+                 : showing == SHOW_AUTHORS || showing == SHOW_SUBJECTS
+                   ? &names_sel
+                 : showing == SHOW_AUTHOR || showing == SHOW_SUBJECT
+                   ? &book_sel : &list_sel;
 
         if (!claim())
         {
@@ -483,15 +600,23 @@ int ebook_shelf_run(void)
             break;
         if (list >= 0)
         {
+            /* Search asks what for first, and stays at the top without */
+            if (list == SHOW_SEARCH
+                && (kbd_input(search_text, sizeof(search_text), NULL) < 0
+                    || !search_text[0]))
+                continue;
             showing = list;
-            *(list == SHOW_AUTHORS ? &author_sel
-              : list == SHOW_AUTHOR ? &book_sel : &list_sel) = 0;
+            *(list == SHOW_AUTHORS || list == SHOW_SUBJECTS ? &names_sel
+              : list == SHOW_AUTHOR || list == SHOW_SUBJECT ? &book_sel
+              : &list_sel) = 0;
             continue;
         }
         if (showing != SHOW_TOP)
         {
-            /* an author's books back to Authors, anything else to the top */
-            showing = showing == SHOW_AUTHOR ? SHOW_AUTHORS : SHOW_TOP;
+            /* an author's or a subject's books back to their list, anything
+             * else to the top */
+            showing = showing == SHOW_AUTHOR ? SHOW_AUTHORS
+                    : showing == SHOW_SUBJECT ? SHOW_SUBJECTS : SHOW_TOP;
             continue;
         }
         break;

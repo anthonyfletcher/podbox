@@ -1185,6 +1185,8 @@ bool simplelist_show_list(struct simplelist_info *info)
     gui_synclist_set_nb_items(&lists, line_count*info->selection_size);
 
     gui_synclist_select_item(&lists, info->selection);
+    if (info->top_item >= 0)
+        gui_synclist_set_top_item(&lists, info->top_item);
 
     /* Here rather than in each caller, so every simplelist screen gets it. */
     gui_synclist_draw_settled(&lists);
@@ -1287,6 +1289,7 @@ void simplelist_info_init(struct simplelist_info *info, char* title,
     info->wps_on_play = false;
     info->timeout = HZ/10;
     info->selection = 0;
+    info->top_item = -1;
     info->action_callback = NULL;
     info->title_icon = Icon_NOICON;
     info->get_icon = NULL;

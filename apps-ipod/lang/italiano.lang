@@ -18248,17 +18248,45 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BOOK_SHELF_ROW_AUTHORS
-  desc: top of the Books list: every author, each opening their books
+  id: LANG_BY_TITLE
+  desc: a row of the Audiobooks and Books menus: every book by its title
   user: core
   <source>
-    *: "[Authors]"
+    *: "By Title"
   </source>
   <dest>
-    *: "[Autori]"
+    *: "Per titolo"
   </dest>
   <voice>
-    *: "Autori"
+    *: "Per titolo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_AUTHOR
+  desc: a row of the Audiobooks and Books menus: every author, each opening their books
+  user: core
+  <source>
+    *: "By Author"
+  </source>
+  <dest>
+    *: "Per autore"
+  </dest>
+  <voice>
+    *: "Per autore"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SUBJECT
+  desc: a row of the Books menu: every subject the books name, each opening its books
+  user: core
+  <source>
+    *: "By Subject"
+  </source>
+  <dest>
+    *: "Per argomento"
+  </dest>
+  <voice>
+    *: "Per argomento"
   </voice>
 </phrase>
 <phrase>
@@ -22816,13 +22844,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_PROGRESS
-  desc: top of the Audiobooks Book list: the books started and not finished
+  desc: a row of the Audiobooks and Books menus: the books in progress
   user: core
   <source>
-    *: "[In Progress]"
+    *: "In Progress"
   </source>
   <dest>
-    *: "[In corso]"
+    *: "In corso"
   </dest>
   <voice>
     *: "In corso"
@@ -22830,13 +22858,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_NEW
-  desc: top of the Audiobooks Book list: the books not started
+  desc: a row of the Audiobooks and Books menus: the books not started
   user: core
   <source>
-    *: "[Not Started]"
+    *: "Not Started"
   </source>
   <dest>
-    *: "[Non iniziati]"
+    *: "Non iniziati"
   </dest>
   <voice>
     *: "Non iniziati"
@@ -22844,13 +22872,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_FINISHED
-  desc: top of the Audiobooks Book list: the books finished
+  desc: a row of the Audiobooks and Books menus: the books finished
   user: core
   <source>
-    *: "[Finished]"
+    *: "Finished"
   </source>
   <dest>
-    *: "[Finiti]"
+    *: "Finiti"
   </dest>
   <voice>
     *: "Finiti"

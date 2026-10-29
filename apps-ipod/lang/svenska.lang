@@ -18255,17 +18255,45 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BOOK_SHELF_ROW_AUTHORS
-  desc: top of the Books list: every author, each opening their books
+  id: LANG_BY_TITLE
+  desc: a row of the Audiobooks and Books menus: every book by its title
   user: core
   <source>
-    *: "[Authors]"
+    *: "By Title"
   </source>
   <dest>
-    *: "[Författare]"
+    *: "Efter titel"
   </dest>
   <voice>
-    *: "Författare"
+    *: "Efter titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_AUTHOR
+  desc: a row of the Audiobooks and Books menus: every author, each opening their books
+  user: core
+  <source>
+    *: "By Author"
+  </source>
+  <dest>
+    *: "Efter författare"
+  </dest>
+  <voice>
+    *: "Efter författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SUBJECT
+  desc: a row of the Books menu: every subject the books name, each opening its books
+  user: core
+  <source>
+    *: "By Subject"
+  </source>
+  <dest>
+    *: "Efter ämne"
+  </dest>
+  <voice>
+    *: "Efter ämne"
   </voice>
 </phrase>
 <phrase>
@@ -22823,13 +22851,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_PROGRESS
-  desc: top of the Audiobooks Book list: the books started and not finished
+  desc: a row of the Audiobooks and Books menus: the books in progress
   user: core
   <source>
-    *: "[In Progress]"
+    *: "In Progress"
   </source>
   <dest>
-    *: "[Påbörjade]"
+    *: "Påbörjade"
   </dest>
   <voice>
     *: "Påbörjade"
@@ -22837,13 +22865,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_NEW
-  desc: top of the Audiobooks Book list: the books not started
+  desc: a row of the Audiobooks and Books menus: the books not started
   user: core
   <source>
-    *: "[Not Started]"
+    *: "Not Started"
   </source>
   <dest>
-    *: "[Ej påbörjade]"
+    *: "Ej påbörjade"
   </dest>
   <voice>
     *: "Ej påbörjade"
@@ -22851,13 +22879,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_FINISHED
-  desc: top of the Audiobooks Book list: the books finished
+  desc: a row of the Audiobooks and Books menus: the books finished
   user: core
   <source>
-    *: "[Finished]"
+    *: "Finished"
   </source>
   <dest>
-    *: "[Avslutade]"
+    *: "Avslutade"
   </dest>
   <voice>
     *: "Avslutade"

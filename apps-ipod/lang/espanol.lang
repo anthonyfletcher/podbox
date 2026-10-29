@@ -18256,17 +18256,45 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BOOK_SHELF_ROW_AUTHORS
-  desc: top of the Books list: every author, each opening their books
+  id: LANG_BY_TITLE
+  desc: a row of the Audiobooks and Books menus: every book by its title
   user: core
   <source>
-    *: "[Authors]"
+    *: "By Title"
   </source>
   <dest>
-    *: "[Autores]"
+    *: "Por título"
   </dest>
   <voice>
-    *: "Autores"
+    *: "Por título"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_AUTHOR
+  desc: a row of the Audiobooks and Books menus: every author, each opening their books
+  user: core
+  <source>
+    *: "By Author"
+  </source>
+  <dest>
+    *: "Por autor"
+  </dest>
+  <voice>
+    *: "Por autor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SUBJECT
+  desc: a row of the Books menu: every subject the books name, each opening its books
+  user: core
+  <source>
+    *: "By Subject"
+  </source>
+  <dest>
+    *: "Por tema"
+  </dest>
+  <voice>
+    *: "Por tema"
   </voice>
 </phrase>
 <phrase>
@@ -22824,13 +22852,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_PROGRESS
-  desc: top of the Audiobooks Book list: the books started and not finished
+  desc: a row of the Audiobooks and Books menus: the books in progress
   user: core
   <source>
-    *: "[In Progress]"
+    *: "In Progress"
   </source>
   <dest>
-    *: "[En curso]"
+    *: "En curso"
   </dest>
   <voice>
     *: "En curso"
@@ -22838,13 +22866,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_NEW
-  desc: top of the Audiobooks Book list: the books not started
+  desc: a row of the Audiobooks and Books menus: the books not started
   user: core
   <source>
-    *: "[Not Started]"
+    *: "Not Started"
   </source>
   <dest>
-    *: "[Sin empezar]"
+    *: "Sin empezar"
   </dest>
   <voice>
     *: "Sin empezar"
@@ -22852,13 +22880,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_FINISHED
-  desc: top of the Audiobooks Book list: the books finished
+  desc: a row of the Audiobooks and Books menus: the books finished
   user: core
   <source>
-    *: "[Finished]"
+    *: "Finished"
   </source>
   <dest>
-    *: "[Terminados]"
+    *: "Terminados"
   </dest>
   <voice>
     *: "Terminados"

@@ -623,7 +623,7 @@ static void book_str(char *dst, size_t cap, const uint8_t *v, uint32_t n,
 }
 
 /* A MOBI's title (EXTH 503, else the header's full name), first author
- * (EXTH 100), parts, and cover image (EXTH 201, from the first image
+ * (EXTH 100), subjects (EXTH 105), parts, and cover image (EXTH 201, from the first image
  * record) unless it is a GIF. Reads every text record for the parts. */
 int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
                  ts_book *out)
@@ -635,7 +635,7 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
     long len;
     int rc;
 
-    out->title[0] = out->author[0] = 0;
+    out->title[0] = out->author[0] = out->subjects[0] = 0;
     out->parts = 0;
     out->cover_at = -1;
     if (!m)
@@ -669,6 +669,13 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
                 else if (type == 100 && !out->author[0])
                     book_str(out->author, TS_BOOK_AUTHOR, r0 + p + 8, l - 8,
                              m->cs);
+                else if (type == 105)
+                {
+                    char s[TS_BOOK_SUBJECTS];
+
+                    book_str(s, sizeof s, r0 + p + 8, l - 8, m->cs);
+                    ts_book_subject(out, s);
+                }
                 else if (type == 201 && l == 12)
                     cover = be32(r0 + p + 8);
                 p += l;

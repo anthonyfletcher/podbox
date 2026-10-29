@@ -315,7 +315,9 @@ void file_index_init(void)
 {
     bg_task_init(&file_index_task);
 
-    /* Nothing to read on a first boot, or after the lists were deleted. */
-    if (!file_exists(FILE_INDEX_DOCS) && !file_exists(FILE_INDEX_IMAGES))
+    /* Nothing to read on a first boot, or after the lists were deleted; or
+     * a book index an older version wrote, which only a walk replaces. */
+    if ((!file_exists(FILE_INDEX_DOCS) && !file_exists(FILE_INDEX_IMAGES))
+        || book_index_stale())
         fi_wants_scan = true;
 }

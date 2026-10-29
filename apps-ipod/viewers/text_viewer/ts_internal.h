@@ -139,6 +139,9 @@ int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 
 /* ---- small helpers --------------------------------------------------- */
 
+/* Subject `s` onto the book's list: whole, once, and while there is room */
+void ts_book_subject(ts_book *b, const char *s);
+
 size_t ts_utf8_put(uint8_t *dst, uint32_t cp);      /* 1..4, 0 if invalid */
 int    ts_ascii_casecmp(const char *a, const char *b);
 int    ts_ascii_ncasecmp(const char *a, const char *b, size_t n);

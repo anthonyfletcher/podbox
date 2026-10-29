@@ -201,6 +201,9 @@ enum variables {
  *
  * 'available' gates a row that cannot always do its job; NULL means always. */
 static bool featured_artists_available(void);
+static bool shelf_finished_available(void);
+static bool shelf_not_started_available(void);
+static bool shelf_in_progress_available(void);
 
 static const struct builtin_row {
     const char *id;
@@ -226,6 +229,13 @@ static const struct builtin_row {
     { "featured_artists", LANG_FEATURED_ARTISTS, TABLE_FEATURED_ARTISTS, 0,
       featured_artists_available },
     { "quiz", LANG_QUIZ, TABLE_MUSIC_QUIZ, 0, NULL },
+    /* The Audiobooks shelves (book_shelf.c), the list in the param */
+    { "book_finished", LANG_BOOK_SHELF_ROW_FINISHED, TABLE_BOOK_SHELF,
+      BOOK_SHELF_FINISHED, shelf_finished_available },
+    { "book_not_started", LANG_BOOK_SHELF_ROW_NEW, TABLE_BOOK_SHELF,
+      BOOK_SHELF_NOT_STARTED, shelf_not_started_available },
+    { "book_in_progress", LANG_BOOK_SHELF_ROW_PROGRESS, TABLE_BOOK_SHELF,
+      BOOK_SHELF_IN_PROGRESS, shelf_in_progress_available },
 };
 
 /* The setting says what the user asked for. An empty table means the library
@@ -237,6 +247,32 @@ static const struct builtin_row {
 static bool featured_artists_available(void)
 {
     return global_settings.featured_artists && db_featured_count() > 0;
+}
+
+/* A shelf's row while Segregate Audiobooks keeps the books apart, unless
+ * the shelf is empty. Kept where the books cannot be counted. */
+static bool shelf_available(enum book_shelf kind)
+{
+    int counts[3];
+
+    if (!global_settings.segregate_audiobooks)
+        return false;
+    return !book_shelf_count(counts) || counts[kind] > 0;
+}
+
+static bool shelf_finished_available(void)
+{
+    return shelf_available(BOOK_SHELF_FINISHED);
+}
+
+static bool shelf_not_started_available(void)
+{
+    return shelf_available(BOOK_SHELF_NOT_STARTED);
+}
+
+static bool shelf_in_progress_available(void)
+{
+    return shelf_available(BOOK_SHELF_IN_PROGRESS);
 }
 
 /* Capacity 10 000 entries (for example 10k different artists) */
@@ -2236,25 +2272,6 @@ static struct book_resume resume_pos;
 static bool resume_row;             /* the level being shown has the row */
 static bool resume_armed;           /* the next playlist starts at it */
 
-/* Whether the level being shown is the Audiobooks menu's list of books, which
- * opens on the shelf's three rows (book_shelf.c) in place of <All tracks> and
- * <Random>: a book is listened to in order and from where it was left, and
- * where each one was left is what those rows sort by. The list of books is
- * the album level at the top of a menu that asks for spoken word -- under
- * Author the albums are a level down, and keep the usual rows. */
-static bool shelf_rows;
-/* The books on each shelf, when shelf_rows is; a shelf with none has no row.
- * -1 where they could not be counted, which keeps every row. */
-static int shelf_count[3];
-
-static const struct {
-    int lang_id;
-    enum book_shelf kind;
-} shelf_row[] = {
-    { LANG_BOOK_SHELF_ROW_FINISHED, BOOK_SHELF_FINISHED },
-    { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
-    { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
-};
 
 /* The album artist chosen above 'level', or -1 */
 static long level_artist(int level)
@@ -2607,10 +2624,6 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         header_count = header ? header_rows_fill(level - 1, tcs_buf, tcs_bufsz)
                               : 0;
         resume_row = book_resume_row(c, level, tag);
-        shelf_rows = global_settings.segregate_audiobooks && level == 0
-                     && tag == tag_album && csi_mentions_spoken();
-        if (shelf_rows && !book_shelf_count(shelf_count))
-            shelf_count[0] = shelf_count[1] = shelf_count[2] = -1;
     }
 
     /* Before the search: the table is built by searches of its own, which
@@ -2828,20 +2841,6 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     if (resume_row)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_RESUME,
                             ID2P(LANG_BOOK_RESUME), -1);
-
-    if (shelf_rows)
-    {
-        for (unsigned s = 0; s < ARRAYLEN(shelf_row); s++)
-        {
-            if (shelf_count[shelf_row[s].kind] == 0)
-                continue;
-            /* The list the row opens rides in extraseek, as the chart
-             * rows' do. */
-            dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_SHELF,
-                                ID2P(shelf_row[s].lang_id),
-                                shelf_row[s].kind);
-        }
-    }
 
     /* Neither over spoken word: a book is heard whole and in order, so
      * every track of an author, or of a book shuffled, is not something to
@@ -4268,8 +4267,8 @@ int browser_db_load(struct browser_context* c)
         pending_top_item = 1;
     }
 
-    /* Every list shows with its special rows -- <All tracks>, <Random>, the
-     * book shelf's -- scrolled off the top and the cursor on a real row,
+    /* Every list shows with its special rows -- <All tracks>, <Random> --
+     * scrolled off the top and the cursor on a real row,
      * however it was arrived at: opened, come back up to, or returned to from
      * a screen one of those rows led to. They are shortcuts, not what the list
      * is for, and a list that looked different depending on how it was reached

@@ -1,7 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to book_index.c: the title, author and cover of every ebook.
+ * Interface to book_index.c: the title, author, subjects and cover of
+ * every ebook.
  ****************************************************************************/
 #ifndef _BOOK_INDEX_H
 #define _BOOK_INDEX_H
@@ -12,12 +13,14 @@
 /* Memory the documents walk takes while it brings the index up to date */
 #define BOOK_INDEX_WORK_BYTES (160 * 1024)
 
-/* One book. title and author are empty where the book names none. */
+/* One book. title and author are empty where the book names none, and
+ * subjects too, else one to a line. */
 struct book_entry
 {
     const char *path;
     const char *title;
     const char *author;
+    const char *subjects;
     int parts;                  /* spine items */
     long cover_at;              /* the cover's offset in the file, or -1 */
     uint32_t cover_csize;       /* its size as stored */
@@ -34,6 +37,10 @@ void book_index_found(const char *path, unsigned long size,
                       unsigned long mtime);
 /* True when anything was added, changed or removed */
 bool book_index_end(bool completed);
+
+/* Whether the index is there but written by an older version, so cannot be
+ * read until the documents walk writes it again */
+bool book_index_stale(void);
 
 /* Whether `path` is a book the index takes */
 bool book_index_is_book(const char *path);
