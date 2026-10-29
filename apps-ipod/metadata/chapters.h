@@ -15,8 +15,9 @@
    has nothing to show, and a lone entry is how some encoders mark delay. */
 #define MIN_CHAPTERS 2
 
-/* whether "path" names a file that could carry chapter marks */
-bool chapters_possible(const char *path);
+/* whether "path" names a file that could carry chapter marks; "spoken" is
+   whether it is spoken word, which an .m4a has to be */
+bool chapters_possible(const char *path, bool spoken);
 
 /* read the chapter marks out of the file "id3" describes into "cue" */
 bool parse_chapters(struct mp3entry *id3, struct cuesheet *cue);

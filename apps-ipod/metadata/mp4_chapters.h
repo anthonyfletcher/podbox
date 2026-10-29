@@ -11,8 +11,9 @@
 #include "metadata.h"
 #include "cuesheet.h"
 
-/* whether "path" names a file that could carry MP4 chapter marks */
-bool mp4_chapters_possible(const char *path);
+/* whether "path" names a file that could carry MP4 chapter marks: an .m4b,
+   or an .m4a that is spoken word */
+bool mp4_chapters_possible(const char *path, bool spoken);
 
 /* fill "cue"'s entries from the file's chapter list, returning how many */
 int read_mp4_chapters(const char *path, struct cuesheet *cue);

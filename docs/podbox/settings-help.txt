@@ -317,8 +317,9 @@ and can be skipped through.
 [chapter marks]
 Reads the chapter list an audiobook carries inside it, so one long file shows
 its chapter names, skips between them and marks them on the progress bar. It
-reads .m4b files and .mp3 files with chapter frames, and a book of more than 99
-chapters lists the first 99 of them.
+reads .m4b files, .mp3 files with chapter frames, and .m4a, Ogg and Opus files
+tagged as spoken word, and a book of more than 99 chapters lists the first 99
+of them.
 
 [folder navigation]
 At the end of a folder, move on rather than stopping: to the next folder, or to

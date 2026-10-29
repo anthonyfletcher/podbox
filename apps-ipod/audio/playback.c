@@ -48,6 +48,7 @@
 #include "rbpaths.h"
 #include "metadata/cuesheet.h"
 #include "metadata/chapters.h"
+#include "database/db_spoken.h"
 #include "buffering.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
@@ -2031,7 +2032,9 @@ static bool audio_load_cuesheet(struct track_info *infop,
         /* A cuesheet beside the file wins: it was written for this track,
            where the chapter marks are whatever the encoder left behind. */
         bool has_chapters = !has_cue && global_settings.chapter_marks
-                            && chapters_possible(track_id3->path);
+                            && chapters_possible(track_id3->path,
+                                   db_spoken_is_spoken_genre(
+                                       track_id3->genre_string));
 
         if (has_cue || has_chapters)
         {

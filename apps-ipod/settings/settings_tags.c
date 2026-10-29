@@ -132,7 +132,7 @@ static const struct tag_row tag_rows[] = {
 { "single mode",         TAG_PLAYBACK,                           "stop after" },
 { "party mode",          TAG_PLAYBACK,                           "queue" },
 { "cuesheet support",    TAG_ADVANCED|TAG_PLAYBACK,                           "cue sheet" },
-{ "chapter marks",       TAG_ADVANCED|TAG_PLAYBACK,        "chapter audiobook book m4b" },
+{ "chapter marks",       TAG_ADVANCED|TAG_PLAYBACK,        "chapter audiobook book m4b m4a ogg opus" },
 { "folder navigation",   TAG_PLAYBACK,                           "auto change directory next folder random constrain start" },
 { "skip length",         TAG_ADVANCED|TAG_PLAYBACK,                           "podcast jump" },
 { "spoken word skip length", TAG_PLAYBACK,                                    "audiobook podcast jump" },

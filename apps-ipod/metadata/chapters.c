@@ -10,9 +10,10 @@
  * own name and author, which come from the tags rather than from the marks,
  * are put on here.
  *
- * The choice is made on the extension alone, because it is asked before the
- * cuesheet buffer is allocated and so has to be answered without opening
- * anything.
+ * The choice is made on the extension, and for the formats music also comes
+ * in -- .m4a, Ogg, Opus -- on whether the track is spoken word, because it
+ * is asked before the cuesheet buffer is allocated and so has to be answered
+ * without opening anything.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -23,10 +24,12 @@
 #include "chapters.h"
 #include "mp4_chapters.h"
 #include "id3_chapters.h"
+#include "ogg_chapters.h"
 
-bool chapters_possible(const char *path)
+bool chapters_possible(const char *path, bool spoken)
 {
-    return mp4_chapters_possible(path) || id3_chapters_possible(path);
+    return mp4_chapters_possible(path, spoken) || id3_chapters_possible(path)
+           || ogg_chapters_possible(path, spoken);
 }
 
 bool parse_chapters_path(const char *path, const char *book,
@@ -36,10 +39,12 @@ bool parse_chapters_path(const char *path, const char *book,
 
     memset(cue, 0, sizeof(struct cuesheet));
 
-    if (mp4_chapters_possible(path))
+    if (mp4_chapters_possible(path, true))
         found = read_mp4_chapters(path, cue);
     else if (id3_chapters_possible(path))
         found = read_id3_chapters(path, cue);
+    else if (ogg_chapters_possible(path, true))
+        found = read_ogg_chapters(path, cue);
 
     if (found < MIN_CHAPTERS)
         return false;

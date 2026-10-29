@@ -3,11 +3,11 @@
  *
  * Reading an audiobook's chapter marks out of the file itself.
  *
- * A chaptered .m4b is one long track carrying a list of the points where
- * its chapters begin. The list is filled into a struct cuesheet, which is
- * the shape the rest of the player already understands: the browser lists
- * it, the progress bar marks it, and skip moves between its entries. Only
- * the reader is new.
+ * A chaptered .m4b, or .m4a, is one long track carrying a list of the points
+ * where its chapters begin. The list is filled into a struct cuesheet, which
+ * is the shape the rest of the player already understands: the browser
+ * lists it, the progress bar marks it, and skip moves between its entries.
+ * Only the reader is new.
  *
  * Books carry that list one of two ways, and both are read here. Nero's
  * "chpl" is a flat table in the file's user data, and is what most
@@ -539,11 +539,14 @@ static int read_chap(int fd, off_t moov_start, off_t moov_end,
     return 0;
 }
 
-bool mp4_chapters_possible(const char *path)
+/* An .m4a is looked in only when it is a book: every music track in one
+ * would otherwise cost a walk of its boxes on each load */
+bool mp4_chapters_possible(const char *path, bool spoken)
 {
     const char *ext = strrchr(path, '.');
 
-    return ext && !strcasecmp(ext, ".m4b");
+    return ext && (!strcasecmp(ext, ".m4b")
+                   || (spoken && !strcasecmp(ext, ".m4a")));
 }
 
 int read_mp4_chapters(const char *path, struct cuesheet *cue)

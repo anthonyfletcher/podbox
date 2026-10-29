@@ -4487,7 +4487,7 @@ static int open_single_book(const char *path, const char *book,
     struct cuesheet *cue;
     size_t bufsize = 0;
 
-    if (!global_settings.chapter_marks || !chapters_possible(path)
+    if (!global_settings.chapter_marks || !chapters_possible(path, true)
         || has_cuesheet(path))
         return play_single_track(path, book);
 
