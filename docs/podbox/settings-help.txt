@@ -1134,8 +1134,8 @@ left in it; Book Progress shows how far through the book you are.
 [text viewer pictures]
 Shows a book's pictures, its cover among them, each on a page of its own,
 fitted inside the margins with no footer. Off, or while Read Aloud is on,
-they are passed over, as is a picture that will not open. EPUB and FB2
-books only.
+they are passed over, as is a picture that will not open. EPUB, FB2 and
+MOBI books only.
 
 [text viewer orientation]
 Holds the page sideways, taller than wide, for reading in one hand. Right

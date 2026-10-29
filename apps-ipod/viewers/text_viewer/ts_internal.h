@@ -124,6 +124,16 @@ int ts_fb2_picture(const bs_io *io, ts_fb2_pictures *p, const char *href,
                    bs_off_t *at, uint32_t *len);
 int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
                   void *ud);
+/* The same for the stream ts_open_mobi() returns. A picture's href is its
+ * recindex, and the picture is stored as it is. */
+int ts_open_mobi(ts_ctx *c, bs_stream **out);
+int ts_mobi_seek_part(bs_stream *st, int part);
+int ts_mobi_parts(const bs_stream *st);
+long ts_mobi_part_size(const bs_stream *st, int part);
+int ts_mobi_picture(const bs_stream *st, const char *href, bs_off_t *at,
+                    uint32_t *csize);
+int ts_mobi_toc(bs_stream *st, int (*cb)(void *, const char *, int),
+                void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);
 int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 

@@ -6,7 +6,7 @@
  ****************************************************************************/
 
 #include "ts_internal.h"
-#include "files/zip_member.h"       /* MEMBER_BASE64 */
+#include "files/zip_member.h"       /* MEMBER_BASE64, MEMBER_STORED */
 
 #ifndef SEEK_SET
 #define SEEK_SET 0
@@ -25,6 +25,7 @@ const char *ts_strerror(int err)
     case BS_ERR_FORMAT: return "malformed file";
     case BS_ERR_UNSUP:  return "unsupported variant";
     case BS_ERR_INVAL:  return "invalid argument";
+    case TS_ERR_LOCKED: return "locked (DRM)";
     }
     return "unknown error";
 }
@@ -35,7 +36,8 @@ const char *ts_format_name(ts_format f)
      * members, so it is an unsigned type and the upper bound is the only
      * check needed. */
     static const char *n[] = { "unknown", "text", "markdown", "html", "rtf",
-                               "fb2", "epub", "docx", "pdf", "lyrics" };
+                               "fb2", "epub", "docx", "pdf", "lyrics",
+                               "mobi" };
     return ((size_t)f < sizeof n / sizeof *n) ? n[f] : "unknown";
 }
 
@@ -166,6 +168,8 @@ static ts_format probe_ext(const char *name)
     if (!ts_ascii_casecmp(e, "epub"))                     return TS_FMT_EPUB;
     if (!ts_ascii_casecmp(e, "docx"))                     return TS_FMT_DOCX;
     if (!ts_ascii_casecmp(e, "pdf"))                      return TS_FMT_PDF;
+    if (!ts_ascii_casecmp(e, "mobi") || !ts_ascii_casecmp(e, "prc") ||
+        !ts_ascii_casecmp(e, "azw"))                      return TS_FMT_MOBI;
     /* By extension only. A lyrics file is plain text with tags in it, so a
      * content sniff would claim .txt files that merely start with a bracket. */
     if (!ts_ascii_casecmp(e, "lrc") || !ts_ascii_casecmp(e, "lrc8") ||
@@ -199,6 +203,7 @@ static ts_format probe(const uint8_t *raw, size_t rawn, const char *name,
     ts_format e;
 
     if (starts(raw, rawn, "%PDF"))          return TS_FMT_PDF;
+    if (rawn >= 68 && !memcmp(raw + 60, "BOOKMOBI", 8)) return TS_FMT_MOBI;
     if (starts(raw, rawn, "{\\rtf"))        return TS_FMT_RTF;
     if (starts(raw, rawn, "PK\x03\x04") ||
         starts(raw, rawn, "PK\x05\x06"))    return TS_FMT_EPUB; /* refined later */
@@ -286,6 +291,7 @@ int ts_open(ts_source **out, const bs_io *io, const char *name,
     case TS_FMT_FB2:    rc = ts_open_fb2(&ctx, &s->pipe);          break;
     case TS_FMT_PDF:    rc = ts_open_pdf(&ctx, &s->pipe);          break;
     case TS_FMT_LYRICS: rc = ts_open_lyrics(&ctx, &s->pipe);       break;
+    case TS_FMT_MOBI:   rc = ts_open_mobi(&ctx, &s->pipe);         break;
     case TS_FMT_EPUB:
     case TS_FMT_DOCX:   rc = ts_open_epub(&ctx, &s->pipe);         break;
     default:            rc = BS_ERR_UNSUP;                         break;
@@ -380,12 +386,16 @@ int ts_rewind(ts_source *s)
 
 int ts_part_count(const ts_source *s)
 {
-    return s && s->parts ? ts_zipdoc_parts(s->parts) : 0;
+    if (!s || !s->parts) return 0;
+    return s->fmt == TS_FMT_MOBI ? ts_mobi_parts(s->parts)
+                                 : ts_zipdoc_parts(s->parts);
 }
 
 long ts_part_size(const ts_source *s, int part)
 {
-    return s && s->parts ? ts_zipdoc_part_size(s->parts, part) : 0;
+    if (!s || !s->parts) return 0;
+    return s->fmt == TS_FMT_MOBI ? ts_mobi_part_size(s->parts, part)
+                                 : ts_zipdoc_part_size(s->parts, part);
 }
 
 int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
@@ -403,6 +413,13 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
         if (rc == BS_OK) *at = (long)data;
         return rc;
     }
+    if (s && s->parts && s->fmt == TS_FMT_MOBI) {
+        rc = ts_mobi_picture(s->parts, href, &data, csize);
+        *usize = *csize;
+        *method = MEMBER_STORED;
+        if (rc == BS_OK) *at = (long)data;
+        return rc;
+    }
     if (!s || !s->parts || s->fmt != TS_FMT_EPUB) return BS_ERR_UNSUP;
     rc = ts_zipdoc_picture(s->parts, part, href, &data, csize, usize, method);
     if (rc == BS_OK) *at = (long)data;
@@ -415,7 +432,8 @@ int ts_seek_part(ts_source *s, int part)
 
     if (!s) return BS_ERR_INVAL;
     if (!s->parts) return BS_ERR_UNSUP;
-    rc = ts_zipdoc_seek_part(s->parts, part);
+    rc = s->fmt == TS_FMT_MOBI ? ts_mobi_seek_part(s->parts, part)
+                               : ts_zipdoc_seek_part(s->parts, part);
     if (rc != BS_OK) return rc;
     s->eof = s->err = 0;
     s->hold_n = 0;
@@ -427,7 +445,8 @@ int ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
 {
     if (!s) return BS_ERR_INVAL;
     if (!s->parts) return BS_ERR_UNSUP;
-    return ts_zipdoc_toc(s->parts, cb, ud);
+    return s->fmt == TS_FMT_MOBI ? ts_mobi_toc(s->parts, cb, ud)
+                                 : ts_zipdoc_toc(s->parts, cb, ud);
 }
 
 void ts_close(ts_source *s)

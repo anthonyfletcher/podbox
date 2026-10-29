@@ -18,6 +18,9 @@ extern "C" {
 
 const char *ts_strerror(int err);
 
+/* Beside the BS_ERR_* codes: a book locked by DRM */
+#define TS_ERR_LOCKED (-16)
+
 /* ---- formats --------------------------------------------------------- */
 
 typedef enum {
@@ -30,7 +33,8 @@ typedef enum {
     TS_FMT_EPUB,
     TS_FMT_DOCX,
     TS_FMT_PDF,
-    TS_FMT_LYRICS        /* .lrc / .lrc8 / .snc, read without the timing */
+    TS_FMT_LYRICS,       /* .lrc / .lrc8 / .snc, read without the timing */
+    TS_FMT_MOBI          /* .mobi / .prc / .azw, MOBI 6 */
 } ts_format;
 
 const char *ts_format_name(ts_format f);
@@ -105,7 +109,8 @@ long ts_read(ts_source *s, char *buf, size_t n);
  * ts_seek_part(). Cheap for every format. */
 int  ts_rewind(ts_source *s);
 
-/* Parts: an EPUB's spine items, each its own chapter file. 0 for a format
+/* Parts: an EPUB's spine items, each its own chapter file, or a MOBI's
+ * stretches between page breaks. 0 for a format
  * without them. ts_seek_part() makes ts_read() return part `part` alone,
  * from its first byte to its end; BS_ERR_UNSUP without parts. */
 int  ts_part_count(const ts_source *s);
@@ -147,11 +152,12 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
 #define TS_BOOK_TITLE  128
 #define TS_BOOK_AUTHOR 96
 
-/* What the book index keeps of an EPUB or FB2: its title and first author,
- * empty where it names none, its spine count (1 for an FB2), and where its
+/* What the book index keeps of an EPUB, FB2 or MOBI: its title and first
+ * author, empty where it names none, its parts (1 for an FB2), and where its
  * cover image lies in the file -- cover_at is -1 when it has none. An EPUB's
  * cover is found as reading.md 6 orders it, the first three ways (the cover
- * page's first image is not looked for); an FB2's is its coverpage's. */
+ * page's first image is not looked for); an FB2's is its coverpage's; a
+ * MOBI's is the image EXTH 201 names, unless it is a GIF. */
 typedef struct {
     char     title[TS_BOOK_TITLE];
     char     author[TS_BOOK_AUTHOR];
@@ -169,6 +175,10 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
 /* The same for an FB2, which needs no arena. BS_OK, or an error for one that
  * cannot be read (a UTF-16 FB2 among them). */
 int ts_fb2_book(const bs_io *io, ts_book *out);
+/* The same for a MOBI, which reads all its text to count the parts; the
+ * arena as for ts_book_read(). TS_ERR_LOCKED for a locked one. */
+int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
+                 ts_book *out);
 
 ts_format ts_source_format(const ts_source *s);
 ts_charset ts_source_charset(const ts_source *s);   /* as detected */

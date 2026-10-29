@@ -59,7 +59,10 @@ bool book_index_is_book(const char *path)
     const char *dot = strrchr(path, '.');
 
     return dot != NULL && (strcasecmp(dot, ".epub") == 0
-                           || strcasecmp(dot, ".fb2") == 0);
+                           || strcasecmp(dot, ".fb2") == 0
+                           || strcasecmp(dot, ".mobi") == 0
+                           || strcasecmp(dot, ".prc") == 0
+                           || strcasecmp(dot, ".azw") == 0);
 }
 
 void book_index_each(book_index_fn fn, void *data)
@@ -202,7 +205,9 @@ static bool write_new(const char *path, uint64_t key, unsigned long size,
         const char *dot = strrchr(path, '.');
         int rc = strcasecmp(dot, ".fb2") == 0
                  ? ts_fb2_book(&io, &b)
-                 : ts_book_read(&io, work->arena, sizeof(work->arena), &b);
+                 : strcasecmp(dot, ".epub") == 0
+                 ? ts_book_read(&io, work->arena, sizeof(work->arena), &b)
+                 : ts_mobi_book(&io, work->arena, sizeof(work->arena), &b);
 
         if (rc != BS_OK)
         {

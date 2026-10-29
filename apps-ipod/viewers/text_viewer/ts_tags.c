@@ -279,7 +279,8 @@ static void process_tag(tg_st *s)
     name[n] = 0;
     if (!n) return;
 
-    /* A picture: <img src>, or the <image> an <svg> wraps; in an FB2, an
+    /* A picture: <img src> (a MOBI's <img recindex>), or the <image> an
+     * <svg> wraps; in an FB2, an
      * <image> of the text, and the first of its coverpage, which is in
      * the skipped <description> */
     if (s->pictures && !close) {
@@ -291,7 +292,8 @@ static void process_tag(tg_st *s)
                     ts_ascii_casecmp(s->skip_name, "description") == 0));
 
         if ((!s->skip_depth && ts_ascii_casecmp(name, "img") == 0 &&
-             tag_attr(t, "src", href, sizeof href)) ||
+             (tag_attr(t, "src", href, sizeof href) ||
+              tag_attr(t, "recindex", href, sizeof href))) ||
             (s->skip_depth && ts_ascii_casecmp(s->skip_name, "svg") == 0 &&
              ts_ascii_casecmp(name, "image") == 0 &&
              (tag_attr(t, "xlink:href", href, sizeof href) ||

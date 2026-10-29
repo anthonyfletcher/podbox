@@ -313,6 +313,13 @@ int ts_fb2_book(const bs_io *io, ts_book *out)
     return BS_ERR_UNSUP;
 }
 
+int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
+                 ts_book *out)
+{
+    (void)io; (void)arena; (void)arena_size; (void)out;
+    return BS_ERR_UNSUP;
+}
+
 int ts_io_core(bs_io *io, struct ts_core_file *f, const char *path)
 {
     (void)io; (void)f; (void)path;
