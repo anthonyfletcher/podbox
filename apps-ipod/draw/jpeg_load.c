@@ -171,7 +171,7 @@ struct jpeg
     int last_dc_val[3];
     int h_scale[2]; /* horizontal scalefactor = (2**N) / 8 */
     int v_scale[2]; /* same as above, for vertical direction */
-    int k_need[2]; /* per component zig-zag index of last needed coefficient */
+    int k_need[2]; /* per component coefficients needed, in zig-zag order */
     int zero_need[2]; /* per compenent number of coefficients to zero */
     jpeg_pix_t *img_buf;
 
@@ -2134,7 +2134,7 @@ static size_t prog_setup(struct jpeg *p_jpeg, char *buf)
         int hs = c ? 1 : h0, vs = c ? 1 : v0;
         int kn = p_jpeg->k_need[!!c];
 
-        pr->nstore[c] = kn >= 63 ? 64 : (kn ? kn : 1);
+        pr->nstore[c] = kn;
         pr->stripe_w[c] = p_jpeg->x_mbl * hs;
         pr->bw[c] = ((p_jpeg->x_size * hs + h0 - 1) / h0 + 7) / 8;
         pr->bh[c] = ((p_jpeg->y_size * vs + v0 - 1) / v0 + 7) / 8;
@@ -2180,8 +2180,7 @@ static void prog_plan(struct jpeg *p_jpeg)
     for (c = 0; c < 3; c++)
     {
         int kn = p_jpeg->k_need[!!c];
-        want[c] = kn >= 63 ? ~(uint64_t)0
-                           : ((uint64_t)1 << (kn ? kn : 1)) - 1;
+        want[c] = kn == 64 ? ~(uint64_t)0 : ((uint64_t)1 << kn) - 1;
     }
     for (i = pr->nscans - 1; i >= 0; i--)
     {
@@ -2766,14 +2765,14 @@ static void set_idct_scale(struct jpeg *p_jpeg)
         p_jpeg->zero_need[0] = (decode_w << 3) + decode_h;
     else
         p_jpeg->zero_need[0] = (decode_h << 3) + decode_w;
-    p_jpeg->k_need[0] = zig[(decode_h << 3) + decode_w];
+    p_jpeg->k_need[0] = zig[(decode_h << 3) + decode_w] + 1;
     decode_w = BIT_N(MIN(p_jpeg->h_scale[1],3)) - 1;
     decode_h = BIT_N(MIN(p_jpeg->v_scale[1],3)) - 1;
     if (p_jpeg->v_scale[1] > 2)
         p_jpeg->zero_need[1] = (decode_w << 3) + decode_h;
     else
         p_jpeg->zero_need[1] = (decode_h << 3) + decode_w;
-    p_jpeg->k_need[1] = zig[(decode_h << 3) + decode_w];
+    p_jpeg->k_need[1] = zig[(decode_h << 3) + decode_w] + 1;
 }
 
 /* One row of MCUs of decoded pixels, at the scale now set. */
