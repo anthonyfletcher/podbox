@@ -788,6 +788,10 @@ supports artwork in lists, or the rows are tall and empty.
 Draws a photograph beside each author in the Audiobooks browser, from a
 folder.jpg in the author's folder. Without one the row shows a placeholder.
 
+[database book art]
+Draws each book's cover beside its row in the Books lists. Needs a theme that
+supports artwork in lists, or the rows are tall and empty.
+
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.
@@ -1141,7 +1145,9 @@ MOBI books only.
 [text viewer orientation]
 Holds the page sideways, taller than wide, for reading in one hand. Right
 Hand turns pages with PLAY and MENU, Left Hand with MENU and PLAY. Double-click
-PLAY on an upright page to turn it, the button now at the top to go back.
+PLAY on an upright page to turn it. Sideways, the button at the top leaves, as
+MENU does upright; hold the one at the bottom to stand the page up again, or
+double-click it to swap hands.
 
 [text viewer wheel scrubs]
 Turning the wheel moves through the book a percent at a time, showing the

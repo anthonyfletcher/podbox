@@ -624,6 +624,13 @@ static long tv_pic_start;
 static int tv_pic_held, tv_pic_drawn;
 static bool tv_pic_stopped;
 
+static void tv_picture_bar_box(int *x, int *y, int *w)
+{
+    *w = tv.vp.width / 2;
+    *x = (tv.vp.width - *w) / 2;
+    *y = tv.vp.height / 2 - 2;
+}
+
 static bool tv_picture_row(int done, int rows)
 {
     struct screen *d = &screens[SCREEN_MAIN];
@@ -641,13 +648,11 @@ static bool tv_picture_row(int done, int rows)
 
     if (rows <= 0 || TIME_BEFORE(current_tick, tv_pic_start + TV_PIC_BAR_AFTER))
         return true;
-    w = tv.vp.width / 2;
+    tv_picture_bar_box(&x, &y, &w);
     fill = (int)((long)w * done / rows);
     if (fill == tv_pic_drawn)
         return true;
     tv_pic_drawn = fill;
-    x = (tv.vp.width - w) / 2;
-    y = tv.vp.height / 2 - 2;
     d->drawrect(x, y, w, 5);
     d->fillrect(x, y, fill, 5);
     if (tv_side)
@@ -722,6 +727,16 @@ static bool tv_picture_decode(const char *href, int w, int h)
                     | FORMAT_DITHER, &format_native);
     cpu_boost(false);
     image_row_hook = NULL;
+    if (tv_pic_drawn >= 0)
+    {   /* the bar, which a picture smaller than the page leaves showing */
+        struct screen *d = &screens[SCREEN_MAIN];
+        int x, y, bw;
+
+        tv_picture_bar_box(&x, &y, &bw);
+        d->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
+        d->fillrect(x, y, bw, 5);
+        d->set_drawmode(DRMODE_SOLID);
+    }
     close(src.fd);
     if (method != MEMBER_STORED)
         remove(TV_PIC_TMP);
@@ -1433,18 +1448,22 @@ static bool tv_next_part(void)
     return false;
 }
 
-/* The last page of the chapter before with text, laid out from its start */
-static bool tv_prev_part(void)
+/* The last page of the last chapter with text before `part`, laid out from
+ * its start */
+static bool tv_end_before(int part)
 {
-    int part;
-
-    for (part = tv.part - 1; part >= 0; part--)
+    while (--part >= 0)
         if (tv_enter_part(part))
         {
             tv_resume_to(TV_OFF_MAX);
             return true;
         }
     return false;
+}
+
+static bool tv_prev_part(void)
+{
+    return tv_end_before(tv.part);
 }
 
 /* The next page, crossing into the next chapter from the last page of one.
@@ -1471,12 +1490,15 @@ static bool tv_advance(void)
     return false;
 }
 
+/* At the end, the page is drawn again: looking past it may have put the
+ * loading box over it */
 static void tv_next_page(void)
 {
-    if (!tv_advance())
-        return;
+    bool moved = tv_advance();
+
     tv_draw();
-    tv_speak_page();
+    if (moved)
+        tv_speak_page();
 }
 
 static void tv_prev_page(void)
@@ -1513,6 +1535,7 @@ static void tv_turn_page(void)
     if (!tv_advance())
     {
         tv_reading = false;
+        tv_draw();
         return;
     }
     tv_draw();
@@ -1742,14 +1765,23 @@ static void tv_place_set(struct tv_place *p, int part, off_t off, off_t size,
     strmemccpy(p->path, path, sizeof(p->path));
 }
 
-/* The page on screen is the book's last: its last chapter's last page */
+/* A finished book opened stays finished until a page is turned: the place
+ * it was opened at, kept while it is */
+static bool tv_open_finished;
+static int tv_open_part;
+static off_t tv_open_pos;
+
+/* The page on screen is the book's last: its last chapter's last page, or
+ * still the one a finished book was opened at */
 static bool tv_at_book_end(void)
 {
-    return (!tv.nparts || tv.part == tv.nparts - 1) && tv_at_end();
+    return ((!tv.nparts || tv.part == tv.nparts - 1) && tv_at_end())
+           || (tv_open_finished && tv.part == tv_open_part
+               && tv.pos == tv_open_pos);
 }
 
 /* The saved place in `file`, 0 and 0 if none; *part may be
- * TV_PART_UNKNOWN */
+ * TV_PART_UNKNOWN. Whether it is finished goes in tv_open_finished. */
 static off_t tv_resume_load(const char *file, off_t size, int *part)
 {
     struct libfile_header h;
@@ -1758,6 +1790,7 @@ static off_t tv_resume_load(const char *file, off_t size, int *part)
     int fd = tv_places_open(&h);
 
     *part = 0;
+    tv_open_finished = false;
     if (fd < 0)
         return 0;
 
@@ -1765,6 +1798,7 @@ static off_t tv_resume_load(const char *file, off_t size, int *part)
     {
         if (strcmp(p.path, file))
             continue;
+        tv_open_finished = p.flags & TV_PLACE_FINISHED;
         if ((off_t)p.size == size)
         {
             *part = p.part;
@@ -2193,14 +2227,17 @@ static void tv_setup_screen(void)
  * full-screen drawing and re-applies whatever the reader changed. */
 /* ---- contents --------------------------------------------------------- */
 
-/* Rows the contents list holds, and the bytes of each title kept */
-#define TV_TOC_MAX   320
-#define TV_TOC_TITLE 46
+/* Rows the contents list holds, and the bytes of each title and anchor
+ * kept */
+#define TV_TOC_MAX    320
+#define TV_TOC_TITLE  46
+#define TV_TOC_ANCHOR 32
 
 struct tv_toc_entry
 {
     int16_t part;
     char title[TV_TOC_TITLE];
+    char anchor[TV_TOC_ANCHOR];     /* the id it points at, "" for the start */
 };
 
 struct tv_toc
@@ -2209,15 +2246,19 @@ struct tv_toc
     int n;
 };
 
-/* ts_toc()'s callback. Sections within one chapter file collapse into its
- * first entry: a jump goes to the start of a file. */
-static int tv_toc_add(void *ud, const char *title, int part)
+/* ts_toc()'s callback. An entry pointing where the one before it does, such
+ * as a chapter's subtitle, or a second at the start of a file, is left out. */
+static int tv_toc_add(void *ud, const char *title, int part,
+                      const char *anchor)
 {
     struct tv_toc *t = ud;
     char *d;
     size_t n;
 
-    if (t->n && t->e[t->n - 1].part == part)
+    if (strlen(anchor) >= TV_TOC_ANCHOR)
+        anchor = "";                /* too long to keep: the file's start */
+    if (t->n && t->e[t->n - 1].part == part
+        && (!anchor[0] || !strcmp(t->e[t->n - 1].anchor, anchor)))
         return 0;
     if (t->n == TV_TOC_MAX)
         return 1;
@@ -2231,6 +2272,7 @@ static int tv_toc_add(void *ud, const char *title, int part)
     }
     memcpy(d, title, n);
     d[n] = '\0';
+    strcpy(t->e[t->n].anchor, anchor);
     t->e[t->n++].part = part;
     return 0;
 }
@@ -2248,15 +2290,17 @@ bool text_viewer_has_contents(void)
 }
 
 /* The book's contents, from its own table of contents, or one row per
- * chapter file with text without one; a pick opens that chapter. Reading the contents
- * ends the chapter being read, so without a pick the page on screen is laid
- * out again. Returns 1 to close the menu after a pick. */
+ * chapter file with text without one; a pick opens that chapter, at the
+ * page its id is on when it starts inside a file. Reading the contents ends
+ * the chapter being read, so without a pick the page on screen is laid out
+ * again. Returns 1 to close the menu after a pick. */
 int text_viewer_contents(void)
 {
     struct simplelist_info info;
     struct tv_toc toc = { NULL, 0 };
     int handle, part = tv.part, sel = 0, target = -1, i, rc;
     off_t pos = tv.pos;
+    char anchor[TV_TOC_ANCHOR] = "";
 
     handle = core_alloc(TV_TOC_MAX * sizeof(struct tv_toc_entry));
     if (handle <= 0)
@@ -2289,24 +2333,44 @@ int text_viewer_contents(void)
                 *nl = '\0';
             if (!*s)
                 continue;
-            tv_toc_add(&toc, s, i);
+            tv_toc_add(&toc, s, i, "");
         }
     }
     cpu_boost(false);
 
+    /* The entry the page on screen is in: the first of its file, as where
+     * the others start is not known until one is picked */
     for (i = 0; i < toc.n; i++)
-        if (toc.e[i].part <= part)
-            sel = i;                /* the entry the page on screen is in */
+        if (toc.e[i].part < part
+            || (toc.e[i].part == part && (i == 0 || toc.e[i - 1].part < part)))
+            sel = i;
     simplelist_info_init(&info, str(LANG_BROWSE_CHAPTERS), toc.n, &toc);
     info.get_name = tv_toc_name;
     info.selection = sel;
     simplelist_show_list(&info);
     if (info.selection >= 0)
+    {
         target = toc.e[info.selection].part;
+        strcpy(anchor, toc.e[info.selection].anchor);
+    }
 
     core_unpin(handle);
     core_free(handle);
 
+    /* An entry inside a file: laid out from where its id is */
+    if (target >= 0 && anchor[0])
+    {
+        long off;
+
+        cpu_boost(true);
+        rc = ts_anchor(tv.src, target, anchor, &off);
+        cpu_boost(false);
+        if (rc == BS_OK && tv_enter_part(target))
+        {
+            tv_resume_to((off_t)off);
+            return 1;
+        }
+    }
     if (target >= 0 && (tv_enter_part(target) || tv_next_part()))
         return 1;
     tv_enter_part(part);
@@ -2390,7 +2454,7 @@ static void tv_scrub_end(bool go)
             if (tv.part == part && within > 0)
                 tv_resume_to((off_t)((int64_t)tv_text_len() * within / 1000));
         }
-        else
+        else if (!tv_end_before(part))  /* empty to the end: its last text */
             tv_enter_part(0);
     }
     tv_draw();
@@ -2457,10 +2521,10 @@ enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_LEAVE, TV_KEY_USB };
 static void tv_event_save(void *param);
 
 /* A raw button while sideways (reading.md 4.1). Forward is the button on the
- * right as the player is held, and Select; back is the one on the left, and
- * a second click of it within TV_DOUBLE_CLICK turns forward again and swaps
- * hands. The button now at the top goes upright on a double-click and opens
- * the settings when held; held Select leaves. */
+ * right as the player is held, and Select; back is the one on the left. The
+ * button now at the top does what MENU does upright: leaves, and opens the
+ * settings when held. The one at the bottom swaps hands on a double-click
+ * and goes upright when held. Held Select leaves too. */
 static enum tv_key tv_side_button(long b)
 {
     static long held, last_click;
@@ -2469,6 +2533,7 @@ static enum tv_key tv_side_button(long b)
     long fwd = right ? BUTTON_PLAY : BUTTON_MENU;
     long back = right ? BUTTON_MENU : BUTTON_PLAY;
     long top = right ? BUTTON_RIGHT : BUTTON_LEFT;
+    long bottom = right ? BUTTON_LEFT : BUTTON_RIGHT;
     long base = b & ~(BUTTON_REPEAT | BUTTON_REL);
     bool twice;
 
@@ -2497,6 +2562,8 @@ static enum tv_key tv_side_button(long b)
             return TV_KEY_LEAVE;
         if (base == top)
             return TV_KEY_MENU;
+        if (base == bottom)
+            tv_orient(TV_ORIENT_UPRIGHT);
         return TV_KEY_NONE;
     }
     if (!(b & BUTTON_REL))
@@ -2514,22 +2581,19 @@ static enum tv_key tv_side_button(long b)
 
     if (tv_scrub_pct >= 0)
     {
-        if (base == BUTTON_SELECT || base == back)
+        if (base == BUTTON_SELECT || base == back || base == top)
             tv_scrub_end(base == BUTTON_SELECT);
         return TV_KEY_NONE;
     }
 
     if (base == BUTTON_SELECT || base == fwd)
         tv_next_page();
-    else if (base == back && twice)
-    {
-        tv_next_page();
-        tv_orient(right ? TV_ORIENT_LEFT : TV_ORIENT_RIGHT);
-    }
     else if (base == back)
         tv_prev_page();
-    else if (base == top && twice)
-        tv_orient(TV_ORIENT_UPRIGHT);
+    else if (base == top)
+        return TV_KEY_LEAVE;
+    else if (base == bottom && twice)
+        tv_orient(right ? TV_ORIENT_LEFT : TV_ORIENT_RIGHT);
     return TV_KEY_NONE;
 }
 
@@ -2637,6 +2701,8 @@ int text_viewer(const char *file)
 
     resume = tv_resume_load(file, tv.file_size, &part);
     tv_open_at(part, resume);
+    tv_open_part = tv.part;
+    tv_open_pos = tv.pos;
 
     tv_draw();
     tv_speak_page();

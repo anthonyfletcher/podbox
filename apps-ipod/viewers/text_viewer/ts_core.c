@@ -462,13 +462,21 @@ int ts_seek_part(ts_source *s, int part)
     return BS_OK;
 }
 
-int ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
-           void *ud)
+int ts_toc(ts_source *s, ts_toc_fn cb, void *ud)
 {
     if (!s) return BS_ERR_INVAL;
     if (!s->parts) return BS_ERR_UNSUP;
     return s->fmt == TS_FMT_MOBI ? ts_mobi_toc(s->parts, cb, ud)
                                  : ts_zipdoc_toc(s->parts, cb, ud);
+}
+
+int ts_anchor(ts_source *s, int part, const char *anchor, long *off)
+{
+    if (!s) return BS_ERR_INVAL;
+    if (!s->parts || s->fmt != TS_FMT_EPUB) return BS_ERR_UNSUP;
+    s->eof = s->err = 0;
+    s->hold_n = 0;
+    return ts_zipdoc_anchor(s->parts, part, anchor, off);
 }
 
 void ts_close(ts_source *s)

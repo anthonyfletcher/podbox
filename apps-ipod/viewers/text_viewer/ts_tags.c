@@ -153,6 +153,9 @@ typedef struct {
     int   cover_done;              /* an FB2's coverpage picture is out */
     int   head_depth;              /* headings open */
     int   head_wait, head_out;     /* TS_HEADING_OPEN due, and written */
+    char  anchor[64];              /* the id watched for, or "" */
+    long  anchor_at;               /* where it was seen, or -1 */
+    long  taken;                   /* bytes handed out since the rewind */
     ts_pend out;
 } tg_st;
 
@@ -278,6 +281,16 @@ static void process_tag(tg_st *s)
     }
     name[n] = 0;
     if (!n) return;
+
+    if (s->anchor[0] && s->anchor_at < 0 && !close) {
+        char id[64];
+
+        if ((tag_attr(t, "id", id, sizeof id) ||
+             (ts_ascii_casecmp(name, "a") == 0 &&
+              tag_attr(t, "name", id, sizeof id))) &&
+            !strcmp(id, s->anchor))
+            s->anchor_at = s->taken + (long)(s->out.tail - s->out.head);
+    }
 
     /* A picture: <img src> (a MOBI's <img recindex>), or the <image> an
      * <svg> wraps; in an FB2, an
@@ -454,6 +467,15 @@ static int fill(tg_st *s)
     return BS_OK;
 }
 
+/* Counted as it goes: a tag fed mid-pull reads the count for an anchor */
+static size_t take(tg_st *s, uint8_t *buf, size_t n)
+{
+    size_t got = ts_pend_take(&s->out, buf, n);
+
+    s->taken += (long)got;
+    return got;
+}
+
 static int tg_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 {
     tg_st *s = st->st;
@@ -461,14 +483,14 @@ static int tg_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
 
     while (done < n) {
         int rc;
-        done += ts_pend_take(&s->out, buf + done, n - done);
+        done += take(s, buf + done, n - done);
         if (done == n) break;
         if (ts_pend_free(&s->out) < 16) continue;
 
         rc = fill(s);
         if (rc != BS_OK) return rc;
         if (s->ipos >= s->ilen) {           /* end of input */
-            done += ts_pend_take(&s->out, buf + done, n - done);
+            done += take(s, buf + done, n - done);
             break;
         }
         feed(s, s->in[s->ipos++]);
@@ -523,7 +545,22 @@ void ts_tags_rewind(bs_stream *st)
 
     s->started = 0;
     s->nl_pending = s->sp_pending = 0;
+    s->taken = 0;
     ts_pend_reset(&s->out);     /* text not yet taken would shift offsets */
+}
+
+void ts_tags_anchor(bs_stream *st, const char *anchor)
+{
+    tg_st *s = st->st;
+
+    strncpy(s->anchor, anchor, sizeof s->anchor - 1);
+    s->anchor[sizeof s->anchor - 1] = 0;
+    s->anchor_at = -1;
+}
+
+long ts_tags_anchor_at(const bs_stream *st)
+{
+    return ((const tg_st *)st->st)->anchor_at;
 }
 
 bs_stream *ts_tags_stream(bs_arena *a, bs_stream *src, ts_tag_profile p,

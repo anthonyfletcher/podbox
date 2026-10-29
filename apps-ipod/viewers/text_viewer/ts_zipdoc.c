@@ -390,7 +390,7 @@ int ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
 typedef struct {
     sp_st *sp;
     const char *base;         /* the contents member's own path */
-    int (*cb)(void *, const char *, int);
+    ts_toc_fn cb;
     void *ud;
     int in_toc;               /* inside <nav epub:type="toc"> */
     int in_title;             /* gathering a title */
@@ -441,6 +441,7 @@ static void title_add(toc_ctx *t, const char *text)
 static void title_emit(toc_ctx *t, const char *href)
 {
     char full[320];
+    const char *frag = strchr(href, '#');
     int zi, part;
 
     while (t->tlen && t->title[t->tlen - 1] == ' ') t->tlen--;
@@ -449,7 +450,8 @@ static void title_emit(toc_ctx *t, const char *href)
     zi = ts_zip_find(t->sp->z, full);
     for (part = 0; zi >= 0 && part < t->sp->nspine; part++)
         if (t->sp->spine[part] == zi) {
-            if (t->tlen && t->cb(t->ud, t->title, part)) t->stop = 1;
+            if (t->tlen && t->cb(t->ud, t->title, part, frag ? frag + 1 : ""))
+                t->stop = 1;
             break;
         }
     t->tlen = 0;
@@ -490,8 +492,7 @@ static int toc_tag(void *ud, const char *tag, const char *text)
     return t->stop;
 }
 
-int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
-                  void *ud)
+int ts_zipdoc_toc(bs_stream *st, ts_toc_fn cb, void *ud)
 {
     sp_st *s = st->st;
     bs_stream *member;
@@ -510,6 +511,28 @@ int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
     if (s->part >= 0) s->cur = s->part + 1;
     if (rc != BS_OK) return rc;
     return scan_markup(member, toc_tag, &t);
+}
+
+int ts_zipdoc_anchor(bs_stream *st, int part, const char *anchor, long *off)
+{
+    sp_st *s = st->st;
+    uint8_t buf[256];
+    long at = -1;
+    int rc = ts_zipdoc_seek_part(st, part);
+
+    if (rc != BS_OK) return rc;
+    ts_tags_anchor(s->tags, anchor);
+    while ((at = ts_tags_anchor_at(s->tags)) < 0) {
+        size_t got = 0;
+
+        rc = bs_pull(st, buf, sizeof buf, &got);
+        if (rc != BS_OK || !got) break;
+    }
+    ts_tags_anchor(s->tags, "");
+    if (rc != BS_OK) return rc;
+    if (at < 0) return BS_ERR_FORMAT;
+    *off = at;
+    return BS_OK;
 }
 
 /* ---- entry point ----------------------------------------------------- */

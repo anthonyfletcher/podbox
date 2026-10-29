@@ -119,12 +119,19 @@ int  ts_seek_part(ts_source *s, int part);
  * guide to how much of the book it is, not to its text. 0 without parts. */
 long ts_part_size(const ts_source *s, int part);
 
-/* The book's own table of contents: cb() gets each entry's title and the
- * part it starts in, in book order, and stops the walk by returning
- * non-zero. BS_ERR_UNSUP when the book has none. Reading the contents ends
- * the part being read, so seek a part before reading on. */
-int  ts_toc(ts_source *s, int (*cb)(void *ud, const char *title, int part),
-            void *ud);
+/* The book's own table of contents: cb() gets each entry's title, the part
+ * it starts in and the id it points at inside that part ("" for the part's
+ * start), in book order, and stops the walk by returning non-zero.
+ * BS_ERR_UNSUP when the book has none. Reading the contents ends the part
+ * being read, so seek a part before reading on. */
+typedef int (*ts_toc_fn)(void *ud, const char *title, int part,
+                         const char *anchor);
+int  ts_toc(ts_source *s, ts_toc_fn cb, void *ud);
+
+/* Where in `part`'s text the element with id `anchor` starts, in *off,
+ * read up to it. BS_ERR_FORMAT when the part has no such id. Like the
+ * contents, it ends the part being read. */
+int  ts_anchor(ts_source *s, int part, const char *anchor, long *off);
 
 void ts_close(ts_source *s);
 

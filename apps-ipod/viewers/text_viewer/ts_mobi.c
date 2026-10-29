@@ -572,8 +572,7 @@ int ts_open_mobi(ts_ctx *c, bs_stream **out)
 
 /* The guide's toc page: each <a filepos=N> on it, by its text, at the part
  * N falls in. Reading it ends the part being read. */
-int ts_mobi_toc(bs_stream *st, int (*cb)(void *, const char *, int),
-                void *ud)
+int ts_mobi_toc(bs_stream *st, ts_toc_fn cb, void *ud)
 {
     mobi_st *m = st->st;
     char tag[TAG_MAX], title[TITLE_MAX];
@@ -616,7 +615,7 @@ int ts_mobi_toc(bs_stream *st, int (*cb)(void *, const char *, int),
                     while (tl > 0 && title[tl - 1] == ' ')
                         tl--;
                     title[tl] = 0;
-                    if (tl && cb(ud, title, part_of(m, target)))
+                    if (tl && cb(ud, title, part_of(m, target), ""))
                         stop = 1;
                     tl = -1;
                 }

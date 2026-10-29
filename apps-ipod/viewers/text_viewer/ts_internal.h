@@ -113,6 +113,11 @@ int  ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
                        int *method);
 /* Pictures become TS_PICTURE_OPEN lines; off unless asked for */
 void ts_tags_pictures(bs_stream *s, int on);
+/* Watches for the element with id `anchor` ("" stops watching); then
+ * ts_tags_anchor_at() is the count of bytes handed out before it, or -1
+ * until it is seen. The count starts at ts_tags_rewind(). */
+void ts_tags_anchor(bs_stream *s, const char *anchor);
+long ts_tags_anchor_at(const bs_stream *s);
 /* An FB2's pictures, by the hash of their ids: found on the first look */
 #define TS_FB2_PICTURES 128
 typedef struct {
@@ -122,8 +127,8 @@ typedef struct {
 /* Where the base64 text of an FB2's picture `href` ("#id") lies in `io` */
 int ts_fb2_picture(const bs_io *io, ts_fb2_pictures *p, const char *href,
                    bs_off_t *at, uint32_t *len);
-int ts_zipdoc_toc(bs_stream *st, int (*cb)(void *, const char *, int),
-                  void *ud);
+int ts_zipdoc_toc(bs_stream *st, ts_toc_fn cb, void *ud);
+int ts_zipdoc_anchor(bs_stream *st, int part, const char *anchor, long *off);
 /* The same for the stream ts_open_mobi() returns. A picture's href is its
  * recindex, and the picture is stored as it is. */
 int ts_open_mobi(ts_ctx *c, bs_stream **out);
@@ -132,8 +137,7 @@ int ts_mobi_parts(const bs_stream *st);
 long ts_mobi_part_size(const bs_stream *st, int part);
 int ts_mobi_picture(const bs_stream *st, const char *href, bs_off_t *at,
                     uint32_t *csize);
-int ts_mobi_toc(bs_stream *st, int (*cb)(void *, const char *, int),
-                void *ud);
+int ts_mobi_toc(bs_stream *st, ts_toc_fn cb, void *ud);
 int ts_open_pdf  (ts_ctx *c, bs_stream **out);
 int ts_open_lyrics(ts_ctx *c, bs_stream **out);
 
