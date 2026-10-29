@@ -571,6 +571,7 @@ static int tv_pic_handle;
 static int tv_pic_part = -1;
 static char tv_pic_href[TV_PIC_HREF];
 static struct bitmap tv_pic_bm;
+static int tv_pic_w, tv_pic_h;      /* the page it was fitted to */
 static bool tv_pic_ok;
 
 /* Pictures of the open book that failed to decode, by chapter and href; a
@@ -665,9 +666,11 @@ static bool tv_picture_decode(const char *href, int w, int h)
     long at;
 
     if (tv_pic_part == tv.part && !strcmp(tv_pic_href, href)
-        && tv_pic_bm.width <= w && tv_pic_bm.height <= h)
+        && tv_pic_w == w && tv_pic_h == h)
         return tv_pic_ok;
     tv_pic_part = tv.part;
+    tv_pic_w = w;
+    tv_pic_h = h;
     strmemccpy(tv_pic_href, href, sizeof(tv_pic_href));
     tv_pic_ok = false;
 
