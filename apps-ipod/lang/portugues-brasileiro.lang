@@ -18249,6 +18249,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_BOOK_SHELF_ROW_AUTHORS
+  desc: top of the Books list: every author, each opening their books
+  user: core
+  <source>
+    *: "[Authors]"
+  </source>
+  <dest>
+    *: "[Autores]"
+  </dest>
+  <voice>
+    *: "Autores"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_AUTHORS
+  desc: title of the Books screen's list of authors
+  user: core
+  <source>
+    *: "Authors"
+  </source>
+  <dest>
+    *: "Autores"
+  </dest>
+  <voice>
+    *: "Autores"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core
