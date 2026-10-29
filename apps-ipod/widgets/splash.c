@@ -32,8 +32,12 @@ static long progress_next_tick, talked_tick, progress_last_call;
 #define PROGRESS_SPACING 4  /* extra gap between the text and the progress bar */
 #define SPLASH_MEMORY_INTERVAL (HZ)
 
+/* The box is centred in an area area_w x area_h from vp's origin: the
+ * physical display for a splash, the caller's viewport for splashf_in(),
+ * which has no shadow, since the shadow is drawn to the screen itself */
 static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
-                            struct viewport *vp, int addl_lines)
+                            struct viewport *vp, int addl_lines,
+                            int area_w, int area_h, bool shadow)
 {
     static int max_width[NB_SCREENS] = {2*RECT_SPACING};
     static enum current_activity last_act = ACTIVITY_UNKNOWN;
@@ -65,6 +69,8 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
      * padding */
     struct dialog_style style = *dialog_get_default_style();
     style.box_margin = RECT_SPACING;
+    if (!shadow)
+        style.box_shadow_offset = 0;
 
     font_getstringsize(" ", &space_w, &chr_h, fontnum);
     /* Reserve a line for each additional element (e.g. the progress bar),
@@ -121,14 +127,14 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
 
     if (width > vp->width)
         width = vp->width;
-    if (height > screen->lcdheight)
-        height = screen->lcdheight;
+    if (height > area_h)
+        height = area_h;
 
     /* Centre on the physical display, not within vp: a themed SBS can inset the
      * UI viewport (e.g. %Vi(-,3,28,302,-,-)), which would leave the box visibly
      * off-centre on screen. */
-    vp->x = (screen->lcdwidth - width) / 2;
-    vp->y = (screen->lcdheight - height) / 2;
+    vp->x = (area_w - width) / 2;
+    vp->y = (area_h - height) / 2;
     vp->width = width;
     vp->height = height;
 
@@ -196,7 +202,8 @@ void splashf(int ticks, const char *fmt, ...)
         struct viewport *last_vp = screen->set_viewport(&vp);
 
         va_start(ap, fmt);
-        if (splash_internal(screen, fmt, ap, &vp, 0))
+        if (splash_internal(screen, fmt, ap, &vp, 0, screen->lcdwidth,
+                            screen->lcdheight, true))
             screen->update_viewport();
         va_end(ap);
 
@@ -204,6 +211,21 @@ void splashf(int ticks, const char *fmt, ...)
     }
     if (ticks)
         sleep(ticks);
+}
+
+void splashf_in(struct viewport *area, const char *fmt, ...)
+{
+    struct screen *screen = &screens[SCREEN_MAIN];
+    struct viewport vp = *area;
+    struct viewport *last_vp = screen->set_viewport(&vp);
+    va_list ap;
+
+    fmt = P2STR((unsigned char *)fmt);
+    va_start(ap, fmt);
+    splash_internal(screen, fmt, ap, &vp, 0, area->width, area->height,
+                    false);
+    va_end(ap);
+    screen->set_viewport(last_vp);
 }
 
 /* set delay before progress meter is shown */
@@ -274,7 +296,8 @@ void splash_progress(int current, int total, const char *fmt, ...)
         struct viewport *last_vp = screen->set_viewport_ex(&vp, vp_flag);
 
         va_start(ap, fmt);
-        if (splash_internal(screen, fmt, ap, &vp, 1))
+        if (splash_internal(screen, fmt, ap, &vp, 1, screen->lcdwidth,
+                            screen->lcdheight, true))
         {
             int size = screen->getcharheight();
             int x = RECT_SPACING;

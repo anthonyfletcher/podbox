@@ -23,6 +23,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>          /* atoi */
+#include <stdarg.h>
 #include <stdio.h>           /* snprintf */
 #include <string.h>
 #include "string-extra.h"    /* strmemccpy */
@@ -982,6 +983,27 @@ static void tv_fullscreen_vp(struct viewport *vp)
     }
 }
 
+/* A box over the page until the page is drawn again: splashf()'s upright,
+ * or drawn into the sideways page and turned with it */
+static void tv_splashf(const char *fmt, ...)
+{
+    struct viewport full;
+    char text[160];
+    va_list ap;
+
+    va_start(ap, fmt);
+    vsnprintf(text, sizeof(text), fmt, ap);
+    va_end(ap);
+    if (!tv_side)
+    {
+        splashf(0, "%s", text);
+        return;
+    }
+    tv_fullscreen_vp(&full);
+    splashf_in(&full, "%s", text);
+    tv_side_push();
+}
+
 /* The text of the chapter, or of a document without chapters: exact once it
  * has all been extracted, which for most chapters is at their first page,
  * and until then no less than the size it is stored at, which bounds it */
@@ -1259,14 +1281,18 @@ static bool tv_slow_open(const char *file)
     return size > TV_WINDOW_SIZE;
 }
 
-/* Names the file being opened. */
-static void tv_splash_loading(void)
+/* Names the file being opened: over the page, sideways with it if it is,
+ * or upright over a list */
+static void tv_splash_loading(bool over_page)
 {
     const char *name = strrchr(tv.path, '/');
 
-    /* splashf, not splash: splash()'s string is a format string, and a '%' in a
-     * filename would be read as a conversion. 0 ticks = until overdrawn. */
-    splashf(0, "%s\n%s", str(LANG_WAIT), name ? name + 1 : tv.path);
+    /* A format, not the name: a '%' in a filename would be read as a
+     * conversion. Until overdrawn. */
+    if (over_page)
+        tv_splashf("%s\n%s", str(LANG_WAIT), name ? name + 1 : tv.path);
+    else
+        splashf(0, "%s\n%s", str(LANG_WAIT), name ? name + 1 : tv.path);
 }
 
 /* Clears the reading area before the open, and names the file when the open
@@ -1286,7 +1312,7 @@ static void tv_show_loading(void)
     d->set_viewport(last);
 
     if (tv_slow_open(tv.path))
-        tv_splash_loading();
+        tv_splash_loading(true);
 }
 
 /* ---- navigation ------------------------------------------------------- */
@@ -1313,7 +1339,7 @@ static bool tv_reach(off_t target)
 
     if (target < tv.win_start)
     {
-        tv_splash_loading();
+        tv_splash_loading(true);
         cpu_boost(true);
         rc = ts_rewind(tv.src);
         cpu_boost(false);
@@ -1548,7 +1574,7 @@ static void tv_read_on(void)
  * exactly as it would have been had the reader paged there by hand. */
 static void tv_resume_to(off_t target)
 {
-    tv_splash_loading();
+    tv_splash_loading(true);
     cpu_boost(true);
 
     while (1)
@@ -2243,7 +2269,7 @@ int text_viewer_contents(void)
     {
         /* No contents of its own: each chapter file by its first line, and
          * those with no text, such as a cover, left out */
-        tv_splash_loading();
+        tv_splash_loading(false);
         toc.n = 0;
         for (i = 0; i < tv.nparts && toc.n < TV_TOC_MAX; i++)
         {
@@ -2331,11 +2357,11 @@ static void tv_scrub_show(void)
     int within;
 
     if (tv.nparts > 1)
-        splashf(0, "%d/%d \xc2\xb7 %d%%",
+        tv_splashf("%d/%d \xc2\xb7 %d%%",
                 tv_scrub_part(tv_scrub_pct, &within) + 1, tv.nparts,
                 tv_scrub_pct);
     else
-        splashf(0, "%d%%", tv_scrub_pct);
+        tv_splashf("%d%%", tv_scrub_pct);
 }
 
 static void tv_scrub(int step)
@@ -2384,7 +2410,7 @@ static void tv_volume(int steps)
     adjust_volume(steps);
     setvol();
     format_sound_value(val, sizeof val, SOUND_VOLUME, global_status.volume);
-    splashf(0, "%s: %s", str(LANG_VOLUME), val);
+    tv_splashf("%s: %s", str(LANG_VOLUME), val);
     tv_volume_until = current_tick + HZ;
 }
 
@@ -2570,7 +2596,7 @@ static void tv_open_at(int part, off_t off)
     }
     if (part == TV_PART_UNKNOWN)
     {
-        tv_splash_loading();
+        tv_splash_loading(true);
         part = tv_find_part(&off);
     }
     if (part < 0 || part >= tv.nparts)

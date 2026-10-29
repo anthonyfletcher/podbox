@@ -29,6 +29,15 @@ extern void splashf(int ticks, const char *fmt, ...) ATTRIBUTE_PRINTF(2, 3);
  */
 #define splash(__ticks, __str) splashf(__ticks, __str)
 
+/*
+ * The same box drawn into `area`, a viewport of the caller's -- its buffer
+ * among it -- centred in it and not sent to the screen, nor said aloud: for
+ * a screen the caller puts on the display itself, such as the reader's
+ * sideways page. The main screen only.
+ */
+extern void splashf_in(struct viewport *area, const char *fmt, ...)
+    ATTRIBUTE_PRINTF(2, 3);
+
 /* set a delay before displaying the progress meter the first time */
 extern void splash_progress_set_delay(long delay_ticks);
 /* Silence the progress meter's own voice, for a caller that announces the same
