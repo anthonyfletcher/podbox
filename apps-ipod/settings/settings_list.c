@@ -1815,7 +1815,7 @@ const struct settings_list settings[] = {
                    ID2P(LANG_OFF), ID2P(LANG_TEXT_VIEWER_PAGE_NUMBER),
                    ID2P(LANG_TEXT_VIEWER_CHAPTER_PROGRESS),
                    ID2P(LANG_TEXT_VIEWER_BOOK_PROGRESS)),
-    CHOICE_SETTING(0, text_viewer_read_aloud, LANG_TEXT_VIEWER_READ_ALOUD, 1,
+    CHOICE_SETTING(0, text_viewer_read_aloud, LANG_TEXT_VIEWER_READ_ALOUD, 0,
                    "text viewer read aloud", "off,page,continuous", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_READ_ALOUD_PAGE),
                    ID2P(LANG_READ_ALOUD_CONTINUOUS)),
