@@ -482,6 +482,7 @@ Shadow Colour only while there is a shadow to colour.
 | Text Viewer ▸ Reading Backlight | How long the backlight stays on after the last button press while the text viewer is open, put back to the player's own Backlight when you leave it. Always keeps it lit, which costs battery if the player is set down mid-page. | Same as Player |  |
 | Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
 | Text Viewer ▸ Alignment | Justified spreads each full line across the page, as a printed book does; a paragraph's last line stays left. Left leaves a ragged right edge. | Left |  |
+| Text Viewer ▸ Paragraph Indent | Indents the first line of each paragraph, as a printed book does, so that paragraphs are easy to tell apart. Headings are never indented. | Off |  |
 | Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
 | Text Viewer ▸ Footer | What the line at the foot of the page shows. Page counts the pages of the chapter; Chapter Progress shows the chapter and roughly how many pages are left in it; Book Progress shows how far through the book you are. | No |  |
 | Text Viewer ▸ Pictures | Shows a book's pictures, its cover among them, each on a page of its own, fitted inside the margins with no footer. Off, or while Read Aloud is on, they are passed over, as is a picture that will not open. EPUB and FB2 books only. | Yes |  |

@@ -1114,6 +1114,10 @@ Always keeps it lit, which costs battery if the player is set down mid-page.
 Justified spreads each full line across the page, as a printed book does;
 a paragraph's last line stays left. Left leaves a ragged right edge.
 
+[text viewer indent]
+Indents the first line of each paragraph, as a printed book does, so that
+paragraphs are easy to tell apart. Headings are never indented.
+
 [text viewer margin]
 Insets the text from the edges of the screen, which is easier to read at the
 cost of a few characters per line.

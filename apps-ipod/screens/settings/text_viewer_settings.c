@@ -68,6 +68,8 @@ MENUITEM_SETTING(text_viewer_brightness,
 MENUITEM_SETTING(text_viewer_backlight,
                  &global_settings.text_viewer_backlight, NULL);
 MENUITEM_SETTING(text_viewer_align, &global_settings.text_viewer_align, NULL);
+MENUITEM_SETTING(text_viewer_indent, &global_settings.text_viewer_indent,
+                 NULL);
 MENUITEM_SETTING(text_viewer_pictures,
                  &global_settings.text_viewer_pictures, NULL);
 MENUITEM_SETTING(text_viewer_orientation,
@@ -236,6 +238,7 @@ MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_backlight,
           &text_viewer_margin,
           &text_viewer_align,
+          &text_viewer_indent,
           &text_viewer_line_spacing,
           &text_viewer_footer,
           &text_viewer_pictures,

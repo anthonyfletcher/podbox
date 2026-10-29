@@ -14,6 +14,7 @@
 #define R_TAB   0x10    /* emit a tab                           */
 #define R_TEXT  0x20    /* DOCX: the element that carries text  */
 #define R_BLANK 0x40    /* leave a blank line here              */
+#define R_HEAD  0x80    /* a heading: its text is marked        */
 
 typedef struct { const char *name; unsigned flags; } rule;
 
@@ -25,8 +26,9 @@ static const rule html_rules[] = {
     { "p", R_BLOCK }, { "div", R_BLOCK }, { "li", R_BLOCK },
     { "ul", R_BLOCK }, { "ol", R_BLOCK }, { "dl", R_BLOCK },
     { "dt", R_BLOCK }, { "dd", R_BLOCK },
-    { "h1", R_BLOCK }, { "h2", R_BLOCK }, { "h3", R_BLOCK },
-    { "h4", R_BLOCK }, { "h5", R_BLOCK }, { "h6", R_BLOCK },
+    { "h1", R_BLOCK | R_HEAD }, { "h2", R_BLOCK | R_HEAD },
+    { "h3", R_BLOCK | R_HEAD }, { "h4", R_BLOCK | R_HEAD },
+    { "h5", R_BLOCK | R_HEAD }, { "h6", R_BLOCK | R_HEAD },
     { "tr", R_BLOCK }, { "table", R_BLOCK }, { "td", R_TAB }, { "th", R_TAB },
     { "blockquote", R_BLOCK }, { "section", R_BLOCK }, { "article", R_BLOCK },
     { "header", R_BLOCK }, { "footer", R_BLOCK }, { "nav", R_BLOCK },
@@ -36,8 +38,9 @@ static const rule html_rules[] = {
 
 static const rule fb2_rules[] = {
     { "binary", R_SKIP }, { "description", R_SKIP }, { "stylesheet", R_SKIP },
-    { "p", R_BLOCK }, { "v", R_BLOCK }, { "subtitle", R_BLOCK },
-    { "title", R_BLOCK }, { "empty-line", R_BLANK }, { "section", R_BLOCK },
+    { "p", R_BLOCK }, { "v", R_BLOCK }, { "subtitle", R_BLOCK | R_HEAD },
+    { "title", R_BLOCK | R_HEAD }, { "empty-line", R_BLANK },
+    { "section", R_BLOCK },
     { "td", R_TAB }, { "th", R_TAB }, { "tr", R_BLOCK },
     { "text-author", R_BLOCK }, { "epigraph", R_BLOCK }, { "poem", R_BLOCK },
     { "cite", R_BLOCK }, { "annotation", R_BLOCK }, { "code", R_PRE },
@@ -148,6 +151,8 @@ typedef struct {
     int   nl_pending, sp_pending, started;
     int   pictures;                /* TS_PICTURE_OPEN lines for pictures */
     int   cover_done;              /* an FB2's coverpage picture is out */
+    int   head_depth;              /* headings open */
+    int   head_wait, head_out;     /* TS_HEADING_OPEN due, and written */
     ts_pend out;
 } tg_st;
 
@@ -179,11 +184,22 @@ static void flush_ws(tg_st *s)
     s->nl_pending = s->sp_pending = 0;
 }
 
+/* A heading's opening mark goes just before its first character, so it
+ * shares that character's line */
+static void head_text(tg_st *s)
+{
+    if (!s->head_wait) return;
+    s->head_wait = 0;
+    s->head_out = 1;
+    ts_emit_cp(&s->out, TS_HEADING_OPEN);
+}
+
 /* Entity replacements arrive as codepoints and must be encoded... */
 static void out_cp(tg_st *s, uint32_t cp)
 {
     flush_ws(s);
     s->started = 1;
+    head_text(s);
     ts_emit_cp(&s->out, cp);
 }
 
@@ -194,6 +210,7 @@ static void out_byte(tg_st *s, uint8_t b)
 {
     flush_ws(s);
     s->started = 1;
+    head_text(s);
     ts_emit(&s->out, &b, 1);
 }
 
@@ -229,12 +246,16 @@ static int tag_attr(const char *t, const char *name, char *out, size_t cap)
 /* A picture, on a line of its own */
 static void out_picture(tg_st *s, const char *href)
 {
+    int wait = s->head_wait;            /* a picture line takes no mark */
+
+    s->head_wait = 0;
     if (s->started && s->nl_pending < 1) s->nl_pending = 1;
     s->sp_pending = 0;
     out_cp(s, TS_PICTURE_OPEN);
     for (; *href; href++) out_byte(s, (uint8_t)*href);
     out_cp(s, TS_PICTURE_CLOSE);
     want_nl(s, 1);
+    s->head_wait = wait;
 }
 
 static void process_tag(tg_st *s)
@@ -310,6 +331,15 @@ static void process_tag(tg_st *s)
         s->text_depth += close ? -1 : 1;
         if (s->text_depth < 0) s->text_depth = 0;
         return;
+    }
+    /* The closing mark goes before the line break the close asks for */
+    if ((r->flags & R_HEAD) && !self) {
+        if (!close) {
+            if (s->head_depth++ == 0) s->head_wait = 1;
+        } else if (s->head_depth > 0 && --s->head_depth == 0) {
+            if (s->head_out) ts_emit_cp(&s->out, TS_HEADING_CLOSE);
+            s->head_wait = s->head_out = 0;
+        }
     }
     if (r->flags & R_PRE) s->pre_depth += close ? -1 : 1;
     if (s->pre_depth < 0) s->pre_depth = 0;
@@ -471,6 +501,7 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
     s->state = ST_TEXT;
     s->tlen = s->elen = 0;
     s->skip_depth = s->pre_depth = s->text_depth = 0;
+    s->head_depth = s->head_wait = s->head_out = 0;
     s->quote = s->match = 0;
     if (s->started) s->nl_pending = 2;      /* blank line between documents */
 }

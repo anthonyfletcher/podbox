@@ -18241,6 +18241,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_INDENT
+  desc: core text viewer: indent each paragraph's first line
+  user: core
+  <source>
+    *: "Paragraph Indent"
+  </source>
+  <dest>
+    *: "段落缩进"
+  </dest>
+  <voice>
+    *: "段落缩进"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_TEXT_VIEWER_MARGIN
   desc: core text viewer margin setting
   user: core

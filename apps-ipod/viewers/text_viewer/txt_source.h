@@ -130,6 +130,11 @@ void ts_close(ts_source *s);
  * private-use codepoints, three bytes each in UTF-8. */
 #define TS_PICTURE_OPEN  0xE000
 #define TS_PICTURE_CLOSE 0xE001
+/* A heading's text -- HTML's h1-h6, FB2's title and subtitle -- lies between
+ * TS_HEADING_OPEN, just before its first character, and TS_HEADING_CLOSE,
+ * just after its last */
+#define TS_HEADING_OPEN  0xE002
+#define TS_HEADING_CLOSE 0xE003
 
 /* Where the picture `href`, written in chapter `part`, lies in the file:
  * the offset of its data, its stored and unpacked sizes, and its method

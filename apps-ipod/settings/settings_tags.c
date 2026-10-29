@@ -332,6 +332,7 @@ static const struct tag_row tag_rows[] = {
 { "text viewer orientation",  TAG_APPEARANCE,                    "text viewer sideways rotate hand" },
 { "text viewer wheel scrubs", TAG_APPEARANCE,                    "text viewer scroll wheel seek jump" },
 { "text viewer alignment",    TAG_APPEARANCE,                    "text viewer justify" },
+{ "text viewer indent",       TAG_APPEARANCE,                    "text viewer paragraph" },
 { "text viewer line spacing", TAG_ADVANCED|TAG_APPEARANCE,       "text viewer leading" },
 { "text viewer footer",       TAG_APPEARANCE,                    "text viewer" },
 { "text viewer read aloud",   TAG_VOICE,                         "text viewer speak read book" },

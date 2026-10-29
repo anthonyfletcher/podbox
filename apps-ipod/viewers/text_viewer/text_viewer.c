@@ -226,7 +226,24 @@ static bool tv_is_shy(const unsigned char *s, size_t n)
     return n >= 2 && s[0] == 0xc2 && s[1] == 0xad;
 }
 
-/* tv_width() of `n` bytes at `s`, soft hyphens left out */
+/* A heading's marks, TS_HEADING_OPEN and TS_HEADING_CLOSE: the text between
+ * them is underlined */
+#define TV_HEAD_OPEN  "\xee\x80\x82"
+
+static bool tv_is_mark(const unsigned char *s, size_t n)
+{
+    return n >= 3 && s[0] == 0xee && s[1] == 0x80
+           && (s[2] == 0x82 || s[2] == 0x83);
+}
+
+/* The bytes of what is invisible and takes no width at `s`, a soft hyphen or
+ * a heading's mark, or 0 */
+static size_t tv_hidden(const unsigned char *s, size_t n)
+{
+    return tv_is_shy(s, n) ? 2 : tv_is_mark(s, n) ? 3 : 0;
+}
+
+/* tv_width() of `n` bytes at `s`, what is hidden left out */
 static int tv_text_width(unsigned char *s, size_t n)
 {
     size_t i = 0, start = 0;
@@ -234,10 +251,12 @@ static int tv_text_width(unsigned char *s, size_t n)
 
     while (i < n)
     {
-        if (tv_is_shy(s + i, n - i))
+        size_t h = tv_hidden(s + i, n - i);
+
+        if (h)
         {
             w += tv_width(s + start, i - start);
-            i += 2;
+            i += h;
             start = i;
         }
         else
@@ -264,6 +283,7 @@ struct tv_line
     int width;      /* pixels they take */
     bool hyphen;    /* broken at a soft hyphen: a '-' follows */
     bool full;      /* ended because the next word did not fit */
+    int indent;     /* pixels before it: a paragraph's first line */
 };
 
 /* The bytes of `s` that fit in `width`, breaking at the last space, or at a
@@ -278,7 +298,7 @@ static void tv_line_break(unsigned char *s, size_t avail, int width,
     int used = 0;
 
     ln->used = ln->draw = 0;
-    ln->width = 0;
+    ln->width = ln->indent = 0;
     ln->hyphen = ln->full = false;
 
     if (avail == 0)
@@ -378,7 +398,7 @@ static void tv_line_break(unsigned char *s, size_t avail, int width,
     ln->used = i;
 }
 
-/* Draws `n` bytes of one word at x, soft hyphens left out; returns the x
+/* Draws `n` bytes of one word at x, what is hidden left out; returns the x
  * after it */
 static int tv_put_word(unsigned char *s, size_t n, int x, int y)
 {
@@ -386,7 +406,9 @@ static int tv_put_word(unsigned char *s, size_t n, int x, int y)
 
     while (i <= n)
     {
-        if (i == n || tv_is_shy(s + i, n - i))
+        size_t h = i < n ? tv_hidden(s + i, n - i) : 0;
+
+        if (i == n || h)
         {
             unsigned char save = s[i];
 
@@ -394,7 +416,7 @@ static int tv_put_word(unsigned char *s, size_t n, int x, int y)
             screens[SCREEN_MAIN].putsxy(x, y, s + start);
             s[i] = save;
             x += tv_width(s + start, i - start);
-            i += 2;
+            i += h ? h : 1;
             start = i;
         }
         else
@@ -405,36 +427,36 @@ static int tv_put_word(unsigned char *s, size_t n, int x, int y)
 
 /* Draws a line at y. With Alignment Justified, a full line's leftover pixels
  * are shared out between its spaces; a paragraph's last line stays left.
- * A line with neither that nor a soft hyphen in it is drawn in one call. */
+ * A line with neither that nor anything hidden in it is drawn in one call. */
 static void tv_draw_line(unsigned char *s, const struct tv_line *ln, int y)
 {
     bool justify = global_settings.text_viewer_align == TV_ALIGN_JUSTIFIED
                    && ln->full;
-    bool shy = false;
-    int gaps = 0, gap = 0, extra = 0, space_w, x = 0;
+    bool hidden = false;
+    int gaps = 0, gap = 0, extra = 0, space_w, x = ln->indent;
     size_t i;
 
     for (i = 0; i < ln->draw; i++)
     {
         if (s[i] == ' ')
             gaps++;
-        else if (tv_is_shy(s + i, ln->draw - i))
-            shy = true;
+        else if (tv_hidden(s + i, ln->draw - i))
+            hidden = true;
     }
 
-    if (!shy && !ln->hyphen && (!justify || gaps == 0))
+    if (!hidden && !ln->hyphen && (!justify || gaps == 0))
     {
         unsigned char save = s[ln->draw];
 
         s[ln->draw] = '\0';
-        screens[SCREEN_MAIN].putsxy(0, y, s);
+        screens[SCREEN_MAIN].putsxy(x, y, s);
         s[ln->draw] = save;
         return;
     }
 
     space_w = tv_literal_width(" ");
     if (justify)
-        extra = tv.vp.width - ln->width;
+        extra = tv.vp.width - ln->indent - ln->width;
 
     i = 0;
     while (i < ln->draw)
@@ -731,12 +753,33 @@ static bool tv_draw_picture(const char *href)
     return false;
 }
 
+/* Whether the line at `off` starts a paragraph: the first of a part, or one
+ * after a line break. Unknown, before the window, counts as not. */
+static bool tv_paragraph_start(off_t off)
+{
+    if (off > tv.win_start)
+        return tv.win[off - tv.win_start - 1] == '\n';
+    return off == 0;
+}
+
+/* Whether a heading is still open at the end of the line's `n` bytes, given
+ * whether it was at their start */
+static bool tv_heading_after(const unsigned char *s, size_t n, bool open)
+{
+    for (size_t i = 0; i + 3 <= n; i++)
+        if (tv_is_mark(s + i, n - i))
+            open = s[i + 2] == 0x82;
+    return open;
+}
+
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
- * offset of the next page. */
+ * offset of the next page. A heading that runs over from the page before is
+ * not underlined on this one. */
 static off_t tv_page(off_t start, bool render)
 {
     off_t off = start;
     int y = 0;
+    bool heading = false;
 
     while (y + tv.line_height <= tv.vp.height - tv_footer_height())
     {
@@ -786,12 +829,31 @@ static off_t tv_page(off_t start, bool render)
             break;
         }
 
-        tv_line_break(s, avail, tv.vp.width, &ln);
-        if (ln.used == 0)
-            break;
+        {
+            bool head = heading
+                        || (avail >= 3 && !memcmp(s, TV_HEAD_OPEN, 3));
+            int indent = global_settings.text_viewer_indent && !head
+                         && s[0] != '\n' && tv_paragraph_start(off)
+                         ? tv_literal_width("M") : 0;
 
-        if (render && ln.draw > 0)
-            tv_draw_line(s, &ln, y);
+            tv_line_break(s, avail, tv.vp.width - indent, &ln);
+            if (ln.used == 0)
+                break;
+            ln.indent = indent;
+
+            if (render && ln.draw > 0)
+            {
+                tv_draw_line(s, &ln, y);
+                if (head)
+                {
+                    int uy = MIN(y + font_get(tv.font)->ascent + 1,
+                                 y + tv.line_height - 1);
+
+                    screens[SCREEN_MAIN].hline(0, ln.width - 1, uy);
+                }
+            }
+            heading = tv_heading_after(s, ln.used, heading);
+        }
 
         off += ln.used;
         y += tv.line_height;
@@ -1044,18 +1106,19 @@ static off_t tv_part_end(off_t from, off_t limit, bool *stop)
     return limit;
 }
 
-/* Queue the parts from `from` that start before `page_end`, the last
- * running on to its own end. */
 /* Drops what the voice should not read from `n` bytes at `s`: soft hyphens,
- * which would split a word, and picture lines. The length left. */
+ * which would split a word, heading marks and picture lines. The length
+ * left. */
 static size_t tv_strip_shy(unsigned char *s, size_t n)
 {
     size_t r = 0, w = 0;
 
     while (r < n)
     {
-        if (tv_is_shy(s + r, n - r))
-            r += 2;
+        size_t h = tv_hidden(s + r, n - r);
+
+        if (h)
+            r += h;
         else if (tv_is_picture(s + r, n - r))
         {
             while (r < n && s[r] != '\n')
@@ -1067,6 +1130,8 @@ static size_t tv_strip_shy(unsigned char *s, size_t n)
     return w;
 }
 
+/* Queue the parts from `from` that start before `page_end`, the last
+ * running on to its own end. */
 static void tv_queue_parts(off_t from, off_t page_end)
 {
     static char text[TV_READ_AHEAD + 2];
@@ -1243,22 +1308,42 @@ static bool tv_reach(off_t target)
     return true;
 }
 
-/* Whether the chapter's window holds anything to show: with pictures passed
- * over, a cover page that is a picture alone has nothing */
+/* Whether picture `href` of the chapter is in the book; one that is not is
+ * remembered as failed, so the layout passes over it */
+static bool tv_picture_found(const char *href)
+{
+    long at;
+    uint32_t csize, usize;
+    int method;
+
+    if (tv_picture_failed(href))
+        return false;
+    if (ts_picture_extent(tv.src, tv.part, href, &at, &csize, &usize,
+                          &method) == BS_OK)
+        return true;
+    if (tv_pic_nfailed < TV_PIC_FAILED)
+        tv_pic_failed[tv_pic_nfailed++] = tv_picture_key(href);
+    return false;
+}
+
+/* Whether the chapter's window holds anything to show: a cover page whose
+ * picture is passed over, or missing from the book, has nothing */
 static bool tv_has_page(void)
 {
     size_t i = 0;
 
-    if (tv_pictures_shown())
-        return true;
     while (i < tv.win_len)
     {
         unsigned char c = tv.win[i];
         char href[TV_PIC_HREF];
 
         if (tv_is_picture(tv.win + i, tv.win_len - i))
+        {
             i += tv_picture_line(tv.win + i, tv.win_len - i, href,
                                  sizeof(href));
+            if (tv_pictures_shown() && tv_picture_found(href))
+                return true;
+        }
         else if (c == '\n' || c == ' ' || c == '\t' || c == '\r')
             i++;
         else
