@@ -30,6 +30,8 @@
  *   - markers: parsing headers, quantisation and Huffman tables
  *   - Huffman decoding: derived tables, the bit buffer, restart markers
  *   - progressive: the scan index, resuming a scan, the coefficient stripe
+ *   - baseline: each MCU block's plan, then decoding a block over the bit
+ *     buffer held in locals, with coefficients past the scale skipped
  *   - store_row_jpeg(): handing decoded rows out
  *   - read_jpeg_file()/read_jpeg_fd(): scale selection and the entry points
  *
@@ -96,7 +98,6 @@ struct prog_scan
     unsigned long bitbuf;
     int bitbuf_bits;
     int marker_val;
-    int marker_ind;
     int last_dc_val[3];
     int eobrun;                 /* blocks still to skip in an end-of-band run */
     int restart_interval;
@@ -150,7 +151,6 @@ struct jpeg
     unsigned long len;
     unsigned long int bitbuf;
     int bitbuf_bits;
-    int marker_ind;
     int marker_val;
     unsigned char marker;
     int x_size, y_size; /* size of image (can be less than block boundary) */
@@ -1549,12 +1549,17 @@ static void fix_huff_tbl(int* htbl, struct derived_tbl* dtbl)
     */
 
     MEMSET(dtbl->look_nbits, 0, sizeof(dtbl->look_nbits));
+    MEMSET(dtbl->look_skip, 0, sizeof(dtbl->look_skip));
 
     p = 0;
     for (l = 1; l <= HUFF_LOOKAHEAD; l++)
     {
         for (i = 1; i <= (int) htbl[l-1]; i++, p++)
         {
+            int sym = htbl[16+p], run = sym >> 4, size = sym & 15;
+            int skip = (l + size) |
+                       ((size || run == 15 ? run + 1 : 64) << 8);
+
             /* l = current code's length, p = its index in huffcode[] &
              * huffval[]. Generate left-justified code followed by all possible
              * bit sequences
@@ -1563,7 +1568,8 @@ static void fix_huff_tbl(int* htbl, struct derived_tbl* dtbl)
             for (ctr = 1 << (HUFF_LOOKAHEAD-l); ctr > 0; ctr--)
             {
                 dtbl->look_nbits[lookbits] = l;
-                dtbl->look_sym[lookbits] = htbl[16+p];
+                dtbl->look_sym[lookbits] = sym;
+                dtbl->look_skip[lookbits] = skip;
                 lookbits++;
             }
         }
@@ -1732,39 +1738,52 @@ INLINE void fix_quant_tables(struct jpeg *p_jpeg)
 * is evaluated multiple times.
 */
 
+static unsigned int fill_byte_slow(struct jpeg* p_jpeg)
+{
+    unsigned int byte = d_getc(p_jpeg, 0), marker;
+
+    if (byte == 0xFF) /* stuffing, or a marker */
+    {
+        do
+            marker = d_getc(p_jpeg, 0);
+        while (marker == 0xFF);
+        if (marker)
+        {
+            p_jpeg->marker_val = marker;
+            byte = 0;
+        }
+    }
+    return byte;
+}
+
+/* Fill the bit buffer to at least 25 bits, a byte at a time. A marker stops
+ * it: from there it supplies zero bits until search_restart() takes the
+ * marker, as it does past the end of the data. */
 static void fill_bit_buffer(struct jpeg* p_jpeg)
 {
-    unsigned char byte, marker;
+    unsigned long bitbuf = p_jpeg->bitbuf;
+    int bits = p_jpeg->bitbuf_bits;
 
-    if (p_jpeg->marker_val)
-        p_jpeg->marker_ind += 16;
-    byte = d_getc(p_jpeg, 0);
-    if (UNLIKELY(byte == 0xFF)) /* legal marker can be byte stuffing or RSTm */
-    {   /* simplification: just skip the (one-byte) marker code */
-        marker = d_getc(p_jpeg, 0);
-        if ((marker & ~7) == 0xD0)
-        {
-            p_jpeg->marker_val = marker;
-            p_jpeg->marker_ind = 8;
-        }
-    }
-    p_jpeg->bitbuf = (p_jpeg->bitbuf << 8) | byte;
+    while (bits <= 24)
+    {
+        unsigned int byte = 0;
 
-    byte = d_getc(p_jpeg, 0);
-    if (UNLIKELY(byte == 0xFF)) /* legal marker can be byte stuffing or RSTm */
-    {   /* simplification: just skip the (one-byte) marker code */
-        marker = d_getc(p_jpeg, 0);
-        if ((marker & ~7) == 0xD0)
+        if (!p_jpeg->marker_val)
         {
-            p_jpeg->marker_val = marker;
-            p_jpeg->marker_ind = 0;
+            if (LIKELY(p_jpeg->buf_left > 0) &&
+                (byte = p_jpeg->buf[p_jpeg->buf_index]) != 0xFF)
+            {
+                p_jpeg->buf_index++;
+                p_jpeg->buf_left--;
+            }
+            else
+                byte = fill_byte_slow(p_jpeg);
         }
+        bitbuf = (bitbuf << 8) | byte;
+        bits += 8;
     }
-    p_jpeg->bitbuf = (p_jpeg->bitbuf << 8) | byte;
-    p_jpeg->bitbuf_bits += 16;
-#ifdef JPEG_BS_DEBUG
-    DEBUGF("read in: %04X\n", p_jpeg->bitbuf & 0xFFFF);
-#endif
+    p_jpeg->bitbuf = bitbuf;
+    p_jpeg->bitbuf_bits = bits;
 }
 
 INLINE void check_bit_buffer(struct jpeg *p_jpeg, int nbits)
@@ -1819,15 +1838,13 @@ INLINE void drop_bits(struct jpeg *p_jpeg, int nbits)
 /* re-synchronize to entropy data (skip restart marker) */
 static void search_restart(struct jpeg *p_jpeg)
 {
-    if (p_jpeg->marker_val)
-    {
-        p_jpeg->marker_val = 0;
-        p_jpeg->bitbuf_bits = p_jpeg->marker_ind;
-        p_jpeg->marker_ind = 0;
-        return;
-    }
-    unsigned char byte;
+    int marker = p_jpeg->marker_val;
+
+    p_jpeg->marker_val = 0;
     p_jpeg->bitbuf_bits = 0;
+    if ((marker & ~7) == 0xD0)
+        return;
+    unsigned char byte;
     while ((byte = d_getc(p_jpeg, 0xFF)))
     {
         if (byte == 0xff)
@@ -1852,44 +1869,29 @@ static void search_restart(struct jpeg *p_jpeg)
     x__ & BIT_N(s__- 1) ? x__ : x__ + (-1 << s__) + 1; \
 })
 
-/* Decode a single value */
-#define huff_decode_dc(p_jpeg, tbl, s, r) \
-{ \
-    int nb, look; \
-\
-    check_bit_buffer((p_jpeg), HUFF_LOOKAHEAD); \
-    look = peek_bits((p_jpeg), HUFF_LOOKAHEAD); \
-    if ((nb = (tbl)->look_nbits[look]) != 0) \
-    { \
-        drop_bits((p_jpeg), nb); \
-        s = (tbl)->look_sym[look]; \
-        check_bit_buffer((p_jpeg), s); \
-        r = get_bits((p_jpeg), s); \
-    } else { \
-        /*  slow_DECODE(s, HUFF_LOOKAHEAD+1)) < 0); */ \
-        long code; \
-        nb=HUFF_LOOKAHEAD+1; \
-        check_bit_buffer((p_jpeg), nb); \
-        code = get_bits((p_jpeg), nb); \
-        while (code > (tbl)->maxcode[nb]) \
-        { \
-            code <<= 1; \
-            check_bit_buffer((p_jpeg), 1); \
-            code |= get_bits((p_jpeg), 1); \
-            nb++; \
-        } \
-        if (nb > 16 || code < (tbl)->mincode[nb]) /* error in Huffman */ \
-        { \
-            r = 0; s = 0; /* fake a zero, this is most safe */ \
-        } else { \
-            s = (tbl)->pub[16 + (tbl)->valptr[nb] + \
-                ((int) (code - (tbl)->mincode[nb]))]; \
-            check_bit_buffer((p_jpeg), s); \
-            r = get_bits((p_jpeg), s); \
-        } \
-    } /* end slow decode */ \
+/* A code longer than HUFF_LOOKAHEAD bits; an invalid one decodes as a zero.
+ * Leaves at least 25 bits in the buffer. */
+static int huff_decode_slow(struct jpeg *p_jpeg, const struct derived_tbl *tbl)
+{
+    int nb = HUFF_LOOKAHEAD + 1, s = 0;
+    long code;
+
+    check_bit_buffer(p_jpeg, nb);
+    code = get_bits(p_jpeg, nb);
+    while (code > tbl->maxcode[nb])
+    {
+        code <<= 1;
+        check_bit_buffer(p_jpeg, 1);
+        code |= get_bits(p_jpeg, 1);
+        nb++;
+    }
+    if (nb <= 16 && code >= tbl->mincode[nb])
+        s = tbl->pub[16 + tbl->valptr[nb] + (int)(code - tbl->mincode[nb])];
+    check_bit_buffer(p_jpeg, 25);
+    return s;
 }
 
+/* Decode a single value */
 #define huff_decode_ac(p_jpeg, tbl, s) \
 { \
     int nb, look; \
@@ -1900,28 +1902,63 @@ static void search_restart(struct jpeg *p_jpeg)
     { \
         drop_bits((p_jpeg), nb); \
         s = (tbl)->look_sym[look]; \
-    } else { \
-        /*  slow_DECODE(s, HUFF_LOOKAHEAD+1)) < 0); */ \
-        long code; \
-        nb=HUFF_LOOKAHEAD+1; \
-        check_bit_buffer((p_jpeg), nb); \
-        code = get_bits((p_jpeg), nb); \
-        while (code > (tbl)->maxcode[nb]) \
-        { \
-            code <<= 1; \
-            check_bit_buffer((p_jpeg), 1); \
-            code |= get_bits((p_jpeg), 1); \
-            nb++; \
-        } \
-        if (nb > 16 || code < (tbl)->mincode[nb]) /* error in Huffman */ \
-        { \
-            s = 0; /* fake a zero, this is most safe */ \
-        } else { \
-            s = (tbl)->pub[16 + (tbl)->valptr[nb] + \
-                ((int) (code - (tbl)->mincode[nb]))]; \
-        } \
-    } /* end slow decode */ \
+    } \
+    else \
+        s = huff_decode_slow((p_jpeg), (tbl)); \
 }
+
+#define huff_decode_dc(p_jpeg, tbl, s, r) \
+{ \
+    huff_decode_ac(p_jpeg, tbl, s); \
+    check_bit_buffer((p_jpeg), s); \
+    r = get_bits((p_jpeg), s); \
+}
+
+/* The same over a copy of the bit buffer in two locals, `bitbuf` and
+ * `bits`, for a block's whole decode. After BITS_FILL at least 25 bits are
+ * in hand: a code of up to HUFF_LOOKAHEAD bits and its magnitude bits. */
+#define BITS_OUT() \
+    (p_jpeg->bitbuf = bitbuf, p_jpeg->bitbuf_bits = bits)
+#define BITS_IN() \
+    (bitbuf = p_jpeg->bitbuf, bits = p_jpeg->bitbuf_bits)
+#define BITS_FILL() \
+do { \
+    while (bits <= 24) \
+    { \
+        unsigned int byte_; \
+        if (LIKELY(p_jpeg->buf_left > 0) && !p_jpeg->marker_val && \
+            (byte_ = p_jpeg->buf[p_jpeg->buf_index]) != 0xFF) \
+        { \
+            p_jpeg->buf_index++; \
+            p_jpeg->buf_left--; \
+            bitbuf = (bitbuf << 8) | byte_; \
+            bits += 8; \
+        } \
+        else \
+        { \
+            BITS_OUT(); \
+            fill_bit_buffer(p_jpeg); \
+            BITS_IN(); \
+        } \
+    } \
+} while (0)
+#define BITS_PEEK(n) ((int)(bitbuf >> (bits - (n))) & (BIT_N(n) - 1))
+#define BITS_HUFF(tbl, s) \
+do { \
+    int look_ = BITS_PEEK(HUFF_LOOKAHEAD); \
+    int nb_ = (tbl)->look_nbits[look_]; \
+    if (LIKELY(nb_)) \
+    { \
+        bits -= nb_; \
+        s = (tbl)->look_sym[look_]; \
+    } \
+    else \
+    { \
+        BITS_OUT(); \
+        s = huff_decode_slow(p_jpeg, (tbl)); \
+        BITS_IN(); \
+    } \
+} while (0)
 
 /* The file offset of the next byte jpeg_getc() returns, and moving it. Exact
  * only for the plain read_buf(): the unsync and base64 readers hand out
@@ -2171,7 +2208,6 @@ static void prog_resume(struct jpeg *p_jpeg, struct prog_scan *sc)
     p_jpeg->bitbuf = sc->bitbuf;
     p_jpeg->bitbuf_bits = sc->bitbuf_bits;
     p_jpeg->marker_val = sc->marker_val;
-    p_jpeg->marker_ind = sc->marker_ind;
     memcpy(p_jpeg->last_dc_val, sc->last_dc_val, sizeof(sc->last_dc_val));
     pr->eobrun = sc->eobrun;
     pr->restart = sc->restart;
@@ -2205,7 +2241,6 @@ static void prog_suspend(struct jpeg *p_jpeg, struct prog_scan *sc)
     sc->bitbuf = p_jpeg->bitbuf;
     sc->bitbuf_bits = p_jpeg->bitbuf_bits;
     sc->marker_val = p_jpeg->marker_val;
-    sc->marker_ind = p_jpeg->marker_ind;
     memcpy(sc->last_dc_val, p_jpeg->last_dc_val, sizeof(sc->last_dc_val));
     sc->eobrun = p_jpeg->prog.eobrun;
     sc->restart = p_jpeg->prog.restart;
@@ -2446,10 +2481,141 @@ static void prog_fill_block(struct jpeg *p_jpeg, int16_t *block, int blkn,
     int k;
 
     block[0] = MULTIPLY16(coef[0], q[0]);
-    MEMSET(block + 1, 0, p_jpeg->zero_need[!!ci] * sizeof(int));
+    if (p_jpeg->zero_need[!!ci]) /* none at 1/8, and a call to skip */
+        MEMSET(block + 1, 0, p_jpeg->zero_need[!!ci] * sizeof(int));
     for (k = 1; k < p_jpeg->k_need[!!ci]; k++)
         if (coef[k])
             block[zag[transpose ? k : k + 64]] = MULTIPLY16(coef[k], q[k]);
+}
+
+/* What one block of an MCU needs, the same for every MCU in the image. */
+struct block_plan
+{
+    const struct derived_tbl *dc, *ac;
+    const int16_t *qt;
+    const unsigned char *order;     /* zig-zag to the IDCT's layout */
+    int *last_dc;
+    void (*v_idct)(int16_t *ws, int16_t *end);
+    void (*h_idct)(int16_t *ws, unsigned char *out, int16_t *end, int rowstep);
+    int16_t *v_end, *h_ws, *h_end;  /* into the block being decoded */
+    int out_offs;                   /* bytes into the MCU's output */
+    int k_need;
+    int zero_bytes;
+    int ci;
+    bool transpose;
+};
+
+static void plan_blocks(struct jpeg *p_jpeg, struct block_plan *plan,
+                        int16_t *block, const int *store_offs)
+{
+    int blkn;
+
+    for (blkn = 0; blkn < p_jpeg->blocks; blkn++)
+    {
+        struct block_plan *bp = &plan[blkn];
+        int ci = p_jpeg->mcu_membership[blkn]; /* component index */
+        int hs = p_jpeg->h_scale[!!ci], vs = p_jpeg->v_scale[!!ci];
+        int idct_cols = BIT_N(MIN(hs, 3));
+        int idct_rows = BIT_N(vs);
+
+        bp->ci = ci;
+        bp->transpose = vs > 2;
+        bp->dc = &p_jpeg->dc_derived_tbls[p_jpeg->scanheader[ci].DC_select];
+        bp->ac = &p_jpeg->ac_derived_tbls[p_jpeg->scanheader[ci].AC_select];
+        bp->qt = p_jpeg->quanttable[p_jpeg->frameheader[ci].quanttable_select];
+        bp->order = bp->transpose ? zag : zag + 64;
+        bp->last_dc = &p_jpeg->last_dc_val[ci];
+        bp->k_need = p_jpeg->k_need[!!ci];
+        bp->zero_bytes = p_jpeg->zero_need[!!ci] * sizeof(int);
+        bp->v_idct = idct_tbl[vs].v_idct;
+        bp->v_end = bp->transpose ? block + 8 * idct_cols : block + idct_cols;
+        bp->h_idct = idct_tbl[hs].h_idct;
+        bp->h_ws = bp->transpose ? block + 64 : block;
+        bp->h_end = bp->h_ws + idct_rows * 8;
+        /* Y, Cb, Cr go to bytes 0-2 for the YUV conversion;
+           R, G, B to their places in struct uint8_rgb */
+        bp->out_offs = (p_jpeg->rgb ? 2 - ci : ci)
+            + store_offs[p_jpeg->mcu_pos[blkn]];
+    }
+}
+
+/* Decode one baseline block into `block`, dequantised and in the IDCT's
+ * order: the coefficients the scale keeps, and the rest only read past. */
+static void decode_block(struct jpeg *p_jpeg, int16_t *block,
+                         const struct block_plan *bp)
+{
+    const struct derived_tbl *dctbl = bp->dc;
+    const struct derived_tbl *actbl = bp->ac;
+    const int16_t *qt = bp->qt;
+    const unsigned char *order = bp->order;
+    int k_need = bp->k_need;
+    unsigned long bitbuf = p_jpeg->bitbuf;
+    int bits = p_jpeg->bitbuf_bits;
+    int k, s, r;
+
+    /* Section F.2.2.1: the DC coefficient's difference */
+    BITS_FILL();
+    BITS_HUFF(dctbl, s);
+    s &= 15;
+    r = BITS_PEEK(s);
+    bits -= s;
+    if (s)
+        *bp->last_dc += HUFF_EXTEND(r, s);
+    block[0] = MULTIPLY16(*bp->last_dc, qt[0]);
+    if (bp->zero_bytes) /* none at 1/8, and a call to skip */
+        MEMSET(block + 1, 0, bp->zero_bytes);
+
+    /* Section F.2.2.2: the AC coefficients the scale keeps... */
+    for (k = 1; k < k_need; k++)
+    {
+        BITS_FILL();
+        BITS_HUFF(actbl, s);
+        r = s >> 4;
+        s &= 15;
+        k += r;
+        if (s)
+        {
+            if (k >= k_need)
+            {
+                bits -= s;
+                k++;
+                break;
+            }
+            r = BITS_PEEK(s);
+            bits -= s;
+            block[order[k]] = MULTIPLY16(HUFF_EXTEND(r, s), qt[k]);
+        }
+        else if (r != 15)
+            goto done;
+    }
+    /* ...and the rest, by the skip table */
+    while (k < 64)
+    {
+        int look, skip;
+
+        BITS_FILL();
+        look = BITS_PEEK(HUFF_LOOKAHEAD);
+        skip = actbl->look_skip[look];
+        if (LIKELY(skip))
+        {
+            bits -= skip & 0xff;
+            k += skip >> 8;
+        }
+        else
+        {
+            BITS_OUT();
+            s = huff_decode_slow(p_jpeg, actbl);
+            BITS_IN();
+            r = s >> 4;
+            s &= 15;
+            if (!s && r != 15)
+                break;
+            bits -= s;
+            k += r + 1;
+        }
+    }
+done:
+    BITS_OUT();
 }
 
 static struct img_part *store_row_jpeg(void *jpeg_args)
@@ -2476,6 +2642,8 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
         store_offs[p_jpeg->store_pos[3]] = store_offs[1] + store_offs[2];
         /* decoded DCT coefficients */
         int16_t block[IDCT_WS_SIZE] __attribute__((aligned(8)));
+        struct block_plan plan[6];
+        plan_blocks(p_jpeg, plan, block, store_offs);
         if (p_jpeg->progressive)
             prog_decode_row(p_jpeg);
         for (x = 0; x < p_jpeg->x_mbl; x++)
@@ -2483,95 +2651,15 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
             int blkn;
             for (blkn = 0; blkn < p_jpeg->blocks; blkn++)
             {
-                int ci = p_jpeg->mcu_membership[blkn]; /* component index */
-                bool transpose = p_jpeg->v_scale[!!ci] > 2;
-                int k = 1; /* coefficient index */
-                int s, r; /* huffman values */
-                struct derived_tbl* dctbl =
-                    &p_jpeg->dc_derived_tbls[p_jpeg->scanheader[ci].DC_select];
-                struct derived_tbl* actbl =
-                    &p_jpeg->ac_derived_tbls[p_jpeg->scanheader[ci].AC_select];
-                const int16_t *qt = p_jpeg->quanttable[
-                    p_jpeg->frameheader[ci].quanttable_select];
-
+                const struct block_plan *bp = &plan[blkn];
                 if (p_jpeg->progressive)
-                {
-                    prog_fill_block(p_jpeg, block, blkn, x, ci, transpose);
-                    goto block_end;
-                }
-
-                /* Section F.2.2.1: decode the DC coefficient difference */
-                huff_decode_dc(p_jpeg, dctbl, s, r);
-
-                {
-                    s = HUFF_EXTEND(r, s);
-                    p_jpeg->last_dc_val[ci] += s;
-                    /* output it (assumes zag[0] = 0) */
-                    block[0] = MULTIPLY16(p_jpeg->last_dc_val[ci], qt[0]);
-                    /* coefficient buffer must be cleared */
-                    MEMSET(block+1, 0, p_jpeg->zero_need[!!ci] * sizeof(int));
-                    /* Section F.2.2.2: decode the AC coefficients */
-                    while(true)
-                    {
-                        huff_decode_ac(p_jpeg, actbl, s);
-                        r = s >> 4;
-                        s &= 15;
-                        k += r;
-                        if (s)
-                        {
-                            check_bit_buffer(p_jpeg, s);
-                            if (k >= p_jpeg->k_need[!!ci])
-                                goto skip_rest;
-                            r = get_bits(p_jpeg, s);
-                            r = HUFF_EXTEND(r, s);
-                            r = MULTIPLY16(r, qt[k]);
-                            block[zag[transpose ? k : k + 64]] = r ;
-                        }
-                        else
-                        {
-                            if (r != 15)
-                                goto block_end;
-                        }
-                        if ((++k) & 64)
-                            goto block_end;
-                    }  /* for k */
-                }
-                for (; k < 64; k++)
-                {
-                    huff_decode_ac(p_jpeg, actbl, s);
-                    r = s >> 4;
-                    s &= 15;
-
-                    if (s)
-                    {
-                        k += r;
-                        check_bit_buffer(p_jpeg, s);
-skip_rest:
-                        drop_bits(p_jpeg, s);
-                    }
-                    else
-                    {
-                        if (r != 15)
-                            break;
-                        k += r;
-                    }
-                }  /* for k */
-block_end:
-                {
-                    int idct_cols = BIT_N(MIN(p_jpeg->h_scale[!!ci], 3));
-                    int idct_rows = BIT_N(p_jpeg->v_scale[!!ci]);
-                    /* Y, Cb, Cr go to bytes 0-2 for the YUV conversion;
-                       R, G, B to their places in struct uint8_rgb */
-                    unsigned char *b_out = out + (p_jpeg->rgb ? 2 - ci : ci)
-                        + store_offs[p_jpeg->mcu_pos[blkn]];
-                    if (idct_tbl[p_jpeg->v_scale[!!ci]].v_idct)
-                        idct_tbl[p_jpeg->v_scale[!!ci]].v_idct(block,
-                            transpose ? block + 8 * idct_cols
-                                      : block + idct_cols);
-                    uint16_t * h_block = transpose ? block + 64 : block;
-                    idct_tbl[p_jpeg->h_scale[!!ci]].h_idct(h_block, b_out,
-                        h_block + idct_rows * 8, b_width);
-                }
+                    prog_fill_block(p_jpeg, block, blkn, x, bp->ci,
+                                    bp->transpose);
+                else
+                    decode_block(p_jpeg, block, bp);
+                if (bp->v_idct)
+                    bp->v_idct(block, bp->v_end);
+                bp->h_idct(bp->h_ws, out + bp->out_offs, bp->h_end, b_width);
             } /* for blkn */
             /* don't starve other threads while an MCU row decodes */
             yield();

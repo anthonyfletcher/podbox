@@ -36,8 +36,12 @@ struct derived_tbl
     the input data stream.  If the next Huffman code is no more
     than HUFF_LOOKAHEAD bits long, we can obtain its length and
     the corresponding symbol directly from these tables. */
-    int look_nbits[1<<HUFF_LOOKAHEAD]; /* # bits, or 0 if too long */
+    unsigned char look_nbits[1<<HUFF_LOOKAHEAD]; /* # bits, or 0 if too long */
     unsigned char look_sym[1<<HUFF_LOOKAHEAD]; /* symbol, or unused */
+    /* For an AC coefficient that is read past: the bits of code and
+     * magnitude together in the low byte, and how far it moves along the
+     * block above it (64 for end of block). 0 if the code is too long. */
+    unsigned short look_skip[1<<HUFF_LOOKAHEAD];
 };
 
 #define QUANT_TABLE_LENGTH  64
