@@ -26416,3 +26416,17 @@
     *: "Bass Boost"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_EBOOK_ART
+  desc: in Settings, art rows on the Books lists
+  user: core
+  <source>
+    *: "Book Art Rows"
+  </source>
+  <dest>
+    *: "Book Art Rows"
+  </dest>
+  <voice>
+    *: "Book Art Rows"
+  </voice>
+</phrase>

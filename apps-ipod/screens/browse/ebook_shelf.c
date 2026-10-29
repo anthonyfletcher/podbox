@@ -190,13 +190,21 @@ static bool collect_book(const struct book_entry *e, void *data)
 {
     struct ebook *b = &books[book_ct];
     const char *title = e->title;
-    char folder[TS_BOOK_AUTHOR];
+    char folder[TS_BOOK_AUTHOR], file[MAX_PATH];
     (void)data;
 
-    if (!title[0])
+    /* No title, or a tool's placeholder for one: the file's name */
+    if (!title[0] || !strcasecmp(title, "unknown")
+        || !strcasecmp(title, "unknown title"))
     {
-        title = strrchr(e->path, '/');
-        title = title ? title + 1 : e->path;
+        const char *name = strrchr(e->path, '/');
+        char *dot;
+
+        strmemccpy(file, name ? name + 1 : e->path, sizeof(file));
+        dot = strrchr(file, '.');
+        if (dot && dot != file)
+            *dot = '\0';
+        title = file;
     }
     if (!e->author[0])
         folder_name(e->path, folder, sizeof(folder));
@@ -502,7 +510,10 @@ static int show(char *path, size_t size, int *selection, int *list)
         load();
         if (top_rows() + row_ct == 0)
         {
-            splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
+            /* A list emptied by the book just read goes back up quietly;
+             * a search that found nothing says so */
+            if (showing == SHOW_TOP || showing == SHOW_SEARCH)
+                splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
             return GO_TO_PREVIOUS;
         }
         simplelist_info_init(&info, (char *)list_title(),
@@ -511,8 +522,8 @@ static int show(char *path, size_t size, int *selection, int *list)
         info.get_kind = get_kind;
         info.get_range = get_range;
         browser_albumart_invalidate();
-        browser_set_showing_art(global_settings.db_bookart);
-        if (global_settings.db_bookart && showing != SHOW_TOP
+        browser_set_showing_art(global_settings.db_ebookart);
+        if (global_settings.db_ebookart && showing != SHOW_TOP
             && !names_listed())
         {
             info.get_albumart = get_art;
@@ -520,13 +531,18 @@ static int show(char *path, size_t size, int *selection, int *list)
         }
         info.action_callback = action_cb;
         info.selection = MIN(*selection, top_rows() + row_ct - 1);
-        /* Opening on the top level, Search is scrolled off above the
-         * cursor, as the Music menu's is */
-        if (showing == SHOW_TOP && info.selection == 0 && top_ct > 1
-            && top_row[top_kinds[0]].kind == SHOW_SEARCH)
+        /* Opening on the top level, Search and Finished are scrolled off
+         * above the cursor, as the Music menu's Search is */
+        if (showing == SHOW_TOP && info.selection == 0)
         {
-            info.selection = 1;
-            info.top_item = 1;
+            int n = 0;
+
+            while (n < top_ct - 1
+                   && (top_row[top_kinds[n]].kind == SHOW_SEARCH
+                       || top_row[top_kinds[n]].kind == BOOK_SHELF_FINISHED))
+                n++;
+            info.selection = n;
+            info.top_item = n;
         }
 
         if (simplelist_show_list(&info))

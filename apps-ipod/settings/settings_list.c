@@ -2147,6 +2147,8 @@ const struct settings_list settings[] = {
                   false, "database audiobook art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_authorart, LANG_DB_AUTHOR_ART,
                   false, "database author art", NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookart, LANG_DB_EBOOK_ART,
+                  false, "database book art", NULL),
     OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
                   false, "segregate audiobooks", segregate_audiobooks_callback),
     /* 0 leaves the skin's own row height; the bounds stop a hand-edited .cfg
