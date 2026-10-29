@@ -2002,9 +2002,24 @@ static int prog_skip_scan(struct jpeg *p_jpeg)
 {
     unsigned char *c;
 
-    while ((c = jpeg_getc(p_jpeg)))
+    while (true)
     {
-        if (*c != 0xFF)
+        unsigned char *at, *ff;
+        int n;
+
+        if (p_jpeg->buf_left < 1)
+        {
+            fill_buf(p_jpeg);
+            if (p_jpeg->buf_left < 1)
+                return 0;
+        }
+        /* memchr() looks a word at a time */
+        at = p_jpeg->buf + p_jpeg->buf_index;
+        ff = memchr(at, 0xFF, p_jpeg->buf_left);
+        n = ff ? ff - at + 1 : p_jpeg->buf_left;
+        p_jpeg->buf_index += n;
+        p_jpeg->buf_left -= n;
+        if (!ff)
             continue;
         do
         {
@@ -2021,7 +2036,6 @@ static int prog_skip_scan(struct jpeg *p_jpeg)
         }
         return jpeg_seek(p_jpeg, jpeg_tell(p_jpeg) - 2) ? 1 : -1;
     }
-    return 0;
 }
 
 /* Index every scan, starting from the one process_markers() has just read
@@ -2779,7 +2793,8 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
                 bp->h_idct(bp->h_ws, out + bp->out_offs, bp->h_end, b_width);
             } /* for blkn */
             /* don't starve other threads while an MCU row decodes */
-            yield();
+            if ((x & 15) == 15)
+                yield();
             unsigned int xp;
             int yp;
             unsigned char *row = out;
