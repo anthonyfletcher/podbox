@@ -147,6 +147,19 @@ void ts_close(ts_source *s);
  * just after its last */
 #define TS_HEADING_OPEN  0xE002
 #define TS_HEADING_CLOSE 0xE003
+/* Just after a note reference's text, which is bracketed when it was not
+ * already: TS_NOTE_OPEN, the note's href as the text wrote it, at most
+ * TS_NOTE_HREF - 1 bytes, and TS_NOTE_CLOSE. EPUB, FB2 and HTML. */
+#define TS_NOTE_OPEN     0xE004
+#define TS_NOTE_CLOSE    0xE005
+#define TS_NOTE_HREF     96
+
+/* The text of the note `href` refers to from chapter `part`, into buf as a
+ * string: the element that has the id, or the paragraph an inline one is
+ * in. A note left out of the flow is read here all the same. Like the
+ * contents, it ends the part being read; a document without parts is
+ * rewound. BS_ERR_FORMAT when there is no such note. */
+int ts_note(ts_source *s, int part, const char *href, char *buf, size_t size);
 
 /* Where the picture `href`, written in chapter `part`, lies in the file:
  * the offset of its data, its stored and unpacked sizes, and its method

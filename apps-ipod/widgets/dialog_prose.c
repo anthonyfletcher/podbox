@@ -30,6 +30,7 @@
 #include "api/misc.h"
 #include "settings/settings.h"
 #include "speech/talk.h"
+#include "lang.h"
 
 /* Wrapped lines held at once. Longer than any explanation worth reading on a
  * 320-pixel screen; the text is clipped rather than the array overrun. */
@@ -48,7 +49,7 @@ struct prose
 {
     const char *body;
     const char *accept;
-    const char *cancel;
+    const char *cancel;         /* NULL: one button, and nothing to decide */
 
     int  scroll;        /* First visible wrapped line */
     int  lines;         /* Wrapped, as of the last draw */
@@ -150,9 +151,15 @@ static void prose_draw(struct dialog *d, struct screen *s,
                            p->scroll, p->scroll + p->visible, VERTICAL);
     }
 
+    y = content->height - bh;
+    if (!p->cancel)
+    {
+        dialog_draw_button(s, &d->style, 0, y, content->width, bh, p->accept,
+                           p->focus == PROSE_BUTTONS);
+        return;
+    }
     gap = 6;
     btn_w = (content->width - gap) / 2;
-    y = content->height - bh;
 
     /* Neither button is highlighted while the text has focus: nothing is
      * selected then, and showing one as though it were invites a press that
@@ -198,7 +205,7 @@ static int prose_action(struct dialog *d, int action, void *data)
     case ACTION_STD_PREV:
         if (p->focus == PROSE_BUTTONS)
         {
-            if (p->sel > 0)
+            if (p->sel > 0 && p->cancel)
             {
                 p->sel--;
                 prose_speak_button(p);
@@ -231,6 +238,8 @@ static int prose_action(struct dialog *d, int action, void *data)
         return DIALOG_CONTINUE;
 
     case ACTION_STD_OK:
+        if (!p->cancel)
+            return DIALOG_ACCEPT;       /* only reading: done with it */
         /* While reading, select moves to the buttons rather than choosing
          * one. Nothing is highlighted yet, so choosing would be guessing --
          * and this is not a decision to make by accident. */
@@ -253,7 +262,7 @@ static int prose_action(struct dialog *d, int action, void *data)
 
     case ACTION_STD_MENU:
     case ACTION_STD_CANCEL:
-        if (p->focus == PROSE_BUTTONS)
+        if (p->focus == PROSE_BUTTONS && p->cancel)
         {
             p->focus = PROSE_TEXT;
             return DIALOG_CONTINUE;
@@ -287,6 +296,7 @@ bool dialog_prose_confirm(const char *title, const char *body,
     struct prose p;
 
     memset(&p, 0, sizeof (p));
+    prose_body = NULL;          /* a caller may reuse its buffer */
     p.body   = body;
     p.accept = accept_label;
     p.cancel = cancel_label;
@@ -301,4 +311,9 @@ bool dialog_prose_confirm(const char *title, const char *body,
     }
 
     return dialog_run(&d, TIMEOUT_BLOCK) == DIALOG_ACCEPT;
+}
+
+void dialog_prose_show(const char *title, const char *body)
+{
+    dialog_prose_confirm(title, body, str(LANG_DIAG_OK), NULL, true);
 }

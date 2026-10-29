@@ -513,6 +513,26 @@ int ts_zipdoc_toc(bs_stream *st, ts_toc_fn cb, void *ud)
     return scan_markup(member, toc_tag, &t);
 }
 
+bs_stream *ts_zipdoc_tags(bs_stream *st)
+{
+    return ((sp_st *)st->st)->tags;
+}
+
+int ts_zipdoc_href_part(const bs_stream *st, int part, const char *href)
+{
+    const sp_st *s = st->st;
+    char full[320];
+    int zi;
+
+    if (href[0] == '#') return part;
+    if (part < 0 || part >= s->nspine) return -1;
+    path_join(ts_zip_name(s->z, s->spine[part]), href, full, sizeof full);
+    zi = ts_zip_find(s->z, full);
+    for (int p = 0; zi >= 0 && p < s->nspine; p++)
+        if (s->spine[p] == zi) return p;
+    return -1;
+}
+
 int ts_zipdoc_anchor(bs_stream *st, int part, const char *anchor, long *off)
 {
     sp_st *s = st->st;
@@ -636,6 +656,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     sp->tags = ts_tags_stream(c->arena, sp->cs, prof, c->cfg);
     if (!sp->tags) return BS_ERR_NOMEM;
     if (c->resolved == TS_FMT_EPUB) ts_tags_pictures(sp->tags, 1);
+    if (prof != TS_TAGS_DOCX) ts_tags_notes(sp->tags, 1);
 
     st->pull = sp_pull; st->reset = sp_reset; st->st = sp;
     c->parts = st;

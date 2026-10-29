@@ -31,4 +31,8 @@ bool dialog_prose_confirm(const char *title, const char *body,
                           const char *cancel_label,
                           bool accept_default);
 
+/* Something only to read: the same box with one button, OK. SELECT or MENU
+ * closes it wherever the reader has got to. */
+void dialog_prose_show(const char *title, const char *body);
+
 #endif /* _GUI_DIALOG_PROSE_H_ */

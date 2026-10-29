@@ -40,6 +40,7 @@
 #include "settings/settings.h"
 #include "lang.h"
 #include "widgets/splash.h"
+#include "widgets/dialog_prose.h"     /* dialog_prose_show */
 #include "draw/viewport.h"
 #include "font.h"
 #include "system/activity.h"
@@ -237,11 +238,23 @@ static bool tv_is_mark(const unsigned char *s, size_t n)
            && (s[2] == 0x82 || s[2] == 0x83);
 }
 
-/* The bytes of what is invisible and takes no width at `s`, a soft hyphen or
- * a heading's mark, or 0 */
+/* A note's mark -- TS_NOTE_OPEN, its href, TS_NOTE_CLOSE -- at `s`: its
+ * length, all of `n` when they end inside it, or 0 */
+static size_t tv_note_mark(const unsigned char *s, size_t n)
+{
+    if (n < 3 || s[0] != 0xee || s[1] != 0x80 || s[2] != 0x84)
+        return 0;
+    for (size_t i = 3; i + 3 <= n; i++)
+        if (s[i] == 0xee && s[i + 1] == 0x80 && s[i + 2] == 0x85)
+            return i + 3;
+    return n;
+}
+
+/* The bytes of what is invisible and takes no width at `s`, a soft hyphen,
+ * a heading's mark or a note's, or 0 */
 static size_t tv_hidden(const unsigned char *s, size_t n)
 {
-    return tv_is_shy(s, n) ? 2 : tv_is_mark(s, n) ? 3 : 0;
+    return tv_is_shy(s, n) ? 2 : tv_is_mark(s, n) ? 3 : tv_note_mark(s, n);
 }
 
 /* tv_width() of `n` bytes at `s`, what is hidden left out */
@@ -2516,7 +2529,8 @@ static void tv_orient(int orientation)
 /* A second click within this is a double-click */
 #define TV_DOUBLE_CLICK (HZ * 4 / 10)
 
-enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_LEAVE, TV_KEY_USB };
+enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_NOTES, TV_KEY_LEAVE,
+              TV_KEY_USB };
 
 static void tv_event_save(void *param);
 
@@ -2524,7 +2538,7 @@ static void tv_event_save(void *param);
  * right as the player is held, and Select; back is the one on the left. The
  * button now at the top does what MENU does upright: leaves, and opens the
  * settings when held. The one at the bottom swaps hands on a double-click
- * and goes upright when held. Held Select leaves too. */
+ * and goes upright when held. Held Select shows the page's notes. */
 static enum tv_key tv_side_button(long b)
 {
     static long held, last_click;
@@ -2559,7 +2573,7 @@ static enum tv_key tv_side_button(long b)
             return TV_KEY_NONE;
         held = base;
         if (base == BUTTON_SELECT)
-            return TV_KEY_LEAVE;
+            return TV_KEY_NOTES;
         if (base == top)
             return TV_KEY_MENU;
         if (base == bottom)
@@ -2617,6 +2631,114 @@ static int tv_menu(void)
     tv_draw();
     tv_speak_page();
     return ret;
+}
+
+/* ---- notes ------------------------------------------------------------ */
+
+#define TV_NOTES_MAX  8         /* notes gathered from one page */
+#define TV_NOTE_BYTES 1536      /* the box's text, all of them */
+
+static char tv_note_text[TV_NOTE_BYTES];
+
+/* Lays the page at `pos` of `part` out again after the engine has read
+ * elsewhere: a document without parts is read again from its start */
+static void tv_reopen(int part, off_t pos)
+{
+    if (tv.nparts)
+        tv_enter_part(part);
+    else if (ts_rewind(tv.src) == BS_OK)
+    {
+        tv.win_start = 0;
+        tv.win_len = 0;
+        tv.eof = false;
+        tv.pos = tv.next = 0;
+        tv.sp = 0;
+        tv_ensure(0, 1);
+    }
+    tv_resume_to(pos);
+}
+
+/* A note's text for the box: what is hidden left out, the white space at
+ * its ends trimmed. Returns its length. */
+static size_t tv_note_clean(char *s)
+{
+    size_t n = tv_strip_shy((unsigned char *)s, strlen(s)), i = 0;
+
+    while (n > 0 && (s[n - 1] == '\n' || s[n - 1] == ' '))
+        n--;
+    while (i < n && (s[i] == '\n' || s[i] == ' '))
+        i++;
+    memmove(s, s + i, n - i);
+    s[n - i] = '\0';
+    return n - i;
+}
+
+/* Hold Select: the notes the page on screen refers to, in a box. Reading
+ * them ends the chapter being read, so the page is laid out again after. */
+static int tv_notes(void)
+{
+    static char hrefs[TV_NOTES_MAX][TS_NOTE_HREF];
+    const unsigned char *s = tv.win + (tv.pos - tv.win_start);
+    size_t n = (size_t)(tv.next - tv.pos), used = 0;
+    int nh = 0, part = tv.part;
+    off_t pos = tv.pos;
+
+    for (size_t i = 0; i < n && nh < TV_NOTES_MAX; i++)
+    {
+        size_t m = tv_note_mark(s + i, n - i);
+
+        if (m > 6 && m - 6 < TS_NOTE_HREF)
+        {
+            memcpy(hrefs[nh], s + i + 3, m - 6);
+            hrefs[nh++][m - 6] = '\0';
+            i += m - 1;
+        }
+    }
+    if (!nh)
+    {
+        tv_splashf("%s", str(LANG_TEXT_VIEWER_NO_NOTES));
+        sleep(HZ);
+        tv_draw();
+        return 0;
+    }
+
+    talk_force_shutup();
+    tv_reading = false;
+    tv_splash_loading(true);
+    cpu_boost(true);
+    for (int k = 0; k < nh; k++)
+    {
+        size_t room = sizeof(tv_note_text) - used;
+
+        if (room < 64)
+            break;
+        if (used)
+        {
+            memcpy(tv_note_text + used, "\n\n", 2);
+            used += 2;
+            room -= 2;
+        }
+        if (ts_note(tv.src, part, hrefs[k], tv_note_text + used, room)
+            == BS_OK)
+            used += tv_note_clean(tv_note_text + used);
+        else if (used >= 2)
+            used -= 2;
+        tv_note_text[used] = '\0';
+    }
+    cpu_boost(false);
+    tv_reopen(part, pos);
+
+    if (used)
+    {
+        viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
+        push_current_activity(ACTIVITY_CONTEXTMENU);
+        dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES), tv_note_text);
+        pop_current_activity();
+        viewportmanager_theme_undo(SCREEN_MAIN, false);
+        tv_apply_settings();
+    }
+    tv_draw();
+    return 0;
 }
 
 /* A power-off never returns to the save below, so the event handler saves the
@@ -2734,6 +2856,9 @@ int text_viewer(const char *file)
                         goto done;
                     }
                     break;
+                case TV_KEY_NOTES:
+                    tv_notes();
+                    break;
                 default:
                     break;
             }
@@ -2788,6 +2913,11 @@ int text_viewer(const char *file)
 
             case ACTION_STD_MENU:        /* Menu leaves the viewer */
                 goto done;
+
+            case ACTION_STD_CONTEXT:     /* hold Select: the page's notes */
+                tv_notes();
+                action_wait_for_release();
+                break;
 
             case ACTION_STD_QUICKSCREEN: /* hold Menu opens the settings */
                 if (tv_menu() == MENU_ATTACHED_USB)

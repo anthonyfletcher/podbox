@@ -18,6 +18,7 @@ static int open_markup(ts_ctx *c, ts_tag_profile p, bs_stream **out)
     if (!st) return BS_ERR_NOMEM;
     st = ts_tags_stream(c->arena, st, p, c->cfg);
     if (!st) return BS_ERR_NOMEM;
+    ts_tags_notes(st, 1);
 
     c->detected = cs;
     *out = st;

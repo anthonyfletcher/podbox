@@ -26417,6 +26417,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_NOTES
+  desc: text viewer: the title of the box with a page's footnotes
+  user: core
+  <source>
+    *: "Notes"
+  </source>
+  <dest>
+    *: "Notes"
+  </dest>
+  <voice>
+    *: "Notes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NO_NOTES
+  desc: text viewer: hold Select on a page that refers to no notes
+  user: core
+  <source>
+    *: "No notes on this page"
+  </source>
+  <dest>
+    *: "No notes on this page"
+  </dest>
+  <voice>
+    *: "No notes on this page"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_DB_EBOOK_ART
   desc: in Settings, art rows on the Books lists
   user: core

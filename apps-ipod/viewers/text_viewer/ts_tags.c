@@ -155,7 +155,14 @@ typedef struct {
     int   head_wait, head_out;     /* TS_HEADING_OPEN due, and written */
     char  anchor[64];              /* the id watched for, or "" */
     long  anchor_at;               /* where it was seen, or -1 */
+    long  anchor_end;              /* where its element closed, or -1 */
+    char  anchor_name[16];         /* that element, and how deep in it */
+    int   anchor_depth, anchor_block;
     long  taken;                   /* bytes handed out since the rewind */
+    int   notes;                   /* references marked, notes left out */
+    int   show_notes;              /* notes kept in: one is being read */
+    int   ref, ref_wait, ref_close; /* in a reference; its bracket due */
+    char  ref_href[TS_NOTE_HREF];
     ts_pend out;
 } tg_st;
 
@@ -197,12 +204,25 @@ static void head_text(tg_st *s)
     ts_emit_cp(&s->out, TS_HEADING_OPEN);
 }
 
+/* A note reference is bracketed unless its text already is, so a
+ * superscript 1 does not read as part of the word before it */
+static void ref_text(tg_st *s, uint32_t c)
+{
+    if (!s->ref_wait || c >= 0xE000) return;
+    s->ref_wait = 0;
+    if (c != '[' && c != '(') {
+        ts_emit(&s->out, (const uint8_t *)"[", 1);
+        s->ref_close = 1;
+    }
+}
+
 /* Entity replacements arrive as codepoints and must be encoded... */
 static void out_cp(tg_st *s, uint32_t cp)
 {
     flush_ws(s);
     s->started = 1;
     head_text(s);
+    ref_text(s, cp);
     ts_emit_cp(&s->out, cp);
 }
 
@@ -213,6 +233,7 @@ static void out_byte(tg_st *s, uint8_t b)
 {
     flush_ws(s);
     s->started = 1;
+    ref_text(s, b);
     head_text(s);
     ts_emit(&s->out, &b, 1);
 }
@@ -261,6 +282,78 @@ static void out_picture(tg_st *s, const char *href)
     s->head_wait = wait;
 }
 
+static int has_word(const char *v, const char *w)
+{
+    size_t l = strlen(w);
+
+    for (; *v; v++)
+        if (ts_ascii_ncasecmp(v, w, l) == 0) return 1;
+    return 0;
+}
+
+/* Whether <a> body `t` is a note reference, its target in href */
+static int note_ref(const tg_st *s, const char *t, char *href, size_t cap)
+{
+    char v[64];
+    const char *frag;
+
+    if (!tag_attr(t, "href", href, cap) && !tag_attr(t, "l:href", href, cap)
+        && !tag_attr(t, "xlink:href", href, cap))
+        return 0;
+    frag = strchr(href, '#');
+    if (!frag || !frag[1]) return 0;
+    frag++;
+    /* a note's link back to its reference */
+    if (!ts_ascii_ncasecmp(frag, "fnanchor", 8)
+        || !ts_ascii_ncasecmp(frag, "noteref", 7)
+        || !ts_ascii_ncasecmp(frag, "ref", 3))
+        return 0;
+    if (tag_attr(t, "epub:type", v, sizeof v) && has_word(v, "noteref"))
+        return 1;
+    if (s->prof == TS_TAGS_FB2)
+        return tag_attr(t, "type", v, sizeof v)
+               && !ts_ascii_casecmp(v, "note");
+    if (tag_attr(t, "class", v, sizeof v)
+        && (has_word(v, "noteref") || has_word(v, "fnanchor")))
+        return 1;
+    return !ts_ascii_ncasecmp(frag, "footnote", 8)
+           || !ts_ascii_ncasecmp(frag, "note", 4)
+           || (!ts_ascii_ncasecmp(frag, "fn", 2)
+               && frag[2] >= '0' && frag[2] <= '9');
+}
+
+/* Whether the element is a note to leave out of the flow: an EPUB's
+ * footnote, an FB2's notes */
+static int note_body(const tg_st *s, const char *t, const char *name)
+{
+    char v[64];
+
+    if (s->prof == TS_TAGS_FB2)
+        return ts_ascii_casecmp(name, "body") == 0
+               && tag_attr(t, "name", v, sizeof v)
+               && !ts_ascii_casecmp(v, "notes");
+    return tag_attr(t, "epub:type", v, sizeof v) && has_word(v, "footnote");
+}
+
+/* The end of a reference: its closing bracket, then the mark that carries
+ * its target */
+static void ref_end(tg_st *s)
+{
+    const char *h;
+
+    if (s->ref_wait) out_byte(s, '*');      /* no text: a marker of its own */
+    if (s->ref_close) out_byte(s, ']');
+    out_cp(s, TS_NOTE_OPEN);
+    for (h = s->ref_href; *h; h++) {     /* no space: a line breaks there */
+        if (*h == ' ') {
+            out_byte(s, '%'); out_byte(s, '2'); out_byte(s, '0');
+        } else
+            out_byte(s, (uint8_t)*h);
+    }
+    out_cp(s, TS_NOTE_CLOSE);
+    s->ref = s->ref_wait = s->ref_close = 0;
+}
+
 static void process_tag(tg_st *s)
 {
     char name[TAGBUF];
@@ -288,8 +381,39 @@ static void process_tag(tg_st *s)
         if ((tag_attr(t, "id", id, sizeof id) ||
              (ts_ascii_casecmp(name, "a") == 0 &&
               tag_attr(t, "name", id, sizeof id))) &&
-            !strcmp(id, s->anchor))
+            !strcmp(id, s->anchor)) {
+            const rule *r = lookup(s->rules, name);
+
             s->anchor_at = s->taken + (long)(s->out.tail - s->out.head);
+            strncpy(s->anchor_name, name, sizeof s->anchor_name - 1);
+            s->anchor_name[sizeof s->anchor_name - 1] = 0;
+            s->anchor_depth = self ? 0 : 1;
+            s->anchor_block = (r && (r->flags & R_BLOCK))
+                              || ts_ascii_casecmp(name, "aside") == 0;
+            if (self) s->anchor_end = s->anchor_at;
+        }
+    } else if (s->anchor_at >= 0 && s->anchor_end < 0 && !self
+               && ts_ascii_casecmp(name, s->anchor_name) == 0) {
+        if (!close)
+            s->anchor_depth++;
+        else if (--s->anchor_depth == 0)
+            s->anchor_end = s->taken + (long)(s->out.tail - s->out.head);
+    }
+
+    /* note references, and the notes left out of the flow */
+    if (s->notes && !s->skip_depth) {
+        if (ts_ascii_casecmp(name, "a") == 0) {
+            if (close && s->ref)
+                ref_end(s);
+            else if (!close && !self && !s->ref
+                     && note_ref(s, t, s->ref_href, sizeof s->ref_href))
+                s->ref = s->ref_wait = 1;
+        } else if (!close && !self && !s->show_notes
+                   && note_body(s, t, name)) {
+            s->skip_depth = 1;
+            memcpy(s->skip_name, name, n + 1);
+            return;
+        }
     }
 
     /* A picture: <img src> (a MOBI's <img recindex>), or the <image> an
@@ -508,10 +632,13 @@ static int tg_reset(bs_stream *st)
     int collapse = s->collapse, max_nl = s->max_nl;
     int rc = src->reset ? src->reset(src) : BS_ERR_UNSUP;
 
+    int pictures = s->pictures, notes = s->notes;
+
     if (rc != BS_OK) return rc;
     memset(s, 0, sizeof *s);
     s->src = src; s->prof = prof; s->rules = rules;
     s->collapse = collapse; s->max_nl = max_nl;
+    s->pictures = pictures; s->notes = notes;
     return BS_OK;
 }
 
@@ -529,12 +656,23 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
     s->skip_depth = s->pre_depth = s->text_depth = 0;
     s->head_depth = s->head_wait = s->head_out = 0;
     s->quote = s->match = 0;
+    s->ref = s->ref_wait = s->ref_close = 0;
     if (s->started) s->nl_pending = 2;      /* blank line between documents */
 }
 
 void ts_tags_pictures(bs_stream *st, int on)
 {
     ((tg_st *)st->st)->pictures = on;
+}
+
+void ts_tags_notes(bs_stream *st, int on)
+{
+    ((tg_st *)st->st)->notes = on;
+}
+
+void ts_tags_show_notes(bs_stream *st, int on)
+{
+    ((tg_st *)st->st)->show_notes = on;
 }
 
 /* Clears the between-documents state so a container back end can start its
@@ -555,12 +693,21 @@ void ts_tags_anchor(bs_stream *st, const char *anchor)
 
     strncpy(s->anchor, anchor, sizeof s->anchor - 1);
     s->anchor[sizeof s->anchor - 1] = 0;
-    s->anchor_at = -1;
+    s->anchor_at = s->anchor_end = -1;
+    s->anchor_depth = 0;
 }
 
 long ts_tags_anchor_at(const bs_stream *st)
 {
     return ((const tg_st *)st->st)->anchor_at;
+}
+
+long ts_tags_anchor_end(const bs_stream *st, int *block)
+{
+    const tg_st *s = st->st;
+
+    *block = s->anchor_block;
+    return s->anchor_end;
 }
 
 bs_stream *ts_tags_stream(bs_arena *a, bs_stream *src, ts_tag_profile p,

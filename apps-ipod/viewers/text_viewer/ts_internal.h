@@ -118,6 +118,13 @@ void ts_tags_pictures(bs_stream *s, int on);
  * until it is seen. The count starts at ts_tags_rewind(). */
 void ts_tags_anchor(bs_stream *s, const char *anchor);
 long ts_tags_anchor_at(const bs_stream *s);
+/* Where the anchor's element closed, or -1; *block whether it is a block,
+ * not an inline element whose note is the paragraph around it */
+long ts_tags_anchor_end(const bs_stream *s, int *block);
+/* Note references marked and notes left out, for a book's text; and the
+ * notes kept in while one is read */
+void ts_tags_notes(bs_stream *s, int on);
+void ts_tags_show_notes(bs_stream *s, int on);
 /* An FB2's pictures, by the hash of their ids: found on the first look */
 #define TS_FB2_PICTURES 128
 typedef struct {
@@ -129,6 +136,10 @@ int ts_fb2_picture(const bs_io *io, ts_fb2_pictures *p, const char *href,
                    bs_off_t *at, uint32_t *len);
 int ts_zipdoc_toc(bs_stream *st, ts_toc_fn cb, void *ud);
 int ts_zipdoc_anchor(bs_stream *st, int part, const char *anchor, long *off);
+/* The spine's tags stage, and the part `href` from `part` names: `part`
+ * for a bare fragment, -1 for none */
+bs_stream *ts_zipdoc_tags(bs_stream *st);
+int ts_zipdoc_href_part(const bs_stream *st, int part, const char *href);
 /* The same for the stream ts_open_mobi() returns. A picture's href is its
  * recindex, and the picture is stored as it is. */
 int ts_open_mobi(ts_ctx *c, bs_stream **out);

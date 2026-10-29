@@ -479,6 +479,73 @@ int ts_anchor(ts_source *s, int part, const char *anchor, long *off)
     return ts_zipdoc_anchor(s->parts, part, anchor, off);
 }
 
+/* From the anchor the tags stage finds on, to its element's end, or for an
+ * inline one to the end of the paragraph */
+static int read_note(bs_stream *src, bs_stream *tags, char *out, size_t size)
+{
+    uint8_t chunk[256];
+    long pos = 0, at = -1, end;
+    size_t n = 0;
+    int text = 0, block, rc = BS_OK;
+
+    for (;;) {
+        size_t got = 0, i;
+
+        rc = bs_pull(src, chunk, sizeof chunk, &got);
+        if (rc != BS_OK) break;
+        at = ts_tags_anchor_at(tags);
+        end = ts_tags_anchor_end(tags, &block);
+        if (!block) end = -1;
+        for (i = 0; at >= 0 && i < got; i++) {
+            long p = pos + (long)i;
+            uint8_t c = chunk[i];
+
+            if (p < at) continue;
+            if ((end >= 0 && p >= end) || (c == '\n' && text && !block)
+                || n + 1 >= size)
+                goto done;
+            out[n++] = (char)c;
+            if (c > ' ') text = 1;
+        }
+        if (!got) break;
+        pos += (long)got;
+    }
+done:
+    out[n] = 0;
+    if (rc != BS_OK) return rc;
+    return at >= 0 ? BS_OK : BS_ERR_FORMAT;
+}
+
+int ts_note(ts_source *s, int part, const char *href, char *buf, size_t size)
+{
+    const char *id = href ? strchr(href, '#') : NULL;
+    bs_stream *tags, *src;
+    int rc;
+
+    if (!s || !id || !id[1] || !buf || size < 8) return BS_ERR_INVAL;
+    if (s->parts && s->fmt != TS_FMT_MOBI) {
+        part = ts_zipdoc_href_part(s->parts, part, href);
+        if (part < 0) return BS_ERR_FORMAT;
+        rc = ts_zipdoc_seek_part(s->parts, part);
+        tags = src = s->parts;
+        tags = ts_zipdoc_tags(s->parts);
+    } else if (!s->parts && href[0] == '#'
+               && (s->fmt == TS_FMT_FB2 || s->fmt == TS_FMT_HTML)) {
+        rc = ts_rewind(s);
+        tags = src = s->pipe;
+    } else
+        return BS_ERR_UNSUP;
+    if (rc != BS_OK) return rc;
+    s->eof = s->err = 0;
+    s->hold_n = 0;
+    ts_tags_show_notes(tags, 1);
+    ts_tags_anchor(tags, id + 1);
+    rc = read_note(src, tags, buf, size);
+    ts_tags_anchor(tags, "");
+    ts_tags_show_notes(tags, 0);
+    return rc;
+}
+
 void ts_close(ts_source *s)
 {
     if (!s) return;
