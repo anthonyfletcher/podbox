@@ -489,6 +489,9 @@ static void process_tag(tg_st *s)
                      tag_attr(t, "href", href, sizeof href)))) {
             int depth = s->skip_depth;
 
+            /* KF8's SVG flow, its cover page's wrapper, is no picture: the
+             * book's cover takes its place */
+            if (!strncmp(href, "kindle:flow:", 12)) return;
             if (depth && fb2) s->cover_done = 1;
             s->skip_depth = 0;          /* out_picture writes */
             out_picture(s, href);
