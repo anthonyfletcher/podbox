@@ -33,6 +33,8 @@ enum tag_type { tag_artist = 0, tag_album, tag_genre, tag_title,
     tag_virt_entryage, tag_virt_autoscore,
     /* Whether the track's genre names spoken word (db_spoken.c). */
     tag_virt_spoken,
+    /* A podcast episode's place in its show (db_episode.c). */
+    tag_virt_episode,
     TAG_COUNT_ALL};
 
 /* How many entries to fetch to the seek table at once while searching. */
@@ -51,8 +53,8 @@ enum tag_type { tag_artist = 0, tag_album, tag_genre, tag_title,
 /* Numeric tags (we can use these tags with conditional clauses).
  *
  * A 32-bit mask over tag indices, so it holds tags 0..31 and no more.
- * tag_virt_spoken is 30; one index is left before a new numeric tag needs
- * this widened and every BIT_N() against it checked. */
+ * tag_virt_episode is 31, the last: a new numeric tag needs this widened
+ * and every BIT_N() against it checked. */
 #define TAGCACHE_NUMERIC_TAGS ((1LU << tag_year) | (1LU << tag_discnumber) | \
     (1LU << tag_tracknumber) | (1LU << tag_length) | (1LU << tag_bitrate) | \
     (1LU << tag_playcount) | (1LU << tag_rating) | (1LU << tag_playtime) | \
@@ -61,7 +63,7 @@ enum tag_type { tag_artist = 0, tag_album, tag_genre, tag_title,
     (1LU << tag_virt_length_min) | (1LU << tag_virt_length_sec) | \
     (1LU << tag_virt_playtime_min) | (1LU << tag_virt_playtime_sec) | \
     (1LU << tag_virt_entryage) | (1LU << tag_virt_autoscore) | \
-    (1LU << tag_virt_spoken))
+    (1LU << tag_virt_spoken) | (1LU << tag_virt_episode))
 
 #define TAGCACHE_IS_NUMERIC(tag) (BIT_N(tag) & TAGCACHE_NUMERIC_TAGS)
 
@@ -282,7 +284,7 @@ struct tagcache_album {
     int16_t  year;               /* the latest of its tracks' */
     uint16_t tracks;
     uint16_t spoken;             /* of them, in a spoken genre */
-    uint16_t pad;
+    uint16_t podcast;            /* of those, in a podcast genre */
 };
 
 struct tagcache_artist {
@@ -292,6 +294,8 @@ struct tagcache_artist {
     uint32_t art_hash;           /* its first album's artist_art_hash */
     uint16_t albums;
     uint16_t spoken_albums;      /* albums all of whose tracks are spoken */
+    uint16_t podcast_albums;     /* of them, all of whose are podcasts */
+    uint16_t pad;
 };
 
 /* Albums in album-seek order then artist-seek order; artists in seek order.

@@ -159,19 +159,25 @@ void db_search_arm_scope(int scope)
  * unique-valued -- their tag files hold one entry per distinct string with no
  * track behind it -- so db_spoken answers for them. An album artist with books
  * and music is found on both sides, and so is an album name that a book and a
- * music album share. */
+ * music album share; the same goes for books and podcasts. */
 static bool match_in_scope(int tag, const struct tagcache_search *tcs)
 {
+    int kind = active_scope == DB_SEARCH_PODCAST ? 2 : 1;
     bool spoken;
 
     if (active_scope == DB_SEARCH_ALL
         || !global_settings.segregate_audiobooks)
         return true;
 
-    if (tag == tag_albumartist && active_scope == DB_SEARCH_SPOKEN)
-        return db_spoken_artist_has_book(tcs->result_seek);
-    if (tag == tag_album && active_scope == DB_SEARCH_SPOKEN)
-        return db_spoken_album_has_book(tcs->result_seek);
+    if (active_scope != DB_SEARCH_MUSIC)
+    {
+        if (tag == tag_albumartist)
+            return db_spoken_artist_has_book(tcs->result_seek, kind);
+        if (tag == tag_album)
+            return db_spoken_album_has_book(tcs->result_seek, kind);
+        if (!db_spoken_group_tag(tag))
+            return tagcache_get_numeric(tcs, tag_virt_spoken) == kind;
+    }
     if (db_spoken_group_tag(tag))
         spoken = db_spoken_group_is_book(tag, tcs->result_seek);
     else if (tag == tag_album || tag == tag_albumartist)
@@ -179,7 +185,7 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
     else
         spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
 
-    return spoken == (active_scope == DB_SEARCH_SPOKEN);
+    return spoken == (active_scope != DB_SEARCH_MUSIC);
 }
 
 /* Whether `query` occurs in `text`, ignoring case. A typed apostrophe also

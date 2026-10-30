@@ -388,6 +388,19 @@ static int browser(void* param)
         }
         break;
 
+        case GO_TO_PODCASTS:
+            if (!wait_for_tagcache_ready() || !db_browser_ready())
+                return GO_TO_PREVIOUS;
+            filter = SHOW_ID3DB;
+            last_ft_dirlevel = tc->dirlevel;
+            /* A fresh root, as a tagnavi row's above */
+            tc->dirlevel = 0;
+            tc->currtable = 0;
+            browser_db_clear_shortcut_base();
+            browser_db_enter_menu_on_next_load("podcasts");
+            push_current_activity(ACTIVITY_DATABASEBROWSER);
+        break;
+
         case GO_TO_ALBUM_COVERS_TRACKS:
             if (!wait_for_tagcache_ready() || !db_browser_ready())
                 return GO_TO_PREVIOUS;
@@ -889,6 +902,7 @@ static const struct root_items items[] = {
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_BOOKS] = { books_scrn, NULL, &text_viewer_menu },
+    [GO_TO_PODCASTS] = { browser, (void*)GO_TO_PODCASTS, &tagcache_menu },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
     [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
@@ -953,6 +967,8 @@ MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
 MENUITEM_RETURNVALUE(books_item, ID2P(LANG_EBOOKS), GO_TO_BOOKS,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
+                        NULL, Icon_Audio);
+MENUITEM_RETURNVALUE(podcasts_item, ID2P(LANG_PODCASTS), GO_TO_PODCASTS,
                         NULL, Icon_Audio);
 
 /* Dynamic-text menu items for the reserved GO_TO_TAGNAVI_FIRST.. slots: the
@@ -1060,6 +1076,7 @@ static struct menu_table menu_table[] = {
     { "images", &images_item },
     { "books", &books_item },
     { "spun", &spun_item },
+    { "podcasts", &podcasts_item },
     { "playlists", &playlists },
     { "currentplaylist", &current_playlist },
     { "shortcuts", &shortcut_menu },
@@ -1262,19 +1279,12 @@ static void root_menu_fixup_tagnavi_slots(void)
  *
  * Safe before tagnavi.config is parsed: the slot comes back -1 and this does
  * nothing, which is why root_menu() calls it again on first entry. */
-static void audiobooks_row(bool on, bool unhide)
+static void spoken_row(struct menu_item_ex *item,
+                       const struct menu_item_ex *after, bool on, bool unhide)
 {
-    int slot = browser_db_spoken_main_menu_slot();
-    struct menu_item_ex *item;
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
     unsigned i;
     int off;
-
-    if (slot < 0 || slot >= TAGNAVI_MAIN_MENU_SLOTS)
-        return;
-
-    item = (struct menu_item_ex *)
-        menu_table[MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS + slot].item;
 
     for (i = 0; i < count; i++)
         if (root_menu__[i] == item)
@@ -1299,9 +1309,11 @@ static void audiobooks_row(bool on, bool unhide)
         }
         else
         {
-            /* After the last tagnavi row, else before Settings, else last. */
+            /* After 'after', else the last tagnavi row, else before
+             * Settings, else last. */
             for (i = count; i-- > 0; )
-                if (tagnavi_slot_of_item(root_menu__[i]) >= 0)
+                if (after ? root_menu__[i] == after
+                          : tagnavi_slot_of_item(root_menu__[i]) >= 0)
                     break;
             if (i < count)
                 at = i + 1;
@@ -1331,6 +1343,21 @@ static void audiobooks_row(bool on, bool unhide)
     }
 
     root_menu_set_count(count);
+}
+
+/* Audiobooks, then Podcasts, which lands after it */
+static void audiobooks_row(bool on, bool unhide)
+{
+    int slot = browser_db_spoken_main_menu_slot();
+
+    if (slot < 0 || slot >= TAGNAVI_MAIN_MENU_SLOTS)
+        return;
+
+    struct menu_item_ex *books = (struct menu_item_ex *)
+        menu_table[MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS + slot].item;
+
+    spoken_row(books, NULL, on, unhide);
+    spoken_row((struct menu_item_ex *)&podcasts_item, books, on, unhide);
 }
 
 void root_menu_set_audiobooks_row(bool on)

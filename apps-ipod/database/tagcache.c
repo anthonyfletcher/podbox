@@ -95,6 +95,7 @@
 #include "database/sound_index.h"
 #include "database/unreadable.h"
 #include "db_spoken.h"
+#include "database/db_episode.h"
 #include "metadata/art_cache.h"   /* art_cache_dir_hash */
 #include "core_alloc.h"
 #include "audio.h"
@@ -235,7 +236,8 @@ static const char * const tags_str[] = { "artist", "album", "genre", "title",
 #else /* strings for logf debugging */
     "tag_virt_basename", "tag_virt_length_min", "tag_virt_length_sec",
     "tag_virt_playtime_min", "tag_virt_playtime_sec",
-    "tag_virt_entryage", "tag_virt_autoscore", "tag_virt_spoken"
+    "tag_virt_entryage", "tag_virt_autoscore", "tag_virt_spoken",
+    "tag_virt_episode"
 };
 /* more debug strings */
 static const char * const tag_type_str[] = {
@@ -1118,7 +1120,11 @@ static void albums_finish(int entries)
                                                  [e->tag_seek[tag_genre]];
         if (db_spoken_is_spoken_genre(g->tag_data)
             && (n = entry_album_row(i)) >= 0)
+        {
             tcrc_albums[n].spoken++;
+            if (db_spoken_is_podcast_genre(g->tag_data))
+                tcrc_albums[n].podcast++;
+        }
     }
 
     for (int r = 0; r < hdr->album_count; r++)
@@ -1133,6 +1139,8 @@ static void albums_finish(int entries)
         ar->albums++;
         if (al->spoken == al->tracks)
             ar->spoken_albums++;
+        if (al->podcast == al->tracks)
+            ar->podcast_albums++;
         ar->playcount += al->playcount;
         if (al->lastplayed > ar->lastplayed)
             ar->lastplayed = al->lastplayed;
@@ -1600,6 +1608,10 @@ static bool retrieve(struct tagcache_search *tcs, struct index_entry *idx,
             if (basename != NULL)
                 memmove(buf, basename + 1, strlen(basename)); /* includes NULL */
         }
+        else if (tag == tag_title
+                 && db_episode_shown_len(buf, strlen(buf)) != (int)strlen(buf)
+                 && db_spoken_kind_seek(idx->tag_seek[tag_genre]) == 2)
+            str_setlen(buf, db_episode_shown_len(buf, strlen(buf)));
         return true;
     }
 
@@ -1659,6 +1671,56 @@ static inline long min_in_ms(long ms)
     return (ms/1000) / 60;
 }
 
+static bool is_podcast(int idx_id, const struct index_entry *idx)
+{
+    return db_spoken_kind_seek(tc_find_tag(tag_genre, idx_id, idx)) == 2;
+}
+
+/* tag_virt_episode: 0 for anything but a podcast episode. The title is read
+ * from RAM where the database is loaded, else from its file. */
+static long episode_key(int idx_id, const struct index_entry *idx)
+{
+    long seek = idx->tag_seek[tag_title];
+    char buf[256];
+    const char *title = buf;
+    struct tagcache_header hdr;
+    struct tagfile_entry tfe;
+    int fd;
+
+    if ((idx->flag & FLAG_DELETED) || !is_podcast(idx_id, idx))
+        return 0;
+
+    if (tc_stat.ramcache)
+        title = ((struct tagfile_entry *)
+                 &tcramcache.hdr->tags[tag_title][seek])->tag_data;
+    else
+    {
+        fd = open_tag_fd(&hdr, tag_title, false);
+        if (fd < 0)
+            return 0;
+        lseek(fd, seek, SEEK_SET);
+        if (read_tagfile_entry_and_tag(fd, &tfe, buf, sizeof(buf))
+            != e_SUCCESS)
+            buf[0] = '\0';
+        close(fd);
+    }
+
+    return db_episode_key(title, idx->tag_seek[tag_mtime]);
+}
+
+/* The length of a title as lists show it: a podcast episode's without the
+ * date the scan put after it */
+static int shown_title_len(int idx_id, const char *title, int len)
+{
+    struct index_entry idx;
+    int shown = db_episode_shown_len(title, len);
+
+    if (shown == len || !get_index(-1, idx_id, &idx, true)
+        || !is_podcast(idx_id, &idx))
+        return len;
+    return shown;
+}
+
 static long check_virtual_tags(int tag, int idx_id,
                                const struct index_entry *idx)
 {
@@ -1709,7 +1771,11 @@ static long check_virtual_tags(int tag, int idx_id,
             break;
 
         case tag_virt_spoken:
-            data = db_spoken_is_spoken_seek(tc_find_tag(tag_genre, idx_id, idx));
+            data = db_spoken_kind_seek(tc_find_tag(tag_genre, idx_id, idx));
+            break;
+
+        case tag_virt_episode:
+            data = episode_key(idx_id, idx);
             break;
 
         /* How many commits before the file has been added to the DB. */
@@ -2488,6 +2554,15 @@ bool tagcache_search_add_clause(struct tagcache_search *tcs,
     return true;
 }
 
+/* A title result as lists show it */
+static void shown_title(struct tagcache_search *tcs, char *buf)
+{
+    int len = shown_title_len(tcs->idx_id, buf, tcs->result_len - 1);
+
+    str_setlen(buf, len);
+    tcs->result_len = len + 1;
+}
+
 static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, long bufsz)
 {
     struct tagfile_entry entry;
@@ -2559,6 +2634,8 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
             tcs->result = buf;
             tcs->idx_id = ep->idx_id;
             tcs->ramresult = false; /* was true before we copied to buf too */
+            if (tcs->type == tag_title)
+                shown_title(tcs, buf);
 
             /* Increase position for the next run. This may get overwritten. */
             tcs->position += sizeof(struct tagfile_entry) + ep->tag_length;
@@ -2611,6 +2688,8 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
     tcs->result_len = entry.tag_length + 1;
     tcs->idx_id = entry.idx_id;
     tcs->ramresult = false;
+    if (tcs->type == tag_title)
+        shown_title(tcs, buf);
 
     return true;
 }
@@ -3042,6 +3121,9 @@ static bool walk_checks_deletions(void)
     return tc_stat.ready && current_tcmh.tch.entry_count <= WALK_SEEN_MAX;
 }
 
+/* A podcast episode's title with its date after it (db_episode.c) */
+static char episode_title[256];
+
 static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
 {
     #define ADD_TAG(entry, tag, data) \
@@ -3193,6 +3275,11 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
      * album artist finds the track under its artist, not under <Untagged>. */
     if (has_artist && (id3.albumartist == NULL || id3.albumartist[0] == '\0'))
         id3.albumartist = id3.artist;
+
+    if (id3.genre_string && db_spoken_is_podcast_genre(id3.genre_string))
+        id3.title = (char *)db_episode_title(id3.title, id3.year_string, path,
+                                             episode_title,
+                                             sizeof(episode_title));
 
     ADD_TAG(entry, tag_filename, &path);
     ADD_TAG(entry, tag_title, &id3.title);

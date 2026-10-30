@@ -1,0 +1,317 @@
+/***************************************************************************
+ * GNU General Public License (version 2+)
+ *
+ * The order of a podcast's episodes, newest first, from what the files say.
+ *
+ * A podcatcher fills the date tags patchily -- often the year alone -- and
+ * shows put their order in different places: an episode number or a date in
+ * the title, or only a date in the file name. The database keeps titles in
+ * RAM but not file names, so the scan settles it while it has both: a
+ * podcast episode whose title gives no order of its own is stored with the
+ * date after it, " (2024-07-30)", from a full release date in the tags or
+ * else from the file name. tag_virt_episode then reads every episode's order
+ * from its stored title, and lists sort on it. The date is the scan's own
+ * marker, not the publisher's, so whatever shows a title cuts it off; the
+ * tag on disk is not touched.
+ *
+ * Parts, in order:
+ *   - reading numbers, dates and month names
+ *   - the order a title gives
+ *   - the title the scan stores, and the title shown
+ ****************************************************************************/
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include "config.h"
+#include "string-extra.h"
+#include "database/db_episode.h"
+
+/* ------------------------------------------------------------------ *
+ * reading numbers, dates and month names                             *
+ * ------------------------------------------------------------------ */
+
+static bool digit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+static bool letter(char c)
+{
+    return (c | 0x20) >= 'a' && (c | 0x20) <= 'z';
+}
+
+/* The number at *s, up to `most` digits, *s moved past it; -1 for none */
+static long number(const char **s, int most)
+{
+    long v = 0;
+    int n = 0;
+
+    while (n < most && digit(**s))
+    {
+        v = v * 10 + (**s - '0');
+        (*s)++;
+        n++;
+    }
+    return n ? v : -1;
+}
+
+/* The month named at s, by its first three letters with no letter running
+ * on past the name it starts; 0 for none. *s moved past the word. */
+static int month(const char **s)
+{
+    static const char names[] = "janfebmaraprmayjunjulaugsepoctnovdec";
+    const char *p = *s;
+
+    if (!letter(p[0]) || !letter(p[1]) || !letter(p[2]))
+        return 0;
+    for (int m = 0; m < 12; m++)
+        if (!strncasecmp(p, names + 3 * m, 3))
+        {
+            p += 3;
+            while (letter(*p))
+                p++;
+            if (*p == '.')
+                p++;
+            *s = p;
+            return m + 1;
+        }
+    return 0;
+}
+
+static long ymd(long y, long m, long d)
+{
+    if (y < 100)
+        y += 2000;
+    if (y < 1900 || y > 2099 || m < 1 || m > 12 || d < 0 || d > 31)
+        return 0;
+    return y * 10000 + m * 100 + d;
+}
+
+/* A full date written YYYY-MM-DD (or with / . _ between, or none) at s */
+static long iso_date(const char *s)
+{
+    long y, m, d;
+    char sep;
+
+    y = number(&s, 4);
+    if (y < 1900)
+        return 0;
+    sep = *s;
+    if (sep == '-' || sep == '/' || sep == '.' || sep == '_')
+        s++;
+    else
+        sep = 0;
+    m = number(&s, 2);
+    if (sep && *s == sep)
+        s++;
+    else if (sep)
+        return 0;
+    d = number(&s, 2);
+    if (m < 0 || d < 1 || digit(*s))
+        return 0;
+    return ymd(y, m, d);
+}
+
+/* ------------------------------------------------------------------ *
+ * the order a title gives                                            *
+ * ------------------------------------------------------------------ */
+
+/* S01E04 or 1x04: season and episode */
+static long season_episode(const char *t)
+{
+    for (const char *p = t; *p; p++)
+    {
+        const char *s = p;
+        long a, b;
+
+        if (p > t && (letter(p[-1]) || digit(p[-1])))
+            continue;
+        if ((*s | 0x20) == 's')
+        {
+            s++;
+            if ((a = number(&s, 3)) >= 0 && (*s | 0x20) == 'e')
+            {
+                s++;
+                if ((b = number(&s, 4)) >= 0 && !digit(*s))
+                    return a * 10000 + b;
+            }
+        }
+        else if ((a = number(&s, 2)) >= 0 && (*s | 0x20) == 'x')
+        {
+            s++;
+            if ((b = number(&s, 4)) >= 0 && !letter(*s) && !digit(*s))
+                return a * 10000 + b;
+        }
+    }
+    return 0;
+}
+
+/* Episode 12, Ep 12, Ep.12, #12, E12 */
+static long episode_number(const char *t)
+{
+    for (const char *p = t; *p; p++)
+    {
+        const char *s = p;
+        long n;
+
+        if (p > t && (letter(p[-1]) || digit(p[-1])))
+            continue;
+        if (!strncasecmp(s, "episode", 7))
+            s += 7;
+        else if (!strncasecmp(s, "ep", 2) && !letter(s[2]))
+            s += 2;
+        else if (*s == '#')
+            s++;
+        else if ((*s | 0x20) == 'e' && digit(s[1]))
+            s++;
+        else
+            continue;
+        while (*s == ' ' || *s == '.')
+            s++;
+        if ((n = number(&s, 5)) > 0 && !letter(*s))
+            return n;
+    }
+    return 0;
+}
+
+/* 2025-05-26, 26 May 2025, May 26, 2025 */
+static long full_date(const char *t)
+{
+    for (const char *p = t; *p; p++)
+    {
+        const char *s = p;
+        long a, b, v;
+        int m;
+
+        if (p > t && (letter(p[-1]) || digit(p[-1])))
+            continue;
+        if (digit(*s) && (v = iso_date(s)))
+            return v;
+        if (digit(*s))
+        {
+            a = number(&s, 2);
+            while (*s == ' ')
+                s++;
+            if ((m = month(&s)))
+            {
+                while (*s == ' ' || *s == ',')
+                    s++;
+                if ((b = number(&s, 4)) >= 1900 && (v = ymd(b, m, a)))
+                    return v;
+            }
+        }
+        else if ((m = month(&s)))
+        {
+            while (*s == ' ')
+                s++;
+            a = number(&s, 2);
+            while (*s == ' ' || *s == ',')
+                s++;
+            if (a > 0 && (b = number(&s, 4)) >= 1900 && (v = ymd(b, m, a)))
+                return v;
+        }
+    }
+    return 0;
+}
+
+/* Jan 2025, January 2025, 03/26: the month alone, day 0 */
+static long month_year(const char *t)
+{
+    for (const char *p = t; *p; p++)
+    {
+        const char *s = p;
+        long a, b;
+        int m;
+
+        if (p > t && (letter(p[-1]) || digit(p[-1])))
+            continue;
+        if ((m = month(&s)))
+        {
+            while (*s == ' ')
+                s++;
+            if ((b = number(&s, 4)) >= 1900 && !digit(*s))
+                return ymd(b, m, 0);
+        }
+        else if ((a = number(&s, 2)) > 0 && *s == '/')
+        {
+            s++;
+            if ((b = number(&s, 2)) >= 0 && !digit(*s) && *s != '/')
+                return ymd(b, a, 0);
+        }
+    }
+    return 0;
+}
+
+static long title_key(const char *t)
+{
+    long k;
+
+    if (!t || !*t)
+        return 0;
+    if ((k = season_episode(t)) || (k = episode_number(t))
+        || (k = full_date(t)) || (k = month_year(t)))
+        return k;
+    return 0;
+}
+
+long db_episode_key(const char *title, unsigned long mtime)
+{
+    long k = title_key(title);
+    unsigned date = mtime >> 16;    /* FAT: year since 1980, month, day */
+
+    if (k)
+        return k;
+    return ymd(1980 + (date >> 9), (date >> 5) & 15, date & 31);
+}
+
+/* ------------------------------------------------------------------ *
+ * the title the scan stores, and the title shown                     *
+ * ------------------------------------------------------------------ */
+
+/* A full date somewhere in the file's name, as eight digits or with
+ * separators: "Seriously-20240730-StealingPower.mp3" */
+static long name_date(const char *path)
+{
+    const char *name = strrchr(path, '/');
+
+    for (const char *p = name ? name + 1 : path; *p; p++)
+    {
+        long v;
+
+        if ((p == path || !digit(p[-1])) && digit(*p) && (v = iso_date(p)))
+            return v;
+    }
+    return 0;
+}
+
+const char *db_episode_title(const char *title, const char *date,
+                             const char *path, char *buf, size_t size)
+{
+    long v;
+
+    if (title_key(title))
+        return title;
+    v = date ? iso_date(date) : 0;
+    if (!v)
+        v = name_date(path);
+    if (!v)
+        return title;
+    snprintf(buf, size, "%s (%04ld-%02ld-%02ld)", title ? title : "",
+             v / 10000, v / 100 % 100, v % 100);
+    return buf;
+}
+
+int db_episode_shown_len(const char *title, int len)
+{
+    const char *s = title + len - 13;
+
+    /* " (YYYY-MM-DD)", the marker exactly */
+    if (len >= 13 && s[0] == ' ' && s[1] == '(' && s[12] == ')'
+        && s[6] == '-' && s[9] == '-'
+        && digit(s[2]) && digit(s[3]) && digit(s[4]) && digit(s[5])
+        && digit(s[7]) && digit(s[8]) && digit(s[10]) && digit(s[11]))
+        return len - 13;
+    return len;
+}

@@ -26738,3 +26738,45 @@
     *: "Book Author Art Rows"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCASTS
+  desc: the Podcasts menu, and its main-menu row
+  user: core
+  <source>
+    *: "Podcasts"
+  </source>
+  <dest>
+    *: "Podcasts"
+  </dest>
+  <voice>
+    *: "Podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_NEW
+  desc: a row of the Podcasts menu: every episode not yet heard
+  user: core
+  <source>
+    *: "New"
+  </source>
+  <dest>
+    *: "New"
+  </dest>
+  <voice>
+    *: "New"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_SHOWS
+  desc: a row of the Podcasts menu: every show, each opening its episodes
+  user: core
+  <source>
+    *: "Shows"
+  </source>
+  <dest>
+    *: "Shows"
+  </dest>
+  <voice>
+    *: "Shows"
+  </voice>
+</phrase>

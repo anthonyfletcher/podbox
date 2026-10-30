@@ -567,6 +567,7 @@ static int get_tag(int *tag)
         TAG_MATCH("album", tag_album) \
         TAG_MATCH("genre", tag_genre) \
         TAG_MATCH("title", tag_title) \
+        TAG_MATCH("mtime", tag_mtime) \
         TAG_MATCH("%sort", var_sorttype) \
         TAG_MATCH("artist", tag_artist) \
         TAG_MATCH("length", tag_length) \
@@ -577,6 +578,7 @@ static int get_tag(int *tag)
         TAG_MATCH("bitrate", tag_bitrate) \
         TAG_MATCH("comment", tag_comment) \
         TAG_MATCH("discnum", tag_discnumber) \
+        TAG_MATCH("episode", tag_virt_episode) \
         TAG_MATCH("%format", var_format) \
         TAG_MATCH("%reload", menu_reload) \
         TAG_MATCH("filename", tag_filename) \
@@ -2175,6 +2177,26 @@ static bool csi_mentions_spoken(void)
     return false;
 }
 
+/* Which spoken word a spoken browse is about, from its `spoken == "n"`
+ * clause: 1 books, 2 podcasts, 0 either (`spoken > "0"`, or none). */
+static int search_spoken_kind(const struct search_instruction *si)
+{
+    int i, j;
+
+    for (i = 0; i < MAX_TAGS; i++)
+        for (j = 0; j < si->clause_count[i]; j++)
+            if (si->clause[i][j]->tag == tag_virt_spoken
+                && si->clause[i][j]->type == clause_is
+                && si->clause[i][j]->numeric_data > 0)
+                return si->clause[i][j]->numeric_data;
+    return 0;
+}
+
+static int csi_spoken_kind(void)
+{
+    return csi ? search_spoken_kind(csi) : 0;
+}
+
 /* The clause that keeps spoken word out. One object, reused for every place
  * it has to be inserted -- tagcache stores the pointer and only reads it. */
 static struct tagcache_search_clause exclude_spoken_clause = {
@@ -2295,7 +2317,8 @@ static const char *level_book(struct browser_context *c, int level, int tag)
         return NULL;
     if (!csi || level < 1 || level >= csi->tagorder_count)
         return NULL;
-    if (csi->tagorder[level - 1] != tag_album || !csi_mentions_spoken())
+    if (csi->tagorder[level - 1] != tag_album || !csi_mentions_spoken()
+        || csi_spoken_kind() == 2)
         return NULL;
 
     return book_resume_id_of(csi->result_seek[level - 1],
@@ -2341,9 +2364,10 @@ static int table_album_row(int level, long seek)
     return n;
 }
 
-/* Whether row 'seek' of a 'tag' list at 'level' is a book. An album under an
- * album artist is answered by its own table row, so a book and a music album
- * of one name are told apart there; anything else by db_spoken. */
+/* Whether row 'seek' of a 'tag' list at 'level' is a book, or a podcast.
+ * An album under an album artist is answered by its own table row, so a book
+ * and a music album of one name are told apart there; anything else by
+ * db_spoken. */
 static bool row_is_book(int tag, long seek, int level)
 {
     struct tagcache_album al;
@@ -2354,7 +2378,7 @@ static bool row_is_book(int tag, long seek, int level)
             && tagcache_album_get(tagcache_album_find(seek,
                                                       csi->result_seek[i]),
                                   &al))
-            return al.spoken == al.tracks;
+            return db_spoken_album_is_kind(&al, csi_spoken_kind());
     return db_spoken_group_is_book(tag, seek);
 }
 
@@ -2366,12 +2390,12 @@ static bool row_has_book(int tag, long seek, int level)
     int i;
 
     if (tag == tag_albumartist)
-        return db_spoken_artist_has_book(seek);
+        return db_spoken_artist_has_book(seek, csi_spoken_kind());
     for (i = 0; tag == tag_album && i < level; i++)
         if (csi->tagorder[i] == tag_albumartist)
             return row_is_book(tag, seek, level);
     if (tag == tag_album)
-        return db_spoken_album_has_book(seek);
+        return db_spoken_album_has_book(seek, csi_spoken_kind());
     return row_is_book(tag, seek, level);
 }
 
@@ -2392,7 +2416,7 @@ static bool row_kept(enum spoken_keep keep, int tag, long seek, int level,
         return row_has_book(tag, seek, level);
     if (keep == KEEP_BOOK_TRACKS)
         return tagcache_album_get(tagcache_album_of(idx_id), &al)
-               && al.spoken == al.tracks;
+               && db_spoken_album_is_kind(&al, csi_spoken_kind());
     return true;
 }
 
@@ -3513,7 +3537,7 @@ static void browser_db_enter_by_label_on_next_load(const unsigned char *label)
 /* The submenu counterpart, armed by id ("runtime" and so on) rather than by
  * position for the same reason the tag version uses tag identity: a row that
  * moves in tagnavi.config must still be found. */
-static void browser_db_enter_menu_on_next_load(const char *menu_id)
+void browser_db_enter_menu_on_next_load(const char *menu_id)
 {
     pending_root_shortcut_tag = -1;
     pending_root_shortcut_label[0] = '\0';
@@ -3974,6 +3998,19 @@ bool browser_db_enter_main_menu_row_on_next_load(int index)
     else
         browser_db_enter_by_label_on_next_load(item->name);
     return true;
+}
+
+/* The Search scope of menu 'm': music, or the spoken word its rows ask for */
+static int menu_spoken_scope(const struct menu_root *m)
+{
+    int i;
+
+    if (!menu_mentions_spoken(m))
+        return DB_SEARCH_MUSIC;
+    for (i = 0; i < m->itemcount; i++)
+        if (search_spoken_kind(&m->items[i]->si) == 2)
+            return DB_SEARCH_PODCAST;
+    return DB_SEARCH_SPOKEN;
 }
 
 /* Whether any row of 'm' asks about spoken word. Used to recognise the
@@ -4625,8 +4662,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
          * Search covers books, every other menu's covers music. The main
          * menu's own Search row is not this one -- root_menu.c arms that,
          * and it covers both. */
-        db_search_arm_scope(menu_mentions_spoken(menus[c->currextra])
-                            ? DB_SEARCH_SPOKEN : DB_SEARCH_MUSIC);
+        db_search_arm_scope(menu_spoken_scope(menus[c->currextra]));
         return GO_TO_DB_SEARCH;
     }
 
@@ -4653,7 +4689,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         char book[BOOK_ID_MAX];
         char name[BOOK_KEY_MAX];
         bool spoken = global_settings.segregate_audiobooks
-                      && csi_mentions_spoken();
+                      && csi_mentions_spoken() && csi_spoken_kind() != 2;
         bool one;
 
         book[0] = '\0';

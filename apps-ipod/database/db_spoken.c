@@ -122,6 +122,7 @@ bool db_spoken_is_spoken_genre(const char *genre)
 #define SPOKEN_GENRE_BUFSZ 128
 
 static long spoken_seek[SPOKEN_SEEK_MAX];
+static bool spoken_podcast[SPOKEN_SEEK_MAX];   /* that genre is a podcast's */
 static int spoken_ct;
 
 /* Cleared by db_spoken_build(), which runs when the commit the tables were
@@ -160,6 +161,7 @@ bool db_spoken_build(void)
             break;
         }
 
+        spoken_podcast[spoken_ct] = db_spoken_is_podcast_genre(build_buf);
         spoken_seek[spoken_ct++] = build_tcs.result_seek;
     }
 
@@ -173,15 +175,20 @@ bool db_spoken_build(void)
 
 bool db_spoken_is_spoken_seek(long genre_seek)
 {
+    return db_spoken_kind_seek(genre_seek) != 0;
+}
+
+int db_spoken_kind_seek(long genre_seek)
+{
     int i;
 
     for (i = 0; i < spoken_ct; i++)
     {
         if (spoken_seek[i] == genre_seek)
-            return true;
+            return spoken_podcast[i] ? 2 : 1;
     }
 
-    return false;
+    return 0;
 }
 
 /* ------------------------------------------------------------------ *
@@ -245,10 +252,10 @@ static uint32_t group_uniqbuf[SPOKEN_GROUP_MAX];
 
 static const struct tagcache_search_clause is_spoken_clause = {
     .tag = tag_virt_spoken,
-    .type = clause_is,
+    .type = clause_gt,
     .numeric = true,
     .source = source_constant,
-    .numeric_data = 1,
+    .numeric_data = 0,
     .str = NULL,
 };
 
@@ -433,12 +440,31 @@ static bool album_is_book(long seek)
     return book;
 }
 
-bool db_spoken_artist_has_book(long seek)
+int db_spoken_album_kind(const struct tagcache_album *al)
+{
+    if (al->spoken != al->tracks)
+        return 0;
+    return al->podcast == al->tracks ? 2 : 1;
+}
+
+bool db_spoken_album_is_kind(const struct tagcache_album *al, int kind)
+{
+    int k = db_spoken_album_kind(al);
+
+    return kind ? k == kind : k != 0;
+}
+
+bool db_spoken_artist_has_book(long seek, int kind)
 {
     struct tagcache_artist ar;
 
-    return tagcache_artist_get(tagcache_artist_find(seek), &ar)
-           && ar.spoken_albums > 0;
+    if (!tagcache_artist_get(tagcache_artist_find(seek), &ar))
+        return false;
+    if (kind == 2)
+        return ar.podcast_albums > 0;
+    if (kind == 1)
+        return ar.spoken_albums > ar.podcast_albums;
+    return ar.spoken_albums > 0;
 }
 
 bool db_spoken_album_is_podcast(long album_seek, long artist_seek)
@@ -457,13 +483,13 @@ bool db_spoken_album_is_podcast(long album_seek, long artist_seek)
     return podcast;
 }
 
-bool db_spoken_album_has_book(long seek)
+bool db_spoken_album_has_book(long seek, int kind)
 {
     struct tagcache_album al;
     int n = tagcache_album_find_name(seek);
 
     while (n >= 0 && tagcache_album_get(n++, &al) && al.album_seek == seek)
-        if (al.spoken == al.tracks)
+        if (db_spoken_album_is_kind(&al, kind))
             return true;
     return false;
 }

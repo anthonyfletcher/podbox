@@ -36,6 +36,9 @@ bool db_spoken_build(void);
  * as an error. */
 bool db_spoken_is_spoken_seek(long genre_seek);
 
+/* The same, as tag_virt_spoken answers it: 0 music, 1 a book, 2 a podcast */
+int db_spoken_kind_seek(long genre_seek);
+
 /* Whether the album, album artist or canonical artist at 'seek' is a book --
  * it holds spoken word and no music.
  *
@@ -55,11 +58,18 @@ bool db_spoken_is_spoken_seek(long genre_seek);
 bool db_spoken_group_tag(int tag);
 bool db_spoken_group_is_book(int tag, long seek);
 
-/* Whether the album artist at 'seek' has at least one album that is a book,
- * and whether any album of the name at 'seek' is one, whoever it is by. False
- * while the database is not in RAM. */
-bool db_spoken_artist_has_book(long seek);
-bool db_spoken_album_has_book(long seek);
+/* What an album of tagcache's album table is, as tag_virt_spoken answers
+ * for a track: 0 music (any music in it), 2 a podcast (podcasts only), else
+ * 1 a book. `kind` below is one of those, or 0 for either of the last two. */
+struct tagcache_album;
+int db_spoken_album_kind(const struct tagcache_album *al);
+bool db_spoken_album_is_kind(const struct tagcache_album *al, int kind);
+
+/* Whether the album artist at 'seek' has at least one album that is a book
+ * (of `kind`), and whether any album of the name at 'seek' is one, whoever it
+ * is by. False while the database is not in RAM. */
+bool db_spoken_artist_has_book(long seek, int kind);
+bool db_spoken_album_has_book(long seek, int kind);
 
 /* Whether the album at 'album_seek' by 'artist_seek' is a podcast, going by
  * its first track's genre. Runs a database search of its own. */

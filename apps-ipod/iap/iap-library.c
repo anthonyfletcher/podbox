@@ -329,10 +329,10 @@ static struct tagcache_search_clause no_spoken = {
 
 static struct tagcache_search_clause only_spoken = {
     .tag = tag_virt_spoken,
-    .type = clause_is,
+    .type = clause_gt,
     .numeric = true,
     .source = source_constant,
-    .numeric_data = 1,
+    .numeric_data = 0,
     .str = NULL,
 };
 

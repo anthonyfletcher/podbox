@@ -15,6 +15,7 @@ enum db_search_scope {
     DB_SEARCH_ALL = 0,   /* both -- the main menu's own Search row */
     DB_SEARCH_MUSIC,     /* the Music menu's */
     DB_SEARCH_SPOKEN,    /* the Audiobooks menu's */
+    DB_SEARCH_PODCAST,   /* the Podcasts menu's */
 };
 
 void db_search_arm_scope(int scope);

@@ -21,9 +21,9 @@ struct menu_table {
 };
 
 struct menu_table *root_menu_get_options(int *nb_options);
-/* Add or remove the Audiobooks row, which Segregate Audiobooks owns -- see
- * root_menu_set_audiobooks_row() for why the setting rather than Customize
- * Main Menu decides whether it is there. */
+/* Add or remove the Audiobooks and Podcasts rows, which Segregate Audiobooks
+ * owns -- see root_menu_set_audiobooks_row() for why the setting rather than
+ * Customize Main Menu decides whether they are there. */
 void root_menu_set_audiobooks_row(bool on);
 /* %Lk of a row that does not open a menu: a Music row on the main menu says
  * whether it is one of the user's own, and the rest are actions. */
@@ -126,6 +126,9 @@ enum {
     GO_TO_MUSIC_QUIZ,
     /* The Books screen (screens/browse/ebook_shelf.c) */
     GO_TO_BOOKS,
+    /* tagnavi.config's "podcasts" menu, opened from a root row of its own:
+     * the main menu's tagnavi slots are all taken. */
+    GO_TO_PODCASTS,
 };
 extern struct menu_item_ex root_menu_;
 

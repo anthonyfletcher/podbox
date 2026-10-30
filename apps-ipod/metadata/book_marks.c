@@ -212,10 +212,10 @@ static int bmark_file_ct;
 
 static struct tagcache_search_clause spoken_clause = {
     .tag = tag_virt_spoken,
-    .type = clause_is,
+    .type = clause_gt,
     .numeric = true,
     .source = source_constant,
-    .numeric_data = 1,
+    .numeric_data = 0,
 };
 
 static void note_bmark(const char *path)
