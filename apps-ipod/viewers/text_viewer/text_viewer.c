@@ -535,11 +535,13 @@ static bool tv_is_picture(const unsigned char *s, size_t n)
     return n >= 3 && !memcmp(s, TV_PIC_OPEN, 3);
 }
 
-/* Read Aloud passes over pictures, as Pictures off does */
+/* Read Aloud passes over pictures, as Pictures off does, while there is a
+ * voice to read with */
 static bool tv_pictures_shown(void)
 {
     return global_settings.text_viewer_pictures
-           && global_settings.text_viewer_read_aloud == TV_READ_OFF;
+           && (global_settings.text_viewer_read_aloud == TV_READ_OFF
+               || !speech_enabled());
 }
 
 /* The white space at `s`, newlines and no-break spaces included */
