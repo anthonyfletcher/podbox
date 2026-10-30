@@ -1163,8 +1163,10 @@ button stays put. Off, the wheel sets Read Aloud's volume.
 Reads the text aloud in the synthesised voice, whether or not Speak Aloud is
 on. Each Page reads the page you turn to, finishing the sentence it ends in;
 Continuously turns the page itself and carries on, until the last page or
-until you leave. With Speak Aloud off, opening a book with it on restarts the
-playing song once, to make room for the voice.
+until you leave. Select (or PLAY, upright) pauses it and goes on from the
+same sentence; with the Hold switch on the screen goes dark and it reads on.
+With Speak Aloud off, opening a book with it on restarts the playing song
+once, to make room for the voice.
 
 [text viewer font]
 A font used only by the text viewer, so reading can use a different typeface

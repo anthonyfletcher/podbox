@@ -1271,6 +1271,9 @@ static void tv_queue_parts(off_t from, off_t page_end)
  * on to the end of the sentence it stops in: a sentence cut at the edge of
  * the screen is said as though it ended there. A page turn cuts off the
  * one before. */
+static bool tv_paused;       /* Read Aloud stopped by the reader, to go on */
+static off_t tv_pause_from;  /* where it goes on from */
+
 static void tv_speak_page(void)
 {
     tv_reading = false;
@@ -1281,8 +1284,72 @@ static void tv_speak_page(void)
         || tv.pos < tv.win_start)
         return;
     talk_force_shutup();
+    if (tv_paused)
+    {
+        tv_pause_from = tv.pos;     /* a page turned while paused */
+        return;
+    }
     tv_queue_parts(tv.pos, tv.next);
     tv_reading = true;
+}
+
+/* Read Aloud is on and has a voice: Select and PLAY pause it */
+static bool tv_aloud(void)
+{
+    return global_settings.text_viewer_read_aloud != TV_READ_OFF
+           && speech_enabled();
+}
+
+/* Select, or PLAY upright, with Read Aloud on: the voice stops, and goes on
+ * again from the start of the sentence it stopped in */
+static void tv_pause_toggle(void)
+{
+    if (!tv_aloud())
+        return;
+    if (!tv_paused)
+    {
+        int item = talk_text_playing();
+
+        tv_pause_from = tv.pos;
+        for (int i = 0; tv_reading && i < tv_nparts; i++)
+            if (tv_parts[i].item == item)
+                tv_pause_from = tv_parts[i].start;
+        talk_force_shutup();
+        tv_reading = false;
+        tv_paused = true;
+        tv_splashf("%s", str(LANG_PAUSE));
+        sleep(HZ / 2);
+        tv_draw();
+        return;
+    }
+    tv_paused = false;
+    if (tv_pause_from < tv.win_start || tv_pause_from > tv.next)
+        tv_pause_from = tv.pos;
+    talk_force_shutup();
+    tv_nparts = 0;
+    tv_heard = -1;
+    tv_queue_parts(tv_pause_from, tv.next);
+    tv_reading = true;
+}
+
+/* Listening with the Hold switch on: the screen goes dark and the voice
+ * reads on, turning pages as it goes; off, the screen comes back */
+static bool tv_dark;
+
+static void tv_hold_dark(void)
+{
+    bool hold = button_hold() && (tv_reading || tv_dark);
+
+    if (hold == tv_dark)
+        return;
+    tv_dark = hold;
+    if (hold)
+        backlight_off();
+    else
+    {
+        backlight_on();
+        tv_draw();
+    }
 }
 
 /* ---- loading splash --------------------------------------------------- */
@@ -2890,6 +2957,7 @@ static void tv_idle(void)
     }
     if (tv_scrub_pct >= 0 && TIME_AFTER(current_tick, tv_scrub_until))
         tv_scrub_end(false);
+    tv_hold_dark();
     tv_read_on();
 }
 
@@ -3039,7 +3107,9 @@ static enum tv_key tv_side_button(long b)
         return TV_KEY_NONE;
     }
 
-    if (base == BUTTON_SELECT || base == fwd)
+    if (base == BUTTON_SELECT && tv_aloud())
+        tv_pause_toggle();
+    else if (base == BUTTON_SELECT || base == fwd)
         tv_next_page();
     else if (base == back)
         tv_prev_page();
@@ -3298,6 +3368,7 @@ int text_viewer(const char *file)
     off_t resume;
     int part;
     long play_tick = current_tick - TV_DOUBLE_CLICK;  /* PLAY's last tap */
+    bool play_wait = false;     /* a tap that pauses, unless a second comes */
 
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;
@@ -3330,13 +3401,14 @@ int text_viewer(const char *file)
     tv_draw();
     tv_speak_page();
     tv_book_done = false;
+    tv_paused = tv_dark = false;
 
     while (1)
     {
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
         int timeout = continuous || tv_volume_until || tv_scrub_pct >= 0
-                      || tv_pic_pending ? HZ/10 : TIMEOUT_BLOCK;
+                      || tv_pic_pending || play_wait ? HZ/10 : TIMEOUT_BLOCK;
         int action;
 
         if (tv_book_done)
@@ -3386,6 +3458,12 @@ int text_viewer(const char *file)
         {
             case ACTION_NONE:
                 tv_idle();
+                if (play_wait && TIME_AFTER(current_tick,
+                                            play_tick + TV_DOUBLE_CLICK))
+                {
+                    play_wait = false;
+                    tv_pause_toggle();
+                }
                 break;
 
             case ACTION_STD_NEXT:
@@ -3398,18 +3476,29 @@ int text_viewer(const char *file)
                 tv_wheel(-1);
                 break;
 
-            /* PLAY twice goes sideways, right hand */
+            /* PLAY twice goes sideways, right hand; once, with Read Aloud
+             * on, pauses or goes on, when no second tap has come */
             case ACTION_TREE_WPS:
                 if (TIME_BEFORE(current_tick, play_tick + TV_DOUBLE_CLICK))
                 {
                     play_tick = current_tick - TV_DOUBLE_CLICK;
+                    play_wait = false;
                     tv_orient(TV_ORIENT_RIGHT);
                 }
                 else
+                {
                     play_tick = current_tick;
+                    play_wait = tv_aloud();
+                }
                 break;
 
-            case ACTION_STD_OK:          /* Select */
+            case ACTION_STD_OK:          /* Select: pauses Read Aloud */
+                if (tv_aloud())
+                    tv_pause_toggle();
+                else
+                    tv_next_page();
+                break;
+
             case ACTION_TREE_PGRIGHT:    /* forward button (>>|) */
                 tv_next_page();
                 break;
@@ -3456,6 +3545,8 @@ int text_viewer(const char *file)
 
   done:
     talk_shutup();             /* the page stops with the viewer */
+    if (tv_dark)
+        backlight_on();
     reading_stats_end(tv_book_percent(), tv_at_book_end());
     tv_resume_save(file, tv.part, tv.pos, tv.file_size);
     tv_close();
