@@ -2585,8 +2585,8 @@ static int header_rows_fill(int level, char *buf, long bufsz)
  * the rows above a podcast's shows                                   *
  * ------------------------------------------------------------------ */
 
-/* Above the list of shows: Search and Finished, scrolled off the top, then
- * In Progress, Not Started and All Episodes. Each state row is hidden while
+/* Above the list of shows: Search, All Episodes and Finished, scrolled off
+ * the top, then In Progress and Not Started. Each state row is hidden while
  * it has no episode, and is an <All tracks> row whose seek names the state,
  * which the track list it opens turns into clauses. */
 enum {
@@ -3118,8 +3118,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                             ID2P(LANG_PODCAST_PLAY_UNPLAYED), -1);
     if (podcast_shows)
     {
-        static const int order[] = { EPISODES_FINISHED, EPISODES_IN_PROGRESS,
-                                     EPISODES_NOT_STARTED, EPISODES_ALL };
+        static const int order[] = { EPISODES_ALL, EPISODES_FINISHED,
+                                     EPISODES_IN_PROGRESS,
+                                     EPISODES_NOT_STARTED };
 
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
                             ID2P(LANG_DB_SEARCH), DB_SEARCH_PODCAST);
@@ -4569,11 +4570,12 @@ int browser_db_load(struct browser_context* c)
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
         /* A podcast's episodes in progress and not started are what its
-         * list is for, and so is a show's Play Unplayed; Search and
-         * Finished go off the top */
+         * list is for, and so is a show's Play Unplayed; Search, All
+         * Episodes and Finished go off the top */
         int first = table == TABLE_ROOT ? c->special_entry_count
                     : podcast_shows
-                      ? 1 + (episode_counts[EPISODES_FINISHED] > 0)
+                      ? 1 + (episode_counts[EPISODES_ALL] > 0)
+                          + (episode_counts[EPISODES_FINISHED] > 0)
                     : show_unplayed ? 0 : c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
