@@ -218,8 +218,10 @@ const char *browser_db_get_entry_value(struct browser_context *c, int id,
  * the episodes it plays; NULL for any other row */
 char *browser_db_get_entry_description(struct browser_context *c, int id,
                                        char *buf, size_t size);
-/* Whether the list on screen is of podcast episodes */
+/* Whether the list on screen is of podcast episodes, and whether any of
+ * them has notes */
 bool browser_db_shows_episodes(struct browser_context *c);
+bool browser_db_episodes_have_notes(struct browser_context *c);
 /* Whether the list on screen is tracks newest first, numbered from the end,
  * or tracks whose order numbers nothing, not numbered at all */
 bool browser_db_counts_down(struct browser_context *c);

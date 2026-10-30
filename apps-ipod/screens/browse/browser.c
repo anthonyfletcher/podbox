@@ -973,8 +973,11 @@ static int update_dir(void)
                 tall_rows = global_settings.db_artistart;
         }
         browser_set_showing_art(tall_rows);
+        /* With the notes box only where it has something to show: a list
+         * whose episodes have no notes keeps all its rows */
         browser_set_showing_episodes(*tc.dirfilter == SHOW_ID3DB
-                                     && browser_db_shows_episodes(&tc));
+                                     && browser_db_shows_episodes(&tc)
+                                     && browser_db_episodes_have_notes(&tc));
         gui_synclist_set_albumart_callback(list,
                                     tall_rows ? browser_get_albumart : NULL);
         /* Uniform tall rows so a cover fits (special rows included); 0 = the

@@ -6617,6 +6617,17 @@ bool browser_db_shows_episodes(struct browser_context *c)
            && browser_db_get_attr(c) == FILE_ATTR_AUDIO;
 }
 
+bool browser_db_episodes_have_notes(struct browser_context *c)
+{
+    static char notes[TAGCACHE_BUFSZ];
+    int i;
+
+    for (i = c->special_entry_count; i < c->filesindir; i++)
+        if (browser_db_get_entry_description(c, i, notes, sizeof(notes)))
+            return true;
+    return false;
+}
+
 const char *browser_db_get_entry_value(struct browser_context *c, int id,
                                        char *buf, size_t size)
 {
