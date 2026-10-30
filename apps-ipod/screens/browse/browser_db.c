@@ -2687,8 +2687,8 @@ static bool show_has_unplayed(int level)
 }
 
 /* Over every episode of the show named at album seek 'seek': how many are
- * not started, and the newest file's time (tag_mtime) */
-static int show_episodes(long seek, unsigned long *newest)
+ * in 'state', and the newest file's time (tag_mtime) */
+static int show_episodes(long seek, int state, unsigned long *newest)
 {
     struct tagcache_album al;
     int n = tagcache_album_find_name(seek);
@@ -2704,7 +2704,7 @@ static int show_episodes(long seek, unsigned long *newest)
         {
             if (tagcache_album_of(i) != n)
                 continue;
-            if (episode_state(i) == EPISODES_NOT_STARTED)
+            if (episode_state(i) == state)
                 fresh++;
             if (tagcache_entry_numeric(i, tag_mtime, &mtime)
                 && (unsigned long)mtime > *newest)
@@ -2724,7 +2724,7 @@ static void sort_shows_newest(struct tagentry *rows, int count)
     if (count > (int)ARRAYLEN(keys))
         return;
     for (i = 0; i < count; i++)
-        show_episodes(rows[i].extraseek, &keys[i]);
+        show_episodes(rows[i].extraseek, EPISODES_NOT_STARTED, &keys[i]);
     for (i = 1; i < count; i++)
     {
         struct tagentry row = rows[i];
@@ -5779,6 +5779,47 @@ static void mark_episode(int idx_id, bool played)
     tagcache_update_numeric(idx_id, tag_lastoffset, 0);
 }
 
+/* The show row 'id' is, as its album table row, or -1 */
+static int show_row(struct browser_context *c, int id)
+{
+    long album_seek, artist_seek;
+
+    if (browser_db_list_spoken_kind(c) != 2
+        || !browser_db_get_book_album(c, id, &album_seek, &artist_seek))
+        return -1;
+    return tagcache_album_find(album_seek, artist_seek);
+}
+
+int browser_db_played_episodes(struct browser_context *c, int id)
+{
+    struct tagentry *entry;
+    unsigned long newest;
+
+    if (show_row(c, id) < 0 || !(entry = browser_db_get_entry(c, id)))
+        return 0;
+    return show_episodes(entry->extraseek, EPISODES_FINISHED, &newest);
+}
+
+int browser_db_delete_played(struct browser_context *c, int id)
+{
+    struct tagcache_search tcs;
+    struct tagcache_album al;
+    char path[MAX_PATH];
+    int n = show_row(c, id), i, gone = 0;
+
+    if (!tagcache_album_get(n, &al) || !tagcache_search(&tcs, tag_filename))
+        return 0;
+    for (i = al.first; i <= al.last; i++)
+        if (tagcache_album_of(i) == n
+            && episode_state(i) == EPISODES_FINISHED
+            && tagcache_retrieve(&tcs, i, tag_filename, path, sizeof(path))
+            && remove(path) == 0)
+            gone++;
+    tagcache_search_finish(&tcs);
+    loaded_entries_crc = 0;
+    return gone;
+}
+
 bool browser_db_mark_episodes(struct browser_context *c, int id,
                               enum browser_db_mark how)
 {
@@ -6587,7 +6628,8 @@ const char *browser_db_get_entry_value(struct browser_context *c, int id,
         || csi->tagorder[c->currextra] != tag_album
         || id < c->special_entry_count
         || !(entry = browser_db_get_entry(c, id))
-        || (fresh = show_episodes(entry->extraseek, &newest)) == 0)
+        || (fresh = show_episodes(entry->extraseek, EPISODES_NOT_STARTED,
+                                  &newest)) == 0)
         return NULL;
     snprintf(buf, size, "%d", fresh);
     return buf;

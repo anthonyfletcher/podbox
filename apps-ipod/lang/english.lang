@@ -26934,3 +26934,31 @@
     *: "Newest Episode"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_PLAYED
+  desc: in a podcast show's context menu: delete the files of its finished episodes
+  user: core
+  <source>
+    *: "Delete Played Episodes"
+  </source>
+  <dest>
+    *: "Delete Played Episodes"
+  </dest>
+  <voice>
+    *: "Delete Played Episodes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETED_N
+  desc: splash after Delete Played Episodes; %d is how many files went
+  user: core
+  <source>
+    *: "Episodes deleted: %d"
+  </source>
+  <dest>
+    *: "Episodes deleted: %d"
+  </dest>
+  <voice>
+    *: "Episodes deleted"
+  </voice>
+</phrase>

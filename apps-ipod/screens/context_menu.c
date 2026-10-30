@@ -74,6 +74,7 @@
 #include "input/action.h"
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
+#include "system/bg_task.h"         /* tagcache_task: Update after a delete */
 #include "screens/settings/exported_settings.h"
 #include "draw/icon_bitmaps.h"
 #include "playlist/save_screen.h"
@@ -1603,6 +1604,43 @@ MENUITEM_FUNCTION_W_PARAM(show_mark_item, 0, ID2P(LANG_PODCAST_MARK_ALL),
                   episode_mark_run, (void *)BROWSER_DB_MARK_SHOW,
                   episode_mark_callback, Icon_NOICON);
 
+/* A show's finished episodes, their files deleted after asking. The
+ * database lets them go at the Update that follows. */
+static int delete_played_run(void)
+{
+    struct browser_context *c = browser_get_context();
+    int gone;
+
+    if (!yesno_pop(ID2P(LANG_PODCAST_DELETE_PLAYED)))
+        return 0;
+    gone = browser_db_delete_played(c, c->selected_item);
+    splashf(HZ * 2, str(LANG_PODCAST_DELETED_N), gone);
+    if (gone > 0)
+    {
+        bg_task_update(&tagcache_task);
+        context_menu_result = ONPLAY_RELOAD_DIR;
+    }
+    return 0;
+}
+
+static int delete_played_callback(int action,
+                                  const struct menu_item_ex *this_item,
+                                  struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && (selected_file.context != CONTEXT_ID3DB
+            || browser_db_played_episodes(c, c->selected_item) == 0))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(delete_played_item, 0, ID2P(LANG_PODCAST_DELETE_PLAYED),
+                  delete_played_run, delete_played_callback, Icon_NOICON);
+
 static int episode_mark_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)
@@ -2181,6 +2219,7 @@ MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            context_menu_callback, Icon_file_view_menu,
            &mark_book_item,
            &episode_mark_item, &episode_older_item, &show_mark_item,
+           &delete_played_item,
            &book_marks_item,
            &listen_book_item,
            &view_playlist_item,

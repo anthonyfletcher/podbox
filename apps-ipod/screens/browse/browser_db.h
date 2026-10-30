@@ -246,6 +246,10 @@ enum browser_db_mark {
 };
 bool browser_db_mark_episodes(struct browser_context *c, int id,
                               enum browser_db_mark how);
+/* The finished episodes of the show row 'id' is, and deleting their files:
+ * how many went. The database keeps them until its next Update. */
+int browser_db_played_episodes(struct browser_context *c, int id);
+int browser_db_delete_played(struct browser_context *c, int id);
 /* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
  * False if index is out of range, or names a submenu with nothing in it:
  * that slot is numbered but hidden. */
