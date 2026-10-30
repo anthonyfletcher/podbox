@@ -82,12 +82,12 @@
 #
 #- Plain row, the full width where there is no chevron
 %Vl(Rows,0,0,160,24,3)%Vy
-%?La<|%?and(%or(%if(%cs,!=,6),%if(%Lk,!=,1)),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%Lk,!=,6)),%or(%if(%cs,!=,13),%if(%Lk,!=,8)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+%?La<|%?and(%or(%if(%cs,!=,6),%if(%Lk,!=,1)),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%Lk,!=,6)),%or(%if(%cs,!=,13),%if(%Lk,!=,8)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>>
 #
 #- Plain row beside a chevron. Only one of the two draws a
 #  given row, so neither clears the other's text
 %Vl(Rows,0,0,136,24,3)%Vy
-%?La<|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+%?La<|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>>
 #
 #- Plain row chevron
 %Vl(Rows,136,0,24,24,2)%Vy
@@ -103,7 +103,7 @@
 #
 #- Art row text
 %Vl(Rows,46,0,114,46,3)%Vy
-%?La<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
+%?La<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>|>
 #
 #Now-playing pane
 %Vl(Pane,166,184,150,22,3)%Vf(!000000)

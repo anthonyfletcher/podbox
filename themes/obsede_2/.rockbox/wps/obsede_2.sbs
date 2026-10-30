@@ -116,7 +116,7 @@
 # 0..160 row width, on art rows and ordinary ones alike.
 %Vl(Rows,0,0,7,21,6)%?La<|%?Lc<%Vb(2a2a2a)|%Vb(000000)>%?St(show icons)<%?if(%LI,>=,0)<%xd(icons,%LI,2)>>>
 %Vl(Rows,7,0,153,21,-)
-%?La<|%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vf(9a9a9a)>%s%LT>
+%?La<|%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vf(9a9a9a)>%s%LT%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>
 %Vl(Rows,0,0,160,24,6)%?La<%?Lc<%Vb(2a2a2a)|%Vb(000000)>|>
 %Vl(Rows,0,24,160,22,6)%?La<%?Lc<%Vb(2a2a2a)|%Vb(000000)>|>
 #- Row art. The special rows carry no cover of their own, and %La is a
@@ -126,4 +126,4 @@
 %Vl(Rows,0,1,44,44,-)%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx([Finished])),%if(%LT,!=,%Sx([Not Started])),%if(%LT,!=,%Sx([In Progress])))<%La>
 #- Special row icons, centred in the 44px cover box, from 24x24-icons (font 6).
 %Vl(Rows,10,11,24,24,6)%?and(%La,%or(%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Resume])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([By album])),%if(%LT,=,%Sx([Finished])),%if(%LT,=,%Sx([Not Started])),%if(%LT,=,%Sx([In Progress]))))<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
-%Vl(Rows,50,11,110,24,-)%?La<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%s%LT|>
+%Vl(Rows,50,11,110,24,-)%?La<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%s%LT%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>|>

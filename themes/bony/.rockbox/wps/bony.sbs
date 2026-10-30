@@ -38,11 +38,11 @@
 #
 #- Plain row
 %Vl(Rows,0,0,240,30,3)%Vy
-%?La<|%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%?if(%LT,=,%Sx(Now Playing))<%s %LT: %?it<%it|%fn>|%s %LT>>
+%?La<|%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%?if(%LT,=,%Sx(Now Playing))<%s %LT: %?it<%it|%fn>|%s %LT%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>>
 #
 #- Art row
 %Vl(Rows,0,0,240,30,3)%Vy
-%?La<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%s      %LT>
+%?La<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%s      %LT%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>
 #
 #- Row art
 %Vl(Rows,10,0,30,30,-)
