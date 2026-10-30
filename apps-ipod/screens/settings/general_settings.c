@@ -1106,8 +1106,12 @@ MENUITEM_SETTING_W_LABEL(database_sort_artists_by,
 MENUITEM_SETTING_W_LABEL(sort_ignore_articles,
                          &global_settings.sort_ignore_articles,
                          ID2P(LANG_SORT_IGNORE_ARTICLES_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(podcast_sort_shows_by,
+                         &global_settings.podcast_sort_shows_by,
+                         ID2P(LANG_SORT_SHOWS_BY_SHORT), NULL);
 MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
-          &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles);
+          &album_sort_menu, &database_sort_artists_by, &podcast_sort_shows_by,
+          &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
 
 MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,

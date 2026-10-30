@@ -194,6 +194,7 @@ static const struct tag_row tag_rows[] = {
 { "year from folder",          TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "album release date folders" },
 { "database sort albums by",   TAG_LIBRARY,                      "sorting albums year artist" },
 { "database sort artists by",  TAG_LIBRARY,                      "sorting artists most played" },
+{ "podcast sort shows by",  TAG_LIBRARY,                         "sorting podcasts shows newest episode latest" },
 { "sort ignoring articles",    TAG_LIBRARY,                      "sorting ignore the a an artists albums" },
 { "album show year",           TAG_LIBRARY,                      "albums release date" },
 { "playlist engine",           TAG_LIBRARY|TAG_PLAYLIST,         "similar genius sound analysis mix" },

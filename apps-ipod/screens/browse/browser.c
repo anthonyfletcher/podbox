@@ -251,6 +251,16 @@ static enum list_row_kind browser_get_kind(int selected_item, void * data)
     return LIST_ROW_FILE;
 }
 
+static const char *browser_get_value(int selected_item, void *data,
+                                     char *buf, size_t size)
+{
+    struct browser_context * local_tc=(struct browser_context *)data;
+
+    if (*local_tc->dirfilter == SHOW_ID3DB)
+        return browser_db_get_entry_value(&tc, selected_item, buf, size);
+    return NULL;
+}
+
 static int browser_get_range(int selected_item, void * data)
 {
     struct browser_context * local_tc=(struct browser_context *)data;
@@ -921,7 +931,7 @@ static int update_dir(void)
     gui_synclist_set_nb_items(list, tc.filesindir);
     gui_synclist_set_icon_callback(list,
                             global_settings.show_icons?browser_get_fileicon:NULL);
-    gui_synclist_set_row_callbacks(list, browser_get_kind, NULL,
+    gui_synclist_set_row_callbacks(list, browser_get_kind, browser_get_value,
                                    browser_is_playing);
     gui_synclist_set_range_callback(list, browser_get_range);
     gui_synclist_set_count_down(list, id3db && browser_db_counts_down(&tc));

@@ -764,6 +764,8 @@ struct user_settings
     int  database_sort_albums_by;
     /* DB_SORT_ARTISTS_*: how the database browser orders its artist lists. */
     int  database_sort_artists_by;
+    /* PODCAST_SHOWS_*: how the Podcasts list orders its shows */
+    int  podcast_sort_shows_by;
     /* Per-context overrides of the line above: three bits for each
      * DB_ALBUM_CTX_*, holding DB_SORT_ALBUMS_* + 1, or 0 for "follow
      * database_sort_albums_by". A context is the level an album list hangs

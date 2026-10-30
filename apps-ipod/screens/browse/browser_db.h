@@ -35,6 +35,13 @@ enum database_sort_artists {
     DB_SORT_ARTISTS_PLAYS,
 };
 
+/* global_settings.podcast_sort_shows_by: how the Podcasts list's shows are
+ * ordered. */
+enum podcast_sort_shows {
+    PODCAST_SHOWS_NAME = 0,
+    PODCAST_SHOWS_NEWEST,
+};
+
 /* The parent an album list hangs under, which is what decides its order.
  * The level above is the whole identity, so every menu grouping by the same
  * artist tag shares one slot: Genre, Year and the history lists all land in
@@ -203,6 +210,10 @@ int browser_db_spoken_main_menu_slot(void);
  * row. The episode by its database index, or by its list row. */
 int browser_db_episode_percent(int idx_id);
 int browser_db_get_entry_range(struct browser_context *c, int id);
+/* %Lv of row 'id': a podcast show's episodes not started, or NULL with
+ * none, and for any other row */
+const char *browser_db_get_entry_value(struct browser_context *c, int id,
+                                       char *buf, size_t size);
 /* %LD of row 'id': a podcast episode's description, or for Play Unplayed
  * the episodes it plays; NULL for any other row */
 char *browser_db_get_entry_description(struct browser_context *c, int id,

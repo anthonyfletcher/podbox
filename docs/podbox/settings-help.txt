@@ -679,6 +679,10 @@ The order of the artist lists in Music: by name, or most played first. Plays
 are counted from the albums an artist heads, so an artist who only guests on
 other albums sorts with the unplayed ones.
 
+[podcast sort shows by]
+The order of the shows in Podcasts: by name, or the show with the newest
+episode first. Newest goes by when an episode's file arrived on the player.
+
 [sort ignoring articles]
 Sorts artists and albums as if a leading "The", "A" or "An" were not there, so
 The Beatles sits among the Bs. The names still show in full.

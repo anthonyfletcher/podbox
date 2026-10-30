@@ -2686,6 +2686,60 @@ static bool show_has_unplayed(int level)
     return false;
 }
 
+/* Over every episode of the show named at album seek 'seek': how many are
+ * not started, and the newest file's time (tag_mtime) */
+static int show_episodes(long seek, unsigned long *newest)
+{
+    struct tagcache_album al;
+    int n = tagcache_album_find_name(seek);
+    int fresh = 0, i;
+    long mtime;
+
+    *newest = 0;
+    for (; n >= 0 && tagcache_album_get(n, &al) && al.album_seek == seek; n++)
+    {
+        if (db_spoken_album_kind(&al) != 2)
+            continue;
+        for (i = al.first; i <= al.last; i++)
+        {
+            if (tagcache_album_of(i) != n)
+                continue;
+            if (episode_state(i) == EPISODES_NOT_STARTED)
+                fresh++;
+            if (tagcache_entry_numeric(i, tag_mtime, &mtime)
+                && (unsigned long)mtime > *newest)
+                *newest = mtime;
+        }
+    }
+    return fresh;
+}
+
+/* Shows By Newest Episode: the shows the newest file first, after the sort
+ * by name, which keeps shows of one date in name order */
+static void sort_shows_newest(struct tagentry *rows, int count)
+{
+    static unsigned long keys[256];
+    int i, j;
+
+    if (count > (int)ARRAYLEN(keys))
+        return;
+    for (i = 0; i < count; i++)
+        show_episodes(rows[i].extraseek, &keys[i]);
+    for (i = 1; i < count; i++)
+    {
+        struct tagentry row = rows[i];
+        unsigned long key = keys[i];
+
+        for (j = i; j > 0 && keys[j - 1] < key; j--)
+        {
+            rows[j] = rows[j - 1];
+            keys[j] = keys[j - 1];
+        }
+        rows[j] = row;
+        keys[j] = key;
+    }
+}
+
 /* The clauses for the state an <All tracks> row's seek names, and the
  * format group to list them by; -1 where the seek names none */
 static int add_episode_clauses(struct tagcache_search *tcs, long state)
@@ -3278,6 +3332,10 @@ entry_skip_formatter:
               sizeof(struct tagentry),
               c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS ? compare_with_albums : compare
         );
+        if (podcast_shows && !c->dirfull
+            && global_settings.podcast_sort_shows_by == PODCAST_SHOWS_NEWEST)
+            sort_shows_newest(&entries[c->special_entry_count],
+                              current_entry_count - c->special_entry_count);
     }
 
     if (show_year && order_tab != NULL)
@@ -6516,6 +6574,23 @@ bool browser_db_shows_episodes(struct browser_context *c)
 {
     return c->currtable != TABLE_ROOT && csi_spoken_kind() == 2
            && browser_db_get_attr(c) == FILE_ATTR_AUDIO;
+}
+
+const char *browser_db_get_entry_value(struct browser_context *c, int id,
+                                       char *buf, size_t size)
+{
+    struct tagentry *entry;
+    unsigned long newest;
+    int fresh;
+
+    if (c->currtable != TABLE_NAVIBROWSE || csi_spoken_kind() != 2
+        || csi->tagorder[c->currextra] != tag_album
+        || id < c->special_entry_count
+        || !(entry = browser_db_get_entry(c, id))
+        || (fresh = show_episodes(entry->extraseek, &newest)) == 0)
+        return NULL;
+    snprintf(buf, size, "%d", fresh);
+    return buf;
 }
 
 int browser_db_get_entry_range(struct browser_context *c, int id)

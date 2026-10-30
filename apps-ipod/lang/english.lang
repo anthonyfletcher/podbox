@@ -26892,3 +26892,45 @@
     *: "Vertical Scroll Speed"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY
+  desc: in Settings, the order of the Podcasts list's shows
+  user: core
+  <source>
+    *: "Sort Shows By"
+  </source>
+  <dest>
+    *: "Sort Shows By"
+  </dest>
+  <voice>
+    *: "Sort Shows By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY_SHORT
+  desc: in Music > Sort: the row for LANG_SORT_SHOWS_BY
+  user: core
+  <source>
+    *: "Shows By"
+  </source>
+  <dest>
+    *: "Shows By"
+  </dest>
+  <voice>
+    *: "Shows By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEWEST_EPISODE
+  desc: a choice of Shows By: the show with the newest episode first
+  user: core
+  <source>
+    *: "Newest Episode"
+  </source>
+  <dest>
+    *: "Newest Episode"
+  </dest>
+  <voice>
+    *: "Newest Episode"
+  </voice>
+</phrase>
