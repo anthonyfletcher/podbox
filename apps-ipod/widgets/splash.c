@@ -246,6 +246,17 @@ void splash_progress_set_silent(bool silent)
     progress_silent = silent;
 }
 
+/* The meter on the line splash_internal() left for it, at the box's foot */
+static void progress_in_box(struct screen *screen, struct viewport *vp,
+                            int current, int total)
+{
+    int size = screen->getcharheight();
+
+    progress_bar_draw(screen, RECT_SPACING, vp->height - size - RECT_SPACING,
+                      vp->width - RECT_SPACING * 2, size, current, total,
+                      global_settings.progress_bar_radius);
+}
+
 /* splash a progress meter */
 void splash_progress(int current, int total, const char *fmt, ...)
 {
@@ -299,18 +310,28 @@ void splash_progress(int current, int total, const char *fmt, ...)
         if (splash_internal(screen, fmt, ap, &vp, 1, screen->lcdwidth,
                             screen->lcdheight, true))
         {
-            int size = screen->getcharheight();
-            int x = RECT_SPACING;
-            int y = vp.height - size - RECT_SPACING;
-            int w = vp.width - RECT_SPACING * 2;
-            int h = size;
-            progress_bar_draw(screen, x, y, w, h, current, total,
-                              global_settings.progress_bar_radius);
-
+            progress_in_box(screen, &vp, current, total);
             screen->update_viewport();
         }
         va_end(ap);
 
         screen->set_viewport(last_vp);
     }
+}
+
+void splash_progress_in(struct viewport *area, int current, int total,
+                        const char *fmt, ...)
+{
+    struct screen *screen = &screens[SCREEN_MAIN];
+    struct viewport vp = *area;
+    struct viewport *last_vp = screen->set_viewport(&vp);
+    va_list ap;
+
+    fmt = P2STR((unsigned char *)fmt);
+    va_start(ap, fmt);
+    if (splash_internal(screen, fmt, ap, &vp, 1, area->width, area->height,
+                        false))
+        progress_in_box(screen, &vp, current, total);
+    va_end(ap);
+    screen->set_viewport(last_vp);
 }

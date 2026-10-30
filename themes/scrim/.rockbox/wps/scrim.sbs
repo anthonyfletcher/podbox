@@ -142,9 +142,10 @@
 %Vl(Rows,10,11,24,24,2)
 %?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(Search),®,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d)>
 #
-# - Row art.
+# - Row art, darkened by a filter when not selected: a rectangle over
+#   the square would darken the sides of a book's narrower cover too.
 %Vl(Rows,0,1,44,44,-)
-%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])))<%La%?Lc<|%dr(0,0,44,44,!000000,-,6)>>
+%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])))<%?Lc<%La|%La(0,-,-,darker40)>>
 #
 # - Selection bar
 %Vl(Rows,50,0,3,46,-)

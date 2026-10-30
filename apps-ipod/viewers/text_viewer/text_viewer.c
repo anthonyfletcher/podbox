@@ -1539,19 +1539,22 @@ static bool tv_book_done;
 static void tv_next_page(void)
 {
     int words = tv_page_words();
-    bool moved = tv_advance();
+    bool moved;
 
-    if (moved && global_settings.text_viewer_read_aloud == TV_READ_OFF)
-        reading_stats_page(words);
-    else
-        reading_stats_touch();
-    if (!moved && tv_at_book_end())
+    if (tv_at_book_end())
     {
+        /* drawn over the page, not over a loading box from looking past */
+        reading_stats_touch();
         tv_splashf("%s", str(LANG_BOOK_SHELF_ROW_FINISHED));
         sleep(HZ);
         tv_book_done = true;
         return;
     }
+    moved = tv_advance();
+    if (moved && global_settings.text_viewer_read_aloud == TV_READ_OFF)
+        reading_stats_page(words);
+    else
+        reading_stats_touch();
     tv_draw();
     if (moved)
         tv_speak_page();
@@ -2965,37 +2968,37 @@ static size_t tv_note_clean(char *s)
     return n - i;
 }
 
-/* A bar under the Wait box while notes are found, by the file position: the
- * first half finding them, the second reading back to the page. Only once
- * it has taken a moment, as the picture bar. */
+/* The progress box while notes are found, by the file position: the first
+ * half finding them, the second reading back to the page. Only once it has
+ * taken a moment, as the picture bar. */
 static long tv_note_start;
 static int tv_note_half, tv_note_drawn;
 static unsigned int tv_note_thread;
 
 static void tv_note_progress(bs_off_t at)
 {
-    struct screen *d = &screens[SCREEN_MAIN];
-    struct viewport *last;
-    int w = tv.vp.width / 2, x = (tv.vp.width - w) / 2;
-    int y = tv.vp.height * 3 / 4, fill;
     int64_t size = tv.file_size;
+    int pct;
 
     if (thread_self() != tv_note_thread || size <= 0
         || TIME_BEFORE(current_tick, tv_note_start + TV_PIC_BAR_AFTER))
         return;
-    fill = (int)(w * (tv_note_half * size + MIN((int64_t)at, size))
-                 / (2 * size));
-    if (fill == tv_note_drawn)
+    pct = (int)(100 * (tv_note_half * size + MIN((int64_t)at, size))
+                / (2 * size));
+    if (pct == tv_note_drawn)
         return;
-    tv_note_drawn = fill;
-    last = d->set_viewport(&tv.vp);
-    d->drawrect(x, y, w, 5);
-    d->fillrect(x, y, fill, 5);
+    tv_note_drawn = pct;
     if (tv_side)
+    {
+        struct viewport full;
+
+        tv_fullscreen_vp(&full);
+        splash_progress_in(&full, pct, 100, "%s",
+                           str(LANG_TEXT_VIEWER_NOTES));
         tv_side_push();
+    }
     else
-        d->update_viewport();
-    d->set_viewport(last);
+        splash_progress(pct, 100, "%s", str(LANG_TEXT_VIEWER_NOTES));
 }
 
 /* Hold Select: the notes the page on screen refers to, in a box. Reading

@@ -52,4 +52,9 @@ extern void splash_progress_set_silent(bool silent);
  * updates limited internally to 20 fps - call repeatedly to update progress
  */
 extern void splash_progress(int current, int total, const char *fmt, ...) ATTRIBUTE_PRINTF(3, 4);
+
+/* The same meter drawn into `area`, as splashf_in() draws its box: not sent
+ * to the screen, nor said aloud, and drawn every call */
+extern void splash_progress_in(struct viewport *area, int current, int total,
+                               const char *fmt, ...) ATTRIBUTE_PRINTF(4, 5);
 #endif /* _GUI_ICON_H_ */
