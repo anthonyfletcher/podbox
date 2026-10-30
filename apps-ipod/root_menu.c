@@ -1345,24 +1345,42 @@ static void spoken_row(struct menu_item_ex *item,
     root_menu_set_count(count);
 }
 
-/* Audiobooks, then Podcasts, which lands after it */
-static void audiobooks_row(bool on, bool unhide)
+/* The Audiobooks row: the main menu's tagnavi row opening the audiobooks
+ * menu, or NULL before tagnavi.config is parsed */
+static struct menu_item_ex *audiobooks_item(void)
 {
     int slot = browser_db_spoken_main_menu_slot();
 
     if (slot < 0 || slot >= TAGNAVI_MAIN_MENU_SLOTS)
-        return;
-
-    struct menu_item_ex *books = (struct menu_item_ex *)
+        return NULL;
+    return (struct menu_item_ex *)
         menu_table[MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS + slot].item;
+}
 
-    spoken_row(books, NULL, on, unhide);
-    spoken_row((struct menu_item_ex *)&podcasts_item, books, on, unhide);
+static void audiobooks_row(bool on, bool unhide)
+{
+    struct menu_item_ex *books = audiobooks_item();
+
+    if (books)
+        spoken_row(books, NULL, on, unhide);
+}
+
+/* After Audiobooks where that is listed */
+static void podcasts_row(bool on, bool unhide)
+{
+    if (audiobooks_item())
+        spoken_row((struct menu_item_ex *)&podcasts_item, audiobooks_item(),
+                   on, unhide);
 }
 
 void root_menu_set_audiobooks_row(bool on)
 {
     audiobooks_row(on, true);
+}
+
+void root_menu_set_podcasts_row(bool on)
+{
+    podcasts_row(on, true);
 }
 
 /* menu_table[] less the tagnavi slots whose row is hidden, such as Custom
@@ -1892,6 +1910,7 @@ void root_menu(void)
     /* Now that tagnavi.config has been parsed the slot can be found, which it
      * could not be when the setting was loaded. */
     audiobooks_row(global_settings.segregate_audiobooks, false);
+    podcasts_row(global_settings.segregate_podcasts, false);
     push_current_activity(ACTIVITY_MAINMENU);
     next_screen = root_menu_setup_screens();
     debug_log_notice(true);

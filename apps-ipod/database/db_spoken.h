@@ -40,7 +40,7 @@ bool db_spoken_is_spoken_seek(long genre_seek);
 int db_spoken_kind_seek(long genre_seek);
 
 /* Whether the album, album artist or canonical artist at 'seek' is a book --
- * it holds spoken word and no music.
+ * it holds only spoken word of the kinds kept apart.
  *
  * These three are unique-valued, so a crawl of their tag files yields one
  * entry per distinct string with no track behind it; there is nothing to ask
@@ -58,9 +58,20 @@ int db_spoken_kind_seek(long genre_seek);
 bool db_spoken_group_tag(int tag);
 bool db_spoken_group_is_book(int tag, long seek);
 
+/* The kinds of spoken word kept apart from the music, as bits 1 << kind:
+ * books by Segregate Audiobooks, podcasts by Segregate Podcasts. 0 for none,
+ * when every list is music. */
+int db_spoken_apart(void);
+bool db_spoken_kind_apart(int kind);
+
+/* Make 'c' the clause a list keeps its music by: the tracks of no kind kept
+ * apart. For a list to insert while db_spoken_apart() is not 0. */
+struct tagcache_search_clause;
+void db_spoken_music_clause(struct tagcache_search_clause *c);
+
 /* What an album of tagcache's album table is, as tag_virt_spoken answers
  * for a track: 0 music (any music in it), 2 a podcast (podcasts only), else
- * 1 a book. `kind` below is one of those, or 0 for either of the last two. */
+ * 1 a book. `kind` below is one of those, or 0 for any kind kept apart. */
 struct tagcache_album;
 int db_spoken_album_kind(const struct tagcache_album *al);
 bool db_spoken_album_is_kind(const struct tagcache_album *al, int kind);

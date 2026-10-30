@@ -8,7 +8,7 @@
  * tagcache keeps the album and artist tables with the database in RAM (see
  * tagcache_album_get()), current with every commit and every play. This
  * copies them out into a caller's buffer as the records the screens read,
- * leaving out spoken word when Segregate Audiobooks keeps it apart. Names stay
+ * leaving out the spoken word Segregate Audiobooks and Podcasts keep apart. Names stay
  * in the database and are read by seek, which holds only for one commit.
  * Nothing is built in the background or kept on disk; the lists exist while
  * the database is in RAM.
@@ -32,6 +32,7 @@
 #include "lang.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"
 #include "widgets/splash.h"
 #include "system/app_buffer.h"        /* scratch for ordering an album */
 #include "system/app_util.h"          /* warn_on_pl_erase */
@@ -40,18 +41,18 @@
 
 /* ---- what is left out, and reading names ------------------------------- */
 
-/* Spoken word, when Segregate Audiobooks keeps it out of the music: an album
- * all of whose tracks are spoken, and an artist all of whose albums are */
+/* Spoken word of the kinds Segregate Audiobooks and Segregate Podcasts keep
+ * out of the music: an album all of whose tracks are, and an artist all of
+ * whose albums are */
 static bool album_hidden(const struct tagcache_album *a)
 {
-    return global_settings.segregate_audiobooks && a->tracks > 0
-           && a->spoken == a->tracks;
+    return a->tracks > 0 && db_spoken_album_is_kind(a, 0);
 }
 
 static bool artist_hidden(const struct tagcache_artist *r)
 {
-    return global_settings.segregate_audiobooks && r->albums > 0
-           && r->spoken_albums == r->albums;
+    return r->albums > 0
+           && db_spoken_group_is_book(tag_albumartist, r->seek);
 }
 
 bool db_summary_current(const struct db_summary_t *t)

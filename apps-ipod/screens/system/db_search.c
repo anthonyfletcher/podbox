@@ -166,7 +166,7 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
     bool spoken;
 
     if (active_scope == DB_SEARCH_ALL
-        || !global_settings.segregate_audiobooks)
+        || (active_scope == DB_SEARCH_MUSIC && !db_spoken_apart()))
         return true;
 
     if (active_scope != DB_SEARCH_MUSIC)
@@ -183,7 +183,8 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
     else if (tag == tag_album || tag == tag_albumartist)
         spoken = false; /* no album tables: no track behind the result */
     else
-        spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
+        spoken = db_spoken_kind_apart(tagcache_get_numeric(tcs,
+                                                           tag_virt_spoken));
 
     return spoken == (active_scope != DB_SEARCH_MUSIC);
 }

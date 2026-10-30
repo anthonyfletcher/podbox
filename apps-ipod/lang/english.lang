@@ -26780,3 +26780,17 @@
     *: "Shows"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SEGREGATE_PODCASTS
+  desc: in Settings, keep podcasts apart from the music
+  user: core
+  <source>
+    *: "Segregate Podcasts"
+  </source>
+  <dest>
+    *: "Segregate Podcasts"
+  </dest>
+  <voice>
+    *: "Segregate Podcasts"
+  </voice>
+</phrase>

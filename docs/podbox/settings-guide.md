@@ -224,7 +224,8 @@ Settings
 | Sort ▸ Ignore The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | No |  |
 | Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | No |  |
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | No |  |
-| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "podcast", "speech" and the like. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | No |  |
+| Segregate Audiobooks | Keeps audiobooks out of the music and gives them an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "speech" and the like. Podcasts have their own setting. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | No |  |
+| Segregate Podcasts | Keeps podcasts out of the music and gives them a Podcasts row on the main menu, listing each show with its newest episode first. A podcast is a track whose genre is exactly "Podcast" or "Podcasts". Off, podcasts are music. | No |  |
 | Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
 | Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | Tracks, Albums, Artists |  |
@@ -239,8 +240,8 @@ Settings
 **Segregate Audiobooks in full.** A genre counts as spoken word if it contains
 "audiobook", "audio book" or "spoken word" anywhere — so Audiobooks,
 Audiobook/Fiction and Spoken Word & Poetry all match — or if it is exactly
-"book", "books", "spoken", "speech", "podcast", "podcasts", "non-music" or
-"nonmusic". Capitals make no difference. Nothing but the genre is read, so a
+"book", "books", "spoken", "speech", "non-music" or "nonmusic"; "podcast" and
+"podcasts" are Segregate Podcasts' instead. Capitals make no difference. Nothing but the genre is read, so a
 book tagged as music browses as music: retag it. An album counts as a book only
 when every track on it is spoken word; under an album artist, a book and a music
 album with the same name are told apart. An artist with books and music is

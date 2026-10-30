@@ -56,6 +56,7 @@
 #include "lang.h"
 #include "audio.h"
 #include "settings.h"
+#include "database/db_spoken.h"
 #include "string-extra.h"
 #include "playlist/playlist.h"
 #include "playlist/mood_screen.h"
@@ -513,8 +514,11 @@ static bool build(int type)
     }
     if (books)
         tagcache_search_add_clause(tcs, &only_spoken);
-    else if (global_settings.segregate_audiobooks)
+    else if (db_spoken_apart())
+    {
+        db_spoken_music_clause(&no_spoken);
         tagcache_search_add_clause(tcs, &no_spoken);
+    }
 
     /* With a filter or a clause the search yields every song, so a value
      * comes once per song holding it. Merging them whenever the block fills

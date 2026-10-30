@@ -799,6 +799,9 @@ struct user_settings
      * it changes what a library looks like, and only an owner who has
      * audiobooks wants it. */
     bool segregate_audiobooks;
+    /* The same for podcasts, with a Podcasts row of their own. Off, they are
+     * music like any other track. */
+    bool segregate_podcasts;
     /* Uniform row height when album or artist art is on -- a little above the
      * cover size so the square fits. Ignored when both are off. */
     int  db_art_row_height;

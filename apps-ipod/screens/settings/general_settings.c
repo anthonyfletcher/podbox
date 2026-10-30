@@ -1116,6 +1116,8 @@ MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
 MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
+MENUITEM_SETTING(segregate_podcasts, &global_settings.segregate_podcasts,
+                 NULL);
 /* The Music Quiz's kinds of question. One always stays on: turning off the
  * last is put back, since a quiz asking nothing cannot be played. */
 static int quiz_kind_callback(int action, const struct menu_item_ex *this_item,
@@ -1145,7 +1147,7 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
           &album_show_year,
-          &featured_artists, &segregate_audiobooks,
+          &featured_artists, &segregate_audiobooks, &segregate_podcasts,
           &search_menu, &quiz_menu,
           &music_appearance_menu    /* theme_settings.c */
           );

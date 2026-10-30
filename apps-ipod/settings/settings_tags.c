@@ -213,7 +213,8 @@ static const struct tag_row tag_rows[] = {
 { "quiz year",           TAG_LIBRARY,                            "music quiz game questions date" },
 { "featured artists",    TAG_LIBRARY,                            "guest feat credits" },
 { "trim titles",         TAG_LIBRARY|TAG_APPEARANCE,             "tidy shorten feat remaster version" },
-{ "segregate audiobooks", TAG_LIBRARY,                           "audiobook books spoken word podcast" },
+{ "segregate audiobooks", TAG_LIBRARY,                           "audiobook books spoken word" },
+{ "segregate podcasts",  TAG_LIBRARY,                            "podcast show episode spoken word" },
 
 /* --- artwork ------------------------------------------------------------- */
 { "art cache album source", TAG_ARTWORK,                         "thumbnail cache embedded cover folder" },

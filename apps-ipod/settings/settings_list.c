@@ -711,6 +711,11 @@ static void segregate_audiobooks_callback(bool segregate)
     root_menu_set_audiobooks_row(segregate);
 }
 
+static void segregate_podcasts_callback(bool segregate)
+{
+    root_menu_set_podcasts_row(segregate);
+}
+
 /* Switching the engine on is how the analysis gets started. Nothing can be
  * matched against until it has run, so a setting that only set a flag would
  * appear to do nothing for as long as it took somebody to find Maintenance.
@@ -2153,6 +2158,8 @@ const struct settings_list settings[] = {
                   NULL),
     OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
                   false, "segregate audiobooks", segregate_audiobooks_callback),
+    OFFON_SETTING(F_BANFROMQS, segregate_podcasts, LANG_SEGREGATE_PODCASTS,
+                  false, "segregate podcasts", segregate_podcasts_callback),
     /* 0 leaves the skin's own row height; the bounds stop a hand-edited .cfg
      * giving a row taller than the screen. */
     INT_SETTING(F_THEMESETTING, db_art_row_height, -1, 52,

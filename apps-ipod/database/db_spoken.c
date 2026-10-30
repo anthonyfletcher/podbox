@@ -16,9 +16,14 @@
  * asking about a track is then a walk of that short array with no string work
  * at all, and it costs the same whether or not the database is in RAM.
  *
+ * Books and podcasts are each kept apart from the music by a setting of their
+ * own, Segregate Audiobooks and Segregate Podcasts. A kind left in is music
+ * to every list that hides spoken word.
+ *
  * Parts, in order:
  *   - the genre names, and matching one
  *   - the seek table, and reading it out of the database
+ *   - which kinds are kept apart
  *   - the albums and artists that are books, for the lists that hide them
  ****************************************************************************/
 
@@ -32,6 +37,7 @@
 #include "string-extra.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
+#include "settings/settings.h"
 
 /* ------------------------------------------------------------------ *
  * the genre names                                                    *
@@ -212,6 +218,47 @@ int db_spoken_kind_seek(long genre_seek)
  * of them; the rest read as music. */
 #define SPOKEN_GROUP_MAX 192
 
+/* ------------------------------------------------------------------ *
+ * which kinds are kept apart                                         *
+ * ------------------------------------------------------------------ */
+
+int db_spoken_apart(void)
+{
+    return (global_settings.segregate_audiobooks ? 1 << 1 : 0)
+           | (global_settings.segregate_podcasts ? 1 << 2 : 0);
+}
+
+bool db_spoken_kind_apart(int kind)
+{
+    return kind > 0 && (db_spoken_apart() & (1 << kind));
+}
+
+/* The clause a list keeps music by, and its opposite, for the kinds kept
+ * apart now: spoken == 0 and spoken > 0 for both, else != and == the one */
+static void apart_clauses(struct tagcache_search_clause *music,
+                          struct tagcache_search_clause *apart)
+{
+    int mask = db_spoken_apart();
+    int kind = mask == 1 << 1 ? 1 : mask == 1 << 2 ? 2 : 0;
+
+    memset(music, 0, sizeof(*music));
+    music->tag = tag_virt_spoken;
+    music->numeric = true;
+    music->source = source_constant;
+    music->type = kind ? clause_is_not : clause_is;
+    music->numeric_data = kind;
+    if (apart)
+    {
+        *apart = *music;
+        apart->type = kind ? clause_is : clause_gt;
+    }
+}
+
+void db_spoken_music_clause(struct tagcache_search_clause *c)
+{
+    apart_clauses(c, NULL);
+}
+
 static struct spoken_group {
     int tag;
     long seek[SPOKEN_GROUP_MAX];
@@ -250,23 +297,12 @@ static void groups_invalidate(void)
 static struct tagcache_search group_tcs;
 static uint32_t group_uniqbuf[SPOKEN_GROUP_MAX];
 
-static const struct tagcache_search_clause is_spoken_clause = {
-    .tag = tag_virt_spoken,
-    .type = clause_gt,
-    .numeric = true,
-    .source = source_constant,
-    .numeric_data = 0,
-    .str = NULL,
-};
+/* Set by a build for its two passes; tagcache keeps the pointers */
+static struct tagcache_search_clause is_spoken_clause;
+static struct tagcache_search_clause is_music_clause;
 
-static const struct tagcache_search_clause is_music_clause = {
-    .tag = tag_virt_spoken,
-    .type = clause_is,
-    .numeric = true,
-    .source = source_constant,
-    .numeric_data = 0,
-    .str = NULL,
-};
+/* The kinds the tables were built for */
+static int groups_mask;
 
 static struct spoken_group *group_for(int tag)
 {
@@ -370,8 +406,9 @@ bool db_spoken_group_ensure(int tag)
     if (!g)
         return false;
 
-    if (g->valid)
+    if (g->valid && groups_mask == db_spoken_apart())
         return true;
+    g->valid = false;
 
     /* One build at a time, and the loser goes away rather than waiting.
      *
@@ -390,6 +427,8 @@ bool db_spoken_group_ensure(int tag)
         return false;
 
     groups_building = true;
+    groups_mask = db_spoken_apart();
+    apart_clauses(&is_music_clause, &is_spoken_clause);
 
     /* A pass that could not read the database empties the table rather than
      * leaving a half-built one standing: nothing is then hidden, and the
@@ -428,7 +467,7 @@ bool db_spoken_group_tag(int tag)
     return group_for(tag) != NULL;
 }
 
-/* Every album of that name is spoken word throughout, whoever it is by */
+/* Every album of that name is kept apart, whoever it is by */
 static bool album_is_book(long seek)
 {
     struct tagcache_album al;
@@ -436,8 +475,16 @@ static bool album_is_book(long seek)
     bool book = n >= 0;
 
     while (book && tagcache_album_get(n++, &al) && al.album_seek == seek)
-        book = al.spoken == al.tracks;
+        book = db_spoken_album_is_kind(&al, 0);
     return book;
+}
+
+/* Of an artist's albums, how many are of a kind kept apart */
+static int artist_apart_albums(const struct tagcache_artist *ar)
+{
+    return (db_spoken_kind_apart(1) ? ar->spoken_albums - ar->podcast_albums
+                                    : 0)
+           + (db_spoken_kind_apart(2) ? ar->podcast_albums : 0);
 }
 
 int db_spoken_album_kind(const struct tagcache_album *al)
@@ -451,7 +498,7 @@ bool db_spoken_album_is_kind(const struct tagcache_album *al, int kind)
 {
     int k = db_spoken_album_kind(al);
 
-    return kind ? k == kind : k != 0;
+    return kind ? k == kind : db_spoken_kind_apart(k);
 }
 
 bool db_spoken_artist_has_book(long seek, int kind)
@@ -464,7 +511,7 @@ bool db_spoken_artist_has_book(long seek, int kind)
         return ar.podcast_albums > 0;
     if (kind == 1)
         return ar.spoken_albums > ar.podcast_albums;
-    return ar.spoken_albums > 0;
+    return artist_apart_albums(&ar) > 0;
 }
 
 bool db_spoken_album_is_podcast(long album_seek, long artist_seek)
@@ -504,7 +551,7 @@ bool db_spoken_group_is_book(int tag, long seek)
         return album_is_book(seek);
     if (tag == tag_albumartist)
         return tagcache_artist_get(tagcache_artist_find(seek), &ar)
-               && ar.spoken_albums == ar.albums;
+               && artist_apart_albums(&ar) == ar.albums;
     if (!g)
         return false;
 

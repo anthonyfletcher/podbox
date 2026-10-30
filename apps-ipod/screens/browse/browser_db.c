@@ -2268,7 +2268,7 @@ static bool exclude_spoken_possible(void)
 /* Whether this browse should have spoken word kept out of it. */
 static bool exclude_spoken_wanted(void)
 {
-    return global_settings.segregate_audiobooks
+    return db_spoken_apart()
         && csi
         && !browse_picked_by_name
         && !csi_mentions_spoken()
@@ -2655,6 +2655,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * thread is building it -- leaves this browse unfiltered rather than
      * half-filtered; the next entry to the screen has it. */
     bool exclude = exclude_spoken_wanted();
+
+    if (exclude)
+        db_spoken_music_clause(&exclude_spoken_clause);
     enum spoken_keep keep = KEEP_ALL;
 
     if (exclude && db_spoken_group_ensure(tag))
