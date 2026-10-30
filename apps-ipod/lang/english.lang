@@ -26780,3 +26780,17 @@
     *: "Segregate Podcasts"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCAST_PLAY_UNPLAYED
+  desc: the row heading a podcast's episodes: play those not finished, oldest first
+  user: core
+  <source>
+    *: "Play Unplayed"
+  </source>
+  <dest>
+    *: "Play Unplayed"
+  </dest>
+  <voice>
+    *: "Play Unplayed"
+  </voice>
+</phrase>

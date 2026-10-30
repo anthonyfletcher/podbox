@@ -104,6 +104,7 @@
 #define TAGNAVI_USER_CONFIG     ROCKBOX_DIR "/tagnavi_user.config"
 
 static int browser_db_play_folder(struct browser_context* c);
+static int play_unplayed(struct browser_context *c);
 static bool under_artist_level(struct browser_context* c);
 
 /* reuse of browser_db data after browser_db_play_folder(), with the two
@@ -112,6 +113,8 @@ static uint32_t loaded_entries_crc = 0;
 static int loaded_head_rows;
 static bool loaded_years_valid;
 static bool loaded_count_down;
+static bool loaded_podcast_shows;
+static bool loaded_show_unplayed;
 
 
 /* this needs to be same size as struct entry (tree.h) and name needs to be
@@ -156,6 +159,7 @@ enum table {
     TABLE_BOOK_RESUME,
     TABLE_BOOK_SHELF,
     TABLE_MUSIC_QUIZ,
+    TABLE_PLAY_UNPLAYED,
 };
 
 static const struct id3_to_search_mapping {
@@ -2659,6 +2663,26 @@ static void episode_counts_fill(void)
     }
 }
 
+/* A show's list opens with Play Unplayed while any of its episodes is not
+ * finished */
+static bool show_unplayed;
+
+static bool show_has_unplayed(int level)
+{
+    struct tagcache_album al;
+    int n, i;
+
+    if (level < 1 || csi->tagorder[level - 1] != tag_album)
+        return false;
+    n = table_album_row(level - 1, csi->result_seek[level - 1]);
+    if (!tagcache_album_get(n, &al))
+        return false;
+    for (i = al.first; i <= al.last; i++)
+        if (tagcache_album_of(i) == n && episode_state(i) != EPISODES_FINISHED)
+            return true;
+    return false;
+}
+
 /* The clauses for the state an <All tracks> row's seek names, and the
  * format group to list them by; -1 where the seek names none */
 static int add_episode_clauses(struct tagcache_search *tcs, long state)
@@ -2772,6 +2796,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         podcast_shows = is_podcast_shows(c, tag, level);
         if (podcast_shows)
             episode_counts_fill();
+        show_unplayed = c->currtable == TABLE_NAVIBROWSE && tag == tag_title
+                        && csi_spoken_kind() == 2 && show_has_unplayed(level);
     }
 
     /* Before the search: the table is built by searches of its own, which
@@ -3029,6 +3055,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * the Resume row's: insert_all_playlist() drops the row rather than
      * playing whichever track the database indexed first, which would shift
      * every selection onto the row before it. */
+    if (show_unplayed)
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_PLAY_UNPLAYED,
+                            ID2P(LANG_PODCAST_PLAY_UNPLAYED), -1);
     if (podcast_shows)
     {
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
@@ -4394,6 +4423,8 @@ int browser_db_load(struct browser_context* c)
                     head_rows = loaded_head_rows;
                     album_years_valid = loaded_years_valid;
                     tracks_count_down = loaded_count_down;
+                    podcast_shows = loaded_podcast_shows;
+                    show_unplayed = loaded_show_unplayed;
                     logf("Reusing %d entries", count);
                     break;
                 }
@@ -4470,10 +4501,11 @@ int browser_db_load(struct browser_context* c)
      * book rather than a chapter of it. */
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
-        /* A podcast's episode states are what its list is for; only its
-         * Search goes off the top */
-        int first = table != TABLE_ROOT && podcast_shows
-                    ? 1 : c->special_entry_count;
+        /* A podcast's episode states are what its list is for, and so is
+         * a show's Play Unplayed; only the Search goes off the top */
+        int first = table == TABLE_ROOT ? c->special_entry_count
+                    : podcast_shows ? 1
+                    : show_unplayed ? 0 : c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
          * one more special row, and goes with them. Asked only when the
@@ -4732,6 +4764,18 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
      * so that returning from the WPS lands on the list as it was. The row
      * plays the level it sits on, like the track rows do, but from where the
      * book was left. */
+    if (dptr->newtable == TABLE_PLAY_UNPLAYED)
+    {
+        if (global_settings.party_mode && audio_status())
+        {
+            splash(HZ, ID2P(LANG_PARTY_MODE));
+            return 0;
+        }
+        if (!warn_on_pl_erase() || play_unplayed(c) < 0)
+            return 0;
+        return GO_TO_WPS;
+    }
+
     if (dptr->newtable == TABLE_BOOK_RESUME)
     {
         if (global_settings.party_mode && audio_status())
@@ -5616,6 +5660,8 @@ static void remember_loaded(struct browser_context* c)
     loaded_head_rows = head_rows;
     loaded_years_valid = album_years_valid;
     loaded_count_down = tracks_count_down;
+    loaded_podcast_shows = podcast_shows;
+    loaded_show_unplayed = show_unplayed;
 }
 
 bool browser_db_counts_down(struct browser_context *c)
@@ -5623,9 +5669,60 @@ bool browser_db_counts_down(struct browser_context *c)
     return c->currtable != TABLE_ROOT && tracks_count_down;
 }
 
+/* A playlist of these episodes alone, in this order, from the first; each
+ * resumes where it was left */
+static int play_episodes(struct browser_context *c, const int *ids, int n)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    int i, added = 0;
+
+    if (n <= 0 || playlist_create(NULL, NULL) < 0)
+        return -1;
+    if (!tagcache_search(&tcs, tag_filename))
+        return -1;
+    for (i = 0; i < n; i++)
+        if (tagcache_retrieve(&tcs, ids[i], tag_filename, path, sizeof(path))
+            && playlist_insert_track(NULL, path, PLAYLIST_INSERT_LAST, false,
+                                     i == n - 1) >= 0)
+            added++;
+    tagcache_search_finish(&tcs);
+    if (added == 0)
+        return -1;
+    playlist_start(0, 0, 0);
+    remember_loaded(c);
+    return 0;
+}
+
+/* Play Unplayed: the show's episodes not finished, oldest first, which is
+ * the list read from its end */
+static int play_unplayed(struct browser_context *c)
+{
+    static int ids[256];
+    int i, n = 0;
+
+    for (i = c->filesindir - 1; i >= c->special_entry_count && n < 256; i--)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+
+        if (e && e->newtable == TABLE_PLAYTRACK
+            && episode_state(e->idx_id) != EPISODES_FINISHED)
+            ids[n++] = e->idx_id;
+    }
+    return play_episodes(c, ids, n);
+}
+
 static int browser_db_play_folder(struct browser_context* c)
 {
     logf( "%s", __func__);
+
+    /* An episode plays alone, so playback stops at its end */
+    struct tagentry *picked = browser_db_get_entry(c, c->selected_item);
+
+    if (picked && picked->newtable == TABLE_PLAYTRACK
+        && browser_db_episode_percent(picked->idx_id) >= 0)
+        return play_episodes(c, &picked->idx_id, 1);
+
     /* c->selected_item indexes the displayed list, whose head is the special
      * rows (<Random> on a track list). insert_all_playlist() drops those --
      * their extraseek doesn't resolve to a track -- so playlist position is the
