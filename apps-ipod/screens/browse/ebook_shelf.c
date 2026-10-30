@@ -386,6 +386,8 @@ static const char *get_name(int n, void *data, char *buffer, size_t len)
 {
     int b = book_at(n);
     (void)data;
+    (void)buffer;
+    (void)len;
 
     if (showing == SHOW_AUTHORS)
         return names + books[rows[n]].author;
@@ -393,11 +395,7 @@ static const char *get_name(int n, void *data, char *buffer, size_t len)
         return names + rows[n];
     if (b < 0)
         return str(top_row[top_kinds[n]].lang_id);
-    if (books[b].state != BOOK_SHELF_IN_PROGRESS || books[b].pct < 0)
-        return names + books[b].title;
-    snprintf(buffer, len, str(LANG_BOOK_SHELF_ROW), names + books[b].title,
-             books[b].pct);
-    return buffer;
+    return names + books[b].title;  /* how far through is %Lr's, for a gauge */
 }
 
 static unsigned int art_hash(int n, void *data)

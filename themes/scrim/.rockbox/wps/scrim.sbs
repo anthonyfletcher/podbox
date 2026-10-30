@@ -150,9 +150,15 @@
 %Vl(Rows,50,0,3,46,-)
 %?and(%La,%Lc)<%dr(0,0,3,46,vivid>60:ffffff,-,14,3)>
 #
-# - Row text
+# - Row text, narrower beside a book's progress gauge
 %Vl(Rows,60,13,230,20,-)
-%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>|>
+%?La<%?Lr<|%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>|>
+%Vl(Rows,60,13,206,20,-)
+%?La<%?Lr<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%LT|>|>
+#
+# - A book's progress gauge, as the rows without art have it
+%Vl(Rows,272,11,24,24,2)
+%?La<%?Lr<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%Lr,0,ø,100,ā,%sel(%ma(%ma(%Lr,*,8),/,100),0,ù,1,ú,2,û,3,ü,4,ý,5,þ,6,ÿ,7,Ā))|>|>
 #
 # Quick settings boxes
 #

@@ -2344,24 +2344,14 @@ struct tv_toc
 };
 
 /* ts_toc()'s callback. An entry pointing where the one before it does, such
- * as a chapter's subtitle, or a second at the start of a file, is left out.
- * A title with "Chapter" and its number after other words, a picture's
- * caption caught up in the heading, starts at "Chapter". */
+ * as a chapter's subtitle, or a second at the start of a file, is left out. */
 static int tv_toc_add(void *ud, const char *title, int part,
                       const char *anchor)
 {
     struct tv_toc *t = ud;
-    const char *c;
     char *d;
     size_t n;
 
-    for (c = title; *c; c++)
-        if (c > title && c[-1] == ' ' && !strncasecmp(c, "chapter ", 8)
-            && c[8] && strchr("IVXLCivxlc0123456789", c[8]))
-        {
-            title = c;
-            break;
-        }
     if (strlen(anchor) >= TV_TOC_ANCHOR)
         anchor = "";                /* too long to keep: the file's start */
     if (t->n && t->e[t->n - 1].part == part

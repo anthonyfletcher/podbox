@@ -622,18 +622,12 @@ static const char *shelf_get_name(int n, void *data, char *buffer,
                                   size_t buffer_len)
 {
     int v = rows[n];
-    int pct;
     (void)data;
+    (void)buffer;
+    (void)buffer_len;
 
-    if (ROW_IS_RESUME(v))
-        return row_name(v);
-
-    pct = shelf_kind == BOOK_SHELF_IN_PROGRESS ? book_percent(&books[v]) : -1;
-    if (pct < 0)
-        return book_name(v);
-
-    snprintf(buffer, buffer_len, str(LANG_BOOK_SHELF_ROW), book_name(v), pct);
-    return buffer;
+    /* how far through is for a theme's gauge, through %Lr */
+    return ROW_IS_RESUME(v) ? row_name(v) : book_name(v);
 }
 
 /* The cover the database browser's list of books gives the same book. A

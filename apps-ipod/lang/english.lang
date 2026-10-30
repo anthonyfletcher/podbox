@@ -22622,7 +22622,7 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW
-  desc: a row of the Audiobooks In progress list: book name, percent heard
+  desc: Book Info's progress line: In progress, and the percent read
   user: core
   <source>
     *: "%s - %d%%"
