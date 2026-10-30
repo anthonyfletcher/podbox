@@ -207,6 +207,8 @@ static void fi_walk(int depth)
             switch (filetype_get_attr(fi_path) & FILE_ATTR_MASK)
             {
                 case FILE_ATTR_TXT:
+                case FILE_ATTR_BOOK:
+                case FILE_ATTR_LYRICS:
                     path_list_write_record(&fi_docs, fi_path);
                     book_index_found(fi_path, info.size, info.mtime);
                     break;

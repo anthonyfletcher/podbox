@@ -80,20 +80,20 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "html", FILE_ATTR_TXT },
     { "htm",  FILE_ATTR_TXT },
     { "rtf",  FILE_ATTR_TXT },
-    { "fb2",  FILE_ATTR_TXT },
-    { "epub", FILE_ATTR_TXT },
-    { "mobi", FILE_ATTR_TXT },
-    { "prc",  FILE_ATTR_TXT },
-    { "azw",  FILE_ATTR_TXT },
-    { "azw3", FILE_ATTR_TXT },
-    { "pdb",  FILE_ATTR_TXT },
+    { "fb2",  FILE_ATTR_BOOK },
+    { "epub", FILE_ATTR_BOOK },
+    { "mobi", FILE_ATTR_BOOK },
+    { "prc",  FILE_ATTR_BOOK },
+    { "azw",  FILE_ATTR_BOOK },
+    { "azw3", FILE_ATTR_BOOK },
+    { "pdb",  FILE_ATTR_BOOK },
     { "docx", FILE_ATTR_TXT },
     { "pdf",  FILE_ATTR_TXT },
     /* Lyrics read as words here, with the timing stripped (ts_lyrics.c). The
      * synchronised viewer is reached from the WPS, not from the browser. */
-    { "lrc",  FILE_ATTR_TXT },
-    { "lrc8", FILE_ATTR_TXT },
-    { "snc",  FILE_ATTR_TXT },
+    { "lrc",  FILE_ATTR_LYRICS },
+    { "lrc8", FILE_ATTR_LYRICS },
+    { "snc",  FILE_ATTR_LYRICS },
     { "bmp",  FILE_ATTR_IMG },
     { "jpg",  FILE_ATTR_IMG },
     { "jpe",  FILE_ATTR_IMG },
@@ -129,9 +129,12 @@ static const struct fileattr_icon_voice inbuilt_attr_icons_voices[] = {
 #endif
     /* Icon codes 1 and 2 of the theme's viewers iconset, which is where
      * viewers.config used to point these. Themes shipping no viewers iconset
-     * fall back to Icon_Questionmark, as they always have. */
+     * fall back to Icon_Questionmark, as they always have. A book and a
+     * lyric file are 3 and 4, which an iconset without them draws as 1. */
     { FILE_ATTR_TXT,   Icon_Last_Themeable + 1, -1 },
     { FILE_ATTR_IMG,   Icon_Last_Themeable + 2, -1 },
+    { FILE_ATTR_BOOK,  Icon_Last_Themeable + 3, -1 },
+    { FILE_ATTR_LYRICS, Icon_Last_Themeable + 4, -1 },
 };
 
 static int filetype_inbuilt_index(int tree_attr)
@@ -417,6 +420,8 @@ bool filetype_open_core_viewer(int attr, const char *file, int *rc)
     switch (attr & FILE_ATTR_MASK)
     {
         case FILE_ATTR_TXT:
+        case FILE_ATTR_BOOK:
+        case FILE_ATTR_LYRICS:
             *rc = text_viewer(file);
             return true;
         case FILE_ATTR_IMG:

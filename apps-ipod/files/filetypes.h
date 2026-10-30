@@ -50,6 +50,9 @@
  * above -- no extension maps to either. */
 #define FILE_ATTR_MOODS    0x1900
 #define FILE_ATTR_JOURNEYS 0x1a00
+/* The core text viewer's too, apart from FILE_ATTR_TXT for their icons */
+#define FILE_ATTR_BOOK     0x1b00
+#define FILE_ATTR_LYRICS   0x1c00
 #define FILE_ATTR_MASK  0xFF00 /* which bits tree.c uses for file types */
 
 /* The rows the browser invents rather than reads off the disk. They name an

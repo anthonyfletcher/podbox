@@ -98,6 +98,9 @@ void screen_put_iconxy(struct screen * display,
     {
         iconset = &iconsets[Iconset_viewers][screen].bmp;
         icon -= Icon_Last_Themeable;
+        /* A book or lyric file, past an older iconset's end, is a document */
+        if (icon >= 3 && icon * height + height > iconset->height)
+            icon = 1;
         if (!iconsets[Iconset_viewers][screen].loaded ||
            (global_status.viewer_icon_count * height > iconset->height) ||
            (icon * height + height > iconset->height))
