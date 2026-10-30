@@ -589,7 +589,90 @@ escaping.
 
 ---
 
-## 8. Checking your theme
+## 8. Options on the player
+
+A theme that reads a `.preferences` file with `%ft` can give the owner a menu
+for it: **Settings > Appearance > Theme Options**. Ship an **`.options`** file
+beside the `.preferences`, with the same name: `themes/mytheme.options` for
+`themes/mytheme.preferences`. Your skins do not change, and firmware without
+the menu ignores the file.
+
+```ini
+# Comments start with #. There are no end-of-line comments.
+format = 1
+title  = My Theme
+
+[auto-hide]
+name    = Auto-hide
+help    = Hides the title and progress after this long without a button
+help    = press. Any input brings them back.
+type    = choice
+choice  = off | Off
+choice  = 5   | 5 seconds
+choice  = 30  | 30 seconds
+default = off
+
+[caption]
+name    = Caption
+help    = The text under the cover when nothing is playing.
+type    = text
+max     = 40
+default = Now Playing
+```
+
+`format = 1` is required, before the first option. `title` names the file's
+row when a theme has more than one options file; `help` there is shown by
+**Explain** on that row.
+
+Each option starts with its key in brackets. That is the `.preferences` line it
+sets, `auto-hide: 5`, and the text your skin passes to `%ft`:
+`%ft(themes/mytheme.preferences, auto-hide:)`. Keys are lower case: letters,
+digits, `-`, `_` and single spaces between words, up to 32 bytes.
+
+| Field | Required | |
+|---|---|---|
+| `name` | yes | The row's label, up to 40 bytes |
+| `help` | no | What **Explain** shows. Repeated lines join with a space; up to 1023 bytes |
+| `type` | yes | `choice` or `text` |
+| `choice` | 2 to 16, for `choice` | `value \| Label`, in menu order. The value is what the skin compares, up to 32 bytes with no spaces, matched case and all; the label is what the owner sees, up to 40 bytes. Without a `\|` the label is the value |
+| `default` | yes | One of the values, or for `text` any text within `max`. Never empty: `%ft` treats an empty value as missing |
+| `max` | no, `text` only | Longest value in bytes, 1 to 120; 60 if not given |
+
+Up to 32 options per file. Fields the table does not name are ignored.
+
+**An option with a mistake is left out of the menu, and the rest still work.**
+The player never shows the error. Switch on **Settings > System > Debug Logs >
+Theme Log** and reload the theme: `.rockbox/logs/theme.log` has a line for each
+one, with the file and line number.
+
+### What the player does to `.preferences`
+
+Each time the theme loads, the player brings the `.preferences` file into line
+with the options file before the skins read it. A missing file is created
+with the defaults, a missing key is added, and a value that is not one of the
+choices, or text past `max`, goes back to its default. It changes only the
+first line for each key, as `%ft` reads it: your comments, and keys the
+options file does not name, stay as they are. A file over 16 KB is left alone,
+and its theme gets no menu.
+
+Every change from the menu is written at once. The theme reloads when the owner
+leaves Theme Options, so the skins only need to read their values with `%ft` as
+they do now.
+
+### Ship `.preferences`, or not
+
+- **Ship both** if the theme should also work on firmware without this menu.
+  Installing an update then puts the owner's choices back to your defaults,
+  as it does today.
+- **Ship only `.options`** if it should keep the owner's choices across
+  updates. The player creates `.preferences` the first time the theme loads,
+  and an update without one leaves it alone. On firmware without the menu,
+  `%ft` finds no file and every value is missing, so write your skins to
+  behave sensibly then.
+
+---
+
+## 9. Checking your theme
 
 `checkwps` parses a skin and reports syntax errors and missing fonts or bitmaps.
 It is not in the player zip: build it on Linux with

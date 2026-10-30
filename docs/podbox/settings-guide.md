@@ -357,6 +357,7 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Theme Options | The loaded theme's own choices, such as what its playing screen shows. Here only when the theme offers them. Each change is saved at once; the theme reloads, taking a moment, when you leave. | — |  |
 | Font | The typeface used throughout the interface. A larger font is easier to read and fits fewer rows on screen. | — |  |
 
 ### Appearance — Skins

@@ -30,6 +30,7 @@
 #include "draw/color.h"                /* color_words_reset */
 #include "metadata/book_resume.h"
 #include "audio/playback.h"           /* audio_release_buffer */
+#include "theme_options.h"
 
 #define FAILSAFENAME "rockbox_failsafe"
 
@@ -168,6 +169,7 @@ void settings_apply_skins(void)
      * word table; start it afresh, or each theme change would add its words
      * to the last one's until a skin failed to load. */
     color_words_reset();
+    theme_options_forget();
 
     /* Make sure each skin is loaded */
     for (i=0; i<SKINNABLE_SCREENS_COUNT; i++)

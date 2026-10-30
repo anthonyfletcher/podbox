@@ -1,0 +1,76 @@
+# iClassic Square Light's options, shown in Appearance > Theme Options.
+format = 1
+title  = iClassic Square Light
+help   = Which parts take the album's colour, and which keep the theme's own.
+
+[vivid_progress_bar]
+name    = Progress Bar
+help    = The bar under the cover on the playing screen.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = yes
+
+[vivid_volume_icons]
+name    = Volume Icons
+help    = The speaker icons either side of the volume bar.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = yes
+
+[vivid_volume_bar]
+name    = Volume Bar
+help    = The bar shown in place of the progress bar while the volume changes.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = yes
+
+[vivid_transport_icon]
+name    = Transport Icon
+help    = The play, pause, fast-forward, rewind and hold icon in the title bar.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = no
+
+[vivid_battery_icon]
+name    = Battery Icon
+help    = The battery icon in the title bar.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = no
+
+[vivid_title_bar]
+name    = Title Bar
+help    = The bar along the top of the screen.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Grey
+default = no
+
+[vivid_title_text]
+name    = Title Text
+help    = The text in the title bar: the list's name, or Now Playing.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = no
+
+[vivid_song_text]
+name    = Song Text
+help    = The song's title, on the playing screen and in the pane beside lists.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = no
+
+[vivid_selection]
+name    = Selection
+help    = The bar behind the selected row in lists.
+type    = choice
+choice  = yes | Album Colour
+choice  = no  | Black
+default = yes

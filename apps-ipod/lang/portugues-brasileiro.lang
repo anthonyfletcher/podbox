@@ -27157,3 +27157,45 @@
     *: "Alfabética Inversa"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_OPTIONS
+  desc: in Appearance, the loaded theme's own options
+  user: core
+  <source>
+    *: "Theme Options"
+  </source>
+  <dest>
+    *: "Opções do Tema"
+  </dest>
+  <voice>
+    *: "Opções do Tema"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL
+  desc: in Theme Options, the row that puts every option back to its default
+  user: core
+  <source>
+    *: "Reset All"
+  </source>
+  <dest>
+    *: "Redefinir Tudo"
+  </dest>
+  <voice>
+    *: "Redefinir Tudo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL_ASK
+  desc: in Theme Options, asked before Reset All
+  user: core
+  <source>
+    *: "Reset every option to its default?"
+  </source>
+  <dest>
+    *: "Redefinir todas as opções para o padrão?"
+  </dest>
+  <voice>
+    *: "Redefinir todas as opções para o padrão?"
+  </voice>
+</phrase>

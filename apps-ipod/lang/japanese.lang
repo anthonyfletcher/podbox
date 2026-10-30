@@ -27162,3 +27162,45 @@
     *: "逆アルファベット順"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_OPTIONS
+  desc: in Appearance, the loaded theme's own options
+  user: core
+  <source>
+    *: "Theme Options"
+  </source>
+  <dest>
+    *: "テーマのオプション"
+  </dest>
+  <voice>
+    *: "テーマのオプション"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL
+  desc: in Theme Options, the row that puts every option back to its default
+  user: core
+  <source>
+    *: "Reset All"
+  </source>
+  <dest>
+    *: "すべてリセット"
+  </dest>
+  <voice>
+    *: "すべてリセット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL_ASK
+  desc: in Theme Options, asked before Reset All
+  user: core
+  <source>
+    *: "Reset every option to its default?"
+  </source>
+  <dest>
+    *: "すべてのオプションを既定値に戻しますか？"
+  </dest>
+  <voice>
+    *: "すべてのオプションを既定値に戻しますか？"
+  </voice>
+</phrase>

@@ -27242,3 +27242,45 @@
     *: "Reverse Alphabetical"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_OPTIONS
+  desc: in Appearance, the loaded theme's own options
+  user: core
+  <source>
+    *: "Theme Options"
+  </source>
+  <dest>
+    *: "Theme Options"
+  </dest>
+  <voice>
+    *: "Theme Options"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL
+  desc: in Theme Options, the row that puts every option back to its default
+  user: core
+  <source>
+    *: "Reset All"
+  </source>
+  <dest>
+    *: "Reset All"
+  </dest>
+  <voice>
+    *: "Reset All"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL_ASK
+  desc: in Theme Options, asked before Reset All
+  user: core
+  <source>
+    *: "Reset every option to its default?"
+  </source>
+  <dest>
+    *: "Reset every option to its default?"
+  </dest>
+  <voice>
+    *: "Reset every option to its default?"
+  </voice>
+</phrase>

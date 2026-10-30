@@ -75,6 +75,9 @@
 #include "backdrop.h"
 #include "statusbar_skinned.h"
 #include "string-extra.h"
+#ifndef CHECKWPS
+#include "theme_options.h"
+#endif
 
 #define WPS_ERROR_INVALID_PARAM         -1
 
@@ -1649,6 +1652,9 @@ static int parse_filetext(struct skin_element *element,
     path_append(buf, ROCKBOX_DIR + 1, filename, sizeof(buf));
 #else
     path_append(buf, ROCKBOX_DIR, filename, sizeof(buf));
+    /* A theme's .preferences is completed from its options before the
+     * first read */
+    theme_options_met(buf);
 #endif
     DEBUGF("%s %s[%d]\n", __func__, buf, line);
 

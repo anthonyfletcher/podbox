@@ -27163,3 +27163,45 @@
     *: "反向字母顺序"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_OPTIONS
+  desc: in Appearance, the loaded theme's own options
+  user: core
+  <source>
+    *: "Theme Options"
+  </source>
+  <dest>
+    *: "主题选项"
+  </dest>
+  <voice>
+    *: "主题选项"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL
+  desc: in Theme Options, the row that puts every option back to its default
+  user: core
+  <source>
+    *: "Reset All"
+  </source>
+  <dest>
+    *: "全部重置"
+  </dest>
+  <voice>
+    *: "全部重置"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL_ASK
+  desc: in Theme Options, asked before Reset All
+  user: core
+  <source>
+    *: "Reset every option to its default?"
+  </source>
+  <dest>
+    *: "将所有选项恢复为默认值？"
+  </dest>
+  <voice>
+    *: "将所有选项恢复为默认值？"
+  </voice>
+</phrase>

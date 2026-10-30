@@ -1713,6 +1713,11 @@ The list is of .sbs files in /.rockbox/wps. Themes with art beside their rows
 need their own base skin, so changing this to something else can leave the lists
 looking plain.
 
+[action: Theme Options]
+The loaded theme's own choices, such as what its playing screen shows. Here
+only when the theme offers them. Each change is saved at once; the theme
+reloads, taking a moment, when you leave.
+
 [action: Clear Backdrop]
 Removes the background image, leaving the background colour showing through.
 

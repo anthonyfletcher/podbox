@@ -224,6 +224,7 @@ screens/settings/sound_settings.c
 screens/settings/text_viewer_settings.c
 screens/settings/lyric_viewer_settings.c
 screens/settings/theme_settings.c
+screens/settings/theme_options_menu.c
 #ifdef HAVE_TAGCACHE
 screens/settings/album_covers_settings.c
 #endif
@@ -308,6 +309,7 @@ skin/skin_render.c
 skin/skin_tokens.c
 skin/statusbar.c
 skin/statusbar_skinned.c
+skin/theme_options.c
 #if (LCD_DEPTH > 1)
 skin/backdrop.c
 #endif

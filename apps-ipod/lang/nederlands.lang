@@ -27164,3 +27164,45 @@
     *: "Omgekeerd alfabetisch"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_OPTIONS
+  desc: in Appearance, the loaded theme's own options
+  user: core
+  <source>
+    *: "Theme Options"
+  </source>
+  <dest>
+    *: "Thema-opties"
+  </dest>
+  <voice>
+    *: "Thema-opties"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL
+  desc: in Theme Options, the row that puts every option back to its default
+  user: core
+  <source>
+    *: "Reset All"
+  </source>
+  <dest>
+    *: "Alles herstellen"
+  </dest>
+  <voice>
+    *: "Alles herstellen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_ALL_ASK
+  desc: in Theme Options, asked before Reset All
+  user: core
+  <source>
+    *: "Reset every option to its default?"
+  </source>
+  <dest>
+    *: "Alle opties terugzetten naar de standaard?"
+  </dest>
+  <voice>
+    *: "Alle opties terugzetten naar de standaard?"
+  </voice>
+</phrase>
