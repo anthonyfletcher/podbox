@@ -47,6 +47,7 @@ enum image_kind {
 struct fd_st {
     int   fd;
     off_t left;                 /* < 0: to the end of the file */
+    off_t start, len;           /* where it began, and left then */
 };
 
 static int fd_pull(bs_stream *s, uint8_t *buf, size_t n, size_t *out)
@@ -64,6 +65,17 @@ static int fd_pull(bs_stream *s, uint8_t *buf, size_t n, size_t *out)
     if (f->left >= 0)
         f->left -= got;
     *out = got;
+    return BS_OK;
+}
+
+/* Back to the picture's first byte, for a decoder that reads it twice */
+static int fd_reset(bs_stream *s)
+{
+    struct fd_st *f = s->st;
+
+    if (lseek(f->fd, f->start, SEEK_SET) != f->start)
+        return BS_ERR_IO;
+    f->left = f->len;
     return BS_OK;
 }
 
@@ -97,6 +109,7 @@ static bs_stream *image_stream(bs_arena *a, const struct image_src *src)
 
     if (!s)
         return NULL;
+    s->reset = NULL;
     if (src->flags & AA_FLAG_VORBIS_BASE64)
     {
         struct ogg_st *o = bs_alloc(a, sizeof *o);
@@ -128,7 +141,10 @@ static bs_stream *image_stream(bs_arena *a, const struct image_src *src)
         return NULL;
     f->fd = src->fd;
     f->left = (src->flags & AA_FLAG_ID3_UNSYNC) ? -1 : src->len;
+    f->start = src->pos;
+    f->len = f->left;
     s->pull = fd_pull;
+    s->reset = fd_reset;
     s->st = f;
     if (src->flags & AA_FLAG_ID3_UNSYNC)
         return bs_unsync_stream(a, s);

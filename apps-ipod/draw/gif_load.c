@@ -10,7 +10,8 @@
  *   LZW    - the image's codes into palette indices, across sub-blocks
  *   rows   - each row of indices as RGB, handed to the scaler; an
  *            interlaced image is put together first, in the room after the
- *            bitmap
+ *            bitmap, and when it is too big for that, a band of rows at a
+ *            time, the image read again from its start for each band
  *
  * The frame is read at its own size, wherever it sits on the screen. A
  * transparent pixel is drawn black, as a PNG's is.
@@ -43,7 +44,8 @@ struct gif {
     int blen, bpos;
     bool ended;                 /* the end code, or the data's end */
     /* rows */
-    uint8_t *idx;               /* one row, or the whole interlaced image */
+    uint8_t *idx;               /* one row, or interlaced rows band0 on */
+    int band0, nband;           /* interlaced: the rows idx holds */
     struct uint8_rgb *rgb;
     int y;                      /* the next row handed out */
     struct img_part part;
@@ -245,6 +247,8 @@ static void to_rgb(const struct gif *g, const uint8_t *idx)
     }
 }
 
+static bool load_band(struct gif *g, int y0);
+
 static struct img_part *store_part_gif(void *args)
 {
     struct gif *g = args;
@@ -252,7 +256,11 @@ static struct img_part *store_part_gif(void *args)
     if (g->y >= g->h)
         return NULL;
     if (g->interlaced)
-        to_rgb(g, g->idx + (size_t)g->y * g->w);
+    {
+        if (g->y >= g->band0 + g->nband && !load_band(g, g->y))
+            return NULL;
+        to_rgb(g, g->idx + (size_t)(g->y - g->band0) * g->w);
+    }
     else
     {
         lzw_pixels(g, g->idx, g->w);
@@ -264,17 +272,38 @@ static struct img_part *store_part_gif(void *args)
     return &g->part;
 }
 
-/* An interlaced image's four passes, each row to its place in idx */
-static bool assemble(struct gif *g)
+/* Rows y0 on of an interlaced image, as many as idx holds, through its four
+ * passes: each of them to its place in idx, the rest into the RGB row,
+ * unused until the rows are handed out. Past the first band the image is
+ * read again from its start. */
+static bool load_band(struct gif *g, int y0)
 {
     static const uint8_t start[4] = { 0, 4, 2, 1 }, step[4] = { 8, 8, 4, 2 };
-    int done = 0;
+    int end = MIN(y0 + g->nband, g->h), done = 0;
 
-    for (int pass = 0; pass < 4; pass++)
-        for (int y = start[pass]; y < g->h; y += step[pass])
+    if (y0 > 0)
+    {
+        if (!g->in->reset || g->in->reset(g->in) != BS_OK
+            || !read_header(g))
+            return false;
+        g->sp = g->nbits = g->blen = g->bpos = 0;
+        g->bits = 0;
+        g->ended = false;
+        lzw_reset(g);
+    }
+    g->band0 = y0;
+    for (int pass = 0; pass < 4 && done < end - y0; pass++)
+        for (int y = start[pass]; y < g->h && done < end - y0;
+             y += step[pass])
         {
-            lzw_pixels(g, g->idx + (size_t)y * g->w, g->w);
-            if (image_row_hook && !image_row_hook(++done, g->h))
+            bool mine = y >= y0 && y < end;
+
+            lzw_pixels(g, mine ? g->idx + (size_t)(y - y0) * g->w
+                               : (uint8_t *)g->rgb, g->w);
+            if (!mine)
+                continue;
+            done++;
+            if (image_row_hook && !image_row_hook(y0 + done, g->h))
                 return false;
         }
     return true;
@@ -333,8 +362,11 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     g->rgb = bs_alloc(a, g->w * sizeof(struct uint8_rgb));
     if (g->interlaced)
     {
-        if ((long)g->w * g->h > free_len - lines)
+        long rows = (free_len - lines) / g->w;
+
+        if (rows < 1)
             return -6;
+        g->nband = rows < g->h ? (int)rows : g->h;
         g->idx = free_start + lines;
     }
     else
@@ -343,7 +375,7 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
         return -6;
 
     lzw_reset(g);
-    if (g->interlaced && !assemble(g))
+    if (g->interlaced && !load_band(g, 0))
         return -9;
 
     if (resize)
