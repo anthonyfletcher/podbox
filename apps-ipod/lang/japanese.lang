@@ -18955,16 +18955,16 @@
 </phrase>
 <phrase>
   id: LANG_REBUILD_FILE_INDEX
-  desc: in File View settings, rescan for documents and images
+  desc: in File View settings, rescan for books, documents and images
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "ドキュメントと画像を再スキャン"
+    *: "本・ドキュメント・画像を再スキャン"
   </dest>
   <voice>
-    *: "ドキュメントと画像を再スキャン"
+    *: "本・ドキュメント・画像を再スキャン"
   </voice>
 </phrase>
 <phrase>
@@ -20075,16 +20075,16 @@
 </phrase>
 <phrase>
   id: LANG_RESCAN_FILES
-  desc: maintenance action, rebuild the flat Documents and Images lists
+  desc: maintenance action, rebuild the Books lists and the flat Documents and Images lists
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "ドキュメントと画像を再スキャン"
+    *: "本・ドキュメント・画像を再スキャン"
   </dest>
   <voice>
-    *: "ドキュメントと画像を再スキャン"
+    *: "本・ドキュメント・画像を再スキャン"
   </voice>
 </phrase>
 <phrase>
@@ -24479,13 +24479,13 @@
   desc: in Settings, database browser audiobook author art rows
   user: core
   <source>
-    *: "Author Art Rows"
+    *: "Audiobook Author Art Rows"
   </source>
   <dest>
-    *: "著者行のアート"
+    *: "オーディオブック著者行のアート"
   </dest>
   <voice>
-    *: "著者行のアート"
+    *: "オーディオブック著者行のアート"
   </voice>
 </phrase>
 <phrase>
@@ -26334,5 +26334,327 @@
   </dest>
   <voice>
     *: "低音強調"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READING_STATS
+  desc: Books: the reading statistics, of a book or all
+  user: core
+  <source>
+    *: "Reading Stats"
+  </source>
+  <dest>
+    *: "読書の統計"
+  </dest>
+  <voice>
+    *: "読書の統計"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_NOT_READ
+  desc: Reading Stats: nothing read yet
+  user: core
+  <source>
+    *: "Not read yet"
+  </source>
+  <dest>
+    *: "まだ読んでいません"
+  </dest>
+  <voice>
+    *: "まだ読んでいません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_TIME
+  desc: Reading Stats: time spent reading
+  user: core
+  <source>
+    *: "Time reading"
+  </source>
+  <dest>
+    *: "読書時間"
+  </dest>
+  <voice>
+    *: "読書時間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES
+  desc: Reading Stats: pages turned forward
+  user: core
+  <source>
+    *: "Pages read"
+  </source>
+  <dest>
+    *: "読んだページ"
+  </dest>
+  <voice>
+    *: "読んだページ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES_A_DAY
+  desc: Reading Stats: pages read, and on average each day read on
+  user: core
+  <source>
+    *: "%d, %d a day"
+  </source>
+  <dest>
+    *: "%d（1日 %d）"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SPEED
+  desc: Reading Stats: reading speed
+  user: core
+  <source>
+    *: "Speed"
+  </source>
+  <dest>
+    *: "速度"
+  </dest>
+  <voice>
+    *: "速度"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_WPM
+  desc: Reading Stats: the speed in words a minute
+  user: core
+  <source>
+    *: "%d words a minute"
+  </source>
+  <dest>
+    *: "毎分 %d 語"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LONGEST
+  desc: Reading Stats: the longest sitting with the book
+  user: core
+  <source>
+    *: "Longest sitting"
+  </source>
+  <dest>
+    *: "最長の読書"
+  </dest>
+  <voice>
+    *: "最長の読書"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STREAK
+  desc: Reading Stats: the most days in a row read on
+  user: core
+  <source>
+    *: "Best streak"
+  </source>
+  <dest>
+    *: "最長連続日数"
+  </dest>
+  <voice>
+    *: "最長連続日数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_DAYS
+  desc: Reading Stats: a number of days
+  user: core
+  <source>
+    *: "%d days"
+  </source>
+  <dest>
+    *: "%d 日"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ONE_DAY
+  desc: Reading Stats: a number of days, when it is one
+  user: core
+  <source>
+    *: "1 day"
+  </source>
+  <dest>
+    *: "1 日"
+  </dest>
+  <voice>
+    *: "1 日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LEFT
+  desc: Reading Stats: time to finish the book at the reader's own speed
+  user: core
+  <source>
+    *: "Time left"
+  </source>
+  <dest>
+    *: "残り時間"
+  </dest>
+  <voice>
+    *: "残り時間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ABOUT
+  desc: Reading Stats: an estimate
+  user: core
+  <source>
+    *: "about %s"
+  </source>
+  <dest>
+    *: "約 %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STARTED
+  desc: Reading Stats: the day the book was started
+  user: core
+  <source>
+    *: "Started"
+  </source>
+  <dest>
+    *: "開始日"
+  </dest>
+  <voice>
+    *: "開始日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LAST
+  desc: Reading Stats: the day the book was last read
+  user: core
+  <source>
+    *: "Last read"
+  </source>
+  <dest>
+    *: "最終読書日"
+  </dest>
+  <voice>
+    *: "最終読書日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_IN_DAYS
+  desc: Reading Stats: the day finished, and the days from starting
+  user: core
+  <source>
+    *: "%s, in %s"
+  </source>
+  <dest>
+    *: "%s（%s）"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS
+  desc: Reading Stats, all books: how many have been read in
+  user: core
+  <source>
+    *: "Books read"
+  </source>
+  <dest>
+    *: "読んだ本"
+  </dest>
+  <voice>
+    *: "読んだ本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS_FINISHED
+  desc: Reading Stats, all books: books read in, and finished
+  user: core
+  <source>
+    *: "%d, %d finished"
+  </source>
+  <dest>
+    *: "%d（読了 %d）"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SINCE
+  desc: Reading Stats, all books: the day the first was started
+  user: core
+  <source>
+    *: "Reading since"
+  </source>
+  <dest>
+    *: "読書開始日"
+  </dest>
+  <voice>
+    *: "読書開始日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NOTES
+  desc: text viewer: the title of the box with a page's footnotes
+  user: core
+  <source>
+    *: "Notes"
+  </source>
+  <dest>
+    *: "注釈"
+  </dest>
+  <voice>
+    *: "注釈"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NO_NOTES
+  desc: text viewer: hold Select on a page that refers to no notes
+  user: core
+  <source>
+    *: "No notes on this page"
+  </source>
+  <dest>
+    *: "このページに注釈はありません"
+  </dest>
+  <voice>
+    *: "このページに注釈はありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_EBOOK_ART
+  desc: in Settings, art rows on the Books lists
+  user: core
+  <source>
+    *: "Book Art Rows"
+  </source>
+  <dest>
+    *: "本の行のアート"
+  </dest>
+  <voice>
+    *: "本の行のアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_EBOOK_AUTHOR_ART
+  desc: in Settings, art rows on the Books Authors list
+  user: core
+  <source>
+    *: "Book Author Art Rows"
+  </source>
+  <dest>
+    *: "本の著者行のアート"
+  </dest>
+  <voice>
+    *: "本の著者行のアート"
   </voice>
 </phrase>

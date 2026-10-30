@@ -18975,16 +18975,16 @@
 </phrase>
 <phrase>
   id: LANG_REBUILD_FILE_INDEX
-  desc: in File View settings, rescan for documents and images
+  desc: in File View settings, rescan for books, documents and images
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "Réanalyser documents & images"
+    *: "Réanalyser livres, documents & images"
   </dest>
   <voice>
-    *: "Réanalyser documents et images"
+    *: "Réanalyser livres, documents & images"
   </voice>
 </phrase>
 <phrase>
@@ -20095,16 +20095,16 @@
 </phrase>
 <phrase>
   id: LANG_RESCAN_FILES
-  desc: maintenance action, rebuild the flat Documents and Images lists
+  desc: maintenance action, rebuild the Books lists and the flat Documents and Images lists
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "Réanalyser documents & images"
+    *: "Réanalyser livres, documents & images"
   </dest>
   <voice>
-    *: "Réanalyser documents et images"
+    *: "Réanalyser livres, documents & images"
   </voice>
 </phrase>
 <phrase>
@@ -24499,13 +24499,13 @@
   desc: in Settings, database browser audiobook author art rows
   user: core
   <source>
-    *: "Author Art Rows"
+    *: "Audiobook Author Art Rows"
   </source>
   <dest>
-    *: "Lignes illustrées : auteurs"
+    *: "Lignes illustrées : auteurs de livres audio"
   </dest>
   <voice>
-    *: "Lignes illustrées pour les auteurs"
+    *: "Lignes illustrées : auteurs de livres audio"
   </voice>
 </phrase>
 <phrase>
@@ -26354,5 +26354,327 @@
   </dest>
   <voice>
     *: "Basses renforcées"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_READING_STATS
+  desc: Books: the reading statistics, of a book or all
+  user: core
+  <source>
+    *: "Reading Stats"
+  </source>
+  <dest>
+    *: "Statistiques de lecture"
+  </dest>
+  <voice>
+    *: "Statistiques de lecture"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_NOT_READ
+  desc: Reading Stats: nothing read yet
+  user: core
+  <source>
+    *: "Not read yet"
+  </source>
+  <dest>
+    *: "Pas encore lu"
+  </dest>
+  <voice>
+    *: "Pas encore lu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_TIME
+  desc: Reading Stats: time spent reading
+  user: core
+  <source>
+    *: "Time reading"
+  </source>
+  <dest>
+    *: "Temps de lecture"
+  </dest>
+  <voice>
+    *: "Temps de lecture"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES
+  desc: Reading Stats: pages turned forward
+  user: core
+  <source>
+    *: "Pages read"
+  </source>
+  <dest>
+    *: "Pages lues"
+  </dest>
+  <voice>
+    *: "Pages lues"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_PAGES_A_DAY
+  desc: Reading Stats: pages read, and on average each day read on
+  user: core
+  <source>
+    *: "%d, %d a day"
+  </source>
+  <dest>
+    *: "%d, %d par jour"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SPEED
+  desc: Reading Stats: reading speed
+  user: core
+  <source>
+    *: "Speed"
+  </source>
+  <dest>
+    *: "Vitesse"
+  </dest>
+  <voice>
+    *: "Vitesse"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_WPM
+  desc: Reading Stats: the speed in words a minute
+  user: core
+  <source>
+    *: "%d words a minute"
+  </source>
+  <dest>
+    *: "%d mots par minute"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LONGEST
+  desc: Reading Stats: the longest sitting with the book
+  user: core
+  <source>
+    *: "Longest sitting"
+  </source>
+  <dest>
+    *: "Plus longue séance"
+  </dest>
+  <voice>
+    *: "Plus longue séance"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STREAK
+  desc: Reading Stats: the most days in a row read on
+  user: core
+  <source>
+    *: "Best streak"
+  </source>
+  <dest>
+    *: "Meilleure série"
+  </dest>
+  <voice>
+    *: "Meilleure série"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_DAYS
+  desc: Reading Stats: a number of days
+  user: core
+  <source>
+    *: "%d days"
+  </source>
+  <dest>
+    *: "%d jours"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ONE_DAY
+  desc: Reading Stats: a number of days, when it is one
+  user: core
+  <source>
+    *: "1 day"
+  </source>
+  <dest>
+    *: "1 jour"
+  </dest>
+  <voice>
+    *: "1 jour"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LEFT
+  desc: Reading Stats: time to finish the book at the reader's own speed
+  user: core
+  <source>
+    *: "Time left"
+  </source>
+  <dest>
+    *: "Temps restant"
+  </dest>
+  <voice>
+    *: "Temps restant"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_ABOUT
+  desc: Reading Stats: an estimate
+  user: core
+  <source>
+    *: "about %s"
+  </source>
+  <dest>
+    *: "environ %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_STARTED
+  desc: Reading Stats: the day the book was started
+  user: core
+  <source>
+    *: "Started"
+  </source>
+  <dest>
+    *: "Commencé"
+  </dest>
+  <voice>
+    *: "Commencé"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_LAST
+  desc: Reading Stats: the day the book was last read
+  user: core
+  <source>
+    *: "Last read"
+  </source>
+  <dest>
+    *: "Dernière lecture"
+  </dest>
+  <voice>
+    *: "Dernière lecture"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_IN_DAYS
+  desc: Reading Stats: the day finished, and the days from starting
+  user: core
+  <source>
+    *: "%s, in %s"
+  </source>
+  <dest>
+    *: "%s, en %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS
+  desc: Reading Stats, all books: how many have been read in
+  user: core
+  <source>
+    *: "Books read"
+  </source>
+  <dest>
+    *: "Livres lus"
+  </dest>
+  <voice>
+    *: "Livres lus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_BOOKS_FINISHED
+  desc: Reading Stats, all books: books read in, and finished
+  user: core
+  <source>
+    *: "%d, %d finished"
+  </source>
+  <dest>
+    *: "%d, %d terminés"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RS_SINCE
+  desc: Reading Stats, all books: the day the first was started
+  user: core
+  <source>
+    *: "Reading since"
+  </source>
+  <dest>
+    *: "Lecteur depuis"
+  </dest>
+  <voice>
+    *: "Lecteur depuis"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NOTES
+  desc: text viewer: the title of the box with a page's footnotes
+  user: core
+  <source>
+    *: "Notes"
+  </source>
+  <dest>
+    *: "Notes"
+  </dest>
+  <voice>
+    *: "Notes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NO_NOTES
+  desc: text viewer: hold Select on a page that refers to no notes
+  user: core
+  <source>
+    *: "No notes on this page"
+  </source>
+  <dest>
+    *: "Aucune note sur cette page"
+  </dest>
+  <voice>
+    *: "Aucune note sur cette page"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_EBOOK_ART
+  desc: in Settings, art rows on the Books lists
+  user: core
+  <source>
+    *: "Book Art Rows"
+  </source>
+  <dest>
+    *: "Lignes illustrées : livres"
+  </dest>
+  <voice>
+    *: "Lignes illustrées : livres"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_EBOOK_AUTHOR_ART
+  desc: in Settings, art rows on the Books Authors list
+  user: core
+  <source>
+    *: "Book Author Art Rows"
+  </source>
+  <dest>
+    *: "Lignes illustrées : auteurs de livres"
+  </dest>
+  <voice>
+    *: "Lignes illustrées : auteurs de livres"
   </voice>
 </phrase>
