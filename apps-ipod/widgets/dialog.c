@@ -575,6 +575,7 @@ void dialog_init(struct dialog *d, int context, const char *title,
     d->backlight_on = true;
     d->fb = NULL;
     d->present = NULL;
+    d->keymap = NULL;
 }
 
 /* Frame + draw the dialog on one screen. The theme parent viewport supplies the
@@ -660,7 +661,9 @@ int dialog_run(struct dialog *d, int poll_ticks)
             ticks = HZ / 10;
 
         skin_inhibit_flush(true);
-        int action = get_action(d->context, ticks);
+        int action = d->keymap ? get_custom_action(CONTEXT_PLUGIN, ticks,
+                                                   d->keymap)
+                               : get_action(d->context, ticks);
         skin_inhibit_flush(false);
 
         disp = d->cb->on_action(d, action, d->data);

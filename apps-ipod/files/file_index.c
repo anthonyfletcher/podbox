@@ -304,7 +304,7 @@ static void fi_request(bool rebuild)
 
 struct bg_task file_index_task =
 {
-    .name    = "documents & images",
+    .name    = "books, documents & images",
     .rank    = BG_RANK_FILES,
     .work_bytes = BOOK_INDEX_WORK_BYTES,
     .request = fi_request,

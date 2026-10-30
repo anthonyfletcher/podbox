@@ -34,6 +34,8 @@
 #include "draw/screen_access.h"
 #include "draw/viewport.h"
 
+struct button_mapping;
+
 struct dialog;
 
 /* ---------------------------------------------------------------------- *
@@ -267,6 +269,9 @@ struct dialog
     struct frame_buffer_t *fb;
     int   fb_w, fb_h;
     void (*present)(void);
+    /* The buttons turned with it: a keymap for get_custom_action(), in
+     * place of `context`. NULL reads `context`. */
+    const struct button_mapping *(*keymap)(int context);
 };
 
 /* Initialise a dialog. `title` and `style` may be NULL (NULL style == the

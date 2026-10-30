@@ -19030,16 +19030,16 @@
 </phrase>
 <phrase>
   id: LANG_REBUILD_FILE_INDEX
-  desc: in File View settings, rescan for documents and images
+  desc: in File View settings, rescan for books, documents and images
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </dest>
   <voice>
-    *: "Rescan Documents & Images"
+    *: "Rescan books, documents and images"
   </voice>
 </phrase>
 <phrase>
@@ -20154,16 +20154,16 @@
 </phrase>
 <phrase>
   id: LANG_RESCAN_FILES
-  desc: maintenance action, rebuild the flat Documents and Images lists
+  desc: maintenance action, rebuild the Books lists and the flat Documents and Images lists
   user: core
   <source>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </source>
   <dest>
-    *: "Rescan Documents & Images"
+    *: "Rescan Books, Documents & Images"
   </dest>
   <voice>
-    *: "Rescan documents and images"
+    *: "Rescan books, documents and images"
   </voice>
 </phrase>
 <phrase>

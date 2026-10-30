@@ -2811,6 +2811,40 @@ static const struct button_mapping *tv_keymap(int context)
            ? get_context_mapping(CONTEXT_STD | CONTEXT_REMOTE) : tv_keys;
 }
 
+/* A box over a sideways page reads the wheel's four buttons as they stand
+ * on the turned page, each doing what the one in its place does upright:
+ * the top one Menu's, the foot PLAY's, the left |<<'s and the right >>|'s.
+ * Right hand turns MENU to the left and >>| to the top. Select and the
+ * wheel are the standard keymap's. */
+#define TV_SIDE_KEYS(top, foot, left, right)                       \
+    { ACTION_NONE,       top,                 BUTTON_NONE },       \
+    { ACTION_STD_MENU,   (top)|BUTTON_REL,    top },               \
+    { ACTION_NONE,       foot,                BUTTON_NONE },       \
+    { ACTION_TREE_WPS,   (foot)|BUTTON_REL,   foot },              \
+    { ACTION_NONE,       left,                BUTTON_NONE },       \
+    { ACTION_STD_CANCEL, (left)|BUTTON_REL,   left },              \
+    { ACTION_NONE,       right,               BUTTON_NONE },       \
+    { ACTION_STD_OK,     (right)|BUTTON_REL,  right },             \
+    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
+
+static const struct button_mapping tv_side_keys_right[] =
+{
+    TV_SIDE_KEYS(BUTTON_RIGHT, BUTTON_LEFT, BUTTON_MENU, BUTTON_PLAY)
+};
+
+static const struct button_mapping tv_side_keys_left[] =
+{
+    TV_SIDE_KEYS(BUTTON_LEFT, BUTTON_RIGHT, BUTTON_PLAY, BUTTON_MENU)
+};
+
+static const struct button_mapping *tv_side_keymap(int context)
+{
+    if (context & CONTEXT_REMOTE)
+        return get_context_mapping(CONTEXT_STD | CONTEXT_REMOTE);
+    return global_settings.text_viewer_orientation == TV_ORIENT_RIGHT
+           ? tv_side_keys_right : tv_side_keys_left;
+}
+
 enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_NOTES, TV_KEY_LEAVE,
               TV_KEY_USB };
 
@@ -3074,7 +3108,7 @@ static int tv_notes(void)
         {
             dialog_prose_show_in(str(LANG_TEXT_VIEWER_NOTES), tv_note_text,
                                  &tv_side_fb, LCD_HEIGHT, LCD_WIDTH,
-                                 tv_side_push);
+                                 tv_side_push, tv_side_keymap);
         }
         else
             dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES), tv_note_text);

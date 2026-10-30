@@ -2130,22 +2130,24 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_statusbar,
                   LANG_STATUS_BAR,
                   false, "album covers statusbar", NULL),
-    /* A theme sets these, and Appearance > Interface Elements shows them. Off
-     * unless asked for, because they make album rows grow to the tall height
-     * to fit a cover -- a theme whose list config doesn't draw the %La cover
-     * gets the tall rows with nothing in them. F_THEMERESET so a theme that
-     * says nothing gets them off rather than inheriting them from the last
-     * theme loaded. */
+    /* A theme sets these, and Appearance > Interface Elements shows them.
+     * They make rows grow to the tall height to fit a cover, so a theme whose
+     * list config doesn't draw the %La cover gets tall rows with nothing in
+     * them, and must say off in its .cfg. Album, audiobook and book covers are
+     * on unless it does: nearly every one has a cover. Artist and author
+     * photographs are off unless asked for, as few have one. F_THEMERESET so
+     * a theme that says nothing gets the defaults rather than inheriting from
+     * the last theme loaded. */
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_albumart, LANG_DB_ALBUM_ART,
-                  false, "database album art", NULL),
+                  true, "database album art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_artistart, LANG_DB_ARTIST_ART,
                   false, "database artist art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_bookart, LANG_DB_BOOK_ART,
-                  false, "database audiobook art", NULL),
+                  true, "database audiobook art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_authorart, LANG_DB_AUTHOR_ART,
                   false, "database author art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookart, LANG_DB_EBOOK_ART,
-                  false, "database book art", NULL),
+                  true, "database book art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookauthorart,
                   LANG_DB_EBOOK_AUTHOR_ART, false, "database book author art",
                   NULL),

@@ -307,7 +307,8 @@ static const struct dialog_callbacks prose_cb =
 static bool prose_run(const char *title, const char *body,
                       const char *accept_label, const char *cancel_label,
                       bool accept_default, struct frame_buffer_t *fb,
-                      int fb_w, int fb_h, void (*present)(void))
+                      int fb_w, int fb_h, void (*present)(void),
+                      const struct button_mapping *(*keymap)(int))
 {
     struct dialog d;
     struct prose p;
@@ -324,6 +325,7 @@ static bool prose_run(const char *title, const char *body,
     d.fb_w = fb_w;
     d.fb_h = fb_h;
     d.present = present;
+    d.keymap = keymap;
     if (global_settings.talk_menu)
     {
         if (title)
@@ -340,18 +342,20 @@ bool dialog_prose_confirm(const char *title, const char *body,
                           bool accept_default)
 {
     return prose_run(title, body, accept_label, cancel_label, accept_default,
-                     NULL, 0, 0, NULL);
+                     NULL, 0, 0, NULL, NULL);
 }
 
 void dialog_prose_show(const char *title, const char *body)
 {
-    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, NULL, 0, 0, NULL);
+    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, NULL, 0, 0, NULL,
+              NULL);
 }
 
 void dialog_prose_show_in(const char *title, const char *body,
                           struct frame_buffer_t *fb, int fb_w, int fb_h,
-                          void (*present)(void))
+                          void (*present)(void),
+                          const struct button_mapping *(*keymap)(int))
 {
     prose_run(title, body, str(LANG_DIAG_OK), NULL, true, fb, fb_w, fb_h,
-              present);
+              present, keymap);
 }

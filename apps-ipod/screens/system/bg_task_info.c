@@ -100,7 +100,7 @@ static void add_file_index_lines(void)
 
     file_index_counts(&docs, &images);
 
-    simplelist_addline("Documents & Images: %s", file_index_state());
+    simplelist_addline("Books, Documents & Images: %s", file_index_state());
 
     /* Zero until a pass has run this boot; the lists on disk may be older. */
     if (docs || images)

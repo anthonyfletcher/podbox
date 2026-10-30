@@ -322,7 +322,7 @@ below the table.
 | Update Database | Finds music added since the last scan. The fix for *my new album isn't showing up*. |
 | Update Index | Makes Album Covers lay out its covers afresh the next time it opens. |
 | Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned, and redoes those whose image was replaced or deleted. |
-| Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
+| Rescan Books, Documents & Images | Rebuilds the Books lists and the flat Documents and Images lists. Normally reruns itself after a USB session. |
 | Update Sound Analysis | Measures tracks the sound analysis has not covered, and retries any it could not read. Needs the charger, and holds the player while it runs. |
 | Rebuild Playback Report | Discards the report's saved figures, the track names it resolved and the moved folders it matched, so it reads the log and the database again. For names that still look wrong after a database update. |
 | Rebuild Database | Discards the database and reads every file again, keeping play counts and ratings. Slow. |
@@ -376,11 +376,11 @@ Separator set above zero.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
-| Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
-| Art Rows ▸ Book Art Rows | Draws each book's cover beside its row in the Books lists. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Book Art Rows | Draws each book's cover beside its row in the Books lists. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Book Author Art Rows | Draws a photograph beside each author in Books > By Author, from a folder.jpg in the author's folder: the one above a book's own folder when books are kept as author, book, file, or else the folder the book is in. | No |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 px | **Cfg** |
 | Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | Yes |  |
