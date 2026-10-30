@@ -26658,3 +26658,227 @@
     *: "本の著者行のアート"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCASTS
+  desc: the Podcasts menu, and its main-menu row
+  user: core
+  <source>
+    *: "Podcasts"
+  </source>
+  <dest>
+    *: "ポッドキャスト"
+  </dest>
+  <voice>
+    *: "ポッドキャスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ALL_EPISODES
+  desc: a row above the Podcasts list of shows: every episode of every show
+  user: core
+  <source>
+    *: "All Episodes"
+  </source>
+  <dest>
+    *: "すべてのエピソード"
+  </dest>
+  <voice>
+    *: "すべてのエピソード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_PODCASTS
+  desc: in Settings, keep podcasts apart from the music
+  user: core
+  <source>
+    *: "Segregate Podcasts"
+  </source>
+  <dest>
+    *: "ポッドキャストを分ける"
+  </dest>
+  <voice>
+    *: "ポッドキャストを分ける"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_PLAY_UNPLAYED
+  desc: the row heading a podcast's episodes: play those not finished, oldest first
+  user: core
+  <source>
+    *: "Play Unplayed"
+  </source>
+  <dest>
+    *: "未再生を再生"
+  </dest>
+  <voice>
+    *: "未再生を再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_PLAYED
+  desc: in a podcast episode's context menu: count it as heard
+  user: core
+  <source>
+    *: "Mark as Played"
+  </source>
+  <dest>
+    *: "再生済みにする"
+  </dest>
+  <voice>
+    *: "再生済みにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_UNPLAYED
+  desc: in a podcast episode's context menu: count it as not heard
+  user: core
+  <source>
+    *: "Mark as Unplayed"
+  </source>
+  <dest>
+    *: "未再生にする"
+  </dest>
+  <voice>
+    *: "未再生にする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_OLDER
+  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  user: core
+  <source>
+    *: "Mark Older as Played"
+  </source>
+  <dest>
+    *: "以前のエピソードを再生済みにする"
+  </dest>
+  <voice>
+    *: "以前のエピソードを再生済みにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_ALL
+  desc: in a podcast show's context menu: count every episode as heard
+  user: core
+  <source>
+    *: "Mark All as Played"
+  </source>
+  <dest>
+    *: "すべて再生済みにする"
+  </dest>
+  <voice>
+    *: "すべて再生済みにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_INFO
+  desc: in a podcast show's context menu: its details
+  user: core
+  <source>
+    *: "Show Info"
+  </source>
+  <dest>
+    *: "番組の情報"
+  </dest>
+  <voice>
+    *: "番組の情報"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_PODCAST_ART
+  desc: in Settings, art rows on the Podcasts lists
+  user: core
+  <source>
+    *: "Podcast Art Rows"
+  </source>
+  <dest>
+    *: "ポッドキャストのアート行"
+  </dest>
+  <voice>
+    *: "ポッドキャストのアート行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLL_BOX_SPEED
+  desc: in Settings, how fast a box of text scrolls upwards
+  user: core
+  <source>
+    *: "Vertical Scroll Speed"
+  </source>
+  <dest>
+    *: "縦スクロールの速度"
+  </dest>
+  <voice>
+    *: "縦スクロールの速度"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY
+  desc: in Settings, the order of the Podcasts list's shows
+  user: core
+  <source>
+    *: "Sort Shows By"
+  </source>
+  <dest>
+    *: "番組の並べ替え"
+  </dest>
+  <voice>
+    *: "番組の並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY_SHORT
+  desc: in Music > Sort: the row for LANG_SORT_SHOWS_BY
+  user: core
+  <source>
+    *: "Shows By"
+  </source>
+  <dest>
+    *: "番組の並び"
+  </dest>
+  <voice>
+    *: "番組の並び"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEWEST_EPISODE
+  desc: a choice of Shows By: the show with the newest episode first
+  user: core
+  <source>
+    *: "Newest Episode"
+  </source>
+  <dest>
+    *: "最新のエピソード"
+  </dest>
+  <voice>
+    *: "最新のエピソード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_PLAYED
+  desc: in a podcast show's context menu: delete the files of its finished episodes
+  user: core
+  <source>
+    *: "Delete Played Episodes"
+  </source>
+  <dest>
+    *: "再生済みエピソードを削除"
+  </dest>
+  <voice>
+    *: "再生済みエピソードを削除"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETED_N
+  desc: splash after Delete Played Episodes; %d is how many files went
+  user: core
+  <source>
+    *: "Episodes deleted: %d"
+  </source>
+  <dest>
+    *: "削除したエピソード：%d"
+  </dest>
+  <voice>
+    *: "削除したエピソード：%d"
+  </voice>
+</phrase>

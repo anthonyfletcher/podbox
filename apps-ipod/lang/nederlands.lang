@@ -26660,3 +26660,227 @@
     *: "Rijen met foto van boekauteur"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCASTS
+  desc: the Podcasts menu, and its main-menu row
+  user: core
+  <source>
+    *: "Podcasts"
+  </source>
+  <dest>
+    *: "Podcasts"
+  </dest>
+  <voice>
+    *: "Podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ALL_EPISODES
+  desc: a row above the Podcasts list of shows: every episode of every show
+  user: core
+  <source>
+    *: "All Episodes"
+  </source>
+  <dest>
+    *: "Alle afleveringen"
+  </dest>
+  <voice>
+    *: "Alle afleveringen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_PODCASTS
+  desc: in Settings, keep podcasts apart from the music
+  user: core
+  <source>
+    *: "Segregate Podcasts"
+  </source>
+  <dest>
+    *: "Podcasts apart houden"
+  </dest>
+  <voice>
+    *: "Podcasts apart houden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_PLAY_UNPLAYED
+  desc: the row heading a podcast's episodes: play those not finished, oldest first
+  user: core
+  <source>
+    *: "Play Unplayed"
+  </source>
+  <dest>
+    *: "Ongehoorde afspelen"
+  </dest>
+  <voice>
+    *: "Ongehoorde afspelen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_PLAYED
+  desc: in a podcast episode's context menu: count it as heard
+  user: core
+  <source>
+    *: "Mark as Played"
+  </source>
+  <dest>
+    *: "Markeren als beluisterd"
+  </dest>
+  <voice>
+    *: "Markeren als beluisterd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_UNPLAYED
+  desc: in a podcast episode's context menu: count it as not heard
+  user: core
+  <source>
+    *: "Mark as Unplayed"
+  </source>
+  <dest>
+    *: "Markeren als niet beluisterd"
+  </dest>
+  <voice>
+    *: "Markeren als niet beluisterd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_OLDER
+  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  user: core
+  <source>
+    *: "Mark Older as Played"
+  </source>
+  <dest>
+    *: "Oudere markeren als beluisterd"
+  </dest>
+  <voice>
+    *: "Oudere markeren als beluisterd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_ALL
+  desc: in a podcast show's context menu: count every episode as heard
+  user: core
+  <source>
+    *: "Mark All as Played"
+  </source>
+  <dest>
+    *: "Alles markeren als beluisterd"
+  </dest>
+  <voice>
+    *: "Alles markeren als beluisterd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_INFO
+  desc: in a podcast show's context menu: its details
+  user: core
+  <source>
+    *: "Show Info"
+  </source>
+  <dest>
+    *: "Programma-info"
+  </dest>
+  <voice>
+    *: "Programma-info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_PODCAST_ART
+  desc: in Settings, art rows on the Podcasts lists
+  user: core
+  <source>
+    *: "Podcast Art Rows"
+  </source>
+  <dest>
+    *: "Rijen met afbeelding: podcasts"
+  </dest>
+  <voice>
+    *: "Rijen met afbeelding: podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLL_BOX_SPEED
+  desc: in Settings, how fast a box of text scrolls upwards
+  user: core
+  <source>
+    *: "Vertical Scroll Speed"
+  </source>
+  <dest>
+    *: "Verticale scrollsnelheid"
+  </dest>
+  <voice>
+    *: "Verticale scrollsnelheid"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY
+  desc: in Settings, the order of the Podcasts list's shows
+  user: core
+  <source>
+    *: "Sort Shows By"
+  </source>
+  <dest>
+    *: "Programma's sorteren op"
+  </dest>
+  <voice>
+    *: "Programma's sorteren op"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY_SHORT
+  desc: in Music > Sort: the row for LANG_SORT_SHOWS_BY
+  user: core
+  <source>
+    *: "Shows By"
+  </source>
+  <dest>
+    *: "Programma's op"
+  </dest>
+  <voice>
+    *: "Programma's op"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEWEST_EPISODE
+  desc: a choice of Shows By: the show with the newest episode first
+  user: core
+  <source>
+    *: "Newest Episode"
+  </source>
+  <dest>
+    *: "Nieuwste aflevering"
+  </dest>
+  <voice>
+    *: "Nieuwste aflevering"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_PLAYED
+  desc: in a podcast show's context menu: delete the files of its finished episodes
+  user: core
+  <source>
+    *: "Delete Played Episodes"
+  </source>
+  <dest>
+    *: "Beluisterde afleveringen wissen"
+  </dest>
+  <voice>
+    *: "Beluisterde afleveringen wissen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETED_N
+  desc: splash after Delete Played Episodes; %d is how many files went
+  user: core
+  <source>
+    *: "Episodes deleted: %d"
+  </source>
+  <dest>
+    *: "Afleveringen gewist: %d"
+  </dest>
+  <voice>
+    *: "Afleveringen gewist: %d"
+  </voice>
+</phrase>

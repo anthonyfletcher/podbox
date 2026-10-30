@@ -26653,3 +26653,227 @@
     *: "Linhas com Foto: Autores de Livros"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCASTS
+  desc: the Podcasts menu, and its main-menu row
+  user: core
+  <source>
+    *: "Podcasts"
+  </source>
+  <dest>
+    *: "Podcasts"
+  </dest>
+  <voice>
+    *: "Podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ALL_EPISODES
+  desc: a row above the Podcasts list of shows: every episode of every show
+  user: core
+  <source>
+    *: "All Episodes"
+  </source>
+  <dest>
+    *: "Todos os Episódios"
+  </dest>
+  <voice>
+    *: "Todos os Episódios"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_PODCASTS
+  desc: in Settings, keep podcasts apart from the music
+  user: core
+  <source>
+    *: "Segregate Podcasts"
+  </source>
+  <dest>
+    *: "Separar os Podcasts"
+  </dest>
+  <voice>
+    *: "Separar os Podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_PLAY_UNPLAYED
+  desc: the row heading a podcast's episodes: play those not finished, oldest first
+  user: core
+  <source>
+    *: "Play Unplayed"
+  </source>
+  <dest>
+    *: "Tocar Não Ouvidos"
+  </dest>
+  <voice>
+    *: "Tocar Não Ouvidos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_PLAYED
+  desc: in a podcast episode's context menu: count it as heard
+  user: core
+  <source>
+    *: "Mark as Played"
+  </source>
+  <dest>
+    *: "Marcar como Ouvido"
+  </dest>
+  <voice>
+    *: "Marcar como Ouvido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_UNPLAYED
+  desc: in a podcast episode's context menu: count it as not heard
+  user: core
+  <source>
+    *: "Mark as Unplayed"
+  </source>
+  <dest>
+    *: "Marcar como Não Ouvido"
+  </dest>
+  <voice>
+    *: "Marcar como Não Ouvido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_OLDER
+  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  user: core
+  <source>
+    *: "Mark Older as Played"
+  </source>
+  <dest>
+    *: "Marcar Anteriores como Ouvidos"
+  </dest>
+  <voice>
+    *: "Marcar Anteriores como Ouvidos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_ALL
+  desc: in a podcast show's context menu: count every episode as heard
+  user: core
+  <source>
+    *: "Mark All as Played"
+  </source>
+  <dest>
+    *: "Marcar Todos como Ouvidos"
+  </dest>
+  <voice>
+    *: "Marcar Todos como Ouvidos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_INFO
+  desc: in a podcast show's context menu: its details
+  user: core
+  <source>
+    *: "Show Info"
+  </source>
+  <dest>
+    *: "Informações do Programa"
+  </dest>
+  <voice>
+    *: "Informações do Programa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_PODCAST_ART
+  desc: in Settings, art rows on the Podcasts lists
+  user: core
+  <source>
+    *: "Podcast Art Rows"
+  </source>
+  <dest>
+    *: "Linhas com Arte: Podcasts"
+  </dest>
+  <voice>
+    *: "Linhas com Arte: Podcasts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLL_BOX_SPEED
+  desc: in Settings, how fast a box of text scrolls upwards
+  user: core
+  <source>
+    *: "Vertical Scroll Speed"
+  </source>
+  <dest>
+    *: "Velocidade de Rolagem Vertical"
+  </dest>
+  <voice>
+    *: "Velocidade de Rolagem Vertical"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY
+  desc: in Settings, the order of the Podcasts list's shows
+  user: core
+  <source>
+    *: "Sort Shows By"
+  </source>
+  <dest>
+    *: "Ordenar Programas por"
+  </dest>
+  <voice>
+    *: "Ordenar Programas por"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SHOWS_BY_SHORT
+  desc: in Music > Sort: the row for LANG_SORT_SHOWS_BY
+  user: core
+  <source>
+    *: "Shows By"
+  </source>
+  <dest>
+    *: "Programas por"
+  </dest>
+  <voice>
+    *: "Programas por"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEWEST_EPISODE
+  desc: a choice of Shows By: the show with the newest episode first
+  user: core
+  <source>
+    *: "Newest Episode"
+  </source>
+  <dest>
+    *: "Episódio Mais Recente"
+  </dest>
+  <voice>
+    *: "Episódio Mais Recente"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_PLAYED
+  desc: in a podcast show's context menu: delete the files of its finished episodes
+  user: core
+  <source>
+    *: "Delete Played Episodes"
+  </source>
+  <dest>
+    *: "Apagar Episódios Ouvidos"
+  </dest>
+  <voice>
+    *: "Apagar Episódios Ouvidos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETED_N
+  desc: splash after Delete Played Episodes; %d is how many files went
+  user: core
+  <source>
+    *: "Episodes deleted: %d"
+  </source>
+  <dest>
+    *: "Episódios apagados: %d"
+  </dest>
+  <voice>
+    *: "Episódios apagados: %d"
+  </voice>
+</phrase>
