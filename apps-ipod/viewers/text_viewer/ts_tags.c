@@ -672,6 +672,12 @@ static int tg_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
         rc = fill(s);
         if (rc != BS_OK) return rc;
         if (s->ipos >= s->ilen) {           /* end of input */
+            /* A first part with no text is the cover page, however the
+             * reader reaches the part after it */
+            if (s->cover_due) {
+                cover_first(s, 0);
+                continue;
+            }
             done += take(s, buf + done, n - done);
             break;
         }
