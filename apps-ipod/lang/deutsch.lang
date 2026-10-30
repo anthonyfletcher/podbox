@@ -19625,16 +19625,16 @@
 </phrase>
 <phrase>
   id: LANG_DB_SEARCH_ORDER
-  desc: General Settings > Search: which kind of result is listed first
+  desc: Library > Search: which kind of result Music's search lists first
   user: core
   <source>
-    *: "Result Order"
+    *: "Music Order"
   </source>
   <dest>
-    *: "Reihenfolge der Treffer"
+    *: "Musik-Reihenfolge"
   </dest>
   <voice>
-    *: "Reihenfolge der Treffer"
+    *: "Musik-Reihenfolge"
   </voice>
 </phrase>
 <phrase>
@@ -26892,5 +26892,243 @@
   </dest>
   <voice>
     *: "Folgen gelöscht: %d"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_SEARCH_ORDER
+  desc: Library > Search: which kind of result Audiobooks' search lists first
+  user: core
+  <source>
+    *: "Audiobook Order"
+  </source>
+  <dest>
+    *: "Hörbuch-Reihenfolge"
+  </dest>
+  <voice>
+    *: "Hörbuch-Reihenfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_SEARCH_ORDER
+  desc: Library > Search: which kind of result Podcasts' search lists first
+  user: core
+  <source>
+    *: "Podcast Order"
+  </source>
+  <dest>
+    *: "Podcast-Reihenfolge"
+  </dest>
+  <voice>
+    *: "Podcast-Reihenfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SEARCH_ORDER
+  desc: Library > Search: whether Books' search lists titles or authors first
+  user: core
+  <source>
+    *: "Book Order"
+  </source>
+  <dest>
+    *: "Buch-Reihenfolge"
+  </dest>
+  <voice>
+    *: "Buch-Reihenfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_BOOK_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Books, Authors"
+  </source>
+  <dest>
+    *: "Kapitel, Bücher, Autoren"
+  </dest>
+  <voice>
+    *: "Kapitel, Bücher, Autoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_AUTHOR_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Authors, Books"
+  </source>
+  <dest>
+    *: "Kapitel, Autoren, Bücher"
+  </dest>
+  <voice>
+    *: "Kapitel, Autoren, Bücher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_CHAPTER_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Chapters, Authors"
+  </source>
+  <dest>
+    *: "Bücher, Kapitel, Autoren"
+  </dest>
+  <voice>
+    *: "Bücher, Kapitel, Autoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_AUTHOR_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Authors, Chapters"
+  </source>
+  <dest>
+    *: "Bücher, Autoren, Kapitel"
+  </dest>
+  <voice>
+    *: "Bücher, Autoren, Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_BOOK_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Books, Chapters"
+  </source>
+  <dest>
+    *: "Autoren, Bücher, Kapitel"
+  </dest>
+  <voice>
+    *: "Autoren, Bücher, Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_CHAPTER_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Chapters, Books"
+  </source>
+  <dest>
+    *: "Autoren, Kapitel, Bücher"
+  </dest>
+  <voice>
+    *: "Autoren, Kapitel, Bücher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Shows, Hosts"
+  </source>
+  <dest>
+    *: "Folgen, Sendungen, Moderatoren"
+  </dest>
+  <voice>
+    *: "Folgen, Sendungen, Moderatoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Hosts, Shows"
+  </source>
+  <dest>
+    *: "Folgen, Moderatoren, Sendungen"
+  </dest>
+  <voice>
+    *: "Folgen, Moderatoren, Sendungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Episodes, Hosts"
+  </source>
+  <dest>
+    *: "Sendungen, Folgen, Moderatoren"
+  </dest>
+  <voice>
+    *: "Sendungen, Folgen, Moderatoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Hosts, Episodes"
+  </source>
+  <dest>
+    *: "Sendungen, Moderatoren, Folgen"
+  </dest>
+  <voice>
+    *: "Sendungen, Moderatoren, Folgen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Shows, Episodes"
+  </source>
+  <dest>
+    *: "Moderatoren, Sendungen, Folgen"
+  </dest>
+  <voice>
+    *: "Moderatoren, Sendungen, Folgen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Episodes, Shows"
+  </source>
+  <dest>
+    *: "Moderatoren, Folgen, Sendungen"
+  </dest>
+  <voice>
+    *: "Moderatoren, Folgen, Sendungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_TITLES_AUTHORS
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Titles, Authors"
+  </source>
+  <dest>
+    *: "Titel, Autoren"
+  </dest>
+  <voice>
+    *: "Titel, Autoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHORS_TITLES
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Authors, Titles"
+  </source>
+  <dest>
+    *: "Autoren, Titel"
+  </dest>
+  <voice>
+    *: "Autoren, Titel"
   </voice>
 </phrase>

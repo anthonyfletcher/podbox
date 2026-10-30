@@ -19614,16 +19614,16 @@
 </phrase>
 <phrase>
   id: LANG_DB_SEARCH_ORDER
-  desc: General Settings > Search: which kind of result is listed first
+  desc: Library > Search: which kind of result Music's search lists first
   user: core
   <source>
-    *: "Result Order"
+    *: "Music Order"
   </source>
   <dest>
-    *: "Träffordning"
+    *: "Musikordning"
   </dest>
   <voice>
-    *: "Träffordning"
+    *: "Musikordning"
   </voice>
 </phrase>
 <phrase>
@@ -26881,5 +26881,243 @@
   </dest>
   <voice>
     *: "Avsnitt raderade: %d"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_SEARCH_ORDER
+  desc: Library > Search: which kind of result Audiobooks' search lists first
+  user: core
+  <source>
+    *: "Audiobook Order"
+  </source>
+  <dest>
+    *: "Ljudboksordning"
+  </dest>
+  <voice>
+    *: "Ljudboksordning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_SEARCH_ORDER
+  desc: Library > Search: which kind of result Podcasts' search lists first
+  user: core
+  <source>
+    *: "Podcast Order"
+  </source>
+  <dest>
+    *: "Poddordning"
+  </dest>
+  <voice>
+    *: "Poddordning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SEARCH_ORDER
+  desc: Library > Search: whether Books' search lists titles or authors first
+  user: core
+  <source>
+    *: "Book Order"
+  </source>
+  <dest>
+    *: "Bokordning"
+  </dest>
+  <voice>
+    *: "Bokordning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_BOOK_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Books, Authors"
+  </source>
+  <dest>
+    *: "Kapitel, Böcker, Författare"
+  </dest>
+  <voice>
+    *: "Kapitel, Böcker, Författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_AUTHOR_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Authors, Books"
+  </source>
+  <dest>
+    *: "Kapitel, Författare, Böcker"
+  </dest>
+  <voice>
+    *: "Kapitel, Författare, Böcker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_CHAPTER_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Chapters, Authors"
+  </source>
+  <dest>
+    *: "Böcker, Kapitel, Författare"
+  </dest>
+  <voice>
+    *: "Böcker, Kapitel, Författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_AUTHOR_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Authors, Chapters"
+  </source>
+  <dest>
+    *: "Böcker, Författare, Kapitel"
+  </dest>
+  <voice>
+    *: "Böcker, Författare, Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_BOOK_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Books, Chapters"
+  </source>
+  <dest>
+    *: "Författare, Böcker, Kapitel"
+  </dest>
+  <voice>
+    *: "Författare, Böcker, Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_CHAPTER_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Chapters, Books"
+  </source>
+  <dest>
+    *: "Författare, Kapitel, Böcker"
+  </dest>
+  <voice>
+    *: "Författare, Kapitel, Böcker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Shows, Hosts"
+  </source>
+  <dest>
+    *: "Avsnitt, Program, Värdar"
+  </dest>
+  <voice>
+    *: "Avsnitt, Program, Värdar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Hosts, Shows"
+  </source>
+  <dest>
+    *: "Avsnitt, Värdar, Program"
+  </dest>
+  <voice>
+    *: "Avsnitt, Värdar, Program"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Episodes, Hosts"
+  </source>
+  <dest>
+    *: "Program, Avsnitt, Värdar"
+  </dest>
+  <voice>
+    *: "Program, Avsnitt, Värdar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Hosts, Episodes"
+  </source>
+  <dest>
+    *: "Program, Värdar, Avsnitt"
+  </dest>
+  <voice>
+    *: "Program, Värdar, Avsnitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Shows, Episodes"
+  </source>
+  <dest>
+    *: "Värdar, Program, Avsnitt"
+  </dest>
+  <voice>
+    *: "Värdar, Program, Avsnitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Episodes, Shows"
+  </source>
+  <dest>
+    *: "Värdar, Avsnitt, Program"
+  </dest>
+  <voice>
+    *: "Värdar, Avsnitt, Program"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_TITLES_AUTHORS
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Titles, Authors"
+  </source>
+  <dest>
+    *: "Titlar, Författare"
+  </dest>
+  <voice>
+    *: "Titlar, Författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHORS_TITLES
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Authors, Titles"
+  </source>
+  <dest>
+    *: "Författare, Titlar"
+  </dest>
+  <voice>
+    *: "Författare, Titlar"
   </voice>
 </phrase>

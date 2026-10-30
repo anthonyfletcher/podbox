@@ -19613,16 +19613,16 @@
 </phrase>
 <phrase>
   id: LANG_DB_SEARCH_ORDER
-  desc: General Settings > Search: which kind of result is listed first
+  desc: Library > Search: which kind of result Music's search lists first
   user: core
   <source>
-    *: "Result Order"
+    *: "Music Order"
   </source>
   <dest>
-    *: "結果の順序"
+    *: "音楽の順序"
   </dest>
   <voice>
-    *: "結果の順序"
+    *: "音楽の順序"
   </voice>
 </phrase>
 <phrase>
@@ -26880,5 +26880,243 @@
   </dest>
   <voice>
     *: "削除したエピソード：%d"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_SEARCH_ORDER
+  desc: Library > Search: which kind of result Audiobooks' search lists first
+  user: core
+  <source>
+    *: "Audiobook Order"
+  </source>
+  <dest>
+    *: "オーディオブックの順序"
+  </dest>
+  <voice>
+    *: "オーディオブックの順序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_SEARCH_ORDER
+  desc: Library > Search: which kind of result Podcasts' search lists first
+  user: core
+  <source>
+    *: "Podcast Order"
+  </source>
+  <dest>
+    *: "ポッドキャストの順序"
+  </dest>
+  <voice>
+    *: "ポッドキャストの順序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SEARCH_ORDER
+  desc: Library > Search: whether Books' search lists titles or authors first
+  user: core
+  <source>
+    *: "Book Order"
+  </source>
+  <dest>
+    *: "本の順序"
+  </dest>
+  <voice>
+    *: "本の順序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_BOOK_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Books, Authors"
+  </source>
+  <dest>
+    *: "章, 本, 著者"
+  </dest>
+  <voice>
+    *: "章, 本, 著者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_CHAPTER_AUTHOR_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Chapters, Authors, Books"
+  </source>
+  <dest>
+    *: "章, 著者, 本"
+  </dest>
+  <voice>
+    *: "章, 著者, 本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_CHAPTER_AUTHOR
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Chapters, Authors"
+  </source>
+  <dest>
+    *: "本, 章, 著者"
+  </dest>
+  <voice>
+    *: "本, 章, 著者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_BOOK_AUTHOR_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Books, Authors, Chapters"
+  </source>
+  <dest>
+    *: "本, 著者, 章"
+  </dest>
+  <voice>
+    *: "本, 著者, 章"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_BOOK_CHAPTER
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Books, Chapters"
+  </source>
+  <dest>
+    *: "著者, 本, 章"
+  </dest>
+  <voice>
+    *: "著者, 本, 章"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHOR_CHAPTER_BOOK
+  desc: a choice of Audiobook Order
+  user: core
+  <source>
+    *: "Authors, Chapters, Books"
+  </source>
+  <dest>
+    *: "著者, 章, 本"
+  </dest>
+  <voice>
+    *: "著者, 章, 本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Shows, Hosts"
+  </source>
+  <dest>
+    *: "エピソード, 番組, ホスト"
+  </dest>
+  <voice>
+    *: "エピソード, 番組, ホスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Episodes, Hosts, Shows"
+  </source>
+  <dest>
+    *: "エピソード, ホスト, 番組"
+  </dest>
+  <voice>
+    *: "エピソード, ホスト, 番組"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Episodes, Hosts"
+  </source>
+  <dest>
+    *: "番組, エピソード, ホスト"
+  </dest>
+  <voice>
+    *: "番組, エピソード, ホスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Shows, Hosts, Episodes"
+  </source>
+  <dest>
+    *: "番組, ホスト, エピソード"
+  </dest>
+  <voice>
+    *: "番組, ホスト, エピソード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Shows, Episodes"
+  </source>
+  <dest>
+    *: "ホスト, 番組, エピソード"
+  </dest>
+  <voice>
+    *: "ホスト, 番組, エピソード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
+  desc: a choice of Podcast Order
+  user: core
+  <source>
+    *: "Hosts, Episodes, Shows"
+  </source>
+  <dest>
+    *: "ホスト, エピソード, 番組"
+  </dest>
+  <voice>
+    *: "ホスト, エピソード, 番組"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_TITLES_AUTHORS
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Titles, Authors"
+  </source>
+  <dest>
+    *: "タイトル, 著者"
+  </dest>
+  <voice>
+    *: "タイトル, 著者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_ORDER_AUTHORS_TITLES
+  desc: a choice of Book Order
+  user: core
+  <source>
+    *: "Authors, Titles"
+  </source>
+  <dest>
+    *: "著者, タイトル"
+  </dest>
+  <voice>
+    *: "著者, タイトル"
   </voice>
 </phrase>
