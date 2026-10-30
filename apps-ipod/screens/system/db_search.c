@@ -80,12 +80,12 @@ static const int search_tags[DB_SEARCH_ORDER_COUNT][3] = {
 /* Both count settings are indices into evenly spaced choice lists, so the
  * value is arithmetic rather than a second table to hold in step with
  * settings_list.c. */
-static int setting_max_rows(void)
+int db_search_max_results(void)
 {
     return 25 * (global_settings.db_search_max_rows + 1);
 }
 
-static int setting_min_letters(void)
+int db_search_min_letters(void)
 {
     return global_settings.db_search_min_letters + 1;
 }
@@ -223,7 +223,11 @@ static int run_search(const char *query, void *ctx)
 {
     char buf[TAGCACHE_BUFSZ];
     struct tagcache_search tcs;
-    const int *tags = search_tags[global_settings.db_search_order];
+    const int *tags = search_tags[active_scope == DB_SEARCH_SPOKEN
+                                  ? global_settings.audiobook_search_order
+                                  : active_scope == DB_SEARCH_PODCAST
+                                  ? global_settings.podcast_search_order
+                                  : global_settings.db_search_order];
     unsigned int i;
 
     (void)ctx;
@@ -233,13 +237,13 @@ static int run_search(const char *query, void *ctx)
 
     /* The setting is a second, lower ceiling; MAX_MATCHES and NAME_ARENA stay
      * the hard array bounds, so no setting can overrun them. */
-    row_limit = MIN(setting_max_rows(), MAX_MATCHES);
+    row_limit = MIN(db_search_max_results(), MAX_MATCHES);
 
     /* Too short to bother with -- and, since the threshold is at least one
      * letter, this is also the empty-query case. Everything above is already
      * cleared, so a query backspaced below the threshold empties the results
      * rather than leaving the last scan's on screen. */
-    if ((int)strlen(query) < setting_min_letters())
+    if ((int)strlen(query) < db_search_min_letters())
         return 0;
 
     for (i = 0; i < ARRAYLEN(search_tags[0]); i++)

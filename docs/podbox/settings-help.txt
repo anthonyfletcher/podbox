@@ -701,15 +701,27 @@ Lines wait in memory until the disk is about to sleep, so a crash can lose the
 last few. Switches itself off after the time set in Switch Off After.
 
 [search max rows]
-How many results a search keeps. More results take longer to scroll than to
-find; another letter is usually quicker.
+How many results a search keeps, in Music, Audiobooks, Podcasts and Books.
+More results take longer to scroll than to find; another letter is usually
+quicker.
 
 [search min letters]
-How many letters must be typed before searching starts. Raise it if
-one-letter searches return more than they are worth.
+How many letters must be typed before searching starts, in Music,
+Audiobooks, Podcasts and Books. Raise it if one-letter searches return more
+than they are worth.
 
 [search order]
-Which of tracks, albums and artists is listed first in search results.
+Which of tracks, albums and artists Music's search lists first.
+
+[search order audiobooks]
+Which of chapters, books and authors Audiobooks' search lists first.
+
+[search order podcasts]
+Which of episodes, shows and hosts Podcasts' search lists first. A host is
+the album artist, which for most podcasts is the network.
+
+[search order books]
+Whether Books' search lists matching titles or matching authors first.
 
 [quiz title]
 Music Quiz rounds that play a clip and ask which track it is.

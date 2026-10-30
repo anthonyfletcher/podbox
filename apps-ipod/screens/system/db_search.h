@@ -20,6 +20,10 @@ enum db_search_scope {
 
 void db_search_arm_scope(int scope);
 
+/* Library > Search's limits, which the Books search keeps too */
+int db_search_max_results(void);
+int db_search_min_letters(void);
+
 int db_search_run(void);
 
 #endif /* _DB_SEARCH_H */

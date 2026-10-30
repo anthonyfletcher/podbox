@@ -1018,15 +1018,20 @@ MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
 
 
 
-/* The text search over the database (screens/system/db_search.c). Its own
- * submenu rather than rows under Music, because all three shape one screen --
- * and nested under Music, since searching is one of the ways in to it. */
+/* The search boxes over the library: Music's, Audiobooks', Podcasts' and
+ * Books'. One set of limits for all four, and an order for each. */
 MENUITEM_SETTING(db_search_max_rows, &global_settings.db_search_max_rows, NULL);
 MENUITEM_SETTING(db_search_min_letters,
                  &global_settings.db_search_min_letters, NULL);
 MENUITEM_SETTING(db_search_order, &global_settings.db_search_order, NULL);
+MENUITEM_SETTING(audiobook_search_order,
+                 &global_settings.audiobook_search_order, NULL);
+MENUITEM_SETTING(podcast_search_order,
+                 &global_settings.podcast_search_order, NULL);
+MENUITEM_SETTING(book_search_order, &global_settings.book_search_order, NULL);
 MAKE_MENU(search_menu, ID2P(LANG_DB_SEARCH), 0, Icon_NOICON,
-          &db_search_max_rows, &db_search_min_letters, &db_search_order
+          &db_search_max_rows, &db_search_min_letters, &db_search_order,
+          &audiobook_search_order, &podcast_search_order, &book_search_order
           );
 
 /* How the Music browser presents what the database holds -- as against the
@@ -1152,7 +1157,7 @@ MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
           &album_show_year,
           &featured_artists, &segregate_audiobooks, &segregate_podcasts,
-          &search_menu, &quiz_menu,
+          &quiz_menu,
           &music_appearance_menu    /* theme_settings.c */
           );
 
@@ -1186,6 +1191,7 @@ MAKE_MENU(language_menu, ID2P(LANG_LANGUAGE_AND_TEXT), 0, Icon_Language,
 MAKE_MENU(library_menu, ID2P(LANG_LIBRARY), 0, Icon_Playlist,
           &file_menu,
           &music_menu,
+          &search_menu,
           &album_covers_menu,
           &tagcache_menu,
           &art_cache_menu,

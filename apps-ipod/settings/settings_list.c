@@ -1686,6 +1686,39 @@ const struct settings_list settings[] = {
                    ID2P(LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK),
                    ID2P(LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK),
                    ID2P(LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM)),
+    /* The same orders in the same cfg words: track, album and artist are a
+     * chapter, a book and an author, or an episode, a show and a host */
+    CHOICE_SETTING(F_BANFROMQS, audiobook_search_order,
+                   LANG_AUDIOBOOK_SEARCH_ORDER,
+                   DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK, "search order audiobooks",
+                   "track album artist,track artist album,"
+                   "album track artist,album artist track,"
+                   "artist album track,artist track album",
+                   NULL, DB_SEARCH_ORDER_COUNT,
+                   ID2P(LANG_SEARCH_ORDER_CHAPTER_BOOK_AUTHOR),
+                   ID2P(LANG_SEARCH_ORDER_CHAPTER_AUTHOR_BOOK),
+                   ID2P(LANG_SEARCH_ORDER_BOOK_CHAPTER_AUTHOR),
+                   ID2P(LANG_SEARCH_ORDER_BOOK_AUTHOR_CHAPTER),
+                   ID2P(LANG_SEARCH_ORDER_AUTHOR_BOOK_CHAPTER),
+                   ID2P(LANG_SEARCH_ORDER_AUTHOR_CHAPTER_BOOK)),
+    CHOICE_SETTING(F_BANFROMQS, podcast_search_order,
+                   LANG_PODCAST_SEARCH_ORDER,
+                   DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST, "search order podcasts",
+                   "track album artist,track artist album,"
+                   "album track artist,album artist track,"
+                   "artist album track,artist track album",
+                   NULL, DB_SEARCH_ORDER_COUNT,
+                   ID2P(LANG_SEARCH_ORDER_EPISODE_SHOW_HOST),
+                   ID2P(LANG_SEARCH_ORDER_EPISODE_HOST_SHOW),
+                   ID2P(LANG_SEARCH_ORDER_SHOW_EPISODE_HOST),
+                   ID2P(LANG_SEARCH_ORDER_SHOW_HOST_EPISODE),
+                   ID2P(LANG_SEARCH_ORDER_HOST_SHOW_EPISODE),
+                   ID2P(LANG_SEARCH_ORDER_HOST_EPISODE_SHOW)),
+    CHOICE_SETTING(F_BANFROMQS, book_search_order, LANG_BOOK_SEARCH_ORDER,
+                   BOOK_SEARCH_TITLES_FIRST, "search order books",
+                   "titles,authors", NULL, 2,
+                   ID2P(LANG_SEARCH_ORDER_TITLES_AUTHORS),
+                   ID2P(LANG_SEARCH_ORDER_AUTHORS_TITLES)),
     CHOICE_SETTING(F_TEMPVAR, default_codepage, LANG_DEFAULT_CODEPAGE, 14,
                    "default codepage",
                    /* The order must match with that in unicode.c */

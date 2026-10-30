@@ -248,6 +248,11 @@ enum
     DB_SEARCH_ORDER_COUNT
 };
 
+enum {
+    BOOK_SEARCH_TITLES_FIRST = 0,
+    BOOK_SEARCH_AUTHORS_FIRST,
+};
+
 /* dir filter options */
 /* Note: Any new filter modes need to be added before NUM_FILTER_MODES.
  *       Any new rockbox browse filter modes (accessible through the menu)
@@ -627,7 +632,10 @@ struct user_settings
      * lists, not the values themselves. */
     int db_search_max_rows;      /* 0..7 -> 25..200 results, in steps of 25 */
     int db_search_min_letters;   /* 0..2 -> 1..3 letters before a scan runs */
-    int db_search_order;         /* DB_SEARCH_ORDER_* */
+    int db_search_order;         /* DB_SEARCH_ORDER_*, for music */
+    int audiobook_search_order;  /* the same, for Audiobooks' Search */
+    int podcast_search_order;    /* the same, for Podcasts' Search */
+    int book_search_order;       /* BOOK_SEARCH_*: titles or authors first */
     /* Read guest credits ("feat. X") out of titles and per-track artists, so
      * the browser can list them. Off, the table is never built. */
     bool featured_artists;

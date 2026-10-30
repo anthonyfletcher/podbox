@@ -39,6 +39,7 @@
 #include "widgets/search_dialog.h"
 #include "widgets/splash.h"
 #include "settings/settings.h"
+#include "screens/system/db_search.h"  /* the search limits */
 #include "system/activity.h"
 #include "system/app_buffer.h"
 #include "files/book_index.h"
@@ -727,10 +728,13 @@ static int compare_search_authors(const void *a, const void *b)
 
 static int search_scan(const char *query, void *ctx)
 {
-    int authors, k;
+    int authors, k, n;
+    int most = db_search_max_results();
     (void)ctx;
 
     row_ct = 0;
+    if ((int)strlen(query) < db_search_min_letters())
+        return 0;
     for (int i = 0; query[0] && i < book_ct; i++)
     {
         const char *a = names + books[i].author;
@@ -749,7 +753,21 @@ static int search_scan(const char *query, void *ctx)
         if (strcasestr(names + books[i].title, query))
             rows[row_ct++] = i;
     qsort(rows + authors, row_ct - authors, sizeof(*rows), compare_rows);
-    return row_ct;
+
+    /* Book Order: the titles first, by moving the authors after them */
+    if (global_settings.book_search_order == BOOK_SEARCH_TITLES_FIRST
+        && authors > 0)
+    {
+        for (k = 0; k < authors; k++)
+        {
+            int a = rows[0];
+
+            memmove(rows, rows + 1, (row_ct - 1) * sizeof(*rows));
+            rows[row_ct - 1] = a;
+        }
+    }
+    n = MIN(row_ct, most);
+    return n;
 }
 
 static const char *search_row(int i, void *ctx)

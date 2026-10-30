@@ -227,9 +227,6 @@ Settings
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | No |  |
 | Segregate Audiobooks | Keeps audiobooks out of the music and gives them an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "speech" and the like. Podcasts have their own setting. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | No |  |
 | Segregate Podcasts | Keeps podcasts out of the music and gives them a Podcasts row on the main menu, listing each show with its newest episode first. A podcast is a track whose genre is exactly "Podcast" or "Podcasts". Off, podcasts are music. | No |  |
-| Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
-| Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
-| Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | Tracks, Albums, Artists |  |
 | Quiz Questions ▸ Name the Track | Music Quiz rounds that play a clip and ask which track it is. | Yes |  |
 | Quiz Questions ▸ Name the Artist | Music Quiz rounds that play a clip and ask who it is by. The wrong answers are artists that sound alike, or share the genre and decade, as the game goes on. | Yes |  |
 | Quiz Questions ▸ Name the Album | Music Quiz rounds that play a clip and ask which album it is from. In the later rounds the wrong answers are the same artist's other albums. | Yes |  |
@@ -265,6 +262,17 @@ while a book plays, and a book with bookmarks has a Bookmarks row there and in
 its own menu: choosing one plays the book from that place. A list with no books in it has no row. The
 Audiobooks lists have no <All Tracks> or <Random> rows.
 
+
+### Library — Search
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Maximum Results | How many results a search keeps, in Music, Audiobooks, Podcasts and Books. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
+| Minimum Letters | How many letters must be typed before searching starts, in Music, Audiobooks, Podcasts and Books. Raise it if one-letter searches return more than they are worth. | 1 |  |
+| Music Order | Which of tracks, albums and artists Music's search lists first. | Tracks, Albums, Artists |  |
+| Audiobook Order | Which of chapters, books and authors Audiobooks' search lists first. | Books, Authors, Chapters |  |
+| Podcast Order | Which of episodes, shows and hosts Podcasts' search lists first. A host is the album artist, which for most podcasts is the network. | Episodes, Shows, Hosts |  |
+| Book Order | Whether Books' search lists matching titles or matching authors first. | Titles, Authors |  |
 
 ### Library — Carousel
 
