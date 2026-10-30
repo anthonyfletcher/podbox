@@ -573,6 +573,8 @@ void dialog_init(struct dialog *d, int context, const char *title,
     d->title = title;
     d->style = style ? *style : *dialog_get_default_style();
     d->backlight_on = true;
+    d->fb = NULL;
+    d->present = NULL;
 }
 
 /* Frame + draw the dialog on one screen. The theme parent viewport supplies the
@@ -587,6 +589,15 @@ static void dialog_draw_one(struct dialog *d, struct screen *s, int screen_nr)
 
     if (d->style.box_font != DIALOG_FONT_INHERIT)
         parent.font = d->style.box_font;
+    if (d->fb)
+    {
+        /* the shadow is drawn on the screen, outside the box's buffer */
+        d->style.box_shadow_offset = 0;
+        parent.buffer = d->fb;
+        parent.x = parent.y = 0;
+        parent.width = d->fb_w;
+        parent.height = d->fb_h;
+    }
 
     /* measure() runs with the parent active, so its text metrics see the font
      * the box will actually be drawn in */
@@ -601,8 +612,11 @@ static void dialog_draw_one(struct dialog *d, struct screen *s, int screen_nr)
     d->cb->draw(d, s, &content, d->data);
 
     s->set_viewport(&box);
-    s->update_viewport();
+    if (!d->fb)
+        s->update_viewport();
     s->set_viewport(outer);
+    if (d->fb)
+        d->present();
 }
 
 int dialog_run(struct dialog *d, int poll_ticks)

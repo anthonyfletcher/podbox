@@ -1145,14 +1145,14 @@ MOBI books only.
 [text viewer orientation]
 Holds the page sideways, taller than wide, for reading in one hand. Right
 Hand turns pages with PLAY and MENU, Left Hand with MENU and PLAY. Double-click
-PLAY on an upright page to turn it. Sideways, the button at the top leaves, as
+PLAY on an upright page to turn it, right hand. Sideways, the button at the top leaves, as
 MENU does upright; hold the one at the bottom to stand the page up again, or
 double-click it to swap hands.
 
 [text viewer wheel scrubs]
 Turning the wheel moves through the book a percent at a time, showing the
-chapter and percentage it would go to; Select goes there, and Previous or
-Menu stays put. Off, the wheel sets Read Aloud's volume.
+chapter and percentage it would go to; Select goes there, and any other
+button stays put. Off, the wheel sets Read Aloud's volume.
 
 [text viewer read aloud]
 Reads the text aloud in the synthesised voice, whether or not Speak Aloud is

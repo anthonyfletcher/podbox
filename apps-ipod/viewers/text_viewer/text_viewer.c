@@ -1056,15 +1056,20 @@ static int tv_pages_left(void)
     return (len - tv.next + per_page - 1) / per_page;
 }
 
-/* How far through the book the page on screen ends, in percent: by the
- * stored sizes of the chapters before it and the part of this one read */
+static bool tv_at_book_end(void);
+
+/* How far through the book the page on screen starts, in percent, and 100 on
+ * its last page: by the stored sizes of the chapters before it and the part
+ * of this one read */
 static int tv_book_percent(void)
 {
     long before = 0, total = 0, size;
     off_t len = tv_text_len();
 
+    if (tv_at_book_end())
+        return 100;
     if (!tv.nparts)
-        return len ? (int)((int64_t)tv.next * 100 / len) : 100;
+        return len ? (int)((int64_t)tv.pos * 100 / len) : 100;
     for (int i = 0; i < tv.nparts; i++)
     {
         size = ts_part_size(tv.src, i);
@@ -1074,8 +1079,8 @@ static int tv_book_percent(void)
     }
     size = ts_part_size(tv.src, tv.part);
     if (len)
-        before += (long)((int64_t)size * MIN(tv.next, len) / len);
-    return total ? (int)((int64_t)before * 100 / total) : 0;
+        before += (long)((int64_t)size * MIN(tv.pos, len) / len);
+    return total ? MIN((int)((int64_t)before * 100 / total), 99) : 0;
 }
 
 /* The footer, right-aligned on the reserved bottom line. Drawn with tv.vp
@@ -1404,13 +1409,11 @@ static bool tv_picture_found(const char *href)
     return false;
 }
 
-/* Whether the chapter's window holds anything to show: a cover page whose
- * picture is passed over, or missing from the book, has nothing */
-static bool tv_has_page(void)
+/* Whether the window from `i` to `end` holds anything to show: a cover page
+ * whose picture is passed over, or missing from the book, has nothing */
+static bool tv_shows(size_t i, size_t end)
 {
-    size_t i = 0;
-
-    while (i < tv.win_len)
+    while (i < end)
     {
         unsigned char c = tv.win[i];
         char href[TV_PIC_HREF];
@@ -1448,7 +1451,7 @@ static bool tv_enter_part(int part)
     if (rc != BS_OK)
         return false;
     tv_ensure(0, 1);
-    return tv.win_len > 0 && tv_has_page();
+    return tv.win_len > 0 && tv_shows(0, tv.win_len);
 }
 
 /* The first page of the next chapter with text */
@@ -1480,6 +1483,11 @@ static bool tv_prev_part(void)
     return tv_end_before(tv.part);
 }
 
+/* The page a next page found nothing after, though a chapter followed it:
+ * the book's last, with only empty chapters behind it. -1 until found. */
+static int tv_last_part = -1;
+static off_t tv_last_pos;
+
 /* The next page, crossing into the next chapter from the last page of one.
  * False at the end of the document, leaving the last page where it was. */
 static bool tv_advance(void)
@@ -1501,11 +1509,11 @@ static bool tv_advance(void)
     /* Nothing after it has text: back to where the reader was */
     tv_enter_part(part);
     tv_resume_to(pos);
+    tv_last_part = part;
+    tv_last_pos = pos;
     return false;
 }
 
-/* At the end, the page is drawn again: looking past it may have put the
- * loading box over it */
 /* The words on the page on screen, for the reading statistics */
 static int tv_page_words(void)
 {
@@ -1526,7 +1534,8 @@ static int tv_page_words(void)
 }
 
 /* A page read by eye counts toward the statistics; one Read Aloud says
- * does not */
+ * does not. At the end, the page is drawn again: looking past it may have
+ * put the loading box over it, and its percent is now 100. */
 static void tv_next_page(void)
 {
     int words = tv_page_words();
@@ -1562,6 +1571,45 @@ static void tv_prev_page(void)
         if (!tv_reach(tv.stack[tv.sp - 1]))
             return;
         tv.sp--;
+    }
+    tv_draw();
+    tv_speak_page();
+}
+
+/* Held back: the first page of the chapter, or of the one before when
+ * already there */
+static void tv_chapter_start(void)
+{
+    int start = tv.part, part = start;
+
+    reading_stats_touch();
+    if (tv.nparts && tv.pos == 0 && part > 0)
+    {
+        while (--part >= 0 && !tv_enter_part(part))
+            ;
+        if (part < 0)
+            tv_enter_part(start);
+    }
+    else if (tv.nparts)
+        tv_enter_part(part);
+    else
+        tv_reach(0);
+    tv.sp = 0;
+    tv_draw();
+    tv_speak_page();
+}
+
+/* Held forward: the first page of the next chapter, or the book's last */
+static void tv_chapter_next(void)
+{
+    int part = tv.part;
+
+    reading_stats_touch();
+    if (!tv.nparts || !tv_next_part())
+    {
+        if (tv.nparts)
+            tv_enter_part(part);
+        tv_resume_to(TV_OFF_MAX);
     }
     tv_draw();
     tv_speak_page();
@@ -1677,6 +1725,9 @@ struct tv_place
 
 /* Read to its last page, or marked Finished */
 #define TV_PLACE_FINISHED 0x1
+/* The book's percent at the page, plus one: 0 in a record from before it */
+#define TV_PLACE_PCT_SHIFT 8
+#define TV_PLACE_PCT_MASK  (0xff << TV_PLACE_PCT_SHIFT)
 
 /* Version 2 of the record, before the flags */
 struct tv_place_v2
@@ -1813,11 +1864,13 @@ static bool tv_open_finished;
 static int tv_open_part;
 static off_t tv_open_pos;
 
-/* The page on screen is the book's last: its last chapter's last page, or
- * still the one a finished book was opened at */
+/* The page on screen is the book's last: its last chapter's last page, the
+ * last before chapters with nothing in them, or still the one a finished
+ * book was opened at */
 static bool tv_at_book_end(void)
 {
     return ((!tv.nparts || tv.part == tv.nparts - 1) && tv_at_end())
+           || (tv.part == tv_last_part && tv.pos == tv_last_pos)
            || (tv_open_finished && tv.part == tv_open_part
                && tv.pos == tv_open_pos);
 }
@@ -1876,6 +1929,7 @@ static void tv_resume_save(const char *file, int part, off_t off,
     tv_place_set(&p, part, off, size, file);
     if (tv_at_book_end())
         p.flags |= TV_PLACE_FINISHED;
+    p.flags |= (tv_book_percent() + 1) << TV_PLACE_PCT_SHIFT;
     ok = libfile_write(&w, &p, sizeof(p), 1);
 
     old = tv_places_open(&h);
@@ -1904,7 +1958,9 @@ void text_viewer_each_place(text_viewer_place_fn fn, void *data)
         return;
     for (uint32_t i = 0; i < h.count && tv_place_read(fd, &p); i++)
     {
-        if (!fn(p.path, p.part, p.flags & TV_PLACE_FINISHED, data))
+        int pct = ((p.flags & TV_PLACE_PCT_MASK) >> TV_PLACE_PCT_SHIFT) - 1;
+
+        if (!fn(p.path, pct, p.flags & TV_PLACE_FINISHED, data))
             break;
     }
     close(fd);
@@ -1948,7 +2004,9 @@ bool text_viewer_mark_place(const char *path, int state)
             {
                 if (state == TV_MARK_NOT_STARTED)
                     continue;
-                p.flags = state == TV_MARK_FINISHED ? TV_PLACE_FINISHED : 0;
+                p.flags &= ~TV_PLACE_FINISHED;
+                if (state == TV_MARK_FINISHED)
+                    p.flags |= TV_PLACE_FINISHED;
             }
             ok = libfile_write(&w, &p, sizeof(p), 1);
             kept++;
@@ -2235,9 +2293,6 @@ static void tv_apply_settings(void)
               && tv_side_alloc();
     if (!tv_side)
         tv_side_free();
-    else
-        global_settings.text_viewer_last_hand =
-            global_settings.text_viewer_orientation;
 
     margin = global_settings.text_viewer_margin ? TV_MARGIN : 0;
     tv.vp.x = margin;
@@ -2289,14 +2344,24 @@ struct tv_toc
 };
 
 /* ts_toc()'s callback. An entry pointing where the one before it does, such
- * as a chapter's subtitle, or a second at the start of a file, is left out. */
+ * as a chapter's subtitle, or a second at the start of a file, is left out.
+ * A title with "Chapter" and its number after other words, a picture's
+ * caption caught up in the heading, starts at "Chapter". */
 static int tv_toc_add(void *ud, const char *title, int part,
                       const char *anchor)
 {
     struct tv_toc *t = ud;
+    const char *c;
     char *d;
     size_t n;
 
+    for (c = title; *c; c++)
+        if (c > title && c[-1] == ' ' && !strncasecmp(c, "chapter ", 8)
+            && c[8] && strchr("IVXLCivxlc0123456789", c[8]))
+        {
+            title = c;
+            break;
+        }
     if (strlen(anchor) >= TV_TOC_ANCHOR)
         anchor = "";                /* too long to keep: the file's start */
     if (t->n && t->e[t->n - 1].part == part
@@ -2399,7 +2464,8 @@ int text_viewer_contents(void)
     core_unpin(handle);
     core_free(handle);
 
-    /* An entry inside a file: laid out from where its id is */
+    /* An entry inside a file: a page that starts where its id is, the text
+     * before it on the page before */
     if (target >= 0 && anchor[0])
     {
         long off;
@@ -2410,6 +2476,16 @@ int text_viewer_contents(void)
         if (rc == BS_OK && tv_enter_part(target))
         {
             tv_resume_to((off_t)off);
+            while (off < tv.win_start + (off_t)tv.win_len
+                   && (tv.win[off - tv.win_start] == '\n'
+                       || tv.win[off - tv.win_start] == ' '))
+                off++;
+            if (tv.pos < (off_t)off && tv.sp < TV_MAX_PAGES
+                && off < tv.win_start + (off_t)tv.win_len)
+            {
+                tv.stack[tv.sp++] = tv.pos;
+                tv.pos = off;
+            }
             return 1;
         }
     }
@@ -2426,13 +2502,16 @@ static long tv_volume_until;
 /* ---- scrubbing with the wheel ------------------------------------------ */
 
 /* Wheel Scrubs: the wheel moves a target through the book a percent a click,
- * shown over the page; Select jumps there, and Previous, Menu or a few idle
- * seconds put the page back. Placed by the chapters' stored sizes, as Book
- * Progress counts them. */
-#define TV_SCRUB_IDLE (HZ * 4)
+ * shown over the page; Select jumps there, and any other button or a few
+ * idle seconds put the page back. Placed by the chapters' stored sizes, as
+ * Book Progress counts them. The first clicks only show where the page is,
+ * so a brush of the wheel moves nothing. */
+#define TV_SCRUB_IDLE  (HZ * 4)
+#define TV_SCRUB_SLACK 4
 
 static int tv_scrub_pct = -1;   /* the target, or -1 when not scrubbing */
 static long tv_scrub_until;
+static int tv_scrub_slack;      /* clicks still to pass before it moves */
 
 /* The chapter `pct` percent into the book falls in, and how far into it, in
  * thousandths, in *within */
@@ -2473,8 +2552,14 @@ static void tv_scrub_show(void)
 static void tv_scrub(int step)
 {
     if (tv_scrub_pct < 0)
+    {
         tv_scrub_pct = tv_book_percent();
-    tv_scrub_pct = MIN(MAX(tv_scrub_pct + step, 0), 100);
+        tv_scrub_slack = TV_SCRUB_SLACK;
+    }
+    if (tv_scrub_slack > 0)
+        tv_scrub_slack--;
+    else
+        tv_scrub_pct = MIN(MAX(tv_scrub_pct + step, 0), 100);
     tv_scrub_until = current_tick + TV_SCRUB_IDLE;
     tv_scrub_show();
 }
@@ -2558,6 +2643,26 @@ static void tv_orient(int orientation)
 /* A second click within this is a double-click */
 #define TV_DOUBLE_CLICK (HZ * 4 / 10)
 
+/* Upright, |<< and >>| turn the page when let go, so that holding them can
+ * move by chapters instead; >>| is told from Select, which ends a scrub by
+ * going there. The rest is the standard keymap. */
+static const struct button_mapping tv_keys[] =
+{
+    { ACTION_NONE,            BUTTON_LEFT,                BUTTON_NONE },
+    { ACTION_STD_CANCEL,      BUTTON_LEFT|BUTTON_REL,     BUTTON_LEFT },
+    { ACTION_LISTTREE_PGUP,   BUTTON_LEFT|BUTTON_REPEAT,  BUTTON_LEFT },
+    { ACTION_NONE,            BUTTON_RIGHT,               BUTTON_NONE },
+    { ACTION_TREE_PGRIGHT,    BUTTON_RIGHT|BUTTON_REL,    BUTTON_RIGHT },
+    { ACTION_LISTTREE_PGDOWN, BUTTON_RIGHT|BUTTON_REPEAT, BUTTON_RIGHT },
+    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
+};
+
+static const struct button_mapping *tv_keymap(int context)
+{
+    return context & CONTEXT_REMOTE
+           ? get_context_mapping(CONTEXT_STD | CONTEXT_REMOTE) : tv_keys;
+}
+
 enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_NOTES, TV_KEY_LEAVE,
               TV_KEY_USB };
 
@@ -2567,7 +2672,8 @@ static void tv_event_save(void *param);
  * right as the player is held, and Select; back is the one on the left. The
  * button now at the top does what MENU does upright: leaves, and opens the
  * settings when held. The one at the bottom swaps hands on a double-click
- * and goes upright when held. Held Select shows the page's notes. */
+ * and goes upright when held. Held Select shows the page's notes; held
+ * forward and back move by chapters. */
 static enum tv_key tv_side_button(long b)
 {
     static long held, last_click;
@@ -2596,7 +2702,11 @@ static enum tv_key tv_side_button(long b)
         return TV_KEY_NONE;
     }
 
-    if (b & BUTTON_REPEAT)
+    /* A press ends any hold: the box or menu a hold opened takes its
+     * release */
+    if (!(b & (BUTTON_REPEAT | BUTTON_REL)))
+        held = 0;
+    if ((b & BUTTON_REPEAT) && !(b & BUTTON_REL))
     {
         if (held == base)
             return TV_KEY_NONE;
@@ -2607,6 +2717,10 @@ static enum tv_key tv_side_button(long b)
             return TV_KEY_MENU;
         if (base == bottom)
             tv_orient(TV_ORIENT_UPRIGHT);
+        else if (tv_scrub_pct < 0 && base == back)
+            tv_chapter_start();
+        else if (tv_scrub_pct < 0 && base == fwd)
+            tv_chapter_next();
         return TV_KEY_NONE;
     }
     if (!(b & BUTTON_REL))
@@ -2624,8 +2738,7 @@ static enum tv_key tv_side_button(long b)
 
     if (tv_scrub_pct >= 0)
     {
-        if (base == BUTTON_SELECT || base == back || base == top)
-            tv_scrub_end(base == BUTTON_SELECT);
+        tv_scrub_end(base == BUTTON_SELECT);
         return TV_KEY_NONE;
     }
 
@@ -2657,6 +2770,10 @@ static int tv_menu(void)
     if (ret == MENU_ATTACHED_USB)
         return ret;
     tv_apply_settings();
+    /* A picture's page, the picture now passed over, has nothing on it */
+    if (!tv_shows(tv.pos - tv.win_start,
+                  tv_page(tv.pos, false) - tv.win_start))
+        tv_advance();
     tv_draw();
     tv_speak_page();
     reading_stats_touch();
@@ -2734,7 +2851,7 @@ static int tv_notes(void)
 
     talk_force_shutup();
     tv_reading = false;
-    tv_splash_loading(true);
+    tv_splashf("%s\n%s", str(LANG_WAIT), str(LANG_TEXT_VIEWER_NOTES));
     cpu_boost(true);
     for (int k = 0; k < nh; k++)
     {
@@ -2760,9 +2877,19 @@ static int tv_notes(void)
 
     if (used)
     {
+        /* sideways, the box goes over the page in the sideways buffer */
+        if (tv_side)
+            tv_draw();
         viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
         push_current_activity(ACTIVITY_CONTEXTMENU);
-        dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES), tv_note_text);
+        if (tv_side)
+        {
+            dialog_prose_show_in(str(LANG_TEXT_VIEWER_NOTES), tv_note_text,
+                                 &tv_side_fb, LCD_HEIGHT, LCD_WIDTH,
+                                 tv_side_push);
+        }
+        else
+            dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES), tv_note_text);
         pop_current_activity();
         viewportmanager_theme_undo(SCREEN_MAIN, false);
         tv_apply_settings();
@@ -2858,6 +2985,7 @@ int text_viewer(const char *file)
     tv_open_at(part, resume);
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
+    tv_last_part = -1;
 
     tv_draw();
     tv_speak_page();
@@ -2898,12 +3026,14 @@ int text_viewer(const char *file)
             continue;
         }
 
-        action = get_action(CONTEXT_STD, timeout);
+        action = get_custom_action(CONTEXT_PLUGIN, timeout, tv_keymap);
 
-        /* A scrub takes the buttons that end it */
-        if (tv_scrub_pct >= 0 && (action == ACTION_STD_OK
-                                  || action == ACTION_STD_CANCEL
-                                  || action == ACTION_STD_MENU))
+        /* A scrub takes every button but the wheel, Select to jump */
+        if (tv_scrub_pct >= 0 && action != ACTION_NONE
+            && !(action & SYS_EVENT)
+            && action != ACTION_UNKNOWN && action != ACTION_REDRAW
+            && action != ACTION_STD_NEXT && action != ACTION_STD_NEXTREPEAT
+            && action != ACTION_STD_PREV && action != ACTION_STD_PREVREPEAT)
         {
             tv_scrub_end(action == ACTION_STD_OK);
             continue;
@@ -2925,23 +3055,32 @@ int text_viewer(const char *file)
                 tv_wheel(-1);
                 break;
 
-            /* PLAY twice goes sideways, to the hand last used */
+            /* PLAY twice goes sideways, right hand */
             case ACTION_TREE_WPS:
                 if (TIME_BEFORE(current_tick, play_tick + TV_DOUBLE_CLICK))
                 {
                     play_tick = current_tick - TV_DOUBLE_CLICK;
-                    tv_orient(global_settings.text_viewer_last_hand);
+                    tv_orient(TV_ORIENT_RIGHT);
                 }
                 else
                     play_tick = current_tick;
                 break;
 
-            case ACTION_STD_OK:          /* forward button (>>|) */
+            case ACTION_STD_OK:          /* Select */
+            case ACTION_TREE_PGRIGHT:    /* forward button (>>|) */
                 tv_next_page();
                 break;
 
             case ACTION_STD_CANCEL:      /* back button (|<<) */
                 tv_prev_page();
+                break;
+
+            case ACTION_LISTTREE_PGUP:   /* |<< held */
+                tv_chapter_start();
+                break;
+
+            case ACTION_LISTTREE_PGDOWN: /* >>| held */
+                tv_chapter_next();
                 break;
 
             case ACTION_STD_MENU:        /* Menu leaves the viewer */

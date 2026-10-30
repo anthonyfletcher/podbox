@@ -69,16 +69,18 @@ static void prose_measure(struct dialog *d, struct screen *s,
     struct prose *p = data;
     struct dialog_insets in;
     int fh = font_get(box->font)->height, need, max;
+    int sw = d->fb ? d->fb_w : s->lcdwidth;
+    int sh = d->fb ? d->fb_h : s->lcdheight;
 
     dialog_get_insets(&d->style, &in);
-    box->width  = s->lcdwidth * PROSE_W_PCT / 100;
-    max = s->lcdheight * PROSE_H_PCT / 100;
+    box->width  = sw * PROSE_W_PCT / 100;
+    max = sh * PROSE_H_PCT / 100;
     need = prose_wrap(p->body, box->width - in.left - in.right
                                - PROSE_BAR_W - PROSE_BAR_GAP, box->font) * fh
            + fh / 2 + fh + 8 + in.top + in.bottom;
     box->height = MIN(need, max);
-    box->x = (s->lcdwidth - box->width) / 2;
-    box->y = (s->lcdheight - box->height) / 2;
+    box->x = (sw - box->width) / 2;
+    box->y = (sh - box->height) / 2;
 }
 
 /* The wrap, kept between repaints.
@@ -298,10 +300,10 @@ static const struct dialog_callbacks prose_cb =
     .on_close  = NULL,
 };
 
-bool dialog_prose_confirm(const char *title, const char *body,
-                          const char *accept_label,
-                          const char *cancel_label,
-                          bool accept_default)
+static bool prose_run(const char *title, const char *body,
+                      const char *accept_label, const char *cancel_label,
+                      bool accept_default, struct frame_buffer_t *fb,
+                      int fb_w, int fb_h, void (*present)(void))
 {
     struct dialog d;
     struct prose p;
@@ -314,6 +316,10 @@ bool dialog_prose_confirm(const char *title, const char *body,
     p.sel    = accept_default ? 1 : 0;  /* once the buttons are reached */
 
     dialog_init(&d, CONTEXT_STD, title, NULL, &prose_cb, &p);
+    d.fb = fb;
+    d.fb_w = fb_w;
+    d.fb_h = fb_h;
+    d.present = present;
     if (global_settings.talk_menu)
     {
         if (title)
@@ -324,7 +330,24 @@ bool dialog_prose_confirm(const char *title, const char *body,
     return dialog_run(&d, TIMEOUT_BLOCK) == DIALOG_ACCEPT;
 }
 
+bool dialog_prose_confirm(const char *title, const char *body,
+                          const char *accept_label,
+                          const char *cancel_label,
+                          bool accept_default)
+{
+    return prose_run(title, body, accept_label, cancel_label, accept_default,
+                     NULL, 0, 0, NULL);
+}
+
 void dialog_prose_show(const char *title, const char *body)
 {
-    dialog_prose_confirm(title, body, str(LANG_DIAG_OK), NULL, true);
+    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, NULL, 0, 0, NULL);
+}
+
+void dialog_prose_show_in(const char *title, const char *body,
+                          struct frame_buffer_t *fb, int fb_w, int fb_h,
+                          void (*present)(void))
+{
+    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, fb, fb_w, fb_h,
+              present);
 }

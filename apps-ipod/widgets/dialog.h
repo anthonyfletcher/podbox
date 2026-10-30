@@ -259,6 +259,14 @@ struct dialog
      * pass costs a full repaint of the box (see dialog_run), so this is the
      * difference between animating and burning CPU. */
     int   poll_ticks;
+
+    /* --- optional, set after dialog_init() --- */
+    /* Drawn into `fb`, fb_w by fb_h, over whatever it holds, and shown by
+     * present() after each repaint, instead of on the screen: for a page
+     * the text viewer has turned sideways. NULL draws on the screen. */
+    struct frame_buffer_t *fb;
+    int   fb_w, fb_h;
+    void (*present)(void);
 };
 
 /* Initialise a dialog. `title` and `style` may be NULL (NULL style == the

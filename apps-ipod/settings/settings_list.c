@@ -1795,9 +1795,6 @@ const struct settings_list settings[] = {
                    NULL, 3, ID2P(LANG_TEXT_VIEWER_UPRIGHT),
                    ID2P(LANG_TEXT_VIEWER_RIGHT_HAND),
                    ID2P(LANG_TEXT_VIEWER_LEFT_HAND)),
-    /* Which way PLAY's double-click turns an upright page */
-    {F_T_INT, &global_settings.text_viewer_last_hand, -1, INT(1),
-        "text viewer last hand", UNUSED},
     OFFON_SETTING(0, text_viewer_pictures, LANG_TEXT_VIEWER_PICTURES, true,
                   "text viewer pictures", NULL),
     OFFON_SETTING(0, text_viewer_wheel_scrub, LANG_TEXT_VIEWER_WHEEL_SCRUB,

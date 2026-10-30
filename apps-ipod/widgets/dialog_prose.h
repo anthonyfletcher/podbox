@@ -35,4 +35,11 @@ bool dialog_prose_confirm(const char *title, const char *body,
  * closes it wherever the reader has got to. */
 void dialog_prose_show(const char *title, const char *body);
 
+/* The same, drawn into `fb` over what it holds and shown by present(): see
+ * struct dialog's fb */
+struct frame_buffer_t;
+void dialog_prose_show_in(const char *title, const char *body,
+                          struct frame_buffer_t *fb, int fb_w, int fb_h,
+                          void (*present)(void));
+
 #endif /* _GUI_DIALOG_PROSE_H_ */

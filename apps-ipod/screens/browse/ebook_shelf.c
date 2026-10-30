@@ -65,7 +65,6 @@ struct ebook
     uint32_t title;             /* the book's own, or its file name */
     uint32_t author;            /* the book's own, or its folder's name */
     uint32_t subjects;          /* the first of nsubjects, one after another */
-    int16_t  parts;
     int16_t  pct;               /* how far through, or -1 */
     uint8_t  state;             /* enum book_shelf */
     uint8_t  nsubjects;
@@ -216,13 +215,12 @@ static bool collect_book(const struct book_entry *e, void *data)
         || !add_name(e->author[0] ? e->author : folder, &b->author)
         || !add_subjects(b, e->subjects))
         return false;
-    b->parts = e->parts;
     b->pct = -1;
     b->state = BOOK_SHELF_NOT_STARTED;
     return ++book_ct < EBOOKS_MAX;
 }
 
-static bool collect_place(const char *path, int part, bool finished,
+static bool collect_place(const char *path, int pct, bool finished,
                           void *data)
 {
     (void)data;
@@ -233,8 +231,8 @@ static bool collect_place(const char *path, int part, bool finished,
         if (strcmp(names + b->path, path))
             continue;
         b->state = finished ? BOOK_SHELF_FINISHED : BOOK_SHELF_IN_PROGRESS;
-        if (!finished && part >= 0 && b->parts > 0)
-            b->pct = MIN(part * 100 / b->parts, 99);
+        if (!finished)
+            b->pct = MIN(pct, 99);
         break;
     }
     return true;

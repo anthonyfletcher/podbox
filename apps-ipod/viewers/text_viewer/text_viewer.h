@@ -48,10 +48,10 @@ enum
     TV_COLOUR_CUSTOM,        /* text_viewer_fg on text_viewer_bg */
 };
 
-/* The reading places, newest first: each document's path, the chapter it
- * was left in (-1 when not known) and whether it was read to its end, until
- * `fn` returns false */
-typedef bool (*text_viewer_place_fn)(const char *path, int part,
+/* The reading places, newest first: each document's path, how far through
+ * it the page left on ends in percent (-1 when not known) and whether it was
+ * read to its end, until `fn` returns false */
+typedef bool (*text_viewer_place_fn)(const char *path, int pct,
                                      bool finished, void *data);
 void text_viewer_each_place(text_viewer_place_fn fn, void *data);
 
@@ -70,7 +70,7 @@ enum
     TV_FOOTER_BOOK,          /* how far through the book */
 };
 
-/* text_viewer_orientation, and text_viewer_last_hand's two */
+/* text_viewer_orientation */
 enum
 {
     TV_ORIENT_UPRIGHT = 0,
