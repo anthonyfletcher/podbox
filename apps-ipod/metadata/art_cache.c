@@ -41,6 +41,7 @@
 #include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"   /* which albums are books */
 #include "system/bg_task.h"         /* the caching pass runs as one */
 #include "files/book_index.h"       /* the books the pass visits */
 #include "files/zip_member.h"       /* a deflated cover, inflated */
@@ -1422,12 +1423,17 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
  * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the folder is
  * cached: an existence check per size, plus the image lookup and stamp under
  * aa_check_all, and no image or track is read. */
+/* Set while a book's own art is cached: the cover inside its file before
+ * the folder's, which the folder's other books share */
+static bool aa_book_track;
+
 static bool aa_cache_dir(const char *probe_path, unsigned int dh,
                          struct aa_stamp *slot, bool artist,
                          void *workbuf, size_t worksz, bool *aborted)
 {
     int source = artist ? ART_SOURCE_FILES
-                        : global_settings.art_cache_album_source;
+               : aa_book_track ? ART_SOURCE_EMBEDDED_FIRST
+               : global_settings.art_cache_album_source;
     bool embedded = source != ART_SOURCE_FILES;
     struct aa_src src;
 
@@ -1810,6 +1816,24 @@ static enum bg_result aa_run_pass(void)
             {
                 path_list_write_record(&noart_albums, aa_dir);
                 aa_log_miss("album", aa_dir);
+            }
+        }
+        if (aborted)
+            break;
+
+        /* A book's first track, the key tagcache gives the book's art: the
+         * art inside that file, or else its folder's */
+        {
+            struct tagcache_album al;
+
+            if (tagcache_album_get(tagcache_album_of(tcs.idx_id), &al)
+                && al.first == tcs.idx_id && db_spoken_album_kind(&al) == 1
+                && (slot = aa_visit(aa_hash(tcs.result))))
+            {
+                aa_book_track = true;
+                aa_cache_dir(tcs.result, aa_hash(tcs.result), slot, false,
+                             workbuf, worksz, &aborted);
+                aa_book_track = false;
             }
         }
         if (aborted)

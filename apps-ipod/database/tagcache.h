@@ -281,6 +281,8 @@ struct tagcache_album {
     uint32_t art_hash;           /* art_cache_dir_hash() of its first track's
                                     folder, 0 for none */
     uint32_t artist_art_hash;    /* and of the folder above that */
+    uint32_t file_art_hash;      /* and of its first track's own path, which
+                                    a book's art_hash is: books share folders */
     int16_t  year;               /* the latest of its tracks' */
     uint16_t tracks;
     uint16_t spoken;             /* of them, in a spoken genre */

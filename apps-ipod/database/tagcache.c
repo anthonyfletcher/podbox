@@ -1086,6 +1086,7 @@ static void albums_note_path(int idx_id, const char *filename)
     if (r->first != idx_id)
         return;
 
+    r->file_art_hash = art_cache_dir_hash(filename);
     strmemccpy(dir, filename, sizeof(dir));
     sep = strrchr(dir, '/');
     if (!sep || sep == dir)
@@ -1129,8 +1130,12 @@ static void albums_finish(int entries)
 
     for (int r = 0; r < hdr->album_count; r++)
     {
-        const struct tagcache_album *al = &tcrc_albums[r];
+        struct tagcache_album *al = &tcrc_albums[r];
         int a = artist_row(al->artist_seek);
+
+        /* A book's art is its first file's: one folder may hold several */
+        if (db_spoken_album_kind(al) == 1 && al->file_art_hash)
+            al->art_hash = al->file_art_hash;
         struct tagcache_artist *ar;
 
         if (a < 0)
