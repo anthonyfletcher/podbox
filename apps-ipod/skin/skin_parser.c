@@ -75,9 +75,7 @@
 #include "backdrop.h"
 #include "statusbar_skinned.h"
 #include "string-extra.h"
-#ifndef CHECKWPS
 #include "theme_options.h"
-#endif
 
 #define WPS_ERROR_INVALID_PARAM         -1
 
@@ -1650,6 +1648,7 @@ static int parse_filetext(struct skin_element *element,
 #ifdef CHECKWPS
     /* CheckWPS runs in the folder holding .rockbox, not at its root */
     path_append(buf, ROCKBOX_DIR + 1, filename, sizeof(buf));
+    theme_options_check(buf, search_text, search_len);
 #else
     path_append(buf, ROCKBOX_DIR, filename, sizeof(buf));
     /* A theme's .preferences is completed from its options before the

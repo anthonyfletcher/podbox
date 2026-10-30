@@ -2,6 +2,7 @@
 ../../apps-ipod/skin/skin_parser.c
 ../../apps-ipod/skin/custom_tags.c
 ../../apps-ipod/skin/skin_backdrops.c
+../../apps-ipod/skin/theme_options.c
 ../../apps-ipod/draw/viewport.c
 ../../apps-ipod/speech/language.c
 ../../apps-ipod/draw/color.c

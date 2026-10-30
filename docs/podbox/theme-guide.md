@@ -699,6 +699,10 @@ own line, inherited from the `.sbs` `%Vi`, or the theme default.
 checkwps --viewports .rockbox/wps/YourTheme.sbs .rockbox/wps/YourTheme.wps
 ```
 
+It also checks each `.options` file your skins' `%ft` paths lead to: every
+mistake in it is printed with its line number, and so is any `%ft` key it does
+not define, which is usually a typo in the skin.
+
 What it proves is that your tags and syntax are valid and your assets exist. It
 does not exercise colours, list rendering, the USB handover or anything else in
 this document — a theme can report "parsed OK" and still be wrong on screen.

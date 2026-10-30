@@ -89,4 +89,9 @@ const char *theme_options_title(int n);
 /* The .options path for a .preferences path, into `buf` */
 bool theme_options_options_path(const char *prefs, char *buf, int bufsize);
 
+/* CheckWPS, in place of theme_options_met(): a skin's %ft reads `path`,
+ * looking for the `keylen` bytes of `key` (NULL for a line number). Prints
+ * the options file's errors the first time, and a key it does not define. */
+void theme_options_check(const char *path, const char *key, int keylen);
+
 #endif /* _THEME_OPTIONS_H_ */

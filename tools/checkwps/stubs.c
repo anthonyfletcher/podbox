@@ -407,6 +407,7 @@ void root_menu_load_from_cfg(void *setting, char *value)
 }
 
 void root_menu_set_audiobooks_row(bool on) { (void)on; }
+void root_menu_set_podcasts_row(bool on) { (void)on; }
 
 void root_menu_set_default(void *setting, void *defaultval)
 {

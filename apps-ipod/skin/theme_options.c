@@ -13,6 +13,8 @@
  *              only the keys' first lines, then the swap
  *   load       theme_options_met(), from the skin parser: records each
  *              .preferences file and completes it from its options
+ *   check      theme_options_check(), CheckWPS's instead: prints each
+ *              options file's errors, and each %ft key it does not define
  *
  * Nothing here allocates: completion runs inside the skin parse, where a
  * core_alloc() stops playback. The working state is static instead, and
@@ -23,6 +25,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include "config.h"
 #include "file.h"
@@ -126,9 +129,19 @@ static struct
     int count;                  /* headings met */
 } p;
 
+/* An error goes to the theme log, or to CheckWPS's output */
+static void report(int line, const char *what)
+{
+#ifdef CHECKWPS
+    printf("%s:%d: %s\n", p.path, line, what);
+#else
+    debug_log(DEBUG_LOG_SKIN, "%s:%d: %s", p.path, line, what);
+#endif
+}
+
 static void error(const char *what)
 {
-    debug_log(DEBUG_LOG_SKIN, "%s:%d: %s", p.path, p.line, what);
+    report(p.line, what);
 }
 
 /* An error in the option being read: it is left out */
@@ -165,7 +178,7 @@ static bool finish(void)
         why = "default is empty or longer than max";
 
     if (why)
-        debug_log(DEBUG_LOG_SKIN, "%s:%d: %s", p.path, p.head_line, why);
+        report(p.head_line, why);
     return !why;
 }
 
@@ -725,3 +738,79 @@ const char *theme_options_title(int n)
 
     return i < 0 ? NULL : rec[i].title;
 }
+
+#ifdef CHECKWPS
+/* --- check --------------------------------------------------------------- */
+
+/* The .preferences files met in this run, each with its options' good keys
+ * and the undefined keys already reported */
+static struct
+{
+    char path[MAX_PATH];
+    char opts[MAX_PATH];
+    bool has_options;
+    int count, missing;
+    char keys[THEME_OPTIONS_MAX][THEME_OPTION_KEY_MAX + 1];
+    char reported[THEME_OPTIONS_MAX][THEME_OPTION_KEY_MAX + 1];
+} chk[THEME_OPTIONS_FILES];
+static int chks;
+
+static void check_one(const struct theme_option *opt, void *data)
+{
+    int n = (intptr_t)data;
+
+    strcpy(chk[n].keys[chk[n].count++], opt->key);
+}
+
+static bool key_listed(char (*keys)[THEME_OPTION_KEY_MAX + 1], int count,
+                       const char *key, int keylen)
+{
+    for (int i = 0; i < count; i++)
+        if ((int)strlen(keys[i]) == keylen
+            && !strncasecmp(keys[i], key, keylen))
+            return true;
+    return false;
+}
+
+void theme_options_check(const char *path, const char *key, int keylen)
+{
+    size_t len = strlen(path);
+    int n;
+
+    if (len <= PREFS_EXT_LEN || len >= MAX_PATH
+        || strcasecmp(path + len - PREFS_EXT_LEN, prefs_ext))
+        return;
+    for (n = 0; n < chks; n++)
+        if (!strcasecmp(chk[n].path, path))
+            break;
+    if (n == chks)
+    {
+        if (chks == THEME_OPTIONS_FILES)
+            return;
+        chks++;
+        strcpy(chk[n].path, path);
+        if (theme_options_options_path(path, chk[n].opts, MAX_PATH)
+            && file_exists(chk[n].opts))
+        {
+            printf("Checking %s ...\n", chk[n].opts);
+            chk[n].has_options =
+                theme_options_parse(chk[n].opts, NULL, check_one,
+                                    (void *)(intptr_t)n) >= 0;
+        }
+    }
+    if (!key || !chk[n].has_options)
+        return;
+
+    /* %ft's search text is the key and its ':' */
+    while (keylen > 0 && (key[keylen - 1] == ':' || key[keylen - 1] == ' '))
+        keylen--;
+    if (key_listed(chk[n].keys, chk[n].count, key, keylen)
+        || key_listed(chk[n].reported, chk[n].missing, key, keylen))
+        return;
+    printf("%%ft key '%.*s': no such option in %s, or it has an error\n",
+           keylen, key, chk[n].opts);
+    if (chk[n].missing < THEME_OPTIONS_MAX && keylen <= THEME_OPTION_KEY_MAX)
+        snprintf(chk[n].reported[chk[n].missing++], THEME_OPTION_KEY_MAX + 1,
+                 "%.*s", keylen, key);
+}
+#endif /* CHECKWPS */
