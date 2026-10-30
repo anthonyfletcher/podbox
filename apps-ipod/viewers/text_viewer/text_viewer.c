@@ -805,6 +805,10 @@ static bool tv_heading_after(const unsigned char *s, size_t n, bool open)
     return open;
 }
 
+/* A heading has been laid out: a text without chapters has contents to
+ * browse */
+static bool tv_heads_seen;
+
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
  * offset of the next page. A heading that runs over from the page before is
  * not underlined on this one. */
@@ -873,6 +877,8 @@ static off_t tv_page(off_t start, bool render)
         {
             bool head = heading
                         || (avail >= 3 && !memcmp(s, TV_HEAD_OPEN, 3));
+
+            tv_heads_seen |= head;
             int indent = global_settings.text_viewer_indent && !head
                          && s[0] != '\n' && tv_paragraph_start(off)
                          ? tv_literal_width("M") : 0;
@@ -2501,6 +2507,7 @@ static void tv_setup_screen(void)
 struct tv_toc_entry
 {
     int16_t part;
+    int32_t off;                    /* a heading in one text, or -1 */
     char title[TV_TOC_TITLE];
     char anchor[TV_TOC_ANCHOR];     /* the id it points at, "" for the start */
 };
@@ -2511,20 +2518,13 @@ struct tv_toc
     int n;
 };
 
-/* ts_toc()'s callback. An entry pointing where the one before it does, such
- * as a chapter's subtitle, or a second at the start of a file, is left out. */
-static int tv_toc_add(void *ud, const char *title, int part,
-                      const char *anchor)
+/* An entry at the end, its title cut at a character if it must be */
+static int tv_toc_put(struct tv_toc *t, const char *title, int part,
+                      const char *anchor, long off)
 {
-    struct tv_toc *t = ud;
     char *d;
     size_t n;
 
-    if (strlen(anchor) >= TV_TOC_ANCHOR)
-        anchor = "";                /* too long to keep: the file's start */
-    if (t->n && t->e[t->n - 1].part == part
-        && (!anchor[0] || !strcmp(t->e[t->n - 1].anchor, anchor)))
-        return 0;
     if (t->n == TV_TOC_MAX)
         return 1;
     d = t->e[t->n].title;
@@ -2538,8 +2538,97 @@ static int tv_toc_add(void *ud, const char *title, int part,
     memcpy(d, title, n);
     d[n] = '\0';
     strcpy(t->e[t->n].anchor, anchor);
+    t->e[t->n].off = off;
     t->e[t->n++].part = part;
     return 0;
+}
+
+/* ts_toc()'s callback. An entry pointing where the one before it does, such
+ * as a chapter's subtitle, or a second at the start of a file, is left out. */
+static int tv_toc_add(void *ud, const char *title, int part,
+                      const char *anchor)
+{
+    struct tv_toc *t = ud;
+
+    if (strlen(anchor) >= TV_TOC_ANCHOR)
+        anchor = "";                /* too long to keep: the file's start */
+    if (t->n && t->e[t->n - 1].part == part
+        && (!anchor[0] || !strcmp(t->e[t->n - 1].anchor, anchor)))
+        return 0;
+    return tv_toc_put(t, title, part, anchor, -1);
+}
+
+/* Back to the first byte of a text without chapters, with an empty window:
+ * the engine has been read elsewhere */
+static void tv_restart_text(void)
+{
+    ts_rewind(tv.src);
+    tv.win_start = 0;
+    tv.win_len = 0;
+    tv.eof = false;
+    tv.pos = tv.next = 0;
+    tv.sp = 0;
+}
+
+/* The contents of a text without chapters: its headings, read from its
+ * start, where each begins. A run of headings, a number and its title, is
+ * one row. */
+static void tv_toc_heads(struct tv_toc *t)
+{
+    char buf[512], title[TV_TOC_TITLE + 4];
+    long got, at = 0, start = -1, run_end = -1;
+    int in = 0, tl = 0;
+
+    tv_splash_loading(false);
+    tv_restart_text();
+    while ((got = ts_read(tv.src, buf, sizeof(buf))) > 0)
+    {
+        for (long i = 0; i < got; i++, at++)
+        {
+            unsigned char c = buf[i];
+
+            if (c == 0xee && i + 2 < got && (unsigned char)buf[i + 1] == 0x80
+                && ((unsigned char)buf[i + 2] == 0x82
+                    || (unsigned char)buf[i + 2] == 0x83))
+            {
+                bool open = (unsigned char)buf[i + 2] == 0x82;
+
+                i += 2;
+                at += 2;
+                if (open)
+                {
+                    if (start < 0 || at - 2 > run_end)
+                    {
+                        if (start >= 0 && tl)
+                        {
+                            title[tl] = '\0';
+                            tv_toc_put(t, title, 0, "", start);
+                        }
+                        start = at - 2;
+                        tl = 0;
+                    }
+                    else if (tl && tl < TV_TOC_TITLE - 1)
+                        title[tl++] = ' ';
+                    in = 1;
+                }
+                else
+                {
+                    in = 0;
+                    run_end = at + 1;
+                }
+                continue;
+            }
+            if (in && tl < TV_TOC_TITLE + 2 && c != '\n')
+                title[tl++] = c;
+            else if (!in && at == run_end && (c == '\n' || c == ' '))
+                run_end = at + 1;       /* white space keeps the run going */
+        }
+    }
+    if (start >= 0 && tl)
+    {
+        title[tl] = '\0';
+        tv_toc_put(t, title, 0, "", start);
+    }
 }
 
 static const char *tv_toc_name(int item, void *data, char *buf, size_t len)
@@ -2551,7 +2640,7 @@ static const char *tv_toc_name(int item, void *data, char *buf, size_t len)
 
 bool text_viewer_has_contents(void)
 {
-    return tv.src && tv.nparts > 1;
+    return tv.src && (tv.nparts > 1 || (!tv.nparts && tv_heads_seen));
 }
 
 /* The book's contents, from its own table of contents, or one row per
@@ -2565,6 +2654,7 @@ int text_viewer_contents(void)
     struct tv_toc toc = { NULL, 0 };
     int handle, part = tv.part, sel = 0, target = -1, i, rc;
     off_t pos = tv.pos;
+    long head = -1;
     char anchor[TV_TOC_ANCHOR] = "";
 
     handle = core_alloc(TV_TOC_MAX * sizeof(struct tv_toc_entry));
@@ -2573,8 +2663,10 @@ int text_viewer_contents(void)
     toc.e = core_get_data_pinned(handle);
 
     cpu_boost(true);
-    rc = ts_toc(tv.src, tv_toc_add, &toc);
-    if (rc != BS_OK || !toc.n)
+    rc = tv.nparts ? ts_toc(tv.src, tv_toc_add, &toc) : BS_ERR_UNSUP;
+    if (!tv.nparts)
+        tv_toc_heads(&toc);
+    else if (rc != BS_OK || !toc.n)
     {
         /* No contents of its own: each chapter file by its first line, and
          * those with no text, such as a cover, left out */
@@ -2606,8 +2698,10 @@ int text_viewer_contents(void)
     /* The entry the page on screen is in: the first of its file, as where
      * the others start is not known until one is picked */
     for (i = 0; i < toc.n; i++)
-        if (toc.e[i].part < part
-            || (toc.e[i].part == part && (i == 0 || toc.e[i - 1].part < part)))
+        if (tv.nparts ? toc.e[i].part < part
+                        || (toc.e[i].part == part
+                            && (i == 0 || toc.e[i - 1].part < part))
+                      : toc.e[i].off <= pos)
             sel = i;
     simplelist_info_init(&info, str(LANG_BROWSE_CHAPTERS), toc.n, &toc);
     info.get_name = tv_toc_name;
@@ -2617,10 +2711,22 @@ int text_viewer_contents(void)
     {
         target = toc.e[info.selection].part;
         strcpy(anchor, toc.e[info.selection].anchor);
+        head = toc.e[info.selection].off;
     }
 
     core_unpin(handle);
     core_free(handle);
+
+    /* A heading of a text without chapters: a page that starts at it */
+    if (!tv.nparts)
+    {
+        tv_restart_text();
+        if (head > 0)
+            tv_start_at((off_t)head);
+        else if (head < 0)
+            tv_resume_to(pos);
+        return head >= 0;
+    }
 
     /* An entry inside a file: a page that starts where its id is, the text
      * before it on the page before */
@@ -2719,7 +2825,16 @@ static void tv_scrub_end(bool go)
 
     tv_scrub_pct = -1;
     if (go && !tv.nparts)
-        tv_resume_to((off_t)((int64_t)tv_text_len() * pct / 100));
+    {
+        off_t to = (off_t)((int64_t)tv_text_len() * pct / 100);
+
+        if (to < tv.pos)
+        {
+            tv_reach(0);                /* laid out forward, from the top */
+            tv.sp = 0;
+        }
+        tv_resume_to(to);
+    }
     else if (go)
     {
         int part = tv_scrub_part(pct, &within);
@@ -3210,6 +3325,7 @@ int text_viewer(const char *file)
     tv_open_at(part, resume);
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
+    tv_heads_seen = false;
 
     tv_draw();
     tv_speak_page();
