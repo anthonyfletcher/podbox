@@ -1623,6 +1623,11 @@ int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
     br_init(&d->br, &d->parts[0]);
     if (!read_headers(d, fd, data + 10 + (tag >> 5), data + size, tokbuf))
         return -3;
+    /* Shrunk to half or less, the loop filter's smoothing of block edges is
+     * averaged away by the scaler, and it is a quarter of the decode:
+     * passed over, as libwebp's bypass_filtering does */
+    if (resize && width >= 2 * bm->width && height >= 2 * bm->height)
+        d->filter_type = 0;
 
     d->extra = d->filter_type == 2 ? 8 : d->filter_type == 1 ? 2 : 0;
     d->ys = mb_w * 16;
