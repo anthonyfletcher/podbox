@@ -14,10 +14,15 @@
  * marker, not the publisher's, so whatever shows a title cuts it off; the
  * tag on disk is not touched.
  *
+ * The description is the file's COMM frame, which the tag reader keeps only
+ * the first 500 bytes of, mid-word; the scan reads it again itself and keeps
+ * as much as the database holds, cut at a word.
+ *
  * Parts, in order:
  *   - reading numbers, dates and month names
  *   - the order a title gives
  *   - the title the scan stores, and the title shown
+ *   - an episode's description
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -25,6 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "config.h"
+#include "file.h"
+#include "rbunicode.h"
 #include "string-extra.h"
 #include "database/db_episode.h"
 
@@ -301,6 +308,142 @@ const char *db_episode_title(const char *title, const char *date,
     snprintf(buf, size, "%s (%04ld-%02ld-%02ld)", title ? title : "",
              v / 10000, v / 100 % 100, v % 100);
     return buf;
+}
+
+/* ------------------------------------------------------------------ *
+ * an episode's description                                           *
+ * ------------------------------------------------------------------ */
+
+static unsigned long be32(const unsigned char *p)
+{
+    return (unsigned long)p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+}
+
+static unsigned long syncsafe(const unsigned char *p)
+{
+    return (unsigned long)p[0] << 21 | p[1] << 14 | p[2] << 7 | p[3];
+}
+
+/* The text of a COMM frame's body 'raw' (n bytes) as UTF-8 in 'out', past
+ * its encoding byte, language and short description. False where it is cut
+ * short: 'out' or 'raw' ran out first. */
+static bool comm_text(const unsigned char *raw, size_t n, bool raw_cut,
+                      char *out, size_t size)
+{
+    int enc = raw[0];
+    bool wide = enc == 1 || enc == 2;
+    bool le = false;
+    size_t i = 4;
+    char *o = out, *end = out + size - 4;
+
+    /* the short description, ended by a 0 of the encoding's width */
+    if (wide)
+    {
+        while (i + 1 < n && (raw[i] || raw[i + 1]))
+            i += 2;
+        i += 2;
+    }
+    else
+    {
+        while (i < n && raw[i])
+            i++;
+        i++;
+    }
+    if (wide && i + 1 < n && ((raw[i] == 0xff && raw[i + 1] == 0xfe)
+                              || (raw[i] == 0xfe && raw[i + 1] == 0xff)))
+    {
+        le = raw[i] == 0xff;
+        i += 2;
+    }
+    else if (enc == 1)
+        le = true;
+
+    while (i < n && o < end)
+    {
+        unsigned long c;
+
+        if (wide)
+        {
+            if (i + 1 >= n)
+                break;
+            c = le ? raw[i] | raw[i + 1] << 8 : raw[i] << 8 | raw[i + 1];
+            i += 2;
+        }
+        else if (enc == 3)
+        {
+            *o++ = raw[i++];
+            continue;
+        }
+        else
+            c = raw[i++];
+        if (c == 0)
+            break;
+        o = (char *)utf8encode(c, (unsigned char *)o);
+    }
+    *o = '\0';
+    return !raw_cut && (i >= n || o < end);
+}
+
+/* "... the last whole word…", within 'size' */
+static void cut_at_word(char *s, size_t size)
+{
+    size_t len = strlen(s);
+    char *sp;
+
+    if (len + 4 > size)
+        len = size - 4;
+    s[len] = '\0';
+    sp = strrchr(s, ' ');
+    if (sp && sp > s + len / 2)
+        *sp = '\0';
+    else    /* no space near: back to a character's first byte */
+        while (len > 0 && (s[len] & 0xc0) == 0x80)
+            s[len--] = '\0';
+    strcat(s, "\xe2\x80\xa6");
+}
+
+bool db_episode_comment(const char *path, char *buf, size_t size)
+{
+    static unsigned char raw[1024];
+    unsigned char h[10];
+    unsigned long end, pos = 10, n;
+    bool found = false;
+    int fd = open(path, O_RDONLY);
+
+    if (fd < 0)
+        return false;
+    /* ID3v2.3 or 2.4, without whole-tag unsynchronisation or an extended
+     * header, which podcatchers do not write */
+    if (read(fd, h, 10) != 10 || memcmp(h, "ID3", 3) || h[3] < 3 || h[3] > 4
+        || (h[5] & 0xc0))
+    {
+        close(fd);
+        return false;
+    }
+    end = 10 + syncsafe(h + 6);
+    while (!found && pos + 10 <= end)
+    {
+        unsigned char f[10];
+
+        if (lseek(fd, pos, SEEK_SET) < 0 || read(fd, f, 10) != 10 || !f[0])
+            break;
+        n = h[3] == 4 ? syncsafe(f + 4) : be32(f + 4);
+        if (!memcmp(f, "COMM", 4) && !f[9] && n > 4)
+        {
+            size_t got = n < sizeof(raw) ? n : sizeof(raw);
+
+            if ((size_t)read(fd, raw, got) == got)
+            {
+                if (!comm_text(raw, got, got < n, buf, size))
+                    cut_at_word(buf, size);
+                found = buf[0] != '\0';
+            }
+            break;
+        }
+        pos += 10 + n;
+    }
+    close(fd);
+    return found;
 }
 
 int db_episode_shown_len(const char *title, int len)

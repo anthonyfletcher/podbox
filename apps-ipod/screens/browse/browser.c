@@ -260,6 +260,17 @@ static int browser_get_range(int selected_item, void * data)
     return -1;
 }
 
+static const char *browser_get_description(int selected_item, void *data,
+                                           char *buf, size_t size)
+{
+    struct browser_context * local_tc=(struct browser_context *)data;
+
+    if (*local_tc->dirfilter == SHOW_ID3DB)
+        return browser_db_get_entry_description(&tc, selected_item, buf,
+                                                size);
+    return NULL;
+}
+
 static bool browser_is_playing(int selected_item, void * data)
 {
     struct browser_context * local_tc=(struct browser_context *)data;
@@ -763,6 +774,25 @@ void browser_set_showing_art(bool on)
     }
 }
 
+/* The same for a list of podcast episodes, whose skin can give the selected
+ * one's notes a box below a shorter list (%LD) */
+static bool db_showing_episodes;
+
+bool browser_showing_episodes(void)
+{
+    return db_showing_episodes;
+}
+
+static void browser_set_showing_episodes(bool on)
+{
+    if (on != db_showing_episodes)
+    {
+        db_showing_episodes = on;
+        FOR_NB_SCREENS(i)
+            sb_skin_settle(i);
+    }
+}
+
 /*
  * Called when a new dir is loaded (for example when returning from other apps ...)
  * also completely redraws the tree
@@ -895,6 +925,7 @@ static int update_dir(void)
                                    browser_is_playing);
     gui_synclist_set_range_callback(list, browser_get_range);
     gui_synclist_set_count_down(list, id3db && browser_db_counts_down(&tc));
+    gui_synclist_set_description_callback(list, browser_get_description);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
      * and the whole off path never touch the art-resolution code.
@@ -931,6 +962,8 @@ static int update_dir(void)
                 tall_rows = global_settings.db_artistart;
         }
         browser_set_showing_art(tall_rows);
+        browser_set_showing_episodes(*tc.dirfilter == SHOW_ID3DB
+                                     && browser_db_shows_episodes(&tc));
         gui_synclist_set_albumart_callback(list,
                                     tall_rows ? browser_get_albumart : NULL);
         /* Uniform tall rows so a cover fits (special rows included); 0 = the
@@ -1642,7 +1675,10 @@ int rockbox_browse(struct browse_context *browse)
     if (backup_count >= 0)
         tc = backups[backup_count];
     else
+    {
         db_showing_art = false;    /* no browse left on screen */
+        db_showing_episodes = false;
+    }
 
     return ret_val;
 }

@@ -194,6 +194,8 @@ int sb_get_backdrop(enum screen_type screen)
         return -1;
 }
 static bool force_waiting = false;
+/* A scrolling %wt's next step is due: sb_busy_tick() woke the UI for it */
+static bool textbox_waiting = false;
 void sb_skin_update(enum screen_type screen, bool force)
 {
     struct wps_data *data = skin_get_gwps(CUSTOM_STATUSBAR, screen)->data;
@@ -201,6 +203,16 @@ void sb_skin_update(enum screen_type screen, bool force)
     int i = screen;
     if (!data->wps_loaded)
         return;
+    /* A step of the box alone, not the bar, unless the bar is due as well */
+    if (textbox_waiting && !force && !force_waiting
+        && !TIME_AFTER(current_tick, next_update[i]))
+    {
+        textbox_waiting = false;
+        if (lcd_active())
+            skin_update(CUSTOM_STATUSBAR, screen, SKIN_REFRESH_SCROLL);
+        return;
+    }
+    textbox_waiting = false;
     {
         static bool sb_was_recolouring[NB_SCREENS] = {false};
         bool sb_recolouring = dynamic_colors_needs_repaint() || dynamic_colors_pending();
@@ -293,6 +305,21 @@ static void sb_busy_tick(void)
     static long next_poke = 0;
     static bool was_busy = false;
     bool busy;
+    struct wps_data *data;
+
+    /* A %wt scrolling on the bar, at its own pace, while nothing else
+     * drives the UI */
+    if (sbs_loaded[SCREEN_MAIN] && !textbox_waiting && lcd_active()
+        && button_queue_empty())
+    {
+        data = skin_get_gwps(CUSTOM_STATUSBAR, SCREEN_MAIN)->data;
+        if (data->textbox_moving
+            && !TIME_BEFORE(current_tick, data->textbox_due))
+        {
+            textbox_waiting = true;
+            button_queue_post(BUTTON_NONE, 0);
+        }
+    }
 
     if (TIME_BEFORE(current_tick, next_poke))
         return;

@@ -6446,6 +6446,25 @@ int browser_db_episode_percent(int idx_id)
     return plays > 0 ? 100 : 0;
 }
 
+char *browser_db_get_entry_description(struct browser_context *c, int id,
+                                       char *buf, size_t size)
+{
+    struct tagentry *entry;
+
+    if (browser_db_get_entry_range(c, id) < 0
+        || !(entry = browser_db_get_entry(c, id))
+        || !tagcache_entry_string(entry->idx_id, tag_comment, buf, size)
+        || !buf[0] || !strcmp(buf, UNTAGGED))
+        return NULL;
+    return buf;
+}
+
+bool browser_db_shows_episodes(struct browser_context *c)
+{
+    return c->currtable != TABLE_ROOT && csi_spoken_kind() == 2
+           && browser_db_get_attr(c) == FILE_ATTR_AUDIO;
+}
+
 int browser_db_get_entry_range(struct browser_context *c, int id)
 {
     struct tagentry *entry;

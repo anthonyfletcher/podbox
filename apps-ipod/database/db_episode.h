@@ -7,6 +7,7 @@
 #ifndef _DB_EPISODE_H_
 #define _DB_EPISODE_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /* The order an episode's stored title gives, as tag_virt_episode answers
@@ -23,5 +24,10 @@ const char *db_episode_title(const char *title, const char *date,
 
 /* The length of `title` (`len` bytes) without that marker at its end */
 int db_episode_shown_len(const char *title, int len);
+
+/* An MP3 episode's description, its ID3v2 COMM text, as UTF-8 in `buf`: all
+ * of it, or as much as fits cut at a word and ended with an ellipsis. False
+ * where the file has none this can read. */
+bool db_episode_comment(const char *path, char *buf, size_t size);
 
 #endif /* _DB_EPISODE_H_ */

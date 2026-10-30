@@ -121,10 +121,16 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_LIST_ITEM_RANGE,    "Lr", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_PLAYING,  "LP", "|IS",        SKIN_REFRESH_DYNAMIC),
 
+    /* The selected row's description, wherever it is used: on a list of
+     * podcast episodes, the episode's comment tag, or a space where it has
+     * none -- so %?LD says the list is one -- and empty on any other list.
+     * For a %wt below the list. (%LC is upstream's row column.) */
+    TAG(SKIN_TOKEN_LIST_SELECTED_DESC, "LD", "",           SKIN_REFRESH_DYNAMIC),
+
     /* %wt(text[,align]): draw text word-wrapped and aligned to fill the current
-     * viewport, ellipsised on overflow -- or, with %s on its line in a .wps,
-     * scrolled up through it. A drawing tag (renders directly like %Sb), so
-     * DYNAMIC to redraw as the text changes. */
+     * viewport, ellipsised on overflow -- or, with %s on its line, scrolled up
+     * through it. A drawing tag (renders directly like %Sb), so DYNAMIC to
+     * redraw as the text changes. */
     TAG(SKIN_TOKEN_TEXT_BOX,           "wt", "T|ST",       SKIN_REFRESH_DYNAMIC),
 
     /* The height of the line box text sits in. The drawing code already centres

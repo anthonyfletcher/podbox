@@ -203,6 +203,11 @@ int browser_db_spoken_main_menu_slot(void);
  * row. The episode by its database index, or by its list row. */
 int browser_db_episode_percent(int idx_id);
 int browser_db_get_entry_range(struct browser_context *c, int id);
+/* %LD of row 'id': a podcast episode's description, or NULL */
+char *browser_db_get_entry_description(struct browser_context *c, int id,
+                                       char *buf, size_t size);
+/* Whether the list on screen is of podcast episodes */
+bool browser_db_shows_episodes(struct browser_context *c);
 /* Whether the list on screen is tracks newest first, numbered from the end */
 bool browser_db_counts_down(struct browser_context *c);
 /* What spoken word the list on screen is of, as tag_virt_spoken answers:

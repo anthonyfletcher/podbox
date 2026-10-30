@@ -132,6 +132,8 @@ void browser_albumart_invalidate(void);
 bool browser_showing_art(void);
 /* Set by a list outside the browser that draws art rows the same way. */
 void browser_set_showing_art(bool on);
+/* True while the on-screen browse level is a list of podcast episodes. */
+bool browser_showing_episodes(void);
 
 struct bitmap;
 struct dim;

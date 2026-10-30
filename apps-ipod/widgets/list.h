@@ -237,6 +237,8 @@ struct gui_synclist
     list_get_name *callback_get_item_value;     /* a setting row's value */
     list_get_range *callback_get_item_range;    /* ...and where it sits */
     list_is_playing *callback_item_is_playing;
+    /* %LD: the selected row's description */
+    list_get_name *callback_get_item_description;
     /* %Lp counts from the last row up: a list sorted newest first, so the
      * oldest is 1 however many are added. Its tracks run to the end. */
     bool count_down;
@@ -279,6 +281,9 @@ extern void gui_synclist_set_range_callback(struct gui_synclist * lists,
 /* Whether %Lp counts down; see count_down */
 extern void gui_synclist_set_count_down(struct gui_synclist * lists,
                                         bool count_down);
+/* The answer to %LD. May be NULL. */
+extern void gui_synclist_set_description_callback(struct gui_synclist * lists,
+                                                  list_get_name callback);
 extern void gui_synclist_speak_item(struct gui_synclist * lists);
 extern int gui_synclist_get_nb_items(struct gui_synclist * lists);
 
@@ -341,6 +346,8 @@ const char* skinlist_get_item_value(int offset, bool wrap,
 bool skinlist_item_is_playing(int offset, bool wrap);
 /* %Lr: 0 to 100, or -1 on a row that is not a number setting. */
 int skinlist_get_item_range(int offset, bool wrap);
+/* %LD of the list on screen, or NULL */
+const char *skinlist_get_selected_description(char *buf, int buf_size);
 /* %Lp: the row's number among the list's tracks, from 1; -1 on any row that
  * is not a track. */
 int skinlist_get_item_position(int offset, bool wrap);

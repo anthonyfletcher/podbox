@@ -1134,8 +1134,9 @@ static int parse_textbox(struct skin_element *element,
     tb->fallback = INVALID_OFFSET;
     tb->valign = 't';
     tb->halign = 'l';
-    /* Only the WPS has a clock fast enough to move it. */
-    tb->scroll = curr_skin == WPS && element->line == curr_scroll_line;
+    /* The WPS's clock moves it, and the status bar's tick in the .sbs */
+    tb->scroll = (curr_skin == WPS || curr_skin == CUSTOM_STATUSBAR)
+                 && element->line == curr_scroll_line;
     if (tb->scroll)
         curr_vp->has_scroll_textbox = true;
     tb->offset = 0;
@@ -2552,7 +2553,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_SUBLINE_SCROLL:
                     curr_scroll_line = element->line;
-                    if (curr_skin == WPS && curr_textbox
+                    if ((curr_skin == WPS || curr_skin == CUSTOM_STATUSBAR)
+                        && curr_textbox
                         && curr_textbox_line == element->line)
                     {
                         curr_textbox->scroll = true;

@@ -3122,8 +3122,10 @@ static bool walk_checks_deletions(void)
     return tc_stat.ready && current_tcmh.tch.entry_count <= WALK_SEEN_MAX;
 }
 
-/* A podcast episode's title with its date after it (db_episode.c) */
+/* A podcast episode's title with its date after it, and its description
+ * (db_episode.c) */
 static char episode_title[256];
+static char episode_comment[TAG_MAXLEN - 32];
 
 static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
 {
@@ -3278,9 +3280,13 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         id3.albumartist = id3.artist;
 
     if (id3.genre_string && db_spoken_is_podcast_genre(id3.genre_string))
+    {
         id3.title = (char *)db_episode_title(id3.title, id3.year_string, path,
                                              episode_title,
                                              sizeof(episode_title));
+        if (db_episode_comment(path, episode_comment, sizeof(episode_comment)))
+            id3.comment = episode_comment;
+    }
 
     ADD_TAG(entry, tag_filename, &path);
     ADD_TAG(entry, tag_title, &id3.title);

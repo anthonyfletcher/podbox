@@ -1741,6 +1741,17 @@ const char *get_token_value(struct gui_wps *gwps,
             return skinlist_item_is_art_row(gwps->display->screen_type,
                                             li->offset, li->wrap) ? "a" : "";
         }
+        case SKIN_TOKEN_LIST_SELECTED_DESC:
+        {
+            /* From the browser's state, not the list's, so it holds still
+             * while the list is rebuilt for the viewport it chose */
+            const char *s;
+
+            if (!browser_showing_episodes())
+                return NULL;
+            s = skinlist_get_selected_description(buf, buf_size);
+            return s && *s ? s : " ";
+        }
         case SKIN_TOKEN_LIST_HAS_ART_ROWS:
             /* List-level, and answerable before anything draws -- which is what
              * lets it choose between two %Lb where %?La cannot. */
