@@ -91,6 +91,12 @@ bool db_spoken_is_podcast_genre(const char *genre)
     return false;
 }
 
+bool db_spoken_is_book_genre(const char *genre)
+{
+    return db_spoken_is_spoken_genre(genre)
+           && !db_spoken_is_podcast_genre(genre);
+}
+
 bool db_spoken_is_spoken_genre(const char *genre)
 {
     int i;
@@ -221,6 +227,12 @@ int db_spoken_kind_seek(long genre_seek)
 /* ------------------------------------------------------------------ *
  * which kinds are kept apart                                         *
  * ------------------------------------------------------------------ */
+
+bool db_spoken_is_episode(const char *genre)
+{
+    return global_settings.segregate_podcasts && genre
+           && db_spoken_is_podcast_genre(genre);
+}
 
 int db_spoken_apart(void)
 {

@@ -1235,7 +1235,8 @@ static void browser_db_buffer_event(unsigned short id, void *ev_data)
     struct tagcache_search tcs;
     struct mp3entry *id3 = ((struct track_event *)ev_data)->id3;
 
-    bool autoresume = global_settings.autoresume_enable;
+    bool autoresume = global_settings.autoresume_enable
+                      || db_spoken_is_episode(id3->genre_string);
 
     logf("be:%s", id3->path);
 
@@ -1310,7 +1311,8 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
 
     bool auto_skip = te->flags & TEF_AUTO_SKIP;
     bool counted = true;
-    bool autoresume = global_settings.autoresume_enable;
+    bool autoresume = global_settings.autoresume_enable
+                      || db_spoken_is_episode(id3->genre_string);
 
     /* Don't process unplayed tracks, or tracks interrupted within the
        first 15 seconds but always process autoresume point */
@@ -6095,6 +6097,31 @@ bool browser_db_entry_is_playing(struct browser_context *c, int id)
 
     entry = loaded_entry(c, id);
     return entry && entry->idx_id == browser_db_track_idx(id3);
+}
+
+int browser_db_episode_percent(int idx_id)
+{
+    long spoken, elapsed, length, plays;
+
+    if (!tagcache_entry_numeric(idx_id, tag_virt_spoken, &spoken)
+        || spoken != 2 || !db_spoken_kind_apart(2)
+        || !tagcache_entry_numeric(idx_id, tag_lastelapsed, &elapsed)
+        || !tagcache_entry_numeric(idx_id, tag_length, &length)
+        || !tagcache_entry_numeric(idx_id, tag_playcount, &plays))
+        return -1;
+    if (elapsed > 0 && length > 0)
+        return MAX(1, MIN(99, (int)((int64_t)elapsed * 100 / length)));
+    return plays > 0 ? 100 : 0;
+}
+
+int browser_db_get_entry_range(struct browser_context *c, int id)
+{
+    struct tagentry *entry;
+
+    if (browser_db_get_entry_kind(c, id) != LIST_ROW_TRACK
+        || !(entry = loaded_entry(c, id)))
+        return -1;
+    return browser_db_episode_percent(entry->idx_id);
 }
 
 int browser_db_get_icon(struct browser_context* c)

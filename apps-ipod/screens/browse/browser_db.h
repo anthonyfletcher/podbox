@@ -198,6 +198,11 @@ int browser_db_get_main_menu_tag_row_count(void);
  * Recognised by its rows asking about the `spoken` tag rather than by its
  * name, so a renamed or user-written menu still counts. */
 int browser_db_spoken_main_menu_slot(void);
+/* %Lr of a podcast episode, kept apart by Segregate Podcasts: how far
+ * through it is, 0 not started and 100 heard to its end; -1 for any other
+ * row. The episode by its database index, or by its list row. */
+int browser_db_episode_percent(int idx_id);
+int browser_db_get_entry_range(struct browser_context *c, int id);
 /* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
  * False if index is out of range, or names a submenu with nothing in it:
  * that slot is numbered but hidden. */

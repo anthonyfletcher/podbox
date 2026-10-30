@@ -161,7 +161,7 @@ bool book_resume_id_of(long album_seek, long artist_seek, char *buf,
          artist_seek < 0 && n >= 0 && tagcache_album_get(n, &al)
          && al.album_seek == album_seek; n++)
     {
-        if (al.spoken == al.tracks)
+        if (db_spoken_album_kind(&al) == 1)
             artist_seek = al.artist_seek;
     }
     if (artist_seek < 0 && n > 0 && tagcache_album_get(n - 1, &al)
@@ -461,7 +461,7 @@ static uint64_t book_of_row(int n, uint64_t named)
     char id[BOOK_ID_MAX];
 
     if (tagcache_album_get(n, &al)
-        && al.spoken == al.tracks
+        && db_spoken_album_kind(&al) == 1
         && tagcache_seek_string(tag_album, al.album_seek, album,
                                 sizeof(album))
         && book_resume_key(album) == named
@@ -598,7 +598,7 @@ static void track_finish_event(unsigned short id, void *ev_data)
      * through the next track can still carry it. The position cannot. */
     if (id3->elapsed + BOOK_END_SLACK_MS < id3->length)
         return;
-    if (!db_spoken_is_spoken_genre(id3->genre_string))
+    if (!db_spoken_is_book_genre(id3->genre_string))
         return;
 
     ended_pending = false;
@@ -703,7 +703,7 @@ static struct mp3entry *loaded_book(const char **name, uint64_t *book)
     static char id_buf[BOOK_ID_MAX];
     struct mp3entry *id3 = audio_status() ? audio_current_track() : NULL;
 
-    if (id3 == NULL || !db_spoken_is_spoken_genre(id3->genre_string))
+    if (id3 == NULL || !db_spoken_is_book_genre(id3->genre_string))
         return NULL;
 
     *name = book_name(id3, id_buf, sizeof(id_buf));
@@ -849,7 +849,7 @@ static bool book_playing(void)
         || !(audio_status() & AUDIO_STATUS_PLAY))
         return false;
     id3 = audio_current_track();
-    return id3 != NULL && db_spoken_is_spoken_genre(id3->genre_string);
+    return id3 != NULL && db_spoken_is_book_genre(id3->genre_string);
 }
 
 static void idle_save_event(const struct queue_event *ev);

@@ -1933,12 +1933,14 @@ static bool audio_start_codec(bool auto_skip)
         return false;
     }
 
-    bool autoresume_enable = !cur_id3->skip_resume_adjustments && global_settings.autoresume_enable;
+    bool episode = db_spoken_is_episode(cur_id3->genre_string);
+    bool autoresume_enable = !cur_id3->skip_resume_adjustments
+                             && (global_settings.autoresume_enable || episode);
 
     if (autoresume_enable && !(cur_id3->elapsed || cur_id3->offset))
     {
-        /* Resume all manually selected tracks */
-        bool resume = !auto_skip;
+        /* Resume all manually selected tracks, and every episode */
+        bool resume = !auto_skip || episode;
 
         /* Send the "buffer" event to obtain the resume position for the codec */
         send_track_event(PLAYBACK_EVENT_TRACK_BUFFER, 0, cur_id3);

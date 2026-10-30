@@ -2842,7 +2842,8 @@ bool tagcache_fill_tags(struct mp3entry *id3, const char *filename)
     if (id3->bitrate == 0)
         id3->bitrate = 1;
 
-    if (global_settings.autoresume_enable)
+    if (global_settings.autoresume_enable
+        || db_spoken_is_episode(id3->genre_string))
     {
         id3->elapsed = get_tag_numeric(entry, tag_lastelapsed, idx_id);
         logf("tagcache_fill_tags: Set elapsed for %s to %lX\n",

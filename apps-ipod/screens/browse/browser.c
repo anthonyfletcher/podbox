@@ -251,6 +251,15 @@ static enum list_row_kind browser_get_kind(int selected_item, void * data)
     return LIST_ROW_FILE;
 }
 
+static int browser_get_range(int selected_item, void * data)
+{
+    struct browser_context * local_tc=(struct browser_context *)data;
+
+    if (*local_tc->dirfilter == SHOW_ID3DB)
+        return browser_db_get_entry_range(&tc, selected_item);
+    return -1;
+}
+
 static bool browser_is_playing(int selected_item, void * data)
 {
     struct browser_context * local_tc=(struct browser_context *)data;
@@ -884,6 +893,7 @@ static int update_dir(void)
                             global_settings.show_icons?browser_get_fileicon:NULL);
     gui_synclist_set_row_callbacks(list, browser_get_kind, NULL,
                                    browser_is_playing);
+    gui_synclist_set_range_callback(list, browser_get_range);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
      * and the whole off path never touch the art-resolution code.
