@@ -17,4 +17,8 @@ struct ts_core_file {
  * takes ownership of the fd and closes it. Returns BS_OK or BS_ERR_IO. */
 int ts_io_core(bs_io *io, struct ts_core_file *f, const char *path);
 
+/* When set, told the file position after every read: how far a long read
+ * has got, for a progress bar */
+extern void (*ts_io_progress)(bs_off_t pos);
+
 #endif /* TS_IO_CORE_H */

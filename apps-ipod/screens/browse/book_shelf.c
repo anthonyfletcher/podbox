@@ -652,15 +652,18 @@ static const struct bitmap *shelf_get_albumart(int n, void *data,
                            filter_hash);
 }
 
-/* %Lr: how far through an In progress book, for a theme's gauge */
+/* %Lr: how far through a book, for a theme's gauge: a finished one is full */
 static int shelf_get_range(int n, void *data)
 {
     int v = rows[n];
     (void)data;
 
-    if (ROW_IS_RESUME(v) || shelf_kind != BOOK_SHELF_IN_PROGRESS)
+    if (ROW_IS_RESUME(v))
         return -1;
-    return book_percent(&books[v]);
+    if (shelf_kind == BOOK_SHELF_FINISHED)
+        return 100;
+    return shelf_kind == BOOK_SHELF_IN_PROGRESS ? book_percent(&books[v])
+                                                : -1;
 }
 
 /* A book, as it is in the database browser's list of books. */

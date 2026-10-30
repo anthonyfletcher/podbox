@@ -34,9 +34,9 @@
 #include "file.h"
 #include "lang.h"
 #include "strnatcmp.h"
-#include "widgets/keyboard.h"
 #include "widgets/list.h"
 #include "widgets/menu.h"
+#include "widgets/search_dialog.h"
 #include "widgets/splash.h"
 #include "settings/settings.h"
 #include "system/activity.h"
@@ -80,8 +80,8 @@ static int book_ct, row_ct;
 
 /* What the list shows: the top level's rows alone; one of the three lists
  * by its enum book_shelf; every book by title; every author, or the books of
- * author_shown; every subject, or the books of subject_shown; or the books
- * search_text finds */
+ * author_shown; or every subject, or the books of subject_shown. Search is
+ * the search box, over every book. */
 #define SHOW_TOP      (-1)
 #define SHOW_TITLES   3
 #define SHOW_AUTHORS  4
@@ -93,7 +93,8 @@ static int book_ct, row_ct;
 static int showing;
 static char author_shown[TS_BOOK_AUTHOR];
 static char subject_shown[TS_BOOK_SUBJECTS];
-static char search_text[64];
+static char search_text[SEARCH_MAX_QUERY + 1];
+static char select_path[MAX_PATH];  /* a book to put the cursor on, or "" */
 
 /* The top level's rows: those with a book to show, in this order */
 static const struct
@@ -180,6 +181,8 @@ static bool add_subjects(struct ebook *b, const char *s)
         size_t n = nl ? (size_t)(nl - s) : strlen(s);
 
         strmemccpy(one, s, MIN(n + 1, sizeof(one)));
+        if (one[0] >= 'a' && one[0] <= 'z')
+            one[0] -= 'a' - 'A';    /* "prose" is listed as "Prose" */
         if (!add_name(one, &at))
             return false;
         if (b->nsubjects++ == 0)
@@ -277,9 +280,6 @@ static bool shown(const struct ebook *b)
         case SHOW_AUTHORS: return true;
         case SHOW_AUTHOR:  return !strcmp(names + b->author, author_shown);
         case SHOW_SUBJECT: return has_subject(b, subject_shown);
-        case SHOW_SEARCH:  return strcasestr(names + b->title, search_text)
-                                  || strcasestr(names + b->author,
-                                                search_text);
         default:           return b->state == showing;
     }
 }
@@ -413,14 +413,16 @@ static const struct bitmap *get_art(int n, void *data, struct dim *size,
     return browser_art_row(n, data, art_hash, size, filter, filter_hash);
 }
 
-/* %Lr: how far through an In progress book, for a theme's gauge */
+/* %Lr: how far through a book, for a theme's gauge: a finished one is full,
+ * one not started has none */
 static int get_range(int n, void *data)
 {
     int b = book_at(n);
     (void)data;
 
-    return b < 0 || books[b].state != BOOK_SHELF_IN_PROGRESS
-           ? -1 : books[b].pct;
+    if (b < 0 || books[b].state == BOOK_SHELF_NOT_STARTED)
+        return -1;
+    return books[b].state == BOOK_SHELF_FINISHED ? 100 : books[b].pct;
 }
 
 static enum list_row_kind get_kind(int n, void *data)
@@ -441,7 +443,6 @@ static const char *list_title(void)
         case SHOW_AUTHOR:   return author_shown;
         case SHOW_SUBJECTS: return str(LANG_BY_SUBJECT);
         case SHOW_SUBJECT:  return subject_shown;
-        case SHOW_SEARCH:   return search_text;
         default:            return str(list_lang(showing));
     }
 }
@@ -594,9 +595,8 @@ static int show(char *path, size_t size, int *selection, int *list)
         load();
         if (top_rows() + row_ct == 0)
         {
-            /* A list emptied by the book just read goes back up quietly;
-             * a search that found nothing says so */
-            if (showing == SHOW_TOP || showing == SHOW_SEARCH)
+            /* A list emptied by the book just read goes back up quietly */
+            if (showing == SHOW_TOP)
                 splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
             return GO_TO_PREVIOUS;
         }
@@ -628,6 +628,12 @@ static int show(char *path, size_t size, int *selection, int *list)
             info.selection = n;
             info.top_item = n;
         }
+        /* The book just finished, in Finished */
+        for (int n = 0; select_path[0] && n < top_rows() + row_ct; n++)
+            if (book_at(n) >= 0
+                && !strcmp(names + books[book_at(n)].path, select_path))
+                *selection = info.selection = n;
+        select_path[0] = '\0';
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
@@ -665,6 +671,55 @@ static int show(char *path, size_t size, int *selection, int *list)
     return ret;
 }
 
+/* The search box over every book: its title or its author */
+static int search_scan(const char *query, void *ctx)
+{
+    (void)ctx;
+    row_ct = 0;
+    for (int i = 0; query[0] && i < book_ct; i++)
+        if (strcasestr(names + books[i].title, query)
+            || strcasestr(names + books[i].author, query))
+            rows[row_ct++] = i;
+    qsort(rows, row_ct, sizeof(*rows), compare_rows);
+    return row_ct;
+}
+
+static const char *search_row(int i, void *ctx)
+{
+    (void)ctx;
+    return names + books[rows[i]].title;
+}
+
+/* Search until a book is chosen, into `path`, or the box is left. Each book
+ * read goes back to the box, on the same query. */
+static int search_books(char *path, size_t size)
+{
+    static const struct search_provider provider = {
+        .activity = ACTIVITY_DB_SEARCH,
+        .scan     = search_scan,
+        .row_text = search_row,
+        .row_icon = NULL,
+    };
+    struct search_provider p = provider;
+    int chosen;
+
+    p.title = str(LANG_DB_SEARCH);
+    path[0] = '\0';
+    if (!claim())
+    {
+        splash(HZ * 2, ID2P(LANG_OUT_OF_MEMORY));
+        return GO_TO_PREVIOUS;
+    }
+    showing = SHOW_TITLES;
+    load();
+    chosen = search_dialog_run(&p, NULL, search_text, sizeof(search_text));
+    if (chosen >= 0)
+        strmemccpy(path, names + books[rows[chosen]].path, size);
+    release();
+    showing = SHOW_TOP;
+    return chosen == SEARCH_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
+}
+
 int ebook_shelf_run(void)
 {
     static char path[MAX_PATH];
@@ -692,10 +747,18 @@ int ebook_shelf_run(void)
 
         if (path[0])
         {
-            /* The reader takes the whole screen and the buffer back */
+            /* The reader takes the whole screen and the buffer back. A book
+             * read to its end is shown in Finished. */
+            bool finished = text_viewer_finished(path);
+
             ret = text_viewer(path);
             if (ret == GO_TO_ROOT)
                 break;
+            if (!finished && text_viewer_finished(path))
+            {
+                showing = BOOK_SHELF_FINISHED;
+                strmemccpy(select_path, path, sizeof(select_path));
+            }
             continue;
         }
         if (ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER)
@@ -711,11 +774,21 @@ int ebook_shelf_run(void)
                 }
                 continue;
             }
-            /* Search asks what for first, and stays at the top without */
-            if (list == SHOW_SEARCH
-                && (kbd_input(search_text, sizeof(search_text), NULL) < 0
-                    || !search_text[0]))
+            if (list == SHOW_SEARCH)
+            {
+                int r;
+
+                while ((r = search_books(path, sizeof(path))) != GO_TO_ROOT
+                       && path[0] && (r = text_viewer(path)) != GO_TO_ROOT)
+                    ;
+                path[0] = '\0';
+                if (r == GO_TO_ROOT)
+                {
+                    ret = GO_TO_ROOT;
+                    break;
+                }
                 continue;
+            }
             showing = list;
             *(list == SHOW_AUTHORS || list == SHOW_SUBJECTS ? &names_sel
               : list == SHOW_AUTHOR || list == SHOW_SUBJECT ? &book_sel

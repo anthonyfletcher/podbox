@@ -21,8 +21,12 @@ static long coreio_read(void *ctx, void *buf, size_t n)
 
     if (got > 0 && f->pos >= 0) f->pos += got;
     else if (got < 0) f->pos = -1;
+    if (ts_io_progress && f->pos >= 0)
+        ts_io_progress(f->pos);
     return got;
 }
+
+void (*ts_io_progress)(bs_off_t pos);
 
 static bs_off_t coreio_seek(void *ctx, bs_off_t off, int whence)
 {

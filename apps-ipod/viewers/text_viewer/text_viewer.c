@@ -1483,10 +1483,9 @@ static bool tv_prev_part(void)
     return tv_end_before(tv.part);
 }
 
-/* The page a next page found nothing after, though a chapter followed it:
- * the book's last, with only empty chapters behind it. -1 until found. */
-static int tv_last_part = -1;
-static off_t tv_last_pos;
+/* The last chapter with anything to show: the book ends at its last page,
+ * whatever empty chapters follow it. Found when the book opens. */
+static int tv_last_text;
 
 /* The next page, crossing into the next chapter from the last page of one.
  * False at the end of the document, leaving the last page where it was. */
@@ -1509,8 +1508,6 @@ static bool tv_advance(void)
     /* Nothing after it has text: back to where the reader was */
     tv_enter_part(part);
     tv_resume_to(pos);
-    tv_last_part = part;
-    tv_last_pos = pos;
     return false;
 }
 
@@ -1533,9 +1530,12 @@ static int tv_page_words(void)
     return words;
 }
 
+/* Next on a book's last page: the book is closed, Finished */
+static bool tv_book_done;
+
 /* A page read by eye counts toward the statistics; one Read Aloud says
- * does not. At the end, the page is drawn again: looking past it may have
- * put the loading box over it, and its percent is now 100. */
+ * does not. At the end of a chapter, the page is drawn again: looking past
+ * it may have put the loading box over it. At the book's end it closes. */
 static void tv_next_page(void)
 {
     int words = tv_page_words();
@@ -1545,6 +1545,13 @@ static void tv_next_page(void)
         reading_stats_page(words);
     else
         reading_stats_touch();
+    if (!moved && tv_at_book_end())
+    {
+        tv_splashf("%s", str(LANG_BOOK_SHELF_ROW_FINISHED));
+        sleep(HZ);
+        tv_book_done = true;
+        return;
+    }
     tv_draw();
     if (moved)
         tv_speak_page();
@@ -1576,41 +1583,182 @@ static void tv_prev_page(void)
     tv_speak_page();
 }
 
-/* Held back: the first page of the chapter, or of the one before when
- * already there */
+/* ---- chapters by their headings ---------------------------------------- */
+
+/* The window's byte at `at`, an offset into the chapter's text */
+#define TV_AT(at) (tv.win[(at) - tv.win_start])
+
+/* Past the white space and heading lines at `at`, up to `end`: where the
+ * text starts on a page that opens with a chapter's headings */
+static off_t tv_past_heads(off_t at, off_t end)
+{
+    while (at < end)
+    {
+        unsigned char c = TV_AT(at);
+
+        if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
+            at++;
+        else if (end - at >= 3 && !memcmp(&TV_AT(at), TV_HEAD_OPEN, 3))
+        {
+            for (at += 3; at + 3 <= end && !(TV_AT(at) == 0xee
+                     && TV_AT(at + 1) == 0x80 && TV_AT(at + 2) == 0x83); at++)
+                ;
+            at += 3;
+        }
+        else
+            break;
+    }
+    return at;
+}
+
+/* The first heading from `from` up to `to`, or -1 */
+static off_t tv_head_in(off_t from, off_t to)
+{
+    for (off_t i = from; i + 3 <= to; i++)
+        if (!memcmp(&TV_AT(i), TV_HEAD_OPEN, 3))
+            return i;
+    return -1;
+}
+
+/* Back to the first page of the chapter's text, or of a document without
+ * chapters */
+static void tv_to_start(void)
+{
+    if (tv.nparts)
+        tv_enter_part(tv.part);
+    else
+    {
+        tv_reach(0);
+        tv.sp = 0;
+    }
+}
+
+/* A page that starts at `off`, the text before it on the pages before, laid
+ * out from the chapter's start: where a heading begins */
+static void tv_start_at(off_t off)
+{
+    tv_resume_to(off);
+    while (off < tv.win_start + (off_t)tv.win_len
+           && (TV_AT(off) == '\n' || TV_AT(off) == ' '))
+        off++;
+    if (tv.pos < off && tv.sp < TV_MAX_PAGES
+        && off < tv.win_start + (off_t)tv.win_len)
+    {
+        tv.stack[tv.sp++] = tv.pos;
+        tv.pos = off;
+    }
+}
+
+/* Laid out from the chapter's start: the start of the last run of headings
+ * before `target`, or -1. Headings in a row, a chapter's number and its
+ * title, are one. */
+static off_t tv_head_before(off_t target)
+{
+    off_t last = -1, run_end = -1;
+
+    tv_to_start();
+    while (tv.pos < target)
+    {
+        off_t next = tv_page(tv.pos, false), h, at = tv.pos;
+
+        while ((h = tv_head_in(at, MIN(next, target))) >= 0)
+        {
+            if (h >= run_end)
+                last = h;
+            run_end = tv_past_heads(h, next);
+            at = h + 3;
+        }
+        if (next <= tv.pos || (tv.eof && next >= tv.win_start
+                                             + (off_t)tv.win_len))
+            break;
+        if (tv.sp < TV_MAX_PAGES)
+            tv.stack[tv.sp++] = tv.pos;
+        tv.pos = next;
+    }
+    return last;
+}
+
+/* Held back: where this chapter's headings start, or, already there, the
+ * chapter before's */
 static void tv_chapter_start(void)
 {
-    int start = tv.part, part = start;
+    int part = tv.part;
+    off_t target = tv.pos, h;
 
     reading_stats_touch();
-    if (tv.nparts && tv.pos == 0 && part > 0)
+    tv_splash_loading(true);
+    cpu_boost(true);
+    h = tv_head_before(target);
+    if (h < 0 && tv.nparts)
     {
-        while (--part >= 0 && !tv_enter_part(part))
-            ;
-        if (part < 0)
-            tv_enter_part(start);
+        /* None before it in this chapter's text: its start, or when the
+         * page is that start, the last heading of the text before */
+        tv_to_start();
+        if (target > tv_past_heads(0, tv.win_start + (off_t)tv.win_len)
+            || !tv_end_before(part))
+        {
+            tv_enter_part(part);
+            h = 0;
+        }
+        else
+        {
+            h = tv_head_before(TV_OFF_MAX);
+            if (h < 0)
+                h = 0;
+        }
     }
-    else if (tv.nparts)
-        tv_enter_part(part);
-    else
-        tv_reach(0);
-    tv.sp = 0;
+    else if (h < 0)
+        h = 0;
+    tv_to_start();
+    if (h > 0)
+        tv_start_at(h);
+    cpu_boost(false);
     tv_draw();
     tv_speak_page();
 }
 
-/* Held forward: the first page of the next chapter, or the book's last */
+/* Held forward: the next chapter's headings, past those the page opens
+ * with, or the book's last page */
 static void tv_chapter_next(void)
 {
     int part = tv.part;
+    off_t from;
 
     reading_stats_touch();
-    if (!tv.nparts || !tv_next_part())
+    tv_splash_loading(true);
+    cpu_boost(true);
+    from = tv_past_heads(tv.pos, tv_page(tv.pos, false));
+    while (1)
     {
-        if (tv.nparts)
-            tv_enter_part(part);
-        tv_resume_to(TV_OFF_MAX);
+        off_t next = tv_page(tv.pos, false);
+        off_t h = tv_head_in(MAX(from, tv.pos), next);
+
+        if (h >= 0)
+        {
+            if (h > tv.pos && tv.sp < TV_MAX_PAGES)
+            {
+                tv.stack[tv.sp++] = tv.pos;
+                tv.pos = h;
+            }
+            break;
+        }
+        if (next <= tv.pos || (tv.eof && next >= tv.win_start
+                                             + (off_t)tv.win_len))
+        {
+            /* the end of this chapter's text: the next with any, or this
+             * last page */
+            if (tv.nparts && !tv_next_part())
+            {
+                tv_enter_part(part);
+                tv_resume_to(TV_OFF_MAX);
+            }
+            break;
+        }
+        if (tv.sp < TV_MAX_PAGES)
+            tv.stack[tv.sp++] = tv.pos;
+        tv.pos = next;
     }
+    cpu_boost(false);
     tv_draw();
     tv_speak_page();
 }
@@ -1864,13 +2012,11 @@ static bool tv_open_finished;
 static int tv_open_part;
 static off_t tv_open_pos;
 
-/* The page on screen is the book's last: its last chapter's last page, the
- * last before chapters with nothing in them, or still the one a finished
- * book was opened at */
+/* The page on screen is the book's last: the last page of its last chapter
+ * with text, or still the one a finished book was opened at */
 static bool tv_at_book_end(void)
 {
-    return ((!tv.nparts || tv.part == tv.nparts - 1) && tv_at_end())
-           || (tv.part == tv_last_part && tv.pos == tv_last_pos)
+    return ((!tv.nparts || tv.part >= tv_last_text) && tv_at_end())
            || (tv_open_finished && tv.part == tv_open_part
                && tv.pos == tv_open_pos);
 }
@@ -1964,6 +2110,25 @@ void text_viewer_each_place(text_viewer_place_fn fn, void *data)
             break;
     }
     close(fd);
+}
+
+bool text_viewer_finished(const char *path)
+{
+    struct libfile_header h;
+    struct tv_place p;
+    bool finished = false;
+    int fd = tv_places_open(&h);
+
+    if (fd < 0)
+        return false;
+    for (uint32_t i = 0; i < h.count && tv_place_read(fd, &p); i++)
+        if (!strcmp(p.path, path))
+        {
+            finished = p.flags & TV_PLACE_FINISHED;
+            break;
+        }
+    close(fd);
+    return finished;
 }
 
 bool text_viewer_mark_place(const char *path, int state)
@@ -2465,17 +2630,7 @@ int text_viewer_contents(void)
         cpu_boost(false);
         if (rc == BS_OK && tv_enter_part(target))
         {
-            tv_resume_to((off_t)off);
-            while (off < tv.win_start + (off_t)tv.win_len
-                   && (tv.win[off - tv.win_start] == '\n'
-                       || tv.win[off - tv.win_start] == ' '))
-                off++;
-            if (tv.pos < (off_t)off && tv.sp < TV_MAX_PAGES
-                && off < tv.win_start + (off_t)tv.win_len)
-            {
-                tv.stack[tv.sp++] = tv.pos;
-                tv.pos = off;
-            }
+            tv_start_at((off_t)off);
             return 1;
         }
     }
@@ -2810,6 +2965,39 @@ static size_t tv_note_clean(char *s)
     return n - i;
 }
 
+/* A bar under the Wait box while notes are found, by the file position: the
+ * first half finding them, the second reading back to the page. Only once
+ * it has taken a moment, as the picture bar. */
+static long tv_note_start;
+static int tv_note_half, tv_note_drawn;
+static unsigned int tv_note_thread;
+
+static void tv_note_progress(bs_off_t at)
+{
+    struct screen *d = &screens[SCREEN_MAIN];
+    struct viewport *last;
+    int w = tv.vp.width / 2, x = (tv.vp.width - w) / 2;
+    int y = tv.vp.height * 3 / 4, fill;
+    int64_t size = tv.file_size;
+
+    if (thread_self() != tv_note_thread || size <= 0
+        || TIME_BEFORE(current_tick, tv_note_start + TV_PIC_BAR_AFTER))
+        return;
+    fill = (int)(w * (tv_note_half * size + MIN((int64_t)at, size))
+                 / (2 * size));
+    if (fill == tv_note_drawn)
+        return;
+    tv_note_drawn = fill;
+    last = d->set_viewport(&tv.vp);
+    d->drawrect(x, y, w, 5);
+    d->fillrect(x, y, fill, 5);
+    if (tv_side)
+        tv_side_push();
+    else
+        d->update_viewport();
+    d->set_viewport(last);
+}
+
 /* Hold Select: the notes the page on screen refers to, in a box. Reading
  * them ends the chapter being read, so the page is laid out again after. */
 static int tv_notes(void)
@@ -2842,6 +3030,11 @@ static int tv_notes(void)
     talk_force_shutup();
     tv_reading = false;
     tv_splashf("%s\n%s", str(LANG_WAIT), str(LANG_TEXT_VIEWER_NOTES));
+    tv_note_start = current_tick;
+    tv_note_thread = thread_self();
+    tv_note_half = 0;
+    tv_note_drawn = -1;
+    ts_io_progress = tv_note_progress;
     cpu_boost(true);
     for (int k = 0; k < nh; k++)
     {
@@ -2863,7 +3056,9 @@ static int tv_notes(void)
         tv_note_text[used] = '\0';
     }
     cpu_boost(false);
+    tv_note_half = 1;
     tv_reopen(part, pos);
+    ts_io_progress = NULL;
 
     if (used)
     {
@@ -2934,6 +3129,9 @@ static void tv_open_at(int part, off_t off)
         tv_splash_loading(true);
         part = tv_find_part(&off);
     }
+    for (tv_last_text = tv.nparts - 1;
+         tv_last_text > 0 && !tv_enter_part(tv_last_text); tv_last_text--)
+        ;
     if (part < 0 || part >= tv.nparts)
         part = off = 0;
     if (!tv_enter_part(part) && !tv_next_part())
@@ -2975,10 +3173,10 @@ int text_viewer(const char *file)
     tv_open_at(part, resume);
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
-    tv_last_part = -1;
 
     tv_draw();
     tv_speak_page();
+    tv_book_done = false;
 
     while (1)
     {
@@ -2988,6 +3186,8 @@ int text_viewer(const char *file)
                       || tv_pic_pending ? HZ/10 : TIMEOUT_BLOCK;
         int action;
 
+        if (tv_book_done)
+            goto done;
         if (tv_side)
         {
             long b = timeout == TIMEOUT_BLOCK ? button_get(true)

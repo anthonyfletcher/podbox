@@ -159,9 +159,13 @@ static void prose_draw(struct dialog *d, struct screen *s,
      * there is some, which is the question a reader actually has. */
     if (p->lines > p->visible)
     {
+        /* Into a buffer, filled with the box's colour: clearing in inverse
+         * video copies the screen's backdrop, laid out for the screen */
         gui_scrollbar_draw(s, content->width - PROSE_BAR_W, 0,
                            PROSE_BAR_W, body_h, p->lines,
-                           p->scroll, p->scroll + p->visible, VERTICAL);
+                           p->scroll, p->scroll + p->visible,
+                           d->fb ? VERTICAL | FOREGROUND | INNER_BGFILL
+                                 : VERTICAL);
     }
 
     y = content->height - bh;

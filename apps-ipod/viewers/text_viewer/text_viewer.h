@@ -55,6 +55,9 @@ typedef bool (*text_viewer_place_fn)(const char *path, int pct,
                                      bool finished, void *data);
 void text_viewer_each_place(text_viewer_place_fn fn, void *data);
 
+/* Whether `path` was read to its end, or marked Finished */
+bool text_viewer_finished(const char *path);
+
 /* Marks `path` as the Books shelf's Mark as does: In progress keeps its
  * place (or gives it one at its start), Finished as well and flags it,
  * Not started forgets it. False if the file could not be written. */
