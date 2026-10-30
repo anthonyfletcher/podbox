@@ -10,6 +10,8 @@
  *
  * Above the files sit Search and By Type, scrolled off the top: a search of
  * the names, and the files of one type -- EPUB, PNG -- in a list of their own.
+ * Every list is in the order Sort Documents or Sort Images sets: by name
+ * either way, or the newest first by the time each line of the list carries.
  *
  * The list comes from the background walk in files/file_index.c; nothing is
  * scanned here. Opening is left to the core viewers, through the same
@@ -42,6 +44,8 @@
 #include "files/file_index.h"
 #include "files/path_list.h"
 #include "files/filetypes.h"
+#include "system/bg_task.h"         /* a file gone: the walk again */
+#include "strnatcmp.h"
 #include "root_menu.h"
 #include "browser_flat.h"
 
@@ -61,6 +65,33 @@ static int shown_ct;
 static int heads;               /* HEAD_ROWS above them, or none */
 
 #define TYPE_MAX 8
+
+/* Line `i`'s path, past the time before it */
+static const char *flat_path(int i)
+{
+    const char *line = path_list_get(&list, i);
+    const char *tab = strchr(line, '\t');
+
+    return tab ? tab + 1 : line;
+}
+
+static unsigned long flat_time(int i)
+{
+    return strtoul(path_list_get(&list, i), NULL, 16);
+}
+
+static int compare_files(const void *a, const void *b)
+{
+    int x = *(const int *)a, y = *(const int *)b;
+    int order = flat_images ? global_settings.sort_images
+                            : global_settings.sort_documents;
+    int by_name = strnatcasecmp(path_list_leaf(&list, x),
+                                path_list_leaf(&list, y));
+
+    if (order == FLAT_SORT_NEWEST && flat_time(x) != flat_time(y))
+        return flat_time(x) < flat_time(y) ? 1 : -1;
+    return order == FLAT_SORT_NAME_REVERSE ? -by_name : by_name;
+}
 
 /* A file's type as By Type names it: its extension in capitals, the ways of
  * writing one type made one */
@@ -82,7 +113,8 @@ static void file_type(const char *path, char *buf, size_t size)
             strlcpy(buf, same[i][1], size);
 }
 
-/* `shown` filled with every file of `type`, or every file for NULL */
+/* `shown` filled with every file of `type`, or every file for NULL, in the
+ * order set */
 static void fill_shown(const char *type)
 {
     char t[TYPE_MAX];
@@ -92,12 +124,13 @@ static void fill_shown(const char *type)
     {
         if (type)
         {
-            file_type(path_list_get(&list, i), t, sizeof(t));
+            file_type(flat_path(i), t, sizeof(t));
             if (strcmp(t, type))
                 continue;
         }
         shown[shown_ct++] = i;
     }
+    qsort(shown, shown_ct, sizeof(shown[0]), compare_files);
 }
 
 static bool load(void)
@@ -118,14 +151,15 @@ static int open_file(int index)
     char path[MAX_PATH];
     int attr, rc = GO_TO_PREVIOUS;
 
-    strlcpy(path, path_list_get(&list, index), sizeof(path));
+    strlcpy(path, flat_path(index), sizeof(path));
     attr = filetype_get_attr(path);
 
     /* The list is only as fresh as the last walk, so a file named in it may
-     * be gone. */
+     * be gone: the walk runs again, and the list follows when it is done. */
     if (!file_exists(path))
     {
         splash(HZ * 2, ID2P(LANG_FILE_NOT_FOUND));
+        bg_task_update(&file_index_task);
         return GO_TO_PREVIOUS;
     }
 
@@ -221,7 +255,7 @@ static void fill_types(void)
     type_ct = 0;
     for (i = 0; i < list.count; i++)
     {
-        file_type(path_list_get(&list, i), t, sizeof(t));
+        file_type(flat_path(i), t, sizeof(t));
         for (k = 0; k < type_ct && strcmp(types[k], t); k++)
             ;
         if (k == type_ct)
@@ -261,8 +295,7 @@ static const char *type_name(int i, void *data, char *buf, size_t size)
 static enum themable_icons type_icon(int i, void *data)
 {
     (void)data;
-    return filetype_get_icon(filetype_get_attr(path_list_get(&list,
-                                                             type_files[i])));
+    return filetype_get_icon(filetype_get_attr(flat_path(type_files[i])));
 }
 
 static enum list_row_kind type_kind(int i, void *data)
@@ -321,7 +354,7 @@ static enum themable_icons flat_get_icon(int selected_item, void *data)
     if (selected_item < heads)
         return Icon_NOICON;
     return filetype_get_icon(filetype_get_attr(
-                path_list_get(&list, shown[selected_item - heads])));
+                flat_path(shown[selected_item - heads])));
 }
 
 static enum list_row_kind flat_get_kind(int selected_item, void *data)

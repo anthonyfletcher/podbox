@@ -177,6 +177,8 @@ static const struct tag_row tag_rows[] = {
 /* --- files and the browser ----------------------------------------------- */
 { "sort case",           TAG_LIBRARY,                            "sorting uppercase" },
 { "sort dirs",           TAG_LIBRARY,                            "sorting directories folders" },
+{ "sort documents",      TAG_LIBRARY,                            "sorting documents books order date newest" },
+{ "sort images",         TAG_LIBRARY,                            "sorting images pictures order date newest" },
 { "sort files",          TAG_LIBRARY,                            "sorting" },
 { "sort interpret number", TAG_LIBRARY,                          "sorting numbers" },
 { "show files",          TAG_LIBRARY,                            "filter hide" },

@@ -282,8 +282,13 @@ MENUITEM_SETTING_W_LABEL(sort_file, &global_settings.sort_file,
                          ID2P(LANG_SORT_FILE_SHORT), NULL);
 MENUITEM_SETTING_W_LABEL(interpret_numbers, &global_settings.interpret_numbers,
                          ID2P(LANG_SORT_INTERPRET_NUMBERS_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(sort_documents, &global_settings.sort_documents,
+                         ID2P(LANG_DOCUMENTS), NULL);
+MENUITEM_SETTING_W_LABEL(sort_images, &global_settings.sort_images,
+                         ID2P(LANG_IMAGES), NULL);
 MAKE_MENU(file_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
-          &sort_case, &sort_dir, &sort_file, &interpret_numbers);
+          &sort_case, &sort_dir, &sort_file, &sort_documents, &sort_images,
+          &interpret_numbers);
 MENUITEM_SETTING(dirfilter, &global_settings.dirfilter, NULL);
 MENUITEM_SETTING(show_filename_ext, &global_settings.show_filename_ext, NULL);
 MENUITEM_SETTING(browse_current, &global_settings.browse_current, NULL);

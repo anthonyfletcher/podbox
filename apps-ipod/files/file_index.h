@@ -15,6 +15,7 @@ void file_index_init(void);
 
 /* Path of the list file for one class, for path_list_load(). Absent until a
  * walk has completed. */
+/* Each line is the file's time in eight hex digits, a tab, and its path */
 const char *file_index_list(bool images);
 
 /* True while a walk is running. */

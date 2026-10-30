@@ -109,6 +109,16 @@ const char *file_index_list(bool images)
     return images ? FILE_INDEX_IMAGES : FILE_INDEX_DOCS;
 }
 
+/* A line of a list: the file's time (FAT date and time) in eight hex
+ * digits, a tab, and the path */
+static void fi_record(struct path_list_writer *w, unsigned long mtime)
+{
+    static char line[MAX_PATH + 10];
+
+    snprintf(line, sizeof(line), "%08lx\t%s", mtime, fi_path);
+    path_list_write_record(w, line);
+}
+
 /* ---- the walk ---------------------------------------------------------- */
 
 /* Give up promptly for a USB session, a shutdown, or the artwork cache
@@ -209,12 +219,12 @@ static void fi_walk(int depth)
                 case FILE_ATTR_TXT:
                 case FILE_ATTR_BOOK:
                 case FILE_ATTR_LYRICS:
-                    path_list_write_record(&fi_docs, fi_path);
+                    fi_record(&fi_docs, info.mtime);
                     book_index_found(fi_path, info.size, info.mtime);
                     break;
                 case FILE_ATTR_IMG:
                     if (!fi_is_cover_art((char *)entry->d_name))
-                        path_list_write_record(&fi_images, fi_path);
+                        fi_record(&fi_images, info.mtime);
                     break;
             }
         }

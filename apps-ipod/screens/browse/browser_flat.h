@@ -13,4 +13,11 @@
  * code. */
 int browser_flat(bool images);
 
+/* global_settings.sort_documents and sort_images */
+enum flat_sort {
+    FLAT_SORT_NAME = 0,
+    FLAT_SORT_NAME_REVERSE,
+    FLAT_SORT_NEWEST,
+};
+
 #endif /* _BROWSER_FLAT_H */

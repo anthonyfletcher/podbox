@@ -505,6 +505,14 @@ The order folders are listed in: by name, or by when they were last written.
 [sort files]
 The order files are listed in, including grouping by type.
 
+[sort documents]
+The order of the Documents list: by name either way, or the newest file
+first. Newest goes by when a file was last changed.
+
+[sort images]
+The order of the Images list: by name either way, or the newest picture
+first. Newest goes by when a file was last changed.
+
 [sort interpret number]
 Whether "track2" comes before "track10" by reading the digits as a number, or
 after it by comparing them one character at a time.
@@ -1102,7 +1110,7 @@ How quickly text too long for its line moves.
 
 [vertical scroll speed]
 How quickly a box of text too long for it moves up, such as a podcast
-episode's notes. Slower than Scroll Speed by default: it is read as it goes.
+episode's notes, apart from Scroll Speed's sideways lines.
 
 [scroll delay]
 How long text waits before it starts moving, so a row can be read before it

@@ -29,8 +29,9 @@
  *   1: library/, logs/, the libfile .dat files.
  *   2: the database in library/database; every file the player owns a .dat.
  *   3: no album index on disk: tagcache keeps the album tables.
- *   4: the text viewer's reading places in user/. */
-#define LIBRARY_FORMAT 4
+ *   4: the text viewer's reading places in user/.
+ *   5: the document and image lists carry each file's date. */
+#define LIBRARY_FORMAT 5
 
 #define LIB_FORMAT_FILE     LIB_DIR "/format.dat"
 #define LIB_SOUND_FILE      LIB_DIR "/sound.dat"

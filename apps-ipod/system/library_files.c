@@ -649,6 +649,9 @@ static const char *const dead[] = {
     LIB_ART_DIR "/stamps.dat.tmp",
     LIB_ART_DIR "/noart_albums.lst.tmp",
     LIB_ART_DIR "/noart_artists.lst.tmp",
+    /* Layout 5's carry dates; the walk at boot writes them again */
+    LIB_DOCUMENTS_FILE,
+    LIB_IMAGES_FILE,
 };
 
 static void remove_dead(void)
