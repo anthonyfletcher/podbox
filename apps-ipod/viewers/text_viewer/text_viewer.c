@@ -1065,6 +1065,7 @@ static int tv_pages_left(void)
 }
 
 static bool tv_at_book_end(void);
+static bool tv_at_last_page(void);
 
 /* How far through the book the page on screen starts, in percent, and 100 on
  * its last page: by the stored sizes of the chapters before it and the part
@@ -1616,7 +1617,7 @@ static void tv_next_page(void)
     int words = tv_page_words();
     bool moved;
 
-    if (tv_at_book_end())
+    if (tv_at_last_page())
     {
         /* drawn over the page, not over a loading box from looking past */
         reading_stats_touch();
@@ -2090,11 +2091,18 @@ static bool tv_open_finished;
 static int tv_open_part;
 static off_t tv_open_pos;
 
-/* The page on screen is the book's last: the last page of its last chapter
- * with text, or still the one a finished book was opened at */
+/* The page on screen is the last page of the book's last chapter with text */
+static bool tv_at_last_page(void)
+{
+    return (!tv.nparts || tv.part >= tv_last_text) && tv_at_end();
+}
+
+/* The book stands at its end: its last page, or still the page a finished
+ * book was opened at -- which a change of layout, a picture shown or a font
+ * size, can have moved off the last page */
 static bool tv_at_book_end(void)
 {
-    return ((!tv.nparts || tv.part >= tv_last_text) && tv_at_end())
+    return tv_at_last_page()
            || (tv_open_finished && tv.part == tv_open_part
                && tv.pos == tv_open_pos);
 }
