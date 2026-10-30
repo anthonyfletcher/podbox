@@ -1195,7 +1195,7 @@ double-click it to swap hands.
 [text viewer wheel scrubs]
 Turning the wheel moves through the book a percent at a time, showing the
 chapter and percentage it would go to; Select goes there, and any other
-button stays put. Off, the wheel sets Read Aloud's volume.
+button stays put.
 
 [text viewer read aloud]
 Reads the text aloud in the synthesised voice, whether or not Speak Aloud is

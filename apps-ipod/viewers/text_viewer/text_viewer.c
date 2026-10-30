@@ -63,7 +63,6 @@
 #include "draw/resize.h"         /* format_native */
 #include "files/zip_member.h"
 #include "crc32.h"
-#include "system/volume.h"   /* adjust_volume, format_sound_value */
 #include "audio/sound_feedback.h"   /* keyclick_click */
 
 /* Extracted text kept resident, and how much of it sits behind the current
@@ -2828,9 +2827,6 @@ int text_viewer_contents(void)
     return target >= 0;
 }
 
-/* When the volume shown over the page is due to go, or 0 when none is */
-static long tv_volume_until;
-
 /* ---- scrubbing with the wheel ------------------------------------------ */
 
 /* Wheel Scrubs: the wheel moves a target through the book a percent a click,
@@ -2930,29 +2926,11 @@ static void tv_scrub_end(bool go)
         tv_speak_page();
 }
 
-/* With Read Aloud on and Wheel Scrubs off, the wheel sets the volume and
- * shows it over the page for a second; otherwise it does nothing. */
-static void tv_volume(int steps)
-{
-    char val[32];
-
-    if (global_settings.text_viewer_read_aloud == TV_READ_OFF)
-        return;
-
-    adjust_volume(steps);
-    setvol();
-    format_sound_value(val, sizeof val, SOUND_VOLUME, global_status.volume);
-    tv_splashf("%s: %s", str(LANG_VOLUME), val);
-    tv_volume_until = current_tick + HZ;
-}
-
-/* The wheel: scrubbing with Wheel Scrubs on, the volume otherwise */
+/* The wheel: scrubbing with Wheel Scrubs on; otherwise it only clicks */
 static void tv_wheel(int step)
 {
     if (global_settings.text_viewer_wheel_scrub)
         tv_scrub(step);
-    else
-        tv_volume(step);
 }
 
 /* What the loop does when no key came: overlays time out, and Continuously
@@ -2961,11 +2939,6 @@ static void tv_idle(void)
 {
     if (tv_pic_pending)
         tv_draw();
-    if (tv_volume_until && TIME_AFTER(current_tick, tv_volume_until))
-    {
-        tv_volume_until = 0;
-        tv_draw();
-    }
     if (tv_scrub_pct >= 0 && TIME_AFTER(current_tick, tv_scrub_until))
         tv_scrub_end(false);
     tv_hold_dark();
@@ -3385,7 +3358,6 @@ int text_viewer(const char *file)
     tv.path = file;
     tv.user_font = -1;           /* no font override loaded yet */
     tv.footer_font = -1;
-    tv_volume_until = 0;
     tv_scrub_pct = -1;
 
     /* Take the screen (theme off) and put up a clean loading frame before the
@@ -3418,7 +3390,7 @@ int text_viewer(const char *file)
     {
         bool continuous = tv_reading
             && global_settings.text_viewer_read_aloud == TV_READ_CONTINUOUS;
-        int timeout = continuous || tv_volume_until || tv_scrub_pct >= 0
+        int timeout = continuous || tv_scrub_pct >= 0
                       || tv_pic_pending || play_wait ? HZ/10 : TIMEOUT_BLOCK;
         int action;
 
