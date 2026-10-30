@@ -399,6 +399,57 @@ static struct skin_albumart *cd_albumart(struct wps_data *data,
     return aa ? aa : skin_albumart_first(skin_buffer, data->albumart);
 }
 
+/* One %Sb bar drawn as segments: whole ones only, on a grid that starts at the
+ * baseline -- the floor, or for a centred bar the middle, mirrored outward --
+ * so a bar's top and its cap always land on a segment boundary. Nothing is
+ * drawn in the gaps, so whatever is behind the viewport shows through. */
+static void draw_spectrum_segments(struct screen *display,
+                                   const struct spectrum_bars *sb,
+                                   int x, int w, int vp_h, int level, int peak,
+                                   int cap_h, unsigned bar_fg, unsigned cap_fg)
+{
+    int pitch = sb->seg_h + sb->seg_gap;
+    int mid = vp_h / 2;
+    int half_gap = sb->seg_gap / 2;
+    int space = sb->center_aligned ? mid - half_gap : vp_h;
+    int slots = MAX((space + sb->seg_gap) / pitch, 1);
+    /* Nearest whole segment, and never none: as with the continuous bar, an
+     * empty column reads as the meter having stopped. */
+    int lit = MIN(MAX((level * slots + 50) / 100, 1), slots);
+    int from = 0, to = lit;
+
+    for (int pass = 0; pass < (cap_h > 0 ? 2 : 1); pass++)
+    {
+        if (pass == 1)
+        {
+            /* The cap rounds up to whole segments and sits in the slots
+             * nearest its peak, never lower than its own height. */
+            int cap_slots = MIN((cap_h + pitch - 1) / pitch, slots);
+            to = MIN(MAX((peak * slots + 50) / 100, cap_slots), slots);
+            from = to - cap_slots;
+            if (cap_fg != bar_fg)
+                display->set_foreground(cap_fg);
+        }
+        for (int k = from; k < to; k++)
+        {
+            int rise = k * pitch + sb->seg_h;
+            if (sb->center_aligned)
+            {
+                fill_round_rect(display, x, mid - half_gap - rise,
+                                w, sb->seg_h, sb->radius);
+                fill_round_rect(display,
+                                x, mid + sb->seg_gap - half_gap + k * pitch,
+                                w, sb->seg_h, sb->radius);
+            }
+            else
+                fill_round_rect(display, x, vp_h - rise,
+                                w, sb->seg_h, sb->radius);
+        }
+    }
+    if (cap_h > 0 && cap_fg != bar_fg)
+        display->set_foreground(bar_fg);
+}
+
 static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                              struct skin_element *element)
 {
@@ -815,9 +866,18 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                         peak = spectrum_meter_get_peak(i, sb->bars);
                     }
 
-                    bar_h = (level * vp_h) / 100;
                     int x = i * (bar_w + gap);
                     int y;
+
+                    if (sb->seg_h > 0)
+                    {
+                        draw_spectrum_segments(gwps->display, sb, x, bar_w,
+                                               vp_h, level, peak, cap_h,
+                                               bar_fg, cap_fg);
+                        continue;
+                    }
+
+                    bar_h = (level * vp_h) / 100;
 
                     /* Always show at least a sliver -- a fully-empty gap
                      * reads as "the meter stopped", not "it's quiet". */

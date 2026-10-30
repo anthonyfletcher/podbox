@@ -1209,6 +1209,13 @@ int get_sleep_timer(void)
         return 0;
 }
 
+/* Seconds the running timer was started from, by its setter or by a
+ * keypress restart; 0 when none is running. */
+int get_sleep_timer_duration(void)
+{
+    return sleeptimer_active ? (int)sleeptimer_duration : 0;
+}
+
 void set_keypress_restarts_sleep_timer(bool enable)
 {
     sleeptimer_key_restarts = enable;

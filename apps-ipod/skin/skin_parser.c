@@ -694,6 +694,18 @@ static int parse_spectrumbars(struct skin_element *element,
             return -1;
         sb->peak_tinted = true;
     }
+    /* Segments: their height switches them on, as the cap's thickness does,
+     * and the gap between them is a pixel unless the skin says otherwise. */
+    sb->seg_h = 0;
+    sb->seg_gap = 1;
+    if (element->params_count > 6 && !isdefault(get_param(element, 6)))
+        sb->seg_h = get_param(element, 6)->data.number;
+    if (sb->seg_h < 0)
+        sb->seg_h = 0;
+    if (element->params_count > 7 && !isdefault(get_param(element, 7)))
+        sb->seg_gap = get_param(element, 7)->data.number;
+    if (sb->seg_gap < 0)
+        sb->seg_gap = 0;
     return 0;
 }
 

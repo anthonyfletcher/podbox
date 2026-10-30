@@ -47,7 +47,8 @@ preceding group repeats.
 | [`%pd(n, text)`](#pdn-text--pad-or-truncate-to-n-columns) | pad or truncate |
 | [`%trm(text, chars)`](#trmtext-chars--strip-characters-from-both-ends) | strip characters from both ends |
 | [`%ma(a, op, b)`](#maa-op-b--integer-arithmetic) | integer arithmetic |
-| [`%Sb(bars[, align, radius, gap, peak, peakcolour])`](#sbbars-align-radius-gap-peak-peakcolour--spectrum-analyser) | spectrum analyser |
+| [`%Sb(bars[, align, radius, gap, peak, peakcolour, segment, segmentgap])`](#sbbars-align-radius-gap-peak-peakcolour-segment-segmentgap--spectrum-analyser) | spectrum analyser |
+| [`%bsp`](#bsp--sleep-timer-remaining-as-a-percentage) | sleep timer remaining, as a percentage |
 | [`%lb`](#lb--background-index-building) | background work running |
 | [`%lw`](#lw--foreground-work-in-progress) | foreground work running |
 | [`%la`](#la--animated-spinner-frame) | spinner frame |
@@ -342,7 +343,7 @@ zero yield 0). `a` and `b` may be numbers or tags.
 
 ## Widgets and indicators
 
-### `%Sb(bars[, align[, radius[, gap[, peak[, peakcolour]]]]])` — spectrum analyser
+### `%Sb(bars[, align[, radius[, gap[, peak[, peakcolour[, segment[, segmentgap]]]]]]])` — spectrum analyser
 
 Draws an audio spectrum analyser filling the current viewport. `bars` is the
 number of bands, 1–8 (values outside that range are clamped).
@@ -385,6 +386,15 @@ midline in both directions, so it gets two caps, mirrored — and a rounded bar'
 caps are rounded to match, the radius fitted to the cap the same way it is
 fitted to a short bar.
 
+`segment` breaks each bar into segments `segment` pixels tall, with
+`segmentgap` pixels between them (1 if left out). Left out, or 0, the bars are
+continuous. A bar shows whole segments only, as many as its level rounds to,
+and never none. The segments count up from the bottom, or out from the middle
+for `center` and `radiate`, so every bar's top lands on a segment boundary.
+Caps snap to the same grid: a cap fills whole segments, as many as `peak`
+pixels reaches into, so it is never sliced by a gap. The gaps are not drawn,
+so whatever is behind the viewport shows through them.
+
 Arguments are positional, so reaching a later one means writing the earlier
 ones. Give them as `-` to keep the default:
 
@@ -397,6 +407,26 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(8, -, 3, 1, 2)  # 2px caps, in the viewport foreground
 %V(20,40,120,60,-)%Sb(8, -, 3, 1, 2, FF6600)   # the same caps, in orange
 %V(20,40,120,60,-)%Sb(5, center, 1, -, 3, 80D0FF)  # centred, a cap each end
+%V(20,40,120,60,-)%Sb(8, -, -, -, -, -, 2)       # 2px segments, 1px apart
+%V(20,40,120,60,-)%Sb(8, -, -, -, 2, FF6600, 2, 1)  # the same, with orange caps
+```
+
+### `%bsp` — sleep timer remaining, as a percentage
+
+How much of the sleep timer is left, from 100 when it starts down towards 0, as
+a bare number for `%ma` and comparisons. It is a share of the length the timer
+was started with, whether from the setting, a shortcut or the context menu, and
+it goes back to 100 when a keypress restarts the timer. It is empty when no
+timer is running, as `%bs` is, including while the player is set to pause at
+the end of a chapter. It rounds up, so it reads 0 only in the timer's last
+second.
+
+As a conditional it divides the percentage into equal parts, lowest first, so
+the last branch is the one showing when the timer starts. With no timer running
+it also takes the last branch, so test `%?bs` first to tell the two apart:
+
+```
+%?bs<%?bsp<%xd(Sleep,1)|%xd(Sleep,2)|%xd(Sleep,3)|%xd(Sleep,4)>|%xd(SleepOff)>
 ```
 
 ### `%lb` — background index building

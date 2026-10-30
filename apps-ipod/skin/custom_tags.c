@@ -25,7 +25,10 @@ static const struct tag_info custom_tags[] =
      * Arguments are positional and the parser rejects '-' on an uppercase type
      * outright, so an uppercase one here would make `gap` unreachable without
      * also writing an alignment. */
-    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|siiis",SKIN_REFRESH_SPECTRUM),
+    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|siiisii",SKIN_REFRESH_SPECTRUM),
+    /* The sleep timer's remaining time as a percentage of the length it was
+     * started from; empty with no timer running, as %bs is. */
+    TAG(SKIN_TOKEN_SLEEP_TIMER_PERCENT, "bsp", "",   SKIN_REFRESH_DYNAMIC),
     /* The wrap argument is lowercase 's' for the same reason as the filter
      * chain after it: upstream's 'S' would make the arguments past it
      * reachable only by also writing wrap or nowrap.

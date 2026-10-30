@@ -164,6 +164,7 @@ int get_battery_capacity(void); /* get local battery capacity value */
 void set_sleeptimer_duration(int minutes);
 bool get_sleep_timer_active(void);
 int get_sleep_timer(void);
+int get_sleep_timer_duration(void);
 void set_keypress_restarts_sleep_timer(bool enable);
 void handle_auto_poweroff(void);
 void set_car_adapter_mode(bool setting);

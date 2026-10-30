@@ -399,6 +399,8 @@ struct spectrum_bars {
     int16_t radius;
     int16_t gap;        /* pixels between bars; 1 unless the skin said otherwise */
     int16_t peak_h;     /* cap thickness in pixels; 0 draws no caps */
+    int16_t seg_h;      /* segment height; 0 draws continuous bars */
+    int16_t seg_gap;    /* pixels between segments */
     /* The cap's own colour, and whether the skin named one. Absent it keeps
      * the viewport foreground, so a cap is visible by the gap it floats in
      * rather than by contrast. */

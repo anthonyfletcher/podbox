@@ -1925,6 +1925,23 @@ const char *get_token_value(struct gui_wps *gwps,
             }
         }
 
+        case SKIN_TOKEN_SLEEP_TIMER_PERCENT:
+        {
+            int left = get_sleep_timer();
+            int length = get_sleep_timer_duration();
+            if (length <= 0)
+                return NULL;
+            /* Rounded up: 100 as it starts, and 0 only in its last second */
+            int pc = MIN((100 * left + length - 1) / length, 100);
+            if (limit == TOKEN_VALUE_ONLY)
+                numeric_ret = pc;
+            else
+                numeric_ret = MIN(limit * pc / 100 + 1, limit);
+            itoa_buf(buf, buf_size, pc);
+            numeric_buf = buf;
+            goto gtv_ret_numeric_tag_info;
+        }
+
         case SKIN_TOKEN_PLAYBACK_STATUS:
         {
             int status = current_playmode();

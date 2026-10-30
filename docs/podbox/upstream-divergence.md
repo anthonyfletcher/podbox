@@ -46,6 +46,7 @@ fork's USB work; the `tools/` changes are this fork's.
 | `export/storage.h`, `storage.c` | `Q_STORAGE_PRE_WAKE`, stubs and dispatch for the two calls above | Reaches SSD mode through the generic `storage_*` interface. |
 | `powermgmt.c` | The charger case sets `CHARGING` unconditionally; the battery-level test keys off `charge_state > DISCHARGING` | The 6G's charge-status line oscillates on weak USB sources, which flipped the voltage curve and moved the reading several points. |
 | `powermgmt.c` | New `charge_finished`, debounced over 8 samples and held until unplug; the 99 % cap needs it | Otherwise a full battery never shows 100 %. Other targets never set it, so they keep upstream's behaviour. |
+| `powermgmt.c`, `export/powermgmt.h` | New `get_sleep_timer_duration()`, the length the running timer last started from | `%bsp` is a percentage of the timer's own length, which only the firmware still has after a keypress restart. |
 | `SOURCES` | `mikey-6g.c` wrapped in `#ifdef HAVE_MIKEY_REMOTE` | So the inline remote can be switched off with one line in `export/config.h`. |
 | `export/font.h` | `MAXUSERFONTS` 12 → 16 | Screens that load their own fonts share the slots with the theme. |
 | `export/config.h` | `HAVE_MULTIMEDIA_KEYS` gated on `USB_ENABLE_IAP \|\| HAVE_MIKEY_REMOTE`, outside the `HAVE_USBSTACK` block | The 6G's inline remote produces the same key codes as USB iAP, without USB. |
