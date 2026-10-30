@@ -516,11 +516,13 @@ MENUITEM_SETTING(db_bookart, &global_settings.db_bookart, NULL);
 MENUITEM_SETTING(db_authorart, &global_settings.db_authorart, NULL);
 MENUITEM_SETTING(db_ebookart, &global_settings.db_ebookart, NULL);
 MENUITEM_SETTING(db_ebookauthorart, &global_settings.db_ebookauthorart, NULL);
+MENUITEM_SETTING(db_podcastart, &global_settings.db_podcastart, NULL);
 
 /* One list under two names: Appearance > Interface Elements > Art Rows, and
  * Appearance inside Library > Music. */
 #define ART_ROWS_ITEMS &db_albumart, &db_artistart, &db_bookart, \
-                       &db_authorart, &db_ebookart, &db_ebookauthorart
+                       &db_authorart, &db_ebookart, &db_ebookauthorart, \
+                       &db_podcastart
 MAKE_MENU(art_rows_menu, ID2P(LANG_ART_ROWS), NULL, Icon_NOICON,
             ART_ROWS_ITEMS);
 MAKE_MENU(music_appearance_menu, ID2P(LANG_APPEARANCE), NULL, Icon_NOICON,

@@ -802,6 +802,11 @@ Draws a photograph beside each author in Books > By Author, from a folder.jpg
 in the author's folder: the one above a book's own folder when books are kept
 as author, book, file, or else the folder the book is in.
 
+[database podcast art]
+Draws each show's art beside its row in the Podcasts list, from the art its
+episodes carry or a folder.jpg beside them. Needs a theme that supports
+artwork in lists, or the rows are tall and empty.
+
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.

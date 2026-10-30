@@ -26864,3 +26864,17 @@
     *: "Show Info"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_PODCAST_ART
+  desc: in Settings, art rows on the Podcasts lists
+  user: core
+  <source>
+    *: "Podcast Art Rows"
+  </source>
+  <dest>
+    *: "Podcast Art Rows"
+  </dest>
+  <voice>
+    *: "Podcast Art Rows"
+  </voice>
+</phrase>

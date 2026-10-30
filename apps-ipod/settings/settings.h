@@ -789,6 +789,9 @@ struct user_settings
      * of an author. Off by default. */
     bool db_authorart;
     bool db_ebookauthorart;
+    /* Show art on the Podcasts lists. On by default: a podcatcher embeds the
+     * show's art in every episode. */
+    bool db_podcastart;
     /* Covers on the Books lists. Off by default; a theme that draws art in
      * lists turns it on. */
     bool db_ebookart;

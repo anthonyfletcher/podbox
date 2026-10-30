@@ -2156,6 +2156,8 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookauthorart,
                   LANG_DB_EBOOK_AUTHOR_ART, false, "database book author art",
                   NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_podcastart,
+                  LANG_DB_PODCAST_ART, true, "database podcast art", NULL),
     OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
                   false, "segregate audiobooks", segregate_audiobooks_callback),
     OFFON_SETTING(F_BANFROMQS, segregate_podcasts, LANG_SEGREGATE_PODCASTS,

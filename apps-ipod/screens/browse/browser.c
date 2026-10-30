@@ -920,7 +920,9 @@ static int update_dir(void)
             bool album = browser_db_is_album_list(&tc);
             bool artist = !album && browser_db_is_artist_list(&tc);
 
-            if (browser_db_is_spoken_list(&tc))
+            if (browser_db_list_spoken_kind(&tc) == 2)
+                tall_rows = album && global_settings.db_podcastart;
+            else if (browser_db_is_spoken_list(&tc))
                 tall_rows = album ? global_settings.db_bookart
                                   : artist && global_settings.db_authorart;
             else if (album)
