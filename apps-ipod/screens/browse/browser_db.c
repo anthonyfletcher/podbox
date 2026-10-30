@@ -111,6 +111,7 @@ static bool under_artist_level(struct browser_context* c);
 static uint32_t loaded_entries_crc = 0;
 static int loaded_head_rows;
 static bool loaded_years_valid;
+static bool loaded_count_down;
 
 
 /* this needs to be same size as struct entry (tree.h) and name needs to be
@@ -2011,6 +2012,8 @@ static struct tagentry* get_entries(struct browser_context *tc)
  * tagentry, which must stay the size of struct entry. Valid only for the list
  * retrieve_entries() last filled it for. */
 static bool album_years_valid;
+/* The list loaded is of podcast episodes sorted newest first */
+static bool tracks_count_down;
 
 static int16_t *album_years(struct browser_context *c)
 {
@@ -2889,6 +2892,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             fmt = formats[i];
     }
 
+    tracks_count_down = fmt && fmt->sort_inverse && tag == tag_title
+                        && csi_spoken_kind() == 2;
     if (fmt)
     {
         sort_inverse = fmt->sort_inverse;
@@ -4388,6 +4393,7 @@ int browser_db_load(struct browser_context* c)
                     count = c->dirlength;
                     head_rows = loaded_head_rows;
                     album_years_valid = loaded_years_valid;
+                    tracks_count_down = loaded_count_down;
                     logf("Reusing %d entries", count);
                     break;
                 }
@@ -5609,6 +5615,12 @@ static void remember_loaded(struct browser_context* c)
     loaded_entries_crc = browser_db_data_crc(c);
     loaded_head_rows = head_rows;
     loaded_years_valid = album_years_valid;
+    loaded_count_down = tracks_count_down;
+}
+
+bool browser_db_counts_down(struct browser_context *c)
+{
+    return c->currtable != TABLE_ROOT && tracks_count_down;
 }
 
 static int browser_db_play_folder(struct browser_context* c)

@@ -203,6 +203,8 @@ int browser_db_spoken_main_menu_slot(void);
  * row. The episode by its database index, or by its list row. */
 int browser_db_episode_percent(int idx_id);
 int browser_db_get_entry_range(struct browser_context *c, int id);
+/* Whether the list on screen is tracks newest first, numbered from the end */
+bool browser_db_counts_down(struct browser_context *c);
 /* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
  * False if index is out of range, or names a submenu with nothing in it:
  * that slot is numbered but hidden. */

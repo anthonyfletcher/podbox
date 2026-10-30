@@ -894,6 +894,7 @@ static int update_dir(void)
     gui_synclist_set_row_callbacks(list, browser_get_kind, NULL,
                                    browser_is_playing);
     gui_synclist_set_range_callback(list, browser_get_range);
+    gui_synclist_set_count_down(list, id3db && browser_db_counts_down(&tc));
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
      * and the whole off path never touch the art-resolution code.

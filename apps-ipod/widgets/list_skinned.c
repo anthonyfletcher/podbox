@@ -191,6 +191,8 @@ int skinlist_get_item_position(int offset, bool wrap)
     data = current_list->data;
     if (kind(item, data) != LIST_ROW_TRACK)
         return -1;
+    if (current_list->count_down)
+        return current_list->nb_items - item;
 
     if (counted_generation != current_list->generation
         || counted_nb_items != current_list->nb_items
