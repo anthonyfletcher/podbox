@@ -1597,6 +1597,32 @@ struct aa_books_ctx
     bool *aborted;
 };
 
+/* The folders an author's photograph may be in, as an artist's is: the
+ * book's own, for books kept as author, file, and the one above it, for
+ * author, book, file. Each once, whatever number of books share it. */
+static void aa_book_folders(const char *path, struct aa_books_ctx *c)
+{
+    char dir[MAX_PATH];
+
+    strmemccpy(dir, path, sizeof(dir));
+    for (int up = 0; up < 2 && !*c->aborted; up++)
+    {
+        char *slash = strrchr(dir, '/');
+        unsigned int dh;
+        struct aa_stamp *slot;
+
+        if (!slash || slash == dir)
+            return;                     /* at the top: no author's folder */
+        *slash = '\0';
+        dh = aa_hash(dir);
+        if (!(slot = aa_visit(dh)))
+            continue;
+        snprintf(aa_probe, sizeof(aa_probe), "%s/_", dir);
+        aa_cache_dir(aa_probe, dh, slot, true, c->workbuf, c->worksz,
+                     c->aborted);
+    }
+}
+
 /* One book of the index: a visit, as a folder has one */
 static bool aa_book_visit(const struct book_entry *e, void *data)
 {
@@ -1612,6 +1638,9 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
         *c->aborted = true;
         return false;
     }
+    aa_book_folders(e->path, c);
+    if (*c->aborted)
+        return false;
     if (!(slot = aa_visit(bh)))
         return true;
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(bh))

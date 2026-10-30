@@ -379,8 +379,9 @@ Separator set above zero.
 | Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
 | Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
 | Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
-| Art Rows ▸ Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
+| Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
 | Art Rows ▸ Book Art Rows | Draws each book's cover beside its row in the Books lists. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Book Author Art Rows | Draws a photograph beside each author in Books > By Author, from a folder.jpg in the author's folder: the one above a book's own folder when books are kept as author, book, file, or else the folder the book is in. | No |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 px | **Cfg** |
 | Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | Yes |  |
 | Status Bar | Whether the clock and battery strip is drawn, and at which edge. | Top |  |

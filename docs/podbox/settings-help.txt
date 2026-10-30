@@ -792,6 +792,11 @@ folder.jpg in the author's folder. Without one the row shows a placeholder.
 Draws each book's cover beside its row in the Books lists. Needs a theme that
 supports artwork in lists, or the rows are tall and empty.
 
+[database book author art]
+Draws a photograph beside each author in Books > By Author, from a folder.jpg
+in the author's folder: the one above a book's own folder when books are kept
+as author, book, file, or else the folder the book is in.
+
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.

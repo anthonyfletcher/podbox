@@ -24559,13 +24559,13 @@
   desc: in Settings, database browser audiobook author art rows
   user: core
   <source>
-    *: "Author Art Rows"
+    *: "Audiobook Author Art Rows"
   </source>
   <dest>
-    *: "Author Art Rows"
+    *: "Audiobook Author Art Rows"
   </dest>
   <voice>
-    *: "Author Art Rows"
+    *: "Audiobook Author Art Rows"
   </voice>
 </phrase>
 <phrase>
@@ -26722,5 +26722,19 @@
   </dest>
   <voice>
     *: "Book Art Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_EBOOK_AUTHOR_ART
+  desc: in Settings, art rows on the Books Authors list
+  user: core
+  <source>
+    *: "Book Author Art Rows"
+  </source>
+  <dest>
+    *: "Book Author Art Rows"
+  </dest>
+  <voice>
+    *: "Book Author Art Rows"
   </voice>
 </phrase>

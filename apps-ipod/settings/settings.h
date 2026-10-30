@@ -788,6 +788,7 @@ struct user_settings
     /* The same for the author rows, apart, since few people keep a photograph
      * of an author. Off by default. */
     bool db_authorart;
+    bool db_ebookauthorart;
     /* Covers on the Books lists. Off by default; a theme that draws art in
      * lists turns it on. */
     bool db_ebookart;

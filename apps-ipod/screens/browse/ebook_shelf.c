@@ -49,6 +49,8 @@
 #include "viewers/text_viewer/text_viewer.h"
 #include "viewers/text_viewer/txt_source.h"     /* TS_BOOK_AUTHOR */
 #include "viewers/text_viewer/reading_stats.h"
+#include "bitmaps/podbox_icon_artist.h"
+#include "bitmaps/podbox_icon_book.h"
 #include "ebook_shelf.h"
 
 /* ------------------------------------------------------------------ *
@@ -413,6 +415,44 @@ static const struct bitmap *get_art(int n, void *data, struct dim *size,
     return browser_art_row(n, data, art_hash, size, filter, filter_hash);
 }
 
+/* An author's photograph, from one of their books: the folder above the
+ * book's own when that has a picture of its own (author, book, file), else
+ * the book's folder (author, file) */
+static unsigned int author_art_hash(int n, void *data)
+{
+    char dir[MAX_PATH], out[MAX_PATH];
+    char *slash;
+    unsigned int up;
+    bool placeholder;
+    (void)data;
+
+    if (showing != SHOW_AUTHORS || n < 0 || n >= row_ct)
+        return 0;
+    strmemccpy(dir, names + books[rows[n]].path, sizeof(dir));
+    if (!(slash = strrchr(dir, '/')) || slash == dir)
+        return 0;
+    *slash = '\0';
+    if ((slash = strrchr(dir, '/')) && slash != dir)
+    {
+        *slash = '\0';
+        up = art_cache_dir_hash(dir);
+        if (art_cache_lookup_hash(up, 0, out, sizeof(out), &placeholder)
+            && !placeholder)
+            return up;
+        *slash = '/';
+    }
+    return art_cache_dir_hash(dir);
+}
+
+static const struct bitmap *get_author_art(int n, void *data,
+                                           struct dim *size,
+                                           const struct img_filter *filter,
+                                           uint32_t filter_hash)
+{
+    return browser_art_row(n, data, author_art_hash, size, filter,
+                           filter_hash);
+}
+
 /* %Lr: how far through a book, for a theme's gauge: a finished one is full,
  * one not started has none */
 static int get_range(int n, void *data)
@@ -606,13 +646,16 @@ static int show(char *path, size_t size, int *selection, int *list)
         info.get_kind = get_kind;
         info.get_range = get_range;
         browser_albumart_invalidate();
-        browser_set_showing_art(global_settings.db_ebookart);
         if (global_settings.db_ebookart && showing != SHOW_TOP
             && !names_listed())
-        {
             info.get_albumart = get_art;
+        else if (global_settings.db_ebookauthorart
+                 && showing == SHOW_AUTHORS)
+            info.get_albumart = get_author_art;
+        browser_set_showing_art(global_settings.db_ebookart
+                                || info.get_albumart != NULL);
+        if (info.get_albumart)
             info.row_height = global_settings.db_art_row_height;
-        }
         info.action_callback = action_cb;
         info.selection = MIN(*selection, top_rows() + row_ct - 1);
         /* Opening on the top level, Search and Finished are scrolled off
@@ -671,40 +714,74 @@ static int show(char *path, size_t size, int *selection, int *list)
     return ret;
 }
 
-/* The search box over every book: its title or its author */
+/* The search box over every book: the authors whose name matches, each once,
+ * then the books whose title does. A row is a book's index, or an author's
+ * name in the names with SEARCH_AUTHOR set. */
+#define SEARCH_AUTHOR 0x40000000
+
+static int compare_search_authors(const void *a, const void *b)
+{
+    return strnatcasecmp(names + (*(const int *)a & ~SEARCH_AUTHOR),
+                         names + (*(const int *)b & ~SEARCH_AUTHOR));
+}
+
 static int search_scan(const char *query, void *ctx)
 {
+    int authors, k;
     (void)ctx;
+
     row_ct = 0;
     for (int i = 0; query[0] && i < book_ct; i++)
-        if (strcasestr(names + books[i].title, query)
-            || strcasestr(names + books[i].author, query))
+    {
+        const char *a = names + books[i].author;
+
+        if (!strcasestr(a, query))
+            continue;
+        for (k = 0; k < row_ct; k++)
+            if (!strcmp(names + (rows[k] & ~SEARCH_AUTHOR), a))
+                break;
+        if (k == row_ct)
+            rows[row_ct++] = SEARCH_AUTHOR | (int)books[i].author;
+    }
+    qsort(rows, row_ct, sizeof(*rows), compare_search_authors);
+    authors = row_ct;
+    for (int i = 0; query[0] && i < book_ct; i++)
+        if (strcasestr(names + books[i].title, query))
             rows[row_ct++] = i;
-    qsort(rows, row_ct, sizeof(*rows), compare_rows);
+    qsort(rows + authors, row_ct - authors, sizeof(*rows), compare_rows);
     return row_ct;
 }
 
 static const char *search_row(int i, void *ctx)
 {
     (void)ctx;
-    return names + books[rows[i]].title;
+    return rows[i] & SEARCH_AUTHOR ? names + (rows[i] & ~SEARCH_AUTHOR)
+                                   : names + books[rows[i]].title;
 }
 
-/* Search until a book is chosen, into `path`, or the box is left. Each book
- * read goes back to the box, on the same query. */
-static int search_books(char *path, size_t size)
+static const struct bitmap *search_icon(int i, void *ctx)
+{
+    (void)ctx;
+    return rows[i] & SEARCH_AUTHOR ? &bm_podbox_icon_artist
+                                   : &bm_podbox_icon_book;
+}
+
+/* Search until a book or an author is chosen, its path or name into `out`
+ * and *author saying which, or the box is left, `out` empty. */
+static int search_books(char *out, size_t size, bool *author)
 {
     static const struct search_provider provider = {
         .activity = ACTIVITY_DB_SEARCH,
         .scan     = search_scan,
         .row_text = search_row,
-        .row_icon = NULL,
+        .row_icon = search_icon,
     };
     struct search_provider p = provider;
     int chosen;
 
     p.title = str(LANG_DB_SEARCH);
-    path[0] = '\0';
+    out[0] = '\0';
+    *author = false;
     if (!claim())
     {
         splash(HZ * 2, ID2P(LANG_OUT_OF_MEMORY));
@@ -714,7 +791,13 @@ static int search_books(char *path, size_t size)
     load();
     chosen = search_dialog_run(&p, NULL, search_text, sizeof(search_text));
     if (chosen >= 0)
-        strmemccpy(path, names + books[rows[chosen]].path, size);
+    {
+        int v = rows[chosen];
+
+        *author = v & SEARCH_AUTHOR;
+        strmemccpy(out, names + (*author ? v & ~SEARCH_AUTHOR
+                                         : (int)books[v].path), size);
+    }
     release();
     showing = SHOW_TOP;
     return chosen == SEARCH_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
@@ -776,17 +859,27 @@ int ebook_shelf_run(void)
             }
             if (list == SHOW_SEARCH)
             {
+                bool author;
                 int r;
 
-                while ((r = search_books(path, sizeof(path))) != GO_TO_ROOT
-                       && path[0] && (r = text_viewer(path)) != GO_TO_ROOT)
+                while ((r = search_books(path, sizeof(path), &author))
+                           != GO_TO_ROOT
+                       && path[0] && !author
+                       && (r = text_viewer(path)) != GO_TO_ROOT)
                     ;
-                path[0] = '\0';
                 if (r == GO_TO_ROOT)
                 {
                     ret = GO_TO_ROOT;
                     break;
                 }
+                if (path[0] && author)
+                {
+                    /* an author chosen: their books, as By Author has them */
+                    strmemccpy(author_shown, path, sizeof(author_shown));
+                    showing = SHOW_AUTHOR;
+                    book_sel = 0;
+                }
+                path[0] = '\0';
                 continue;
             }
             showing = list;

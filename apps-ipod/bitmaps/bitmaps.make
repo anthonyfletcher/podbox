@@ -33,6 +33,7 @@ BMPHFILES = $(BMPINCDIR)/default_icons.h \
 	$(BMPINCDIR)/podbox_icon_album.h \
 	$(BMPINCDIR)/podbox_icon_artist.h \
 	$(BMPINCDIR)/podbox_icon_track.h \
+	$(BMPINCDIR)/podbox_icon_book.h \
 	$(BMPINCDIR)/podbox_folder_closed_off.h \
 	$(BMPINCDIR)/podbox_folder_closed_on.h \
 	$(BMPINCDIR)/podbox_folder_open_off.h \
