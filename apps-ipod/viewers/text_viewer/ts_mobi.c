@@ -25,6 +25,7 @@
  * alone.
  ****************************************************************************/
 
+#include <stdio.h>
 #include "ts_internal.h"
 #include "files/zip_member.h"       /* MEMBER_STORED */
 
@@ -445,6 +446,8 @@ static void read_range(mobi_st *m, uint32_t from, uint32_t to)
     {
         ts_tags_restart(m->tags, m->cs_st);
         ts_tags_rewind(m->tags);
+        if (from == m->part_at[0])
+            ts_tags_cover_due(m->tags);
     }
 }
 
@@ -489,6 +492,40 @@ long ts_mobi_part_size(const bs_stream *st, int part)
            ? (long)(m->part_at[part + 1] - m->part_at[part]) : 0;
 }
 
+/* The cover's image record counted from 1, as a picture's href counts it
+ * (EXTH 201 counts from 0), or 0 for none. Record 0, `len` long, must be in
+ * m->raw. */
+static uint32_t exth_cover(const mobi_st *m, long len)
+{
+    const uint8_t *r0 = m->raw;
+    uint32_t hl, p, cnt;
+
+    if (m->plain || len < 132 || memcmp(r0 + 16, "MOBI", 4)
+        || m->first_image == ~0u)
+        return 0;
+    hl = be32(r0 + 20);
+    if (!(be32(r0 + 128) & 0x40) || 16 + hl + 12 > (uint32_t)len
+        || memcmp(r0 + 16 + hl, "EXTH", 4))
+        return 0;
+    p = 16 + hl + 12;
+    cnt = be32(r0 + 16 + hl + 8);
+    while (cnt-- && p + 8 <= (uint32_t)len)
+    {
+        uint32_t type = be32(r0 + p), l = be32(r0 + p + 4);
+
+        if (l < 8 || l > (uint32_t)len - p)
+            break;
+        if (type == 201 && l == 12)
+        {
+            uint32_t c = be32(r0 + p + 8);
+
+            return m->first_image + c < (uint32_t)m->nrec ? c + 1 : 0;
+        }
+        p += l;
+    }
+    return 0;
+}
+
 /* A picture's href is its recindex, or KF8's kindle:embed:NNNN in base 32
  * with a ?mime= after it: the image record, counted from 1 */
 int ts_mobi_picture(const bs_stream *st, const char *href, bs_off_t *at,
@@ -529,14 +566,17 @@ int ts_open_mobi(ts_ctx *c, bs_stream **out)
 {
     mobi_st *m = bs_alloc(c->arena, sizeof *m);
     bs_stream *st = bs_alloc(c->arena, sizeof *st);
+    uint32_t cover;
     long r0len;
     int rc;
 
     if (!m || !st)
         return BS_ERR_NOMEM;
     rc = open_container(m, c->arena, c->io, &r0len);
-    if (rc == BS_OK)
-        rc = load_text_map(m, c->arena);
+    if (rc != BS_OK)
+        return rc;
+    cover = exth_cover(m, r0len);
+    rc = load_text_map(m, c->arena);
     if (rc != BS_OK)
         return rc;
 
@@ -553,6 +593,13 @@ int ts_open_mobi(ts_ctx *c, bs_stream **out)
         if (!m->tags)
             return BS_ERR_NOMEM;
         ts_tags_pictures(m->tags, 1);
+        if (cover)
+        {
+            char href[12];
+
+            snprintf(href, sizeof href, "%lu", (unsigned long)cover);
+            ts_tags_cover(m->tags, href);
+        }
     }
     m->part = -1;
 
@@ -699,7 +746,7 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
 {
     bs_arena a = { arena, arena_size, 0 };
     mobi_st *m = bs_alloc(&a, sizeof *m);
-    uint32_t cover = ~0u;
+    uint32_t cover;
     const uint8_t *r0;
     long len;
     int rc;
@@ -764,16 +811,14 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
                     book_str(s, sizeof s, r0 + p + 8, l - 8, m->cs);
                     ts_book_subject(out, s);
                 }
-                else if (type == 201 && l == 12)
-                    cover = be32(r0 + p + 8);
                 p += l;
             }
         }
     }
-    if (cover != ~0u && m->first_image != ~0u
-        && m->first_image + cover < (uint32_t)m->nrec)
+    cover = exth_cover(m, len);
+    if (cover)
     {
-        int r = m->first_image + cover;
+        int r = m->first_image + cover - 1;
 
         out->cover_at = m->rec[r];
         out->cover_csize = out->cover_usize = m->rec[r + 1] - m->rec[r];

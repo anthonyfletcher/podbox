@@ -199,6 +199,8 @@ typedef struct {
     int       nomem;
     int       nav_zi;         /* EPUB 3's contents, or -1 */
     char      toc_id[64];     /* the spine's NCX, by manifest id */
+    char      cover_id[64];   /* EPUB 2's <meta name="cover" content=...> */
+    char      cover[TS_COVER_HREF]; /* "/" and its path in the zip, or "" */
 } opf_ctx;
 
 static char *dup_str(bs_arena *a, const char *s)
@@ -216,7 +218,25 @@ static int opf_tag(void *ud, const char *tag)
 
     if (tag_is(tag, "manifest") && tag[0] != '/') return 0;
 
+    if (tag_is(tag, "meta") && attr(tag, "name", type, sizeof type) &&
+        !ts_ascii_casecmp(type, "cover"))
+        attr(tag, "content", o->cover_id, sizeof o->cover_id);
+
     if (tag_is(tag, "item") && attr(tag, "href", href, sizeof href)) {
+        /* The cover: EPUB 3's cover-image, or EPUB 2's by its id */
+        if (attr(tag, "media-type", type, sizeof type) &&
+            !ts_ascii_ncasecmp(type, "image/", 6)) {
+            int cov = attr(tag, "properties", type, sizeof type) &&
+                      strstr(type, "cover-image");
+
+            if (!cov && o->cover_id[0] && attr(tag, "id", id, sizeof id))
+                cov = !strcmp(id, o->cover_id);
+            if (cov && !o->cover[0]) {
+                o->cover[0] = '/';
+                path_join(o->opf, href, o->cover + 1, sizeof o->cover - 1);
+            }
+            return 0;
+        }
         /* Only the documents that can hold text are worth remembering. */
         if (attr(tag, "media-type", type, sizeof type) &&
             !strstr(type, "xhtml") && !strstr(type, "html") &&
@@ -340,6 +360,8 @@ static int sp_reset(bs_stream *st)
     s->cur = s->part >= 0 ? s->part : 0;
     s->opened = 0;
     ts_tags_rewind(s->tags);
+    if (s->cur == 0)
+        ts_tags_cover_due(s->tags);
     return BS_OK;
 }
 
@@ -378,7 +400,7 @@ int ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
     memcpy(unescaped, href, n + 1);
     url_unescape(unescaped);
     path_join(ts_zip_name(s->z, s->spine[part]), unescaped, full, sizeof full);
-    idx = ts_zip_find(s->z, full);
+    idx = ts_zip_find(s->z, full[0] == '/' ? full + 1 : full);  /* the cover */
     if (idx < 0) return BS_ERR_FORMAT;
     return ts_zip_extent(s->z, idx, at, csize, usize, method);
 }
@@ -569,7 +591,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     bs_stream *st, *member;
     sp_st *sp;
     int rc, i, idx;
-    char opf[256];
+    char opf[256], cover[TS_COVER_HREF] = "";
     ts_tag_profile prof;
     int *spine;
 
@@ -616,6 +638,7 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
         if (rc != BS_OK) return rc;
         if (o.nomem) return BS_ERR_NOMEM;
         sp->nspine = o.nspine;
+        memcpy(cover, o.cover, sizeof cover);
 
         /* The contents: EPUB 3's nav document, else the spine's NCX */
         if (o.nav_zi >= 0) {
@@ -655,7 +678,10 @@ int ts_open_epub(ts_ctx *c, bs_stream **out)
     if (!sp->cs) return BS_ERR_NOMEM;
     sp->tags = ts_tags_stream(c->arena, sp->cs, prof, c->cfg);
     if (!sp->tags) return BS_ERR_NOMEM;
-    if (c->resolved == TS_FMT_EPUB) ts_tags_pictures(sp->tags, 1);
+    if (c->resolved == TS_FMT_EPUB) {
+        ts_tags_pictures(sp->tags, 1);
+        ts_tags_cover(sp->tags, cover);
+    }
     if (prof != TS_TAGS_DOCX) ts_tags_notes(sp->tags, 1);
 
     st->pull = sp_pull; st->reset = sp_reset; st->st = sp;

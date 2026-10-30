@@ -151,7 +151,11 @@ typedef struct {
     int   nl_pending, sp_pending, started;
     int   pictures;                /* TS_PICTURE_OPEN lines for pictures */
     int   cover_done;              /* an FB2's coverpage picture is out */
+    char  cover[TS_COVER_HREF];    /* the book's cover, or "" */
+    int   cover_due;               /* it goes first, unless a picture does */
     int   head_depth;              /* headings open */
+    int   font_depth;              /* <font>s open */
+    uint32_t font_head;            /* which of them are headings, a bit each */
     int   head_wait, head_out;     /* TS_HEADING_OPEN due, and written */
     char  anchor[64];              /* the id watched for, or "" */
     long  anchor_at;               /* where it was seen, or -1 */
@@ -216,9 +220,21 @@ static void ref_text(tg_st *s, uint32_t c)
     }
 }
 
+static void out_picture(tg_st *s, const char *href);
+
+/* The book's cover as its first page, when its text starts with no picture
+ * of its own: called with what is about to be written first */
+static void cover_first(tg_st *s, uint32_t cp)
+{
+    s->cover_due = 0;
+    if (cp != TS_PICTURE_OPEN)
+        out_picture(s, s->cover);
+}
+
 /* Entity replacements arrive as codepoints and must be encoded... */
 static void out_cp(tg_st *s, uint32_t cp)
 {
+    if (s->cover_due) cover_first(s, cp);
     flush_ws(s);
     s->started = 1;
     head_text(s);
@@ -231,6 +247,7 @@ static void out_cp(tg_st *s, uint32_t cp)
  * every non-ASCII character. */
 static void out_byte(tg_st *s, uint8_t b)
 {
+    if (s->cover_due) cover_first(s, b);
     flush_ws(s);
     s->started = 1;
     ref_text(s, b);
@@ -354,6 +371,38 @@ static void ref_end(tg_st *s)
     s->ref = s->ref_wait = s->ref_close = 0;
 }
 
+/* A MOBI writes a book's headings as large text, <font size="7">, not as
+ * <h2>: those of size 5 and up (or +2 and up) are headings, each standing
+ * apart and marked as an <h2>'s text is */
+static void font_tag(tg_st *s, const char *t, int close)
+{
+    char v[8];
+    int big = 0;
+
+    if (!close) {
+        if (tag_attr(t, "size", v, sizeof v))
+            big = v[0] == '+' ? v[1] >= '2' && v[1] <= '9'
+                              : v[0] >= '5' && v[0] <= '9';
+        if (s->font_depth < 32 && big)
+            s->font_head |= 1u << s->font_depth;
+        s->font_depth++;
+        if (!big) return;
+        if (s->head_depth++ == 0) s->head_wait = 1;
+        want_nl(s, 2);
+        return;
+    }
+    if (s->font_depth == 0) return;
+    s->font_depth--;
+    if (s->font_depth >= 32 || !(s->font_head & (1u << s->font_depth)))
+        return;
+    s->font_head &= ~(1u << s->font_depth);
+    if (s->head_depth > 0 && --s->head_depth == 0) {
+        if (s->head_out) ts_emit_cp(&s->out, TS_HEADING_CLOSE);
+        s->head_wait = s->head_out = 0;
+    }
+    want_nl(s, 2);
+}
+
 static void process_tag(tg_st *s)
 {
     char name[TAGBUF];
@@ -452,6 +501,12 @@ static void process_tag(tg_st *s)
     if (s->skip_depth) {
         if (ts_ascii_casecmp(name, s->skip_name) == 0)
             s->skip_depth += close ? -1 : (self ? 0 : 1);
+        return;
+    }
+
+    if (s->prof == TS_TAGS_HTML && !self &&
+        ts_ascii_casecmp(name, "font") == 0) {
+        font_tag(s, t, close);
         return;
     }
 
@@ -633,12 +688,16 @@ static int tg_reset(bs_stream *st)
     int rc = src->reset ? src->reset(src) : BS_ERR_UNSUP;
 
     int pictures = s->pictures, notes = s->notes;
+    char cover[TS_COVER_HREF];
 
     if (rc != BS_OK) return rc;
+    memcpy(cover, s->cover, sizeof cover);
     memset(s, 0, sizeof *s);
     s->src = src; s->prof = prof; s->rules = rules;
     s->collapse = collapse; s->max_nl = max_nl;
     s->pictures = pictures; s->notes = notes;
+    memcpy(s->cover, cover, sizeof cover);
+    s->cover_due = s->pictures && s->cover[0];
     return BS_OK;
 }
 
@@ -655,6 +714,8 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
     s->tlen = s->elen = 0;
     s->skip_depth = s->pre_depth = s->text_depth = 0;
     s->head_depth = s->head_wait = s->head_out = 0;
+    s->font_depth = 0;
+    s->font_head = 0;
     s->quote = s->match = 0;
     s->ref = s->ref_wait = s->ref_close = 0;
     if (s->started) s->nl_pending = 2;      /* blank line between documents */
@@ -663,6 +724,21 @@ void ts_tags_restart(bs_stream *st, bs_stream *src)
 void ts_tags_pictures(bs_stream *st, int on)
 {
     ((tg_st *)st->st)->pictures = on;
+}
+
+void ts_tags_cover(bs_stream *st, const char *href)
+{
+    tg_st *s = st->st;
+
+    if (strlen(href) < sizeof s->cover) strcpy(s->cover, href);
+    ts_tags_cover_due(st);      /* a new stream starts at the first part */
+}
+
+void ts_tags_cover_due(bs_stream *st)
+{
+    tg_st *s = st->st;
+
+    s->cover_due = s->pictures && s->cover[0];
 }
 
 void ts_tags_notes(bs_stream *st, int on)

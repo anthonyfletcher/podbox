@@ -113,6 +113,12 @@ int  ts_zipdoc_picture(const bs_stream *st, int part, const char *href,
                        int *method);
 /* Pictures become TS_PICTURE_OPEN lines; off unless asked for */
 void ts_tags_pictures(bs_stream *s, int on);
+/* A book's cover, given as a picture's href, goes on its own page before the
+ * text from the next ts_tags_cover_due() on, unless a picture comes first;
+ * a back end calls that when it starts the book's first part */
+#define TS_COVER_HREF 128
+void ts_tags_cover(bs_stream *s, const char *href);
+void ts_tags_cover_due(bs_stream *s);
 /* Watches for the element with id `anchor` ("" stops watching); then
  * ts_tags_anchor_at() is the count of bytes handed out before it, or -1
  * until it is seen. The count starts at ts_tags_rewind(). */
