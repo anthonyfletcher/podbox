@@ -327,6 +327,7 @@ static int parse_image_display(struct skin_element *element,
     }
     id->label = img->label;
     id->offset = 0;
+    id->last = IMAGE_LAST_NONE;
     id->token = PTRTOSKINOFFSET(skin_buffer, NULL);
     if (img->using_preloaded_icons)
     {

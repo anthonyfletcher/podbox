@@ -188,6 +188,21 @@ void skin_mark_dirty_rect(enum screen_type screen, int x, int y, int w, int h)
     pending[screen].r[best].y2 = MAX(pending[screen].r[best].y2, y2);
 }
 
+bool skin_dirty_rect_intersects(enum screen_type screen,
+                                int x, int y, int w, int h)
+{
+    if (pending[screen].whole)
+        return true;
+
+    for (int i = 0; i < pending[screen].count; i++)
+    {
+        if (x < pending[screen].r[i].x2 && x + w > pending[screen].r[i].x1 &&
+            y < pending[screen].r[i].y2 && y + h > pending[screen].r[i].y1)
+            return true;
+    }
+    return false;
+}
+
 int skin_take_dirty_rects(enum screen_type screen,
                           struct skin_dirty_rect *out)
 {

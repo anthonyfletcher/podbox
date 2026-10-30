@@ -47,6 +47,10 @@ struct skin_dirty_rect { short x, y, w, h; };
 
 void skin_mark_dirty(enum screen_type screen);
 void skin_mark_dirty_rect(enum screen_type screen, int x, int y, int w, int h);
+/* Whether anything owed a flush overlaps this region: something has drawn
+ * there since the last flush. */
+bool skin_dirty_rect_intersects(enum screen_type screen,
+                                int x, int y, int w, int h);
 /* Take the pending-flush flag for a screen: says whether one is owed, and
  * clears it. Named for the clearing rather than the answer -- the caller is
  * taking responsibility for the flush, and one site calls it for that alone

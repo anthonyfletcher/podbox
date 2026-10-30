@@ -103,6 +103,12 @@ struct skin_draw_info {
     /* Anything in this viewport actually reached the framebuffer, so the
      * viewport's rectangle has to be flushed. See do_non_text_tags(). */
     bool drew;
+    /* An %xd whose subimage has not changed may be held: left as it is in the
+     * framebuffer rather than cleared and drawn again, unless something else
+     * in the viewport draws. Set only where nothing could have drawn over it
+     * since its last pass -- see skin_render_viewport(). */
+    bool hold_images;
+    bool redraw_images; /* an %xd cleared its area: held ones draw too */
 
     /* Same problem one step further out. A tinted %dr composites with whatever
      * is under it, and the album art and images are drawn once for the whole
@@ -648,9 +654,14 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             struct gui_img *img = skin_find_item(label,SKIN_FIND_IMAGE, data);
             if (img && img->loaded)
             {
+                bool hold = info->hold_images &&
+                    (info->refresh_type & SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL;
+
                 if (SKINOFFSETTOPTR(skin_buffer, id->token) == NULL)
                 {
                     img->display = id->subimage;
+                    if (!hold)
+                        img->forced = true;
                 }
                 else
                 {
@@ -669,8 +680,26 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                         a--;
                     a += id->offset;
 
-                    /* Clear the image, as in conditionals */
-                    clear_image_pos(gwps, img);
+                    /* Drawn without its clear when the viewport is touched, so
+                     * held only if a redraw over itself is a no-op: an alpha
+                     * bitmap would darken a step each time. */
+                    bool changed = a != id->last;
+                    id->last = a;
+                    if (changed || img->bm.alpha_offset > 0)
+                        hold = false;
+
+                    if (!hold)
+                    {
+                        /* Clear the image, as in conditionals. The clear can
+                         * take a neighbouring image with it, so every image in
+                         * the viewport draws again; only a new subimage is
+                         * owed a flush. */
+                        clear_image_pos(gwps, img);
+                        img->forced = true;
+                        info->redraw_images = true;
+                        if (changed)
+                            info->drew = true;
+                    }
 
                     /* If the token returned a value which is higher than
                      * the amount of subimages, don't draw it. */
@@ -1364,10 +1393,25 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         if (token) {
             struct gui_img *img = (struct gui_img *)SKINOFFSETTOPTR(skin_buffer, token->value.data);
         if (img)
+            {
                 img->display = -1;
+                img->forced = false;
+            }
         }
         imglist = SKINOFFSETTOPTR(skin_buffer, imglist->next);
     }
+
+    /* Holding an %xd trusts the framebuffer to still have it. A full refresh
+     * clears the viewport first; a pending region over it means an earlier
+     * viewport drew there since the last flush; and the status bar's images
+     * can sit over the list, which repaints and flushes outside any pass. */
+    info.hold_images =
+        (refresh_type & SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL
+        && gwps != skin_get_gwps(CUSTOM_STATUSBAR, display->screen_type)
+        && !skin_dirty_rect_intersects(display->screen_type,
+                                       skin_viewport->vp.x, skin_viewport->vp.y,
+                                       skin_viewport->vp.width,
+                                       skin_viewport->vp.height);
 
     /* fix font ID's */
     if (skin_viewport->parsed_fontid == 1)
@@ -1429,6 +1473,20 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         if (!info.no_line_break)
             info.line_number++;
         line = SKINOFFSETTOPTR(skin_buffer, line->next);
+    }
+    /* Nothing touched the viewport, so the held images are still on it */
+    if (info.hold_images && !info.drew && !info.redraw_images)
+    {
+        imglist = SKINOFFSETTOPTR(skin_buffer, gwps->data->images);
+        while (imglist)
+        {
+            struct wps_token *token = SKINOFFSETTOPTR(skin_buffer, imglist->token);
+            struct gui_img *img = token ? (struct gui_img *)
+                SKINOFFSETTOPTR(skin_buffer, token->value.data) : NULL;
+            if (img && !img->forced)
+                img->display = -1;
+            imglist = SKINOFFSETTOPTR(skin_buffer, imglist->next);
+        }
     }
     wps_display_images(gwps, &skin_viewport->vp);
 

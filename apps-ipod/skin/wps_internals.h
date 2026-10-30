@@ -99,6 +99,7 @@ struct gui_img {
     int buflib_handle;
     OFFSETTYPE(char*) label;
     int display;
+    bool forced;            /* a tag this pass needs it drawn; see %xd */
     bool loaded;            /* load state */
     bool using_preloaded_icons; /* using the icon system instead of a bmp */
     bool is_9_segment;
@@ -110,7 +111,9 @@ struct image_display {
     OFFSETTYPE(struct wps_token*) token; /* the token to get the subimage number from */
     int16_t subimage;
     int16_t offset; /* offset into the bitmap strip to start */
+    int16_t last;   /* subimage set on the last pass; IMAGE_LAST_NONE before */
 };
+#define IMAGE_LAST_NONE (-0x7fff - 1)
 
 struct progressbar {
     enum skin_token_type type;
