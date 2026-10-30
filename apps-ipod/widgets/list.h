@@ -242,6 +242,8 @@ struct gui_synclist
     /* %Lp counts from the last row up: a list sorted newest first, so the
      * oldest is 1 however many are added. Its tracks run to the end. */
     bool count_down;
+    /* %Lp is empty: an order that numbers nothing */
+    bool unnumbered;
 
     /* Changes whenever the items may have: init, the item count or the kind
      * callback. Unique across lists, so a reused struct gets a new one. */
@@ -278,9 +280,11 @@ extern void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
 /* The answer to %Lr. May be NULL. */
 extern void gui_synclist_set_range_callback(struct gui_synclist * lists,
                                             list_get_range range_callback);
-/* Whether %Lp counts down; see count_down */
+/* Whether %Lp counts down, or is empty; see count_down and unnumbered */
 extern void gui_synclist_set_count_down(struct gui_synclist * lists,
                                         bool count_down);
+extern void gui_synclist_set_unnumbered(struct gui_synclist * lists,
+                                        bool unnumbered);
 /* The answer to %LD. May be NULL. */
 extern void gui_synclist_set_description_callback(struct gui_synclist * lists,
                                                   list_get_name callback);

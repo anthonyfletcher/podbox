@@ -318,6 +318,7 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     gui_list->callback_item_is_playing = NULL;
     gui_list->callback_get_item_description = NULL;
     gui_list->count_down = false;
+    gui_list->unnumbered = false;
     gui_list->generation = ++last_generation;
 }
 
@@ -773,6 +774,11 @@ void gui_synclist_set_range_callback(struct gui_synclist * lists,
 void gui_synclist_set_count_down(struct gui_synclist * lists, bool count_down)
 {
     lists->count_down = count_down;
+}
+
+void gui_synclist_set_unnumbered(struct gui_synclist * lists, bool unnumbered)
+{
+    lists->unnumbered = unnumbered;
 }
 
 void gui_synclist_set_description_callback(struct gui_synclist * lists,

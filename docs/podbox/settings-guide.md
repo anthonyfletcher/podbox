@@ -467,6 +467,7 @@ Shadow Colour only while there is a shadow to colour.
 |---|---|---|---|
 | Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | Yes |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
+| Vertical Scroll Speed | How quickly a box of text too long for it moves up, such as a podcast episode's notes. Slower than Scroll Speed by default: it is read as it goes. | 6 |  |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1 s |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 px | **Adv** |
 | Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. Bigger numbers mean more lines bounce. At 0 everything scrolls in one direction. | 50% | **Adv** |

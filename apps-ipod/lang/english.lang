@@ -26878,3 +26878,17 @@
     *: "Podcast Art Rows"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SCROLL_BOX_SPEED
+  desc: in Settings, how fast a box of text scrolls upwards
+  user: core
+  <source>
+    *: "Vertical Scroll Speed"
+  </source>
+  <dest>
+    *: "Vertical Scroll Speed"
+  </dest>
+  <voice>
+    *: "Vertical Scroll Speed"
+  </voice>
+</phrase>

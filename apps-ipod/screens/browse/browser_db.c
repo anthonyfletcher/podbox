@@ -113,6 +113,7 @@ static uint32_t loaded_entries_crc = 0;
 static int loaded_head_rows;
 static bool loaded_years_valid;
 static bool loaded_count_down;
+static bool loaded_unnumbered;
 static bool loaded_podcast_shows;
 static bool loaded_show_unplayed;
 
@@ -2018,6 +2019,8 @@ static struct tagentry* get_entries(struct browser_context *tc)
 static bool album_years_valid;
 /* The list loaded is of podcast episodes sorted newest first */
 static bool tracks_count_down;
+/* ...of every show's, in one state or all, whose order numbers nothing */
+static bool tracks_unnumbered;
 
 static int16_t *album_years(struct browser_context *c)
 {
@@ -2582,10 +2585,10 @@ static int header_rows_fill(int level, char *buf, long bufsz)
  * the rows above a podcast's shows                                   *
  * ------------------------------------------------------------------ */
 
-/* Above the list of shows, Search, then the episodes of every show in one
- * state, each row hidden while it has none, then all of them. A state row
- * is an <All tracks> row whose seek names the state, which the track list
- * it opens turns into clauses. */
+/* Above the list of shows: Search and Finished, scrolled off the top, then
+ * In Progress, Not Started and All Episodes. Each state row is hidden while
+ * it has no episode, and is an <All tracks> row whose seek names the state,
+ * which the track list it opens turns into clauses. */
 enum {
     EPISODES_IN_PROGRESS = 1,
     EPISODES_NOT_STARTED,
@@ -2920,6 +2923,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
 
     tracks_count_down = fmt && fmt->sort_inverse && tag == tag_title
                         && csi_spoken_kind() == 2;
+    tracks_unnumbered = episodes != 0;
     if (fmt)
     {
         sort_inverse = fmt->sort_inverse;
@@ -3060,13 +3064,17 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                             ID2P(LANG_PODCAST_PLAY_UNPLAYED), -1);
     if (podcast_shows)
     {
+        static const int order[] = { EPISODES_FINISHED, EPISODES_IN_PROGRESS,
+                                     EPISODES_NOT_STARTED, EPISODES_ALL };
+
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
                             ID2P(LANG_DB_SEARCH), DB_SEARCH_PODCAST);
-        for (i = EPISODES_IN_PROGRESS; i <= EPISODES_ALL; i++)
-            if (episode_counts[i] > 0)
+        for (i = 0; i < (int)ARRAYLEN(order); i++)
+            if (episode_counts[order[i]] > 0)
                 dptr = add_head_row(c, dptr, offset, &sidx,
                                     TABLE_ALLSUBENTRIES,
-                                    ID2P(episode_rows[i].lang_id), i);
+                                    ID2P(episode_rows[order[i]].lang_id),
+                                    order[i]);
     }
     if (tag == tag_album && featured_row_count(level) > 0)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
@@ -4423,6 +4431,7 @@ int browser_db_load(struct browser_context* c)
                     head_rows = loaded_head_rows;
                     album_years_valid = loaded_years_valid;
                     tracks_count_down = loaded_count_down;
+                    tracks_unnumbered = loaded_unnumbered;
                     podcast_shows = loaded_podcast_shows;
                     show_unplayed = loaded_show_unplayed;
                     logf("Reusing %d entries", count);
@@ -4501,10 +4510,12 @@ int browser_db_load(struct browser_context* c)
      * book rather than a chapter of it. */
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
-        /* A podcast's episode states are what its list is for, and so is
-         * a show's Play Unplayed; only the Search goes off the top */
+        /* A podcast's episodes in progress and not started are what its
+         * list is for, and so is a show's Play Unplayed; Search and
+         * Finished go off the top */
         int first = table == TABLE_ROOT ? c->special_entry_count
-                    : podcast_shows ? 1
+                    : podcast_shows
+                      ? 1 + (episode_counts[EPISODES_FINISHED] > 0)
                     : show_unplayed ? 0 : c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
@@ -5660,6 +5671,7 @@ static void remember_loaded(struct browser_context* c)
     loaded_head_rows = head_rows;
     loaded_years_valid = album_years_valid;
     loaded_count_down = tracks_count_down;
+    loaded_unnumbered = tracks_unnumbered;
     loaded_podcast_shows = podcast_shows;
     loaded_show_unplayed = show_unplayed;
 }
@@ -5667,6 +5679,11 @@ static void remember_loaded(struct browser_context* c)
 bool browser_db_counts_down(struct browser_context *c)
 {
     return c->currtable != TABLE_ROOT && tracks_count_down;
+}
+
+bool browser_db_unnumbered(struct browser_context *c)
+{
+    return c->currtable != TABLE_ROOT && tracks_unnumbered;
 }
 
 int browser_db_list_spoken_kind(struct browser_context *c)
@@ -5714,6 +5731,8 @@ bool browser_db_mark_episodes(struct browser_context *c, int id,
 
     if (!entry)
         return false;
+    /* The rows above the list follow the marks: loaded again, not reused */
+    loaded_entries_crc = 0;
     switch (how)
     {
         case BROWSER_DB_MARK_PLAYED:
@@ -6446,10 +6465,44 @@ int browser_db_episode_percent(int idx_id)
     return plays > 0 ? 100 : 0;
 }
 
+/* Play Unplayed's: the episodes it plays, in the order it plays them */
+static char *unplayed_description(struct browser_context *c, char *buf,
+                                  size_t size)
+{
+    size_t used = 0;
+    int i;
+
+    buf[0] = '\0';
+    for (i = c->filesindir - 1; i >= c->special_entry_count; i--)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+        const char *name;
+        int n;
+
+        if (!e || e->newtable != TABLE_PLAYTRACK
+            || episode_state(e->idx_id) == EPISODES_FINISHED)
+            continue;
+        name = (const char *)P2STR((unsigned char *)e->name);
+        n = snprintf(buf + used, size - used, "%s%s", used ? "\n" : "",
+                     name);
+        if (n < 0 || (size_t)n >= size - used)
+            break;
+        used += n;
+    }
+    return buf[0] ? buf : NULL;
+}
+
 char *browser_db_get_entry_description(struct browser_context *c, int id,
                                        char *buf, size_t size)
 {
     struct tagentry *entry;
+
+    if (id < c->special_entry_count)
+    {
+        entry = browser_db_get_entry(c, id);
+        return entry && entry->newtable == TABLE_PLAY_UNPLAYED
+               ? unplayed_description(c, buf, size) : NULL;
+    }
 
     if (browser_db_get_entry_range(c, id) < 0
         || !(entry = browser_db_get_entry(c, id))

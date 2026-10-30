@@ -1084,6 +1084,10 @@ Scroll Now Playing does nothing while this is off.
 [scroll speed]
 How quickly text too long for its line moves.
 
+[vertical scroll speed]
+How quickly a box of text too long for it moves up, such as a podcast
+episode's notes. Slower than Scroll Speed by default: it is read as it goes.
+
 [scroll delay]
 How long text waits before it starts moving, so a row can be read before it
 slides.

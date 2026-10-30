@@ -613,6 +613,7 @@ struct user_settings
     bool list_wraparound;  /* wrap around to opposite end of list when scrolling */
     int  list_order;       /* order for numeric lists (ascending or descending) */
     int  scroll_speed;     /* long texts scrolling speed: 1-30 */
+    int  scroll_box_speed; /* the same, for text scrolling upwards */
     int  bidir_limit;      /* bidir scroll length limit */
     int  scroll_delay;     /* delay (in 1/10s) before starting scroll */
     int  scroll_step;      /* pixels to advance per update */

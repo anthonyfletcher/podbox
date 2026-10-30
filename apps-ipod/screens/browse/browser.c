@@ -925,6 +925,7 @@ static int update_dir(void)
                                    browser_is_playing);
     gui_synclist_set_range_callback(list, browser_get_range);
     gui_synclist_set_count_down(list, id3db && browser_db_counts_down(&tc));
+    gui_synclist_set_unnumbered(list, id3db && browser_db_unnumbered(&tc));
     gui_synclist_set_description_callback(list, browser_get_description);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
@@ -1402,6 +1403,14 @@ static int dirbrowse(void)
                     && file_attr_is_row(
                         get_valid_entry(__func__, &tc, tc.selected_item)->attr
                         & FILE_ATTR_MASK))
+                    break;
+
+                /* A podcast list's rows above its own -- Search, the
+                 * episode states, Play Unplayed -- are actions, with nothing
+                 * a menu could act on */
+                if (id3db && numentries
+                    && tc.selected_item < tc.special_entry_count
+                    && browser_db_list_spoken_kind(&tc) == 2)
                     break;
 
                 /* Nor does a Music menu row (Artists, Albums) hold music: it

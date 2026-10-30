@@ -237,16 +237,21 @@ static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
 }
 
 /* Where a scrolling %wt's text sits, from the clock: at the top for the
- * scroll delay, then a pixel up for every step sideways scrolling takes at
- * the scroll speed, until its last line reaches the bottom; still there for
- * the delay, then back to the top. Scroll step is not used: more than a pixel
+ * scroll delay, then a pixel up for every step Vertical Scroll Speed sets,
+ * until its last line reaches the bottom; still there for the delay, then
+ * back to the top. Scroll step is not used: more than a pixel
  * at a time looks jerky going up. New text starts again from the top.
  * `range` is how far the text overflows. */
 static void textbox_scroll(struct wps_data *data, struct skin_textbox *tb,
                            const char *text, int range)
 {
+    /* Scroll Speed's steps, the ticks a pixel takes at each */
+    static const unsigned char speed_ticks[18] = {
+        100, 80, 64, 50, 40, 32, 25, 20, 16, 12, 10, 8, 6, 5, 4, 3, 2, 1
+    };
     long delay = global_settings.scroll_delay * HZ / 1000;
-    long tick = MAX(lcd_scroll_info.ticks, 1);
+    long tick = speed_ticks[MIN((unsigned)global_settings.scroll_box_speed,
+                                ARRAYLEN(speed_ticks) - 1)];
     unsigned hash = 5381;
     const char *c;
 

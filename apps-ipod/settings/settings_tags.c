@@ -314,6 +314,7 @@ static const struct tag_row tag_rows[] = {
 /* --- scrolling ----------------------------------------------------------- */
 { "scrolling enabled",   TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text ellipsis cut truncate" },
 { "scroll speed",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text" },
+{ "vertical scroll speed", TAG_SCROLLING|TAG_APPEARANCE,         "scrolling text box notes description upwards" },
 { "scroll delay",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text start" },
 { "scroll step",         TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "scrolling text" },
 { "bidir limit",         TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "bidirectional scrolling bounce" },

@@ -1744,10 +1744,12 @@ const char *get_token_value(struct gui_wps *gwps,
         case SKIN_TOKEN_LIST_SELECTED_DESC:
         {
             /* From the browser's state, not the list's, so it holds still
-             * while the list is rebuilt for the viewport it chose */
+             * while the list is rebuilt for the viewport it chose; and only
+             * with the browser on top, not a menu over it */
             const char *s;
 
-            if (!browser_showing_episodes())
+            if (!browser_showing_episodes()
+                || get_current_activity() != ACTIVITY_DATABASEBROWSER)
                 return NULL;
             s = skinlist_get_selected_description(buf, buf_size);
             return s && *s ? s : " ";

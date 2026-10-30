@@ -199,7 +199,7 @@ int skinlist_get_item_position(int offset, bool wrap)
         return -1;
     kind = current_list->callback_get_item_kind;
     data = current_list->data;
-    if (kind(item, data) != LIST_ROW_TRACK)
+    if (kind(item, data) != LIST_ROW_TRACK || current_list->unnumbered)
         return -1;
     if (current_list->count_down)
         return current_list->nb_items - item;
