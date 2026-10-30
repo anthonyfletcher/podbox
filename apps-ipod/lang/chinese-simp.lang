@@ -27121,3 +27121,45 @@
     *: "作者, 书名"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_DOCUMENTS
+  desc: in Settings, the order of the Documents list
+  user: core
+  <source>
+    *: "Sort Documents"
+  </source>
+  <dest>
+    *: "文档排序"
+  </dest>
+  <voice>
+    *: "文档排序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IMAGES
+  desc: in Settings, the order of the Images list
+  user: core
+  <source>
+    *: "Sort Images"
+  </source>
+  <dest>
+    *: "图片排序"
+  </dest>
+  <voice>
+    *: "图片排序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALPHA_REVERSE
+  desc: a choice of Sort Documents and Sort Images: names from Z to A
+  user: core
+  <source>
+    *: "Reverse Alphabetical"
+  </source>
+  <dest>
+    *: "反向字母顺序"
+  </dest>
+  <voice>
+    *: "反向字母顺序"
+  </voice>
+</phrase>

@@ -27120,3 +27120,45 @@
     *: "著者, タイトル"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_DOCUMENTS
+  desc: in Settings, the order of the Documents list
+  user: core
+  <source>
+    *: "Sort Documents"
+  </source>
+  <dest>
+    *: "文書の並べ替え"
+  </dest>
+  <voice>
+    *: "文書の並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IMAGES
+  desc: in Settings, the order of the Images list
+  user: core
+  <source>
+    *: "Sort Images"
+  </source>
+  <dest>
+    *: "画像の並べ替え"
+  </dest>
+  <voice>
+    *: "画像の並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALPHA_REVERSE
+  desc: a choice of Sort Documents and Sort Images: names from Z to A
+  user: core
+  <source>
+    *: "Reverse Alphabetical"
+  </source>
+  <dest>
+    *: "逆アルファベット順"
+  </dest>
+  <voice>
+    *: "逆アルファベット順"
+  </voice>
+</phrase>

@@ -27121,3 +27121,45 @@
     *: "Författare, Titlar"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_DOCUMENTS
+  desc: in Settings, the order of the Documents list
+  user: core
+  <source>
+    *: "Sort Documents"
+  </source>
+  <dest>
+    *: "Sortera dokument"
+  </dest>
+  <voice>
+    *: "Sortera dokument"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IMAGES
+  desc: in Settings, the order of the Images list
+  user: core
+  <source>
+    *: "Sort Images"
+  </source>
+  <dest>
+    *: "Sortera bilder"
+  </dest>
+  <voice>
+    *: "Sortera bilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALPHA_REVERSE
+  desc: a choice of Sort Documents and Sort Images: names from Z to A
+  user: core
+  <source>
+    *: "Reverse Alphabetical"
+  </source>
+  <dest>
+    *: "Omvänd bokstavsordning"
+  </dest>
+  <voice>
+    *: "Omvänd bokstavsordning"
+  </voice>
+</phrase>

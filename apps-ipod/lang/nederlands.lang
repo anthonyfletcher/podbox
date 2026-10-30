@@ -27122,3 +27122,45 @@
     *: "Auteurs, Titels"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_DOCUMENTS
+  desc: in Settings, the order of the Documents list
+  user: core
+  <source>
+    *: "Sort Documents"
+  </source>
+  <dest>
+    *: "Documenten sorteren"
+  </dest>
+  <voice>
+    *: "Documenten sorteren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IMAGES
+  desc: in Settings, the order of the Images list
+  user: core
+  <source>
+    *: "Sort Images"
+  </source>
+  <dest>
+    *: "Afbeeldingen sorteren"
+  </dest>
+  <voice>
+    *: "Afbeeldingen sorteren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALPHA_REVERSE
+  desc: a choice of Sort Documents and Sort Images: names from Z to A
+  user: core
+  <source>
+    *: "Reverse Alphabetical"
+  </source>
+  <dest>
+    *: "Omgekeerd alfabetisch"
+  </dest>
+  <voice>
+    *: "Omgekeerd alfabetisch"
+  </voice>
+</phrase>
