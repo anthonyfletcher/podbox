@@ -26794,3 +26794,73 @@
     *: "Play Unplayed"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_PLAYED
+  desc: in a podcast episode's context menu: count it as heard
+  user: core
+  <source>
+    *: "Mark as Played"
+  </source>
+  <dest>
+    *: "Mark as Played"
+  </dest>
+  <voice>
+    *: "Mark as Played"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_UNPLAYED
+  desc: in a podcast episode's context menu: count it as not heard
+  user: core
+  <source>
+    *: "Mark as Unplayed"
+  </source>
+  <dest>
+    *: "Mark as Unplayed"
+  </dest>
+  <voice>
+    *: "Mark as Unplayed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_OLDER
+  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  user: core
+  <source>
+    *: "Mark Older as Played"
+  </source>
+  <dest>
+    *: "Mark Older as Played"
+  </dest>
+  <voice>
+    *: "Mark Older as Played"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MARK_ALL
+  desc: in a podcast show's context menu: count every episode as heard
+  user: core
+  <source>
+    *: "Mark All as Played"
+  </source>
+  <dest>
+    *: "Mark All as Played"
+  </dest>
+  <voice>
+    *: "Mark All as Played"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_INFO
+  desc: in a podcast show's context menu: its details
+  user: core
+  <source>
+    *: "Show Info"
+  </source>
+  <dest>
+    *: "Show Info"
+  </dest>
+  <voice>
+    *: "Show Info"
+  </voice>
+</phrase>

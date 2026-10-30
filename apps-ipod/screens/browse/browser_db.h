@@ -205,6 +205,28 @@ int browser_db_episode_percent(int idx_id);
 int browser_db_get_entry_range(struct browser_context *c, int id);
 /* Whether the list on screen is tracks newest first, numbered from the end */
 bool browser_db_counts_down(struct browser_context *c);
+/* What spoken word the list on screen is of, as tag_virt_spoken answers:
+ * 1 books, 2 podcasts, 0 either or neither */
+int browser_db_list_spoken_kind(struct browser_context *c);
+
+/* Row 'id' as a podcast episode, or -1 for any other row */
+enum {
+    BROWSER_DB_EPISODE_NOT_STARTED,
+    BROWSER_DB_EPISODE_IN_PROGRESS,
+    BROWSER_DB_EPISODE_FINISHED,
+};
+int browser_db_episode_state(struct browser_context *c, int id);
+
+/* Mark row 'id', an episode, played or not; the episodes below it played;
+ * or every episode of the show that row 'id' is. A place held goes. */
+enum browser_db_mark {
+    BROWSER_DB_MARK_PLAYED,
+    BROWSER_DB_MARK_UNPLAYED,
+    BROWSER_DB_MARK_OLDER,
+    BROWSER_DB_MARK_SHOW,
+};
+bool browser_db_mark_episodes(struct browser_context *c, int id,
+                              enum browser_db_mark how);
 /* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
  * False if index is out of range, or names a submenu with nothing in it:
  * that slot is numbered but hidden. */

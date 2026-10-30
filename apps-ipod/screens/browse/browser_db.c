@@ -5669,6 +5669,82 @@ bool browser_db_counts_down(struct browser_context *c)
     return c->currtable != TABLE_ROOT && tracks_count_down;
 }
 
+int browser_db_list_spoken_kind(struct browser_context *c)
+{
+    return c->currtable != TABLE_ROOT ? csi_spoken_kind() : 0;
+}
+
+int browser_db_episode_state(struct browser_context *c, int id)
+{
+    struct tagentry *entry;
+
+    if (id < c->special_entry_count || browser_db_get_entry_range(c, id) < 0
+        || !(entry = browser_db_get_entry(c, id)))
+        return -1;
+    switch (episode_state(entry->idx_id))
+    {
+        case EPISODES_IN_PROGRESS:
+            return BROWSER_DB_EPISODE_IN_PROGRESS;
+        case EPISODES_FINISHED:
+            return BROWSER_DB_EPISODE_FINISHED;
+        default:
+            return BROWSER_DB_EPISODE_NOT_STARTED;
+    }
+}
+
+/* Played keeps the plays counted, at least one; either way the place goes */
+static void mark_episode(int idx_id, bool played)
+{
+    long plays;
+
+    if (!tagcache_entry_numeric(idx_id, tag_playcount, &plays))
+        return;
+    tagcache_update_numeric(idx_id, tag_playcount, played ? MAX(plays, 1) : 0);
+    tagcache_update_numeric(idx_id, tag_lastelapsed, 0);
+    tagcache_update_numeric(idx_id, tag_lastoffset, 0);
+}
+
+bool browser_db_mark_episodes(struct browser_context *c, int id,
+                              enum browser_db_mark how)
+{
+    struct tagentry *entry = browser_db_get_entry(c, id);
+    struct tagcache_album al;
+    long album_seek, artist_seek;
+    int i, n;
+
+    if (!entry)
+        return false;
+    switch (how)
+    {
+        case BROWSER_DB_MARK_PLAYED:
+        case BROWSER_DB_MARK_UNPLAYED:
+            mark_episode(entry->idx_id, how == BROWSER_DB_MARK_PLAYED);
+            return true;
+
+        case BROWSER_DB_MARK_OLDER:
+            /* Below it, the list running newest first */
+            for (i = id + 1; i < c->filesindir; i++)
+            {
+                entry = browser_db_get_entry(c, i);
+                if (entry && entry->newtable == TABLE_PLAYTRACK)
+                    mark_episode(entry->idx_id, true);
+            }
+            return true;
+
+        case BROWSER_DB_MARK_SHOW:
+            if (!browser_db_get_book_album(c, id, &album_seek, &artist_seek))
+                return false;
+            n = tagcache_album_find(album_seek, artist_seek);
+            if (!tagcache_album_get(n, &al))
+                return false;
+            for (i = al.first; i <= al.last; i++)
+                if (tagcache_album_of(i) == n)
+                    mark_episode(i, true);
+            return true;
+    }
+    return false;
+}
+
 /* A playlist of these episodes alone, in this order, from the first; each
  * resumes where it was left */
 static int play_episodes(struct browser_context *c, const int *ids, int n)

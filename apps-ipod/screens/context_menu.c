@@ -1549,6 +1549,87 @@ static int mark_book_run(void)
 MENUITEM_FUNCTION(mark_book_item, 0, ID2P(LANG_BOOK_MARK_AS),
                   mark_book_run, mark_book_callback, Icon_NOICON);
 
+/* A podcast's episodes: one played or not, those older played, or a show's
+ * all played */
+static int episode_mark_lang(void)
+{
+    struct browser_context *c = browser_get_context();
+
+    return browser_db_episode_state(c, c->selected_item)
+           == BROWSER_DB_EPISODE_FINISHED ? LANG_PODCAST_MARK_UNPLAYED
+                                          : LANG_PODCAST_MARK_PLAYED;
+}
+
+static char *episode_mark_name(int selected_item, void *data,
+                               char *buffer, size_t buffer_len)
+{
+    (void)selected_item; (void)data; (void)buffer; (void)buffer_len;
+    return str(episode_mark_lang());
+}
+
+static int episode_mark_speak(int selected_item, void *data)
+{
+    (void)selected_item; (void)data;
+    talk_id(episode_mark_lang(), false);
+    return 0;
+}
+
+static int episode_mark_run(void *param)
+{
+    struct browser_context *c = browser_get_context();
+    enum browser_db_mark how = (intptr_t)param;
+
+    if (how == BROWSER_DB_MARK_PLAYED && episode_mark_lang()
+                                         == LANG_PODCAST_MARK_UNPLAYED)
+        how = BROWSER_DB_MARK_UNPLAYED;
+    if (browser_db_mark_episodes(c, c->selected_item, how))
+        context_menu_result = ONPLAY_RELOAD_DIR;
+    return 0;
+}
+
+static int episode_mark_callback(int action,
+                                 const struct menu_item_ex *this_item,
+                                 struct gui_synclist *this_list);
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(episode_mark_item, 0, episode_mark_run,
+                  (void *)BROWSER_DB_MARK_PLAYED,
+                  episode_mark_name, episode_mark_speak, NULL,
+                  episode_mark_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(episode_older_item, 0,
+                  ID2P(LANG_PODCAST_MARK_OLDER), episode_mark_run,
+                  (void *)BROWSER_DB_MARK_OLDER,
+                  episode_mark_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(show_mark_item, 0, ID2P(LANG_PODCAST_MARK_ALL),
+                  episode_mark_run, (void *)BROWSER_DB_MARK_SHOW,
+                  episode_mark_callback, Icon_NOICON);
+
+static int episode_mark_callback(int action,
+                                 const struct menu_item_ex *this_item,
+                                 struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+    long album_seek, artist_seek;
+    bool episode;
+
+    (void)this_list;
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+    if (selected_file.context != CONTEXT_ID3DB)
+        return ACTION_EXIT_MENUITEM;
+
+    episode = browser_db_episode_state(c, c->selected_item) >= 0;
+    if (this_item == &episode_mark_item)
+        return episode ? action : ACTION_EXIT_MENUITEM;
+    if (this_item == &episode_older_item)
+        return episode && c->selected_item + 1 < c->filesindir
+               ? action : ACTION_EXIT_MENUITEM;
+    return !episode && browser_db_list_spoken_kind(c) == 2
+           && browser_db_get_book_album(c, c->selected_item, &album_seek,
+                                        &artist_seek)
+           && db_spoken_album_is_podcast(album_seek, artist_seek)
+           ? action : ACTION_EXIT_MENUITEM;
+}
+
 /* A book's bookmarks, from the browser or Now Playing; choosing one plays it */
 static char marks_book[BOOK_ID_MAX];
 
@@ -1687,7 +1768,8 @@ static int info_lang_id(void)
     if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO)
         return LANG_TRACK_INFO;
     if (ctx_in_order)
-        return LANG_BOOK_INFO;
+        return browser_db_list_spoken_kind(browser_get_context()) == 2
+               ? LANG_SHOW_INFO : LANG_BOOK_INFO;
 
     switch (browser_db_current_scope())
     {
@@ -2098,6 +2180,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
 MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            context_menu_callback, Icon_file_view_menu,
            &mark_book_item,
+           &episode_mark_item, &episode_older_item, &show_mark_item,
            &book_marks_item,
            &listen_book_item,
            &view_playlist_item,
