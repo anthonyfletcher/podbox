@@ -26753,31 +26753,17 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_PODCAST_NEW
-  desc: a row of the Podcasts menu: every episode not yet heard
+  id: LANG_PODCAST_ALL_EPISODES
+  desc: a row above the Podcasts list of shows: every episode of every show
   user: core
   <source>
-    *: "New"
+    *: "All Episodes"
   </source>
   <dest>
-    *: "New"
+    *: "All Episodes"
   </dest>
   <voice>
-    *: "New"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_PODCAST_SHOWS
-  desc: a row of the Podcasts menu: every show, each opening its episodes
-  user: core
-  <source>
-    *: "Shows"
-  </source>
-  <dest>
-    *: "Shows"
-  </dest>
-  <voice>
-    *: "Shows"
+    *: "All Episodes"
   </voice>
 </phrase>
 <phrase>

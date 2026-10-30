@@ -215,8 +215,11 @@ enum list_row_kind browser_db_get_main_menu_row_kind(int index);
  * shipped menu's "Album" and "Recently Added" both start on tag_album. False
  * where browser_db_get_main_menu_row() is. */
 bool browser_db_enter_main_menu_row_on_next_load(int index);
-/* The same for the main menu's row opening the menu of id 'menu_id' */
+/* The same for the main menu's row opening the menu of id 'menu_id', and
+ * then for the row of that menu labelled 'label', from which BACK leaves */
 void browser_db_enter_menu_on_next_load(const char *menu_id);
+void browser_db_enter_menu_row_on_next_load(const char *menu_id,
+                                            const char *label);
 /* The Music menu's rows, for the screen that turns them on and off
  * (screens/music_menu_config.c). Only rows the menu would actually draw are
  * enumerated, so one already hidden for another reason -- an empty submenu, or

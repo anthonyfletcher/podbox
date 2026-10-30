@@ -2571,6 +2571,118 @@ static int header_rows_fill(int level, char *buf, long bufsz)
 
 /* Special row *sidx at the head of the list, written at dptr only when the
  * page starting at 'offset' holds it. Returns where the next row goes. */
+/* ------------------------------------------------------------------ *
+ * the rows above a podcast's shows                                   *
+ * ------------------------------------------------------------------ */
+
+/* Above the list of shows, Search, then the episodes of every show in one
+ * state, each row hidden while it has none, then all of them. A state row
+ * is an <All tracks> row whose seek names the state, which the track list
+ * it opens turns into clauses. */
+enum {
+    EPISODES_IN_PROGRESS = 1,
+    EPISODES_NOT_STARTED,
+    EPISODES_FINISHED,
+    EPISODES_ALL,
+};
+
+static const struct episode_row {
+    int lang_id;
+    const char *format;     /* the tagnavi.config %format to list them by */
+} episode_rows[] = {
+    [EPISODES_IN_PROGRESS] = { LANG_BOOK_SHELF_ROW_PROGRESS,
+                               "fmt_episode_heard" },
+    [EPISODES_NOT_STARTED] = { LANG_BOOK_SHELF_ROW_NEW, "fmt_episode_new" },
+    [EPISODES_FINISHED]    = { LANG_BOOK_SHELF_ROW_FINISHED,
+                               "fmt_episode_heard" },
+    [EPISODES_ALL]         = { LANG_PODCAST_ALL_EPISODES, "fmt_episode_new" },
+};
+
+static struct tagcache_search_clause episode_elapsed_clause = {
+    .tag = tag_lastelapsed, .numeric = true, .source = source_constant,
+};
+static struct tagcache_search_clause episode_plays_clause = {
+    .tag = tag_playcount, .numeric = true, .source = source_constant,
+};
+
+/* Episodes in each state, counted when the list of shows loads; 0 for a
+ * state with none */
+static int episode_counts[EPISODES_ALL + 1];
+/* The list being loaded is a podcast's shows, whose Search alone scrolls off */
+static bool podcast_shows;
+
+static bool is_podcast_shows(struct browser_context *c, int tag, int level)
+{
+    return c->currtable == TABLE_NAVIBROWSE && level == 0
+           && tag == tag_album && csi_spoken_kind() == 2;
+}
+
+static int episode_state(int idx_id)
+{
+    long elapsed, plays;
+
+    if (!tagcache_entry_numeric(idx_id, tag_lastelapsed, &elapsed)
+        || !tagcache_entry_numeric(idx_id, tag_playcount, &plays))
+        return 0;
+    if (elapsed > 0)
+        return EPISODES_IN_PROGRESS;
+    return plays > 0 ? EPISODES_FINISHED : EPISODES_NOT_STARTED;
+}
+
+/* From the album table, so only with the database in RAM; without it every
+ * row shows */
+static void episode_counts_fill(void)
+{
+    struct tagcache_album al;
+    int n, i;
+
+    memset(episode_counts, 0, sizeof(episode_counts));
+    if (tagcache_album_count() == 0)
+    {
+        for (i = 0; i <= EPISODES_ALL; i++)
+            episode_counts[i] = 1;
+        return;
+    }
+    for (n = 0; tagcache_album_get(n, &al); n++)
+    {
+        if (db_spoken_album_kind(&al) != 2)
+            continue;
+        for (i = al.first; i <= al.last; i++)
+            if (tagcache_album_of(i) == n)
+            {
+                episode_counts[episode_state(i)]++;
+                episode_counts[EPISODES_ALL]++;
+            }
+    }
+}
+
+/* The clauses for the state an <All tracks> row's seek names, and the
+ * format group to list them by; -1 where the seek names none */
+static int add_episode_clauses(struct tagcache_search *tcs, long state)
+{
+    int i;
+
+    if (state < EPISODES_IN_PROGRESS || state > EPISODES_ALL)
+        return -1;
+    if (state == EPISODES_IN_PROGRESS)
+    {
+        episode_elapsed_clause.type = clause_gt;
+        tagcache_search_add_clause(tcs, &episode_elapsed_clause);
+    }
+    else if (state != EPISODES_ALL)
+    {
+        episode_elapsed_clause.type = clause_is;
+        episode_plays_clause.type = state == EPISODES_FINISHED ? clause_gt
+                                                               : clause_is;
+        tagcache_search_add_clause(tcs, &episode_elapsed_clause);
+        tagcache_search_add_clause(tcs, &episode_plays_clause);
+    }
+    for (i = 0; i < format_count; i++)
+        if (!strcmp(formats[i]->name, episode_rows[state].format))
+            return formats[i]->group_id;
+    return -1;
+}
+
 static struct tagentry *add_head_row(struct browser_context *c,
                                      struct tagentry *dptr, int offset,
                                      int *sidx, int newtable,
@@ -2617,10 +2729,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     int order_prefix = 0;  /* characters this level prepends for the sort */
     bool header = false;
 
+    long episodes = 0;  /* the episode state an <All tracks> row named */
+
     if (c->currtable == TABLE_ALLSUBENTRIES || c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
     {
         tag = tag_title;
         level--;
+        if (csi_spoken_kind() == 2)
+            episodes = csi->result_seek[level];
     }
     else
     {
@@ -2650,6 +2766,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         header_count = header ? header_rows_fill(level - 1, tcs_buf, tcs_bufsz)
                               : 0;
         resume_row = book_resume_row(c, level, tag);
+        podcast_shows = is_podcast_shows(c, tag, level);
+        if (podcast_shows)
+            episode_counts_fill();
     }
 
     /* Before the search: the table is built by searches of its own, which
@@ -2688,6 +2807,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         sort = true;
 
     add_level_filters(&tcs, level);
+    int episode_format = add_episode_clauses(&tcs, episodes);
     if (header && (csi->header_untagged & (1 << (level - 1))))
     {
         header_untagged_clause.tag = csi->tagorder[level - 1];
@@ -2758,6 +2878,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * Otherwise, tracks will be sorted by title names */
     int format_group = c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
                        ? csi->format_id[level + 1] : csi->format_id[level];
+
+    if (episode_format >= 0)
+        format_group = episode_format;
 
     fmt = NULL;
     for (i = 0; i < format_count; i++)
@@ -2901,6 +3024,16 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * the Resume row's: insert_all_playlist() drops the row rather than
      * playing whichever track the database indexed first, which would shift
      * every selection onto the row before it. */
+    if (podcast_shows)
+    {
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
+                            ID2P(LANG_DB_SEARCH), DB_SEARCH_PODCAST);
+        for (i = EPISODES_IN_PROGRESS; i <= EPISODES_ALL; i++)
+            if (episode_counts[i] > 0)
+                dptr = add_head_row(c, dptr, offset, &sidx,
+                                    TABLE_ALLSUBENTRIES,
+                                    ID2P(episode_rows[i].lang_id), i);
+    }
     if (tag == tag_album && featured_row_count(level) > 0)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
                             ID2P(LANG_FEATURED_IN), -1);
@@ -3548,6 +3681,14 @@ void browser_db_enter_menu_on_next_load(const char *menu_id)
     pending_root_shortcut_label[0] = '\0';
     strmemccpy(pending_root_shortcut_menu, menu_id,
                sizeof(pending_root_shortcut_menu));
+}
+
+void browser_db_enter_menu_row_on_next_load(const char *menu_id,
+                                            const char *label)
+{
+    browser_db_enter_menu_on_next_load(menu_id);
+    strmemccpy(pending_root_shortcut_label, label,
+               sizeof(pending_root_shortcut_label));
 }
 
 /* Finding a row to select, among the rows actually on screen.
@@ -4323,7 +4464,10 @@ int browser_db_load(struct browser_context* c)
      * book rather than a chapter of it. */
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
-        int first = c->special_entry_count;
+        /* A podcast's episode states are what its list is for; only its
+         * Search goes off the top */
+        int first = table != TABLE_ROOT && podcast_shows
+                    ? 1 : c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
          * one more special row, and goes with them. Asked only when the
@@ -4667,7 +4811,10 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
          * Search covers books, every other menu's covers music. The main
          * menu's own Search row is not this one -- root_menu.c arms that,
          * and it covers both. */
-        db_search_arm_scope(menu_spoken_scope(menus[c->currextra]));
+        /* A row above a list carries its scope */
+        db_search_arm_scope(c->currtable == TABLE_ROOT
+                            ? menu_spoken_scope(menus[c->currextra])
+                            : seek);
         return GO_TO_DB_SEARCH;
     }
 
