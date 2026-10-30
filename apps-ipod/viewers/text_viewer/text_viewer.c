@@ -64,6 +64,7 @@
 #include "files/zip_member.h"
 #include "crc32.h"
 #include "system/volume.h"   /* adjust_volume, format_sound_value */
+#include "audio/sound_feedback.h"   /* keyclick_click */
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -3427,6 +3428,9 @@ int text_viewer(const char *file)
         {
             long b = timeout == TIMEOUT_BLOCK ? button_get(true)
                                               : button_get_w_tmo(timeout);
+
+            /* Read past the action system, which clicks for the rest */
+            keyclick_click(true, b);
 
             switch (tv_side_button(b))
             {
