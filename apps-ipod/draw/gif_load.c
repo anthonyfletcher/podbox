@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include "system.h"
+#include "file.h"
 #include "bmp.h"
 #include "resize.h"
 #include "gif_load.h"
@@ -361,4 +362,59 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
                           free_len, cformat, 0, store_part_gif, g))
         return -9;
     return bm_size;
+}
+
+/* Past a colour table whose size `flags` gives, if it has one */
+static bool skip_table(int fd, int flags)
+{
+    return !(flags & 0x80) || lseek(fd, 3 * (2 << (flags & 7)), SEEK_CUR) >= 0;
+}
+
+/* Past an extension's sub-blocks, up to the empty one that ends them */
+static bool skip_fd_blocks(int fd)
+{
+    uint8_t n;
+
+    do
+        if (read(fd, &n, 1) != 1 || lseek(fd, n, SEEK_CUR) < 0)
+            return false;
+    while (n);
+    return true;
+}
+
+/* read_header()'s walk to the first image, by seeking past what it would
+ * read */
+bool gif_usable(int fd)
+{
+    uint8_t b[13];
+
+    if (lseek(fd, 0, SEEK_SET) != 0 || read(fd, b, 13) != 13
+        || memcmp(b, "GIF8", 4) || !skip_table(fd, b[10]))
+        return false;
+    for (;;)
+    {
+        if (read(fd, b, 1) != 1)
+            return false;
+        if (b[0] == 0x21)                       /* an extension */
+        {
+            if (read(fd, b, 2) != 2 || (b[0] == 0xf9 && b[1] != 4))
+                return false;
+            if (lseek(fd, -1, SEEK_CUR) < 0 || !skip_fd_blocks(fd))
+                return false;
+        }
+        else if (b[0] == 0x2c)                  /* the image */
+        {
+            int w, h;
+
+            if (read(fd, b, 9) != 9)
+                return false;
+            w = b[4] | b[5] << 8;
+            h = b[6] | b[7] << 8;
+            return skip_table(fd, b[8]) && read(fd, b, 1) == 1
+                   && b[0] >= 2 && b[0] <= 8 && w >= 1 && h >= 1
+                   && w <= 32767 && h <= 32767;
+        }
+        else
+            return false;                       /* the trailer, or worse */
+    }
 }

@@ -23,6 +23,8 @@
 #include "settings/settings.h"
 #include "screens/playback/wps.h"
 #include "draw/image_load.h"
+#include "draw/gif_load.h"
+#include "draw/webp_load.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -64,12 +66,13 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
 }
 
 /* Whether an image the search has found can be drawn. The JPEG decoder takes
- * baseline and progressive Huffman-coded images only, and the PNG reader no
- * very wide ones; one they cannot read must not stop the
- * search: an arithmetic-coded cover.jpg would otherwise hide a folder.jpg
- * beside it, which the search only reaches later. Reads a JPEG's markers up
- * to the frame header, or a PNG's header, by content whatever the name, and
- * leaves anything it cannot place for the decoder to judge. */
+ * baseline and progressive Huffman-coded images only, the PNG reader no
+ * very wide ones and the WebP reader no lossless ones; one they cannot read
+ * must not stop the search: an arithmetic-coded cover.jpg would otherwise
+ * hide a folder.jpg beside it, which the search only reaches later. Reads a
+ * JPEG's markers up to the frame header, or a PNG's, GIF's or WebP's
+ * headers, by content whatever the name, and leaves anything it cannot place
+ * for the decoder to judge. */
 static bool art_file_usable(const char *path)
 {
     unsigned char b[4];
@@ -80,7 +83,8 @@ static bool art_file_usable(const char *path)
     if (!file_exists(path))
         return false;
     if (!ext || (strcasecmp(ext, ".jpg") && strcasecmp(ext, ".jpeg")
-                 && strcasecmp(ext, ".png")))
+                 && strcasecmp(ext, ".png") && strcasecmp(ext, ".gif")
+                 && strcasecmp(ext, ".webp")))
         return true;
 
     fd = open(path, O_RDONLY);
@@ -89,6 +93,10 @@ static bool art_file_usable(const char *path)
     i = read(fd, b, 2);
     if (i == 2 && b[0] == 0x89 && b[1] == 'P')
         usable = png_usable(fd);
+    else if (i == 2 && b[0] == 'G' && b[1] == 'I')
+        usable = gif_usable(fd);
+    else if (i == 2 && b[0] == 'R' && b[1] == 'I')
+        usable = webp_usable(fd);
     else if (i == 2 && b[0] == 0xff && b[1] == 0xd8)
     {
         for (i = 0; i < 64 && read(fd, b, 4) == 4 && b[0] == 0xff; i++)

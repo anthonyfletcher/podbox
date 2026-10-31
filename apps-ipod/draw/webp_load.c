@@ -1624,3 +1624,18 @@ int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
         return -9;
     return bm_size;
 }
+
+bool webp_usable(int fd)
+{
+    uint8_t h[10];
+    off_t data, size;
+    uint32_t tag;
+
+    if (find_vp8(fd, 0, -1, &data, &size) < 0 || size < 10
+        || lseek(fd, data, SEEK_SET) != data || read(fd, h, 10) != 10)
+        return false;
+    tag = h[0] | h[1] << 8 | h[2] << 16;
+    return !(tag & 1) && ((tag >> 1) & 7) <= 3 && ((tag >> 4) & 1)
+           && h[3] == 0x9d && h[4] == 0x01 && h[5] == 0x2a
+           && (h[6] | h[7] << 8) & 0x3fff && (h[8] | h[9] << 8) & 0x3fff;
+}

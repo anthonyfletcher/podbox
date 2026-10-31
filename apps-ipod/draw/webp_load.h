@@ -16,4 +16,8 @@
 int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
                  int maxsize, int format, const struct custom_format *cformat);
 
+/* Whether fd holds, from its start, a WebP that read_webp_fd() decodes: a
+ * lossy one. Reads the chunk headers and the frame header only. */
+bool webp_usable(int fd);
+
 #endif /* _WEBP_LOAD_H_ */

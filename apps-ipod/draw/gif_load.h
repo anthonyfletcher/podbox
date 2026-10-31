@@ -18,4 +18,8 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
                     int maxsize, int format,
                     const struct custom_format *cformat);
 
+/* Whether fd holds, from its start, a GIF that read_gif_stream() decodes.
+ * Reads up to the first image's header only. */
+bool gif_usable(int fd);
+
 #endif /* _GIF_LOAD_H_ */
