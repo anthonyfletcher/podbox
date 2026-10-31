@@ -142,6 +142,9 @@ static char* skin_buffer;
  * cannot be taken back out -- the foreground has already copied it -- so
  * skin_render() repaints everything. */
 static bool backdrop_flipped;
+/* ...and outside the WPS, that repaint owes the ground between the viewports
+ * a clear, which nothing else there gives it */
+static bool flip_clear_owed;
 
 static inline struct skin_element*
 get_child(OFFSETTYPE(struct skin_element**) children, int child)
@@ -1624,7 +1627,9 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
                    != first_vp->bg_pattern
                 || dynamic_colors_screen_clear_needed();
         }
+        screen_clear_owed |= flip_clear_owed;
     }
+    flip_clear_owed = false;
 
     viewport = SKINOFFSETTOPTR(skin_buffer, data->tree);
     if (!viewport) return;
@@ -1778,11 +1783,18 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     if (screen_clear_owed)
         clear_wps_screen(display);
 
-    if (backdrop_flipped &&
-        (old_refresh_mode&SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL)
+    if (backdrop_flipped)
     {
-        skin_render(gwps, SKIN_REFRESH_ALL);
-        return;
+        /* A changed backdrop shows only where something clears to it. The
+         * WPS's full pass clears the ground between its viewports; nothing
+         * else does, so elsewhere the repaint is told to. */
+        flip_clear_owed = get_current_activity() != ACTIVITY_WPS;
+        if (flip_clear_owed
+            || (old_refresh_mode&SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL)
+        {
+            skin_render(gwps, SKIN_REFRESH_ALL);
+            return;
+        }
     }
 
     if (((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL))

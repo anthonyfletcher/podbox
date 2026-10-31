@@ -1723,8 +1723,11 @@ looking plain.
 
 [action: Theme Options]
 The loaded theme's own choices, such as what its playing screen shows. Here
-only when the theme offers them. Each change is saved at once; the theme
-reloads, taking a moment, when you leave.
+only when the theme offers them. Each change is saved at once and shows as
+soon as you leave.
+
+It can also go on the Now Playing screen's context menu: turn it on in Context
+Menus > Now Playing Menu.
 
 [action: Clear Backdrop]
 Removes the background image, leaving the background colour showing through.
@@ -1833,6 +1836,8 @@ from there.
 [action: Now Playing Menu]
 Chooses which rows the Now Playing screen's context menu shows. A row can also
 be hidden by holding Select on it in the menu; this is where it comes back.
+
+Theme Options starts off. Turned on, it shows only while the theme has options.
 
 [action: Track Menu]
 Chooses which rows a track's context menu shows, in the browsers and the queue.

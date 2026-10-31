@@ -18,6 +18,7 @@
 #define THEME_OPTION_CHOICES     16     /* choices per option */
 #define THEME_OPTIONS_MAX        32     /* options per file */
 #define THEME_OPTIONS_FILES      4      /* .preferences files per theme */
+#define THEME_OPTIONS_LIVE       64     /* distinct live %ft reads */
 
 enum theme_option_type
 {
@@ -64,6 +65,13 @@ int theme_options_parse(const char *path, struct theme_options_head *head,
 bool theme_options_read(const char *path, const char *key,
                         char *buf, int bufsize);
 
+/* What %ft finds in the file at `path`: the rest of the first line that
+ * starts with the `search_len` bytes of `search`, after any spaces, or with
+ * `search` NULL, line `line` from 0. Into `buf`; returns its length, or -1
+ * when nothing was found or it is empty. */
+int theme_options_filetext(const char *path, const char *search,
+                           int search_len, int line, char *buf, int bufsize);
+
 /* Whether `value` is one `opt` may have */
 bool theme_option_valid(const struct theme_option *opt, const char *value);
 
@@ -79,6 +87,18 @@ void theme_options_forget(void);
 /* A skin's %ft reads `path`: the first time in a load, records it and
  * completes it from the options file beside it */
 void theme_options_met(const char *path);
+
+/* A skin's %ft found `value` in `path`, as theme_options_filetext() takes
+ * the search: an index for theme_options_live_value(), kept up to date by
+ * every write, or -1 to keep the value fixed. Only a recorded file with
+ * options is live. */
+int theme_options_live(const char *path, const char *search, int search_len,
+                       int line, const char *value);
+const char *theme_options_live_value(int n);
+
+/* Whether every %ft that reads `path` is live, so a write to it needs no
+ * reload */
+bool theme_options_live_only(const char *path);
 
 /* The recorded .preferences files whose options files have a good option:
  * how many, and the n-th one's path and title */

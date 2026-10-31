@@ -5,8 +5,9 @@
  * skin/theme_options.c reads and writes the files; this is the screen.
  *
  * One options file opens straight onto its options; more than one opens on
- * a row per file. Each change is written when it is made, and the theme
- * reloads once, on leaving, if anything changed.
+ * a row per file. Each change is written when it is made, and the skins
+ * read it at their next draw. Only a file some %ft reads at load alone (see
+ * theme_options_live()) has the theme reload once, on leaving.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -44,7 +45,15 @@ static struct
     int count, room;
 } f;
 
-static bool changed;
+static bool changed;            /* a value was written */
+static bool reload;             /* ...to a file not every %ft reads live */
+
+static void written(void)
+{
+    changed = true;
+    if (!theme_options_live_only(f.prefs))
+        reload = true;
+}
 
 static void collect(const struct theme_option *opt, void *data)
 {
@@ -76,7 +85,7 @@ static void set_value(int n, const char *value)
         return;
     }
     strmemccpy(f.values[n], value, sizeof f.values[n]);
-    changed = true;
+    written();
 }
 
 static void restore_title(struct gui_synclist *lists, const char *title)
@@ -193,7 +202,7 @@ static void reset_all(void)
     }
     for (int i = 0; i < f.count; i++)
         strcpy(f.values[i], f.opts[i].def);
-    changed = true;
+    written();
 }
 
 static int option_action(int action, struct gui_synclist *lists)
@@ -329,7 +338,7 @@ static int theme_options_menu(void)
 {
     bool to_root = false;
 
-    changed = false;
+    changed = reload = false;
     if (theme_options_count() == 1)
         to_root = edit_file(0);
     else
@@ -350,11 +359,17 @@ static int theme_options_menu(void)
         }
     }
 
-    if (changed)
+    if (reload)
     {
         /* A reload is long enough to read as a hang without it */
         splash(0, ID2P(LANG_WAIT));
         settings_apply_skins();
+    }
+    else if (changed)
+    {
+        /* A %ft line redraws only on a full update */
+        for (int i = 0; i < SKINNABLE_SCREENS_COUNT; i++)
+            skin_request_full_update(i);
     }
     return to_root ? MENU_ATTACHED_USB : 0;
 }

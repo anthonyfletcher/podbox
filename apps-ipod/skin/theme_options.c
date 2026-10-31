@@ -8,11 +8,14 @@
  * Parts:
  *   parse      theme_options_parse() streams an options file, one option
  *              held at a time, and hands each good one to its caller
- *   read       theme_options_read(): a key's value, found as %ft finds it
+ *   read       theme_options_read(): a key's value, found as %ft finds it;
+ *              theme_options_filetext(): what %ft itself finds, in any file
  *   write      theme_options_write(): a copy through <name>.new, changing
  *              only the keys' first lines, then the swap
  *   load       theme_options_met(), from the skin parser: records each
  *              .preferences file and completes it from its options
+ *   live       the skins' %ft reads of those files, which every write
+ *              rereads, so a change shows at the next draw with no reload
  *   check      theme_options_check(), CheckWPS's instead: prints each
  *              options file's errors, and each %ft key it does not define
  *
@@ -436,8 +439,47 @@ bool theme_options_read(const char *path, const char *key,
     return found;
 }
 
+int theme_options_filetext(const char *path, const char *search,
+                           int search_len, int line, char *buf, int bufsize)
+{
+    char *start = buf;
+    int fd, rd = 0;
+
+    if (search)
+        line = 0x3FF; /* 1k lines is a pretty large file */
+    if (line > 0x3FF || (fd = open_utf8(path, O_RDONLY)) < 0)
+        return -1;
+
+    while (line >= 0)
+    {
+        if ((rd = read_line(fd, buf, bufsize)) <= 0)
+            break;
+        if (search && strncasecmp(buf, search, search_len) == 0)
+        {
+            start += search_len;
+            rd -= search_len;
+            /* skip whitespace between the key and its value */
+            while (*start == ' ' || *start == '\t')
+            {
+                start++;
+                rd--;
+            }
+            break;
+        }
+        line--;
+    }
+    close(fd);
+
+    if (rd <= 0) /* empty line? */
+        return -1;
+    memmove(buf, start, rd);
+    buf[rd] = '\0';
+    return rd;
+}
 
 /* --- write --------------------------------------------------------------- */
+
+static void live_refresh(const char *path);
 
 static struct
 {
@@ -603,7 +645,10 @@ bool theme_options_write(const char *path, const char * const *keys,
     /* FAT's rename does not replace a file. A power cut between the two
      * leaves only the .new, which the next load renames into place. */
     remove(path);
-    return rename(newpath, path) == 0;
+    if (rename(newpath, path) != 0)
+        return false;
+    live_refresh(path);
+    return true;
 }
 
 /* --- load ---------------------------------------------------------------- */
@@ -614,6 +659,7 @@ static struct
     char path[MAX_PATH];
     char title[THEME_OPTION_NAME_MAX + 1];
     bool good;                  /* its options file has a good option */
+    bool fixed;                 /* ...and a %ft that reads it is not live */
 } rec[THEME_OPTIONS_FILES];
 static int recs;
 
@@ -665,9 +711,12 @@ bool theme_options_options_path(const char *prefs, char *buf, int bufsize)
     return snprintf(buf, bufsize, "%.*s.options", (int)len, prefs) < bufsize;
 }
 
+static int lives;
+
 void theme_options_forget(void)
 {
     recs = 0;
+    lives = 0;
 }
 
 void theme_options_met(const char *path)
@@ -685,6 +734,7 @@ void theme_options_met(const char *path)
         return;
     strcpy(rec[recs].path, path);
     rec[recs].good = false;
+    rec[recs].fixed = false;
     title = rec[recs].title;
     recs++;
 
@@ -763,6 +813,96 @@ const char *theme_options_title(int n)
     int i = nth_good(n);
 
     return i < 0 ? NULL : rec[i].title;
+}
+
+/* --- live ---------------------------------------------------------------- */
+
+/* A skin's live %ft token holds an index here, and the same read in two
+ * skins shares one entry. A read that does not fit stays fixed at its parse
+ * and marks its file, so the menu reloads the theme for that file instead. */
+static struct
+{
+    signed char file;           /* in rec[] */
+    signed char search_len;     /* -1: read by line number */
+    short line;
+    char search[THEME_OPTION_KEY_MAX + 2];
+    char value[THEME_OPTION_TEXT_MAX + 1];
+} live[THEME_OPTIONS_LIVE];
+
+static int live_file(const char *path)
+{
+    for (int i = 0; i < recs; i++)
+        if (rec[i].good && !strcasecmp(rec[i].path, path))
+            return i;
+    return -1;
+}
+
+int theme_options_live(const char *path, const char *search, int search_len,
+                       int line, const char *value)
+{
+    int file = live_file(path);
+    int n;
+
+    if (file < 0)
+        return -1;
+    if (search)
+        line = 0;
+    else
+        search_len = -1;
+    for (n = 0; n < lives; n++)
+    {
+        if (live[n].file == file && live[n].search_len == search_len
+            && live[n].line == line
+            && (search_len < 0
+                || !strncasecmp(live[n].search, search, search_len)))
+            return n;
+    }
+    if (n == THEME_OPTIONS_LIVE || search_len > THEME_OPTION_KEY_MAX + 1
+        || strlen(value) > THEME_OPTION_TEXT_MAX)
+    {
+        rec[file].fixed = true;
+        return -1;
+    }
+    live[n].file = file;
+    live[n].search_len = search_len;
+    live[n].line = line;
+    if (search_len > 0)
+        memcpy(live[n].search, search, search_len);
+    strcpy(live[n].value, value);
+    lives++;
+    return n;
+}
+
+const char *theme_options_live_value(int n)
+{
+    return n >= 0 && n < lives ? live[n].value : "";
+}
+
+bool theme_options_live_only(const char *path)
+{
+    int file = live_file(path);
+
+    return file >= 0 && !rec[file].fixed;
+}
+
+/* Rereads every live entry of the file just written */
+static void live_refresh(const char *path)
+{
+    char buf[MAX_PATH];
+    int file = live_file(path);
+
+    for (int n = 0; file >= 0 && n < lives; n++)
+    {
+        if (live[n].file != file)
+            continue;
+        if (theme_options_filetext(path,
+                                   live[n].search_len < 0 ? NULL
+                                                          : live[n].search,
+                                   live[n].search_len, live[n].line,
+                                   buf, sizeof buf) < 0)
+            buf[0] = '\0';
+        strmemccpy(live[n].value, buf, sizeof live[n].value);
+    }
 }
 
 #ifdef CHECKWPS

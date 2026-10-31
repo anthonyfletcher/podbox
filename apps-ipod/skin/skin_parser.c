@@ -1601,12 +1601,12 @@ static int parse_filetext(struct skin_element *element,
 {
     (void)wps_data;
     const char* filename;
+    char path[MAX_PATH];
     char buf[MAX_PATH];
-    char *buf_start = buf;
-    int fd;
     int line = 0;
     const char *search_text = NULL;
     int search_len = 0;
+    int rd;
 
     /* format: %ft(filename[,line|search text]) */
     filename = get_param_text(element, 0);
@@ -1619,11 +1619,10 @@ static int parse_filetext(struct skin_element *element,
         else if (param1->type == STRING)
         {
             search_text = get_param_text(element, 1);
-            line = 0x3FF; /* 1k lines is a pretty large file */
             /* Trim whitespace around the key so "key:" and "key: " match the
              * same line -- the value's own whitespace is skipped after the
-             * match below. Without this the key had to be written to include
-             * the exact spacing used in the file. */
+             * match. Without this the key had to be written to include the
+             * exact spacing used in the file. */
             while (*search_text == ' ' || *search_text == '\t')
                 search_text++;
             search_len = strlen(search_text);
@@ -1647,68 +1646,47 @@ static int parse_filetext(struct skin_element *element,
 
 #ifdef CHECKWPS
     /* CheckWPS runs in the folder holding .rockbox, not at its root */
-    path_append(buf, ROCKBOX_DIR + 1, filename, sizeof(buf));
-    theme_options_check(buf, search_text, search_len);
+    path_append(path, ROCKBOX_DIR + 1, filename, sizeof(path));
+    theme_options_check(path, search_text, search_len);
 #else
-    path_append(buf, ROCKBOX_DIR, filename, sizeof(buf));
+    path_append(path, ROCKBOX_DIR, filename, sizeof(path));
     /* A theme's .preferences is completed from its options before the
      * first read */
-    theme_options_met(buf);
+    theme_options_met(path);
 #endif
-    DEBUGF("%s %s[%d]\n", __func__, buf, line);
+    DEBUGF("%s %s[%d]\n", __func__, path, line);
 
-    if (line > 0x3FF || (fd = open_utf8(buf, O_RDONLY)) < 0)
+    rd = theme_options_filetext(path, search_text, search_len, line,
+                                buf, sizeof(buf));
+    if (rd < 0)
     {
-        DEBUGF("%s: Error Opening %s\n", __func__, buf);
+        DEBUGF("%s: Error Reading %s\n", __func__, filename);
         goto failure;
     }
 
-    int rd = 0;
-    while (line >= 0)
+#ifndef CHECKWPS
+    /* A theme option's value is read at each draw, so the Theme Options
+     * menu changes it without a reload */
+    int live = theme_options_live(path, search_text, search_len, line, buf);
+    if (live >= 0)
     {
-        if ((rd = read_line(fd, buf, sizeof(buf))) <= 0)
-            break;
-        if (search_text && strncasecmp(buf, search_text, search_len) == 0)
-        {
-            buf_start += search_len;
-            rd -= search_len;
-            /* skip whitespace between the key and its value */
-            while (*buf_start == ' ' || *buf_start == '\t')
-            {
-                buf_start++;
-                rd--;
-            }
-            DEBUGF("%s: found '%s' Reading '%s'\n", __func__, search_text, buf);
-            break;
-        }
-        line--;
+        token->value.i = live;
+        return 0;
     }
-
-    if (rd <= 0) /* empty line? */
-    {
-        DEBUGF("%s: Error(%d) Reading %s\n", __func__, rd, filename);
-        close(fd);
-        goto failure;
-    }
+#endif
 
     if (element->is_conditional)
-    {
-        buf_start = buf;
         rd = 1; /* just alloc enough for the conditional to work*/
-    }
-
-    buf_start[rd] = '\0';
+    buf[rd] = '\0';
 
     char * skinbuf = skin_buffer_alloc(rd+1);
 
     if (!skinbuf)
     {
         DEBUGF("%s: Error No Buffer %s\n", __func__, filename);
-        close(fd);
         return WPS_ERROR_INVALID_PARAM;
     }
-    strcpy(skinbuf, buf_start);
-    close(fd);
+    strcpy(skinbuf, buf);
     token->value.data = PTRTOSKINOFFSET(skin_buffer, skinbuf);
     token->type = SKIN_TOKEN_STRING;
     return 0;

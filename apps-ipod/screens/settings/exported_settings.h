@@ -34,6 +34,9 @@ extern const struct menu_item_ex
                                        Appearance */
         , music_appearance_menu     /* theme_settings.c -- under
                                        Library > Music */
+        , theme_options_item        /* theme_options_menu.c -- under
+                                       Appearance, and on Now Playing's
+                                       context menu */
         , scroll_settings_menu      /* display_settings.c -- shown under UI
                                        Settings, defined beside the other
                                        LCD scroll settings it configures */

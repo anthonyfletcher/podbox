@@ -2214,6 +2214,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
            &sound_mix_item,
            &spike_run_item,
            &wps_playlist_menu, &cat_playlist_menu,
+           &theme_options_item,
            &wps_more_menu,
          );
 
@@ -2720,12 +2721,14 @@ MAKE_ONPLAYMENU_TITLED( item_menu,
  * browser's are. What cannot be hidden is what keeps a menu from emptying:
  * the Info row and the rows that play. Each kind's rows are listed in the
  * order its editor shows them; a row's place in its list is its bit in
- * global_settings.context_hidden[], which is saved by name. */
+ * global_settings.context_hidden[], which is saved by name. The rows in
+ * hidden_by_default[] start hidden. */
 
 static const short now_playing_rows[] = {
     LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_GO_TO_ALBUM,
     LANG_GO_TO_ARTIST, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
-    LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_SHOW_IN_FILES,
+    LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_THEME_OPTIONS,
+    LANG_SHOW_IN_FILES,
     LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU, LANG_BROWSE_CUESHEET,
     LANG_BROWSE_CHAPTERS, LANG_EQUALIZER, LANG_SOUND_SETTINGS, LANG_PLAYBACK,
     LANG_DELETE,
@@ -2792,6 +2795,24 @@ static const struct {
 
 _Static_assert(CONTEXT_KINDS == CONTEXT_MENU_KINDS,
                "one hidden-row mask per kind of context menu");
+
+/* Rows that start hidden, wherever they are listed. config.cfg names such a
+ * row with a '+' once it is shown, so a line saved before it existed still
+ * leaves it hidden. */
+static const short hidden_by_default[] = {
+    LANG_THEME_OPTIONS,
+};
+
+static uint32_t default_mask(int kind)
+{
+    uint32_t mask = 0;
+
+    for (int i = 0; i < kinds[kind].count; i++)
+        for (unsigned j = 0; j < ARRAYLEN(hidden_by_default); j++)
+            if (kinds[kind].rows[i] == hidden_by_default[j])
+                mask |= 1u << i;
+    return mask;
+}
 
 int context_menu_kind_label(int kind)
 {
@@ -2934,15 +2955,24 @@ static int setting_kind(void *setting)
 void context_hidden_load_from_cfg(void *setting, char *value)
 {
     int kind = setting_kind(setting);
-    uint32_t mask = 0;
+    uint32_t mask = default_mask(kind);
     char *save, *name = strtok_r(value, ",", &save);
 
     while (name)
     {
+        bool shown;
+
         name = skip_whitespace(name);
+        shown = (*name == '+');
+        if (shown)
+            name++;
         for (int i = 0; i < kinds[kind].count; i++)
         {
-            if (!strcasecmp(name, lang_id_to_english(kinds[kind].rows[i])))
+            if (strcasecmp(name, lang_id_to_english(kinds[kind].rows[i])))
+                continue;
+            if (shown)
+                mask &= ~(1u << i);
+            else
                 mask |= 1u << i;
         }
         name = strtok_r(NULL, ",", &save);
@@ -2954,13 +2984,20 @@ char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len)
 {
     int kind = setting_kind(setting);
     uint32_t mask = *(uint32_t *)setting;
+    uint32_t def = default_mask(kind);
     int len = 0;
 
     buf[0] = '\0';
     for (int i = 0; i < kinds[kind].count && len < buf_len; i++)
     {
-        if (mask & (1u << i))
+        uint32_t bit = 1u << i;
+
+        if ((mask & bit) && !(def & bit))
             len += snprintf(buf + len, buf_len - len, "%s%s", len ? ", " : "",
+                            lang_id_to_english(kinds[kind].rows[i]));
+        else if (!(mask & bit) && (def & bit))
+            len += snprintf(buf + len, buf_len - len, "%s+%s",
+                            len ? ", " : "",
                             lang_id_to_english(kinds[kind].rows[i]));
     }
     return buf;
@@ -2969,13 +3006,13 @@ char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len)
 bool context_hidden_is_changed(void *setting, void *defaultval)
 {
     (void)defaultval;
-    return *(uint32_t *)setting != 0;
+    return *(uint32_t *)setting != default_mask(setting_kind(setting));
 }
 
 void context_hidden_set_default(void *setting, void *defaultval)
 {
     (void)defaultval;
-    *(uint32_t *)setting = 0;
+    *(uint32_t *)setting = default_mask(setting_kind(setting));
 }
 
 

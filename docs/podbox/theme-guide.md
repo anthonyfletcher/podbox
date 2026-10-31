@@ -655,9 +655,22 @@ first line for each key, as `%ft` reads it: your comments, and keys the
 options file does not name, stay as they are. A file over 16 KB is left alone,
 and its theme gets no menu.
 
-Every change from the menu is written at once. The theme reloads when the owner
-leaves Theme Options, so the skins only need to read their values with `%ft` as
-they do now.
+Every change from the menu is written at once, and the skins show it the next
+time they draw, with no reload: a `%ft` on a file with an options file reads
+the current value each time. One skin can therefore hold two layouts and let
+the owner switch between them while the music plays:
+
+```
+%?if(%ft(themes/mytheme.preferences, view:), =, notes)<%Vd(notes)|%Vd(cover)>
+```
+
+A theme whose skins make more than 64 different `%ft` reads of its options
+files still works, but leaving Theme Options reloads it, which takes about a
+second.
+
+The owner can put **Theme Options** on the Now Playing context menu with
+**Settings > Appearance > Menus > Context Menus > Now Playing Menu**. It is
+off until they do, so a theme built around switching layouts should say so.
 
 ### Ship `.preferences`, or not
 

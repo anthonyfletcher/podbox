@@ -75,6 +75,7 @@
 #include "wps_internals.h"
 #include "custom_tokens.h"
 #include "skin_engine.h"
+#include "theme_options.h"
 #include "statusbar_skinned.h"
 #include "root_menu.h"
 #include "speech/language.h"
@@ -1633,6 +1634,10 @@ const char *get_token_value(struct gui_wps *gwps,
 
         case SKIN_TOKEN_STRING:
             return (char*)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+
+        /* Only a live %ft keeps this type past the parse */
+        case SKIN_TOKEN_FILE_TEXT:
+            return theme_options_live_value(token->value.i);
 
         case SKIN_TOKEN_TRANSLATEDSTRING:
             return token->value.i < LANG_LAST_INDEX_IN_ARRAY ?

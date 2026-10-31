@@ -572,7 +572,6 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &sep_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
-extern const struct menu_item_ex theme_options_item;      /* theme_options_menu.c */
 extern const struct menu_item_ex music_menu_config_item;  /* general_settings.c */
 
 /* Menus: what each one shows. The rows a context menu can hide are listed by
