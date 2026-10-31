@@ -9,14 +9,13 @@
  * track when the audio buffer holds the memory. So they are taken only once
  * a speed other than 100% is chosen -- at boot, before playback, if it was
  * chosen before, or when the setting is changed -- and never from the audio
- * thread. A track change only sets the factor.
+ * thread. A track only sets the factor, as its decoding starts: the PCM
+ * buffer still holds the last track's end, at the last track's speed.
  ****************************************************************************/
 #include <stdbool.h>
 #include "config.h"
 #include "audio.h"
 #include "metadata.h"
-#include "system/appevents.h"
-#include "events.h"
 #include "dsp_core.h"
 #include "tdspeed.h"
 #include "settings/settings.h"
@@ -42,10 +41,9 @@ static void apply(const struct mp3entry *id3)
     dsp_set_timestretch(pct * PITCH_SPEED_PRECISION);
 }
 
-static void track_change(unsigned short id, void *data)
+void spoken_speed_track(const struct mp3entry *id3)
 {
-    (void)id;
-    apply(((struct track_event *)data)->id3);
+    apply(id3);
 }
 
 void spoken_speed_set(int pct)
@@ -59,5 +57,4 @@ void spoken_speed_init(void)
 {
     if (global_settings.spoken_speed != 100)
         dsp_timestretch_enable(true);
-    add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_change);
 }

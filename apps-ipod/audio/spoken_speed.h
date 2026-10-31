@@ -20,5 +20,7 @@ struct mp3entry;
 /* Whether 'id3' is spoken word, by its genre: what Spoken Word Speed and
  * Spoken Word Skip Length apply to */
 bool spoken_word_track(const struct mp3entry *id3);
+/* The audio thread, before the codec decodes 'id3': its speed */
+void spoken_speed_track(const struct mp3entry *id3);
 
 #endif /* _SPOKEN_SPEED_H_ */

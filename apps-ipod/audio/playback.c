@@ -49,6 +49,7 @@
 #include "metadata/cuesheet.h"
 #include "metadata/chapters.h"
 #include "database/db_spoken.h"
+#include "audio/spoken_speed.h"
 #include "buffering.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
@@ -1996,6 +1997,7 @@ static bool audio_start_codec(bool auto_skip)
     ci.audio_hid = info.audio_hid;
     ci.filesize = buf_filesize(info.audio_hid);
     buf_set_base_handle(info.audio_hid);
+    spoken_speed_track(cur_id3);
 
     /* All required data is now available for the codec */
     codec_go();
