@@ -234,68 +234,55 @@ static int search_run(void)
 
 static int show_list(const char *type, char *title);
 
-static char types[16][TYPE_MAX];
-static int type_files[16];      /* a file of each, for its icon */
-static int type_counts[16];
+static struct file_kind
+{
+    char name[TYPE_MAX];
+    int file;                   /* a file of the type, for its icon */
+    int count;
+} types[16];
 static int type_ct;
 
 static int compare_types(const void *a, const void *b)
 {
-    return strcmp(types[*(const int *)a], types[*(const int *)b]);
+    return strcmp(((const struct file_kind *)a)->name,
+                  ((const struct file_kind *)b)->name);
 }
 
 static void fill_types(void)
 {
-    static int order[16];
     char t[TYPE_MAX];
-    char sorted[16][TYPE_MAX];
-    int files[16], counts[16];
     int i, k;
 
     type_ct = 0;
     for (i = 0; i < list.count; i++)
     {
         file_type(flat_path(i), t, sizeof(t));
-        for (k = 0; k < type_ct && strcmp(types[k], t); k++)
+        for (k = 0; k < type_ct && strcmp(types[k].name, t); k++)
             ;
         if (k == type_ct)
         {
             if (type_ct == (int)ARRAYLEN(types))
                 continue;
-            strlcpy(types[type_ct], t, TYPE_MAX);
-            type_files[type_ct] = i;
-            type_counts[type_ct++] = 0;
+            strlcpy(types[type_ct].name, t, TYPE_MAX);
+            types[type_ct].file = i;
+            types[type_ct++].count = 0;
         }
-        type_counts[k]++;
+        types[k].count++;
     }
-    for (i = 0; i < type_ct; i++)
-        order[i] = i;
-    qsort(order, type_ct, sizeof(order[0]), compare_types);
-    for (i = 0; i < type_ct; i++)
-    {
-        strlcpy(sorted[i], types[order[i]], TYPE_MAX);
-        files[i] = type_files[order[i]];
-        counts[i] = type_counts[order[i]];
-    }
-    for (i = 0; i < type_ct; i++)
-    {
-        strlcpy(types[i], sorted[i], TYPE_MAX);
-        type_files[i] = files[i];
-        type_counts[i] = counts[i];
-    }
+    qsort(types, type_ct, sizeof(types[0]), compare_types);
 }
 
 static const char *type_name(int i, void *data, char *buf, size_t size)
 {
     (void)data;
-    snprintf(buf, size, "%s (%d)", types[i], type_counts[i]);
+    snprintf(buf, size, "%s (%d)", types[i].name, types[i].count);
     return buf;
 }
 
 static enum themable_icons type_icon(int i, void *data)
 {
     (void)data;
-    return filetype_get_icon(filetype_get_attr(flat_path(type_files[i])));
+    return filetype_get_icon(filetype_get_attr(flat_path(types[i].file)));
 }
 
 static enum list_row_kind type_kind(int i, void *data)
@@ -323,9 +310,9 @@ static int types_run(void)
         if (info.selection < 0)
             return GO_TO_PREVIOUS;
         sel = info.selection;
-        snprintf(title, sizeof(title), "%s (%d)", types[sel],
-                 type_counts[sel]);
-        ret = show_list(types[sel], title);
+        snprintf(title, sizeof(title), "%s (%d)", types[sel].name,
+                 types[sel].count);
+        ret = show_list(types[sel].name, title);
         if (ret != GO_TO_PREVIOUS)
             return ret;
     }
