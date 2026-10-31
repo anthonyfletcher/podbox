@@ -27089,87 +27089,31 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  id: LANG_SEARCH_ORDER_EPISODES_SHOWS
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </source>
   <dest>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </dest>
   <voice>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  id: LANG_SEARCH_ORDER_SHOWS_EPISODES
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Hosts, Shows"
+    *: "Shows, Episodes"
   </source>
   <dest>
-    *: "Episodes, Hosts, Shows"
+    *: "Shows, Episodes"
   </dest>
   <voice>
-    *: "Episodes, Hosts, Shows"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Episodes, Hosts"
-  </source>
-  <dest>
-    *: "Shows, Episodes, Hosts"
-  </dest>
-  <voice>
-    *: "Shows, Episodes, Hosts"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Hosts, Episodes"
-  </source>
-  <dest>
-    *: "Shows, Hosts, Episodes"
-  </dest>
-  <voice>
-    *: "Shows, Hosts, Episodes"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Shows, Episodes"
-  </source>
-  <dest>
-    *: "Hosts, Shows, Episodes"
-  </dest>
-  <voice>
-    *: "Hosts, Shows, Episodes"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Episodes, Shows"
-  </source>
-  <dest>
-    *: "Hosts, Episodes, Shows"
-  </dest>
-  <voice>
-    *: "Hosts, Episodes, Shows"
+    *: "Shows, Episodes"
   </voice>
 </phrase>
 <phrase>
@@ -27282,5 +27226,117 @@
   </dest>
   <voice>
     *: "Reset every option to its default?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS_SPOKEN
+  desc: a choice of Chapter Marks: audiobooks and podcasts only
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "Spoken Word"
+  </dest>
+  <voice>
+    *: "Spoken Word"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY
+  desc: Library > Music > Sort: the order of Audiobooks' books
+  user: core
+  <source>
+    *: "Sort Audiobooks By"
+  </source>
+  <dest>
+    *: "Sort Audiobooks By"
+  </dest>
+  <voice>
+    *: "Sort Audiobooks By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY_SHORT
+  desc: the same, as its row in the Sort menu
+  user: core
+  <source>
+    *: "Audiobooks By"
+  </source>
+  <dest>
+    *: "Audiobooks By"
+  </dest>
+  <voice>
+    *: "Audiobooks By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BOOKS_BY
+  desc: Library > Files > Sort: the order of Books' books
+  user: core
+  <source>
+    *: "Sort Books By"
+  </source>
+  <dest>
+    *: "Sort Books By"
+  </dest>
+  <voice>
+    *: "Sort Books By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR_PLUS_NAME
+  desc: a choice of Audiobooks By and Books By: by author, then by name
+  user: core
+  <source>
+    *: "Author + Name"
+  </source>
+  <dest>
+    *: "Author + Name"
+  </dest>
+  <voice>
+    *: "Author + Name"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Audiobook Menu"
+  </source>
+  <dest>
+    *: "Audiobook Menu"
+  </dest>
+  <voice>
+    *: "Audiobook Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Podcast Menu"
+  </source>
+  <dest>
+    *: "Podcast Menu"
+  </dest>
+  <voice>
+    *: "Podcast Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_CHAPTERS
+  desc: splash: a book with no chapters to browse
+  user: core
+  <source>
+    *: "No chapters"
+  </source>
+  <dest>
+    *: "No chapters"
+  </dest>
+  <voice>
+    *: "No chapters"
   </voice>
 </phrase>

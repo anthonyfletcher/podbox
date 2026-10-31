@@ -2752,8 +2752,18 @@ static const short folder_rows[] = {
     LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY, LANG_DELETE,
     LANG_DELETE_DIR, LANG_CREATE_DIR, LANG_SET_AS_BACKDROP, LANG_SET_AS,
 };
-static const short book_rows[] = {
+static const short audiobook_rows[] = {
     LANG_BOOK_MARK_AS, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL, LANG_QUEUE_MENU,
+    LANG_SHOW_IN_FILES,
+};
+static const short podcast_rows[] = {
+    LANG_PODCAST_MARK_PLAYED, LANG_PODCAST_MARK_OLDER, LANG_PODCAST_MARK_ALL,
+    LANG_PODCAST_DELETE_PLAYED, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL,
+    LANG_QUEUE_MENU, LANG_SHOW_IN_FILES,
+};
+/* Books' own menu, in ebook_shelf.c: Book Info is the row that stays */
+static const short book_rows[] = {
+    LANG_BOOK_MARK_AS, LANG_BROWSE_CHAPTERS, LANG_READING_STATS,
     LANG_SHOW_IN_FILES,
 };
 
@@ -2772,6 +2782,10 @@ static const struct {
                               ARRAYLEN(artist_rows) },
     [CONTEXT_KIND_FOLDER] = { LANG_FOLDER_MENU, folder_rows,
                               ARRAYLEN(folder_rows) },
+    [CONTEXT_KIND_AUDIOBOOK] = { LANG_AUDIOBOOK_MENU, audiobook_rows,
+                                 ARRAYLEN(audiobook_rows) },
+    [CONTEXT_KIND_PODCAST] = { LANG_PODCAST_MENU, podcast_rows,
+                               ARRAYLEN(podcast_rows) },
     [CONTEXT_KIND_BOOK]   = { LANG_BOOK_MENU,   book_rows,
                               ARRAYLEN(book_rows) },
 };
@@ -2800,8 +2814,11 @@ static int selected_kind(void)
 {
     if (selected_file.context == CONTEXT_WPS)
         return CONTEXT_KIND_NOW_PLAYING;
+    if (selected_file.context == CONTEXT_ID3DB
+        && browser_db_list_spoken_kind(browser_get_context()) == 2)
+        return CONTEXT_KIND_PODCAST;
     if (ctx_in_order)
-        return CONTEXT_KIND_BOOK;
+        return CONTEXT_KIND_AUDIOBOOK;
     if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO)
         return CONTEXT_KIND_TRACK;
     if (selected_file.context == CONTEXT_ID3DB)
@@ -2831,6 +2848,8 @@ static int row_lang_id(const struct menu_item_ex *row)
 
         if (row == &sleep_timer_item)
             return LANG_SLEEP_TIMER;
+        if (row == &episode_mark_item)
+            return LANG_PODCAST_MARK_PLAYED;
         if (d->list_get_name == item_row_name)
         {
             int i = item_row_index(d->list_get_name_data);
@@ -2854,6 +2873,14 @@ static int row_bit(int kind, const struct menu_item_ex *row)
             return i;
     }
     return -1;
+}
+
+bool context_menu_row_hidden(int kind, int lang_id)
+{
+    for (int i = 0; i < kinds[kind].count; i++)
+        if (kinds[kind].rows[i] == lang_id)
+            return global_settings.context_hidden[kind] & (1u << i);
+    return false;
 }
 
 static bool row_hidden(const struct menu_item_ex *row)

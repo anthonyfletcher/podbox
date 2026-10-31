@@ -2794,7 +2794,12 @@ int text_viewer_contents(void)
     info.selection = sel;
     /* USB leaves the selection where it was, where MENU and BACK clear it.
      * The book's file is closed under the reader then, so it leaves too. */
-    if (simplelist_show_list(&info) && info.selection >= 0)
+    if (!toc.n)
+    {
+        splash(HZ, ID2P(LANG_NO_CHAPTERS));
+        info.selection = -1;
+    }
+    else if (simplelist_show_list(&info) && info.selection >= 0)
     {
         core_unpin(handle);
         core_free(handle);
@@ -3370,6 +3375,15 @@ static void tv_open_at(int part, off_t off)
         tv_resume_to(off);
 }
 
+/* Set by text_viewer_chapters() for the next text_viewer() */
+static bool tv_open_contents;
+
+int text_viewer_chapters(const char *file)
+{
+    tv_open_contents = true;
+    return text_viewer(file);
+}
+
 int text_viewer(const char *file)
 {
     int ret = GO_TO_PREVIOUS;
@@ -3377,7 +3391,9 @@ int text_viewer(const char *file)
     int part;
     long play_tick = current_tick - TV_DOUBLE_CLICK;  /* PLAY's last tap */
     bool play_wait = false;     /* a tap that pauses, unless a second comes */
+    bool contents = tv_open_contents;
 
+    tv_open_contents = false;
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;
     tv.user_font = -1;           /* no font override loaded yet */
@@ -3398,14 +3414,32 @@ int text_viewer(const char *file)
         return GO_TO_PREVIOUS;
     }
 
-    reading_stats_begin(file);
     resume = tv_resume_load(file, tv.file_size, &part);
     /* Before the pages to the saved place are laid out, which see headings */
     tv_heads_seen = false;
     tv_open_at(part, resume);
+    tv_paused = tv_dark = false;
+
+    /* Opened on its contents: without a pick it closes unread, its place
+     * as it was */
+    if (contents)
+    {
+        int picked;
+
+        viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
+        picked = text_viewer_contents();
+        viewportmanager_theme_undo(SCREEN_MAIN, false);
+        if (picked != 1)
+        {
+            tv_close();
+            viewportmanager_theme_undo(SCREEN_MAIN, false);
+            pop_current_activity();
+            return picked == MENU_ATTACHED_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
+        }
+    }
+    reading_stats_begin(file);
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
-    tv_paused = tv_dark = false;
 
     tv_draw();
     tv_speak_page();

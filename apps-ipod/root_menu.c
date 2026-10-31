@@ -971,6 +971,8 @@ MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
                         NULL, Icon_Audio);
 MENUITEM_RETURNVALUE(podcasts_item, ID2P(LANG_PODCASTS), GO_TO_PODCASTS,
                         NULL, Icon_Audio);
+MENUITEM_RETURNVALUE(quiz_item, ID2P(LANG_QUIZ), GO_TO_MUSIC_QUIZ,
+                        NULL, Icon_Audio);
 
 /* Dynamic-text menu items for the reserved GO_TO_TAGNAVI_FIRST.. slots: the
  * displayed name/voice for slot N is fetched fresh from browser_db's parsed
@@ -1080,6 +1082,7 @@ static struct menu_table menu_table[] = {
     { "podcasts", &podcasts_item },
     { "playlists", &playlists },
     { "currentplaylist", &current_playlist },
+    { "quiz", &quiz_item },
     { "shortcuts", &shortcut_menu },
     { "settings", &menu_ },
     { "system_menu", &system_menu_ },
@@ -1109,7 +1112,7 @@ static void root_menu_set_count(unsigned count)
 
 /* The default order of the main menu: Resume/Now Playing, Music, Album
  * covers, [tagnavi rows, in whatever order they're already in], Playlists,
- * Files, Shortcuts, Settings, System. Applied by root_menu_set_default()
+ * Files, Books, Shortcuts, Settings, System. Applied by root_menu_set_default()
  * only -- a saved order is the user's, and nothing that loads or amends it
  * may re-sort it, or Move in Customize Main Menu is undone on the spot. It is
  * a pass rather than the order of menu_table[] because tagnavi slots must
@@ -1122,14 +1125,14 @@ static void root_menu_set_count(unsigned count)
 static void root_menu_apply_canonical_order(void)
 {
     static const struct menu_item_ex * const before_tagnavi[] = {
-        &wps_item, &continue_reading, &books_item,
+        &wps_item, &continue_reading,
         &db_browser, &album_covers_item, &artist_portraits_item,
         &random_album_item,
     };
     static const struct menu_item_ex * const after_tagnavi[] = {
-        &current_playlist, &playlists,
-        &documents_item, &images_item, &spun_item,
-        &file_browser, &shortcut_menu,
+        &current_playlist, &playlists, &spun_item,
+        &file_browser, &books_item, &documents_item, &images_item,
+        &shortcut_menu, &quiz_item,
         &menu_, &system_menu_,
     };
     struct menu_item_ex *reordered[MAX_MENU_ITEMS];
@@ -1240,6 +1243,75 @@ static int root_menu_off_find(const struct menu_item_ex *item)
     return -1;
 }
 
+/* Where a row goes that the order does not name, on or off -- the rows off by
+ * default, or new since the order was saved: turned off, after the first of
+ * its anchors that is on, else before Settings. Customize Main Menu then
+ * shows it there, and turning it on leaves it there. Podcasts and the tagnavi
+ * rows are left out: their settings and tagnavi.config place them. */
+static const struct {
+    const struct menu_item_ex *item;
+    const struct menu_item_ex *after[3];
+} root_menu_homes[] = {
+    { &books_item,        { &file_browser, NULL } },
+    { &documents_item,    { &books_item, &file_browser } },
+    { &images_item,       { &documents_item, &books_item, &file_browser } },
+    { &random_album_item, { &db_browser, NULL } },
+    { &db_search_item,    { &db_browser, NULL } },
+    { &current_playlist,  { &playlists, NULL } },
+};
+
+/* Where in root_menu__[] 'item' is, or 'count' */
+static unsigned root_menu_find(const struct menu_item_ex *item, unsigned count)
+{
+    unsigned i;
+
+    for (i = 0; i < count && root_menu__[i] != item; i++)
+        ;
+    return i;
+}
+
+/* Turned off at its home, if the order does not name it. 'home' indexes
+ * root_menu_homes[], or is -1 for before Settings. */
+static void root_menu_place(int idx, int home)
+{
+    const struct menu_item_ex *item = menu_table[idx].item;
+    unsigned count = MENU_GET_COUNT(root_menu_.flags);
+    unsigned at = root_menu_find(&menu_, count);
+
+    if (root_menu_find(item, count) < count || item == &podcasts_item
+        || root_menu_off_find(item) >= 0
+        || root_menu_off_count >= MAX_MENU_ITEMS)
+        return;
+    for (int a = 0; home >= 0 && a < 3; a++)
+    {
+        unsigned i = root_menu_find(root_menu_homes[home].after[a], count);
+
+        if (i < count)
+        {
+            at = i + 1;
+            break;
+        }
+    }
+    root_menu_off[root_menu_off_count].idx = idx;
+    root_menu_off[root_menu_off_count].after = at;
+    root_menu_off_count++;
+}
+
+/* The homes in their table's order, which is theirs where two share a
+ * place, then every other row */
+static void root_menu_place_unlisted(void)
+{
+    int tagnavi_start = MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS;
+    int idx;
+
+    for (unsigned k = 0; k < ARRAYLEN(root_menu_homes); k++)
+        for (idx = 0; idx < tagnavi_start; idx++)
+            if (menu_table[idx].item == root_menu_homes[k].item)
+                root_menu_place(idx, k);
+    for (idx = 0; idx < tagnavi_start; idx++)
+        root_menu_place(idx, -1);
+}
+
 /* settings_load() reads the saved order before browser_db_init() has parsed
  * tagnavi.config, so root_menu_load_from_cfg() cannot tell which tagnavi
  * slots are backed by a row and keeps every one the order names, in place.
@@ -1310,21 +1382,13 @@ static void spoken_row(struct menu_item_ex *item,
         }
         else
         {
-            /* After 'after', else the last tagnavi row, else before
-             * Settings, else last. */
-            for (i = count; i-- > 0; )
-                if (after ? root_menu__[i] == after
-                          : tagnavi_slot_of_item(root_menu__[i]) >= 0)
-                    break;
-            if (i < count)
+            /* After 'after', else after Music, else before Settings, else
+             * last */
+            if ((i = root_menu_find(after, count)) < count
+                || (i = root_menu_find(&db_browser, count)) < count)
                 at = i + 1;
             else
-                for (i = 0; i < count; i++)
-                    if (root_menu__[i] == &menu_)
-                    {
-                        at = i;
-                        break;
-                    }
+                at = root_menu_find(&menu_, count);
         }
 
         memmove(&root_menu__[at + 1], &root_menu__[at],
@@ -1363,10 +1427,10 @@ static void audiobooks_row(bool on, bool unhide)
     struct menu_item_ex *books = audiobooks_item();
 
     if (books)
-        spoken_row(books, NULL, on, unhide);
+        spoken_row(books, &db_browser, on, unhide);
 }
 
-/* After Audiobooks where that is listed */
+/* After Audiobooks where that is on, else after Music */
 static void podcasts_row(bool on, bool unhide)
 {
     if (audiobooks_item())
@@ -1498,6 +1562,7 @@ void root_menu_load_from_cfg(void* setting, char *value)
         menu_item_count--;
     }
     root_menu_.flags |= MENU_ITEM_COUNT(menu_item_count);
+    root_menu_place_unlisted();
     /* A .cfg loaded once tagnavi.config is parsed gets no first entry to
      * drop the slots it names that have no row. */
     if (browser_db_ready())
@@ -1603,17 +1668,22 @@ void root_menu_set_default(void* setting, void* defaultval)
          * first entry of the Playlists context menu ("View Current Playlist"),
          * and the WPS reaches it too, so nothing is stranded by leaving the
          * root row out -- unlike the four above, this one cannot be made
-         * unreachable from here. */
+         * unreachable from here. The Quiz has its home in the Music menu
+         * as well. Podcasts is placed by its setting, after Audiobooks:
+         * see podcasts_row(). */
         if (menu_table[i].item == &random_album_item
             || menu_table[i].item == &db_search_item
             || menu_table[i].item == &documents_item
             || menu_table[i].item == &images_item
-            || menu_table[i].item == &current_playlist)
+            || menu_table[i].item == &current_playlist
+            || menu_table[i].item == &quiz_item
+            || menu_table[i].item == &podcasts_item)
             continue;
         root_menu__[out++] = (struct menu_item_ex *)menu_table[i].item;
     }
     root_menu_.flags |= MENU_ITEM_COUNT(out);
     root_menu_apply_canonical_order();
+    root_menu_place_unlisted();
     *(bool*)setting = false;
 }
 

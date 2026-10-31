@@ -917,7 +917,8 @@ static void track_list_clear(unsigned int action)
    setting calls for it. */
 static bool need_cuesheet_buffer(void)
 {
-    return global_settings.cuesheet || global_settings.chapter_marks;
+    return global_settings.cuesheet
+           || global_settings.chapter_marks != CHAPTER_MARKS_OFF;
 }
 
 /* What size is needed for the scratch buffer? */
@@ -2035,8 +2036,8 @@ static bool audio_load_cuesheet(struct track_info *infop,
                        && look_for_cuesheet_file(track_id3, &cue_file);
         /* A cuesheet beside the file wins: it was written for this track,
            where the chapter marks are whatever the encoder left behind. */
-        bool has_chapters = !has_cue && global_settings.chapter_marks
-                            && chapters_possible(track_id3->path,
+        bool has_chapters = !has_cue
+                            && chapters_wanted(track_id3->path,
                                    db_spoken_is_spoken_genre(
                                        track_id3->genre_string));
 

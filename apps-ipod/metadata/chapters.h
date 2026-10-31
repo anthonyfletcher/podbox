@@ -19,6 +19,10 @@
    whether it is spoken word, which an .m4a has to be */
 bool chapters_possible(const char *path, bool spoken);
 
+/* whether the Chapter Marks setting reads "path"'s chapter marks, given
+   whether it is spoken word, and the file could carry them */
+bool chapters_wanted(const char *path, bool spoken);
+
 /* read the chapter marks out of the file "id3" describes into "cue" */
 bool parse_chapters(struct mp3entry *id3, struct cuesheet *cue);
 

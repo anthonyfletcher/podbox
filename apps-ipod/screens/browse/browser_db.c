@@ -2114,13 +2114,20 @@ static int album_sort_ctx(int level)
     }
 }
 
+static int csi_spoken_kind(void);
+
 /* The order an album list at this level is drawn in. */
 static int album_sort_order(int level)
 {
     int ctx = album_sort_ctx(level);
     int order = browser_db_album_sort_get(ctx);
 
-    if (order < 0)
+    /* Audiobooks' books have a setting of their own */
+    if (csi_spoken_kind() == 1)
+        order = global_settings.audiobook_sort_books_by
+                == BOOKS_SORT_AUTHOR_NAME ? DB_SORT_ALBUMS_ARTIST_NAME
+                                          : DB_SORT_ALBUMS_NAME;
+    else if (order < 0)
         order = global_settings.database_sort_albums_by;
     if (browser_db_album_sort_artist_first_moot(ctx)
         && order >= DB_SORT_ALBUMS_ARTIST_NAME)
@@ -4784,8 +4791,7 @@ static int open_single_book(const char *path, const char *book,
     struct cuesheet *cue;
     size_t bufsize = 0;
 
-    if (!global_settings.chapter_marks || !chapters_possible(path, true)
-        || has_cuesheet(path))
+    if (!chapters_wanted(path, true) || has_cuesheet(path))
         return play_single_track(path, book);
 
     cue = (struct cuesheet *)app_get_buffer(&bufsize, "chapters");

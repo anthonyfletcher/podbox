@@ -25,6 +25,10 @@ bool text_viewer_has_contents(void);
  * MENU_ATTACHED_USB after USB. */
 int text_viewer_contents(void);
 
+/* text_viewer() opened on the book's contents: a pick reads from there, and
+ * without one it closes, unread */
+int text_viewer_chapters(const char *file);
+
 /* Path of the most recently read document, for a caller that wants to reopen
  * it. False if nothing has been read, or the record is unusable. The document
  * may since have been deleted; the caller checks. */

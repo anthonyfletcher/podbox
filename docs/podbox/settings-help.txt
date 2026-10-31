@@ -315,11 +315,11 @@ Reads .cue files, so an album ripped as one long file still shows track names
 and can be skipped through.
 
 [chapter marks]
-Reads the chapter list an audiobook carries inside it, so one long file shows
-its chapter names, skips between them and marks them on the progress bar. It
-reads .m4b files, .mp3 files with chapter frames, and .m4a, Ogg and Opus files
-tagged as spoken word, and a book of more than 99 chapters lists the first 99
-of them.
+Reads the chapter list a file carries inside it, so one long file shows its
+chapter names, skips between them and marks them on the progress bar. Spoken
+Word reads them from audiobooks and podcasts only; All reads them from music
+too, such as a symphony marked by movement. It reads .m4b, .m4a, .mp3, Ogg and
+Opus files, and lists the first 99 chapters of a longer list.
 
 [folder navigation]
 At the end of a folder, move on rather than stopping: to the next folder, or to
@@ -505,6 +505,11 @@ The order folders are listed in: by name, or by when they were last written.
 [sort files]
 The order files are listed in, including grouping by type.
 
+[book sort by]
+The order of the books in Books' lists: by name, or by author and then name,
+so each author's books sit together. One author's books are always in name
+order.
+
 [sort documents]
 The order of the Documents list: by name either way, or the newest file
 first. Newest goes by when a file was last changed.
@@ -687,6 +692,10 @@ The order of the artist lists in Music: by name, or most played first. Plays
 are counted from the albums an artist heads, so an artist who only guests on
 other albums sorts with the unplayed ones.
 
+[audiobook sort books by]
+The order of the books in Audiobooks: by name, or by author and then name, so
+each author's books sit together.
+
 [podcast sort shows by]
 The order of the shows in Podcasts: by name, or the show with the newest
 episode first. Newest goes by when an episode's file arrived on the player.
@@ -725,8 +734,7 @@ Which of tracks, albums and artists Music's search lists first.
 Which of chapters, books and authors Audiobooks' search lists first.
 
 [search order podcasts]
-Which of episodes, shows and hosts Podcasts' search lists first. A host is
-the album artist, which for most podcasts is the network.
+Whether Podcasts' search lists matching episodes or matching shows first.
 
 [search order books]
 Whether Books' search lists matching titles or matching authors first.
@@ -1842,9 +1850,17 @@ shows. A row hidden by holding Select on it comes back here.
 Chooses which rows the context menu of a folder or file in Files shows. A row
 hidden by holding Select on it comes back here.
 
-[action: Book Menu]
-Chooses which rows a book's context menu shows, on the shelf and in Audiobooks.
+[action: Audiobook Menu]
+Chooses which rows an audiobook's context menu shows, in Audiobooks and on the
+book shelf. A row hidden by holding Select on it comes back here.
+
+[action: Podcast Menu]
+Chooses which rows the context menu of a show or an episode in Podcasts shows.
 A row hidden by holding Select on it comes back here.
+
+[action: Book Menu]
+Chooses which rows a book's context menu shows in Books. Book Info is always
+there.
 
 [action: Edit Music Menu]
 Chooses which views appear inside Music and in what order.

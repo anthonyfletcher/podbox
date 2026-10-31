@@ -587,12 +587,17 @@ CONTEXT_MENU_ITEM(ctxmenu_track_item,  LANG_TRACK_MENU,  CONTEXT_KIND_TRACK)
 CONTEXT_MENU_ITEM(ctxmenu_album_item,  LANG_ALBUM_MENU,  CONTEXT_KIND_ALBUM)
 CONTEXT_MENU_ITEM(ctxmenu_artist_item, LANG_ARTIST_MENU, CONTEXT_KIND_ARTIST)
 CONTEXT_MENU_ITEM(ctxmenu_folder_item, LANG_FOLDER_MENU, CONTEXT_KIND_FOLDER)
+CONTEXT_MENU_ITEM(ctxmenu_audiobook_item, LANG_AUDIOBOOK_MENU,
+                  CONTEXT_KIND_AUDIOBOOK)
+CONTEXT_MENU_ITEM(ctxmenu_podcast_item, LANG_PODCAST_MENU,
+                  CONTEXT_KIND_PODCAST)
 CONTEXT_MENU_ITEM(ctxmenu_book_item,   LANG_BOOK_MENU,   CONTEXT_KIND_BOOK)
 #undef CONTEXT_MENU_ITEM
 
 MAKE_MENU(context_menus_menu, ID2P(LANG_CONTEXT_MENUS), NULL, Icon_NOICON,
             &ctxmenu_now_playing_item, &ctxmenu_track_item, &ctxmenu_album_item,
-            &ctxmenu_artist_item, &ctxmenu_folder_item, &ctxmenu_book_item);
+            &ctxmenu_artist_item, &ctxmenu_folder_item,
+            &ctxmenu_audiobook_item, &ctxmenu_podcast_item, &ctxmenu_book_item);
 
 MAKE_MENU(menus_menu, ID2P(LANG_MENUS), NULL, Icon_NOICON,
             &main_menu_config_item,

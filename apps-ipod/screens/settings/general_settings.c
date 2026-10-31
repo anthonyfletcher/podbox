@@ -286,9 +286,11 @@ MENUITEM_SETTING_W_LABEL(sort_documents, &global_settings.sort_documents,
                          ID2P(LANG_DOCUMENTS), NULL);
 MENUITEM_SETTING_W_LABEL(sort_images, &global_settings.sort_images,
                          ID2P(LANG_IMAGES), NULL);
+MENUITEM_SETTING_W_LABEL(book_sort_by, &global_settings.book_sort_by,
+                         ID2P(LANG_EBOOKS), NULL);
 MAKE_MENU(file_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
-          &sort_case, &sort_dir, &sort_file, &sort_documents, &sort_images,
-          &interpret_numbers);
+          &sort_case, &sort_dir, &sort_file, &book_sort_by, &sort_documents,
+          &sort_images, &interpret_numbers);
 MENUITEM_SETTING(dirfilter, &global_settings.dirfilter, NULL);
 MENUITEM_SETTING(show_filename_ext, &global_settings.show_filename_ext, NULL);
 MENUITEM_SETTING(browse_current, &global_settings.browse_current, NULL);
@@ -1119,8 +1121,12 @@ MENUITEM_SETTING_W_LABEL(sort_ignore_articles,
 MENUITEM_SETTING_W_LABEL(podcast_sort_shows_by,
                          &global_settings.podcast_sort_shows_by,
                          ID2P(LANG_SORT_SHOWS_BY_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(audiobook_sort_books_by,
+                         &global_settings.audiobook_sort_books_by,
+                         ID2P(LANG_SORT_AUDIOBOOKS_BY_SHORT), NULL);
 MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
-          &album_sort_menu, &database_sort_artists_by, &podcast_sort_shows_by,
+          &album_sort_menu, &database_sort_artists_by,
+          &audiobook_sort_books_by, &podcast_sort_shows_by,
           &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
 

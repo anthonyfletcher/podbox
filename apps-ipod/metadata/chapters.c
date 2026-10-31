@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "metadata.h"
+#include "settings.h"
 #include "string-extra.h"
 #include "cuesheet.h"
 #include "chapters.h"
@@ -30,6 +31,17 @@ bool chapters_possible(const char *path, bool spoken)
 {
     return mp4_chapters_possible(path, spoken) || id3_chapters_possible(path)
            || ogg_chapters_possible(path, spoken);
+}
+
+bool chapters_wanted(const char *path, bool spoken)
+{
+    int marks = global_settings.chapter_marks;
+
+    if (marks == CHAPTER_MARKS_OFF
+        || (marks == CHAPTER_MARKS_SPOKEN && !spoken))
+        return false;
+    /* All reads music's .m4a, Ogg and Opus as a book's */
+    return chapters_possible(path, spoken || marks == CHAPTER_MARKS_ALL);
 }
 
 bool parse_chapters_path(const char *path, const char *book,

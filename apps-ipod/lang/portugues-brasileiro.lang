@@ -27004,87 +27004,31 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  id: LANG_SEARCH_ORDER_EPISODES_SHOWS
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </source>
   <dest>
-    *: "Episódios, Programas, Apresentadores"
+    *: "Episódios, Programas"
   </dest>
   <voice>
-    *: "Episódios, Programas, Apresentadores"
+    *: "Episódios, Programas"
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  id: LANG_SEARCH_ORDER_SHOWS_EPISODES
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Hosts, Shows"
+    *: "Shows, Episodes"
   </source>
   <dest>
-    *: "Episódios, Apresentadores, Programas"
+    *: "Programas, Episódios"
   </dest>
   <voice>
-    *: "Episódios, Apresentadores, Programas"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Episodes, Hosts"
-  </source>
-  <dest>
-    *: "Programas, Episódios, Apresentadores"
-  </dest>
-  <voice>
-    *: "Programas, Episódios, Apresentadores"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Hosts, Episodes"
-  </source>
-  <dest>
-    *: "Programas, Apresentadores, Episódios"
-  </dest>
-  <voice>
-    *: "Programas, Apresentadores, Episódios"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Shows, Episodes"
-  </source>
-  <dest>
-    *: "Apresentadores, Programas, Episódios"
-  </dest>
-  <voice>
-    *: "Apresentadores, Programas, Episódios"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Episodes, Shows"
-  </source>
-  <dest>
-    *: "Apresentadores, Episódios, Programas"
-  </dest>
-  <voice>
-    *: "Apresentadores, Episódios, Programas"
+    *: "Programas, Episódios"
   </voice>
 </phrase>
 <phrase>
@@ -27197,5 +27141,117 @@
   </dest>
   <voice>
     *: "Redefinir todas as opções para o padrão?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS_SPOKEN
+  desc: a choice of Chapter Marks: audiobooks and podcasts only
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "Voz falada"
+  </dest>
+  <voice>
+    *: "Voz falada"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY
+  desc: Library > Music > Sort: the order of Audiobooks' books
+  user: core
+  <source>
+    *: "Sort Audiobooks By"
+  </source>
+  <dest>
+    *: "Ordenar Audiolivros por"
+  </dest>
+  <voice>
+    *: "Ordenar Audiolivros por"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY_SHORT
+  desc: the same, as its row in the Sort menu
+  user: core
+  <source>
+    *: "Audiobooks By"
+  </source>
+  <dest>
+    *: "Audiolivros por"
+  </dest>
+  <voice>
+    *: "Audiolivros por"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BOOKS_BY
+  desc: Library > Files > Sort: the order of Books' books
+  user: core
+  <source>
+    *: "Sort Books By"
+  </source>
+  <dest>
+    *: "Ordenar Livros por"
+  </dest>
+  <voice>
+    *: "Ordenar Livros por"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR_PLUS_NAME
+  desc: a choice of Audiobooks By and Books By: by author, then by name
+  user: core
+  <source>
+    *: "Author + Name"
+  </source>
+  <dest>
+    *: "Autor + Nome"
+  </dest>
+  <voice>
+    *: "Autor + Nome"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Audiobook Menu"
+  </source>
+  <dest>
+    *: "Menu do audiolivro"
+  </dest>
+  <voice>
+    *: "Menu do audiolivro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Podcast Menu"
+  </source>
+  <dest>
+    *: "Menu do podcast"
+  </dest>
+  <voice>
+    *: "Menu do podcast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_CHAPTERS
+  desc: splash: a book with no chapters to browse
+  user: core
+  <source>
+    *: "No chapters"
+  </source>
+  <dest>
+    *: "Sem capítulos"
+  </dest>
+  <voice>
+    *: "Sem capítulos"
   </voice>
 </phrase>

@@ -27010,87 +27010,31 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  id: LANG_SEARCH_ORDER_EPISODES_SHOWS
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </source>
   <dest>
-    *: "单集, 节目, 主持人"
+    *: "单集, 节目"
   </dest>
   <voice>
-    *: "单集, 节目, 主持人"
+    *: "单集, 节目"
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  id: LANG_SEARCH_ORDER_SHOWS_EPISODES
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Hosts, Shows"
+    *: "Shows, Episodes"
   </source>
   <dest>
-    *: "单集, 主持人, 节目"
+    *: "节目, 单集"
   </dest>
   <voice>
-    *: "单集, 主持人, 节目"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Episodes, Hosts"
-  </source>
-  <dest>
-    *: "节目, 单集, 主持人"
-  </dest>
-  <voice>
-    *: "节目, 单集, 主持人"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Hosts, Episodes"
-  </source>
-  <dest>
-    *: "节目, 主持人, 单集"
-  </dest>
-  <voice>
-    *: "节目, 主持人, 单集"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Shows, Episodes"
-  </source>
-  <dest>
-    *: "主持人, 节目, 单集"
-  </dest>
-  <voice>
-    *: "主持人, 节目, 单集"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Episodes, Shows"
-  </source>
-  <dest>
-    *: "主持人, 单集, 节目"
-  </dest>
-  <voice>
-    *: "主持人, 单集, 节目"
+    *: "节目, 单集"
   </voice>
 </phrase>
 <phrase>
@@ -27203,5 +27147,117 @@
   </dest>
   <voice>
     *: "将所有选项恢复为默认值？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS_SPOKEN
+  desc: a choice of Chapter Marks: audiobooks and podcasts only
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "语音"
+  </dest>
+  <voice>
+    *: "语音"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY
+  desc: Library > Music > Sort: the order of Audiobooks' books
+  user: core
+  <source>
+    *: "Sort Audiobooks By"
+  </source>
+  <dest>
+    *: "有声书排序方式"
+  </dest>
+  <voice>
+    *: "有声书排序方式"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY_SHORT
+  desc: the same, as its row in the Sort menu
+  user: core
+  <source>
+    *: "Audiobooks By"
+  </source>
+  <dest>
+    *: "有声书排序"
+  </dest>
+  <voice>
+    *: "有声书排序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BOOKS_BY
+  desc: Library > Files > Sort: the order of Books' books
+  user: core
+  <source>
+    *: "Sort Books By"
+  </source>
+  <dest>
+    *: "图书排序方式"
+  </dest>
+  <voice>
+    *: "图书排序方式"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR_PLUS_NAME
+  desc: a choice of Audiobooks By and Books By: by author, then by name
+  user: core
+  <source>
+    *: "Author + Name"
+  </source>
+  <dest>
+    *: "作者 + 书名"
+  </dest>
+  <voice>
+    *: "作者 + 书名"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Audiobook Menu"
+  </source>
+  <dest>
+    *: "有声书菜单"
+  </dest>
+  <voice>
+    *: "有声书菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Podcast Menu"
+  </source>
+  <dest>
+    *: "播客菜单"
+  </dest>
+  <voice>
+    *: "播客菜单"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_CHAPTERS
+  desc: splash: a book with no chapters to browse
+  user: core
+  <source>
+    *: "No chapters"
+  </source>
+  <dest>
+    *: "没有章节"
+  </dest>
+  <voice>
+    *: "没有章节"
   </voice>
 </phrase>

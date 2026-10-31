@@ -253,6 +253,24 @@ enum {
     BOOK_SEARCH_AUTHORS_FIRST,
 };
 
+enum {
+    PODCAST_SEARCH_EPISODES_FIRST = 0,
+    PODCAST_SEARCH_SHOWS_FIRST,
+};
+
+/* Audiobooks' and Books' order: by name, or by author and then name */
+enum {
+    BOOKS_SORT_NAME = 0,
+    BOOKS_SORT_AUTHOR_NAME,
+};
+
+/* Chapter Marks: none, a spoken-word genre's, or every file's */
+enum {
+    CHAPTER_MARKS_OFF = 0,
+    CHAPTER_MARKS_SPOKEN,
+    CHAPTER_MARKS_ALL,
+};
+
 /* dir filter options */
 /* Note: Any new filter modes need to be added before NUM_FILTER_MODES.
  *       Any new rockbox browse filter modes (accessible through the menu)
@@ -566,7 +584,8 @@ struct user_settings
                            artist, composer, work, or genre */
     bool party_mode;    /* party mode - unstoppable music */
     bool cuesheet;
-    bool chapter_marks; /* read chapter marks out of the file itself */
+    int chapter_marks;  /* CHAPTER_MARKS_*: whose chapter marks are read out
+                           of the file itself */
     bool car_adapter_mode; /* 0=off 1=on */
     int car_adapter_mode_delay; /* delay before resume,  in seconds*/
     int start_in_screen;
@@ -634,7 +653,7 @@ struct user_settings
     int db_search_min_letters;   /* 0..2 -> 1..3 letters before a scan runs */
     int db_search_order;         /* DB_SEARCH_ORDER_*, for music */
     int audiobook_search_order;  /* the same, for Audiobooks' Search */
-    int podcast_search_order;    /* the same, for Podcasts' Search */
+    int podcast_search_order;    /* PODCAST_SEARCH_*: episodes or shows first */
     int book_search_order;       /* BOOK_SEARCH_*: titles or authors first */
     /* Read guest credits ("feat. X") out of titles and per-track artists, so
      * the browser can list them. Off, the table is never built. */
@@ -764,7 +783,7 @@ struct user_settings
     int  music_menu_sig;
     /* Rows hidden from each kind of context menu: a bit per row of the kind's
      * list in screens/context_menu.c, saved by the rows' names. */
-#define CONTEXT_MENU_KINDS 6
+#define CONTEXT_MENU_KINDS 8
     uint32_t context_hidden[CONTEXT_MENU_KINDS];
     /* DB_SORT_ALBUMS_*: how the database browser orders its album lists. The
      * year and artist come from the summary index, not the database. Separate
@@ -774,6 +793,9 @@ struct user_settings
     int  database_sort_artists_by;
     /* PODCAST_SHOWS_*: how the Podcasts list orders its shows */
     int  podcast_sort_shows_by;
+    /* BOOKS_SORT_*: how Audiobooks' and Books' lists order their books */
+    int  audiobook_sort_books_by;
+    int  book_sort_by;
     /* FLAT_SORT_*: how Documents and Images order their files */
     int  sort_documents;
     int  sort_images;

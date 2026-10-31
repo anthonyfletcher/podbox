@@ -78,7 +78,7 @@ Settings
 |---|---|---|---|
 | Enable EQ | Master switch for the ten-band equaliser. Changing a band in Edit EQ, or choosing a preset, switches it on. | No |  |
 | Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. While Auto Headroom is on it is set for you, and a value set here lasts only until the next EQ change. | 0 dB | **Adv** |
-| Auto Headroom | Sets Precut from the curve: the equaliser is turned down by as much as its highest boost, so a boosted preset does not clip. Off leaves Precut where you set it; the curve editor then shows by how much the curve clips. | Yes |  |
+| Auto Headroom | Sets Precut from the curve: the equaliser is turned down by as much as its highest boost, so a boosted preset does not clip. Off leaves Precut where you set it; the curve editor then shows by how much the curve clips. | Yes | **Adv** |
 
 ### Sound Settings — Haas Surround
 
@@ -122,9 +122,9 @@ Settings
 | Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | Off | **Adv** |
 | Auto-Change Directory | At the end of a folder, move on rather than stopping: to the next folder, or to one picked at random. The In Start Directory choices never leave the folder set with Start Directory in the file browser. Random picks one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | No |  |
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | No | **Adv** |
-| Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files, .mp3 files with chapter frames, and .m4a, Ogg and Opus files tagged as spoken word, and a book of more than 99 chapters lists the first 99 of them. | No | **Adv** |
+| Chapter Marks | Reads the chapter list a file carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. Spoken Word reads them from audiobooks and podcasts only; All reads them from music too, such as a symphony marked by movement. It reads .m4b, .m4a, .mp3, Ogg and Opus files, and lists the first 99 chapters of a longer list. | Spoken Word | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | Skip Track | **Adv** |
-| Spoken Word Skip Length | Skip Length for audiobooks and podcasts alone, so a book can skip 30 seconds while music skips whole tracks. Same as Music uses Skip Length. | Same as Music |  |
+| Spoken Word Skip Length | Skip Length for audiobooks and podcasts alone, so a book can skip 30 seconds while music skips whole tracks. Same as Music uses Skip Length. | Same as Music | **Adv** |
 | Spoken Word Speed | Plays audiobooks and podcasts faster or slower without changing the voice's pitch; music always plays at its own speed. Also in Now Playing's menu while spoken word plays. The first change from 100% restarts the playing track once. | 100% |  |
 | Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | No | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | Auto | **Adv** |
@@ -203,8 +203,9 @@ Settings
 | Sort ▸ Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | No |  |
 | Sort ▸ Directories | The order folders are listed in: by name, or by when they were last written. | Alphabetical |  |
 | Sort ▸ Files | The order files are listed in, including grouping by type. | Alphabetical |  |
-| Sort ▸ Documents | The order of the Documents list: by name either way, or the newest file first. Newest goes by when a file was last changed. | Alphabetical |  |
-| Sort ▸ Images | The order of the Images list: by name either way, or the newest picture first. Newest goes by when a file was last changed. | Alphabetical |  |
+| Sort ▸ Books | The order of the books in Books' lists: by name, or by author and then name, so each author's books sit together. One author's books are always in name order. | Name | **Adv** |
+| Sort ▸ Documents | The order of the Documents list: by name either way, or the newest file first. Newest goes by when a file was last changed. | Alphabetical | **Adv** |
+| Sort ▸ Images | The order of the Images list: by name either way, or the newest picture first. Newest goes by when a file was last changed. | Alphabetical | **Adv** |
 | Sort ▸ Interpret Numbers | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | As Whole Numbers |  |
 | Show Files | Which files the browser shows: everything, only what can be opened, only music, or only playlists. The quickest way to make a cluttered folder readable. | Supported |  |
 | Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | Only When Viewing All Types |  |
@@ -223,7 +224,8 @@ Settings
 | Sort ▸ Albums By ▸ Composer | The order for the album list inside a composer. | Default |  |
 | Sort ▸ Albums By ▸ Other Lists | The order for every album list that has no row of its own under Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | Name |  |
 | Sort ▸ Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | Name |  |
-| Sort ▸ Shows By | The order of the shows in Podcasts: by name, or the show with the newest episode first. Newest goes by when an episode's file arrived on the player. | Name |  |
+| Sort ▸ Audiobooks By | The order of the books in Audiobooks: by name, or by author and then name, so each author's books sit together. | Name | **Adv** |
+| Sort ▸ Shows By | The order of the shows in Podcasts: by name, or the show with the newest episode first. Newest goes by when an episode's file arrived on the player. | Name | **Adv** |
 | Sort ▸ Ignore The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | No |  |
 | Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | No |  |
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | No |  |
@@ -271,10 +273,10 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 |---|---|---|---|
 | Maximum Results | How many results a search keeps, in Music, Audiobooks, Podcasts and Books. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Minimum Letters | How many letters must be typed before searching starts, in Music, Audiobooks, Podcasts and Books. Raise it if one-letter searches return more than they are worth. | 1 |  |
-| Music Order | Which of tracks, albums and artists Music's search lists first. | Tracks, Albums, Artists |  |
-| Audiobook Order | Which of chapters, books and authors Audiobooks' search lists first. | Books, Authors, Chapters |  |
-| Podcast Order | Which of episodes, shows and hosts Podcasts' search lists first. A host is the album artist, which for most podcasts is the network. | Episodes, Shows, Hosts |  |
-| Book Order | Whether Books' search lists matching titles or matching authors first. | Titles, Authors |  |
+| Music Order | Which of tracks, albums and artists Music's search lists first. | Tracks, Albums, Artists | **Adv** |
+| Audiobook Order | Which of chapters, books and authors Audiobooks' search lists first. | Books, Authors, Chapters | **Adv** |
+| Podcast Order | Whether Podcasts' search lists matching episodes or matching shows first. | Episodes, Shows | **Adv** |
+| Book Order | Whether Books' search lists matching titles or matching authors first. | Titles, Authors | **Adv** |
 
 ### Library — Carousel
 
@@ -479,7 +481,7 @@ Shadow Colour only while there is a shadow to colour.
 |---|---|---|---|
 | Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | Yes |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
-| Vertical Scroll Speed | How quickly a box of text too long for it moves up, such as a podcast episode's notes, apart from Scroll Speed's sideways lines. | 10 |  |
+| Vertical Scroll Speed | How quickly a box of text too long for it moves up, such as a podcast episode's notes, apart from Scroll Speed's sideways lines. | 10 | **Adv** |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1 s |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 px | **Adv** |
 | Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. Bigger numbers mean more lines bounce. At 0 everything scrolls in one direction. | 50% | **Adv** |
@@ -675,7 +677,7 @@ restart, which costs battery life: restart the player afterwards.
 | Voice Filenames | Whether filenames are spoken, and how. Spell reads the name, or spells it out with Voice File Only. | Spell | **Adv** |
 | Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | No | **Adv** |
 | Say File Type | Speaks the file's type along with its name. | No | **Adv** |
-| Say List Titles | Says a list's title before its first row when you go into it, so you hear where you are as well as what is selected. | No |  |
+| Say List Titles | Says a list's title before its first row when you go into it, so you hear where you are as well as what is selected. | No | **Adv** |
 | Announce Track Change | Says the title and artist of each new track as it starts, with Speak Aloud on. Over the Music speaks on top of it; Pause the Music pauses for the announcement and carries on after it. | Off |  |
 | Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs Speak Aloud on. | No | **Adv** |
 | Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100% | **Adv** |

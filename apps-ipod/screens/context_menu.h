@@ -91,9 +91,14 @@ enum context_menu_kind {
     CONTEXT_KIND_ALBUM,
     CONTEXT_KIND_ARTIST,
     CONTEXT_KIND_FOLDER,
-    CONTEXT_KIND_BOOK,
+    CONTEXT_KIND_AUDIOBOOK,
+    CONTEXT_KIND_PODCAST,
+    CONTEXT_KIND_BOOK,          /* Books' own menu, a book to read */
     CONTEXT_KINDS
 };
+
+/* Whether the row labelled 'lang_id' is hidden from 'kind's menu */
+bool context_menu_row_hidden(int kind, int lang_id);
 
 /* For the screen that turns rows back on: a kind's name, and the labels of
  * the rows it can hide, in order -- row i is bit i of

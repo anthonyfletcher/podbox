@@ -27011,87 +27011,31 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_SHOW_HOST
+  id: LANG_SEARCH_ORDER_EPISODES_SHOWS
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Shows, Hosts"
+    *: "Episodes, Shows"
   </source>
   <dest>
-    *: "Afleveringen, Programma's, Presentatoren"
+    *: "Afleveringen, Programma's"
   </dest>
   <voice>
-    *: "Afleveringen, Programma's, Presentatoren"
+    *: "Afleveringen, Programma's"
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SEARCH_ORDER_EPISODE_HOST_SHOW
+  id: LANG_SEARCH_ORDER_SHOWS_EPISODES
   desc: a choice of Podcast Order
   user: core
   <source>
-    *: "Episodes, Hosts, Shows"
+    *: "Shows, Episodes"
   </source>
   <dest>
-    *: "Afleveringen, Presentatoren, Programma's"
+    *: "Programma's, Afleveringen"
   </dest>
   <voice>
-    *: "Afleveringen, Presentatoren, Programma's"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_EPISODE_HOST
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Episodes, Hosts"
-  </source>
-  <dest>
-    *: "Programma's, Afleveringen, Presentatoren"
-  </dest>
-  <voice>
-    *: "Programma's, Afleveringen, Presentatoren"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_SHOW_HOST_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Shows, Hosts, Episodes"
-  </source>
-  <dest>
-    *: "Programma's, Presentatoren, Afleveringen"
-  </dest>
-  <voice>
-    *: "Programma's, Presentatoren, Afleveringen"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_SHOW_EPISODE
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Shows, Episodes"
-  </source>
-  <dest>
-    *: "Presentatoren, Programma's, Afleveringen"
-  </dest>
-  <voice>
-    *: "Presentatoren, Programma's, Afleveringen"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_SEARCH_ORDER_HOST_EPISODE_SHOW
-  desc: a choice of Podcast Order
-  user: core
-  <source>
-    *: "Hosts, Episodes, Shows"
-  </source>
-  <dest>
-    *: "Presentatoren, Afleveringen, Programma's"
-  </dest>
-  <voice>
-    *: "Presentatoren, Afleveringen, Programma's"
+    *: "Programma's, Afleveringen"
   </voice>
 </phrase>
 <phrase>
@@ -27204,5 +27148,117 @@
   </dest>
   <voice>
     *: "Alle opties terugzetten naar de standaard?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS_SPOKEN
+  desc: a choice of Chapter Marks: audiobooks and podcasts only
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "Gesproken woord"
+  </dest>
+  <voice>
+    *: "Gesproken woord"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY
+  desc: Library > Music > Sort: the order of Audiobooks' books
+  user: core
+  <source>
+    *: "Sort Audiobooks By"
+  </source>
+  <dest>
+    *: "Luisterboeken sorteren op"
+  </dest>
+  <voice>
+    *: "Luisterboeken sorteren op"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_AUDIOBOOKS_BY_SHORT
+  desc: the same, as its row in the Sort menu
+  user: core
+  <source>
+    *: "Audiobooks By"
+  </source>
+  <dest>
+    *: "Luisterboeken op"
+  </dest>
+  <voice>
+    *: "Luisterboeken op"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BOOKS_BY
+  desc: Library > Files > Sort: the order of Books' books
+  user: core
+  <source>
+    *: "Sort Books By"
+  </source>
+  <dest>
+    *: "Boeken sorteren op"
+  </dest>
+  <voice>
+    *: "Boeken sorteren op"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR_PLUS_NAME
+  desc: a choice of Audiobooks By and Books By: by author, then by name
+  user: core
+  <source>
+    *: "Author + Name"
+  </source>
+  <dest>
+    *: "Auteur + Naam"
+  </dest>
+  <voice>
+    *: "Auteur + Naam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Audiobook Menu"
+  </source>
+  <dest>
+    *: "Luisterboekmenu"
+  </dest>
+  <voice>
+    *: "Luisterboekmenu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Podcast Menu"
+  </source>
+  <dest>
+    *: "Podcastmenu"
+  </dest>
+  <voice>
+    *: "Podcastmenu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_CHAPTERS
+  desc: splash: a book with no chapters to browse
+  user: core
+  <source>
+    *: "No chapters"
+  </source>
+  <dest>
+    *: "Geen hoofdstukken"
+  </dest>
+  <voice>
+    *: "Geen hoofdstukken"
   </voice>
 </phrase>

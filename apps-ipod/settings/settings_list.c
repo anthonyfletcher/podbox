@@ -1695,7 +1695,7 @@ const struct settings_list settings[] = {
                    ID2P(LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK),
                    ID2P(LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM)),
     /* The same orders in the same cfg words: track, album and artist are a
-     * chapter, a book and an author, or an episode, a show and a host */
+     * chapter, a book and an author */
     CHOICE_SETTING(F_BANFROMQS, audiobook_search_order,
                    LANG_AUDIOBOOK_SEARCH_ORDER,
                    DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK, "search order audiobooks",
@@ -1711,17 +1711,10 @@ const struct settings_list settings[] = {
                    ID2P(LANG_SEARCH_ORDER_AUTHOR_CHAPTER_BOOK)),
     CHOICE_SETTING(F_BANFROMQS, podcast_search_order,
                    LANG_PODCAST_SEARCH_ORDER,
-                   DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST, "search order podcasts",
-                   "track album artist,track artist album,"
-                   "album track artist,album artist track,"
-                   "artist album track,artist track album",
-                   NULL, DB_SEARCH_ORDER_COUNT,
-                   ID2P(LANG_SEARCH_ORDER_EPISODE_SHOW_HOST),
-                   ID2P(LANG_SEARCH_ORDER_EPISODE_HOST_SHOW),
-                   ID2P(LANG_SEARCH_ORDER_SHOW_EPISODE_HOST),
-                   ID2P(LANG_SEARCH_ORDER_SHOW_HOST_EPISODE),
-                   ID2P(LANG_SEARCH_ORDER_HOST_SHOW_EPISODE),
-                   ID2P(LANG_SEARCH_ORDER_HOST_EPISODE_SHOW)),
+                   PODCAST_SEARCH_EPISODES_FIRST, "search order podcasts",
+                   "episodes,shows", NULL, 2,
+                   ID2P(LANG_SEARCH_ORDER_EPISODES_SHOWS),
+                   ID2P(LANG_SEARCH_ORDER_SHOWS_EPISODES)),
     CHOICE_SETTING(F_BANFROMQS, book_search_order, LANG_BOOK_SEARCH_ORDER,
                    BOOK_SEARCH_TITLES_FIRST, "search order books",
                    "titles,authors", NULL, 2,
@@ -1918,8 +1911,11 @@ const struct settings_list settings[] = {
                    ID2P(LANG_SET_BOOL_YES), ID2P(LANG_FORCE)),
     OFFON_SETTING(F_BANFROMQS,cuesheet,LANG_CUESHEET_ENABLE,false,"cuesheet support",
                   NULL),
-    OFFON_SETTING(F_BANFROMQS,chapter_marks,LANG_CHAPTER_MARKS,false,
-                  "chapter marks", NULL),
+    CHOICE_SETTING(F_BANFROMQS, chapter_marks, LANG_CHAPTER_MARKS,
+                   CHAPTER_MARKS_SPOKEN, "chapter marks",
+                   "off,spoken word,all", NULL, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_CHAPTER_MARKS_SPOKEN),
+                   ID2P(LANG_ALL)),
     TABLE_SETTING_LIST(F_TIME_SETTING | F_ALLOW_ARBITRARY_VALS, skip_length,
                   LANG_SKIP_LENGTH, 0, "skip length",
                   "outro,track",
@@ -2105,6 +2101,14 @@ const struct settings_list settings[] = {
                   0, "podcast sort shows by",
                   "name,newest episode", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_NEWEST_EPISODE)),
+    CHOICE_SETTING(0, audiobook_sort_books_by, LANG_SORT_AUDIOBOOKS_BY,
+                  BOOKS_SORT_NAME, "audiobook sort books by",
+                  "name,author+name", NULL, 2,
+                  ID2P(LANG_NAME), ID2P(LANG_AUTHOR_PLUS_NAME)),
+    CHOICE_SETTING(0, book_sort_by, LANG_SORT_BOOKS_BY,
+                  BOOKS_SORT_NAME, "book sort by",
+                  "name,author+name", NULL, 2,
+                  ID2P(LANG_NAME), ID2P(LANG_AUTHOR_PLUS_NAME)),
     OFFON_SETTING(0, album_covers_sort_ignore_articles,
                   LANG_SORT_IGNORE_ARTICLES, false,
                   "album covers sort ignoring articles", NULL),
@@ -2331,7 +2335,10 @@ const struct settings_list settings[] = {
     CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_ALBUM,  "context hidden album"),
     CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_ARTIST, "context hidden artist"),
     CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_FOLDER, "context hidden folder"),
-    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_BOOK,   "context hidden book"),
+    /* "book" is Audiobooks' menu, which had the name first */
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_AUDIOBOOK, "context hidden book"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_PODCAST, "context hidden podcast"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_BOOK,   "context hidden reading"),
 #undef CONTEXT_HIDDEN_SETTING
 
 

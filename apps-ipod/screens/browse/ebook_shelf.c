@@ -45,6 +45,7 @@
 #include "files/book_index.h"
 #include "metadata/art_cache.h"
 #include "root_menu.h"
+#include "screens/context_menu.h"    /* the Book Menu's hidden rows */
 #include "screens/browse/browser.h"      /* browser_art_row */
 #include "screens/browse/book_shelf.h"   /* enum book_shelf */
 #include "viewers/text_viewer/text_viewer.h"
@@ -341,7 +342,10 @@ static void load(void)
         row_ct = n;
     }
     else
-        qsort(rows, row_ct, sizeof(*rows), compare_rows);
+        /* One author's books are in name order whichever is set */
+        qsort(rows, row_ct, sizeof(*rows),
+              global_settings.book_sort_by == BOOKS_SORT_AUTHOR_NAME
+              && showing != SHOW_AUTHOR ? compare_authors : compare_rows);
 
     top_ct = 0;
     for (size_t k = 0; showing == SHOW_TOP && k < ARRAYLEN(top_row); k++)
@@ -559,15 +563,39 @@ static int marked_row;
 /* A GO_TO_* a menu row leaves the shelf with, or GO_TO_PREVIOUS */
 static int menu_exit;
 
-/* A book's menu: Mark As, Book Info, Reading Stats, Show in Files. True
- * when the list should end: a mark changed it, or a row leaves the shelf. */
+/* The book Browse Chapters opens, and the row it was on; -1 for none */
+static int chapters_book = -1;
+static int chapters_row;
+
+/* The rows of a book's menu, in order */
+static const int book_menu_rows[] = {
+    LANG_BOOK_MARK_AS, LANG_BROWSE_CHAPTERS, LANG_BOOK_INFO,
+    LANG_READING_STATS, LANG_SHOW_IN_FILES,
+};
+
+/* Rows hidden in Appearance > Menus > Book Menu are left out */
+static int book_menu_callback(int action, const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && context_menu_row_hidden(CONTEXT_KIND_BOOK,
+                                   book_menu_rows[(intptr_t)this_item]))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+/* A book's menu: Mark As, Browse Chapters, Book Info, Reading Stats, Show in
+ * Files. True when the list should end: a mark changed it, or a row leaves
+ * the shelf or opens the book. */
 static bool book_menu(int b)
 {
     int choice = 0;
 
-    MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
-                        ID2P(LANG_BOOK_MARK_AS), ID2P(LANG_BOOK_INFO),
-                        ID2P(LANG_READING_STATS), ID2P(LANG_SHOW_IN_FILES));
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), book_menu_callback,
+                        ID2P(LANG_BOOK_MARK_AS), ID2P(LANG_BROWSE_CHAPTERS),
+                        ID2P(LANG_BOOK_INFO), ID2P(LANG_READING_STATS),
+                        ID2P(LANG_SHOW_IN_FILES));
     push_current_activity(ACTIVITY_CONTEXTMENU);
     choice = do_menu(&menu, &choice, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
@@ -577,15 +605,18 @@ static bool book_menu(int b)
         case 0:
             return mark_menu(b);
         case 1:
+            chapters_book = b;
+            return true;
+        case 2:
             if (!book_info(b))
                 menu_exit = GO_TO_ROOT;
             break;
-        case 2:
+        case 3:
             if (!reading_stats_show(names + books[b].path,
                                     names + books[b].title))
                 menu_exit = GO_TO_ROOT;
             break;
-        case 3:
+        case 4:
             browser_reveal_on_next_load(names + books[b].path);
             menu_exit = GO_TO_FILEBROWSER;
             break;
@@ -606,7 +637,9 @@ static int action_cb(int action, struct gui_synclist *lists)
     b = book_at(n);
     if (b < 0 || !book_menu(b))
         return ACTION_REDRAW;
-    if (menu_exit == GO_TO_PREVIOUS)
+    if (chapters_book >= 0)
+        chapters_row = n;
+    else if (menu_exit == GO_TO_PREVIOUS)
         marked_row = n;
     return ACTION_STD_CANCEL;
 }
@@ -628,7 +661,7 @@ static int show(char *path, size_t size, int *selection, int *list)
     *list = -1;
     do
     {
-        marked_row = -1;
+        marked_row = chapters_book = -1;
         menu_exit = GO_TO_PREVIOUS;
         load();
         if (top_rows() + row_ct == 0)
@@ -680,6 +713,11 @@ static int show(char *path, size_t size, int *selection, int *list)
             ret = GO_TO_ROOT;
         else if (menu_exit != GO_TO_PREVIOUS)
             ret = menu_exit;
+        else if (chapters_book >= 0)
+        {
+            *selection = chapters_row;
+            strmemccpy(path, names + books[chapters_book].path, size);
+        }
         else if (info.selection >= 0 && marked_row < 0)
         {
             int b = book_at(info.selection);
@@ -849,7 +887,9 @@ int ebook_shelf_run(void)
              * read to its end is shown in Finished. */
             bool finished = text_viewer_finished(path);
 
-            ret = text_viewer(path);
+            ret = chapters_book >= 0 ? text_viewer_chapters(path)
+                                     : text_viewer(path);
+            chapters_book = -1;
             if (ret == GO_TO_ROOT)
                 break;
             if (!finished && text_viewer_finished(path))

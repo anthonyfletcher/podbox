@@ -77,6 +77,13 @@ static const int search_tags[DB_SEARCH_ORDER_COUNT][3] = {
     { tag_albumartist, tag_title,       tag_album       },
 };
 
+/* Podcasts' rows, by podcast_search_order: a show's album artist is its
+ * publisher, which Podcasts has no list of, so it is not searched */
+static const int podcast_tags[2][3] = {
+    { tag_title, tag_album, -1 },
+    { tag_album, tag_title, -1 },
+};
+
 /* Both count settings are indices into evenly spaced choice lists, so the
  * value is arithmetic rather than a second table to hold in step with
  * settings_list.c. */
@@ -223,11 +230,11 @@ static int run_search(const char *query, void *ctx)
 {
     char buf[TAGCACHE_BUFSZ];
     struct tagcache_search tcs;
-    const int *tags = search_tags[active_scope == DB_SEARCH_SPOKEN
-                                  ? global_settings.audiobook_search_order
-                                  : active_scope == DB_SEARCH_PODCAST
-                                  ? global_settings.podcast_search_order
-                                  : global_settings.db_search_order];
+    const int *tags = active_scope == DB_SEARCH_PODCAST
+                      ? podcast_tags[global_settings.podcast_search_order]
+                      : search_tags[active_scope == DB_SEARCH_SPOKEN
+                                    ? global_settings.audiobook_search_order
+                                    : global_settings.db_search_order];
     unsigned int i;
 
     (void)ctx;
@@ -248,7 +255,7 @@ static int run_search(const char *query, void *ctx)
 
     for (i = 0; i < ARRAYLEN(search_tags[0]); i++)
     {
-        if (!tagcache_search(&tcs, tags[i]))
+        if (tags[i] < 0 || !tagcache_search(&tcs, tags[i]))
             continue;
 
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
