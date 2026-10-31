@@ -207,7 +207,6 @@ GIF, WebP and BMP pictures.
 - See the lyrics of what is playing
   - Press `Select + Play` on the Now Playing screen
   - `Settings > Library > Viewers > Lyrics Viewer` for how they are shown
-
 - Choose how documents look: font, text size, margin, line spacing, justification, paragraph
   indent and colours
   - `Settings > Library > Viewers > Text Viewer`
@@ -215,7 +214,6 @@ GIF, WebP and BMP pictures.
   - The backlight can stay on while you read, with a brightness of its own:
     `Reading Backlight` and `Reading Brightness`
 - `Continue Reading` on the main menu reopens your last document where you left off
-
 - `Books` on the main menu shows every EPUB, FB2 and Kindle (MOBI, AZW3) book on the player,
   with its cover
   - A MOBI locked to a Kindle account will not open
@@ -248,7 +246,6 @@ GIF, WebP and BMP pictures.
 - Turn the wheel to move through the book a percent at a time; `Select` goes there, any other
   button stays put
   - Off by default. `Settings > Library > Viewers > Text Viewer > Wheel Scrubs`
-
 - See every document and every image on the player in a list of each, search them, and list
   them by type
   - Hidden by default. Add it with `Settings > Appearance > Menus > Edit Main Menu`
