@@ -32,6 +32,7 @@
 #include "speech/talk.h"           /* UNIT_SEC */
 #include "system/library_files.h"
 #include "database/libfile.h"
+#include "viewers/playback_viewer/pv_stats.h"  /* the calendar */
 #include "reading_stats.h"
 
 #define RS_MAX      256             /* books kept, as reading.dat keeps */
@@ -58,34 +59,7 @@ static bool rs_open, rs_day_done;
 static long rs_mark;                /* the clock's last event */
 static long rs_ticks;               /* this sitting's time */
 
-/* Days from 1970-01-01 to y-m-d, proleptic Gregorian */
-static long days_from_civil(int y, int m, int d)
-{
-    long era, yoe, doy;
-
-    y -= m <= 2;
-    era = (y >= 0 ? y : y - 399) / 400;
-    yoe = y - era * 400;
-    doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-    return era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
-}
-
-static void civil_from_days(long z, int *y, int *m, int *d)
-{
-    long era, doe, yoe, doy, mp;
-
-    z += 719468;
-    era = (z >= 0 ? z : z - 146096) / 146097;
-    doe = z - era * 146097;
-    yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    mp = (5 * doy + 2) / 153;
-    *d = doy - (153 * mp + 2) / 5 + 1;
-    *m = mp < 10 ? mp + 3 : mp - 9;
-    *y = yoe + era * 400 + (*m <= 2);
-}
-
-#define RS_EPOCH days_from_civil(1999, 12, 31)
+#define RS_EPOCH pv_days_from_civil(1999, 12, 31)
 
 /* Today as a record keeps it, or 0 without the clock */
 static int rs_today(void)
@@ -94,7 +68,7 @@ static int rs_today(void)
 
     if (!valid_time(tm))
         return 0;
-    return days_from_civil(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday)
+    return pv_days_from_civil(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday)
            - RS_EPOCH;
 }
 
@@ -265,7 +239,7 @@ static void rs_date(char *buf, size_t size, int day)
 {
     int y, m, d;
 
-    civil_from_days(day + RS_EPOCH, &y, &m, &d);
+    pv_civil_from_days(day + RS_EPOCH, &y, &m, &d);
     snprintf(buf, size, "%s %d %d", str(LANG_MONTH_JANUARY + m - 1), d, y);
 }
 

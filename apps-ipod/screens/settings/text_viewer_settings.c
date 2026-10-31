@@ -21,6 +21,7 @@
 #include "draw/icon_bitmaps.h"
 #include "viewers/text_viewer/text_viewer.h"   /* contents, TV_COLOUR_* */
 #include "widgets/color_picker.h"           /* set_color */
+#include "root_menu.h"                      /* MENU_ATTACHED_USB */
 
 MENUITEM_SETTING(text_viewer_colour_mode,
                  &global_settings.text_viewer_colour_mode, NULL);
@@ -47,18 +48,19 @@ static int set_custom_colour(void *which)
                      : global_settings.text_viewer_fg;
     int old = *colour;
 
-    set_color(str(text ? LANG_TEXT_VIEWER_TEXT_COLOUR
-                       : LANG_TEXT_VIEWER_PAGE_COLOUR), (unsigned *)colour,
-              other);
+    if (set_color(str(text ? LANG_TEXT_VIEWER_TEXT_COLOUR
+                           : LANG_TEXT_VIEWER_PAGE_COLOUR), (unsigned *)colour,
+                  other))
+        return MENU_ATTACHED_USB;
     if (*colour != old)
         settings_save();
     return 0;
 }
-MENUITEM_FUNCTION_W_PARAM(text_viewer_text_colour, 0,
+MENUITEM_FUNCTION_W_PARAM(text_viewer_text_colour, MENU_FUNC_CHECK_RETVAL,
                           ID2P(LANG_TEXT_VIEWER_TEXT_COLOUR),
                           set_custom_colour, (void *)1,
                           custom_colour_callback, Icon_NOICON);
-MENUITEM_FUNCTION_W_PARAM(text_viewer_page_colour, 0,
+MENUITEM_FUNCTION_W_PARAM(text_viewer_page_colour, MENU_FUNC_CHECK_RETVAL,
                           ID2P(LANG_TEXT_VIEWER_PAGE_COLOUR),
                           set_custom_colour, NULL,
                           custom_colour_callback, Icon_NOICON);

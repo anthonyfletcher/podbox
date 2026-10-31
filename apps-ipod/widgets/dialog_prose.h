@@ -32,14 +32,14 @@ bool dialog_prose_confirm(const char *title, const char *body,
                           bool accept_default);
 
 /* Something only to read: the same box with one button, OK. SELECT or MENU
- * closes it wherever the reader has got to. */
-void dialog_prose_show(const char *title, const char *body);
+ * closes it wherever the reader has got to. True if USB closed it. */
+bool dialog_prose_show(const char *title, const char *body);
 
 /* The same, drawn into `fb` over what it holds and shown by present(), its
  * buttons read through `keymap`: see struct dialog's fb and keymap */
 struct frame_buffer_t;
 struct button_mapping;
-void dialog_prose_show_in(const char *title, const char *body,
+bool dialog_prose_show_in(const char *title, const char *body,
                           struct frame_buffer_t *fb, int fb_w, int fb_h,
                           void (*present)(void),
                           const struct button_mapping *(*keymap)(int));

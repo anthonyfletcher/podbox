@@ -304,7 +304,7 @@ static const struct dialog_callbacks prose_cb =
     .on_close  = NULL,
 };
 
-static bool prose_run(const char *title, const char *body,
+static int prose_run(const char *title, const char *body,
                       const char *accept_label, const char *cancel_label,
                       bool accept_default, struct frame_buffer_t *fb,
                       int fb_w, int fb_h, void (*present)(void),
@@ -333,7 +333,7 @@ static bool prose_run(const char *title, const char *body,
         talk_string(body, true);
     }
 
-    return dialog_run(&d, TIMEOUT_BLOCK) == DIALOG_ACCEPT;
+    return dialog_run(&d, TIMEOUT_BLOCK);
 }
 
 bool dialog_prose_confirm(const char *title, const char *body,
@@ -342,20 +342,20 @@ bool dialog_prose_confirm(const char *title, const char *body,
                           bool accept_default)
 {
     return prose_run(title, body, accept_label, cancel_label, accept_default,
-                     NULL, 0, 0, NULL, NULL);
+                     NULL, 0, 0, NULL, NULL) == DIALOG_ACCEPT;
 }
 
-void dialog_prose_show(const char *title, const char *body)
+bool dialog_prose_show(const char *title, const char *body)
 {
-    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, NULL, 0, 0, NULL,
-              NULL);
+    return prose_run(title, body, str(LANG_DIAG_OK), NULL, true, NULL, 0, 0,
+                     NULL, NULL) == DIALOG_ABORT;
 }
 
-void dialog_prose_show_in(const char *title, const char *body,
+bool dialog_prose_show_in(const char *title, const char *body,
                           struct frame_buffer_t *fb, int fb_w, int fb_h,
                           void (*present)(void),
                           const struct button_mapping *(*keymap)(int))
 {
-    prose_run(title, body, str(LANG_DIAG_OK), NULL, true, fb, fb_w, fb_h,
-              present, keymap);
+    return prose_run(title, body, str(LANG_DIAG_OK), NULL, true, fb, fb_w,
+                     fb_h, present, keymap) == DIALOG_ABORT;
 }

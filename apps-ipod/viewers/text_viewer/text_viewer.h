@@ -21,7 +21,8 @@ int text_viewer(const char *file);
 bool text_viewer_has_contents(void);
 
 /* The open book's contents as a list; picking an entry goes to that chapter.
- * Returns 1 after a pick, which closes the menu it was opened from. */
+ * Returns 1 after a pick, which closes the menu it was opened from, and
+ * MENU_ATTACHED_USB after USB. */
 int text_viewer_contents(void);
 
 /* Path of the most recently read document, for a caller that wants to reopen

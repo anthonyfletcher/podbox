@@ -504,7 +504,7 @@ static uint32_t exth_cover(const mobi_st *m, long len)
         || m->first_image == ~0u)
         return 0;
     hl = be32(r0 + 20);
-    if (!(be32(r0 + 128) & 0x40) || 16 + hl + 12 > (uint32_t)len
+    if (!(be32(r0 + 128) & 0x40) || hl > (uint32_t)len - 28
         || memcmp(r0 + 16 + hl, "EXTH", 4))
         return 0;
     p = 16 + hl + 12;
@@ -787,7 +787,7 @@ int ts_mobi_book(const bs_io *io, void *arena, size_t arena_size,
         if (name_at < (uint32_t)len && name_len <= (uint32_t)len - name_at)
             book_str(out->title, TS_BOOK_TITLE, r0 + name_at, name_len,
                      m->cs);
-        if ((be32(r0 + 128) & 0x40) && 16 + hl + 12 <= (uint32_t)len
+        if ((be32(r0 + 128) & 0x40) && hl <= (uint32_t)len - 28
             && !memcmp(r0 + 16 + hl, "EXTH", 4))
         {
             uint32_t p = 16 + hl + 12, cnt = be32(r0 + 16 + hl + 8);

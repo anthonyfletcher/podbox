@@ -695,6 +695,7 @@ static bool tv_picture_decode(const char *href, int w, int h)
     tv_pic_h = h;
     strmemccpy(tv_pic_href, href, sizeof(tv_pic_href));
     tv_pic_ok = false;
+    tv_pic_stopped = false;
 
     if (tv_pic_handle <= 0)
     {
@@ -735,7 +736,6 @@ static bool tv_picture_decode(const char *href, int w, int h)
     tv_pic_start = current_tick;
     tv_pic_held = button_status();
     tv_pic_drawn = -1;
-    tv_pic_stopped = false;
     image_row_hook = tv_picture_row;
     cpu_boost(true);
     rc = image_load(&src, &tv_pic_bm, TV_PIC_BYTES,
@@ -2783,7 +2783,14 @@ int text_viewer_contents(void)
     simplelist_info_init(&info, str(LANG_BROWSE_CHAPTERS), toc.n, &toc);
     info.get_name = tv_toc_name;
     info.selection = sel;
-    simplelist_show_list(&info);
+    /* USB leaves the selection where it was, where MENU and BACK clear it.
+     * The book's file is closed under the reader then, so it leaves too. */
+    if (simplelist_show_list(&info) && info.selection >= 0)
+    {
+        core_unpin(handle);
+        core_free(handle);
+        return MENU_ATTACHED_USB;
+    }
     if (info.selection >= 0)
     {
         target = toc.e[info.selection].part;
@@ -3120,6 +3127,9 @@ static int tv_menu(void)
 
     if (ret == MENU_ATTACHED_USB)
         return ret;
+    /* A pause ends with Read Aloud: turned on again, it reads */
+    if (!tv_aloud())
+        tv_paused = false;
     tv_apply_settings();
     /* A picture's page, the picture now passed over, has nothing on it */
     if (!tv_shows(tv.pos - tv.win_start,
@@ -3205,7 +3215,8 @@ static void tv_note_progress(bs_off_t at)
 }
 
 /* Hold Select: the notes the page on screen refers to, in a box. Reading
- * them ends the chapter being read, so the page is laid out again after. */
+ * them ends the chapter being read, so the page is laid out again after.
+ * MENU_ATTACHED_USB if USB closed the box, when the reader leaves. */
 static int tv_notes(void)
 {
     static char hrefs[TV_NOTES_MAX][TS_NOTE_HREF];
@@ -3268,21 +3279,25 @@ static int tv_notes(void)
 
     if (used)
     {
+        bool usb;
+
         /* sideways, the box goes over the page in the sideways buffer */
         if (tv_side)
             tv_draw();
         viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
         push_current_activity(ACTIVITY_CONTEXTMENU);
         if (tv_side)
-        {
-            dialog_prose_show_in(str(LANG_TEXT_VIEWER_NOTES), tv_note_text,
-                                 &tv_side_fb, LCD_HEIGHT, LCD_WIDTH,
-                                 tv_side_push, tv_side_keymap);
-        }
+            usb = dialog_prose_show_in(str(LANG_TEXT_VIEWER_NOTES),
+                                       tv_note_text, &tv_side_fb,
+                                       LCD_HEIGHT, LCD_WIDTH, tv_side_push,
+                                       tv_side_keymap);
         else
-            dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES), tv_note_text);
+            usb = dialog_prose_show(str(LANG_TEXT_VIEWER_NOTES),
+                                    tv_note_text);
         pop_current_activity();
         viewportmanager_theme_undo(SCREEN_MAIN, false);
+        if (usb)
+            return MENU_ATTACHED_USB;
         tv_apply_settings();
     }
     tv_draw();
@@ -3419,7 +3434,11 @@ int text_viewer(const char *file)
                     }
                     break;
                 case TV_KEY_NOTES:
-                    tv_notes();
+                    if (tv_notes() == MENU_ATTACHED_USB)
+                    {
+                        ret = GO_TO_ROOT;
+                        goto done;
+                    }
                     break;
                 default:
                     break;
@@ -3505,7 +3524,11 @@ int text_viewer(const char *file)
                 goto done;
 
             case ACTION_STD_CONTEXT:     /* hold Select: the page's notes */
-                tv_notes();
+                if (tv_notes() == MENU_ATTACHED_USB)
+                {
+                    ret = GO_TO_ROOT;
+                    goto done;
+                }
                 action_wait_for_release();
                 break;
 
