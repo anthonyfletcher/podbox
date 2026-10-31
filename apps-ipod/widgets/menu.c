@@ -971,7 +971,9 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
 
             menu_callback(ACTION_EXIT_MENUITEM, menu, &lists);
 
-            if (menu->flags&MENU_EXITAFTERTHISMENU)
+            /* A context menu's submenu goes back to the menu it was opened
+             * from; only the menu itself closes */
+            if ((menu->flags & MENU_EXITAFTERTHISMENU) && stack_top == 0)
                 done = true;
             else if ((menu->flags&MENU_TYPE_MASK) == MT_MENU)
                 exiting_menu = true;
