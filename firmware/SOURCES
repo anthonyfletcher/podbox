@@ -1453,6 +1453,7 @@ target/arm/ipod/video/lcd-as-video.S
 target/arm/ipod/video/lcd-video.c
 #ifndef BOOTLOADER
 target/arm/ipod/video/battery-video.c
+target/arm/ipod/video/lcd-e2-video.c
 #endif /* BOOTLOADER */
 #endif /* IPOD_VIDEO */
 

@@ -743,6 +743,12 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
 - pymobiledevice3 by doronz88 (https://github.com/doronz88/pymobiledevice3)
   - Fetched the iPhone's logs of its conversation with the car
 
+### iPod Video display
+
+- ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
+  - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
+    the CPU decodes music
+
 ### Speech
 
 - NV Speech Player by NV Access (https://github.com/nvaccess/NVSpeechPlayer), GPL v2

@@ -40,6 +40,7 @@
 #include "core_alloc.h"
 #include "videoout.h"
 #endif
+#include "lcd-e2-video.h"
 
 /* The BCM bus width is 16 bits. But since the low address bits aren't decoded
  * by the chip (the 3 BCM address bits are mapped to address bits 16..18 of the
@@ -379,6 +380,7 @@ void lcd_init_device(void)
     lcd_state.blocked = false;
     lcd_state.state = LCD_INITIAL;
 #ifndef BOOTLOADER
+    lcd_port_init();
 #if NUM_CORES > 1
     corelock_init(&lcd_state.cl);
 #endif
@@ -418,8 +420,7 @@ void lcd_init_device(void)
 
 /*** update functions ***/
 
-/* Update a fraction of the display. */
-void lcd_update_rect(int x, int y, int width, int height)
+static void update_rect(int x, int y, int width, int height, bool locked)
 {
     const fb_data *addr;
     unsigned bcmaddr;
@@ -460,8 +461,15 @@ void lcd_update_rect(int x, int y, int width, int height)
 
     if (width == LCD_WIDTH)
     {
-        bcm_write_addr(bcmaddr);
-        lcd_write_data(addr, width * height);
+        size_t bytes = width * height * 2;
+        size_t done = locked ? lcd_e2_push(bcmaddr, addr, bytes) : 0;
+
+        /* What is left is always an even number of pixels */
+        if (done < bytes)
+        {
+            bcm_write_addr(bcmaddr + done);
+            lcd_write_data(addr + done / 2, (bytes - done) / 2);
+        }
     }
     else
     {
@@ -475,6 +483,17 @@ void lcd_update_rect(int x, int y, int width, int height)
         while (--height > 0);
     }
     lcd_unblock_and_update();
+}
+
+/* Update a fraction of the display. The port lock is taken before
+ * update_rect() reads the display and TV state, which can change while it
+ * waits. */
+void lcd_update_rect(int x, int y, int width, int height)
+{
+    bool locked = lcd_port_lock();
+
+    update_rect(x, y, width, height, locked);
+    lcd_port_unlock(locked);
 }
 
 /* Update the display.
@@ -498,10 +517,14 @@ void lcd_blit_yuv(unsigned char * const src[3],
     unsigned bcmaddr;
     off_t z;
     unsigned char const * yuv_src[3];
+    bool locked = lcd_port_lock();
 
 #ifdef HAVE_LCD_SLEEP
     if (!lcd_state.display_on)
+    {
+        lcd_port_unlock(locked);
         return;
+    }
 #endif
 
     /* Sorry, but width and height must be >= 2 or else */
@@ -529,6 +552,7 @@ void lcd_blit_yuv(unsigned char * const src[3],
     while (--height > 0);
 
     lcd_unblock_and_update();
+    lcd_port_unlock(locked);
 }
 
 #ifdef HAVE_LCD_SLEEP
@@ -809,6 +833,10 @@ static void tv_start(void)
         }
     }
 
+    /* The port lock comes before tv_lock, always. A TV pass needs only
+     * tv_lock: while the TV runs, no other port user writes. */
+    bool locked = lcd_port_lock();
+
     /* A sleeping BCM is powered down and would never answer a command. */
     if (!lcd_state.display_on)
         lcd_awake();
@@ -847,6 +875,7 @@ static void tv_start(void)
     tv_starting = false;
     lcd_unblock_tick();
     mutex_unlock(&tv_lock);
+    lcd_port_unlock(locked);
 
     tv_mark_dirty(0, LCD_HEIGHT);
 }
@@ -856,6 +885,8 @@ static void tv_start(void)
  * picture that is now black. */
 static void tv_stop(void)
 {
+    bool locked = lcd_port_lock();
+
     mutex_lock(&tv_lock);
     lcd_block_tick();
     tv_wipe(tv_height);
@@ -867,6 +898,7 @@ static void tv_stop(void)
     }
     lcd_unblock_tick();
     mutex_unlock(&tv_lock);
+    lcd_port_unlock(locked);
 
     lcd_update();
 }
@@ -1007,6 +1039,8 @@ static void bcm_init(void)
 
 void lcd_awake(void)
 {
+    bool locked = lcd_port_lock();
+
     if (!lcd_state.display_on && flash_vmcs_length != 0)
     {
         /* Ensure BCM has been off for >= 50 ms */
@@ -1029,9 +1063,12 @@ void lcd_awake(void)
         lcd_state.waking = true;
         tick_add_task(&lcd_tick);
         semaphore_wait(&(lcd_state.initwakeup), TIMEOUT_BLOCK);
+        lcd_port_unlock(locked);
 
         send_event(LCD_EVENT_ACTIVATION, NULL);
+        return;
     }
+    lcd_port_unlock(locked);
 }
 
 void lcd_sleep(void)
@@ -1040,6 +1077,9 @@ void lcd_sleep(void)
     if (tv_bcm_mode)
         return;
 #endif
+    /* Held so a push in flight ends before the BCM powers down */
+    bool locked = lcd_port_lock();
+
     if (lcd_state.display_on && flash_vmcs_length != 0)
     {
         lcd_state.display_on = false;
@@ -1058,6 +1098,7 @@ void lcd_sleep(void)
         /* Remember time to ensure BCM stays off for >= 50 ms */
         lcd_state.update_timeout = current_tick;
     }
+    lcd_port_unlock(locked);
 }
 
 bool lcd_active(void)
