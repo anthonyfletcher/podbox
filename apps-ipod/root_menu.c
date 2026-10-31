@@ -502,6 +502,15 @@ static int browser(void* param)
             last_db_selection = 0;
         break;
 
+        /* The same as a tagnavi row: Podcasts' table history is the Music
+         * menu's, so Music cannot resume inside its own list after it. */
+        case GO_TO_PODCASTS:
+            tc->dirlevel = last_ft_dirlevel;
+            tc->currtable = 0;
+            last_db_dirlevel = 0;
+            last_db_selection = 0;
+        break;
+
         case GO_TO_ALBUM_COVERS_TRACKS:
             tc->dirlevel = last_ft_dirlevel;
             /* enter_album_tracks_directly() left tc->currtable/currextra
