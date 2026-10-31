@@ -751,8 +751,9 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
             p->gy = -1;
         }
     }
-    if (bm->width == src_dim.width && bm->height == src_dim.height)
-        resize = false;
+    /* An interlaced image read at a reduced size needs the scaler, whatever
+     * the format asked */
+    resize = bm->width != src_dim.width || bm->height != src_dim.height;
     /* The area scaler, which resize_on_load() picks for a narrower bitmap,
      * reads 8-bit RGB rows and the assembled grid without a copy */
     p->raw = resize && (src_dim.width > bm->width || bm->width < 2)

@@ -1,8 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to image_load.c: one call that decodes a JPEG, PNG or BMP,
- * whole file or embedded in another, chosen by its content.
+ * Interface to image_load.c: one call that decodes a JPEG, PNG, GIF, WebP or
+ * BMP, whole file or embedded in another, chosen by its content.
  ****************************************************************************/
 #ifndef _IMAGE_LOAD_H_
 #define _IMAGE_LOAD_H_
