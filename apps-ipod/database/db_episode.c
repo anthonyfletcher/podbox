@@ -368,6 +368,20 @@ static bool comm_text(const unsigned char *raw, size_t n, bool raw_cut,
                 break;
             c = le ? raw[i] | raw[i + 1] << 8 : raw[i] << 8 | raw[i + 1];
             i += 2;
+            /* a character past U+FFFF comes as a pair, one character */
+            if (c >= 0xd800 && c < 0xdc00 && i + 1 < n)
+            {
+                unsigned long lo = le ? raw[i] | raw[i + 1] << 8
+                                      : raw[i] << 8 | raw[i + 1];
+
+                if (lo >= 0xdc00 && lo < 0xe000)
+                {
+                    c = 0x10000 + ((c - 0xd800) << 10) + (lo - 0xdc00);
+                    i += 2;
+                }
+            }
+            if (c >= 0xd800 && c < 0xe000)
+                c = 0xfffd;
         }
         else if (enc == 3)
         {
@@ -384,21 +398,52 @@ static bool comm_text(const unsigned char *raw, size_t n, bool raw_cut,
     return !raw_cut && (i >= n || o < end);
 }
 
+/* Whether a COMM frame's short description starts "iTun": iTunNORM,
+ * iTunSMPB and the rest hold numbers, not notes */
+static bool comm_is_itunes(const unsigned char *raw, size_t n)
+{
+    static const char want[] = "iTun";
+    size_t i = 4, k;
+
+    if (raw[0] == 1 || raw[0] == 2)
+    {
+        if (i + 1 < n && ((raw[i] == 0xff && raw[i + 1] == 0xfe)
+                          || (raw[i] == 0xfe && raw[i + 1] == 0xff)))
+            i += 2;
+        for (k = 0; k < 4; k++, i += 2)
+            if (i + 1 >= n || (raw[i] | raw[i + 1]) != want[k]
+                || (raw[i] && raw[i + 1]))
+                return false;
+        return true;
+    }
+    return n >= 8 && !memcmp(raw + 4, want, 4);
+}
+
 /* "... the last whole word…", within 'size' */
 static void cut_at_word(char *s, size_t size)
 {
     size_t len = strlen(s);
+    size_t lead;
     char *sp;
 
     if (len + 4 > size)
         len = size - 4;
+    /* a character cut short at the end goes whole */
+    lead = len;
+    while (lead > 0 && ((unsigned char)s[lead - 1] & 0xc0) == 0x80)
+        lead--;
+    if (lead > 0 && (unsigned char)s[lead - 1] >= 0xc0)
+    {
+        unsigned char c = s[lead - 1];
+        size_t whole = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : 2;
+
+        if (lead - 1 + whole > len)
+            len = lead - 1;
+    }
     s[len] = '\0';
     sp = strrchr(s, ' ');
     if (sp && sp > s + len / 2)
         *sp = '\0';
-    else    /* no space near: back to a character's first byte */
-        while (len > 0 && (s[len] & 0xc0) == 0x80)
-            s[len--] = '\0';
     strcat(s, "\xe2\x80\xa6");
 }
 
@@ -432,13 +477,15 @@ bool db_episode_comment(const char *path, char *buf, size_t size)
         {
             size_t got = n < sizeof(raw) ? n : sizeof(raw);
 
-            if ((size_t)read(fd, raw, got) == got)
+            if ((size_t)read(fd, raw, got) != got)
+                break;
+            /* iTunes' own numbers, which its tag readers skip too */
+            if (!comm_is_itunes(raw, got))
             {
                 if (!comm_text(raw, got, got < n, buf, size))
                     cut_at_word(buf, size);
                 found = buf[0] != '\0';
             }
-            break;
         }
         pos += 10 + n;
     }

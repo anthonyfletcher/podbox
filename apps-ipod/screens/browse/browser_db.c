@@ -1317,8 +1317,11 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
 
     bool auto_skip = te->flags & TEF_AUTO_SKIP;
     bool counted = true;
+    /* A podcast keeps its place whatever Segregate Podcasts says: without
+     * one, a play counted partway reads as Finished, and Delete Played
+     * Episodes takes it */
     bool autoresume = global_settings.autoresume_enable
-                      || db_spoken_is_episode(id3->genre_string);
+                      || db_spoken_is_podcast_genre(id3->genre_string);
 
     /* Don't process unplayed tracks, or tracks interrupted within the
        first 15 seconds but always process autoresume point */
@@ -5802,36 +5805,85 @@ int browser_db_played_episodes(struct browser_context *c, int id)
     return show_episodes(entry->extraseek, EPISODES_FINISHED, &newest);
 }
 
-int browser_db_delete_played(struct browser_context *c, int id)
+/* Each episode of the show row `id`, over every album row the show's row
+ * merges, one for each album artist its episodes name. False if `id` is
+ * not a show. */
+static bool show_each(struct browser_context *c, int id,
+                      void (*fn)(int idx_id, void *data), void *data)
+{
+    struct tagentry *entry;
+    struct tagcache_album al;
+    long seek;
+    int n, i;
+
+    if (show_row(c, id) < 0 || !(entry = browser_db_get_entry(c, id)))
+        return false;
+    seek = entry->extraseek;
+    for (n = tagcache_album_find_name(seek);
+         n >= 0 && tagcache_album_get(n, &al) && al.album_seek == seek; n++)
+    {
+        if (db_spoken_album_kind(&al) != 2)
+            continue;
+        for (i = al.first; i <= al.last; i++)
+            if (tagcache_album_of(i) == n)
+                fn(i, data);
+    }
+    return true;
+}
+
+struct delete_played
 {
     struct tagcache_search tcs;
-    struct tagcache_album al;
     char path[MAX_PATH];
-    int n = show_row(c, id), i, gone = 0;
+    int gone;
+};
 
-    if (!tagcache_album_get(n, &al) || !tagcache_search(&tcs, tag_filename))
+static void delete_if_played(int idx_id, void *data)
+{
+    struct delete_played *d = data;
+
+    if (episode_state(idx_id) == EPISODES_FINISHED
+        && tagcache_retrieve(&d->tcs, idx_id, tag_filename, d->path,
+                             sizeof(d->path))
+        && remove(d->path) == 0)
+        d->gone++;
+}
+
+int browser_db_delete_played(struct browser_context *c, int id)
+{
+    static struct delete_played d;
+
+    d.gone = 0;
+    if (!tagcache_search(&d.tcs, tag_filename))
         return 0;
-    for (i = al.first; i <= al.last; i++)
-        if (tagcache_album_of(i) == n
-            && episode_state(i) == EPISODES_FINISHED
-            && tagcache_retrieve(&tcs, i, tag_filename, path, sizeof(path))
-            && remove(path) == 0)
-            gone++;
-    tagcache_search_finish(&tcs);
+    show_each(c, id, delete_if_played, &d);
+    tagcache_search_finish(&d.tcs);
     loaded_entries_crc = 0;
-    return gone;
+    return d.gone;
+}
+
+static void mark_played(int idx_id, void *data)
+{
+    (void)data;
+    mark_episode(idx_id, true);
 }
 
 bool browser_db_mark_episodes(struct browser_context *c, int id,
                               enum browser_db_mark how)
 {
     struct tagentry *entry = browser_db_get_entry(c, id);
-    struct tagcache_album al;
-    long album_seek, artist_seek;
-    int i, n;
+    int i;
 
     if (!entry)
         return false;
+    /* A commit holds the database's queue, which drops what does not fit:
+     * a mark of many episodes waits for it to end */
+    if ((how == BROWSER_DB_MARK_OLDER || how == BROWSER_DB_MARK_SHOW)
+        && !tagcache_search_ready())
+    {
+        splash(HZ * 2, ID2P(LANG_TAGCACHE_BUSY));
+        return false;
+    }
     /* The rows above the list follow the marks: loaded again, not reused */
     loaded_entries_crc = 0;
     switch (how)
@@ -5852,15 +5904,7 @@ bool browser_db_mark_episodes(struct browser_context *c, int id,
             return true;
 
         case BROWSER_DB_MARK_SHOW:
-            if (!browser_db_get_book_album(c, id, &album_seek, &artist_seek))
-                return false;
-            n = tagcache_album_find(album_seek, artist_seek);
-            if (!tagcache_album_get(n, &al))
-                return false;
-            for (i = al.first; i <= al.last; i++)
-                if (tagcache_album_of(i) == n)
-                    mark_episode(i, true);
-            return true;
+            return show_each(c, id, mark_played, NULL);
     }
     return false;
 }

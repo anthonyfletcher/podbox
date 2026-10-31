@@ -1658,8 +1658,11 @@ static int episode_mark_callback(int action,
     episode = browser_db_episode_state(c, c->selected_item) >= 0;
     if (this_item == &episode_mark_item)
         return episode ? action : ACTION_EXIT_MENUITEM;
+    /* Only in a show's own list, newest first: the state lists run by when
+     * each was heard, across shows */
     if (this_item == &episode_older_item)
-        return episode && c->selected_item + 1 < c->filesindir
+        return episode && browser_db_counts_down(c)
+               && c->selected_item + 1 < c->filesindir
                ? action : ACTION_EXIT_MENUITEM;
     return !episode && browser_db_list_spoken_kind(c) == 2
            && browser_db_get_book_album(c, c->selected_item, &album_seek,

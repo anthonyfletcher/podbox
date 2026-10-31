@@ -2562,7 +2562,9 @@ bool tagcache_search_add_clause(struct tagcache_search *tcs,
 /* A title result as lists show it */
 static void shown_title(struct tagcache_search *tcs, char *buf)
 {
-    int len = shown_title_len(tcs->idx_id, buf, tcs->result_len - 1);
+    /* Not result_len: read from disk, that counts the padding after the
+     * string as well */
+    int len = shown_title_len(tcs->idx_id, buf, strlen(buf));
 
     str_setlen(buf, len);
     tcs->result_len = len + 1;
