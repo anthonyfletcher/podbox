@@ -210,6 +210,10 @@ struct skin_viewport {
     bool fgbg_changed;
     bool has_busy_tag;   /* holds %lh, %lb or %lw; skin_request_busy_redraw() */
     bool has_scroll_textbox; /* holds a scrolling %wt */
+    /* Something outside a pass can draw over its %xd images -- a later
+     * viewport overlaps it, or a line in it scrolls -- so they are drawn
+     * every pass, never held (skin_render_viewport()) */
+    bool no_hold;
     struct gradient_config start_gradient;
     unsigned int dc_orig_fg; /* original parsed fg for dynamic colors */
     unsigned int dc_orig_bg; /* original parsed bg for dynamic colors */

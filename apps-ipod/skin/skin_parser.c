@@ -2237,6 +2237,32 @@ static int load_skin_bmp(struct wps_data *wps_data, struct gui_img *img, char* b
     return -1;
 }
 
+/* Marks no_hold on each viewport a later one overlaps: the later one's clear,
+ * when it is hidden, erases the earlier one's images after their pass */
+static void mark_overlapped(struct skin_element *el)
+{
+    for (; el; el = SKINOFFSETTOPTR(skin_buffer, el->next))
+    {
+        struct skin_viewport *a = SKINOFFSETTOPTR(skin_buffer, el->data);
+        struct skin_element *later;
+
+        if (!a)
+            continue;
+        for (later = SKINOFFSETTOPTR(skin_buffer, el->next);
+             later && !a->no_hold;
+             later = SKINOFFSETTOPTR(skin_buffer, later->next))
+        {
+            struct skin_viewport *b = SKINOFFSETTOPTR(skin_buffer, later->data);
+
+            if (b && a->vp.x < b->vp.x + b->vp.width
+                && b->vp.x < a->vp.x + a->vp.width
+                && a->vp.y < b->vp.y + b->vp.height
+                && b->vp.y < a->vp.y + a->vp.height)
+                a->no_hold = true;
+        }
+    }
+}
+
 static bool load_skin_bitmaps(struct wps_data *wps_data, char *bmpdir)
 {
     struct skin_token_list *list;
@@ -2408,6 +2434,7 @@ static int convert_viewport(struct wps_data *data, struct skin_element* element)
     skin_vp->is_infovp = false;
     skin_vp->has_busy_tag = false;
     skin_vp->has_scroll_textbox = false;
+    skin_vp->no_hold = false;
     skin_vp->parsed_fontid = 1;
     element->data = PTRTOSKINOFFSET(skin_buffer, skin_vp);
     curr_vp = skin_vp;
@@ -2558,6 +2585,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_SUBLINE_SCROLL:
                     curr_scroll_line = element->line;
+                    if (curr_vp)
+                        curr_vp->no_hold = true;
                     if ((curr_skin == WPS || curr_skin == CUSTOM_STATUSBAR)
                         && curr_textbox
                         && curr_textbox_line == element->line)
@@ -2876,6 +2905,7 @@ static bool load_skin_data(enum skinnable_screens skin,
     skin_buffer_init(skin_buffer, buffersize);
     struct skin_element *tree = skin_parse(wps_buffer, skin_element_callback, wps_data);
     wps_data->tree = PTRTOSKINOFFSET(skin_buffer, tree);
+    mark_overlapped(tree);
     if (!SKINOFFSETTOPTR(skin_buffer, wps_data->tree)) {
 #ifdef DEBUG_SKIN_ENGINE
         if (isfile && debug_wps)

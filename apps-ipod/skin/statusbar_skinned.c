@@ -196,11 +196,16 @@ int sb_get_backdrop(enum screen_type screen)
 static bool force_waiting = false;
 /* A scrolling %wt's next step is due: sb_busy_tick() woke the UI for it */
 static bool textbox_waiting = false;
+/* The main screen's bar, as the UI thread last found it, for the tick to read:
+ * skin_get_gwps() loads a skin that is not loaded, which the tick cannot do */
+static struct wps_data *sb_main_data;
 void sb_skin_update(enum screen_type screen, bool force)
 {
     struct wps_data *data = skin_get_gwps(CUSTOM_STATUSBAR, screen)->data;
     static long next_update[NB_SCREENS] = {0};
     int i = screen;
+    if (screen == SCREEN_MAIN)
+        sb_main_data = data;
     if (!data->wps_loaded)
         return;
     /* A step of the box alone, not the bar, unless the bar is due as well */
@@ -309,10 +314,10 @@ static void sb_busy_tick(void)
 
     /* A %wt scrolling on the bar, at its own pace, while nothing else
      * drives the UI */
-    if (sbs_loaded[SCREEN_MAIN] && !textbox_waiting && lcd_active()
-        && button_queue_empty())
+    data = sb_main_data;
+    if (sbs_loaded[SCREEN_MAIN] && data && data->wps_loaded
+        && !textbox_waiting && lcd_active() && button_queue_empty())
     {
-        data = skin_get_gwps(CUSTOM_STATUSBAR, SCREEN_MAIN)->data;
         if (data->textbox_moving
             && !TIME_BEFORE(current_tick, data->textbox_due))
         {

@@ -1468,10 +1468,12 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
 
     /* Holding an %xd trusts the framebuffer to still have it. A full refresh
      * clears the viewport first; a pending region over it means an earlier
-     * viewport drew there since the last flush; and the status bar's images
-     * can sit over the list, which repaints and flushes outside any pass. */
+     * viewport drew there since the last flush; the status bar's images
+     * can sit over the list, which repaints and flushes outside any pass;
+     * and no_hold marks a viewport something else can draw over. */
     info.hold_images =
-        (refresh_type & SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL
+        !skin_viewport->no_hold
+        && (refresh_type & SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL
         && gwps != skin_get_gwps(CUSTOM_STATUSBAR, display->screen_type)
         && !skin_dirty_rect_intersects(display->screen_type,
                                        skin_viewport->vp.x, skin_viewport->vp.y,
