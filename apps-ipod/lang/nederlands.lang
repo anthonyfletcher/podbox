@@ -26679,10 +26679,10 @@
   desc: a row above the Podcasts list of shows: every episode of every show
   user: core
   <source>
-    *: "All Episodes"
+    *: "[All Episodes]"
   </source>
   <dest>
-    *: "Alle afleveringen"
+    *: "[Alle afleveringen]"
   </dest>
   <voice>
     *: "Alle afleveringen"
@@ -26707,10 +26707,10 @@
   desc: the row heading a podcast's episodes: play those not finished, oldest first
   user: core
   <source>
-    *: "Play Unplayed"
+    *: "[Play Unplayed]"
   </source>
   <dest>
-    *: "Ongehoorde afspelen"
+    *: "[Ongehoorde afspelen]"
   </dest>
   <voice>
     *: "Ongehoorde afspelen"
@@ -27260,5 +27260,47 @@
   </dest>
   <voice>
     *: "Geen hoofdstukken"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_PROGRESS
+  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[Bezig]"
+  </dest>
+  <voice>
+    *: "Bezig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_NEW
+  desc: a row above the Podcasts list of shows: the episodes not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[Niet begonnen]"
+  </dest>
+  <voice>
+    *: "Niet begonnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_FINISHED
+  desc: a row above the Podcasts list of shows: the episodes finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[Uitgeluisterd]"
+  </dest>
+  <voice>
+    *: "Uitgeluisterd"
   </voice>
 </phrase>

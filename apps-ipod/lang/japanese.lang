@@ -26677,10 +26677,10 @@
   desc: a row above the Podcasts list of shows: every episode of every show
   user: core
   <source>
-    *: "All Episodes"
+    *: "[All Episodes]"
   </source>
   <dest>
-    *: "すべてのエピソード"
+    *: "[すべてのエピソード]"
   </dest>
   <voice>
     *: "すべてのエピソード"
@@ -26705,10 +26705,10 @@
   desc: the row heading a podcast's episodes: play those not finished, oldest first
   user: core
   <source>
-    *: "Play Unplayed"
+    *: "[Play Unplayed]"
   </source>
   <dest>
-    *: "未再生を再生"
+    *: "[未再生を再生]"
   </dest>
   <voice>
     *: "未再生を再生"
@@ -27258,5 +27258,47 @@
   </dest>
   <voice>
     *: "チャプターなし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_PROGRESS
+  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[途中]"
+  </dest>
+  <voice>
+    *: "途中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_NEW
+  desc: a row above the Podcasts list of shows: the episodes not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[未再生]"
+  </dest>
+  <voice>
+    *: "未再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_FINISHED
+  desc: a row above the Podcasts list of shows: the episodes finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[完了]"
+  </dest>
+  <voice>
+    *: "完了"
   </voice>
 </phrase>

@@ -2610,11 +2610,9 @@ static const struct episode_row {
     int lang_id;
     const char *format;     /* the tagnavi.config %format to list them by */
 } episode_rows[] = {
-    [EPISODES_IN_PROGRESS] = { LANG_BOOK_SHELF_ROW_PROGRESS,
-                               "fmt_episode_heard" },
-    [EPISODES_NOT_STARTED] = { LANG_BOOK_SHELF_ROW_NEW, "fmt_episode_new" },
-    [EPISODES_FINISHED]    = { LANG_BOOK_SHELF_ROW_FINISHED,
-                               "fmt_episode_heard" },
+    [EPISODES_IN_PROGRESS] = { LANG_PODCAST_ROW_PROGRESS, "fmt_episode_heard" },
+    [EPISODES_NOT_STARTED] = { LANG_PODCAST_ROW_NEW, "fmt_episode_new" },
+    [EPISODES_FINISHED]    = { LANG_PODCAST_ROW_FINISHED, "fmt_episode_heard" },
     [EPISODES_ALL]         = { LANG_PODCAST_ALL_EPISODES, "fmt_episode_new" },
 };
 

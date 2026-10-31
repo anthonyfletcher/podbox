@@ -26671,10 +26671,10 @@
   desc: a row above the Podcasts list of shows: every episode of every show
   user: core
   <source>
-    *: "All Episodes"
+    *: "[All Episodes]"
   </source>
   <dest>
-    *: "Tutti gli episodi"
+    *: "[Tutti gli episodi]"
   </dest>
   <voice>
     *: "Tutti gli episodi"
@@ -26699,10 +26699,10 @@
   desc: the row heading a podcast's episodes: play those not finished, oldest first
   user: core
   <source>
-    *: "Play Unplayed"
+    *: "[Play Unplayed]"
   </source>
   <dest>
-    *: "Riproduci non ascoltati"
+    *: "[Riproduci non ascoltati]"
   </dest>
   <voice>
     *: "Riproduci non ascoltati"
@@ -27252,5 +27252,47 @@
   </dest>
   <voice>
     *: "Nessun capitolo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_PROGRESS
+  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[In corso]"
+  </dest>
+  <voice>
+    *: "In corso"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_NEW
+  desc: a row above the Podcasts list of shows: the episodes not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[Non iniziati]"
+  </dest>
+  <voice>
+    *: "Non iniziati"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_FINISHED
+  desc: a row above the Podcasts list of shows: the episodes finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[Finiti]"
+  </dest>
+  <voice>
+    *: "Finiti"
   </voice>
 </phrase>

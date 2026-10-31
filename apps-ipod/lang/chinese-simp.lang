@@ -26678,10 +26678,10 @@
   desc: a row above the Podcasts list of shows: every episode of every show
   user: core
   <source>
-    *: "All Episodes"
+    *: "[All Episodes]"
   </source>
   <dest>
-    *: "所有单集"
+    *: "[所有单集]"
   </dest>
   <voice>
     *: "所有单集"
@@ -26706,10 +26706,10 @@
   desc: the row heading a podcast's episodes: play those not finished, oldest first
   user: core
   <source>
-    *: "Play Unplayed"
+    *: "[Play Unplayed]"
   </source>
   <dest>
-    *: "播放未听单集"
+    *: "[播放未听单集]"
   </dest>
   <voice>
     *: "播放未听单集"
@@ -27259,5 +27259,47 @@
   </dest>
   <voice>
     *: "没有章节"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_PROGRESS
+  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[收听中]"
+  </dest>
+  <voice>
+    *: "收听中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_NEW
+  desc: a row above the Podcasts list of shows: the episodes not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[未开始]"
+  </dest>
+  <voice>
+    *: "未开始"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_ROW_FINISHED
+  desc: a row above the Podcasts list of shows: the episodes finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[已听完]"
+  </dest>
+  <voice>
+    *: "已听完"
   </voice>
 </phrase>
