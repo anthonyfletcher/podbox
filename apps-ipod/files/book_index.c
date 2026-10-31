@@ -82,12 +82,11 @@ bool book_index_is_book(const char *path)
                            || strcasecmp(dot, ".pdb") == 0);
 }
 
-void book_index_each(book_index_fn fn, void *data)
+void book_index_each(book_index_fn fn, void *data,
+                     struct book_index_text *text)
 {
-    static char path[MAX_PATH];
-    static char title[TS_BOOK_TITLE];
-    static char author[TS_BOOK_AUTHOR];
-    static char subjects[TS_BOOK_SUBJECTS];
+    char *path = text->path, *title = text->title, *author = text->author,
+         *subjects = text->subjects;
     struct book_entry e = { .path = path, .title = title, .author = author,
                             .subjects = subjects };
     struct libfile_header h;
@@ -99,9 +98,10 @@ void book_index_each(book_index_fn fn, void *data)
         return;
     while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
     {
-        if (r.path_len >= sizeof(path) || r.title_len >= sizeof(title)
-            || r.author_len >= sizeof(author)
-            || r.subjects_len >= sizeof(subjects)
+        if (r.path_len >= sizeof(text->path)
+            || r.title_len >= sizeof(text->title)
+            || r.author_len >= sizeof(text->author)
+            || r.subjects_len >= sizeof(text->subjects)
             || read(fd, path, r.path_len) != r.path_len
             || read(fd, title, r.title_len) != r.title_len
             || read(fd, author, r.author_len) != r.author_len

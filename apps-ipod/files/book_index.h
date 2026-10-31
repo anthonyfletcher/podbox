@@ -9,6 +9,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "file.h"                               /* MAX_PATH */
+#include "viewers/text_viewer/txt_source.h"     /* TS_BOOK_* */
 
 /* Memory the documents walk takes while it brings the index up to date */
 #define BOOK_INDEX_WORK_BYTES (160 * 1024)
@@ -45,9 +47,20 @@ bool book_index_stale(void);
 /* Whether `path` is a book the index takes */
 bool book_index_is_book(const char *path);
 
-/* Every indexed book, until `fn` returns false. The strings last only for
- * the call. */
+/* Where book_index_each() puts each book's strings. Each caller has its
+ * own: the art cache's thread walks the index while the Books screen does. */
+struct book_index_text
+{
+    char path[MAX_PATH];
+    char title[TS_BOOK_TITLE];
+    char author[TS_BOOK_AUTHOR];
+    char subjects[TS_BOOK_SUBJECTS];
+};
+
+/* Every indexed book, until `fn` returns false. The strings are in `text`,
+ * and last only for the call. */
 typedef bool (*book_index_fn)(const struct book_entry *e, void *data);
-void book_index_each(book_index_fn fn, void *data);
+void book_index_each(book_index_fn fn, void *data,
+                     struct book_index_text *text);
 
 #endif /* _BOOK_INDEX_H */

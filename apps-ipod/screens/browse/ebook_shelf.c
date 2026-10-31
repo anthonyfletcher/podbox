@@ -311,12 +311,13 @@ static void subject_rows(void)
  * one book of each author */
 static void load(void)
 {
+    static struct book_index_text text;
     int counts[3] = { 0, 0, 0 };
     bool subjects = false;
 
     book_ct = row_ct = 0;
     names_used = 0;
-    book_index_each(collect_book, NULL);
+    book_index_each(collect_book, NULL, &text);
     text_viewer_each_place(collect_place, NULL);
 
     for (int i = 0; i < book_ct; i++)
@@ -544,11 +545,7 @@ static bool book_info(int b)
         snprintf(info_line[n++], MAX_PATH, str(LANG_BOOK_SHELF_ROW),
                  str(LANG_BOOKS_IN_PROGRESS), e->pct);
     else
-        strmemccpy(info_line[n++],
-                   str(e->state == BOOK_SHELF_FINISHED ? LANG_BOOKS_FINISHED
-                       : e->state == BOOK_SHELF_NOT_STARTED
-                         ? LANG_BOOKS_NOT_STARTED : LANG_BOOKS_IN_PROGRESS),
-                   MAX_PATH);
+        strmemccpy(info_line[n++], str(list_lang(e->state)), MAX_PATH);
     snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_PROPERTIES_PATH),
              names + e->path);
 

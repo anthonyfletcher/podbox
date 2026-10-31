@@ -1882,9 +1882,10 @@ static enum bg_result aa_run_pass(void)
     /* Every book in the index, which the orphan sweep below then spares */
     if (!aborted)
     {
+        static struct book_index_text text;
         struct aa_books_ctx books = { workbuf, worksz, &aborted };
 
-        book_index_each(aa_book_visit, &books);
+        book_index_each(aa_book_visit, &books, &text);
     }
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
