@@ -352,7 +352,7 @@ static bool assemble_track_info(const char *filename, struct dir_stats *stats)
     return true;
 }
 
-int properties(const char *file)
+static int show_properties(const char *file)
 {
     static struct dir_stats stats;
 
@@ -412,4 +412,14 @@ int properties(const char *file)
               (stats.canceled ? 0 : -1);
 
     return ret == 1 ? GO_TO_ROOT : GO_TO_PREVIOUS;
+}
+
+/* Under Track Info's activity, as Sound Properties is: a read-out of one file
+ * or folder, which a theme otherwise styles as the list it was opened from. */
+int properties(const char *file)
+{
+    push_current_activity(ACTIVITY_ID3SCREEN);
+    int ret = show_properties(file);
+    pop_current_activity();
+    return ret;
 }
