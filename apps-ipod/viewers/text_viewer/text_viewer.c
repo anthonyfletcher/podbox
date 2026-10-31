@@ -519,7 +519,8 @@ static int tv_footer_height(void)
 /* A picture reaches the text as a line of its own: TS_PICTURE_OPEN, its href,
  * TS_PICTURE_CLOSE, three bytes each in UTF-8. Shown, it is a page by itself,
  * fitted inside the margins with no footer; otherwise the line is passed
- * over, as it is once it has failed to decode. */
+ * over. One that fails to decode is passed over too, but still ends the page
+ * before it. */
 #define TV_PIC_OPEN   "\xee\x80\x80"
 #define TV_PIC_CLOSE  "\xee\x80\x81"
 #define TV_PIC_TMP    LIB_CACHE_DIR "/picture.tmp"
@@ -859,13 +860,21 @@ static off_t tv_page(off_t start, bool render)
             char href[TV_PIC_HREF];
             size_t used = tv_picture_line(s, avail, href, sizeof(href));
 
-            if (!tv_pictures_shown() || tv_picture_failed(href))
+            if (!tv_pictures_shown())
             {
                 off += used;
                 continue;
             }
+            /* A page of its own. One that will not decode still ends the page
+             * before, so the pages are the same whether its failure is known
+             * yet or not, and paging back retraces them. */
             if (y > 0)
-                break;                       /* a page of its own */
+                break;
+            if (tv_picture_failed(href))
+            {
+                off += used;
+                continue;
+            }
             if (render && !tv_draw_picture(href))
             {
                 off += used;
@@ -3391,15 +3400,16 @@ int text_viewer(const char *file)
 
     reading_stats_begin(file);
     resume = tv_resume_load(file, tv.file_size, &part);
+    /* Before the pages to the saved place are laid out, which see headings */
+    tv_heads_seen = false;
     tv_open_at(part, resume);
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
-    tv_heads_seen = false;
+    tv_paused = tv_dark = false;
 
     tv_draw();
     tv_speak_page();
     tv_book_done = false;
-    tv_paused = tv_dark = false;
 
     while (1)
     {
