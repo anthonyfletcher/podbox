@@ -4211,6 +4211,9 @@ static int album_covers_loop(void)
         skin_inhibit_flush(true);
         button = get_custom_action(CONTEXT_PLUGIN, timeout, get_context_map);
         skin_inhibit_flush(false);
+        /* A hold of Play from now on is the random spin */
+        if (!(button_status() & BUTTON_PLAY))
+            button_set_sw_poweroff_state(false);
 
         /* The index's seeks, and the captions read through them, hold only
          * for the commit they were read in. Checked here, between the wait and
@@ -4654,8 +4657,9 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
     model->set_initial(selected_file);
 
     /* Play held is the random spin here, and held long enough it would power
-     * off */
-    button_set_sw_poweroff_state(false);
+     * off. Held Play on the playing screen opens this, and that hold still
+     * powers off, until Play is let go: see album_covers_loop(). */
+    button_set_sw_poweroff_state(button_status() & BUTTON_PLAY);
     ret = album_covers_loop();
     button_set_sw_poweroff_state(true);
 
