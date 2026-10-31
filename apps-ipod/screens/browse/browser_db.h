@@ -155,7 +155,8 @@ struct browser_db_header {
     int album_row;      /* tagcache_album_get()'s, which the art is keyed by */
 };
 /* False unless the level on screen is an album's tracks in a music browse
- * and the album table is in RAM. Reads RAM only. */
+ * and the album table is in RAM. A track list longer than the loaded page is
+ * read from disk to count its tracks. */
 bool browser_db_album_header(struct browser_context *c,
                              struct browser_db_header *h);
 

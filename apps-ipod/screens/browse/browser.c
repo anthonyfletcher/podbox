@@ -1303,12 +1303,24 @@ static int music_row_menu(void)
 
 /** Selecting **/
 
+/* A library list longer than its loaded page reloads pages while selecting,
+ * and a database update can renumber its rows under the marks: the mode is
+ * kept off such a list while one runs */
+static bool select_unsafe(void)
+{
+    struct tagcache_stat *stat = tagcache_get_stat();
+
+    return *tc.dirfilter == SHOW_ID3DB && tc.dirfull
+           && (stat->scanning || stat->commit_step > 0);
+}
+
 /* Whether a row's Select... is offered: on a library list of tracks, and in
  * Files itself rather than a picker or the catalogue */
 bool browser_select_offered(void)
 {
     if (!tc.browse || (tc.browse->flags & BROWSE_SELECTONLY)
-        || tc.filesindir <= 0 || tc.filesindir > LIST_SELECT_MAX_ROWS)
+        || tc.filesindir <= 0 || tc.filesindir > LIST_SELECT_MAX_ROWS
+        || select_unsafe())
         return false;
     if (*tc.dirfilter == SHOW_ID3DB)
         return browser_db_get_attr(&tc) == FILE_ATTR_AUDIO;
@@ -1340,46 +1352,41 @@ static bool playable(int attr)
  * out of the menu leaves it on */
 static bool select_acted;
 
-/* Each ticked row's path and attributes to 'fn', in list order. The count
- * handed on, or -1 when the database would not be searched. */
-static int select_each(bool (*fn)(const char *path, int attr, void *data),
-                       void *data)
+/* A ticked row's path, for list_select_save(); 'data' is the database
+ * search in the library */
+static bool row_path(int row, char *buf, size_t size, int *attr, void *data)
+{
+    struct entry *e;
+
+    if (*tc.dirfilter == SHOW_ID3DB)
+    {
+        *attr = FILE_ATTR_AUDIO;
+        return browser_db_row_path(&tc, data, row, buf, size);
+    }
+    e = get_valid_entry(__func__, &tc, row);
+    browser_disk_assemble_path(buf, size, tc.currdir, e->name);
+    *attr = e->attr;
+    return true;
+}
+
+/* Every ticked row's path saved, before the menu acts on any */
+static bool select_save(void)
 {
     struct tagcache_search tcs;
     bool db = *tc.dirfilter == SHOW_ID3DB;
-    char path[MAX_PATH];
-    int n = 0;
+    bool ok;
 
     if (db && !tagcache_search(&tcs, tag_filename))
     {
         splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        return -1;
+        return false;
     }
-    for (int row = list_select_next(-1); row >= 0;
-         row = list_select_next(row))
-    {
-        int attr;
-
-        if (db)
-        {
-            if (!browser_db_row_path(&tc, &tcs, row, path, sizeof(path)))
-                continue;
-            attr = FILE_ATTR_AUDIO;
-        }
-        else
-        {
-            struct entry *e = get_valid_entry(__func__, &tc, row);
-            browser_disk_assemble_path(path, sizeof(path), tc.currdir,
-                                       e->name);
-            attr = e->attr;
-        }
-        if (!fn(path, attr, data))
-            break;
-        n++;
-    }
+    ok = list_select_save(row_path, &tcs);
     if (db)
         tagcache_search_finish(&tcs);
-    return n;
+    if (!ok)
+        splash(HZ, ID2P(LANG_FAILED));
+    return ok;
 }
 
 static bool insert_one(const char *path, int attr, void *data)
@@ -1412,7 +1419,7 @@ static bool select_insert(int position, bool queue, bool create_new)
         playlist_insert_context_release(&context);
         return false;
     }
-    n = select_each(insert_one, &context);
+    n = list_select_saved_each(insert_one, &context);
     playlist_insert_context_release(&context);
     return n > 0;
 }
@@ -1440,7 +1447,7 @@ static int select_write(const char *playlist, bool new_playlist)
     struct write_state w = { playlist, new_playlist };
 
     select_acted = true;
-    return select_each(write_one, &w) > 0 ? 0 : -1;
+    return list_select_saved_each(write_one, &w) > 0 ? 0 : -1;
 }
 
 static bool name_one(const char *path, int attr, void *data)
@@ -1464,7 +1471,7 @@ static int select_clip(bool copy)
         splash(HZ, ID2P(LANG_FAILED));
         return 0;
     }
-    n = select_each(name_one, &fd);
+    n = list_select_saved_each(name_one, &fd);
     close(fd);
     if (n > 0)
         context_menu_clip_many(tc.currdir, copy);
@@ -1481,11 +1488,15 @@ static int select_copy(void)
     return select_clip(true);
 }
 
+/* A cancel or a failure stops the lot; 'data' says which it was */
 static bool delete_one(const char *path, int attr, void *data)
 {
+    int rc = delete_fileobject_confirmed(path);
+
     (void)attr;
-    (void)data;
-    return delete_fileobject_confirmed(path) >= 0;
+    if (rc == FORC_CANCELLED)
+        *(bool *)data = true;
+    return rc == FORC_SUCCESS || rc == FORC_NOOP;
 }
 
 static int select_delete(void)
@@ -1493,14 +1504,19 @@ static int select_delete(void)
     char text[48];
     const char *lines[] = { text };
     const struct text_message message = { lines, 1 };
+    bool cancelled = false;
 
     snprintf(text, sizeof(text), str(LANG_REALLY_DELETE_N),
              list_select_count());
     select_acted = true;
     if (gui_syncyesno_run(&message, NULL, NULL) != YESNO_YES)
         return 0;
-    if (select_each(delete_one, NULL) < list_select_count())
-        splash(HZ, ID2P(LANG_FAILED));
+    if (list_select_saved_each(delete_one, &cancelled) < list_select_count())
+    {
+        int id = cancelled ? LANG_CANCEL : LANG_FAILED;
+
+        splash(HZ, ID2P(id));
+    }
     reload_dir = true;
     return 0;
 }
@@ -1518,12 +1534,15 @@ static int select_menu(void)
     char name[48];
     int ret;
 
+    if (!select_save())
+        return ONPLAY_OK;
     list_select_menu_name(name, sizeof(name), db);
     select_acted = false;
     ret = context_menu_show_item(name, ATTR_DIRECTORY, false, false,
                                  select_insert, select_write,
                                  db ? NULL : file_rows,
                                  db ? 0 : ARRAYLEN(file_rows));
+    remove(LIST_SELECT_SAVED);
     if (select_acted)
         list_select_end();
     return ret;
@@ -1579,6 +1598,8 @@ static int dirbrowse(void)
         gui_synclist_do_button(&browser_lists, &button);
         tc.selected_item = gui_synclist_get_sel_pos(&browser_lists);
 
+        if (list_select_active() && select_unsafe())
+            list_select_end();
         switch (list_select_action(button))
         {
             case LIST_SELECT_PASS:
@@ -1984,6 +2005,9 @@ int rockbox_browse(struct browse_context *browse)
     }
     if (backup_count >= NUM_TC_BACKUP)
         return GO_TO_PREVIOUS;
+    /* A browse opened from a selecting list, such as Add to Playlist's
+     * picker, is not selecting */
+    struct gui_synclist *selecting = list_select_suspend();
     if (backup_count >= 0)
         backups[backup_count] = tc;
     backup_count++;
@@ -2055,6 +2079,7 @@ int rockbox_browse(struct browse_context *browse)
         db_showing_episodes = false;
         db_showing_header = false;
     }
+    list_select_resume(selecting);
 
     return ret_val;
 }

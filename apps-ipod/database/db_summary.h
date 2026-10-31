@@ -116,14 +116,16 @@ struct db_summary_order {
 
 /* Fill 'out' with an entry per album name, sorted by seek so the caller can
  * binary search it. Returns how many were written, or a negative ERROR_*.
- * 'ignore_articles' places artists as Sort Ignoring Articles does.
+ * 'ignore_articles' places artists as Sort Ignoring Articles does. 'spoken'
+ * keeps the albums Segregate Audiobooks and Podcasts leave out, for a list of
+ * spoken word.
  *
  * For ordering album lists by year or by artist. The browser cannot read the
  * year from the database itself -- a unique tag's rows carry no index entry for
  * a numeric tag to be read from -- and the year here is the better one anyway:
  * the latest across the album's tracks, which is what Album covers sorts on. */
 int db_summary_read_order_table(struct db_summary_order *out, int max,
-                                bool ignore_articles);
+                                bool ignore_articles, bool spoken);
 
 /* Build the current playlist from one album's tracks and start it, in the same
  * disc/track order the browser's track list shows them in. Returns the number

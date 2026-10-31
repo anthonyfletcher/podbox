@@ -420,7 +420,8 @@ void lcd_init_device(void)
 
 /*** update functions ***/
 
-static void update_rect(int x, int y, int width, int height, bool locked)
+static void update_rect(int x, int y, int width, int height,
+                        const struct frame_buffer_t *fb, bool locked)
 {
     const fb_data *addr;
     unsigned bcmaddr;
@@ -456,7 +457,7 @@ static void update_rect(int x, int y, int width, int height, bool locked)
     /* Prevent the tick from triggering BCM updates while we're writing. */
     lcd_block_tick();
 
-    addr = FBADDR(x, y);
+    addr = FBADDRBUF(fb, x, y);
     bcmaddr = BCMA_CMDPARAM + (LCD_WIDTH*2) * y + (x << 1);
 
     if (width == LCD_WIDTH)
@@ -485,15 +486,57 @@ static void update_rect(int x, int y, int width, int height, bool locked)
     lcd_unblock_and_update();
 }
 
-/* Update a fraction of the display. The port lock is taken before
- * update_rect() reads the display and TV state, which can change while it
- * waits. */
+extern struct frame_buffer_t lcd_framebuffer_default;
+
+/* An update asked for while another thread held the port, [x0,x1) by
+ * [y0,y1), empty while x0 >= x1. Only CPU threads touch it, between
+ * yields. */
+static int pend_x0 = LCD_WIDTH, pend_y0 = LCD_HEIGHT, pend_x1, pend_y1;
+
+static void defer_rect(int x, int y, int width, int height)
+{
+    if (width <= 0 || height <= 0)
+        return;
+    pend_x0 = MIN(pend_x0, x);
+    pend_y0 = MIN(pend_y0, y);
+    pend_x1 = MAX(pend_x1, x + width);
+    pend_y1 = MAX(pend_y1, y + height);
+}
+
+/* Lets go of the port, sending what was deferred first. It goes from the
+ * framebuffer itself, whatever viewport the thread that asked had set. */
+static void port_unlock(bool locked)
+{
+    while (lcd_port_outermost(locked) && pend_x0 < pend_x1)
+    {
+        int x = pend_x0, y = pend_y0;
+        int width = pend_x1 - x, height = pend_y1 - y;
+
+        pend_x0 = LCD_WIDTH;
+        pend_y0 = LCD_HEIGHT;
+        pend_x1 = pend_y1 = 0;
+        update_rect(x, y, width, height, &lcd_framebuffer_default, true);
+    }
+    lcd_port_unlock(locked);
+}
+
+/* Update a fraction of the display. It never waits for the port: the scroll
+ * thread calls this with its line's viewport set in place of the UI
+ * thread's, so while another thread holds the port the rectangle is left
+ * for the holder to send. The port lock is taken before update_rect() reads
+ * the display and TV state. */
 void lcd_update_rect(int x, int y, int width, int height)
 {
-    bool locked = lcd_port_lock();
+    bool locked;
 
-    update_rect(x, y, width, height, locked);
-    lcd_port_unlock(locked);
+    if (lcd_port_held_elsewhere())
+    {
+        defer_rect(x, y, width, height);
+        return;
+    }
+    locked = lcd_port_lock();
+    update_rect(x, y, width, height, lcd_current_viewport->buffer, locked);
+    port_unlock(locked);
 }
 
 /* Update the display.
@@ -522,7 +565,7 @@ void lcd_blit_yuv(unsigned char * const src[3],
 #ifdef HAVE_LCD_SLEEP
     if (!lcd_state.display_on)
     {
-        lcd_port_unlock(locked);
+        port_unlock(locked);
         return;
     }
 #endif
@@ -552,7 +595,7 @@ void lcd_blit_yuv(unsigned char * const src[3],
     while (--height > 0);
 
     lcd_unblock_and_update();
-    lcd_port_unlock(locked);
+    port_unlock(locked);
 }
 
 #ifdef HAVE_LCD_SLEEP
@@ -875,7 +918,7 @@ static void tv_start(void)
     tv_starting = false;
     lcd_unblock_tick();
     mutex_unlock(&tv_lock);
-    lcd_port_unlock(locked);
+    port_unlock(locked);
 
     tv_mark_dirty(0, LCD_HEIGHT);
 }
@@ -898,7 +941,7 @@ static void tv_stop(void)
     }
     lcd_unblock_tick();
     mutex_unlock(&tv_lock);
-    lcd_port_unlock(locked);
+    port_unlock(locked);
 
     lcd_update();
 }
@@ -1063,12 +1106,12 @@ void lcd_awake(void)
         lcd_state.waking = true;
         tick_add_task(&lcd_tick);
         semaphore_wait(&(lcd_state.initwakeup), TIMEOUT_BLOCK);
-        lcd_port_unlock(locked);
+        port_unlock(locked);
 
         send_event(LCD_EVENT_ACTIVATION, NULL);
         return;
     }
-    lcd_port_unlock(locked);
+    port_unlock(locked);
 }
 
 void lcd_sleep(void)
@@ -1098,7 +1141,7 @@ void lcd_sleep(void)
         /* Remember time to ensure BCM stays off for >= 50 ms */
         lcd_state.update_timeout = current_tick;
     }
-    lcd_port_unlock(locked);
+    port_unlock(locked);
 }
 
 bool lcd_active(void)

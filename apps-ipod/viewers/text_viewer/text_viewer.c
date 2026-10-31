@@ -1658,19 +1658,7 @@ static void tv_prev_page(void)
     off_t was_next = tv.next;
 
     reading_stats_touch();
-    if (tv.sp == 0)
-    {
-        /* first page of the chapter: the last of the one before */
-        if (!tv.nparts || part == 0)
-            return;
-        if (!tv_prev_part())
-        {
-            tv_enter_part(part);       /* every chapter before is empty */
-            return;
-        }
-        tv_draw();
-    }
-    else
+    if (tv.sp > 0)
     {
         do
         {
@@ -1682,7 +1670,23 @@ static void tv_prev_page(void)
                 continue;
             tv_draw();
         } while (tv.sp > 0 && tv.next == was_next);
+        /* Unless the chapter opens on such a page, and one comes before */
+        if (tv.sp > 0 || tv.next != was_next || !tv.nparts || part == 0)
+        {
+            tv_speak_page();
+            return;
+        }
     }
+
+    /* first page of the chapter: the last of the one before */
+    if (!tv.nparts || part == 0)
+        return;
+    if (!tv_prev_part())
+    {
+        tv_enter_part(part);       /* every chapter before is empty */
+        return;
+    }
+    tv_draw();
     tv_speak_page();
 }
 

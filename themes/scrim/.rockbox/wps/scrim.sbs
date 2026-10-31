@@ -60,9 +60,9 @@
 # - Title
 %Vl(Chrome,0,0,320,35,3)
 %Vl(ChromeG,10,8,200,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>
 %Vl(ChromeN,10,8,152,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>
 #
 # - Status icons. The charging glyphs mirror the level glyphs band for
 #   band; one covers levels 2 to 5, so it stands in four places.

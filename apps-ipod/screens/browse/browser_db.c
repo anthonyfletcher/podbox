@@ -337,6 +337,7 @@ struct display_format {
 
 static struct display_format *formats[TAGMENU_MAX_FMTS];
 static int format_count;
+static int builtin_format_count;    /* formats[] the firmware defines, first */
 
 #define MENUENTRY_MAX_NAME 64
 struct menu_entry {
@@ -927,6 +928,16 @@ static int add_format(const char *buf)
         core_unpin(browser_db_handle);
 
         formats[format_count]->clause_count = clause_count;
+    }
+
+    /* A config's format of a built-in name replaces the built-in one */
+    for (int i = 0; i < builtin_format_count; i++)
+    {
+        if (formats[i]->group_id == formats[format_count]->group_id)
+        {
+            formats[i]->name[0] = '\0';
+            formats[i]->group_id = -1;
+        }
     }
 
     format_count++;
@@ -1756,9 +1767,10 @@ static void browser_db_unload(struct browser_context *c)
  * Lists of spoken word for a library without segregation are made under any
  * other id, in tagnavi_custom.config.
  *
- * A format is added only where the config has none of its name, since a
- * name can carry several conditional variants. */
-static const char *const builtin_menu_lines[] = {
+ * Their formats are read ahead of the config, so its menus and
+ * tagnavi_custom.config can use them; a config's format of the same name
+ * replaces the built-in one, all its variants with it (add_format()). */
+static const char *const builtin_format_lines[] = {
     /* A show's episodes newest first, by the order their titles give
      * (db_episode.c) */
     "%format \"fmt_episode\" \"%010d%s\" episode title %sort = \"inverse\" "
@@ -1769,7 +1781,9 @@ static const char *const builtin_menu_lines[] = {
         "%sort = \"inverse\" %strip = \"10\"",
     "%format \"fmt_episode_heard\" \"%010d%s - %s\" lastplayed album title "
         "%sort = \"inverse\" %strip = \"10\"",
-    "",
+};
+
+static const char *const builtin_menu_lines[] = {
     /* "spoken" is answered from the genre alone (db_spoken.c): 1 a book, 2 a
      * podcast. Search leads, so the menu opens one row below it; the three
      * shelves (book_shelf.c) are built-in rows, each hidden while empty. */
@@ -1799,22 +1813,6 @@ static const struct {
     { BROWSER_DB_MENU_PODCASTS,   "Podcasts" },
 };
 
-static bool format_named(const char *line)
-{
-    char name[sizeof(formats[0]->name)];
-    const char *q = strchr(line, '"');
-    const char *e = q ? strchr(q + 1, '"') : NULL;
-
-    if (!e || (size_t)(e - q - 1) >= sizeof(name))
-        return false;
-    memcpy(name, q + 1, e - q - 1);
-    name[e - q - 1] = '\0';
-    for (int i = 0; i < format_count; i++)
-        if (formats[i] && !strcasecmp(formats[i]->name, name))
-            return true;
-    return false;
-}
-
 static int menu_index(const char *id)
 {
     for (int i = 0; i < menu_count; i++)
@@ -1832,34 +1830,48 @@ static int parse_builtin_line(int n, const char *text)
     return parse_line(n, line, NULL);
 }
 
+static bool add_builtin_formats(void)
+{
+    int n = 0;
+
+    builtin_format_count = 0;
+    if (parse_builtin_line(n++, TAGNAVI_VERSION) < 0)
+        return false;
+    for (int i = 0; i < (int)ARRAYLEN(builtin_format_lines); i++)
+        if (parse_builtin_line(n++, builtin_format_lines[i]) < 0)
+            return false;
+    builtin_format_count = format_count;
+    return true;
+}
+
 static bool add_builtin_menus(void)
 {
     struct menu_root *root;
     int n = 0, i, j;
 
     /* Emptied, so the built-in rows replace the config's rather than
-     * following them */
+     * following them. The rows are allocated afresh: parse_search() adds to
+     * whatever a reused one holds. */
     for (i = 0; i < (int)ARRAYLEN(builtin_menu_links); i++)
     {
         int m = menu_index(builtin_menu_links[i].id);
         if (m >= 0)
+        {
+            memset(menus[m]->items, 0, sizeof(menus[m]->items));
             menus[m]->itemcount = 0;
+        }
     }
 
     if (parse_builtin_line(n++, TAGNAVI_VERSION) < 0)
         return false;
     for (i = 0; i < (int)ARRAYLEN(builtin_menu_lines); i++)
-    {
-        const char *l = builtin_menu_lines[i];
-
-        if (!strncmp(l, "%format", 7) && format_named(l))
-            continue;
-        if (parse_builtin_line(n++, l) < 0)
+        if (parse_builtin_line(n++, builtin_menu_lines[i]) < 0)
             return false;
-    }
 
     /* A main menu row for each, where the config's main menu has none --
-     * appended, so the rows above keep their numbers */
+     * appended, so the main menu's own rows keep their slot numbers. The
+     * custom menu's rows are numbered after them (main_menu_slot()) and
+     * move up one for each row added. */
     root = menus[rootmenu];
     for (i = 0; root && i < (int)ARRAYLEN(builtin_menu_links); i++)
     {
@@ -1867,10 +1879,9 @@ static bool add_builtin_menus(void)
         char text[MENUENTRY_MAX_NAME + MAX_MENU_ID_SIZE + 16];
         bool linked = false;
 
-        for (j = 0; j < root->itemcount; j++)
-            if (root->items[j]->type == menu_load
-                && root->items[j]->link == m)
-                linked = true;
+        for (j = 0; j < root->itemcount && !linked; j++)
+            linked = root->items[j]->type == menu_load
+                     && root->items[j]->link == m;
         if (linked)
             continue;
 
@@ -1898,6 +1909,9 @@ static bool initialize_browser_db(void) /* also used when user selects 'Reload' 
     if (browser_db_handle < 0)
         panicf("browser_db OOM");
 
+    if (!add_builtin_formats())
+        logf("built-in formats failed");
+
     /* Use the user tagnavi config if present, otherwise use the default. */
     bool user = file_exists(TAGNAVI_USER_CONFIG);
     bool ok = parse_menu(user ? TAGNAVI_USER_CONFIG : TAGNAVI_DEFAULT_CONFIG);
@@ -1914,6 +1928,8 @@ static bool initialize_browser_db(void) /* also used when user selects 'Reload' 
         menu = NULL;
         rootmenu = -1;
         browser_db_buf_used = 0;
+        if (!add_builtin_formats())
+            logf("built-in formats failed");
         ok = parse_menu(TAGNAVI_DEFAULT_CONFIG);
     }
     if (!ok)
@@ -3172,7 +3188,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         order_tab = app_get_buffer(&otab_sz, "album sort");
         order_count = db_summary_read_order_table(order_tab,
                                     otab_sz / sizeof(*order_tab),
-                                    global_settings.sort_ignore_articles);
+                                    global_settings.sort_ignore_articles,
+                                    csi_spoken_kind() != 0);
         if (order_count <= 0)
             order_tab = NULL;
         /* A %format row is written without the prefix, so a level that has
@@ -5065,26 +5082,18 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
      * so that returning from the WPS lands on the list as it was. The row
      * plays the level it sits on, like the track rows do, but from where the
      * book was left. */
-    if (dptr->newtable == TABLE_PLAY_UNPLAYED)
+    if (dptr->newtable == TABLE_PLAY_UNPLAYED
+        || dptr->newtable == TABLE_SHUFFLE_ALBUMS)
     {
-        if (global_settings.party_mode && audio_status())
-        {
-            splash(HZ, ID2P(LANG_PARTY_MODE));
-            return 0;
-        }
-        if (!warn_on_pl_erase() || play_unplayed(c) < 0)
-            return 0;
-        return GO_TO_WPS;
-    }
+        bool unplayed = dptr->newtable == TABLE_PLAY_UNPLAYED;
 
-    if (dptr->newtable == TABLE_SHUFFLE_ALBUMS)
-    {
         if (global_settings.party_mode && audio_status())
         {
             splash(HZ, ID2P(LANG_PARTY_MODE));
             return 0;
         }
-        if (!warn_on_pl_erase() || play_shuffled_albums(c) < 0)
+        if (!warn_on_pl_erase()
+            || (unplayed ? play_unplayed(c) : play_shuffled_albums(c)) < 0)
             return 0;
         return GO_TO_WPS;
     }

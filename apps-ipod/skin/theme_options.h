@@ -67,8 +67,8 @@ bool theme_options_read(const char *path, const char *key,
 
 /* What %ft finds in the file at `path`: the rest of the first line that
  * starts with the `search_len` bytes of `search`, after any spaces, or with
- * `search` NULL, line `line` from 0. Into `buf`; returns its length, or -1
- * when nothing was found or it is empty. */
+ * `search` NULL, line `line` from 0. Into `buf`, cut to fit; returns its
+ * strlen(), or -1 when nothing was found or it is empty. */
 int theme_options_filetext(const char *path, const char *search,
                            int search_len, int line, char *buf, int bufsize);
 

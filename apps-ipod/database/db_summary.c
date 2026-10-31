@@ -8,7 +8,8 @@
  * tagcache keeps the album and artist tables with the database in RAM (see
  * tagcache_album_get()), current with every commit and every play. This
  * copies them out into a caller's buffer as the records the screens read,
- * leaving out the spoken word Segregate Audiobooks and Podcasts keep apart. Names stay
+ * leaving out the spoken word Segregate Audiobooks and Podcasts keep apart
+ * unless the order table is for a list of it. Names stay
  * in the database and are read by seek, which holds only for one commit.
  * Nothing is built in the background or kept on disk; the lists exist while
  * the database is in RAM.
@@ -279,7 +280,7 @@ static int compare_artist_rows(const void *a_v, const void *b_v)
 }
 
 int db_summary_read_order_table(struct db_summary_order *out, int max,
-                                bool ignore_articles)
+                                bool ignore_articles, bool spoken)
 {
     struct tagcache_album a;
     int na = tagcache_album_count(), nr = tagcache_artist_count();
@@ -293,7 +294,7 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
      * latest year among them, and the first artist's place */
     for (int i = 0; i < na; i++)
     {
-        if (!tagcache_album_get(i, &a) || album_hidden(&a))
+        if (!tagcache_album_get(i, &a) || (!spoken && album_hidden(&a)))
             continue;
         if (n > 0 && out[n - 1].seek == a.album_seek)
         {

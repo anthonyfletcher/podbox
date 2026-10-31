@@ -43,6 +43,27 @@ int  list_select_next(int after);
 /* After the screen redraws its list, which sets the title afresh */
 void list_select_retitle(void);
 void list_select_end(void);
+/* For a screen opened over a selecting one, such as a playlist picker: the
+ * mode is off, and ending it does nothing, until resumed with what this
+ * returned */
+struct gui_synclist *list_select_suspend(void);
+void list_select_resume(struct gui_synclist *list);
+
+/* Acting on one ticked row can change the list the next is read from -- a
+ * folder's insert reloads the browser's listing, Play empties the Queue -- so
+ * a screen saves every row's path here before its menu opens, acts from the
+ * file, and removes it after. One "<attr> <path>" line a row. */
+#define LIST_SELECT_SAVED ROCKBOX_DIR "/select.lst"
+/* A row's path and attributes into 'buf'; false leaves the row out */
+typedef bool list_select_path_of(int row, char *buf, size_t size, int *attr,
+                                 void *data);
+/* False when the file could not be written */
+bool list_select_save(list_select_path_of *path_of, void *data);
+/* Each saved path to 'fn', in order, until it returns false. The count it
+ * took, or -1 when there is no file. */
+int  list_select_saved_each(bool (*fn)(const char *path, int attr,
+                                       void *data),
+                            void *data);
 
 /* For the list's drawing: -1 when 'list' is not selecting or 'row' cannot be
  * ticked, else whether it is */

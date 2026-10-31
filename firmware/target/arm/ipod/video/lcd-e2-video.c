@@ -35,28 +35,71 @@
  * The port has one auto-incrementing address register, and a push now
  * yields, so every thread-level port user in lcd-video.c holds this. The
  * tick's reads are kept out by lcd_block_tick(), not by this. All the
- * holders run on the CPU, so it lives in ordinary memory. */
+ * holders run on the CPU, so it lives in ordinary memory. The mutex's own
+ * owner says whether it is held, including by a waiter it was just handed
+ * to; the owner and depth here say whether by the caller. */
 static struct mutex lcd_port_mtx;
 static bool lcd_port_ready;
+static unsigned int lcd_port_owner;
+static int lcd_port_depth;
+/* The thread that set up the LCD, the UI thread: only its updates push. */
+static unsigned int lcd_port_pusher;
+
+/* Set while a piece may be on its way, from just before e2_start() to the
+ * end of its wait; e2_cut, when a CPU writer stopped that piece. */
+static bool e2_moving, e2_cut;
+static void e2_stop(void);
 
 void lcd_port_init(void)
 {
     mutex_init(&lcd_port_mtx);
+    lcd_port_pusher = thread_self();
     lcd_port_ready = true;
+}
+
+static bool lcd_port_usable(void)
+{
+    return lcd_port_ready && irq_enabled() && CURRENT_CORE == CPU;
 }
 
 bool lcd_port_lock(void)
 {
-    if (!lcd_port_ready || !irq_enabled() || CURRENT_CORE != CPU)
+    if (!lcd_port_usable())
+    {
+        /* A panic, say, while the holder waits on a piece: the caller's
+         * writes would otherwise land in the middle of it */
+        if (e2_moving)
+        {
+            e2_stop();
+            e2_cut = true;
+        }
         return false;
+    }
     mutex_lock(&lcd_port_mtx);
+    if (lcd_port_depth++ == 0)
+        lcd_port_owner = thread_self();
     return true;
 }
 
 void lcd_port_unlock(bool locked)
 {
     if (locked)
+    {
+        lcd_port_depth--;
         mutex_unlock(&lcd_port_mtx);
+    }
+}
+
+bool lcd_port_held_elsewhere(void)
+{
+    if (!lcd_port_usable() || lcd_port_mtx.blocker.thread == NULL)
+        return false;
+    return lcd_port_depth == 0 || lcd_port_owner != thread_self();
+}
+
+bool lcd_port_outermost(bool locked)
+{
+    return locked && lcd_port_depth == 1;
 }
 
 /*** the engine's registers ***
@@ -132,14 +175,19 @@ static bool e2_busy(void)
     return (E2_STATUS & E2_BUSY) || (E2_CMD & E2_START);
 }
 
+/* Returns once the engine has let go of the port, or after PORT_US */
 static void e2_stop(void)
 {
     int oldlevel = disable_interrupt_save(IRQ_FIQ_STATUS);
+    unsigned long t0;
 
     E2_CMD &= ~E2_INTR;
     E2_CMD &= ~E2_START;
     restore_interrupt(oldlevel);
     (void)E2_STATUS;
+    t0 = USEC_TIMER;
+    while ((E2_STATUS & E2_BUSY) && USEC_TIMER - t0 <= PORT_US)
+        ;
 }
 
 /*** the push ***/
@@ -153,7 +201,7 @@ size_t lcd_e2_push(unsigned bcmaddr, const fb_data *src, size_t bytes)
         return 0;
     /* The engine lands a frame about half as late again, so it pays only
      * while the codec can use the time it frees */
-    if (!e2_on ||
+    if (!e2_on || thread_self() != lcd_port_pusher ||
         mixer_channel_status(PCM_MIXER_CHAN_PLAYBACK) != CHANNEL_PLAYING)
         return 0;
 
@@ -162,8 +210,12 @@ size_t lcd_e2_push(unsigned bcmaddr, const fb_data *src, size_t bytes)
         size_t n = MIN(bytes - done, PIECE_MAX);
         unsigned long t0;
 
+        e2_moving = true;
         if (!e2_start(bcmaddr + done, (const char *)src + done, n))
+        {
+            e2_moving = false;
             break;
+        }
         t0 = USEC_TIMER;
         /* Unboosted, a big piece outlasts a tick, and yield() returns at
          * once when nothing else is runnable: sleeping lets the core idle. */
@@ -176,9 +228,17 @@ size_t lcd_e2_push(unsigned bcmaddr, const fb_data *src, size_t bytes)
                 /* The CPU sends this piece again, and every one after */
                 e2_stop();
                 e2_on = false;
+                e2_moving = false;
                 return done;
             }
             yield();
+        }
+        e2_moving = false;
+        /* The CPU sends a piece that was cut short, and the rest */
+        if (e2_cut)
+        {
+            e2_cut = false;
+            return done;
         }
         done += n;
         if (!port_ready())

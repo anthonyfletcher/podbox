@@ -146,6 +146,9 @@ static bool backdrop_flipped;
 /* ...and outside the WPS, that repaint owes the ground between the viewports
  * a clear, which nothing else there gives it */
 static bool flip_clear_owed;
+/* That repaint is one pass deep: a backdrop conditional the pass itself
+ * flips again would otherwise recurse until the stack runs out */
+static bool flip_repainting;
 
 static inline struct skin_element*
 get_child(OFFSETTYPE(struct skin_element**) children, int child)
@@ -1805,7 +1808,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     if (screen_clear_owed)
         clear_wps_screen(display);
 
-    if (backdrop_flipped)
+    if (backdrop_flipped && !flip_repainting)
     {
         /* A changed backdrop shows only where something clears to it. The
          * WPS's full pass clears the ground between its viewports; nothing
@@ -1814,7 +1817,9 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         if (flip_clear_owed
             || (old_refresh_mode&SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL)
         {
+            flip_repainting = true;
             skin_render(gwps, SKIN_REFRESH_ALL);
+            flip_repainting = false;
             return;
         }
     }

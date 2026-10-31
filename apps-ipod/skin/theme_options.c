@@ -442,39 +442,36 @@ bool theme_options_read(const char *path, const char *key,
 int theme_options_filetext(const char *path, const char *search,
                            int search_len, int line, char *buf, int bufsize)
 {
-    char *start = buf;
-    int fd, rd = 0;
+    char *start = NULL;
+    int fd, len;
 
     if (search)
         line = 0x3FF; /* 1k lines is a pretty large file */
     if (line > 0x3FF || (fd = open_utf8(path, O_RDONLY)) < 0)
         return -1;
 
-    while (line >= 0)
+    /* read_line()'s count is the bytes it consumed, line ending and all, so
+     * the length is taken from the string */
+    while (line >= 0 && read_line(fd, buf, bufsize) > 0)
     {
-        if ((rd = read_line(fd, buf, bufsize)) <= 0)
-            break;
         if (search && strncasecmp(buf, search, search_len) == 0)
         {
-            start += search_len;
-            rd -= search_len;
+            start = buf + search_len;
             /* skip whitespace between the key and its value */
             while (*start == ' ' || *start == '\t')
-            {
                 start++;
-                rd--;
-            }
             break;
         }
+        if (!search && line == 0)
+            start = buf;
         line--;
     }
     close(fd);
 
-    if (rd <= 0) /* empty line? */
+    if (!start || (len = strlen(start)) == 0)
         return -1;
-    memmove(buf, start, rd);
-    buf[rd] = '\0';
-    return rd;
+    memmove(buf, start, len + 1);
+    return len;
 }
 
 /* --- write --------------------------------------------------------------- */
@@ -891,7 +888,9 @@ static void live_refresh(const char *path)
     char buf[MAX_PATH];
     int file = live_file(path);
 
-    for (int n = 0; file >= 0 && n < lives; n++)
+    if (file < 0)
+        return;
+    for (int n = 0; n < lives; n++)
     {
         if (live[n].file != file)
             continue;

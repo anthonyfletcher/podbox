@@ -664,13 +664,17 @@ the owner switch between them while the music plays:
 %?if(%ft(themes/mytheme.preferences, view:), =, notes)<%Vd(notes)|%Vd(cover)>
 ```
 
-A theme whose skins make more than 64 different `%ft` reads of its options
-files still works, but leaving Theme Options reloads it, which takes about a
-second.
+Three things make an options file need a reload instead: skins that make more
+than 64 different `%ft` reads of the theme's options files, a `%ft` on the
+file whose search text (the key and its `:`) is over 33 bytes, or one that
+finds a value over 120 bytes. The theme still works, but leaving Theme Options
+reloads it, which takes about a second and stops the music.
 
 The owner can put **Theme Options** on the Now Playing context menu with
 **Settings > Appearance > Menus > Context Menus > Now Playing Menu**. It is
 off until they do, so a theme built around switching layouts should say so.
+That menu leaves the row out for a theme that needs a reload, so keep within
+the three limits above if you want it there.
 
 ### Ship `.preferences`, or not
 

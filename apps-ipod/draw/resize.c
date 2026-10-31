@@ -689,11 +689,6 @@ bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,
                       const struct custom_format *cformat, int format_index,
                       struct img_part *(*store_part)(void *args), void *args)
 {
-    struct scaler_context ctx = { .bm = bm, .dither = dither };
-    void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
-        cformat ? cformat->output_row_8 : output_row_8_native;
-    int row;
-
     if (bm->width != src->width || bm->height != src->height)
     {
         struct rowset rset = {
@@ -702,7 +697,12 @@ bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,
         return resize_on_load(bm, dither, src, &rset, buf, len, cformat,
                               format_index, store_part, args);
     }
-    for (row = 0; row < bm->height; row++)
+
+    struct scaler_context ctx = { .bm = bm, .dither = dither };
+    void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
+        cformat ? cformat->output_row_8 : output_row_8_native;
+
+    for (int row = 0; row < bm->height; row++)
     {
         struct img_part *part;
 

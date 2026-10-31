@@ -1215,6 +1215,8 @@ static int choose_zoom(struct image_info *info, ssize_t remaining)
         if ((d >= ds_min || (d == 1 && imgdec->unscaled_avail))
             && rung_fits(d, remaining))
             rungs[n++] = d;
+    if (n == 0)
+        return ds;
 
     for (int i = 0; i < n; i++)
     {
@@ -1230,8 +1232,6 @@ static int choose_zoom(struct image_info *info, ssize_t remaining)
         if (rungs[i] == ds)
             sel = i;
     }
-    if (n == 0)
-        return ds;
 
     iv_menu_begin();
     usb = set_option(str(LANG_ZOOM), &sel, RB_INT, items, n, NULL);

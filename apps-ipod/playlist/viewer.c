@@ -850,8 +850,8 @@ static int row_index(int row)
            % viewer.num_tracks;
 }
 
-/* The ticked tracks' playlist indices, in list order, or -1 for too many */
-static int select_indices(void)
+/* The ticked tracks' rows, in list order, or -1 for too many */
+static int select_rows(void)
 {
     int n = 0;
 
@@ -863,7 +863,7 @@ static int select_indices(void)
             splash(HZ, ID2P(LANG_FAILED));
             return -1;
         }
-        select_index[n++] = row_index(row);
+        select_index[n++] = row;
     }
     return n;
 }
@@ -875,42 +875,60 @@ static int compare_desc(const void *a, const void *b)
 
 static bool select_acted;
 
-/* From the highest index down, so each index is still the track it named */
+/* From the highest index down, so each index is still the track it named.
+ * The playing track's going restarts playback, unless nothing that stays
+ * comes after it and Repeat is not All, as for one track. */
 static int select_remove(void)
 {
-    int n = select_indices();
-    bool playing = false;
+    int n = select_rows();
+    int playing_row = -1;
 
     select_acted = true;
     if (n <= 0 || menu_track_stale())
         return ONPLAY_OK;
-    qsort(select_index, n, sizeof(*select_index), compare_desc);
     for (int i = 0; i < n; i++)
     {
-        if (select_index[i] == viewer.current_playing_track)
-            playing = (audio_status() & AUDIO_STATUS_PLAY) != 0;
-        playlist_delete(viewer.playlist, select_index[i]);
+        int index = row_index(select_index[i]);
+
+        if (index == viewer.current_playing_track
+            && (audio_status() & AUDIO_STATUS_PLAY))
+            playing_row = select_index[i];
+        select_index[i] = index;
     }
-    if (playing)
+    qsort(select_index, n, sizeof(*select_index), compare_desc);
+    for (int i = 0; i < n; i++)
+        playlist_delete(viewer.playlist, select_index[i]);
+    if (playing_row >= 0)
     {
+        /* The ticked rows after the playing one */
+        int after = 0;
+
+        for (int row = list_select_next(playing_row); row >= 0;
+             row = list_select_next(row))
+            after++;
         if (playlist_amount_ex(viewer.playlist) <= 0)
             audio_stop();
-        else
+        else if (after < viewer.num_tracks - 1 - playing_row
+                 || global_settings.repeat_mode == REPEAT_ALL)
+        {
             audio_play(0, 0);
-        viewer.current_playing_track = -1;
+            viewer.current_playing_track = -1;
+        }
     }
     menu_result = PV_CONTEXT_MODIFIED;
     return ONPLAY_OK;
 }
 
 /* Each ticked track goes in after the one placed before it, the first after
- * the cursor's. playlist_move() leaves a track at the index it is given and
- * shifts the ones between, so the indices still to move are shifted the same
- * way after each. */
+ * the cursor's. Worked in rows, which is what a move's destination means,
+ * and each converted to an index only at its move: a move changes the first
+ * index. playlist_move() leaves a track at the row it is given and shifts the
+ * ones between, so the rows still to move are shifted the same way after
+ * each. */
 static int select_move_here(void)
 {
-    int n = select_indices();
-    int prev = row_index(viewer.selected_track);
+    int n = select_rows();
+    int prev = viewer.selected_track;
 
     select_acted = true;
     if (n <= 0 || menu_track_stale())
@@ -927,7 +945,8 @@ static int select_move_here(void)
             prev = from;
             continue;
         }
-        if (playlist_move(viewer.playlist, from, to) < 0)
+        if (playlist_move(viewer.playlist, row_index(from),
+                          row_index(to)) < 0)
         {
             splash(HZ, ID2P(LANG_FAILED));
             break;
@@ -947,12 +966,30 @@ static int select_move_here(void)
     return ONPLAY_OK;
 }
 
+/* A ticked row's filename, for list_select_save() */
+static bool row_path(int row, char *buf, size_t size, int *attr, void *data)
+{
+    struct playlist_track_info info;
+
+    (void)data;
+    if (playlist_get_track_info(viewer.playlist, row_index(row), &info) < 0)
+        return false;
+    strlcpy(buf, info.filename, size);
+    *attr = FILE_ATTR_AUDIO;
+    return true;
+}
+
+static bool insert_one(const char *path, int attr, void *data)
+{
+    (void)attr;
+    return playlist_insert_context_add(data, path) >= 0;
+}
+
 /* Play Next and the like, as they would act on each ticked track */
 static bool select_insert(int position, bool queue, bool create_new)
 {
     struct playlist_insert_context context;
-    struct playlist_track_info info;
-    int added = 0;
+    int added;
 
     (void)create_new;
     select_acted = true;
@@ -962,30 +999,32 @@ static bool select_insert(int position, bool queue, bool create_new)
         playlist_insert_context_release(&context);
         return false;
     }
-    for (int row = list_select_next(-1); row >= 0;
-         row = list_select_next(row))
-        if (playlist_get_track_info(viewer.playlist, row_index(row),
-                                    &info) >= 0
-            && playlist_insert_context_add(&context, info.filename) >= 0)
-            added++;
+    added = list_select_saved_each(insert_one, &context);
     playlist_insert_context_release(&context);
     return added > 0;
 }
 
+struct write_state {
+    const char *playlist;
+    bool new_playlist;
+};
+
+static bool write_one(const char *path, int attr, void *data)
+{
+    struct write_state *w = data;
+    bool ok = catalog_insert_into(w->playlist, w->new_playlist, path,
+                                  attr) >= 0;
+
+    w->new_playlist = false;    /* the first truncates; the rest append */
+    return ok;
+}
+
 static int select_write(const char *playlist, bool new_playlist)
 {
-    struct playlist_track_info info;
-    int written = 0;
+    struct write_state w = { playlist, new_playlist };
 
     select_acted = true;
-    for (int row = list_select_next(-1); row >= 0;
-         row = list_select_next(row))
-        if (playlist_get_track_info(viewer.playlist, row_index(row),
-                                    &info) >= 0
-            && catalog_insert_into(playlist, new_playlist && written == 0,
-                                   info.filename, FILE_ATTR_AUDIO) >= 0)
-            written++;
-    return written > 0 ? 0 : -1;
+    return list_select_saved_each(write_one, &w) > 0 ? 0 : -1;
 }
 
 static enum pv_context_result select_menu(void)
@@ -997,12 +1036,19 @@ static enum pv_context_result select_menu(void)
     char name[48];
     int ret;
 
-    list_select_menu_name(name, sizeof(name), true);
     menu_result = PV_CONTEXT_UNCHANGED;
+    /* Before the menu: its Play empties the Queue before inserting */
+    if (!list_select_save(row_path, NULL))
+    {
+        splash(HZ, ID2P(LANG_FAILED));
+        return menu_result;
+    }
+    list_select_menu_name(name, sizeof(name), true);
     select_acted = false;
     ret = context_menu_show_item(name, ATTR_DIRECTORY, false, false,
                                  select_insert, select_write,
                                  rows, ARRAYLEN(rows));
+    remove(LIST_SELECT_SAVED);
     if (select_acted)
         list_select_end();
     if (ret == ONPLAY_MAINMENU)
@@ -1320,7 +1366,6 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
 
                 if (r == PV_CONTEXT_USB)
                 {
-                    list_select_end();
                     ret = PLAYLIST_VIEWER_USB;
                     goto exit;
                 }

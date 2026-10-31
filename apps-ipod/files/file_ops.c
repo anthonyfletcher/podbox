@@ -573,32 +573,6 @@ int create_dir(void)
     return rc;
 }
 
-static int delete_prepared(struct file_op_params *p);
-
-/* share code for file and directory deletion, saves space */
-int delete_fileobject(const char *selected_file)
-{
-    struct file_op_params param;
-    init_file_op(&param, selected_file, NULL);
-    if (param.append >= sizeof (param.path))
-        return FORC_PATH_TOO_LONG;
-
-    /* Note: delete_fileobject() will happily delete whatever
-     * path is passed (after confirmation) */
-    if (confirm_delete_yesno(param.path, param.toplevel_name) != YESNO_YES)
-        return FORC_CANCELLED;
-    return delete_prepared(&param);
-}
-
-int delete_fileobject_confirmed(const char *path)
-{
-    struct file_op_params param;
-    init_file_op(&param, path, NULL);
-    if (param.append >= sizeof (param.path))
-        return FORC_PATH_TOO_LONG;
-    return delete_prepared(&param);
-}
-
 static int delete_prepared(struct file_op_params *param)
 {
     int rc;
@@ -624,6 +598,30 @@ static int delete_prepared(struct file_op_params *param)
     }
 
     return rc;
+}
+
+/* share code for file and directory deletion, saves space */
+int delete_fileobject(const char *selected_file)
+{
+    struct file_op_params param;
+    init_file_op(&param, selected_file, NULL);
+    if (param.append >= sizeof (param.path))
+        return FORC_PATH_TOO_LONG;
+
+    /* Note: delete_fileobject() will happily delete whatever
+     * path is passed (after confirmation) */
+    if (confirm_delete_yesno(param.path, param.toplevel_name) != YESNO_YES)
+        return FORC_CANCELLED;
+    return delete_prepared(&param);
+}
+
+int delete_fileobject_confirmed(const char *path)
+{
+    struct file_op_params param;
+    init_file_op(&param, path, NULL);
+    if (param.append >= sizeof (param.path))
+        return FORC_PATH_TOO_LONG;
+    return delete_prepared(&param);
 }
 
 int rename_file(const char *selected_file)

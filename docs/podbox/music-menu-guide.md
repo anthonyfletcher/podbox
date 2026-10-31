@@ -234,7 +234,9 @@ Two things to know first:
 - **Audiobooks and Podcasts are built in.** A menu with the id `audiobooks`
   or `podcasts` in your copy is replaced by the player's own. To make your
   own lists of books or podcasts, give them another id in Custom menu; the
-  condition `spoken == "1"` matches books and `spoken == "2"` podcasts.
+  condition `spoken == "1"` matches books and `spoken == "2"` podcasts, and
+  ending a row with `-> title = "fmt_episode"` lists a show's episodes newest
+  first, as Podcasts does.
 
 To hide a row or change the order, use `Edit Music Menu` rather than either
 file.

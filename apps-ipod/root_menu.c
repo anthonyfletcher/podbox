@@ -1693,6 +1693,8 @@ void root_menu_set_default(void* setting, void* defaultval)
     root_menu_.flags |= MENU_ITEM_COUNT(out);
     root_menu_apply_canonical_order();
     root_menu_place_unlisted();
+    audiobooks_row(global_settings.segregate_audiobooks, false);
+    podcasts_row(global_settings.segregate_podcasts, false);
     *(bool*)setting = false;
 }
 

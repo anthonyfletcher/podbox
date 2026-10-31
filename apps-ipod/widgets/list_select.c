@@ -11,10 +11,13 @@
  *   - the marks: a bitmap over the rows, and the count
  *   - runs: SELECT held while the wheel turns
  *   - the title, which says how many are ticked
+ *   - the mode: begun, suspended under another screen, ended
+ *   - the saved rows, which the ticked rows' menu acts from
  *   - what the list's drawing asks
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>     /* strtol */
 #include <string.h>
 #include "config.h"
 #include "system.h"
@@ -23,6 +26,7 @@
 #include "button.h"
 #include "kernel.h"     /* IS_SYSEVENT */
 #include "lang.h"
+#include "system/strutil.h"     /* read_line */
 #include "input/action.h"
 #include "widgets/list.h"
 #include "widgets/list_select.h"
@@ -144,11 +148,13 @@ static bool track_run(void)
 
 /** The title **/
 
+/* The count in the title, and the list redrawn */
 static void show_count(void)
 {
     snprintf(ls.title_buf, sizeof(ls.title_buf), str(LANG_N_SELECTED),
              ls.count);
     gui_synclist_set_title(ls.list, ls.title_buf, ls.title_icon);
+    gui_synclist_draw(ls.list);
 }
 
 void list_select_retitle(void)
@@ -162,7 +168,6 @@ void list_select_retitle(void)
         ls.title_icon = ls.list->title_icon;
     }
     show_count();
-    gui_synclist_draw(ls.list);
 }
 
 /** The mode **/
@@ -184,7 +189,6 @@ bool list_select_begin(struct gui_synclist *list, int row,
     if (eligible(row))
         set_mark(row, true);
     show_count();
-    gui_synclist_draw(list);
     return true;
 }
 
@@ -209,6 +213,19 @@ void list_select_end(void)
     gui_synclist_draw(list);
 }
 
+struct gui_synclist *list_select_suspend(void)
+{
+    struct gui_synclist *list = ls.list;
+
+    ls.list = NULL;
+    return list;
+}
+
+void list_select_resume(struct gui_synclist *list)
+{
+    ls.list = list;
+}
+
 enum list_select_result list_select_action(int action)
 {
     if (!ls.list)
@@ -222,7 +239,6 @@ enum list_select_result list_select_action(int action)
                 set_mark(ls.list->selected_item,
                          !get_mark(marks, ls.list->selected_item));
                 show_count();
-                gui_synclist_draw(ls.list);
             }
             ls.cursor = ls.list->selected_item;
             return LIST_SELECT_HANDLED;
@@ -243,18 +259,61 @@ enum list_select_result list_select_action(int action)
     }
 
     if (track_run())
-    {
         show_count();
-        gui_synclist_draw(ls.list);
-    }
     return IS_SYSEVENT(action) ? LIST_SELECT_PASS : LIST_SELECT_HANDLED;
+}
+
+/** The saved rows **/
+
+/* One line, read or written: never both at once, and never under itself */
+static char line[MAX_PATH + 16];
+
+bool list_select_save(list_select_path_of *path_of, void *data)
+{
+    int fd = open(LIST_SELECT_SAVED, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    bool ok = fd >= 0;
+
+    for (int row = list_select_next(-1); ok && row >= 0;
+         row = list_select_next(row))
+    {
+        int attr;
+
+        if (path_of(row, line, sizeof(line), &attr, data))
+            ok = fdprintf(fd, "%d %s\n", attr, line) > 0;
+    }
+    if (fd >= 0)
+        close(fd);
+    return ok;
+}
+
+int list_select_saved_each(bool (*fn)(const char *path, int attr, void *data),
+                           void *data)
+{
+    int fd = open(LIST_SELECT_SAVED, O_RDONLY);
+    int n = 0;
+
+    if (fd < 0)
+        return -1;
+    while (read_line(fd, line, sizeof(line)) > 0)
+    {
+        char *path;
+        int attr = strtol(line, &path, 10);
+
+        if (*path++ != ' ')
+            continue;
+        if (!fn(path, attr, data))
+            break;
+        n++;
+    }
+    close(fd);
+    return n;
 }
 
 /** What the list's drawing asks **/
 
 int list_select_row_state(const struct gui_synclist *list, int row)
 {
-    if (!ls.list || list != ls.list || !eligible(row))
+    if (list != ls.list || !eligible(row))
         return -1;
     return get_mark(marks, row);
 }

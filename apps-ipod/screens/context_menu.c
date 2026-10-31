@@ -169,11 +169,11 @@ static bool clipboard_clip(struct clipboard *clip, const char *path,
     /* if it fits it clips */
     if (clip->many)
         remove(CLIPBOARD_LIST);
+    clip->many = false;
     if (strmemccpy(clip->path, path, sizeof (clip->path)) != NULL)
     {
         clip->attr = attr;
         clip->flags = flags;
-        clip->many = false;
         return true;
     }
     else {
@@ -3160,12 +3160,9 @@ char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len)
     {
         uint32_t bit = 1u << i;
 
-        if ((mask & bit) && !(def & bit))
-            len += snprintf(buf + len, buf_len - len, "%s%s", len ? ", " : "",
-                            lang_id_to_english(kinds[kind].rows[i]));
-        else if (!(mask & bit) && (def & bit))
-            len += snprintf(buf + len, buf_len - len, "%s+%s",
-                            len ? ", " : "",
+        if ((mask & bit) != (def & bit))
+            len += snprintf(buf + len, buf_len - len, "%s%s%s",
+                            len ? ", " : "", (mask & bit) ? "" : "+",
                             lang_id_to_english(kinds[kind].rows[i]));
     }
     return buf;

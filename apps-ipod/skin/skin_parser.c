@@ -572,8 +572,7 @@ static int parse_list_header(struct skin_element *element,
     (void)wps_data;
     if (!lh)
         return -1;
-    memset(lh, 0, sizeof(*lh));
-    lh->field = BROWSER_HEADER_KIND;
+    memset(lh, 0, sizeof(*lh));         /* field BROWSER_HEADER_KIND */
     lh->art.mask = PTRTOSKINOFFSET(skin_buffer, NULL);
     lh->art.filter = PTRTOSKINOFFSET(skin_buffer, NULL);
     lh->art.centre = true;
@@ -585,7 +584,10 @@ static int parse_list_header(struct skin_element *element,
     lh->field = -1;
     for (unsigned i = 0; i < ARRAYLEN(fields); i++)
         if (fields[i] && !strcasecmp(word, fields[i]))
+        {
             lh->field = i;
+            break;
+        }
     if (lh->field < 0)
         return -1;
 
@@ -1681,10 +1683,9 @@ static int parse_filetext(struct skin_element *element,
         else if (param1->type == STRING)
         {
             search_text = get_param_text(element, 1);
-            /* Trim whitespace around the key so "key:" and "key: " match the
-             * same line -- the value's own whitespace is skipped after the
-             * match. Without this the key had to be written to include the
-             * exact spacing used in the file. */
+            /* Whitespace around the key is trimmed, so "key:" and "key: "
+             * match the same line whatever the file's spacing; the value's
+             * own whitespace is skipped after the match. */
             while (*search_text == ' ' || *search_text == '\t')
                 search_text++;
             search_len = strlen(search_text);

@@ -7,7 +7,8 @@
  * One options file opens straight onto its options; more than one opens on
  * a row per file. Each change is written when it is made, and the skins
  * read it at their next draw. Only a file some %ft reads at load alone (see
- * theme_options_live()) has the theme reload once, on leaving.
+ * theme_options_live()) has the theme reload once, on leaving, and Now
+ * Playing's menu leaves the row out while the theme has such a file.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -30,6 +31,7 @@
 #include "skin/skin_engine.h"
 #include "skin/statusbar_skinned.h"
 #include "skin/theme_options.h"
+#include "system/activity.h"
 #include "system/app_buffer.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 
@@ -374,6 +376,17 @@ static int theme_options_menu(void)
     return to_root ? MENU_ATTACHED_USB : 0;
 }
 
+/* Whether every options file changes without a reload. Now Playing's menu
+ * offers the row only then: a reload releases the audio buffer, which stops
+ * the track the menu was opened over. */
+static bool all_live(void)
+{
+    for (int i = 0; i < theme_options_count(); i++)
+        if (!theme_options_live_only(theme_options_path(i)))
+            return false;
+    return true;
+}
+
 /* Shown only while the loaded theme has options: the paths recorded as its
  * skins loaded decide, so opening Appearance reads no file */
 static int theme_options_callback(int action,
@@ -382,7 +395,10 @@ static int theme_options_callback(int action,
 {
     (void)this_item;
     (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM && theme_options_count() == 0)
+    if (action == ACTION_REQUEST_MENUITEM
+        && (theme_options_count() == 0
+            || (get_current_activity() == ACTIVITY_CONTEXTMENU
+                && !all_live())))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
