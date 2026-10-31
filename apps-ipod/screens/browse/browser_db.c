@@ -3751,6 +3751,10 @@ static char pending_root_shortcut_menu[MAX_MENU_ID_SIZE];
 /* Its label counterpart, for a caller that knows which row it means rather
  * than only what that row browses. Empty when none is armed. */
 static char pending_root_shortcut_label[MENUENTRY_MAX_NAME];
+/* With a submenu's row, the value picked on its first level, and the title
+ * that value's list takes; -1 for the row itself. */
+static long pending_row_seek = -1;
+static char pending_row_title[MENUENTRY_MAX_NAME];
 
 /* Arm by the first tag the root row browses (e.g. tag_album): identity rather
  * than position, so it survives tagnavi.config reordering. */
@@ -3798,6 +3802,17 @@ void browser_db_enter_menu_row_on_next_load(const char *menu_id,
     browser_db_enter_menu_on_next_load(menu_id);
     strmemccpy(pending_root_shortcut_label, label,
                sizeof(pending_root_shortcut_label));
+    pending_row_seek = -1;
+}
+
+void browser_db_enter_menu_row_value_on_next_load(const char *menu_id,
+                                                  const char *label,
+                                                  long seek, const char *title)
+{
+    browser_db_enter_menu_row_on_next_load(menu_id, label);
+    pending_row_seek = seek;
+    strmemccpy(pending_row_title, title ? title : "",
+               sizeof(pending_row_title));
 }
 
 /* Finding a row to select, among the rows actually on screen.
@@ -4335,6 +4350,31 @@ static int enter_shortcut_row(struct browser_context *c, int idx)
     return browser_db_load(c);
 }
 
+/* Open the submenu's row at 'idx' already past its first level, as if 'seek'
+ * had been picked there: one show, book or author. False for a row that does
+ * not browse at least two levels. */
+static bool enter_row_value(struct browser_context *c, int idx, long seek)
+{
+    struct tagentry *e = browser_db_get_entry(c, idx);
+    struct menu_root *m = menus[c->currextra];
+    struct search_instruction *si;
+
+    if (e->newtable != TABLE_NAVIBROWSE || e->extraseek < 0
+        || e->extraseek >= m->itemcount)
+        return false;
+    si = &m->items[e->extraseek]->si;
+    if (si->tagorder_count < 2)
+        return false;
+
+    csi = si;
+    csi->result_seek[0] = seek;
+    c->currtable = TABLE_NAVIBROWSE;
+    c->currextra = 1;
+    enter_as_root_shortcut(c);
+    strmemccpy(current_title[1], pending_row_title, sizeof(current_title[0]));
+    return true;
+}
+
 int browser_db_load(struct browser_context* c)
 {
     logf( "%s", __func__);
@@ -4380,10 +4420,13 @@ int browser_db_load(struct browser_context* c)
         char row[MENUENTRY_MAX_NAME];
         int idx, rows;
 
+        long seek = pending_row_seek;
+
         strmemccpy(target, pending_root_shortcut_menu, sizeof(target));
         strmemccpy(row, pending_root_shortcut_label, sizeof(row));
         pending_root_shortcut_menu[0] = '\0';
         pending_root_shortcut_label[0] = '\0';
+        pending_row_seek = -1;
 
         rows = load_root_for_shortcut(c);
 
@@ -4397,6 +4440,8 @@ int browser_db_load(struct browser_context* c)
             rows = browser_db_load(c);
 
             idx = loaded_row_for_label(c, rows, row);
+            if (idx >= 0 && seek >= 0 && enter_row_value(c, idx, seek))
+                return browser_db_load(c);
             if (idx >= 0)
                 return enter_shortcut_row(c, idx);
             /* Row renamed or removed: the submenu, and BACK leaves */

@@ -27291,3 +27291,45 @@
     *: "Finished"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GO_TO_PODCAST
+  desc: in the context menu: open a podcast episode's show in Podcasts
+  user: core
+  <source>
+    *: "Go to Podcast"
+  </source>
+  <dest>
+    *: "Go to Podcast"
+  </dest>
+  <voice>
+    *: "Go to Podcast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUDIOBOOK
+  desc: in the context menu: open an audiobook track's book in Audiobooks
+  user: core
+  <source>
+    *: "Go to Audiobook"
+  </source>
+  <dest>
+    *: "Go to Audiobook"
+  </dest>
+  <voice>
+    *: "Go to Audiobook"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUTHOR
+  desc: in the context menu: open an audiobook's author in Audiobooks
+  user: core
+  <source>
+    *: "Go to Author"
+  </source>
+  <dest>
+    *: "Go to Author"
+  </dest>
+  <voice>
+    *: "Go to Author"
+  </voice>
+</phrase>

@@ -196,6 +196,12 @@ void browser_db_enter_artist_album_tracks_on_next_load(long album_seek,
  * selecting an album descends into its tracks. */
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title);
+/* A submenu's row ("podcasts", "Podcasts") opened at one value of its first
+ * level -- a show, a book, an author -- by seek, titled 'title'. A single
+ * BACK leaves. Where the row is gone, the submenu or its row opens instead. */
+void browser_db_enter_menu_row_value_on_next_load(const char *menu_id,
+                                                  const char *label,
+                                                  long seek, const char *title);
 /* Number of main-menu slots the root ("main") menu numbers: its tag-browse
  * ("->") and submenu ("==>") rows, then those of the custom menu; action
  * rows (e.g. "~>" shuffle) don't count. Used by root_menu.c to know how many

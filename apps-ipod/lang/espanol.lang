@@ -27304,3 +27304,45 @@
     *: "Terminados"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GO_TO_PODCAST
+  desc: in the context menu: open a podcast episode's show in Podcasts
+  user: core
+  <source>
+    *: "Go to Podcast"
+  </source>
+  <dest>
+    *: "Ir al pódcast"
+  </dest>
+  <voice>
+    *: "Ir al pódcast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUDIOBOOK
+  desc: in the context menu: open an audiobook track's book in Audiobooks
+  user: core
+  <source>
+    *: "Go to Audiobook"
+  </source>
+  <dest>
+    *: "Ir al audiolibro"
+  </dest>
+  <voice>
+    *: "Ir al audiolibro"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUTHOR
+  desc: in the context menu: open an audiobook's author in Audiobooks
+  user: core
+  <source>
+    *: "Go to Author"
+  </source>
+  <dest>
+    *: "Ir al autor"
+  </dest>
+  <voice>
+    *: "Ir al autor"
+  </voice>
+</phrase>

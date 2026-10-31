@@ -1490,19 +1490,65 @@ static int go_to_artist(void)
     return 0;
 }
 
+/* Spoken word kept apart has a menu of its own, which a Go to opens in place
+ * of Music's: a podcast's show in Podcasts, a book or its author in
+ * Audiobooks. */
+static int go_to_spoken(const char *menu_id, int row_lang, bool author)
+{
+    struct tagcache_album album;
+    char name[MAX_PATH];
+    long seek;
+
+    if (!selected_track_album(&album))
+        return 0;
+    seek = author ? album.artist_seek : album.album_seek;
+    if (!tagcache_seek_string(author ? tag_albumartist : tag_album, seek,
+                              name, sizeof(name)))
+        name[0] = '\0';
+
+    browser_db_enter_menu_row_value_on_next_load(menu_id, str(row_lang),
+                                                 seek, name);
+    context_menu_result = ONPLAY_GO_TO_LIBRARY;
+    return 0;
+}
+
+static int go_to_podcast(void)
+{
+    return go_to_spoken("podcasts", LANG_PODCASTS, false);
+}
+
+static int go_to_audiobook(void)
+{
+    return go_to_spoken("audiobooks", LANG_BY_TITLE, false);
+}
+
+static int go_to_author(void)
+{
+    return go_to_spoken("audiobooks", LANG_BY_AUTHOR, true);
+}
+
 MENUITEM_FUNCTION(go_to_album_item, 0, ID2P(LANG_GO_TO_ALBUM),
                   go_to_album, go_to_callback, Icon_NOICON);
 MENUITEM_FUNCTION(go_to_artist_item, 0, ID2P(LANG_GO_TO_ARTIST),
                   go_to_artist, go_to_callback, Icon_NOICON);
+MENUITEM_FUNCTION(go_to_podcast_item, 0, ID2P(LANG_GO_TO_PODCAST),
+                  go_to_podcast, go_to_callback, Icon_NOICON);
+MENUITEM_FUNCTION(go_to_audiobook_item, 0, ID2P(LANG_GO_TO_AUDIOBOOK),
+                  go_to_audiobook, go_to_callback, Icon_NOICON);
+MENUITEM_FUNCTION(go_to_author_item, 0, ID2P(LANG_GO_TO_AUTHOR),
+                  go_to_author, go_to_callback, Icon_NOICON);
 
 /* An artist row in the album table has an untagged album artist as a seek
- * like any other; its name read back is what says it is untagged. */
+ * like any other; its name read back is what says it is untagged. Which of
+ * the rows show is the album's kind: spoken word kept apart, 1 a book and 2 a
+ * podcast, or 0 for music and spoken word browsed with it. */
 static int go_to_callback(int action,
                           const struct menu_item_ex *this_item,
                           struct gui_synclist *this_list)
 {
     struct tagcache_album album;
     char name[2];
+    int kind;
 
     (void)this_list;
     if (action != ACTION_REQUEST_MENUITEM)
@@ -1510,9 +1556,18 @@ static int go_to_callback(int action,
 
     if (!ctx_go_to || ctx_in_order || !selected_track_album(&album))
         return ACTION_EXIT_MENUITEM;
-    if (this_item == &go_to_artist_item &&
-        !tagcache_seek_string(tag_albumartist, album.artist_seek,
-                              name, sizeof(name)))
+    kind = db_spoken_album_kind(&album);
+    if (!db_spoken_kind_apart(kind))
+        kind = 0;
+    if (this_item == &go_to_podcast_item)
+        return kind == 2 ? action : ACTION_EXIT_MENUITEM;
+    if (this_item == &go_to_audiobook_item)
+        return kind == 1 ? action : ACTION_EXIT_MENUITEM;
+    if (kind != (this_item == &go_to_author_item ? 1 : 0))
+        return ACTION_EXIT_MENUITEM;
+    if ((this_item == &go_to_artist_item || this_item == &go_to_author_item)
+        && !tagcache_seek_string(tag_albumartist, album.artist_seek,
+                                 name, sizeof(name)))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -2208,6 +2263,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
            &rating_item,
            &wps_track_info_item,
            &go_to_album_item, &go_to_artist_item,
+           &go_to_podcast_item, &go_to_audiobook_item, &go_to_author_item,
            &lyrics_item,
            &sleep_timer_item,
            &wps_speed_item,
@@ -2233,6 +2289,7 @@ MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            &sound_mix_item, &winddown_item,
            &rating_item, &album_rating_item,
            &go_to_album_item, &go_to_artist_item,
+           &go_to_podcast_item, &go_to_audiobook_item, &go_to_author_item,
            &properties_item, &track_info_item,
            &clipboard_paste_item,
            &more_menu,
@@ -2711,6 +2768,7 @@ MAKE_ONPLAYMENU_TITLED( item_menu,
            &cat_playlist_menu,
            &rating_item,
            &go_to_album_item, &go_to_artist_item,
+           &go_to_podcast_item, &go_to_audiobook_item, &go_to_author_item,
            &item_more_menu,
          );
 
@@ -2726,7 +2784,8 @@ MAKE_ONPLAYMENU_TITLED( item_menu,
 
 static const short now_playing_rows[] = {
     LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_GO_TO_ALBUM,
-    LANG_GO_TO_ARTIST, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
+    LANG_GO_TO_ARTIST, LANG_GO_TO_PODCAST, LANG_GO_TO_AUDIOBOOK,
+    LANG_GO_TO_AUTHOR, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
     LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_THEME_OPTIONS,
     LANG_SHOW_IN_FILES,
     LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU, LANG_BROWSE_CUESHEET,
@@ -2735,7 +2794,8 @@ static const short now_playing_rows[] = {
 };
 static const short track_rows[] = {
     LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_WINDDOWN, LANG_MENU_SET_RATING,
-    LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_PASTE, LANG_QUEUE_MENU,
+    LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_GO_TO_PODCAST,
+    LANG_GO_TO_AUDIOBOOK, LANG_GO_TO_AUTHOR, LANG_PASTE, LANG_QUEUE_MENU,
     LANG_SHOW_IN_FILES, LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY,
     LANG_DELETE, LANG_CREATE_DIR,
 };

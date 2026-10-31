@@ -27304,3 +27304,45 @@
     *: "Uitgeluisterd"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GO_TO_PODCAST
+  desc: in the context menu: open a podcast episode's show in Podcasts
+  user: core
+  <source>
+    *: "Go to Podcast"
+  </source>
+  <dest>
+    *: "Naar podcast"
+  </dest>
+  <voice>
+    *: "Naar podcast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUDIOBOOK
+  desc: in the context menu: open an audiobook track's book in Audiobooks
+  user: core
+  <source>
+    *: "Go to Audiobook"
+  </source>
+  <dest>
+    *: "Naar luisterboek"
+  </dest>
+  <voice>
+    *: "Naar luisterboek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUTHOR
+  desc: in the context menu: open an audiobook's author in Audiobooks
+  user: core
+  <source>
+    *: "Go to Author"
+  </source>
+  <dest>
+    *: "Naar auteur"
+  </dest>
+  <voice>
+    *: "Naar auteur"
+  </voice>
+</phrase>

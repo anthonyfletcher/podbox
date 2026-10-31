@@ -27302,3 +27302,45 @@
     *: "完了"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GO_TO_PODCAST
+  desc: in the context menu: open a podcast episode's show in Podcasts
+  user: core
+  <source>
+    *: "Go to Podcast"
+  </source>
+  <dest>
+    *: "ポッドキャストへ移動"
+  </dest>
+  <voice>
+    *: "ポッドキャストへ移動"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUDIOBOOK
+  desc: in the context menu: open an audiobook track's book in Audiobooks
+  user: core
+  <source>
+    *: "Go to Audiobook"
+  </source>
+  <dest>
+    *: "オーディオブックへ移動"
+  </dest>
+  <voice>
+    *: "オーディオブックへ移動"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_AUTHOR
+  desc: in the context menu: open an audiobook's author in Audiobooks
+  user: core
+  <source>
+    *: "Go to Author"
+  </source>
+  <dest>
+    *: "著者へ移動"
+  </dest>
+  <voice>
+    *: "著者へ移動"
+  </voice>
+</phrase>
