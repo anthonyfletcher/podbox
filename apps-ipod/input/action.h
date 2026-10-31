@@ -98,6 +98,7 @@ enum {
     CONTEXT_USB_HID_MODE_MOUSE,
     CONTEXT_SPIKE, /* uses the ACTION_SPIKE_ defines below */
     CONTEXT_MUSIC_QUIZ, /* uses the ACTION_QUIZ_ defines below */
+    CONTEXT_LIST_SELECT, /* a list in selecting mode: ACTION_LS_ */
     LAST_CONTEXT_PLACEHOLDER,
 };
 
@@ -324,6 +325,10 @@ enum {
     /* The EQ editor: the EQ is off while Play is held. */
     ACTION_EQ_COMPARE,
     ACTION_EQ_COMPARE_END,
+
+    /* A list's selecting mode (widgets/list_select.c) */
+    ACTION_LS_TOGGLE,
+    ACTION_LS_MENU,
 
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };

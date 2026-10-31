@@ -66,6 +66,7 @@
 #include "rbunicode.h"
 #include "diacritic.h"
 #include "custom_tokens.h"
+#include "screens/browse/browser.h"   /* %LH(art) */
 #include "draw/text_wrap.h"
 #include "scroll_engine.h"
 
@@ -171,6 +172,7 @@ static void draw_pending_aa(struct screen *display,
     int ax = (vp->width - aw) / 2;
     int ay = (vp->height - ah) / 2;
     bool whole = bmp->width == bmp->height;
+    bool centre = !whole || (li && li->centre);
 
     if (li && li->radius && whole && bmp->format == FORMAT_NATIVE
         && !bmp->alpha_offset)
@@ -178,13 +180,13 @@ static void draw_pending_aa(struct screen *display,
         display->set_drawmode(DRMODE_FG);
         bitmap_part_round(display, (const fb_data *)bmp->data,
                           LCD_FBSTRIDE(bmp->width, bmp->height),
-                          0, 0, aw, ah, li->radius,
-                          SKINOFFSETTOPTR(skin_buffer, li->mask));
+                          centre ? ax : 0, centre ? ay : 0, aw, ah,
+                          li->radius, SKINOFFSETTOPTR(skin_buffer, li->mask));
     }
     else
     {
         display->set_drawmode(DRMODE_SOLID);
-        display->bmp_part(bmp, 0, 0, whole ? 0 : ax, whole ? 0 : ay, aw, ah);
+        display->bmp_part(bmp, 0, 0, centre ? ax : 0, centre ? ay : 0, aw, ah);
     }
     display->set_drawmode(DRMODE_SOLID);
 }
@@ -804,6 +806,26 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 {
                     info->pending_aa = bmp;
                     info->pending_aa_item = li;
+                }
+            }
+            break;
+        }
+        case SKIN_TOKEN_LIST_HEADER:
+        {
+            struct list_header *lh = (struct list_header *)
+                SKINOFFSETTOPTR(skin_buffer, token->value.data);
+            if (!lh || lh->field != BROWSER_HEADER_ART)
+                return false;   /* a field: text, like any other tag */
+            if (do_refresh
+                && get_current_activity() == ACTIVITY_DATABASEBROWSER)
+            {
+                struct dim size = { skin_vp->vp.width, skin_vp->vp.height };
+                const struct bitmap *bmp = browser_header_art(&size);
+
+                if (bmp)
+                {
+                    info->pending_aa = bmp;
+                    info->pending_aa_item = &lh->art;
                 }
             }
             break;

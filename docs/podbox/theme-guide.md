@@ -462,8 +462,8 @@ Despite the name, `%?La` is a property of the whole list: it is true on album an
 artist lists, on audiobook book and author lists and on the Audiobooks shelf,
 each while its switch is on, and false everywhere else. So in an album list
 **every** row takes
-the art branch, including `[All Tracks]`, `[Random]`, `[Featured In]` and
-`[Untagged]`. Those have no cover, so the art branch must cope — either leave
+the art branch, including `[All Tracks]`, `[Random]`, `[Shuffle Albums]`,
+`[Featured In]` and `[Untagged]`. Those have no cover, so the art branch must cope — either leave
 the slot empty and let the text sit indented with the rest, or draw a glyph
 there.
 

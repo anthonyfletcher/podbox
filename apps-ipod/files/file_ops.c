@@ -573,10 +573,11 @@ int create_dir(void)
     return rc;
 }
 
+static int delete_prepared(struct file_op_params *p);
+
 /* share code for file and directory deletion, saves space */
 int delete_fileobject(const char *selected_file)
 {
-    int rc;
     struct file_op_params param;
     init_file_op(&param, selected_file, NULL);
     if (param.append >= sizeof (param.path))
@@ -586,25 +587,40 @@ int delete_fileobject(const char *selected_file)
      * path is passed (after confirmation) */
     if (confirm_delete_yesno(param.path, param.toplevel_name) != YESNO_YES)
         return FORC_CANCELLED;
+    return delete_prepared(&param);
+}
 
-    if (param.is_dir) {
-        int rc = check_count_fileobjects(&param);
-        DEBUGF("%s res: %d, ct: %d, %s", __func__, rc, param.objects, param.path);
+int delete_fileobject_confirmed(const char *path)
+{
+    struct file_op_params param;
+    init_file_op(&param, path, NULL);
+    if (param.append >= sizeof (param.path))
+        return FORC_PATH_TOO_LONG;
+    return delete_prepared(&param);
+}
+
+static int delete_prepared(struct file_op_params *param)
+{
+    int rc;
+
+    if (param->is_dir) {
+        int rc = check_count_fileobjects(param);
+        DEBUGF("%s res: %d, ct: %d, %s", __func__, rc, param->objects, param->path);
         if (rc != FORC_SUCCESS)
             return rc;
     }
 
     clear_screen_buffer(true);
 
-    if (param.is_dir) { /* if directory */
+    if (param->is_dir) { /* if directory */
         cpu_boost(true);
-        rc = directory_fileop(&param, FOC_DELETE);
+        rc = directory_fileop(param, FOC_DELETE);
         cpu_boost(false);
     } else {
-        param.objects = param.processed = 1;
-        if (poll_cancel_action(FOC_DELETE, &param))
+        param->objects = param->processed = 1;
+        if (poll_cancel_action(FOC_DELETE, param))
             return FORC_CANCELLED;
-        rc = remove(param.path) * 10;
+        rc = remove(param->path) * 10;
     }
 
     return rc;

@@ -1759,6 +1759,28 @@ const char *get_token_value(struct gui_wps *gwps,
             s = skinlist_get_selected_description(buf, buf_size);
             return s && *s ? s : " ";
         }
+        case SKIN_TOKEN_LIST_ITEM_MARKED:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            switch (skinlist_item_mark(li->offset, li->wrap))
+            {
+                case 1:  return "m";
+                case 0:  return "u";
+                default: return NULL;
+            }
+        }
+        case SKIN_TOKEN_LIST_HEADER:
+        {
+            /* As %LD: the browser's, and only with the browser on top. The
+             * cover is drawn by skin_render.c, so it reads as no text. */
+            struct list_header *lh = (struct list_header *)
+                SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!lh || lh->field == BROWSER_HEADER_ART
+                || get_current_activity() != ACTIVITY_DATABASEBROWSER)
+                return NULL;
+            return browser_header_text(lh->field, buf, buf_size);
+        }
         case SKIN_TOKEN_LIST_HAS_ART_ROWS:
             /* List-level, and answerable before anything draws -- which is what
              * lets it choose between two %Lb where %?La cannot. */

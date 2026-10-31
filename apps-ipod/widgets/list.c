@@ -383,7 +383,7 @@ void gui_synclist_draw_settled(struct gui_synclist *lists)
 /*
  * Force a full screen update.
  */
-void gui_synclist_draw(struct gui_synclist *gui_list)
+void gui_synclist_layout(struct gui_synclist *gui_list)
 {
     if (list_is_dirty(gui_list) || list_ui_viewport_moved(gui_list))
     {
@@ -393,6 +393,11 @@ void gui_synclist_draw(struct gui_synclist *gui_list)
         gui_synclist_select_item(gui_list, gui_list->selected_item);
         need_full_update = true;
     }
+}
+
+void gui_synclist_draw(struct gui_synclist *gui_list)
+{
+    gui_synclist_layout(gui_list);
     FOR_NB_SCREENS(i)
     {
         if (!skinlist_draw(&screens[i], gui_list))

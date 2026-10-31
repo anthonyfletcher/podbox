@@ -42,6 +42,8 @@
 static int update_delay = DEFAULT_UPDATE_DELAY;
 
 static bool sbs_has_title[NB_SCREENS];
+static bool sbs_has_header[NB_SCREENS];     /* uses %LH */
+static bool sbs_has_mark[NB_SCREENS];       /* uses %Lm */
 static const char* sbs_title[NB_SCREENS];
 static char sbs_persistent_title[NB_SCREENS][80];
 static enum themable_icons sbs_icon[NB_SCREENS];
@@ -71,6 +73,26 @@ void sb_skin_has_title(enum screen_type screen)
     sbs_has_title[screen] = true;
 }
 
+void sb_skin_uses_header(enum screen_type screen)
+{
+    sbs_has_header[screen] = true;
+}
+
+bool sb_skin_has_header(enum screen_type screen)
+{
+    return sbs_has_header[screen];
+}
+
+void sb_skin_uses_mark(enum screen_type screen)
+{
+    sbs_has_mark[screen] = true;
+}
+
+bool sb_skin_has_mark(enum screen_type screen)
+{
+    return sbs_has_mark[screen];
+}
+
 const char* sb_get_title(enum screen_type screen)
 {
     return sbs_has_title[screen] ? sbs_title[screen] : NULL;
@@ -95,6 +117,8 @@ void sb_process(enum screen_type screen, struct wps_data *data, bool preprocess)
     {
         sbs_loaded[screen] = false;
         sbs_has_title[screen] = false;
+        sbs_has_header[screen] = false;
+        sbs_has_mark[screen] = false;
         viewportmanager_theme_enable(screen, false, NULL);
         return;
     }

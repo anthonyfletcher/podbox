@@ -143,6 +143,8 @@ bool sb_set_title_text(const char *title, enum themable_icons icon,
 
 int sb_get_backdrop(enum screen_type screen) { (void)screen; return -1; }
 void sb_skin_has_title(enum screen_type screen) { (void)screen; }
+void sb_skin_uses_header(enum screen_type screen) { (void)screen; }
+void sb_skin_uses_mark(enum screen_type screen) { (void)screen; }
 void sb_skin_update(enum screen_type screen, bool force)
 {
     (void)screen; (void)force;

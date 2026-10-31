@@ -40,14 +40,12 @@ enum {
     PLUGIN_ABORT,
     PLUGIN_OUTOFMEM,
 
-    ZOOM_IN,
-    ZOOM_OUT,
-    ZOOM_FIT,
+    ZOOM_CHOOSE,    /* Zoom on the menu: the list of rungs */
     NEXT_FRAME,
 
-    /* show_menu()'s "the user asked to leave", which is not a button and so
-     * cannot come back as one. */
-    IV_MENU_QUIT,
+    /* show_menu()'s Zoom row, which the decode loop answers, since it holds
+     * what the list needs */
+    IV_MENU_ZOOM,
 };
 
 /* The downscale value naming the fit-to-screen rendering, as opposed to the

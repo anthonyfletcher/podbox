@@ -134,6 +134,13 @@ bool browser_showing_art(void);
 void browser_set_showing_art(bool on);
 /* True while the on-screen browse level is a list of podcast episodes. */
 bool browser_showing_episodes(void);
+/* Whether the list on screen offers Select... in a row's context menu */
+bool browser_select_offered(void);
+
+/* %LH: the header over the list on screen, by a field from
+ * skin/custom_tokens.h. Every field is NULL while the browse on screen has
+ * none. */
+const char *browser_header_text(int field, char *buf, size_t size);
 
 struct bitmap;
 struct dim;
@@ -149,6 +156,8 @@ const struct bitmap *browser_art_row(int selected_item, void *data,
                                      struct dim *size,
                                      const struct img_filter *filter,
                                      uint32_t filter_hash);
+/* %LH(art): the header's cover at the size given, from the same cache */
+const struct bitmap *browser_header_art(struct dim *size);
 
 bool bookmark_play(char* resume_file, int index, unsigned long elapsed,
                    unsigned long offset, int seed, char *filename);

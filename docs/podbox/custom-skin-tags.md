@@ -60,6 +60,8 @@ preceding group repeats.
 | [`%Lv`](#lv--a-setting-rows-value) | a setting row's value |
 | [`%Lr`](#lr--where-a-number-setting-sits-in-its-range) | where a number setting sits in its range |
 | [`%LP`](#lp--is-this-row-playing) | is this row playing |
+| [`%Lm`](#lm--is-this-row-ticked) | is this row ticked |
+| [`%LH([field])`](#lhfield--the-lists-header) | the album over its track list |
 | [`%Cl(...[, filters, radius, label])`](#changed-behaviour-cl-album-art-filters-rounded-corners-and-names) | changed: art filters, corners, names |
 | [`%Cd([name][, x, y, width, height])`](#showing-part-of-an-artwork) | changed: named art, a window of it |
 | [`%dr(...[, opacity, radius])`](#changed-behaviour-dr-opacity-and-rounded-corners) | changed: tint, rounded corners |
@@ -625,7 +627,7 @@ A number saying what choosing the row does:
 | `2` | toggle: an on/off setting | Shuffle |
 | `3` | setting: a choice or a number | Repeat, Volume Limit |
 | `4` | action: does something, or goes somewhere | the main menu's entries, a context menu's, Reset Settings |
-| `5` | command: a library list's own row | [Random], [Resume], [All Tracks], the values a tagnavi `%header_all` or `%header_untagged` level lists |
+| `5` | command: a library list's own row | [Random], [Shuffle Albums], [Resume], [All Tracks], the values a tagnavi `%header_all` or `%header_untagged` level lists |
 | `6` | container: a library item that lists its contents | an artist, album, genre, book or folder |
 | `7` | track: something that plays | a database track, a playlist entry, an audio file, a chapter |
 | `8` | file: any other file | an image, a text file, a playlist file |
@@ -690,6 +692,63 @@ list and the file browser.
 
 ```
 %?LP<* |>%LT
+```
+
+---
+
+### `%Lm` — is this row ticked
+
+A list can be put into selecting mode from a row's context menu (Select...),
+and its rows ticked to act on together. `%Lm` is `m` on a ticked row, `u` on
+one that could be, and empty on a row that cannot be ticked ([All Tracks],
+[Random]) and on every list that is not selecting. So `%?Lm` asks whether to
+draw a mark at all, and `%if(%Lm,=,m)` which one:
+
+```
+%?Lm<%?if(%Lm,=,m)<×|Ö>|%LI>
+```
+
+A skin that uses `%Lm` anywhere draws the marks itself. Every other skin gets
+`[x] ` or `[ ] ` in front of the row's text while it is selecting, which also
+means a comparison of `%LT` with a row's name does not match then.
+
+---
+
+### `%LH([field])` — the list's header
+
+What an album's track list says about the album, for a header above it. Bare,
+`%LH` is the kind of header the list has: `album` on an album's tracks in the
+library, empty everywhere else (Audiobooks and Podcasts included). Choose the
+layout with `%?if(%LH,=,album)<…>`.
+
+With a word it gives one field:
+
+| Field | |
+|---|---|
+| `name` | the album |
+| `artist` | its album artist; empty where several albums share the name |
+| `year` | empty when untagged |
+| `tracks` | the tracks this list shows |
+| `length` | their total, `m:ss` or `h:mm:ss` |
+| `discs` | the highest disc number; empty for one disc |
+| `art` | draws the cover in the middle of the viewport; `%LH(art, 6)` rounds its corners, as `%La` does a row's |
+
+A word it does not know fails the skin. A skin that uses `%LH` anywhere draws
+its own header; any other skin gets the year in the album's list title instead,
+as `Abbey Road (1969)`. The header needs the database in RAM, and is empty
+until it is.
+
+Give the shorter list its own `%Vi` and switch to it, as for episode notes:
+
+```
+%Vi(album,10,114,300,120,-)
+...
+%?if(%LH,=,album)<%Vd(AlbumHead)%VI(album)>
+...
+%Vl(AlbumHead,16,45,60,60,-)
+%LH(art,6)
+%Vl(AlbumHead,84,46,220,20,-)
+%s%LH(name)
 ```
 
 ---

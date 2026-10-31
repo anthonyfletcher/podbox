@@ -137,9 +137,10 @@ static struct selected_file
 
 static struct clipboard
 {
-    char path[MAX_PATH];    /* Clipped file's path */
+    char path[MAX_PATH];    /* Clipped file's path, or the folder of several */
     unsigned int attr;      /* Clipped file's attributes */
     unsigned int flags;     /* Operation type flags */
+    bool many;              /* the names are in CLIPBOARD_LIST */
 } clipboard;
 
 /* set selected file (doesn't touch buffer) */
@@ -153,9 +154,12 @@ static void selected_file_set(int context, const char *path, int attr)
 /* Empty the clipboard */
 static void clipboard_clear_selection(struct clipboard *clip)
 {
+    if (clip->many)
+        remove(CLIPBOARD_LIST);
     clip->path[0] = '\0';
     clip->attr    = 0;
     clip->flags   = 0;
+    clip->many    = false;
 }
 
 /* Store the selection in the clipboard */
@@ -163,10 +167,13 @@ static bool clipboard_clip(struct clipboard *clip, const char *path,
                            unsigned int attr, unsigned int flags)
 {
     /* if it fits it clips */
+    if (clip->many)
+        remove(CLIPBOARD_LIST);
     if (strmemccpy(clip->path, path, sizeof (clip->path)) != NULL)
     {
         clip->attr = attr;
         clip->flags = flags;
+        clip->many = false;
         return true;
     }
     else {
@@ -1151,11 +1158,80 @@ static bool clipboard_copy(void)
                           PASTE_COPY);
 }
 
+void context_menu_clip_many(const char *dir, bool copy)
+{
+    clipboard.many = false;     /* the list on disk is this one's already */
+    clipboard_clip(&clipboard, dir, ATTR_DIRECTORY,
+                   copy ? PASTE_COPY : PASTE_CUT);
+    clipboard.many = true;
+}
+
+/* Several items: each name in CLIPBOARD_LIST pasted as one item is. A cancel
+ * keeps the names not yet done, so Paste again carries on from there. */
+static int clipboard_paste_many(void)
+{
+    char dst[MAX_PATH], src[MAX_PATH], name[MAX_PATH];
+    int fd = open(CLIPBOARD_LIST, O_RDONLY);
+    int rest = -1;
+    bool stopped = false;
+
+    strmemccpy(dst, getcwd(NULL, 0), sizeof(dst));
+    if (fd < 0)
+    {
+        clipboard_clear_selection(&clipboard);
+        return 1;
+    }
+    while (read_line(fd, name, sizeof(name)) > 0)
+    {
+        int rc;
+
+        if (!name[0])
+            continue;
+        if (!stopped)
+        {
+            path_append(src, clipboard.path, name, sizeof(src));
+            rc = copy_move_fileobject(src, dst, clipboard.flags);
+            if (rc == FORC_CANCELLED)
+            {
+                stopped = true;
+                rest = open(CLIPBOARD_LIST ".tmp",
+                            O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            }
+            else
+            {
+                if (rc < FORC_SUCCESS)
+                    splashf(HZ, "%s: %s", str(LANG_FAILED), name);
+                continue;
+            }
+        }
+        if (rest >= 0)
+            fdprintf(rest, "%s\n", name);
+    }
+    close(fd);
+    context_menu_result = ONPLAY_RELOAD_DIR;
+
+    if (!stopped)
+        clipboard_clear_selection(&clipboard);
+    else
+    {
+        splash_cancelled();
+        if (rest >= 0)
+        {
+            close(rest);
+            remove(CLIPBOARD_LIST);
+            rename(CLIPBOARD_LIST ".tmp", CLIPBOARD_LIST);
+        }
+    }
+    return 1;
+}
+
 /* Paste the clipboard to the current directory */
 static int clipboard_paste(void)
 {
     if (!clipboard.path[0])
         return 1;
+    if (clipboard.many)
+        return clipboard_paste_many();
 
     int rc = copy_move_fileobject(clipboard.path, getcwd(NULL, 0), clipboard.flags);
 
@@ -1514,17 +1590,17 @@ static int go_to_spoken(const char *menu_id, int row_lang, bool author)
 
 static int go_to_podcast(void)
 {
-    return go_to_spoken("podcasts", LANG_PODCASTS, false);
+    return go_to_spoken(BROWSER_DB_MENU_PODCASTS, LANG_PODCASTS, false);
 }
 
 static int go_to_audiobook(void)
 {
-    return go_to_spoken("audiobooks", LANG_BY_TITLE, false);
+    return go_to_spoken(BROWSER_DB_MENU_AUDIOBOOKS, LANG_BY_TITLE, false);
 }
 
 static int go_to_author(void)
 {
-    return go_to_spoken("audiobooks", LANG_BY_AUTHOR, true);
+    return go_to_spoken(BROWSER_DB_MENU_AUDIOBOOKS, LANG_BY_AUTHOR, true);
 }
 
 MENUITEM_FUNCTION(go_to_album_item, 0, ID2P(LANG_GO_TO_ALBUM),
@@ -2142,12 +2218,14 @@ MENUITEM_FUNCTION(wps_delete_item, 0, ID2P(LANG_DELETE),
 
 /* The title is what the menu acts on: the playing track's title, or the
  * selected row's name. Copied, because the playing track's id3 is the live
- * entry and not a copy of one. */
+ * entry and not a copy of one. A track's title comes from the database in
+ * RAM, since this runs on every redraw; a track it lacks shows its filename. */
 static char *context_menu_title(int selected_item, void *data,
                                 char *buffer, size_t buffer_len)
 {
     struct mp3entry *id3;
     const char *name;
+    long idx;
 
     (void)selected_item;
     (void)data;
@@ -2168,6 +2246,12 @@ static char *context_menu_title(int selected_item, void *data,
     }
     else if (selected_file.path != NULL)
     {
+        idx = selected_track_idx();
+        if (idx >= 0 && tagcache_entry_string(idx, tag_title, buffer,
+                                              buffer_len)
+            && buffer[0] != '\0')
+            return buffer;
+
         name = strrchr(selected_file.path, PATH_SEPCH);
         name = name ? name + 1 : selected_file.path;
         if (*name != '\0')
@@ -2193,6 +2277,28 @@ static char *context_menu_title(int selected_item, void *data,
 MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
                   view_playlist,
                   context_menu_callback, Icon_NOICON);
+
+/* Select...: the browser turns the list into a selecting one, starting from
+ * the row the menu was opened on */
+static int start_select(void)
+{
+    context_menu_result = ONPLAY_SELECT;
+    return 0;
+}
+
+static int select_callback(int action, const struct menu_item_ex *this_item,
+                           struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && (selected_file.context == CONTEXT_WPS || !browser_select_offered()))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(select_item, 0, ID2P(LANG_SELECT_MANY),
+                  start_select, select_callback, Icon_NOICON);
 
 /* Whether any of a submenu's rows would show. A submenu with none is hidden
  * rather than opened onto an empty list. */
@@ -2285,6 +2391,7 @@ MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            &view_playlist_item,
            &replace_pl_item, &replace_shuf_pl_item,
            &i_pl_item, &i_first_pl_item, &i_last_pl_item,
+           &select_item,
            &cat_playlist_menu,
            &sound_mix_item, &winddown_item,
            &rating_item, &album_rating_item,
@@ -2797,7 +2904,7 @@ static const short track_rows[] = {
     LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_GO_TO_PODCAST,
     LANG_GO_TO_AUDIOBOOK, LANG_GO_TO_AUTHOR, LANG_PASTE, LANG_QUEUE_MENU,
     LANG_SHOW_IN_FILES, LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY,
-    LANG_DELETE, LANG_CREATE_DIR,
+    LANG_DELETE, LANG_CREATE_DIR, LANG_SELECT_MANY,
 };
 static const short album_rows[] = {
     LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_MENU_SET_ALBUM_RATING,
@@ -2814,6 +2921,7 @@ static const short folder_rows[] = {
     LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED, LANG_QUEUE_MENU,
     LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY, LANG_DELETE,
     LANG_DELETE_DIR, LANG_CREATE_DIR, LANG_SET_AS_BACKDROP, LANG_SET_AS,
+    LANG_SELECT_MANY,
 };
 static const short audiobook_rows[] = {
     LANG_BOOK_MARK_AS, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL, LANG_QUEUE_MENU,

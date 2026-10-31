@@ -27383,6 +27383,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_DISPLAY_NUMBERED_FROMTAGS
+  desc: track display options: disc and track number, title and album
+  user: core
+  <source>
+    *: "Number, Title & Album from Tags"
+  </source>
+  <dest>
+    *: "Number, Title & Album from Tags"
+  </dest>
+  <voice>
+    *: "Number, Title and Album from Tags"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_GO_TO_PODCAST
   desc: in the context menu: open a podcast episode's show in Podcasts
   user: core
@@ -27422,5 +27436,159 @@
   </dest>
   <voice>
     *: "Go to Author"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGNAVI_SHUFFLE_ALBUMS
+  desc: "[Shuffle Albums]" entry in tag browser: plays every album listed, albums in a random order, each in its own order
+  user: core
+  <source>
+    *: "[Shuffle Albums]"
+  </source>
+  <dest>
+    *: "[Shuffle Albums]"
+  </dest>
+  <voice>
+    *: "Shuffle Albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SELECT_MANY
+  desc: in a track's or a file's context menu: tick several rows to act on together
+  user: core
+  <source>
+    *: "Select…"
+  </source>
+  <dest>
+    *: "Select…"
+  </dest>
+  <voice>
+    *: "Select"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_SELECTED
+  desc: a list's title while rows are being ticked: how many are
+  user: core
+  <source>
+    *: "%d selected"
+  </source>
+  <dest>
+    *: "%d selected"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_TRACKS_TITLE
+  desc: the title of the menu for several ticked tracks
+  user: core
+  <source>
+    *: "%d tracks"
+  </source>
+  <dest>
+    *: "%d tracks"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_ITEMS_TITLE
+  desc: the title of the menu for several ticked files and folders
+  user: core
+  <source>
+    *: "%d items"
+  </source>
+  <dest>
+    *: "%d items"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOVE_HERE
+  desc: in the playlist viewer's menu for ticked tracks: move them to after the cursor
+  user: core
+  <source>
+    *: "Move Here"
+  </source>
+  <dest>
+    *: "Move Here"
+  </dest>
+  <voice>
+    *: "Move Here"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REALLY_DELETE_N
+  desc: asked before deleting several ticked files and folders
+  user: core
+  <source>
+    *: "Delete %d items?"
+  </source>
+  <dest>
+    *: "Delete %d items?"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_FIT
+  desc: in the image viewer's Zoom list: the whole picture on screen
+  user: core
+  <source>
+    *: "Fit to Screen"
+  </source>
+  <dest>
+    *: "Fit to Screen"
+  </dest>
+  <voice>
+    *: "Fit to Screen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_PAN
+  desc: in the image viewer's menu: the wheel and Left and Right move round a zoomed picture
+  user: core
+  <source>
+    *: "Pan"
+  </source>
+  <dest>
+    *: "Pan"
+  </dest>
+  <voice>
+    *: "Pan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_TRACK_TITLE
+  desc: the title of the menu for one ticked track
+  user: core
+  <source>
+    *: "1 track"
+  </source>
+  <dest>
+    *: "1 track"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_ITEM_TITLE
+  desc: the title of the menu for one ticked file or folder
+  user: core
+  <source>
+    *: "1 item"
+  </source>
+  <dest>
+    *: "1 item"
+  </dest>
+  <voice>
+    *: ""
   </voice>
 </phrase>

@@ -550,6 +550,67 @@ static int parse_viewport_gradient_setup(struct skin_element *element,
     return 0;
 }
 
+/* %LH's field word, as a browser_header_field, and for art a corner radius.
+ * A word it does not know fails the skin, so a typo is seen at once rather
+ * than drawing nothing. */
+static int parse_list_header(struct skin_element *element,
+                             struct wps_token *token,
+                             struct wps_data *wps_data)
+{
+    static const char * const fields[] = {
+        [BROWSER_HEADER_NAME]   = "name",
+        [BROWSER_HEADER_ARTIST] = "artist",
+        [BROWSER_HEADER_YEAR]   = "year",
+        [BROWSER_HEADER_TRACKS] = "tracks",
+        [BROWSER_HEADER_LENGTH] = "length",
+        [BROWSER_HEADER_DISCS]  = "discs",
+        [BROWSER_HEADER_ART]    = "art",
+    };
+    struct list_header *lh = skin_buffer_alloc(sizeof(*lh));
+    const char *word;
+
+    (void)wps_data;
+    if (!lh)
+        return -1;
+    memset(lh, 0, sizeof(*lh));
+    lh->field = BROWSER_HEADER_KIND;
+    lh->art.mask = PTRTOSKINOFFSET(skin_buffer, NULL);
+    lh->art.filter = PTRTOSKINOFFSET(skin_buffer, NULL);
+    lh->art.centre = true;
+    token->value.data = PTRTOSKINOFFSET(skin_buffer, lh);
+    if (element->params_count == 0)
+        return 0;
+
+    word = get_param_text(element, 0);
+    lh->field = -1;
+    for (unsigned i = 0; i < ARRAYLEN(fields); i++)
+        if (fields[i] && !strcasecmp(word, fields[i]))
+            lh->field = i;
+    if (lh->field < 0)
+        return -1;
+
+    /* %LH(art, radius): the cover's corners, as %La rounds a row's */
+    if (element->params_count > 1)
+    {
+        int radius = get_param(element, 1)->data.number;
+        unsigned char *mask;
+
+        if (lh->field != BROWSER_HEADER_ART || radius < 0
+            || radius > ROUND_RECT_MAX_RADIUS)
+            return -1;
+        if (radius > 0)
+        {
+            mask = skin_buffer_alloc(round_rect_mask_size(radius));
+            if (!mask)
+                return -1;
+            round_rect_build_mask(mask, radius, LCD_BLEND_OPAQUE);
+            lh->art.radius = (uint8_t)radius;
+            lh->art.mask = PTRTOSKINOFFSET(skin_buffer, mask);
+        }
+    }
+    return 0;
+}
+
 static int parse_listitem(struct skin_element *element,
                         struct wps_token *token,
                         struct wps_data *wps_data)
@@ -563,6 +624,7 @@ static int parse_listitem(struct skin_element *element,
     li->mask = PTRTOSKINOFFSET(skin_buffer, NULL);
     li->filter = PTRTOSKINOFFSET(skin_buffer, NULL);
     li->filter_hash = 0;
+    li->centre = false;
     if (element->params_count == 0)
         li->offset = 0;
     else
@@ -2640,6 +2702,14 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_LIST_TITLE_TEXT:
                     sb_skin_has_title(curr_screen);
+                    break;
+                case SKIN_TOKEN_LIST_HEADER:
+                    sb_skin_uses_header(curr_screen);
+                    function = parse_list_header;
+                    break;
+                case SKIN_TOKEN_LIST_ITEM_MARKED:
+                    sb_skin_uses_mark(curr_screen);
+                    function = parse_listitem;
                     break;
                 case SKIN_TOKEN_TOP_QUICKSETTING_NAME:
                 case SKIN_TOKEN_TOP_QUICKSETTING_VALUE:

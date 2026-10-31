@@ -392,6 +392,15 @@ struct listitem {
      * cannot. */
     OFFSETTYPE(struct img_filter *) filter;
     uint32_t filter_hash;
+    /* A cover smaller than its viewport sits in the middle of it, not at its
+     * top left. %LH(art) only: a row's cover fills its viewport. */
+    bool centre;
+};
+
+/* %LH: which field, and for the cover, how it is drawn */
+struct list_header {
+    int field;                  /* enum browser_header_field */
+    struct listitem art;
 };
 
 /* %Sb(bars[,align[,radius[,gap[,peak[,peakcolour]]]]]): how many bars to split

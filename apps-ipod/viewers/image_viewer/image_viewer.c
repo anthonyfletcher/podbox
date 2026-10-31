@@ -12,10 +12,11 @@
  *   - A plain core app, entered as image_viewer(file) and returning a GO_TO_*
  *     code, dispatched from the file browser like the text viewer.
  *   - A picture opens on the fit rung, DS_FIT, scaled so all of it is on
- *     screen. Zoom and pan live behind the Zoom / Pan setting, which reads the
- *     one key table (image_viewer_button.h) two ways: off, Left and Right page
- *     between files and a tap of Menu leaves, as in the text viewer; on, the
- *     same four buttons pan and the way out is Quit on the menu.
+ *     screen. Zoom is a list on the menu, of the rungs the picture and memory
+ *     allow. Pan reads the one key table (image_viewer_button.h) two ways:
+ *     off, Left and Right page between files and a tap of Menu leaves, as in
+ *     the text viewer; on, the wheel and Left and Right pan and a tap of Menu
+ *     turns it off.
  *   - Colour 320x240 only; there are no greylib or mono paths.
  *   - Decoders are linked in and chosen from a static table (image_decoder.h),
  *     not loaded as overlays.
@@ -116,13 +117,10 @@ static struct image_info image_info;
 int iv_fit_width = 0, iv_fit_height = 0;
 unsigned iv_src_flags;
 
-/* Zoom / Pan mode: false is the navigation key map, where Left and Right move
- * between pictures and a tap of Menu leaves. Session state, kept across a move
- * to the next picture; only the settings menu changes it.
- *
- * The mode spends Menu on panning up, so it has no tap to leave on. Quit on
- * the menu is the way out of it -- see show_menu(). */
-static bool iv_zoom_mode = false;
+/* Pan: false is the navigation key map, where Left and Right move between
+ * pictures and a tap of Menu leaves. Session state, kept across a move to the
+ * next picture; the menu and a hold of Select change it. */
+static bool iv_pan_mode = false;
 
 /* The button the last pass of scroll_bmp() saw, so a release can be told from
  * a tap: the release that ends a Menu hold arrives after the menu has closed
@@ -148,7 +146,10 @@ static enum image_type image_type = IMAGE_UNKNOWN;
 static struct viewport iv_vp;
 
 /* forward declarations */
-static int show_menu(void); /* MENU_ATTACHED_USB, IV_MENU_QUIT, or 0 */
+static int show_menu(void); /* MENU_ATTACHED_USB, IV_MENU_ZOOM, or 0 */
+/* choose_zoom()'s answer when USB took the screen: no rung is negative */
+#define ZOOM_USB (-1)
+static int choose_zoom(struct image_info *info, ssize_t remaining);
 
 /** Implementation **/
 
@@ -519,6 +520,23 @@ static void pan_view_down(struct image_info *info)
     }
 }
 
+static void redraw_image(struct image_info *info)
+{
+    lcd_clear_display();
+    imgdec->draw_image_rect(info, 0, 0,
+                            info->width-info->x, info->height-info->y);
+    lcd_update();
+}
+
+/* Pan on or off, said briefly over the picture since nothing else on the
+ * screen shows which key map is in use */
+static void set_pan_mode(struct image_info *info, bool on)
+{
+    iv_pan_mode = on;
+    splashf(HZ/2, "%s: %s", str(LANG_IV_PAN), str(on ? LANG_ON : LANG_OFF));
+    redraw_image(info);
+}
+
 /* interactively scroll around the image */
 static int scroll_bmp(struct image_info *info)
 {
@@ -575,7 +593,7 @@ static int scroll_bmp(struct image_info *info)
         switch(button)
         {
         case IMGVIEW_LEFT:
-            if (iv_zoom_mode)
+            if (iv_pan_mode)
             {
                 pan_view_left(info);
                 break;
@@ -591,12 +609,12 @@ static int scroll_bmp(struct image_info *info)
         /* Panning repeats; paging does not. A held Left would otherwise queue
          * one decode per repeat, none of them interruptible. */
         case IMGVIEW_LEFT | BUTTON_REPEAT:
-            if (iv_zoom_mode)
+            if (iv_pan_mode)
                 pan_view_left(info);
             break;
 
         case IMGVIEW_RIGHT:
-            if (iv_zoom_mode)
+            if (iv_pan_mode)
             {
                 pan_view_right(info);
                 break;
@@ -610,27 +628,36 @@ static int scroll_bmp(struct image_info *info)
             break;
 
         case IMGVIEW_RIGHT | BUTTON_REPEAT:
-            if (iv_zoom_mode)
+            if (iv_pan_mode)
                 pan_view_right(info);
             break;
 
-        case IMGVIEW_UP:
-            /* no BUTTON_REPEAT variant: Menu+repeat is the settings gesture */
-            if (iv_zoom_mode)
+        case IMGVIEW_PAN_UP:
+        case IMGVIEW_PAN_UP | BUTTON_REPEAT:
+            if (iv_pan_mode)
                 pan_view_up(info);
+            break;
+
+        case IMGVIEW_PAN_DOWN:
+        case IMGVIEW_PAN_DOWN | BUTTON_REPEAT:
+            if (iv_pan_mode)
+                pan_view_down(info);
             break;
 
         case IMGVIEW_EXIT:
             /* The release that ends a hold is not a tap: the menu has just
              * closed on it. */
-            if (!iv_zoom_mode && iv_lastbutton != IMGVIEW_MENU)
+            if (iv_lastbutton == IMGVIEW_MENU)
+                break;
+            if (!iv_pan_mode)
                 return PLUGIN_OK;
+            set_pan_mode(info, false);
             break;
 
-        case IMGVIEW_DOWN:
-        case IMGVIEW_DOWN | BUTTON_REPEAT:
-            if (iv_zoom_mode)
-                pan_view_down(info);
+        case IMGVIEW_PAN:
+            /* Once a hold: the repeats that follow are the same hold */
+            if (iv_lastbutton != IMGVIEW_PAN)
+                set_pan_mode(info, !iv_pan_mode);
             break;
 
         case BUTTON_NONE:
@@ -663,19 +690,8 @@ static int scroll_bmp(struct image_info *info)
              * which every decoder but the GIF one leaves at zero. */
             break;
 
-        case IMGVIEW_ZOOM_IN:
-            if (iv_zoom_mode)
-                return ZOOM_IN;
-            break;
-
-        case IMGVIEW_ZOOM_OUT:
-            if (iv_zoom_mode)
-                return ZOOM_OUT;
-            break;
-
         case IMGVIEW_MENU:
         {
-            bool was_zoom_mode = iv_zoom_mode;
             int menu;
 
             /* The menu holds no pointer into the buffer either, and the USB
@@ -688,20 +704,11 @@ static int scroll_bmp(struct image_info *info)
 
             if (iv_usb_dropped || menu == MENU_ATTACHED_USB)
                 return PLUGIN_USB_CONNECTED;
-            if (menu == IV_MENU_QUIT)
-                return PLUGIN_OK;
-
-            /* Leaving the mode has to put the picture back to fitting the
-             * screen: the navigation map has no pan in it, so a view left
-             * zoomed could not be moved off the corner it was showing. */
-            if (was_zoom_mode && !iv_zoom_mode)
-                return ZOOM_FIT;
+            if (menu == IV_MENU_ZOOM)
+                return ZOOM_CHOOSE;
 
             /* the menu ran with the theme on; repaint our image */
-            lcd_clear_display();
-            imgdec->draw_image_rect(info, 0, 0,
-                            info->width-info->x, info->height-info->y);
-            lcd_update();
+            redraw_image(info);
             break;
         }
 
@@ -1035,66 +1042,36 @@ static int load_and_show(char *filename, struct image_info *info,
         {
             status = scroll_bmp(info);
 
-            if (status == ZOOM_IN)
+            /* Always on to the redraw below, even when the rung is the one
+             * showing: the list drew over the picture. */
+            if (status == ZOOM_CHOOSE)
             {
-                if (ds == DS_FIT)
-                {
-                    int step = ds_above_fit(info);
-                    if (step < ds_min || !rung_fits(step, remaining))
-                        continue; /* memory allows nothing larger */
-                    ds = step;
-                    /* the fit view showed all of it, so zoom to the middle */
-                    scaled_centre(info, ds, &cx, &cy);
-                }
-                else if (ds > ds_min || (imgdec->unscaled_avail && ds > 1))
-                {
-                    /* if 1/1 is always available, jump ds from ds_min to 1. */
-                    int zoom = (ds == ds_min)? ds_min: 2;
-                    if (!rung_fits(ds / zoom, remaining))
-                        continue;
-                    ds /= zoom; /* reduce downscaling to zoom in */
-                    get_view(info, &cx, &cy);
-                    cx *= zoom; /* prepare the position in the new image */
-                    cy *= zoom;
-                }
-                else
-                    continue;
-            }
+                int target;
 
-            if (status == ZOOM_OUT)
-            {
-                if (ds == DS_FIT)
-                    continue; /* the whole picture is already on screen */
-
-                if (ds < ds_max)
+                iv_buf_idle = true;
+                target = choose_zoom(info, remaining);
+                iv_buf_idle = false;
+                if (iv_usb_dropped || target == ZOOM_USB)
                 {
-                    /* if ds is 1 and ds_min is > 1, jump ds to ds_min. */
-                    int zoom = (ds < ds_min)? ds_min: 2;
-                    if (!rung_fits(ds * zoom, remaining))
-                        continue;
-                    ds *= zoom; /* increase downscaling to zoom out */
-                    get_view(info, &cx, &cy);
-                    cx /= zoom; /* prepare the position in the new image */
-                    cy /= zoom;
+                    status = PLUGIN_USB_CONNECTED;
+                    break;
                 }
-                else if (iv_fit_width && rung_fits(DS_FIT, remaining))
+                if (target != ds)
                 {
-                    ds = DS_FIT; /* the rung below the integer ladder */
-                    scaled_centre(info, ds, &cx, &cy);
+                    /* From or to the whole picture the middle is the place to
+                     * be; between two rungs, the same spot at the new scale */
+                    if (target == DS_FIT || ds == DS_FIT)
+                        scaled_centre(info, target, &cx, &cy);
+                    else
+                    {
+                        get_view(info, &cx, &cy);
+                        cx = cx * ds / target;
+                        cy = cy * ds / target;
+                    }
+                    ds = target;
                 }
-                else
-                    continue;
-            }
-
-            /* Zoom / Pan turned off: back to the whole picture. Always falls
-             * through to the redraw below, even when the view was already
-             * there -- the menu drew over the picture on its way out. */
-            if (status == ZOOM_FIT)
-            {
-                ds = iv_fit_width ? DS_FIT : ds_max;
-                scaled_centre(info, ds, &cx, &cy);
                 /* back to the first frame, which is also what makes the
-                 * redraw below clear the screen the menu drew on */
+                 * redraw below clear the screen the list drew on */
                 frame = 0;
             }
 
@@ -1150,59 +1127,60 @@ static bool find_album_art(int *offset, int *filesize, int *status)
 
 /** Iv_settings menu **/
 
-/* Returns MENU_ATTACHED_USB if the viewer must leave, otherwise 0. */
+/* The theme back on for a menu's chrome, and then the screen back to our own
+ * full-screen drawing */
+static void iv_menu_begin(void)
+{
+    viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+}
+
+static void iv_menu_end(void)
+{
+    pop_current_activity();
+    viewportmanager_theme_undo(SCREEN_MAIN, false);
+    lcd_set_backdrop(NULL);
+    lcd_set_foreground(LCD_WHITE);
+    lcd_set_background(LCD_BLACK);
+}
+
+/* Returns MENU_ATTACHED_USB if the viewer must leave, IV_MENU_ZOOM for the
+ * Zoom row, otherwise 0. */
 static int show_menu(void)
 {
     int result;
 
     enum menu_id
     {
-        MIID_ZOOM_PAN = 0,
+        MIID_ZOOM = 0,
+        MIID_PAN,
         MIID_TOGGLE_SS_MODE,
         MIID_CHANGE_SS_MODE,
-        MIID_QUIT,
     };
 
-    /* Two spellings of one menu, differing only in the Quit row.
-     *
-     * Quit earns a row in Zoom / Pan mode alone: that map spends Menu on
-     * panning up, so the tap of Menu that leaves the viewer is not available
-     * and the menu is the only way out. The navigation map already leaves on
-     * a tap, where a Quit row is one more thing to read past.
-     *
-     * The rows above it are identical in both, so one set of ids serves both
-     * and MIID_QUIT can only ever come back from the second. */
     MENUITEM_STRINGLIST(menu, ID2P(LANG_IMAGE_VIEWER), NULL,
-                        ID2P(LANG_IV_ZOOM_PAN),
+                        ID2P(LANG_ZOOM),
+                        ID2P(LANG_IV_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME));
-    MENUITEM_STRINGLIST(menu_zoom, ID2P(LANG_IMAGE_VIEWER), NULL,
-                        ID2P(LANG_IV_ZOOM_PAN),
-                        ID2P(LANG_SLIDESHOW_MODE),
-                        ID2P(LANG_SLIDESHOW_TIME),
-                        ID2P(LANG_MENU_QUIT));
 
-    static const struct opt_items slideshow[2] = {
+    static const struct opt_items off_on[2] = {
         { STR(LANG_OFF) },
         { STR(LANG_ON) },
     };
 
-    /* re-enable the theme for the menu chrome, then hand the screen back to
-     * our own full-screen drawing when we return. */
-    viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
-    push_current_activity(ACTIVITY_CONTEXTMENU);
-
-    result = do_menu(iv_zoom_mode ? &menu_zoom : &menu, NULL, NULL, false);
+    iv_menu_begin();
+    result = do_menu(&menu, NULL, NULL, false);
 
     switch (result)
     {
-        case MIID_ZOOM_PAN:
-            set_option(str(LANG_IV_ZOOM_PAN), &iv_zoom_mode, RB_BOOL,
-                       slideshow, 2, NULL);
+        case MIID_PAN:
+            set_option(str(LANG_IV_PAN), &iv_pan_mode, RB_BOOL,
+                       off_on, 2, NULL);
             break;
         case MIID_TOGGLE_SS_MODE:
             set_option(str(LANG_SLIDESHOW_MODE), &iv_slideshow_enabled, RB_BOOL,
-                       slideshow, 2, NULL);
+                       off_on, 2, NULL);
             break;
         case MIID_CHANGE_SS_MODE:
             set_int(str(LANG_SLIDESHOW_TIME), "s", UNIT_SEC,
@@ -1210,21 +1188,55 @@ static int show_menu(void)
                     SS_MIN_TIMEOUT, SS_MAX_TIMEOUT, NULL);
             break;
     }
-
-    pop_current_activity();
-    viewportmanager_theme_undo(SCREEN_MAIN, false);
-
-    /* re-establish our own drawing environment */
-    lcd_set_backdrop(NULL);
-    lcd_set_foreground(LCD_WHITE);
-    lcd_set_background(LCD_BLACK);
+    iv_menu_end();
 
     /* USB arriving while the menu was up has freed the buffer, so the caller
-     * must leave rather than redraw from it. Quit is the other answer the
+     * must leave rather than redraw from it. Zoom is the other answer the
      * caller has to act on; everything else is a setting it redraws for. */
     if (result == MENU_ATTACHED_USB)
         return MENU_ATTACHED_USB;
-    return (result == MIID_QUIT) ? IV_MENU_QUIT : 0;
+    return (result == MIID_ZOOM) ? IV_MENU_ZOOM : 0;
+}
+
+/* The Zoom list: the whole picture first, then each integer rung from the
+ * first larger than that down to 1:1, as far as memory allows, named by the
+ * share of the picture's own size it shows. Returns the rung chosen, the one
+ * showing if none was, or ZOOM_USB. */
+static int choose_zoom(struct image_info *info, ssize_t remaining)
+{
+    int rungs[5], n = 0, sel = 0;
+    char labels[5][8];
+    struct opt_items items[5];
+    bool usb;
+
+    if (iv_fit_width && rung_fits(DS_FIT, remaining))
+        rungs[n++] = DS_FIT;
+    for (int d = iv_fit_width ? ds_above_fit(info) : ds_max; d >= 1; d /= 2)
+        if ((d >= ds_min || (d == 1 && imgdec->unscaled_avail))
+            && rung_fits(d, remaining))
+            rungs[n++] = d;
+
+    for (int i = 0; i < n; i++)
+    {
+        if (rungs[i] == DS_FIT)
+            items[i].string = (unsigned char *)str(LANG_IV_FIT);
+        else
+        {
+            snprintf(labels[i], sizeof(labels[i]), "%d%%",
+                     (100 + rungs[i] / 2) / rungs[i]);
+            items[i].string = (unsigned char *)labels[i];
+        }
+        items[i].voice_id = -1;
+        if (rungs[i] == ds)
+            sel = i;
+    }
+    if (n == 0)
+        return ds;
+
+    iv_menu_begin();
+    usb = set_option(str(LANG_ZOOM), &sel, RB_INT, items, n, NULL);
+    iv_menu_end();
+    return usb ? ZOOM_USB : rungs[sel];
 }
 
 /** Screen ownership **/
@@ -1342,7 +1354,7 @@ int image_viewer(const char *file)
     image_type = IMAGE_UNKNOWN;
     imgdec = NULL;
     iv_running_slideshow = false;
-    iv_zoom_mode = false;
+    iv_pan_mode = false;
 
     push_current_activity(ACTIVITY_IMAGEVIEWER);
     iv_setup_screen();

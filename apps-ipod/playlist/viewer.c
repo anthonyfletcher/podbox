@@ -42,8 +42,11 @@
 #include "database/sound_index.h"
 #include "draw/icon.h"
 #include "widgets/list.h"
+#include "widgets/list_select.h"
 #include "widgets/splash.h"
 #include "save_screen.h"
+#include <stdlib.h>   /* qsort */
+#include "dir.h"      /* ATTR_DIRECTORY, the ticked tracks' menu */
 #include "screens/settings/exported_settings.h"
 #include "widgets/yesno.h"
 #include "audio/playback.h"
@@ -200,11 +203,10 @@ static int playlist_entry_load(struct playlist_entry *entry, int index,
 
     len = strlcpy(name_buffer, info.filename, remaining_size) + 1;
 
-    if (len <= remaining_size)
-    {
-        /* iPod Classic 6G custom: always allocate space for title display */
+    /* The tags' text goes in a slot after the filename, when it is shown */
+    if (global_settings.playlist_viewer_track_display
+        > PLAYLIST_VIEWER_ENTRY_SHOW_FULL_PATH && len <= remaining_size)
         len += MAX_PATH + 1;
-    }
 
     if (len <= remaining_size)
     {
@@ -551,6 +553,7 @@ static void format_line(struct playlist_entry* track, char* str,
      * and a theme need never map the ids. Move mode in particular is unusable
      * blind -- you are dragging a track you cannot see. */
     char *skipped, *prefix, *suffix;
+    int display = global_settings.playlist_viewer_track_display;
     skipped = prefix = suffix = "";
     if (track->index == viewer.current_playing_track)
     {
@@ -563,19 +566,33 @@ static void format_line(struct playlist_entry* track, char* str,
         prefix = "+";
     if (track->attr & PLAYLIST_ATTR_SKIPPED)
         skipped = "(ERR) ";
-    if (!(track->attr & PLAYLIST_ATTR_RETRIEVE_ID3_ATTEMPTED))
+    if (display > PLAYLIST_VIEWER_ENTRY_SHOW_FULL_PATH
+        && !(track->attr & PLAYLIST_ATTR_RETRIEVE_ID3_ATTEMPTED))
     {
-        /* iPod Classic 6G custom: always retrieve title from tags/db */
         track->attr |= PLAYLIST_ATTR_RETRIEVE_ID3_ATTEMPTED;
         if (retrieve_id3_tags(track->index, track->name, viewer.id3,
                               METADATA_EXCLUDE_ID3_PATH))
         {
             struct mp3entry * pid3 = viewer.id3;
-            id3viewc[0] = '\0';
-            /* Title only (matching PictureFlow behavior) */
-            if (pid3->title && pid3->title[0] != '\0' &&
-                strmemccpy(id3viewc, pid3->title, MAX_PATH))
+            int n = 0;
+
+            if (pid3->title && pid3->title[0] != '\0')
             {
+                if (display == PLAYLIST_VIEWER_ENTRY_SHOW_ID3_NUMBERED)
+                {
+                    if (pid3->discnum > 0 && pid3->tracknum > 0)
+                        n = snprintf(id3viewc, MAX_PATH, "%d-%02d ",
+                                     pid3->discnum, pid3->tracknum);
+                    else if (pid3->tracknum > 0)
+                        n = snprintf(id3viewc, MAX_PATH, "%02d ",
+                                     pid3->tracknum);
+                }
+                if (display == PLAYLIST_VIEWER_ENTRY_SHOW_ID3_TITLE
+                    || !pid3->album || pid3->album[0] == '\0')
+                    snprintf(id3viewc + n, MAX_PATH - n, "%s", pid3->title);
+                else
+                    snprintf(id3viewc + n, MAX_PATH - n, "%s - %s",
+                             pid3->title, pid3->album);
                 track->attr |= PLAYLIST_ATTR_RETRIEVE_ID3_SUCCEEDED;
             }
             /* Yield to reduce as much as possible the perceived UI lag,
@@ -809,12 +826,197 @@ static int menu_settings(void)
     return ONPLAY_OK;
 }
 
+/* Select...: the loop starts selecting once the menu has closed */
+static bool menu_select_wanted;
+
+static int menu_select(void)
+{
+    menu_abort_move();
+    menu_select_wanted = true;
+    return ONPLAY_OK;
+}
+
+/** The ticked tracks **/
+
+/* Tracks the ticked tracks' menu moves or removes at once: more would want a
+ * buffer the viewer does not have, and are refused */
+#define SELECT_TRACKS_MAX 512
+static int select_index[SELECT_TRACKS_MAX];
+
+/* Row 'row''s playlist index, as playlist_entry_load() works it out */
+static int row_index(int row)
+{
+    return (row + playlist_get_first_index(viewer.playlist))
+           % viewer.num_tracks;
+}
+
+/* The ticked tracks' playlist indices, in list order, or -1 for too many */
+static int select_indices(void)
+{
+    int n = 0;
+
+    for (int row = list_select_next(-1); row >= 0;
+         row = list_select_next(row))
+    {
+        if (n == SELECT_TRACKS_MAX)
+        {
+            splash(HZ, ID2P(LANG_FAILED));
+            return -1;
+        }
+        select_index[n++] = row_index(row);
+    }
+    return n;
+}
+
+static int compare_desc(const void *a, const void *b)
+{
+    return *(const int *)b - *(const int *)a;
+}
+
+static bool select_acted;
+
+/* From the highest index down, so each index is still the track it named */
+static int select_remove(void)
+{
+    int n = select_indices();
+    bool playing = false;
+
+    select_acted = true;
+    if (n <= 0 || menu_track_stale())
+        return ONPLAY_OK;
+    qsort(select_index, n, sizeof(*select_index), compare_desc);
+    for (int i = 0; i < n; i++)
+    {
+        if (select_index[i] == viewer.current_playing_track)
+            playing = (audio_status() & AUDIO_STATUS_PLAY) != 0;
+        playlist_delete(viewer.playlist, select_index[i]);
+    }
+    if (playing)
+    {
+        if (playlist_amount_ex(viewer.playlist) <= 0)
+            audio_stop();
+        else
+            audio_play(0, 0);
+        viewer.current_playing_track = -1;
+    }
+    menu_result = PV_CONTEXT_MODIFIED;
+    return ONPLAY_OK;
+}
+
+/* Each ticked track goes in after the one placed before it, the first after
+ * the cursor's. playlist_move() leaves a track at the index it is given and
+ * shifts the ones between, so the indices still to move are shifted the same
+ * way after each. */
+static int select_move_here(void)
+{
+    int n = select_indices();
+    int prev = row_index(viewer.selected_track);
+
+    select_acted = true;
+    if (n <= 0 || menu_track_stale())
+        return ONPLAY_OK;
+    for (int i = 0; i < n; i++)
+    {
+        int from = select_index[i];
+        int to = from < prev ? prev : prev + 1;
+
+        /* The cursor's own track, or one already where it goes: the next
+         * goes in after it */
+        if (from == prev || from == to)
+        {
+            prev = from;
+            continue;
+        }
+        if (playlist_move(viewer.playlist, from, to) < 0)
+        {
+            splash(HZ, ID2P(LANG_FAILED));
+            break;
+        }
+        for (int j = i + 1; j < n; j++)
+        {
+            int *x = &select_index[j];
+
+            if (from < to && *x > from && *x <= to)
+                (*x)--;
+            else if (from > to && *x >= to && *x < from)
+                (*x)++;
+        }
+        prev = to;
+    }
+    menu_result = PV_CONTEXT_MODIFIED;
+    return ONPLAY_OK;
+}
+
+/* Play Next and the like, as they would act on each ticked track */
+static bool select_insert(int position, bool queue, bool create_new)
+{
+    struct playlist_insert_context context;
+    struct playlist_track_info info;
+    int added = 0;
+
+    (void)create_new;
+    select_acted = true;
+    if (playlist_insert_context_create(NULL, &context, position, queue,
+                                       false) < 0)
+    {
+        playlist_insert_context_release(&context);
+        return false;
+    }
+    for (int row = list_select_next(-1); row >= 0;
+         row = list_select_next(row))
+        if (playlist_get_track_info(viewer.playlist, row_index(row),
+                                    &info) >= 0
+            && playlist_insert_context_add(&context, info.filename) >= 0)
+            added++;
+    playlist_insert_context_release(&context);
+    return added > 0;
+}
+
+static int select_write(const char *playlist, bool new_playlist)
+{
+    struct playlist_track_info info;
+    int written = 0;
+
+    select_acted = true;
+    for (int row = list_select_next(-1); row >= 0;
+         row = list_select_next(row))
+        if (playlist_get_track_info(viewer.playlist, row_index(row),
+                                    &info) >= 0
+            && catalog_insert_into(playlist, new_playlist && written == 0,
+                                   info.filename, FILE_ATTR_AUDIO) >= 0)
+            written++;
+    return written > 0 ? 0 : -1;
+}
+
+static enum pv_context_result select_menu(void)
+{
+    static const struct context_menu_row rows[] = {
+        { LANG_REMOVE,    select_remove,    false },
+        { LANG_MOVE_HERE, select_move_here, false },
+    };
+    char name[48];
+    int ret;
+
+    list_select_menu_name(name, sizeof(name), true);
+    menu_result = PV_CONTEXT_UNCHANGED;
+    select_acted = false;
+    ret = context_menu_show_item(name, ATTR_DIRECTORY, false, false,
+                                 select_insert, select_write,
+                                 rows, ARRAYLEN(rows));
+    if (select_acted)
+        list_select_end();
+    if (ret == ONPLAY_MAINMENU)
+        return PV_CONTEXT_USB;
+    return menu_result;
+}
+
 static enum pv_context_result context_menu(int index)
 {
     static const struct context_menu_row rows[] = {
         { LANG_REMOVE,                  menu_remove,   false },
         { LANG_MOVE,                    menu_move,     false },
         { LANG_TRACK_INFO,              menu_info,     false },
+        { LANG_SELECT_MANY,             menu_select,   false },
         { LANG_SHUFFLE,                 menu_shuffle,  true },
         { LANG_SAVE,                    menu_save,     true },
         { LANG_PLAYLISTVIEWER_SETTINGS, menu_settings, true },
@@ -1059,6 +1261,10 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
         bool moving = viewer.moving_track >= 0;
         bool changed = playlist_changed();
 
+        /* The marks name rows of a playlist that is no longer this one */
+        if (changed && list_select_active())
+            list_select_end();
+
         /* Said, and the keys pressed meanwhile dropped: the OK that would
          * have placed the cancelled move otherwise plays the track. */
         if (changed && moving)
@@ -1086,7 +1292,8 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
         }
 
         /* Timeout so we can determine if play status has changed */
-        bool res = list_do_action(CONTEXT_TREE, HZ/2, &playlist_lists, &button);
+        bool res = list_do_action(list_select_context(CONTEXT_TREE), HZ/2,
+                                  &playlist_lists, &button);
         /* during moving, another redraw is going to be needed,
          * since viewer.selected_track is updated too late (after the first draw)
          * drawing the moving item needs it */
@@ -1102,6 +1309,34 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
             if (reload || viewer.moving_track >= 0)
                 gui_synclist_draw(&playlist_lists);
         }
+
+        switch (list_select_action(button))
+        {
+            case LIST_SELECT_PASS:
+                break;
+            case LIST_SELECT_MENU:
+            {
+                enum pv_context_result r = select_menu();
+
+                if (r == PV_CONTEXT_USB)
+                {
+                    list_select_end();
+                    ret = PLAYLIST_VIEWER_USB;
+                    goto exit;
+                }
+                if (update_viewer(&playlist_lists, r))
+                {
+                    list_select_end();
+                    exit = true;
+                    ret = PLAYLIST_VIEWER_CANCEL;
+                }
+                list_select_retitle();
+                continue;
+            }
+            default:
+                continue;
+        }
+
         switch (button)
         {
             case ACTION_TREE_WPS:
@@ -1208,6 +1443,10 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                     exit = true;
                     ret = PLAYLIST_VIEWER_CANCEL;
                 }
+                else if (menu_select_wanted)
+                    list_select_begin(&playlist_lists, viewer.selected_track,
+                                      NULL, NULL);
+                menu_select_wanted = false;
                 break;
             }
             case ACTION_STD_MENU:
@@ -1269,6 +1508,7 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
     }
 
 exit:
+    list_select_end();      /* the list it holds is on this stack */
     pop_current_activity_without_refresh();
     talk_shutup();
     close_playlist_viewer();

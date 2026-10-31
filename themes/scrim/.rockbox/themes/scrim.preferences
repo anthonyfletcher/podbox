@@ -37,3 +37,10 @@ spectrum peaks: on
 # after changing it.
 # Possible Values: on, off
 episode notes: on
+#
+#-- Album Header --#
+# An album's cover, artist, year, track count and length above its tracks,
+# which then show four rows. Off, the list keeps all its rows. Reload the
+# theme after changing it.
+# Possible Values: on, off
+album header: on

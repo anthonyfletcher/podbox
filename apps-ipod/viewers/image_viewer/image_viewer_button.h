@@ -16,26 +16,25 @@
 #include "config.h"
 #include "button.h"
 
-/* Controls. The viewer has two key maps; the "Zoom / Pan" row in the settings
- * menu -- hold Menu -- swaps between them, and nothing else does.
+/* Controls. The viewer has two key maps: Pan swaps them, from the menu or a
+ * hold of Select. Zoom is chosen from a list on the menu.
  *
- *                  navigation (default)     zoom / pan
- *   wheel          -                        zoom in / out
+ *                  normal                   pan
+ *   wheel          -                        pan up / down
  *   Left / Right   previous / next picture  pan, repeating
- *   Menu (tap)     leave the viewer         pan up
- *   Menu (hold)    settings menu            settings menu
- *   Play           -                        pan down, repeating
+ *   Menu (tap)     leave the viewer         leave pan
+ *   Menu (hold)    menu                     menu
+ *   Select (hold)  pan                      leave pan
  *
  * Menu leaves on the release, not the press: the press cannot yet be told
  * apart from the start of a hold.
  */
-#define IMGVIEW_ZOOM_IN     BUTTON_SCROLL_FWD
-#define IMGVIEW_ZOOM_OUT    BUTTON_SCROLL_BACK
-#define IMGVIEW_UP          BUTTON_MENU
-#define IMGVIEW_DOWN        BUTTON_PLAY
+#define IMGVIEW_PAN_UP      BUTTON_SCROLL_BACK
+#define IMGVIEW_PAN_DOWN    BUTTON_SCROLL_FWD
 #define IMGVIEW_LEFT        BUTTON_LEFT
 #define IMGVIEW_RIGHT       BUTTON_RIGHT
 #define IMGVIEW_MENU        (BUTTON_MENU | BUTTON_REPEAT)
 #define IMGVIEW_EXIT        (BUTTON_MENU | BUTTON_REL)
+#define IMGVIEW_PAN         (BUTTON_SELECT | BUTTON_REPEAT)
 
 #endif /* _IMAGE_VIEWER_BUTTONS_H */

@@ -299,6 +299,10 @@ extern void gui_synclist_draw(struct gui_synclist * lists);
    Use it wherever a list is first shown; plain gui_synclist_draw() for the
    redraws after that. */
 void gui_synclist_draw_settled(struct gui_synclist *lists);
+/* What a draw does first when the list or its UI viewport has changed: lay
+ * out the rows and re-choose the top one. For a caller about to set the top
+ * row itself, which the next draw would otherwise undo. */
+void gui_synclist_layout(struct gui_synclist *lists);
 /* Suppress the LCD flush of the next list draw(s) -- render only, no update. */
 void gui_synclist_inhibit_flush(bool inhibit);
 bool gui_synclist_flush_inhibited(void);
@@ -345,6 +349,9 @@ int skinlist_get_item_column(void);
 enum themable_icons skinlist_get_item_icon(int offset, bool wrap);
 /* %Lk, %Lv and %LP: what the row's list says of it. */
 enum list_row_kind skinlist_get_item_kind(int offset, bool wrap);
+/* %Lm: 1 for a ticked row of a list that is selecting, 0 for one that could
+ * be, -1 for any other */
+int skinlist_item_mark(int offset, bool wrap);
 const char* skinlist_get_item_value(int offset, bool wrap,
                                     char* buf, size_t buf_size);
 bool skinlist_item_is_playing(int offset, bool wrap);

@@ -135,11 +135,40 @@ enum browser_db_scope {
 };
 enum browser_db_scope browser_db_current_scope(void);
 
+/* The path of track row 'row', through a search the caller opened on
+ * tag_filename; false for a row that is not a track */
+struct tagcache_search;
+bool browser_db_row_path(struct browser_context *c,
+                         struct tagcache_search *tcs, int row,
+                         char *buf, size_t size);
+
+/* What an album's track list shows above itself, for the skin's %LH. Strings
+ * are empty where the database names nothing; year and discs are 0. */
+struct browser_db_header {
+    char name[128];
+    char artist[128];
+    int year;
+    int tracks;
+    int discs;          /* the highest disc number, 0 for none */
+    long length_ms;
+    unsigned int art_hash;
+    int album_row;      /* tagcache_album_get()'s, which the art is keyed by */
+};
+/* False unless the level on screen is an album's tracks in a music browse
+ * and the album table is in RAM. Reads RAM only. */
+bool browser_db_album_header(struct browser_context *c,
+                             struct browser_db_header *h);
+
 /* The selected row's name, as it reads on screen. */
 char *browser_db_current_entry_name(char *buf, size_t bufsize);
 
 /* Levels a browse can be deep, which is the ceiling on the filters below. */
 #define BROWSER_DB_MAX_TAGS 5
+
+/* The menus the firmware defines itself (add_builtin_menus()), by the ids
+ * other screens open them by */
+#define BROWSER_DB_MENU_AUDIOBOOKS "audiobooks"
+#define BROWSER_DB_MENU_PODCASTS   "podcasts"
 
 /* What scopes a tagcache search to the selected row: every grouping level
  * above it, then the row itself.
@@ -260,7 +289,8 @@ int browser_db_played_episodes(struct browser_context *c, int id);
 int browser_db_delete_played(struct browser_context *c, int id);
 /* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
  * False if index is out of range, or names a submenu with nothing in it:
- * that slot is numbered but hidden. */
+ * that slot is numbered but hidden, as is one PodBox has a row of its own
+ * for. */
 bool browser_db_get_main_menu_row(int index, const unsigned char **out_name);
 /* Its %Lk: LIST_ROW_CUSTOM or LIST_ROW_CUSTOM_MENU for the user's own, as in
  * the Music menu, and LIST_ROW_ACTION for the rest. */

@@ -61,6 +61,8 @@
 #include "screens/context_menu.h"
 #include "core_alloc.h"
 #include "draw/img_filter.h"   /* the row chain the skin hands down */
+#include "system/format_time.h"   /* %LH(length) */
+#include "skin/custom_tokens.h"   /* %LH's fields */
 #include "metadata/art_cache.h"
 #include "power.h"
 #include "input/action.h"
@@ -83,7 +85,9 @@
 
 /* gui api */
 #include "widgets/list.h"
+#include "widgets/list_select.h"
 #include "widgets/splash.h"
+#include "files/file_ops.h"   /* the ticked rows' Delete */
 #include "screens/music_menu_config.h"
 #include "screens/playback/quick_screen.h"
 #include "screens/shortcuts.h"
@@ -803,6 +807,72 @@ static void browser_set_showing_episodes(bool on)
     }
 }
 
+/* And for an album's tracks, whose skin can draw the album over them (%LH) */
+static bool db_showing_header;
+static struct browser_db_header db_header;
+
+static void browser_set_header(bool on)
+{
+    if (on != db_showing_header)
+    {
+        db_showing_header = on;
+        FOR_NB_SCREENS(i)
+            sb_skin_settle(i);
+    }
+}
+
+const char *browser_header_text(int field, char *buf, size_t size)
+{
+    if (!db_showing_header)
+        return NULL;
+
+    switch (field)
+    {
+        case BROWSER_HEADER_KIND:
+            return "album";
+        case BROWSER_HEADER_NAME:
+            return db_header.name[0] ? db_header.name : NULL;
+        case BROWSER_HEADER_ARTIST:
+            return db_header.artist[0] ? db_header.artist : NULL;
+        case BROWSER_HEADER_YEAR:
+            if (db_header.year <= 0)
+                return NULL;
+            snprintf(buf, size, "%d", db_header.year);
+            return buf;
+        case BROWSER_HEADER_TRACKS:
+            snprintf(buf, size, "%d", db_header.tracks);
+            return buf;
+        case BROWSER_HEADER_LENGTH:
+            if (db_header.length_ms <= 0)
+                return NULL;
+            format_time(buf, size, db_header.length_ms);
+            return buf;
+        case BROWSER_HEADER_DISCS:
+            if (db_header.discs <= 1)
+                return NULL;
+            snprintf(buf, size, "%d", db_header.discs);
+            return buf;
+    }
+    return NULL;
+}
+
+static unsigned int header_art_hash(int selected_item, void *data)
+{
+    (void)selected_item;
+    (void)data;
+    return db_header.art_hash;
+}
+
+/* Keyed below -1, which no row is, and by album, so the cover cached for one
+ * album is never drawn over another's tracks */
+const struct bitmap *browser_header_art(struct dim *size)
+{
+    if (!db_showing_header || !db_header.art_hash)
+        return NULL;
+    return browser_art_row(-2 - db_header.album_row, NULL, header_art_hash,
+                           size, NULL, 0);
+}
+
 /*
  * Called when a new dir is loaded (for example when returning from other apps ...)
  * also completely redraws the tree
@@ -874,6 +944,8 @@ static int update_dir(void)
         }
     }
 
+    browser_set_header(id3db && browser_db_album_header(&tc, &db_header));
+
     if (id3db)
     {
         if (show_path_in_browser == SHOW_PATH_FULL
@@ -881,6 +953,17 @@ static int update_dir(void)
         {
             title = browser_db_get_title(&tc);
             icon = filetype_get_icon(ATTR_DIRECTORY);
+
+            /* A skin without %LH still gets the year, in the title */
+            if (db_showing_header && db_header.year > 0
+                && !sb_skin_has_header(SCREEN_MAIN))
+            {
+                static char title_year[MAX_PATH];
+
+                snprintf(title_year, sizeof(title_year), "%s (%d)",
+                         P2STR((unsigned char *)title), db_header.year);
+                title = title_year;
+            }
         }
     }
     else
@@ -1003,6 +1086,10 @@ static int update_dir(void)
         int top_item = (*tc.dirfilter == SHOW_ID3DB)
                            ? browser_db_take_pending_top_item()
                            : browser_disk_take_pending_top_item();
+        /* Laid out first in the viewport the skin has just chosen (an
+         * album's header shortens the list), or the draw would lay it out
+         * again and put the row above the cursor back. */
+        gui_synclist_layout(list);
         /* Only if the selection still fits on screen below it. The list
          * re-chooses its top row when the selection moves, not on a plain
          * draw, so a top row that pushed the cursor out of sight would simply
@@ -1190,6 +1277,7 @@ void set_current_file(const char *path)
 static int exit_to_new_screen(int screen)
 {
     gui_synclist_scroll_stop(&browser_lists);
+    list_select_end();
     return screen;
 }
 
@@ -1210,6 +1298,234 @@ static int music_row_menu(void)
 
     if (ret == 0 && music_menu_hide_row(index))
         splash(HZ, ID2P(LANG_ROW_HIDDEN));
+    return ret;
+}
+
+/** Selecting **/
+
+/* Whether a row's Select... is offered: on a library list of tracks, and in
+ * Files itself rather than a picker or the catalogue */
+bool browser_select_offered(void)
+{
+    if (!tc.browse || (tc.browse->flags & BROWSE_SELECTONLY)
+        || tc.filesindir <= 0 || tc.filesindir > LIST_SELECT_MAX_ROWS)
+        return false;
+    if (*tc.dirfilter == SHOW_ID3DB)
+        return browser_db_get_attr(&tc) == FILE_ATTR_AUDIO;
+    return *tc.dirfilter <= NUM_FILTER_MODES;
+}
+
+static bool row_selectable(int row, void *data)
+{
+    struct browser_context *c = data;
+    int attr;
+
+    if (*c->dirfilter == SHOW_ID3DB)
+        return row >= c->special_entry_count
+               && browser_db_get_entry_kind(c, row) == LIST_ROW_TRACK;
+    /* Any file or folder, for Cut, Copy and Delete; the ways of playing pass
+     * over what does not play */
+    attr = get_valid_entry(__func__, c, row)->attr;
+    return !file_attr_is_row(attr & FILE_ATTR_MASK);
+}
+
+static bool playable(int attr)
+{
+    return (attr & ATTR_DIRECTORY)
+           || (attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO
+           || (attr & FILE_ATTR_MASK) == FILE_ATTR_M3U;
+}
+
+/* Set when a row of the ticked rows' menu acts, which ends the mode; backing
+ * out of the menu leaves it on */
+static bool select_acted;
+
+/* Each ticked row's path and attributes to 'fn', in list order. The count
+ * handed on, or -1 when the database would not be searched. */
+static int select_each(bool (*fn)(const char *path, int attr, void *data),
+                       void *data)
+{
+    struct tagcache_search tcs;
+    bool db = *tc.dirfilter == SHOW_ID3DB;
+    char path[MAX_PATH];
+    int n = 0;
+
+    if (db && !tagcache_search(&tcs, tag_filename))
+    {
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return -1;
+    }
+    for (int row = list_select_next(-1); row >= 0;
+         row = list_select_next(row))
+    {
+        int attr;
+
+        if (db)
+        {
+            if (!browser_db_row_path(&tc, &tcs, row, path, sizeof(path)))
+                continue;
+            attr = FILE_ATTR_AUDIO;
+        }
+        else
+        {
+            struct entry *e = get_valid_entry(__func__, &tc, row);
+            browser_disk_assemble_path(path, sizeof(path), tc.currdir,
+                                       e->name);
+            attr = e->attr;
+        }
+        if (!fn(path, attr, data))
+            break;
+        n++;
+    }
+    if (db)
+        tagcache_search_finish(&tcs);
+    return n;
+}
+
+static bool insert_one(const char *path, int attr, void *data)
+{
+    struct playlist_insert_context *context = data;
+
+    if (!playable(attr))
+        return true;
+    if (attr & ATTR_DIRECTORY)
+        return playlist_insert_directory(NULL, path, 0, false,
+                   global_settings.recursive_dir_insert != RECURSE_OFF,
+                   context) >= 0;
+    if ((attr & FILE_ATTR_MASK) == FILE_ATTR_M3U)
+        return playlist_entries_iterate(path, context, NULL);
+    return playlist_insert_context_add(context, path) >= 0;
+}
+
+/* One insert context for the lot, so they keep their order wherever they
+ * go: a folder, a playlist and a track can be ticked together */
+static bool select_insert(int position, bool queue, bool create_new)
+{
+    struct playlist_insert_context context;
+    int n;
+
+    (void)create_new;
+    select_acted = true;
+    if (playlist_insert_context_create(NULL, &context, position, queue,
+                                       true) < 0)
+    {
+        playlist_insert_context_release(&context);
+        return false;
+    }
+    n = select_each(insert_one, &context);
+    playlist_insert_context_release(&context);
+    return n > 0;
+}
+
+struct write_state {
+    const char *playlist;
+    bool new_playlist;
+};
+
+static bool write_one(const char *path, int attr, void *data)
+{
+    struct write_state *w = data;
+    bool ok;
+
+    if (!playable(attr))
+        return true;
+    ok = catalog_insert_into(w->playlist, w->new_playlist, path, attr) >= 0;
+
+    w->new_playlist = false;    /* the first truncates; the rest append */
+    return ok;
+}
+
+static int select_write(const char *playlist, bool new_playlist)
+{
+    struct write_state w = { playlist, new_playlist };
+
+    select_acted = true;
+    return select_each(write_one, &w) > 0 ? 0 : -1;
+}
+
+static bool name_one(const char *path, int attr, void *data)
+{
+    const char *name = strrchr(path, '/');
+
+    (void)attr;
+    return fdprintf(*(int *)data, "%s\n", name ? name + 1 : path) > 0;
+}
+
+/* Cut or Copy: the names go to the clipboard's list, the folder to the
+ * clipboard itself */
+static int select_clip(bool copy)
+{
+    int fd = open(CLIPBOARD_LIST, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int n;
+
+    select_acted = true;
+    if (fd < 0)
+    {
+        splash(HZ, ID2P(LANG_FAILED));
+        return 0;
+    }
+    n = select_each(name_one, &fd);
+    close(fd);
+    if (n > 0)
+        context_menu_clip_many(tc.currdir, copy);
+    return 0;
+}
+
+static int select_cut(void)
+{
+    return select_clip(false);
+}
+
+static int select_copy(void)
+{
+    return select_clip(true);
+}
+
+static bool delete_one(const char *path, int attr, void *data)
+{
+    (void)attr;
+    (void)data;
+    return delete_fileobject_confirmed(path) >= 0;
+}
+
+static int select_delete(void)
+{
+    char text[48];
+    const char *lines[] = { text };
+    const struct text_message message = { lines, 1 };
+
+    snprintf(text, sizeof(text), str(LANG_REALLY_DELETE_N),
+             list_select_count());
+    select_acted = true;
+    if (gui_syncyesno_run(&message, NULL, NULL) != YESNO_YES)
+        return 0;
+    if (select_each(delete_one, NULL) < list_select_count())
+        splash(HZ, ID2P(LANG_FAILED));
+    reload_dir = true;
+    return 0;
+}
+
+/* The ticked rows' menu: the ways of playing them and Add to Playlist, and in
+ * Files, Cut, Copy and Delete. Returns what the context menu would. */
+static int select_menu(void)
+{
+    static const struct context_menu_row file_rows[] = {
+        { LANG_CUT,    select_cut,    false },
+        { LANG_COPY,   select_copy,   false },
+        { LANG_DELETE, select_delete, false },
+    };
+    bool db = *tc.dirfilter == SHOW_ID3DB;
+    char name[48];
+    int ret;
+
+    list_select_menu_name(name, sizeof(name), db);
+    select_acted = false;
+    ret = context_menu_show_item(name, ATTR_DIRECTORY, false, false,
+                                 select_insert, select_write,
+                                 db ? NULL : file_rows,
+                                 db ? 0 : ARRAYLEN(file_rows));
+    if (select_acted)
+        list_select_end();
     return ret;
 }
 
@@ -1257,11 +1573,38 @@ static int dirbrowse(void)
             tc.dirlevel = 0; /* shouldnt be needed.. this code needs work! */
 
         keyclick_set_callback(gui_synclist_keyclick_callback, &browser_lists);
-        button = get_action(CONTEXT_TREE|ALLOW_SOFTLOCK,
+        button = get_action(list_select_context(CONTEXT_TREE)|ALLOW_SOFTLOCK,
                             list_do_action_timeout(&browser_lists, HZ/2));
         oldbutton = button;
         gui_synclist_do_button(&browser_lists, &button);
         tc.selected_item = gui_synclist_get_sel_pos(&browser_lists);
+
+        switch (list_select_action(button))
+        {
+            case LIST_SELECT_PASS:
+                break;
+            case LIST_SELECT_MENU:
+                switch (select_menu())
+                {
+                    case ONPLAY_MAINMENU:
+                        list_select_end();
+                        return exit_to_new_screen(GO_TO_ROOT);
+                    case ONPLAY_START_PLAY:
+                        list_select_end();
+                        return exit_to_new_screen(GO_TO_WPS);
+                }
+                if (!reload_dir)
+                {
+                    numentries = update_dir();
+                    list_select_retitle();
+                    continue;
+                }
+                /* A Delete: on to the reload below, which ends the mode */
+                button = ACTION_NONE;
+                break;
+            default:
+                continue;
+        }
         int customaction = ONPLAY_NO_CUSTOMACTION;
         bool do_restore_display = true;
             if (id3db && (button == ACTION_STD_OK || button == ACTION_STD_CONTEXT))
@@ -1527,6 +1870,12 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_WPS);
                         break;
 
+                    case ONPLAY_SELECT:
+                        numentries = update_dir();
+                        list_select_begin(&browser_lists, tc.selected_item,
+                                          row_selectable, &tc);
+                        continue;
+
                     case ONPLAY_PLUGIN:
                         return exit_to_new_screen(GO_TO_PLUGIN);
                         break;
@@ -1590,8 +1939,12 @@ static int dirbrowse(void)
         if (restore || reload_dir) {
             FOR_NB_SCREENS(i)
                 screens[i].scroll_stop();
+            /* A reloaded list may not be the one the marks were made on */
+            if (reload_dir)
+                list_select_end();
             /* restore display */
             numentries = update_dir();
+            list_select_retitle();
             reload_dir = false;
             if (currdir[1] && (numentries < 0))
             {   /* not in root and reload failed */
@@ -1700,6 +2053,7 @@ int rockbox_browse(struct browse_context *browse)
     {
         db_showing_art = false;    /* no browse left on screen */
         db_showing_episodes = false;
+        db_showing_header = false;
     }
 
     return ret_val;

@@ -120,6 +120,10 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_LIST_ITEM_VALUE,    "Lv", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_RANGE,    "Lr", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_PLAYING,  "LP", "|IS",        SKIN_REFRESH_DYNAMIC),
+    /* A row of a list that is selecting: "m" ticked, "u" not, empty for a
+     * row that cannot be and on any other list. A skin that uses it draws
+     * the mark; one that does not gets "[x] " in the text. */
+    TAG(SKIN_TOKEN_LIST_ITEM_MARKED,   "Lm", "|IS",        SKIN_REFRESH_DYNAMIC),
 
     /* The selected row's description, wherever it is used: on a list of
      * podcast episodes, the episode's comment tag, or a space where it has
@@ -127,6 +131,12 @@ static const struct tag_info custom_tags[] =
      * and on one whose episodes have no notes. For a %wt below the list.
      * (%LC is upstream's row column.) */
     TAG(SKIN_TOKEN_LIST_SELECTED_DESC, "LD", "",           SKIN_REFRESH_DYNAMIC),
+
+    /* The list's header, from the browser's state as %LD is: bare, the kind
+     * of header ("album") or empty; with a field word, that field (name,
+     * artist, year, tracks, length, discs); with "art", the cover drawn in
+     * the middle of the viewport, and a corner radius after it. */
+    TAG(SKIN_TOKEN_LIST_HEADER,        "LH", "|SI",        SKIN_REFRESH_DYNAMIC),
 
     /* %wt(text[,align]): draw text word-wrapped and aligned to fill the current
      * viewport, ellipsised on overflow -- or, with %s on its line, scrolled up

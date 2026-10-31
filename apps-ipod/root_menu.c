@@ -397,7 +397,7 @@ static int browser(void* param)
             tc->dirlevel = 0;
             tc->currtable = 0;
             browser_db_clear_shortcut_base();
-            browser_db_enter_menu_row_on_next_load("podcasts",
+            browser_db_enter_menu_row_on_next_load(BROWSER_DB_MENU_PODCASTS,
                                                    str(LANG_PODCASTS));
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         break;
@@ -1839,10 +1839,13 @@ static char *row_menu_name(int selected_item, void *data,
             return (char *)str(LANG_SETTINGS);
     }
 
+    /* A row can name itself by a lang ID rather than text -- Now Playing and
+     * Resume Playback do -- so it is read through P2STR() like a desc */
     if (ctx_row->flags & MENU_DYNAMIC_DESC)
-        return ctx_row->menu_get_name_and_icon->list_get_name(0,
-            ctx_row->menu_get_name_and_icon->list_get_name_data,
-            buffer, buffer_len);
+        return (char *)P2STR((unsigned char *)
+            ctx_row->menu_get_name_and_icon->list_get_name(0,
+                ctx_row->menu_get_name_and_icon->list_get_name_data,
+                buffer, buffer_len));
     if (ctx_row->flags & MENU_HAS_DESC)
         return (char *)P2STR(ctx_row->callback_and_desc->desc);
     return (char *)str(LANG_ONPLAY_MENU_TITLE);

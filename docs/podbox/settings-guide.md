@@ -173,7 +173,7 @@ Settings
 | Sort Playlists | The order saved playlists are listed in: by name, or by when they were made. | Alphabetical |  |
 | Playlist Viewer Settings ▸ Show Icons | Draws icons beside the entries in the playing queue. | Yes |  |
 | Playlist Viewer Settings ▸ Show Indices | Numbers the entries in the playing queue. | Yes |  |
-| Playlist Viewer Settings ▸ Track Display | Whether the queue shows filenames or the artist and title from the tags. | Track Name Only |  |
+| Playlist Viewer Settings ▸ Track Display | What each entry in the queue and in a saved playlist shows: the filename, the full path, or the title from the tags, alone or with the album. Number, Title & Album also puts the disc and track number first, which shows whether an album's tracks are still in order. | Title from ID3 Tags |  |
 | Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | On |  |
 | Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | Yes |  |
 | Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |

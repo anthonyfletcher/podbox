@@ -54,6 +54,23 @@ static const struct button_mapping button_context_standard[]  = {
     LAST_ITEM_IN_LIST
 }; /* button_context_standard */
 
+/* A list in selecting mode. A tap of SELECT ticks a row; held, it belongs to a
+ * run (list_select.c reads it from button_status() as the wheel turns), so
+ * the context menu it would open is claimed here, and a release after the
+ * wheel turned is no tap -- its previous button is the scroll. PLAY opens the
+ * menu for the ticked rows, and MENU leaves. Scrolling is the list's. */
+static const struct button_mapping button_context_list_select[]  = {
+    { ACTION_LS_TOGGLE,         BUTTON_SELECT|BUTTON_REL,       BUTTON_SELECT },
+    { ACTION_NONE,              BUTTON_SELECT|BUTTON_REPEAT,    BUTTON_NONE },
+    { ACTION_NONE,              BUTTON_SELECT|BUTTON_REL,       BUTTON_NONE },
+    { ACTION_LS_MENU,           BUTTON_PLAY|BUTTON_REL,         BUTTON_PLAY },
+    { ACTION_NONE,              BUTTON_PLAY|BUTTON_REPEAT,      BUTTON_NONE },
+    { ACTION_STD_CANCEL,        BUTTON_MENU|BUTTON_REL,         BUTTON_MENU },
+    { ACTION_NONE,              BUTTON_MENU|BUTTON_REPEAT,      BUTTON_NONE },
+
+    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
+}; /* button_context_list_select */
+
 /* No cascade: a game screen that fell through to the list keys would answer
    a turn of the wheel with a scroll. Everything the WPS does that does not
    want SELECT carries over unchanged, because a run is the WPS with a game
@@ -517,6 +534,9 @@ const struct button_mapping* get_context_mapping(int context)
 
         case CONTEXT_MUSIC_QUIZ:
             return button_context_music_quiz;
+
+        case CONTEXT_LIST_SELECT:
+            return button_context_list_select;
 
         case CONTEXT_SETTINGS_TIME:
         case CONTEXT_SETTINGS_COLOURCHOOSER:

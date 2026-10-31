@@ -41,6 +41,14 @@ bool sb_set_title_text(const char* title, enum themable_icons icon, enum screen_
 bool sb_set_persistent_title(const char* title, enum themable_icons icon,
                              enum screen_type screen);
 void sb_skin_has_title(enum screen_type screen);
+/* Whether the skin draws a list's header itself (%LH), or the title must
+ * carry the part of it that matters most */
+void sb_skin_uses_header(enum screen_type screen);
+bool sb_skin_has_header(enum screen_type screen);
+/* Whether the skin marks a selecting list's ticked rows itself (%Lm), or
+ * the rows' text must carry [x] */
+void sb_skin_uses_mark(enum screen_type screen);
+bool sb_skin_has_mark(enum screen_type screen);
 const char* sb_get_title(enum screen_type screen);
 const char* sb_get_persistent_title(enum screen_type screen);
 enum themable_icons sb_get_icon(enum screen_type screen);

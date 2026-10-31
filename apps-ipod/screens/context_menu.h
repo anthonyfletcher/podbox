@@ -29,7 +29,14 @@ enum {
     ONPLAY_PLUGIN,
     ONPLAY_GO_TO_LIBRARY, /* the database browser, armed to open on an entry */
     ONPLAY_FUNC_RETURN, /* for use in hotkey_assignment only */
+    ONPLAY_SELECT,      /* Select...: the list turns into a selecting one */
 };
+
+/* Where Cut and Copy of several items keep their names, one per line; the
+ * folder they are in is the clipboard's path */
+#define CLIPBOARD_LIST ROCKBOX_DIR "/clipboard.lst"
+/* Cut or Copy the items of folder 'dir' named in CLIPBOARD_LIST */
+void context_menu_clip_many(const char *dir, bool copy);
 
 
 enum hotkey_action {

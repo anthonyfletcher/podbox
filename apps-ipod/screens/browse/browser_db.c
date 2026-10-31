@@ -105,6 +105,7 @@
 
 static int browser_db_play_folder(struct browser_context* c);
 static int play_unplayed(struct browser_context *c);
+static int play_shuffled_albums(struct browser_context *c);
 static bool under_artist_level(struct browser_context* c);
 
 /* reuse of browser_db data after browser_db_play_folder(), with the two
@@ -161,6 +162,7 @@ enum table {
     TABLE_BOOK_SHELF,
     TABLE_MUSIC_QUIZ,
     TABLE_PLAY_UNPLAYED,
+    TABLE_SHUFFLE_ALBUMS,
 };
 
 static const struct id3_to_search_mapping {
@@ -1747,6 +1749,144 @@ static void browser_db_unload(struct browser_context *c)
         browser_unlock_cache(c);
 }
 
+/* The Audiobooks and Podcasts menus. Their screens -- the shelves, the
+ * episode states, Play Unplayed -- are built around them, so they are the
+ * firmware's, read after the config through the same parser: a config's own
+ * menu of either id is replaced, and an older one that lacks them gets them.
+ * Lists of spoken word for a library without segregation are made under any
+ * other id, in tagnavi_custom.config.
+ *
+ * A format is added only where the config has none of its name, since a
+ * name can carry several conditional variants. */
+static const char *const builtin_menu_lines[] = {
+    /* A show's episodes newest first, by the order their titles give
+     * (db_episode.c) */
+    "%format \"fmt_episode\" \"%010d%s\" episode title %sort = \"inverse\" "
+        "%strip = \"10\"",
+    /* Episodes of every show, for the rows above the shows: newest file
+     * first, or last heard first. Found by name. */
+    "%format \"fmt_episode_new\" \"%010d%s - %s\" mtime album title "
+        "%sort = \"inverse\" %strip = \"10\"",
+    "%format \"fmt_episode_heard\" \"%010d%s - %s\" lastplayed album title "
+        "%sort = \"inverse\" %strip = \"10\"",
+    "",
+    /* "spoken" is answered from the genre alone (db_spoken.c): 1 a book, 2 a
+     * podcast. Search leads, so the menu opens one row below it; the three
+     * shelves (book_shelf.c) are built-in rows, each hidden while empty. */
+    "%menu_start \"" BROWSER_DB_MENU_AUDIOBOOKS "\" \"Audiobooks\"",
+    "\"Search\" ==> \"db_search\"",
+    "\"Finished\" ==> \"book_finished\"",
+    "\"Not Started\" ==> \"book_not_started\"",
+    "\"In Progress\" ==> \"book_in_progress\"",
+    "\"By Title\"  -> album       ? spoken == \"1\" -> title = \"fmt_title\"",
+    "\"By Author\" -> albumartist ? spoken == \"1\" -> album -> title = "
+        "\"fmt_title\"",
+    "",
+    /* The album is the show. PodBox's Podcasts row opens this row straight
+     * away; above the shows go Search and the episode states. */
+    "%menu_start \"" BROWSER_DB_MENU_PODCASTS "\" \"Podcasts\"",
+    "\"Podcasts\" -> album ? spoken == \"2\" -> title = "
+        "\"fmt_episode\"",
+    "",
+};
+
+/* The main menu rows that open them, for a config with none */
+static const struct {
+    const char *id;
+    const char *row;
+} builtin_menu_links[] = {
+    { BROWSER_DB_MENU_AUDIOBOOKS, "Audiobooks" },
+    { BROWSER_DB_MENU_PODCASTS,   "Podcasts" },
+};
+
+static bool format_named(const char *line)
+{
+    char name[sizeof(formats[0]->name)];
+    const char *q = strchr(line, '"');
+    const char *e = q ? strchr(q + 1, '"') : NULL;
+
+    if (!e || (size_t)(e - q - 1) >= sizeof(name))
+        return false;
+    memcpy(name, q + 1, e - q - 1);
+    name[e - q - 1] = '\0';
+    for (int i = 0; i < format_count; i++)
+        if (formats[i] && !strcasecmp(formats[i]->name, name))
+            return true;
+    return false;
+}
+
+static int menu_index(const char *id)
+{
+    for (int i = 0; i < menu_count; i++)
+        if (menus[i] && !strcasecmp(menus[i]->id, id))
+            return i;
+    return -1;
+}
+
+/* One line through parse_line(), which writes into it */
+static int parse_builtin_line(int n, const char *text)
+{
+    char line[256];
+
+    strmemccpy(line, text, sizeof(line));
+    return parse_line(n, line, NULL);
+}
+
+static bool add_builtin_menus(void)
+{
+    struct menu_root *root;
+    int n = 0, i, j;
+
+    /* Emptied, so the built-in rows replace the config's rather than
+     * following them */
+    for (i = 0; i < (int)ARRAYLEN(builtin_menu_links); i++)
+    {
+        int m = menu_index(builtin_menu_links[i].id);
+        if (m >= 0)
+            menus[m]->itemcount = 0;
+    }
+
+    if (parse_builtin_line(n++, TAGNAVI_VERSION) < 0)
+        return false;
+    for (i = 0; i < (int)ARRAYLEN(builtin_menu_lines); i++)
+    {
+        const char *l = builtin_menu_lines[i];
+
+        if (!strncmp(l, "%format", 7) && format_named(l))
+            continue;
+        if (parse_builtin_line(n++, l) < 0)
+            return false;
+    }
+
+    /* A main menu row for each, where the config's main menu has none --
+     * appended, so the rows above keep their numbers */
+    root = menus[rootmenu];
+    for (i = 0; root && i < (int)ARRAYLEN(builtin_menu_links); i++)
+    {
+        int m = menu_index(builtin_menu_links[i].id);
+        char text[MENUENTRY_MAX_NAME + MAX_MENU_ID_SIZE + 16];
+        bool linked = false;
+
+        for (j = 0; j < root->itemcount; j++)
+            if (root->items[j]->type == menu_load
+                && root->items[j]->link == m)
+                linked = true;
+        if (linked)
+            continue;
+
+        snprintf(text, sizeof(text), "%%menu_start \"%s\" \"%s\"",
+                 root->id, root->_title);
+        if (parse_builtin_line(n++, text) < 0)
+            return false;
+        snprintf(text, sizeof(text), "\"%s\" ==> \"%s\"",
+                 builtin_menu_links[i].row, builtin_menu_links[i].id);
+        if (parse_builtin_line(n++, text) < 0
+            || parse_builtin_line(n++, "") < 0)
+            return false;
+    }
+    return true;
+}
+
 static bool initialize_browser_db(void) /* also used when user selects 'Reload' in 'custom menu'*/
 {
     max_history_level = 0;
@@ -1791,6 +1931,9 @@ static bool initialize_browser_db(void) /* also used when user selects 'Reload' 
      * we have. That shouldn't normally happen. */
     if (rootmenu < 0)
         rootmenu = 0;
+
+    if (!add_builtin_menus())
+        logf("built-in menus failed");
 
     add_event(PLAYBACK_EVENT_TRACK_BUFFER, browser_db_buffer_event);
     add_event(PLAYBACK_EVENT_TRACK_FINISH, browser_db_track_finish_event);
@@ -3082,6 +3225,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * paging `offset` is compared against -- so <Random> sits at index 1 when
      * <All tracks> precedes it and at index 0 when it does not. */
     int sidx = 0;
+    int shuffle_at = -1;    /* where [Shuffle Albums] went, if on this page */
 
     /* -1 so insert_all_playlist() drops the row when it builds the
      * book's playlist: it retrieves a track by this seek, and a 0
@@ -3107,6 +3251,16 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     if (tag != tag_filename && !csi_mentions_spoken())
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_NAVIBROWSE,
                             ID2P(LANG_TAGNAVI_RANDOM), -1);
+    /* [Shuffle Albums] on a list of albums: its rows are what it shuffles,
+     * and the album table it reads them through is only in RAM */
+    if (tag == tag_album && !csi_mentions_spoken()
+        && tagcache_album_count() > 0)
+    {
+        if (offset <= sidx)
+            shuffle_at = current_entry_count;
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_SHUFFLE_ALBUMS,
+                            ID2P(LANG_TAGNAVI_SHUFFLE_ALBUMS), -1);
+    }
     /* [Featured In], on an artist's album list only -- see
      * featured_row_count(). It goes last of the three: putting it first would
      * renumber the other two, and browser_db_load() scrolls a level past its
@@ -3318,6 +3472,22 @@ entry_skip_formatter:
             sort = false;
             break ;
         }
+    }
+
+    /* [Shuffle Albums] has nothing to shuffle on a list of one album. Its row
+     * went in before the list was read, so it comes out now; a list too long
+     * to hold whole has more than one. */
+    if (shuffle_at >= 0 && !c->dirfull
+        && current_entry_count - c->special_entry_count < 2)
+    {
+        struct tagentry *entries = get_entries(c);
+
+        memmove(&entries[shuffle_at], &entries[shuffle_at + 1],
+                (current_entry_count - shuffle_at - 1) * sizeof(*entries));
+        current_entry_count--;
+        c->special_entry_count--;
+        head_rows--;
+        total_count--;
     }
 
     if (sort)
@@ -4219,11 +4389,20 @@ static struct menu_entry *main_menu_slot(int index, struct menu_root **in)
     return NULL;
 }
 
+/* A root row PodBox has a main menu row of its own for: Podcasts, whose own
+ * row goes through this one to open on the shows. Offered as well, it would
+ * be a second Podcasts that opens a menu of one row. */
+static bool main_menu_row_owned(const struct menu_entry *item)
+{
+    return item->type == menu_load && menus[item->link]
+           && !strcasecmp(menus[item->link]->id, BROWSER_DB_MENU_PODCASTS);
+}
+
 bool browser_db_get_main_menu_row(int index, const unsigned char **out_name)
 {
     struct menu_entry *item = main_menu_slot(index, NULL);
 
-    if (!item)
+    if (!item || main_menu_row_owned(item))
         return false;
     if (item->type == menu_load && !row_submenu_has_items(item))
         return false;
@@ -4894,6 +5073,18 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             return 0;
         }
         if (!warn_on_pl_erase() || play_unplayed(c) < 0)
+            return 0;
+        return GO_TO_WPS;
+    }
+
+    if (dptr->newtable == TABLE_SHUFFLE_ALBUMS)
+    {
+        if (global_settings.party_mode && audio_status())
+        {
+            splash(HZ, ID2P(LANG_PARTY_MODE));
+            return 0;
+        }
+        if (!warn_on_pl_erase() || play_shuffled_albums(c) < 0)
             return 0;
         return GO_TO_WPS;
     }
@@ -5998,6 +6189,250 @@ static int play_unplayed(struct browser_context *c)
             ids[n++] = e->idx_id;
     }
     return play_episodes(c, ids, n);
+}
+
+bool browser_db_row_path(struct browser_context *c,
+                         struct tagcache_search *tcs, int row,
+                         char *buf, size_t size)
+{
+    struct tagentry *e = browser_db_get_entry(c, row);
+
+    return e && e->newtable == TABLE_PLAYTRACK
+           && tagcache_retrieve(tcs, e->extraseek, tag_filename, buf, size);
+}
+
+bool browser_db_album_header(struct browser_context *c,
+                             struct browser_db_header *h)
+{
+    struct tagcache_album al;
+    int level = c->currextra;
+    long seek;
+    int row, i;
+    bool shared;
+
+    if (c->currtable != TABLE_NAVIBROWSE || level < 1
+        || csi->tagorder[level] != tag_title
+        || csi->tagorder[level - 1] != tag_album
+        || csi_mentions_spoken() || tagcache_album_count() <= 0)
+        return false;
+
+    /* An album name several albums share, reached without an album artist
+     * to choose between them, is one list of them all: the first one's year
+     * and cover stand for it, and no one artist does. */
+    seek = csi->result_seek[level - 1];
+    row = table_album_row(level - 1, seek);
+    shared = row < 0;
+    if (shared)
+        row = tagcache_album_find_name(seek);
+    if (row < 0 || !tagcache_album_get(row, &al))
+        return false;
+
+    memset(h, 0, sizeof(*h));
+    h->album_row = row;
+    h->year = al.year > 0 ? al.year : 0;
+    h->art_hash = al.art_hash;
+    if (!tagcache_seek_string(tag_album, al.album_seek, h->name,
+                              sizeof(h->name)))
+        h->name[0] = '\0';
+    if (shared || !tagcache_seek_string(tag_albumartist, al.artist_seek,
+                                        h->artist, sizeof(h->artist)))
+        h->artist[0] = '\0';
+
+    /* The list's own rows, not the table's count: a view's clauses can leave
+     * some of the album out */
+    for (i = c->special_entry_count; i < c->filesindir; i++)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+        long v;
+
+        if (!e)
+            break;
+        if (e->newtable != TABLE_PLAYTRACK)
+            continue;
+        h->tracks++;
+        if (tagcache_entry_numeric(e->idx_id, tag_length, &v) && v > 0)
+            h->length_ms += v;
+        if (tagcache_entry_numeric(e->idx_id, tag_discnumber, &v)
+            && v > h->discs)
+            h->discs = v;
+    }
+    return true;
+}
+
+/* Albums [Shuffle Albums] plays at most: more than any one list needs, and a
+ * longer list is sampled evenly rather than cut short */
+#define SHUFFLE_ALBUMS_MAX 2048
+
+struct shuffle_track {
+    int idx_id;
+    int key;        /* disc above track, as the album's own list sorts */
+};
+
+static int compare_shuffle_tracks(const void *p1, const void *p2)
+{
+    const struct shuffle_track *a = p1, *b = p2;
+
+    return a->key - b->key;
+}
+
+/* One album-table row's tracks, in disc and track order, onto the playlist.
+ * False once the playlist will take no more. */
+static bool insert_album_row(struct tagcache_search *tcs,
+                             struct playlist_insert_context *context, int row,
+                             struct shuffle_track *tracks, int cap)
+{
+    struct tagcache_album al;
+    char path[MAX_PATH];
+    int i, n = 0;
+
+    if (!tagcache_album_get(row, &al))
+        return true;
+    for (i = al.first; i <= al.last; i++)
+    {
+        long disc, track;
+
+        if (tagcache_album_of(i) != row)
+            continue;
+        if (n == cap)
+            break;  /* the rest go unsorted, after these */
+        if (!tagcache_entry_numeric(i, tag_discnumber, &disc) || disc < 0)
+            disc = 0;
+        if (!tagcache_entry_numeric(i, tag_tracknumber, &track) || track < 0)
+            track = 0;
+        tracks[n].idx_id = i;
+        tracks[n].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
+        n++;
+    }
+    qsort(tracks, n, sizeof(*tracks), compare_shuffle_tracks);
+
+    for (int j = 0; j < n; j++)
+        if (tagcache_retrieve(tcs, tracks[j].idx_id, tag_filename,
+                              path, sizeof(path))
+            && playlist_insert_context_add(context, path) < 0)
+            return false;
+    for (; i <= al.last; i++)
+        if (tagcache_album_of(i) == row
+            && tagcache_retrieve(tcs, i, tag_filename, path, sizeof(path))
+            && playlist_insert_context_add(context, path) < 0)
+            return false;
+    return true;
+}
+
+/* [Shuffle Albums]: every album on this list, in a random order, each one
+ * whole and in its own order. The albums are the database's album table rows,
+ * so an album's tracks are read from RAM without a search per album. */
+static int play_shuffled_albums(struct browser_context *c)
+{
+    static short rows[SHUFFLE_ALBUMS_MAX];
+    struct tagcache_search tcs;
+    struct playlist_insert_context context;
+    struct tagcache_album al;
+    struct shuffle_track *tracks;
+    size_t bufsize = 0;
+    int i, n = 0, seen = 0;
+    int level = c->currextra;
+    unsigned long last_tick;
+
+    srand(current_tick);
+
+    /* An album name several albums share, with no album artist above to
+     * choose between them, stands for all of them. Past the cap, each album
+     * replaces a kept one at random, so every album is equally likely in. */
+    for (i = c->special_entry_count; i < c->filesindir; i++)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+        int row, last;
+
+        if (!e)
+            break;
+        row = table_album_row(level, e->extraseek);
+        last = row;
+        if (row < 0)
+        {
+            row = last = tagcache_album_find_name(e->extraseek);
+            while (row >= 0 && tagcache_album_get(last + 1, &al)
+                   && al.album_seek == e->extraseek)
+                last++;
+        }
+        for (; row >= 0 && row <= last; row++, seen++)
+        {
+            if (n < SHUFFLE_ALBUMS_MAX)
+                rows[n++] = row;
+            else
+            {
+                int pick = rand() % (seen + 1);
+                if (pick < SHUFFLE_ALBUMS_MAX)
+                    rows[pick] = row;
+            }
+        }
+    }
+    if (n == 0)
+        return -1;
+
+    for (i = n - 1; i > 0; i--)
+    {
+        int j = rand() % (i + 1);
+        short t = rows[i];
+        rows[i] = rows[j];
+        rows[j] = t;
+    }
+
+    /* Claimed only now: paging the list in above borrows the same buffer */
+    tracks = app_get_buffer(&bufsize, "album shuffle");
+    if (!tracks || bufsize < sizeof(*tracks))
+        return -1;
+    if (playlist_create(NULL, NULL) < 0)
+    {
+        app_release_buffer("album shuffle");
+        return -1;
+    }
+    playlist_set_from_artist(under_artist_level(c));
+    if (!tagcache_search(&tcs, tag_filename))
+    {
+        app_release_buffer("album shuffle");
+        return -1;
+    }
+    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
+                                       false, false) < 0)
+    {
+        /* create() keeps the playlist lock even when it fails; release()
+         * is the only thing that gives it back. */
+        playlist_insert_context_release(&context);
+        tagcache_search_finish(&tcs);
+        app_release_buffer("album shuffle");
+        return -1;
+    }
+
+    cpu_boost(true);
+    last_tick = current_tick + HZ/2;
+    splash_progress_set_delay(HZ / 2);
+    for (i = 0; i < n; i++)
+    {
+        if (TIME_AFTER(current_tick, last_tick + HZ/4))
+        {
+            /* (voiced) */
+            splash_progress(i, n, "%s (%s)", str(LANG_WAIT),
+                            str(LANG_OFF_ABORT));
+            if (action_userabort(TIMEOUT_NOBLOCK))
+                break;
+            last_tick = current_tick;
+        }
+        if (!insert_album_row(&tcs, &context, rows[i], tracks,
+                              bufsize / sizeof(*tracks)))
+            break;
+        yield();
+    }
+    cpu_boost(false);
+
+    playlist_insert_context_release(&context);
+    tagcache_search_finish(&tcs);
+    app_release_buffer("album shuffle");
+
+    if (playlist_amount() <= 0)
+        return -1;
+    playlist_start(0, 0, 0);
+    remember_loaded(c);
+    return 0;
 }
 
 static int browser_db_play_folder(struct browser_context* c)

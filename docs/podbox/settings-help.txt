@@ -493,7 +493,10 @@ Draws icons beside the entries in the playing queue.
 Numbers the entries in the playing queue.
 
 [playlist viewer track display]
-Whether the queue shows filenames or the artist and title from the tags.
+What each entry in the queue and in a saved playlist shows: the filename, the
+full path, or the title from the tags, alone or with the album. Number, Title
+& Album also puts the disc and track number first, which shows whether an
+album's tracks are still in order.
 
 [sort case]
 Whether uppercase sorts separately from lowercase, so that "Zoo" can come

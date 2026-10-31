@@ -27,7 +27,11 @@
 #
 # A podcast episode's notes, under a shorter list, unless episode notes is off
 # in scrim.preferences
-%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%dr(10,172,300,62,ffffff,-,3,10)>
+%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%dr(5,172,310,62,ffffff,-,3,6)>
+#
+# An album's header, over its tracks, unless album header is off in
+# scrim.preferences
+%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%dr(5,40,310,70,ffffff,-,3,6)>
 #
 # Quick settings boxes
 %?if(%cs,=,10)<%?if(%QL,!=,ERR)<%dr(12,62,144,72,ffffff,-,3,10)>%?if(%QT,!=,ERR)<%dr(164,62,144,72,ffffff,-,3,10)>%?if(%QR,!=,ERR)<%dr(12,142,144,72,ffffff,-,3,10)>%?if(%QB,!=,ERR)<%dr(164,142,144,72,ffffff,-,3,10)>>
@@ -44,10 +48,10 @@
 # Quick settings. Cover Flow's %VI rides this line because a conditional
 # that flips clears its line's rect, and so does the shorter list a podcast's
 # episodes take for their notes.
-%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>%?if(%cs,=,22)<%VI(covers)>%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%Vd(Notes)%VI(notes)>
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>%?if(%cs,=,22)<%VI(covers)>%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%Vd(Notes)%VI(notes)>%?Ld<%VI(art)>%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Vd(AlbumHead)%VI(album)>
 #
 # Setup rows
-%Lb(Rows,300,30,-,46)
+%Lb(Rows,300,30,-,48)
 #
 # A numeric battery display adds the percentage after the time, so the title
 # and the time have a ChromeG (graphic) and a ChromeN (numeric) copy: the
@@ -82,6 +86,13 @@
 # A podcast's episodes: four rows, and the selected one's notes below them
 %Vi(notes,10,46,300,122,-)
 #
+# An album's tracks: four rows under its header
+%Vi(album,10,114,300,120,-)
+#
+# Album and artist art rows: four of them at 48px, the list a little
+# taller than the others for it
+%Vi(art,10,41,300,192,-)
+#
 # Row setup
 #
 # - Row shape. 1 icon, 2 number, 3 bare. A library list's own rows (%Lk 5:
@@ -95,7 +106,7 @@
 #   A track is numbered only where its list numbers it (%Lp): a podcast's
 #   episodes across its shows go bare.
 %Vl(Rows,0,0,1,1,-)
-%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7),%Lp))<%vs(shape,set,2)|%vs(shape,set,3)>>
+%?Lm<%vs(shape,set,1)|%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7),%Lp))<%vs(shape,set,2)|%vs(shape,set,3)>>>
 #
 # - Chevron, on rows that open a list: a settings or context submenu, a
 #   folder, a database level above the tracks, a catalogue playlist. A Yes/No
@@ -115,7 +126,7 @@
 #   The user's own rows have names no skin knows, so they go by %Lk: 10 a
 #   view, 11 a menu.
 %Vl(Rows,2,3,24,24,2)
-%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(By Type))<ª|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,35,Ę,36,ė,-1,-,¨)>>>>|%?if(%Lk,=,10)<ċ|%?if(%Lk,=,11)<Ċ|%?and(%if(%Lk,=,5),%if(%LT,=,Album))<d|%?if(%LT,=,%Sx(Now Playing))<%?mp<A|A|B|A|A>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Podcasts),Ď,%Sx([All Episodes]),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Books),Č,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%Sx(Custom menu),Ċ,%sel(%LI,19,Þ,2,m)))>>>>>>>
+%?La<|%?Lm<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?if(%Lm,=,m)<×|Ö>|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(By Type))<ª|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,35,Ę,36,ė,-1,-,¨)>>>>|%?if(%Lk,=,10)<ċ|%?if(%Lk,=,11)<Ċ|%?and(%if(%Lk,=,5),%if(%LT,=,Album))<d|%?if(%LT,=,%Sx(Now Playing))<%?mp<A|A|B|A|A>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,%Sx(Resume Playback),C,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Podcasts),Ď,%Sx([All Episodes]),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Books),Č,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%Sx(Custom menu),Ċ,%sel(%LI,19,Þ,2,m)))>>>>>>>>
 #
 # - Row number
 %Vl(Rows,0,5,30,20,3)
@@ -150,32 +161,32 @@
 # Album/Artist row setup
 #
 # - Special row icon, groupings included
-%Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx([All Episodes]),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Search),®,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d)>
+%Vl(Rows,10,12,24,24,2)
+%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx([All Episodes]),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Search),®,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d)>
 #
 # - Row art, darkened by a filter when not selected: a rectangle over
 #   the square would darken the sides of a book's narrower cover too.
-%Vl(Rows,0,1,44,44,-)
-%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])))<%?Lc<%La|%La(0,-,-,darker40)>>
+%Vl(Rows,0,2,44,44,-)
+%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])))<%?if(%cs,=,38)<%?Lc<%La|%La(0,-,-,darker40)>|%?Lc<%La(0,-,2)|%La(0,-,2,darker40)>>>
 #
 # - Selection bar
-%Vl(Rows,50,0,3,46,-)
-%?and(%La,%Lc)<%dr(0,0,3,46,vivid>60:ffffff,-,14,3)>
+%Vl(Rows,50,0,3,48,-)
+%?and(%La,%Lc)<%dr(0,0,3,48,vivid>60:ffffff,-,14,3)>
 #
 # - Row text, narrower beside a book's progress gauge. Each line is drawn
 #   only when it is the one wanted: an empty line would paint over the other.
-%Vl(Rows,60,13,230,20,-)
+%Vl(Rows,60,14,230,20,-)
 %?and(%La,%if(%vg(chev),!=,4))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>
-%Vl(Rows,60,13,206,20,-)
+%Vl(Rows,60,14,206,20,-)
 %?and(%La,%if(%vg(chev),=,4))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>
 #
 # - A book's progress gauge, as the rows without art have it
-%Vl(Rows,272,11,24,24,2)
+%Vl(Rows,272,12,24,24,2)
 %?La<%?Lr<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%Lr,0,ø,100,ā,%sel(%ma(%ma(%Lr,*,8),/,100),0,ù,1,ú,2,û,3,ü,4,ý,5,þ,6,ÿ,7,Ā))|>|>
 #
 # - A show's episodes not started, where a book's gauge would be: a badge
 #   in the accent, 1 to 9 and then 9+
-%Vl(Rows,272,11,24,24,2)%Vf(vivid>60:ffffff)
+%Vl(Rows,272,12,24,24,2)%Vf(vivid>60:ffffff)
 %?and(%La,%Lv)<%sel(%Lv,1,ę,2,Ě,3,ě,4,Ĝ,5,ĝ,6,Ğ,7,ğ,8,Ġ,9,ġ,Ģ)>
 #
 # Quick settings boxes
@@ -221,8 +232,19 @@
 %s%Qb
 #
 # A podcast episode's notes, scrolled up through when they do not fit
-%Vl(Notes,18,177,284,52,4)%Vf(!ffffff)
+%Vl(Notes,13,177,294,52,4)%Vf(!ffffff)
 %s%wt(%LD,tl)
+#
+# An album's header: the cover, then its name, artist, and year, tracks and
+# length
+%Vl(AlbumHead,18,40,44,70,-)
+%LH(art,2)
+%Vl(AlbumHead,74,46,233,20,3)%Vf(!ffffff)
+%s%LH(name)
+%Vl(AlbumHead,74,66,233,20,4)%Vf(!ffffff)
+%s%LH(artist)
+%Vl(AlbumHead,74,86,233,20,4)%Vf(!ffffff)
+%s%?LH(year)<%LH(year) · >%LH(tracks) %Sx(tracks)%?LH(length)< · %LH(length)>
 #
 # Volume overlay
 %Vl(Volume,0,0,320,35,3)%Vg(000000,000000,ffffff)

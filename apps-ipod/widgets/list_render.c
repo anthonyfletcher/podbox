@@ -25,6 +25,7 @@
 #include "input/action.h"
 #include "draw/screen_access.h"
 #include "list.h"
+#include "list_select.h"
 #include "draw/scrollbar.h"
 #include "lang.h"
 #include "sound.h"
@@ -316,6 +317,11 @@ void list_draw(struct screen *display, struct gui_synclist *list)
             entry_name = "";
         else
             entry_name = P2STR(s);
+        {
+            static char marked[MAX_PATH];
+            entry_name = (unsigned char *)list_select_decorate(
+                list, i, (const char *)entry_name, marked, sizeof(marked));
+        }
 
         while (*entry_name == '\t')
         {

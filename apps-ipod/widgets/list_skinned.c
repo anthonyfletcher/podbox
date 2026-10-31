@@ -23,6 +23,7 @@
 #include "input/action.h"
 #include "draw/screen_access.h"
 #include "list.h"
+#include "list_select.h"
 #include "draw/scrollbar.h"
 #include "lang.h"
 #include "sound.h"
@@ -127,7 +128,19 @@ const char* skinlist_get_item_text(int offset, bool wrap, char* buf, size_t buf_
         return NULL;
     const char* ret = current_list->callback_get_item_name(
                     item, current_list->data, buf, buf_size);
-    return P2STR((unsigned char*)ret);
+    ret = P2STR((unsigned char*)ret);
+    /* A skin with %Lm draws the mark itself */
+    if (sb_skin_has_mark(SCREEN_MAIN))
+        return ret;
+    return list_select_decorate(current_list, item, ret, buf, buf_size);
+}
+
+int skinlist_item_mark(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+    if (item < 0 || !current_list)
+        return -1;
+    return list_select_row_state(current_list, item);
 }
 
 enum themable_icons skinlist_get_item_icon(int offset, bool wrap)

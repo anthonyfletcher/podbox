@@ -231,6 +231,10 @@ Two things to know first:
   `Settings > Library > Music > Edit Music Menu` and the main menu remember
   rows by their position, so adding or removing one moves your choices onto
   different rows. Put new rows in Custom menu instead.
+- **Audiobooks and Podcasts are built in.** A menu with the id `audiobooks`
+  or `podcasts` in your copy is replaced by the player's own. To make your
+  own lists of books or podcasts, give them another id in Custom menu; the
+  condition `spoken == "1"` matches books and `spoken == "2"` podcasts.
 
 To hide a row or change the order, use `Edit Music Menu` rather than either
 file.

@@ -51,6 +51,8 @@ int create_dir(void);
 int rename_file(const char *selected_file);
 
 int delete_fileobject(const char *selected_file);
+/* The same, for a caller that has asked already, as for several at once */
+int delete_fileobject_confirmed(const char *path);
 
 int copy_move_fileobject(const char *src_path,
                          const char *dst_path,
