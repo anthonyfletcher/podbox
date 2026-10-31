@@ -264,6 +264,10 @@ static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
 static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
     read_request(IAPGetTrackArtworkDataPayload);
     check_ret(swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID, -IAPAckStatus_EBadParameter);
+    /* The transfer this one ends sends no more chunks */
+    if(ctx->on_send_complete == send_artwork_chunk_cb) {
+        ctx->on_send_complete = NULL;
+    }
     if(ctx->artwork.valid) {
         iap_platform_close_artwork(ctx, &ctx->artwork);
         ctx->artwork.valid = iap_false;
