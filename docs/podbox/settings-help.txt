@@ -1392,7 +1392,8 @@ knows a car by a request of Apple's that a car sends and a computer does
 not, and waits a second before handing a computer the disk, so a car never
 takes it. On answers any accessory that asks and never offers the disk: a
 computer gets none, and may retry the connection for a moment first. Off
-answers none, as an iPod does. Shown only while Accessory Protocol is on.
+answers none, as an iPod does. Changes take effect at the next connection.
+Shown only while Accessory Protocol is on.
 With USB Sound Card on, a car makes the player drop off USB for a moment and come back
 without the sound card.
 
@@ -1730,7 +1731,8 @@ only when the theme offers them. Each change is saved at once and shows as
 soon as you leave.
 
 It can also go on the Now Playing screen's context menu: turn it on in Context
-Menus > Now Playing Menu.
+Menus > Now Playing Menu. It is not offered there for a theme that has to
+reload to show a change, since reloading stops the music.
 
 [action: Clear Backdrop]
 Removes the background image, leaving the background colour showing through.
@@ -1840,7 +1842,8 @@ from there.
 Chooses which rows the Now Playing screen's context menu shows. A row can also
 be hidden by holding Select on it in the menu; this is where it comes back.
 
-Theme Options starts off. Turned on, it shows only while the theme has options.
+Theme Options starts off. Turned on, it shows only while the theme has options
+that change without reloading it.
 
 [action: Track Menu]
 Chooses which rows a track's context menu shows, in the browsers and the queue.

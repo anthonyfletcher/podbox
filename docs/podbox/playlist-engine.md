@@ -35,7 +35,7 @@ three and a half times faster on the player, but noticeably less accurate.
   15 minutes to two hours, or Default. It plays first, and each track after
   it is calmer. Default ends with a running sleep timer; with none, it plays
   Playlist Length tracks.
-- **Order by Sound** — hold `Select` in the playlist viewer. Puts the playlist
+- **Order by Sound** — hold `Select` in the playlist viewer, under `More...`. Puts the playlist
   you already have in an order where each track leads into the next. The
   track playing stays first, tracks not yet measured go to the end, and a
   playlist of more than 100 tracks is left as it is.

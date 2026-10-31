@@ -38,7 +38,9 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
 - Choose what is on the main menu and in what order, including items promoted from the Music menu
   - `Settings > Appearance > Menus > Edit Main Menu`
 - Choose what is in the Music menu and all the context menus
-  - `Settings > Library > Menus`
+  - `Settings > Appearance > Menus`
+- Change a theme's configuration on the player
+  - `Settings > Appearance > Theme Options`, when the theme offers them.
 - Show album art or artist art on the Now Playing screen
   - Theme dependent (the theme must show album art)
   - `Settings > Appearance > Now Playing Screen > Now Playing Artwork`
@@ -51,6 +53,13 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
 - Message, input, confirmation, search, colour, date and time and folder dialogs share one
   themed design
   - `Settings > Appearance > Dialogs`
+- Hold `Select` on a track, folder or file and select `Select...`
+  - Click `Select` to tick or untick a row; hold `Select` and turn the wheel to tick a run of
+    rows, and turn back to untick them
+  - `Play/Pause` opens a menu for the ticked rows: play them, queue them or add them to a
+    playlist; in the Queue, `Move Here` puts them after the selected track and `Remove` takes
+    them out; in `Files`, `Cut`, `Copy` and `Delete`
+  - `Menu` leaves without doing anything
 
 ## Music
 
@@ -73,6 +82,11 @@ or promoted onto the main menu.
   - Off by default. `Settings > Library > Music > Sort > Ignore The/A/An`
 - Play a random album
   - `Music > Random Album`
+- Shuffle albums rather than tracks: every album in a list, in a random order, each whole and in
+  order
+  - `[Shuffle Albums]` at the top of any list of two or more albums
+- See an album's cover, artist, year, track count and length above its tracks
+  - Theme dependent. Scrim shows it, and `Album Header` in its Theme Options turns it off
 - See your most played, most recently played and forgotten albums and artists
   - `Music > Playback History`
 - See how much of an album or artist you have listened to
@@ -90,7 +104,7 @@ Results appear as you type, across tracks, albums and artists. The grid keyboard
 replaced by a single-line editor driven by the click wheel.
 
 - `Music > Search`
-- Choose how results are ordered in `Settings > Library > Music > Search`
+- Choose how results are ordered in `Settings > Library > Search`
 
 ## Audiobooks
 
@@ -101,13 +115,13 @@ their own.
 
 - Give audiobooks their own main menu entry, and keep them out of Music and the carousels
   - Off by default. `Settings > Library > Music > Segregate Audiobooks`
-  - A book is a track with the genre "audiobook", "spoken word", "book", "podcast" or "podcasts"
+  - A book is a track with the genre "audiobook", "spoken word" or "book"
 - Book covers and author photos beside their rows
   - Theme dependent
-  - Off by default. `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows`/`Author Art Rows`
+  - `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows` (on by default)/`Audiobook Author Art Rows`
 - See which books you have finished, not started or are part-way through
-  - Scroll up above the first book in `Audiobooks > Book` for `Finished`, `Not Started` and
-    `In Progress`. A list with no books in it is not shown
+  - `Audiobooks` has `Search`, `Finished`, `Not Started`, `In Progress`, `By Title` and
+    `By Author`. A list with no books in it is not shown
   - Choosing a book plays it, from where you left off if you have started it
   - Hold `Select` on a book and select `Mark as...` to move it between the lists. The mark lasts
     until the book is next played
@@ -116,12 +130,40 @@ their own.
   - A book with bookmarks has a `Bookmarks` row in its menu, in Now Playing's `More...` and when
     you hold `Select` on the book. Choosing one plays the book from there; hold `Select` on one to
     delete it
-  - Bookmarks Rockbox made in a book (`.bmark` files beside its folder or your playlists) are
-    carried over once, the first time bookmarks are opened
 - See the chapters of a book held in a single file
   - Off by default. `Settings > Playback > Chapter Marks`
   - Reads the chapter marks in `.m4b` books and the chapter frames in `.mp3` ones
   - While a book plays, hold `Select` on the Now Playing screen and choose `Browse Chapters`
+- Play audiobooks and podcasts faster or slower without changing the voice, and leave music as it is
+  - `Settings > Playback > Spoken Word Speed`, or hold `Select` on the Now Playing screen
+- Skip a fixed time in a book rather than a whole track
+  - `Settings > Playback > Spoken Word Skip Length`. Follows `Skip Length` until you set it
+- Fall asleep at the end of a chapter
+  - While a book plays, hold `Select` on the Now Playing screen, choose `Sleep Timer` and then
+    `End of Chapter`
+
+## Podcasts
+
+<img src="docs/podbox/images/ss_grid_podcasts.png"/>
+
+Each episode keeps its place, and a show opens on its newest episode.
+
+- Give podcasts their own main menu entry, and keep them out of Music and the carousels
+  - Off by default. `Settings > Library > Music > Segregate Podcasts`
+  - A podcast is a track with the genre "podcast" or "podcasts"
+- Shows listed by name, or the show with the newest episode first
+  - `Settings > Library > Music > Sort > Shows By`
+- `Search`, `[In Progress]`, `[Not Started]`, `[Finished]` and `[All Episodes]` above the shows
+- A show opens on its newest episode, with `[Play Unplayed]` above it
+- An episode's notes under the list
+  - Theme dependent. Scrim shows them, and `Episode Notes` in its Theme Options turns them off
+- Hold `Select` on an episode for `Mark as Played`, `Mark as Unplayed` and `Mark Older as Played`,
+  and on a show for `Mark All as Played` and `Delete Played Episodes`
+- Show art beside the rows
+  - Theme dependent
+  - `Settings > Appearance > Interface Elements > Art Rows > Podcast Art Rows` (on by default)
+- Choose whether Search lists matching episodes or shows first
+  - `Settings > Library > Search > Podcast Order`
 
 ## Album Covers and Artist Portraits
 
@@ -158,17 +200,58 @@ their albums. Both run much faster than Rockbox's PictureFlow, particularly on t
 
 <img src="docs/podbox/images/ss_grid_apps.png" alt="Screenshot"/>
 
-A lyrics viewer follows the song line by line. The text viewer reads txt, lrc, fb2, epub, docx,
-pdf, md, html and rtf, and the image viewer is built in.
+A lyrics viewer follows the song line by line. The text viewer reads txt, lrc, fb2, epub, mobi,
+azw3, pdb, docx, pdf, md, html and rtf, and the image viewer shows JPEG (including CMYK), PNG,
+GIF, WebP and BMP pictures.
 
 - See the lyrics of what is playing
   - Press `Select + Play` on the Now Playing screen
   - `Settings > Library > Viewers > Lyrics Viewer` for how they are shown
-- Choose how documents look: font, margin, line spacing and colours
+
+- Choose how documents look: font, text size, margin, line spacing, justification, paragraph
+  indent and colours
   - `Settings > Library > Viewers > Text Viewer`
+  - `Larger Text` and `Smaller Text` step through the sizes the font comes in
+  - The backlight can stay on while you read, with a brightness of its own:
+    `Reading Backlight` and `Reading Brightness`
 - `Continue Reading` on the main menu reopens your last document where you left off
-- See every document and image on the player in one list, and search them
-  - Hidden by default. Add it with `Settings > Appearance > Edit Main Menu`
+
+- `Books` on the main menu shows every EPUB, FB2 and Kindle (MOBI, AZW3) book on the player,
+  with its cover
+  - A MOBI locked to a Kindle account will not open
+  - `Search` finds books by title or author, and `Finished`, `Not Started` and `In Progress`
+    are as `Audiobooks` has them
+  - Press `>>|` on a book's last page and it closes, shown in `Finished`
+  - `By Title`, `By Author`, and `By Subject` for the subjects the books name, each book under
+    every one of its subjects
+  - Hold `Select` on a book for `Mark as...`, which moves it between the lists, `Book Info`,
+    `Reading Stats` and `Show in Files`
+  - `Reading Stats` shows your time reading, pages a day, reading speed in words a minute, the
+    time left at that speed, when you started and finished, your longest sitting and your best
+    streak of days, for one book or for all of them
+  - See pictures inside books
+- Zoom into a picture and move around it
+  - Hold `Menu` in the image viewer and select `Zoom` for a list of zoom levels
+  - Hold `Select`, or select `Pan` in the same menu, to switch pan mode on: the wheel moves the
+    picture up and down and `|<<` and `>>|` move it sideways. Click `Menu` to switch it off
+- Footnotes are taken out of the text, and each reference reads as `[1]`. Hold `Select` on a
+  page to read the notes it refers to
+- A book's cover is its first page, and its pictures each have a page of their own
+  - On by default. `Settings > Library > Viewers > Text Viewer > Pictures`
+- Hold `|<<` for the start of the chapter and `>>|` for the next one
+- Read holding the player sideways in one hand, turning pages with `Play` and `Menu`
+  - `Settings > Library > Viewers > Text Viewer > Reading Orientation`, or double-click
+    `Play` on an upright page
+  - The button at the top works as `Menu` does upright: click it to leave, hold it for the
+    settings. Double-click the button at the bottom to swap hands, and hold it to stand the
+    page upright again. Hold the page-turning buttons to move by chapters
+- Turn the wheel to move through the book a percent at a time; `Select` goes there, any other
+  button stays put
+  - Off by default. `Settings > Library > Viewers > Text Viewer > Wheel Scrubs`
+
+- See every document and every image on the player in a list of each, search them, and list
+  them by type
+  - Hidden by default. Add it with `Settings > Appearance > Menus > Edit Main Menu`
 
 ## Playback Report
 
@@ -229,7 +312,7 @@ together.
   - Hold `Select` on the track and select `Wind Down`, then choose how long it runs: 15 minutes
     to two hours, or Default to end with your sleep timer (or at your Playlist Length)
 - Order a playlist so each track leads into the next
-  - Hold `Select` in the playlist viewer and select `Order by Sound`
+  - Hold `Select` in the playlist viewer and select `More... > Order by Sound`
 - Keep the music going when anything runs out - an album, a saved playlist or a queue - with more
   of the same
   - `Settings > Library > Playlist Engine > Continue Playing`
@@ -277,7 +360,7 @@ away.
 - Spike: on the Now Playing screen, hold `Select` and select `Play with Spike`
 - Music Quiz: `Music > Quiz`
   - Choose which questions it asks in `Settings > Library > Music > Quiz Questions`
-  - Remove it from the menu with `Settings > Library > Music > Edit Music Menu`
+  - Remove it from the menu with `Settings > Appearance > Menus > Edit Music Menu`
 
 ## Settings
 
@@ -341,6 +424,8 @@ for the full list.
   - `Settings > Library > Art Cache` for settings
   - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache`
   - `System > Background Tasks` to see what it is doing
+- The iPod Video's screen is updated by a second DMA engine while music plays, leaving more of
+  the CPU to the decoder
 - Album and artist lists come straight from the database held in memory, so Album Covers, the
   charts and Random Album open quickly
 - `Back` and `Menu` behave the same way in every menu
@@ -426,6 +511,52 @@ Artist Three
 └── Album One
     └── ...
 ```
+
+Audiobooks and podcasts follow the same shape, with the author or host in place of the artist
+and the book or show in place of the album. Give each book its own folder, whether it is one
+file or many: covers are found per folder, so books sharing a folder share a cover.
+
+```text
+Audiobooks
+├── Frank Herbert
+│   ├── Dune
+│   │   ├── 01 Chapter One.mp3
+│   │   ├── 02 Chapter Two.mp3
+│   │   ├── ...
+│   │   └── folder.jpg
+│   ├── Dune Messiah
+│   │   └── Dune Messiah.m4b
+│   └── folder.jpg
+Podcasts
+└── Show Name
+    ├── Episode One.mp3
+    ├── Episode Two.mp3
+    ├── ...
+    └── folder.jpg
+```
+
+What makes a book or a podcast is its tags, not its folder:
+
+- the genre is "audiobook", "spoken word" or "book" for a book, and "podcast" or "podcasts" for
+  a podcast
+- the album is the book's title or the show's name, on every track
+- the album artist is the author or the host
+- a book in one file (`.m4b`, or `.mp3` with chapter frames) shows its chapters, with
+  `Settings > Playback > Chapter Marks` on
+
+EPUB, FB2 and MOBI books can be anywhere on the disk, and their title and author come from the book
+itself. An image named after a book is its cover, in place of the one inside it:
+
+```text
+Books
+├── Frank Herbert
+│   ├── Dune.epub
+│   ├── Dune.jpg            (optional: replaces the cover inside the book)
+│   └── Dune Messiah.epub
+└── Ursula K. Le Guin
+    └── The Dispossessed.epub
+```
+
 ## Album and artist art
 
 Album art goes with the album's tracks as `folder.jpg` or `cover.jpg`, e.g.
@@ -441,9 +572,9 @@ grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums und
 
 All artwork should be:
 
-- a JPEG (baseline or progressive).
-- embedded as JPEG, if embedded at all. PNG art in tags is skipped. The cache reads the art from
-  only one track per album, so put the cover in every track.
+- a JPEG (baseline or progressive), PNG, GIF, WebP or BMP file. JPEG is the quickest to process.
+- embedded as JPEG or PNG, if embedded at all - the cache reads the art from only one track per
+  album, so put the cover in every track.
 - a sensible size - the cache stores 300x300px copies, and anything much larger takes longer to
   process.
 

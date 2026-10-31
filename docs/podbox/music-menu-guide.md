@@ -201,12 +201,12 @@ These show their own translated name whatever you write before `==>`.
 
 ## Putting a custom row on the main menu
 
-`Settings > Appearance > Edit Main Menu` lists the rows of Custom menu after
-the Music menu's own, and any of them can be switched on. Choosing one opens
-that view straight away, and **BACK** returns to the main menu.
+`Settings > Appearance > Menus > Edit Main Menu` lists the rows of Custom menu
+after the Music menu's own, and any of them can be switched on. Choosing one
+opens that view straight away, and **BACK** returns to the main menu.
 
 - **The main menu has room for 20 rows from Music, and the Music menu uses
-  most of them**, so only the first few rows of Custom menu are offered: 5
+  most of them**, so only the first few rows of Custom menu are offered: 4
   with the Music menu as it ships.
 - **A row on the main menu is remembered by its place in Custom menu.** Move
   or delete a row above it in the file and the main menu opens whichever row
@@ -222,13 +222,13 @@ to `.rockbox/tagnavi_user.config` and edit the copy. The player then reads
 your copy instead of its own, so the original stays untouched and an update
 does not overwrite your changes.
 
-Two things to know first:
+Three things to know first:
 
 - **Your copy does not change with updates.** A new row in a later version of
   PodBox does not appear until you copy the new `tagnavi.config` and make your
   edits again.
 - **Edit the Music menu's rows in place; do not add or remove them.**
-  `Settings > Library > Music > Edit Music Menu` and the main menu remember
+  `Settings > Appearance > Menus > Edit Music Menu` and the main menu remember
   rows by their position, so adding or removing one moves your choices onto
   different rows. Put new rows in Custom menu instead.
 - **Audiobooks and Podcasts are built in.** A menu with the id `audiobooks`

@@ -99,12 +99,12 @@ Search puts the same editor above a live list of database matches. It is the
 best place to get a feel for the control, because results appear as you type.
 
 **Finding it.** It sits in the **Music** list directly above *Search by…*. It
-can also be added to the main menu (`Settings > Appearance > Edit Main Menu`).
+can also be added to the main menu (`Settings > Appearance > Menus > Edit Main Menu`).
 Both entries are hidden unless the database is loaded into RAM.
 
 The search runs about a second after you stop turning the wheel, not on every
 character. It waits for a minimum number of letters first, one by default;
-`Settings > Library > Music > Search > Minimum Letters` raises it if one-letter
+`Settings > Library > Search > Minimum Letters` raises it if one-letter
 searches turn up more than they are worth.
 
 **What is matched.** Case-insensitive, anywhere in the text — `beat` finds
@@ -119,7 +119,7 @@ searches turn up more than they are worth.
 Per-track artist is not searched; search the album artist instead.
 
 Tracks come first, then albums, then artists.
-`Settings > Library > Music > Search > Result Order` offers the other five arrangements, so whichever you
+`Settings > Library > Search > Music Order` offers the other five arrangements, so whichever you
 look for most can be the group you land on.
 
 ### Moving around
@@ -134,6 +134,6 @@ look for most can be the group you land on.
 reopening Search resumes where you left off and re-runs itself a moment later.
 
 The query is capped at 32 characters. How many matches are kept is
-`Settings > Library > Music > Search > Maximum Results` — 50 by default, and up to 200.
+`Settings > Library > Search > Maximum Results` — 50 by default, and up to 200.
 Raising it is rarely the answer: another letter finds the record quicker than
 scrolling does.
