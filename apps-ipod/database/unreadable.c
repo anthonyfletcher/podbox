@@ -51,6 +51,7 @@ struct unreadable_rec
 static struct unreadable_rec table[UNREADABLE_MAX];
 static int count;
 static int list_fd = -1;        /* unreadable.txt.new, while a walk runs */
+static bool list_failed;        /* a line of it was not written whole */
 
 /* Which firmware made the file. The date is in rbversion, so every build
  * differs and each tries the refusals again once. The desktop tool has no
@@ -74,11 +75,12 @@ static struct unreadable_rec *find(uint64_t key)
 
 static void list_line(const char *line)
 {
-    if (list_fd >= 0)
-    {
-        write(list_fd, line, strlen(line));
-        write(list_fd, "\n", 1);
-    }
+    size_t len = strlen(line);
+
+    if (list_fd >= 0
+        && (write(list_fd, line, len) != (ssize_t)len
+            || write(list_fd, "\n", 1) != 1))
+        list_failed = true;
 }
 
 /* Without the player's volume prefix, which means nothing to a reader */
@@ -113,6 +115,7 @@ void unreadable_begin(void)
     }
 
     list_fd = open(UNREADABLE_TXT ".new", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    list_failed = false;
     list_line("# Music files the database could not read. Each is tried "
               "again when it changes.");
 }
@@ -201,13 +204,13 @@ void unreadable_end(bool complete)
             remove(UNREADABLE_DAT);
     }
 
-    /* The list follows the records: left as it was when they could not be
-     * written, removed only when there are none to list */
+    /* The list follows the records: left as it was when they or it could not
+     * be written, removed only when there are none to list */
     if (list_fd >= 0)
     {
         close(list_fd);
         list_fd = -1;
-        if (!ok || kept == 0
+        if (!ok || kept == 0 || list_failed
             || rename(UNREADABLE_TXT ".new", UNREADABLE_TXT) < 0)
         {
             remove(UNREADABLE_TXT ".new");

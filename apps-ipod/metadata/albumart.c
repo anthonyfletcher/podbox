@@ -73,7 +73,7 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
  * JPEG's markers up to the frame header, or a PNG's, GIF's or WebP's
  * headers, by content whatever the name, and leaves anything it cannot place
  * for the decoder to judge. */
-static bool art_file_usable(const char *path)
+bool art_file_usable(const char *path)
 {
     unsigned char b[4];
     const char *ext = strrchr(path, '.');

@@ -209,8 +209,11 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
         s = image_stream(&a, src);
         if (!s || bs_skip(s, at) != BS_OK)
             return -1;
-        return (kind == IMAGE_PNG ? read_png_stream : read_gif_stream)
-                   (s, &a, bm, a.base - (uint8_t *)bm->data, format, cformat);
+        if (kind == IMAGE_PNG)
+            return read_png_stream(s, &a, bm, a.base - (uint8_t *)bm->data,
+                                   format, cformat);
+        return read_gif_stream(s, at, &a, bm, a.base - (uint8_t *)bm->data,
+                               format, cformat);
     case IMAGE_WEBP:
         if (src->flags)
             return -1;
@@ -222,7 +225,7 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
         lseek(src->fd, 0, SEEK_SET);
         return read_bmp_fd(src->fd, bm, maxsize, format, cformat);
     default:
-        /* and anything unrecognised, as before there was a choice */
+        /* and anything unrecognised: JPEG is the default */
         lseek(src->fd, src->pos, SEEK_SET);
         return clip_jpeg_fd(src->fd, src->flags, src->len < 0 ? 0 : src->len,
                             bm, maxsize, format, cformat);

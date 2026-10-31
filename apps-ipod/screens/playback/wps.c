@@ -68,6 +68,7 @@
 #include "ata_idle_notify.h"
 #include "root_menu.h"
 #include "screens/covers/album_covers.h"
+#include "speech/announce.h"
 #include "viewers/lyric_viewer/lyric_viewer.h"
 #include "skin/backdrop.h"
 #include "quick_screen.h"
@@ -121,6 +122,8 @@ static void update_non_static(void)
 
 void wps_do_action(enum wps_do_action_type action, bool updatewps)
 {
+    announce_user_pause();
+
     if (action == WPS_PLAYPAUSE) /* toggle the status */
     {
         struct wps_state *state = get_wps_state();

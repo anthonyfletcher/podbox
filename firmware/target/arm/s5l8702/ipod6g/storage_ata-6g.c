@@ -74,14 +74,16 @@ static bool ata_powered;
 /* "Storage mode = SSD". Both drivers power flash off only once the backlight
  * is off, ten or more seconds after it sleeps; this one also makes the step
  * before that cheaper -- clock-gate rather than STANDBY IMMEDIATE (see
- * ssd_deep_asleep). Q_STORAGE_PRE_WAKE, which backlight.c posts when the
+ * ata_power_up()). Q_STORAGE_PRE_WAKE, which backlight.c posts when the
  * backlight comes on, powers the interface back up before the user has
  * navigated anywhere; drivers/ata.c handles it the same way. */
 static bool ata_ssd_mode = false;
 static long ssd_sleep_tick;
 /* True when the next power-up must be a full init: the drive is unpowered
- * (any power-down, not only the SSD deep sleep) or is being hard reset. */
-static bool ssd_deep_asleep;
+ * (any power-down, not only the SSD deep sleep), is being hard reset, or is
+ * being initialised -- ata_init() runs again after USB, when the tick may
+ * have cut the power behind a clock gate. */
+static bool ata_needs_full_init;
 static struct semaphore mmc_wakeup;
 static struct semaphore mmc_comp_wakeup;
 #ifdef HAVE_ATA_DMA
@@ -666,7 +668,7 @@ static int ata_power_up(void)
     ata_set_active();
 
     if (ata_ssd_mode && !ceata) {
-        if (!ssd_deep_asleep) {
+        if (!ata_needs_full_init) {
             /* Fast path: clock was gated, AUTOLDO still on */
             PWRCON(0) &= ~(1 << 5);
             ata_powered = true;
@@ -792,7 +794,7 @@ static int ata_power_up(void)
     }
 
     ata_powered = true;
-    ssd_deep_asleep = false;
+    ata_needs_full_init = false;
     ata_set_active();
     return 0;
 }
@@ -811,7 +813,7 @@ static void ata_power_down(void)
     PCON(11) &= ~0xf;
     ide_power_enable(false);
     ata_powered = false;
-    ssd_deep_asleep = true;
+    ata_needs_full_init = true;
 }
 
 static int ata_rw_chunk_internal(uint64_t sector, uint32_t cnt, void* buffer, bool write)
@@ -1018,7 +1020,7 @@ int ata_soft_reset(void)
 int ata_hard_reset(void)
 {
     mutex_lock(&ata_mutex);
-    ssd_deep_asleep = true; /* a reset is a full init, never the fast path */
+    ata_needs_full_init = true; /* a reset never takes the fast path */
     PASS_RC(ata_power_up(), 0, 0);
     ata_set_active();
     mutex_unlock(&ata_mutex);
@@ -1214,7 +1216,7 @@ int ata_init(void)
     semaphore_init(&mmc_comp_wakeup, 1, 0);
     ceata = PDAT(11) & BIT(1);
     ata_powered = false;
-    ssd_deep_asleep = false;
+    ata_needs_full_init = true;
     ssd_sleep_tick = 0;
     total_sectors = 0;
 
@@ -1356,12 +1358,12 @@ int ata_event(long id, intptr_t data)
         {
             /* Phase 2: SSD deep sleep — cut AUTOLDO after 10s of
              * clock-gate sleep when backlight is off */
-            if (ata_ssd_mode && !ata_powered && !ssd_deep_asleep
+            if (ata_ssd_mode && !ata_powered && !ata_needs_full_init
                 && !is_backlight_on(true)
                 && TIME_AFTER(current_tick, ssd_sleep_tick + 10 * HZ))
             {
                 mutex_lock(&ata_mutex);
-                if (!ata_powered && !ssd_deep_asleep)
+                if (!ata_powered && !ata_needs_full_init)
                 {
                     logf("ata SSD DEEP %ld", current_tick);
                     PCON(7) = 0;
@@ -1370,7 +1372,7 @@ int ata_event(long id, intptr_t data)
                     PCON(10) &= ~0xffff;
                     PCON(11) &= ~0xf;
                     ide_power_enable(false);
-                    ssd_deep_asleep = true;
+                    ata_needs_full_init = true;
                 }
                 mutex_unlock(&ata_mutex);
             }

@@ -374,15 +374,27 @@ static bool set_dac_rate_idle(unsigned long rate)
     return set_interface(status.alt) && ok;
 }
 
+/* Held from a rate's SET_CUR to the stream's nominal: the USB thread's sink
+ * switch and the audio thread's rate change can both arrive here, and the
+ * driver releases its own lock between transfers */
+static struct mutex rate_mutex;
+
+static void sink_init(void)
+{
+    mutex_init(&rate_mutex);
+}
+
 /* A rate the DAC refuses twice would have it play the mixer's samples at
  * its own rate, so playback goes back to the headphones as for an
  * unplugged DAC; the debug screen keeps the rate set and read. */
 static void sink_set_freq(uint16_t freq)
 {
+    mutex_lock(&rate_mutex);
     if (set_dac_rate(sink_rate(freq)) || set_dac_rate_idle(sink_rate(freq)))
         usb_drv_host_iso_set_nominal(nominal(sink_rate(freq)));
     else
         sink_lost();
+    mutex_unlock(&rate_mutex);
 }
 
 static void sink_lock(void)
@@ -437,7 +449,7 @@ struct pcm_sink usb_host_pcm_sink = {
         .volume_type  = PCM_SINK_HWVOL,
     },
     .ops = {
-        .init     = sink_nop,
+        .init     = sink_init,
         .postinit = sink_nop,
         .set_freq = sink_set_freq,
         .lock     = sink_lock,

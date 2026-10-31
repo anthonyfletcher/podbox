@@ -53,8 +53,12 @@ struct opt_items {
  * artwork that no longer matches. */
 #define MAX_PATHLIST (MAX_PATHNAME*2)
 
-/* The longest config.cfg line read or written, setting name included. See
- * settings.c for why one size serves both. */
+/* The longest config.cfg line read or written, setting name included. Reader
+ * and writer truncate rather than fail, and a truncated line parses as a
+ * shorter value, so one size serves both: sized apart, a value can be written
+ * that cannot be read back. The longest line is "root menu order", which
+ * main_menu_config.c caps at CFG_STR_SIZE and fails to build if that cap,
+ * with the setting name, outgrows this. */
 #define SETTINGS_MAX_LINE 640
 
 /* The values are assigned to the enums so that they correspond to */

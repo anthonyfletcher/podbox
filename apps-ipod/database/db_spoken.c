@@ -304,8 +304,8 @@ static void groups_invalidate(void)
 
 /* Its own search state, not build_tcs. A search started here runs
  * spoken_table_update() on the way in, which may rebuild the genre table
- * through db_spoken_build() -- and that uses build_tcs. Sharing one struct
- * meant the nested search clobbering the one being set up around it. */
+ * through db_spoken_build() -- and that uses build_tcs, so a shared struct
+ * would be clobbered by the nested search while this one is set up. */
 static struct tagcache_search group_tcs;
 static uint32_t group_uniqbuf[SPOKEN_GROUP_MAX];
 

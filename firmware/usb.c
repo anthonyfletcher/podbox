@@ -144,6 +144,7 @@ static int usb_audio = 0;
 #endif
 #ifdef USB_ENABLE_IAP
 static bool usb_iap = true;
+static int usb_iap2_mode = USB_IAP2_MODE_AUTO;
 /* A car that finds the sound card beside the disk goes no further than
  * Apple's 0x53, and reports an authentication error (a Mazda CX-30), where
  * without it the car moves on to the iAP configuration at once. So once a
@@ -226,8 +227,9 @@ void usb_record_waypoint(enum usb_waypoint w, int a, int b)
 
 const struct usb_insert_record *usb_get_insert_record(void)
 {
-    /* The live half, read at display time rather than recorded: a handover
-     * still waiting on a thread shows a non-zero count here. */
+    /* Writes the live half into the record on every call, so a handover still
+     * waiting on a thread shows a non-zero count here. Two plain stores, safe
+     * from any thread. */
     usb_record.acks_remaining = usb_num_acks_to_expect;
     usb_record.storage_handed_over = exclusive_storage_enabled;
     return &usb_record;
@@ -307,13 +309,15 @@ static inline void usb_handle_hotswap(long id)
 #endif /* HAVE_HOTSWAP */
 
 #ifdef USB_ENABLE_AUDIO
+/* The buffers are claimed only at boot, so a setting switched on since then
+ * advertises nothing until the player restarts */
 static bool usb_audio_wanted(void)
 {
 #ifdef USB_ENABLE_IAP
     if(usb_car_no_audio)
         return false;
 #endif
-    return usb_audio != 0;
+    return usb_audio != 0 && usb_audio_buffers_ready();
 }
 #endif
 
@@ -556,6 +560,10 @@ static void usb_set_host_present(bool present)
      * charger costs nothing. */
     thread_set_priority(thread_self(), PRIORITY_REALTIME);
 
+#ifdef USB_ENABLE_IAP
+    usb_iap_set_iap2_mode(usb_iap2_mode);
+#endif
+
 #ifdef HAVE_USB_POWER
     if (usb_power_only)
     {
@@ -641,6 +649,11 @@ void usb_set_dac_active(bool on)
     if(on)
         usb_dac_requested = true;
     queue_post(&usb_queue, USB_HOST_DAC, on);
+}
+
+void usb_host_stream(bool on)
+{
+    queue_post(&usb_queue, USB_HOST_STREAM, on);
 }
 
 bool usb_dac_searching(void)
@@ -976,6 +989,14 @@ static void NORETURN_ATTR usb_thread(void)
             break;
         case USB_HOST_HUB:
             usb_hub_check();
+            break;
+        case USB_HOST_STREAM:
+            if(!usb_host_probe_on)
+                break;
+            if(ev.data)
+                usb_host_audio_start();
+            else
+                usb_host_audio_stop();
             break;
 #endif
 
@@ -1411,6 +1432,9 @@ void usb_storage_ejected(void)
 {
     usb_disk_ejected = true;
     usb_release_exclusive_storage();
+#if defined(USB_ENABLE_STORAGE) && !defined(BOOTLOADER)
+    usb_core_storage_ejected();
+#endif
 }
 
 bool usb_storage_is_ejected(void)
@@ -1435,9 +1459,11 @@ void usb_set_iap(bool enable)
     usb_iap = enable;
 }
 
+/* At the next connection too: off mid-session would leave a car's link
+ * running with nothing answering it */
 void usb_set_iap2_mode(int mode)
 {
-    usb_iap_set_iap2_mode(mode);
+    usb_iap2_mode = mode;
 }
 
 /* The iPod Classic's are the 160 GB model's, which serial iAP reports where
@@ -1463,7 +1489,7 @@ const struct usb_identity* usb_identity(void)
 /* Any thread or an interrupt */
 void usb_car_found(void)
 {
-    if(usb_audio && !usb_car_no_audio)
+    if(usb_audio_wanted())
         queue_post(&usb_queue, USB_CAR_RECONNECT, 0);
 }
 #endif /* USB_ENABLE_IAP */

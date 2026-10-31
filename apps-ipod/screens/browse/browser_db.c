@@ -917,6 +917,7 @@ static int add_format(const char *buf)
             if (!new_clause)
             {
                 logf("browser_db failed to allocate %s", "search clause");
+                core_unpin(browser_db_handle);
                 return -3;
             }
             formats[format_count]->clause[clause_count] = new_clause;
@@ -1441,9 +1442,12 @@ static bool alloc_menu_parse_buf(char *buf, int type)
         return false;
     }
 
-    /* Allocate */
+    /* Allocate, or clear the row a rejected one left: parse_search() adds
+     * to whatever the row holds. */
     if (menu->items[menu->itemcount] == NULL)
         menu->items[menu->itemcount] = browser_db_alloc0(sizeof(struct menu_entry));
+    else
+        memset(menu->items[menu->itemcount], 0, sizeof(struct menu_entry));
     if (!menu->items[menu->itemcount])
     {
         logf("browser_db failed to allocate %s", "menu items");
@@ -1850,16 +1854,12 @@ static bool add_builtin_menus(void)
     int n = 0, i, j;
 
     /* Emptied, so the built-in rows replace the config's rather than
-     * following them. The rows are allocated afresh: parse_search() adds to
-     * whatever a reused one holds. */
+     * following them. */
     for (i = 0; i < (int)ARRAYLEN(builtin_menu_links); i++)
     {
         int m = menu_index(builtin_menu_links[i].id);
         if (m >= 0)
-        {
-            memset(menus[m]->items, 0, sizeof(menus[m]->items));
             menus[m]->itemcount = 0;
-        }
     }
 
     if (parse_builtin_line(n++, TAGNAVI_VERSION) < 0)
@@ -2219,7 +2219,10 @@ int browser_db_album_sort_get(int ctx)
 
     slot = ((packed >> ALBUM_SORT_SHIFT(ctx)) & 3)
          | (((packed >> ALBUM_SORT_HIGH(ctx)) & 1) << 2);
-    return slot ? slot - 1 : -1;
+    /* A hand-edited slot past the last order reads as unset */
+    if (slot == 0 || slot - 1 > DB_SORT_ALBUMS_ARTIST_YEAR_DESC)
+        return -1;
+    return slot - 1;
 }
 
 void browser_db_album_sort_set(int ctx, int order)
@@ -3279,9 +3282,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                             ID2P(LANG_TAGNAVI_SHUFFLE_ALBUMS), -1);
     }
     /* [Featured In], on an artist's album list only -- see
-     * featured_row_count(). It goes last of the three: putting it first would
-     * renumber the other two, and browser_db_load() scrolls a level past its
-     * special rows by counting them.
+     * featured_row_count(). It goes after the rows above: putting it ahead
+     * of them would renumber them, and browser_db_load() scrolls a level past
+     * its special rows by counting them.
      *
      * The label cannot be the artist's name. A special row's name has to
      * outlive the entry, which is why these all point at static strings
@@ -3663,8 +3666,8 @@ static int load_root_for_shortcut(struct browser_context *c)
  * discards it rather than hiding whatever now sits at those positions.
  *
  * Positions past the bit count simply cannot be hidden. The shipped root menu
- * has sixteen rows; this leaves plenty of room and fails by offering too much
- * rather than by hiding the wrong thing. */
+ * fits with room to spare, and a longer one fails by offering too much rather
+ * than by hiding the wrong thing. */
 #define ROW_HIDE_BITS 31
 
 static uint32_t row_hide_bit(int index)
@@ -6387,9 +6390,12 @@ static int play_shuffled_albums(struct browser_context *c)
     }
 
     /* Claimed only now: paging the list in above borrows the same buffer */
-    tracks = app_get_buffer(&bufsize, "album shuffle");
-    if (!tracks || bufsize < sizeof(*tracks))
+    tracks = app_claim_buffer(&bufsize, "album shuffle");
+    if (bufsize < sizeof(*tracks))
+    {
+        app_release_buffer("album shuffle");
         return -1;
+    }
     if (playlist_create(NULL, NULL) < 0)
     {
         app_release_buffer("album shuffle");

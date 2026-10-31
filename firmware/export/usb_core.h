@@ -94,6 +94,9 @@ void usb_core_hotswap_event(int volume,bool inserted);
  * a no-op where the buffers are static BSS. Declared here rather than in
  * usbstack/usb_storage.h so usb.c can reach it. */
 void usb_storage_alloc_buffers(void);
+/* USB thread: the host has ejected the disk, so drop the CPU boost and thread
+ * priority unless another active driver needs them */
+void usb_core_storage_ejected(void);
 #endif
 
 #endif

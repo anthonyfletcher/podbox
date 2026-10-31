@@ -169,11 +169,6 @@ static struct
     char font_error[MAX_PATH]; /* the font that would not load, if any */
 } lv;
 
-/* True if a line has anything worth showing. A .lrc marks an instrumental gap
- * with a timestamp and no words; such a line exists to say when the line
- * before it stops, so drawing one would blank the middle of the screen and
- * push the upcoming words out of view. They are skipped everywhere below --
- * the model keeps them, because their timing is what bounds the line before. */
 /* What line `index` says: a lyric, or the track's name for the title slot. */
 static const char *lv_line_text(int index)
 {
@@ -182,6 +177,11 @@ static const char *lv_line_text(int index)
     return lyrics_text(index);
 }
 
+/* True if a line has anything worth showing. A .lrc marks an instrumental gap
+ * with a timestamp and no words; such a line exists to say when the line
+ * before it stops, so drawing one would blank the middle of the screen and
+ * push the upcoming words out of view. They are skipped everywhere below --
+ * the model keeps them, because their timing is what bounds the line before. */
 static bool lv_has_words(int index)
 {
     const char *t = lv_line_text(index);
@@ -542,11 +542,6 @@ static void lv_row_text(char *buf, size_t size, const struct lv_row *row,
     buf[len] = '\0';
 }
 
-/* Draw one lyric line centred at `y`. Out-of-range indices draw nothing, so
- * the caller can ask for index-1 and index+1 without checking the ends -- and
- * LYRICS_NONE, meaning the song has not reached the first line, falls out as
- * "no current line, first line as next". */
-/* Draw a prepared string, horizontally centred, with its top at `y`. */
 /* Where a row `w` wide starts, for the chosen alignment. */
 static int lv_x(int w)
 {
@@ -559,6 +554,7 @@ static int lv_x(int w)
     }
 }
 
+/* Draw a prepared string, aligned, with its top at `y`. */
 static void lv_draw_text(struct screen *d, const char *text, int y, int opacity)
 {
     int w, h;
@@ -721,7 +717,7 @@ static int lv_block_top(int nrows, bool next_present)
  *
  * A transition is the same four lines seen in two layouts: the one centred
  * before, and the one centred after. Every line's height is the same in both
- * -- that is what stage 2's wrapping of the neighbours bought -- so each line
+ * -- the neighbours wrap just as the current line does -- so each line
  * simply moves from where it was to where it is going, and its rows fade
  * between the opacities the two layouts give them.
  *
@@ -923,9 +919,9 @@ static void lv_anim_draw(int p)
  *
  * Every line wraps, including the neighbours, and neighbour rows fade with
  * their distance from the middle. That is not only how it looks: a line keeps
- * the same height whether it is previous, current or next, so the animation in
- * stage 3 can slide it between those roles as a plain translation instead of
- * re-flowing it mid-move.
+ * the same height whether it is previous, current or next, so the slide can
+ * move it between those roles as a plain translation instead of re-flowing it
+ * mid-move.
  *
  * The current block is centred, and shifts up only far enough to keep the
  * start of the next line on screen -- next is the one the reader is about to
@@ -1040,9 +1036,6 @@ static int lv_ticks_to_next(long elapsed)
     return (ticks > LV_POLL)? LV_POLL: ticks;
 }
 
-/* Point the screen at a different track. Failing to find lyrics is not an
- * error here -- unlike on entry, the screen stays up saying so, because the
- * track after this one may well have some. */
 /* Move to a state, remembering what to call the track, and redraw if either
  * actually changed -- the loop calls this every time round. */
 static void lv_set_state(enum lv_state state, const struct mp3entry *id3)
@@ -1072,14 +1065,17 @@ static void lv_set_state(enum lv_state state, const struct mp3entry *id3)
     lv_draw();
 }
 
+/* Point the screen at a different track. Failing to find lyrics is not an
+ * error: the screen stays up saying so, because the track after this one may
+ * well have some. */
 static enum lyrics_result lv_load_track(const struct mp3entry *id3)
 {
     strlcpy(lv.track, id3->path, sizeof lv.track);
     lv.shown = LV_INDEX_UNSET;
     lv.sung = 0;
     /* A slide holds lv_row pointers *into the lyrics buffer*, and loading
-     * frees that buffer. Anything still running must stop before it does, or
-     * the next frame reads freed memory. */
+     * overwrites that buffer. Anything still running must stop before it
+     * does, or the next frame reads another track's text. */
     anim.active = false;
     /* new track, so possibly new album art and a new palette */
     lv_refresh_colours();
@@ -1134,7 +1130,12 @@ static int lv_menu(void)
     pop_current_activity();
     viewportmanager_theme_undo(SCREEN_MAIN, false);
 
-    lv_setup_screen();          /* re-reads font, colours, spacing */
+    if (ret == MENU_ATTACHED_USB)
+        return ret;
+    /* The theme-off level taken on entry is still in place, so only the
+     * settings are re-read: lv_setup_screen() here would take another level
+     * that nothing undoes. */
+    lv_apply_settings();
     lv.state = LV_SHOWING;      /* so the reload's lv_set_state() redraws */
     lv_clear();
     if (lv.font_error[0])

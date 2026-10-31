@@ -3064,6 +3064,106 @@ int playlist_move(struct playlist_info* playlist, int index, int new_index)
 }
 
 /*
+ * n moves under one lock and one reload, in order: from[i] to to[i], two
+ * different display positions as the playlist stands when that move runs.
+ * Each is converted to an indices[] position only at its move, because a
+ * move changes first_index. Stops at the first failure; returns the number
+ * of moves made, or -1 if none could be.
+ */
+int playlist_move_tracks(struct playlist_info* playlist, const int *from,
+                         const int *to, int n)
+{
+    int moved = 0;
+
+    if (!playlist)
+        playlist = &current_playlist;
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    if (check_control(playlist) < 0)
+    {
+        notify_control_access_error();
+        moved = -1;
+    }
+    else
+    {
+        for (int i = 0; i < n; i++)
+        {
+            int amount = playlist->amount;
+
+            if (from[i] < 0 || from[i] >= amount
+                || to[i] < 0 || to[i] >= amount
+                || move_track_unlocked(playlist,
+                                       (from[i] + playlist->first_index)
+                                           % amount,
+                                       (to[i] + playlist->first_index)
+                                           % amount) < 0)
+            {
+                if (moved == 0)
+                    moved = -1;
+                break;
+            }
+            moved++;
+        }
+    }
+
+    playlist_write_unlock(playlist);
+    dc_thread_start(playlist, true);
+
+    if (moved > 0 && playlist->started && (audio_status() & AUDIO_STATUS_PLAY))
+        audio_flush_and_reload_tracks();
+
+    return moved;
+}
+
+/*
+ * Delete the n tracks at indices[] positions index[], under one lock and one
+ * reload. Removed in the order given, so a caller gives them highest first
+ * for each to still name its track. Returns the number removed, or -1 if
+ * none could be.
+ */
+int playlist_delete_tracks(struct playlist_info* playlist, const int *index,
+                           int n)
+{
+    int removed = 0;
+
+    if (!playlist)
+        playlist = &current_playlist;
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    if (check_control(playlist) < 0)
+    {
+        notify_control_access_error();
+        removed = -1;
+    }
+    else
+    {
+        for (int i = 0; i < n; i++)
+        {
+            if (remove_track_unlocked(playlist, index[i], true) < 0)
+            {
+                if (removed == 0)
+                    removed = -1;
+                break;
+            }
+            removed++;
+        }
+    }
+
+    playlist_write_unlock(playlist);
+    dc_thread_start(playlist, false);
+
+    if (removed > 0 && (audio_status() & AUDIO_STATUS_PLAY) &&
+        playlist->started)
+        audio_flush_and_reload_tracks();
+
+    return removed;
+}
+
+/*
  * Put the playlist in the order given: order[p] is the indices[] position of
  * the track wanted at display position p, as playlist_get_track_info() reports
  * that position before any of this runs.

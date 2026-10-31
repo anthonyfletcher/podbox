@@ -160,10 +160,12 @@ bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size);
  * readings of a re-measured track, one of which the reader would then pick
  * between arbitrarily.
  *
- * False if it could not be written, in which case the file is left exactly as
- * it was: records have no markers and a reader steps through them at a fixed
- * stride, so half a record would put every record after it at the wrong
- * offset with nothing to resynchronise from. */
+ * False if it could not be written. A new record that fails is cut off again,
+ * so the file keeps its length: records have no markers and a reader steps
+ * through them at a fixed stride, so half a record would put every record
+ * after it at the wrong offset with nothing to resynchronise from. A failed
+ * replacement keeps the stride but can leave that one record torn, part old
+ * and part new. */
 bool sound_index_add(const struct sound_record *r);
 
 /* Records written into the working file so far, across resumes. */
@@ -210,7 +212,7 @@ bool sound_index_exists(void);
 /* ---- reading ---- */
 
 /* A reader holds the file open and seeks to what it is asked for, rather than
- * loading the lot: twenty thousand tracks is 800K, and taking that from core
+ * loading the lot: twenty thousand tracks is 1.28 MB, and taking that from core
  * stops playback to get it (see db_summary.h). */
 struct sound_index_reader
 {

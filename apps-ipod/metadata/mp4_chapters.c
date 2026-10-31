@@ -499,7 +499,7 @@ static int read_chap(int fd, off_t moov_start, off_t moov_end,
     struct sample_tables st;
     uint32_t wanted = 0, kind;
     off_t trak_end, payload;
-    int times;
+    int times, titles;
 
     /* The audio track names its chapter track by id. */
     if (lseek(fd, moov_start, SEEK_SET) != moov_start)
@@ -528,8 +528,9 @@ static int read_chap(int fd, off_t moov_start, off_t moov_end,
             && read_sample_tables(fd, trak_end, &st))
         {
             times = read_start_times(fd, &st, cue);
+            titles = read_sample_titles(fd, &st, times, cue);
 
-            return MIN(times, read_sample_titles(fd, &st, times, cue));
+            return MIN(times, titles);
         }
 
         if (lseek(fd, trak_end, SEEK_SET) != trak_end)

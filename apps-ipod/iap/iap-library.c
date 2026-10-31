@@ -211,7 +211,7 @@ static uint32_t list_count;
 static int32_t lists_commit = -1;
 
 enum { EV_PLAY = 1, EV_MIX, EV_START, EV_ARTWORK, EV_PREFETCH, EV_LIST,
-       EV_EXIT };
+       EV_SHUFFLE, EV_REPEAT, EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
@@ -253,6 +253,16 @@ static void worker(void)
         if (ev.id == EV_LIST)
         {
             read_lists(ev.data);    /* nor are iAP2's */
+            continue;
+        }
+        if (ev.id == EV_SHUFFLE || ev.id == EV_REPEAT)
+        {
+            if (leaving)
+                continue;
+            if (ev.id == EV_SHUFFLE)
+                iap_shuffle_state(!global_settings.playlist_shuffle);
+            else
+                iap_repeat_next();
             continue;
         }
         if (ev.id == EV_PLAY)
@@ -475,7 +485,8 @@ static bool build(int type)
     bool books;
     int32_t commit = tagcache_commit_id();
 
-    if (level < 0 || building)
+    /* The worker's playlist read searches with the block's tcs and name too */
+    if (level < 0 || building || lists_state == IAP_LIST_BUSY)
         return false;
 
     /* A commit while browsing moves every seek held here. Read per record
@@ -1346,14 +1357,21 @@ bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
     return true;
 }
 
+/* On the worker: both save the settings, and shuffle reorders the playlist */
 void iap_library_shuffle_toggle(void)
 {
-    iap_shuffle_state(!global_settings.playlist_shuffle);
+    if (!open_block(false))
+        return;
+    prefetch_give_way();
+    queue_post(&worker_q, EV_SHUFFLE, 0);
 }
 
 void iap_library_repeat_next(void)
 {
-    iap_repeat_next();
+    if (!open_block(false))
+        return;
+    prefetch_give_way();
+    queue_post(&worker_q, EV_REPEAT, 0);
 }
 
 /* ------------------------------------------------------------------ *

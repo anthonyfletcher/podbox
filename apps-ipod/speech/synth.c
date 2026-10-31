@@ -593,15 +593,21 @@ static void frames_skip(uint32_t n)
 
 void synth_init(int rate)
 {
+    static bool sin_built;      /* the table depends on nothing: built once */
+
     sample_rate = rate;
     phase_per_hz = (1ull << 32) / rate;
     bw_to_x = ((uint64_t)PI_Q30 << 16) / rate;
     hz_to_sin_index = (2048ull << 32) / rate;
-    for (int i = 0; i <= 1024; i++)
+    if (!sin_built)
     {
-        long cos;
-        long sin = fp_sincos((unsigned long)i << 20, &cos);
-        sin_table[i] = i == 1024 ? 0x7fffffff : sin;
+        for (int i = 0; i <= 1024; i++)
+        {
+            long cos;
+            long sin = fp_sincos((unsigned long)i << 20, &cos);
+            sin_table[i] = i == 1024 ? 0x7fffffff : sin;
+        }
+        sin_built = true;
     }
     noise_seed = 1;
     memset(&src, 0, sizeof(src));

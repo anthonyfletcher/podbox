@@ -8,6 +8,8 @@
 #define _SOUND_MOOD_H
 
 #include <stdbool.h>
+#include <stdint.h>
+#include "database/sound_cal.h"
 #include "database/sound_mix.h"
 
 enum {
@@ -37,5 +39,25 @@ int sound_mood_score(const struct sound_axes *a, int mood);
  * traversal at all. Moving the target is what makes the middle a middle. */
 int sound_mood_score_between(const struct sound_axes *a, int from, int to,
                              int t);
+
+/* One such point, interpolated once for a journey to score every track
+ * against: sound_mood_point_score() answers exactly what
+ * sound_mood_score_between() does for the same moods and 't'. */
+struct mood_point
+{
+    int     n;            /* axes below, or -1 where a mood is out of range */
+    int     mode;
+    bool    needs_tempo;
+    struct
+    {
+        uint8_t cal;
+        int16_t target;
+        int16_t weight;
+    } ax[CAL_AXES];       /* a mood names each axis once */
+};
+
+void sound_mood_point(struct mood_point *p, int from, int to, int t);
+int sound_mood_point_score(const struct sound_axes *a,
+                           const struct mood_point *p);
 
 #endif /* _SOUND_MOOD_H */

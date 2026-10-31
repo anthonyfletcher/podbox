@@ -896,8 +896,7 @@ static int select_remove(void)
         select_index[i] = index;
     }
     qsort(select_index, n, sizeof(*select_index), compare_desc);
-    for (int i = 0; i < n; i++)
-        playlist_delete(viewer.playlist, select_index[i]);
+    playlist_delete_tracks(viewer.playlist, select_index, n);
     if (playing_row >= 0)
     {
         /* The ticked rows after the playing one */
@@ -919,38 +918,43 @@ static int select_remove(void)
     return ONPLAY_OK;
 }
 
-/* Each ticked track goes in after the one placed before it, the first after
- * the cursor's. Worked in rows, which is what a move's destination means,
- * and each converted to an index only at its move: a move changes the first
- * index. playlist_move() leaves a track at the row it is given and shifts the
- * ones between, so the rows still to move are shifted the same way after
- * each. */
+static int select_dest[SELECT_TRACKS_MAX];
+
+/* The cursor's track stays where it is, ticked or not, and the other ticked
+ * tracks follow it in list order: each goes in after the one placed before
+ * it, the first after the cursor's. Worked out in rows, which is what a
+ * move's destination means, and made as one batch of moves. A move leaves a
+ * track at the row it is given and shifts the ones between, so the rows
+ * still to move are shifted the same way after each. */
 static int select_move_here(void)
 {
     int n = select_rows();
     int prev = viewer.selected_track;
+    int cursor = -1;    /* the cursor's track in select_index[], if ticked */
+    int moves = 0;
 
     select_acted = true;
     if (n <= 0 || menu_track_stale())
         return ONPLAY_OK;
     for (int i = 0; i < n; i++)
+        if (select_index[i] == prev)
+            cursor = i;
+    for (int i = 0; i < n; i++)
     {
         int from = select_index[i];
         int to = from < prev ? prev : prev + 1;
 
-        /* The cursor's own track, or one already where it goes: the next
-         * goes in after it */
-        if (from == prev || from == to)
+        if (i == cursor)
+            continue;
+        /* Already where it goes: the next goes in after it */
+        if (from == to)
         {
             prev = from;
             continue;
         }
-        if (playlist_move(viewer.playlist, row_index(from),
-                          row_index(to)) < 0)
-        {
-            splash(HZ, ID2P(LANG_FAILED));
-            break;
-        }
+        /* Entries before i are spent, so the moves are packed over them */
+        select_index[moves] = from;
+        select_dest[moves++] = to;
         for (int j = i + 1; j < n; j++)
         {
             int *x = &select_index[j];
@@ -962,6 +966,9 @@ static int select_move_here(void)
         }
         prev = to;
     }
+    if (moves > 0 && playlist_move_tracks(viewer.playlist, select_index,
+                                          select_dest, moves) < moves)
+        splash(HZ, ID2P(LANG_FAILED));
     menu_result = PV_CONTEXT_MODIFIED;
     return ONPLAY_OK;
 }

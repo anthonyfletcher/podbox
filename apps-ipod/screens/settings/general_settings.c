@@ -234,7 +234,31 @@ MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
 
 /** Playlist Engine **/
 
-MENUITEM_SETTING(playlist_engine, &global_settings.playlist_engine, NULL);
+/* Switching the engine on here is how the analysis gets started: nothing can
+ * be matched until it has run. Only this row offers it -- not a .cfg load and
+ * not the Quick Screen, where the scan's dialogs have no screen of their own.
+ * An index already on disk is left alone, the scan screen asks before it
+ * starts, and with no usable database there is nothing for it to do. */
+static int playlist_engine_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list)
+{
+    static bool was;
+
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_ENTER_MENUITEM)
+        was = global_settings.playlist_engine;
+    else if (action == ACTION_EXIT_MENUITEM
+             && global_settings.playlist_engine && !was
+             && !sound_index_exists() && tagcache_is_usable())
+        sound_scan_screen(false);
+    return action;
+}
+
+MENUITEM_SETTING(playlist_engine, &global_settings.playlist_engine,
+                 playlist_engine_callback);
 MENUITEM_SETTING(track_playlist, &global_settings.track_playlist, NULL);
 MENUITEM_SETTING(analysis_depth, &global_settings.analysis_depth, NULL);
 MENUITEM_SETTING(mood_playlist, &global_settings.mood_playlist, NULL);
@@ -1080,6 +1104,9 @@ static int album_sort_ctx_option(void *param)
         if (order >= DB_SORT_ALBUMS_ARTIST_NAME)
             order -= DB_SORT_ALBUMS_ARTIST_NAME;
     }
+    /* a hand-edited slot past the last order shows as Default */
+    if (order + 1 >= count)
+        order = -1;
     choice = order + 1;
 
     /* set_option() returns true only when USB took over the screen. */

@@ -487,36 +487,12 @@ static int usb_storage_get_config_descriptor(unsigned char *dest,int max_packet_
 static int usb_handle = 0;
 #endif
 
-/* Claim the transfer buffers. Idempotent, and deliberately never released.
- *
- * PODBOX: must be called from usb_init(), at boot, and from nowhere else that
- * matters. The allocation is ~128K of *immovable* buflib, so once audio_init()
- * has taken the rest of the RAM it can only be satisfied by shrinking the audio
- * buffer -- and that callback stops playback with a synchronous queue_send,
- * blocking the calling thread for a fade, a codec halt and several disk writes.
- * Called at boot it lands before audio_init(), so there is nothing to shrink
- * and nothing to wait for.
- *
- * Trap: two later placements are fatal.
- *
- *  - usb_storage_init_connection() runs inside the
- *    host's SET_CONFIGURATION. The USB thread stalls mid-control-transfer, the
- *    host gives up, and usb_request_exclusive_storage() -- which sits *after*
- *    the driver loop in usb_core_do_set_config() -- is never reached, so no
- *    thread is ever asked to release storage.
- *  - usb_storage_init(), i.e. usb_core_init(), runs after usb_drv_init() has
- *    set USBCMD_RUN and attached the device. A stall there is before
- *    SET_ADDRESS, so enumeration never starts and the host bus-resets until
- *    it gives up.
- *
- * The storage handover, usb_storage_notify_event(), stalls nothing, but
- * reshapes the audio buffer to fit the allocation on every connection.
- *
- * Not freed on disconnect either, or the next connection would pay for it.
- *
- * Targets with USB_STATIC_ALLOC never had the problem: their buffers are BSS.
- * PP502x is excluded from that because USB_DEVBSS_ATTR is IBSS_ATTR there and
- * 128K does not fit in IRAM. */
+/* Claim the transfer buffers from usb_init() at boot, before audio_init(),
+ * and never release them. Idempotent. They are ~128K of immovable buflib, so
+ * claimed any later they come from shrinking the audio buffer, which stops
+ * playback and blocks the USB thread inside SET_CONFIGURATION or before
+ * SET_ADDRESS long enough for the host to give up. PP502x allocates where
+ * USB_STATIC_ALLOC targets use BSS: its USB_DEVBSS_ATTR is IRAM, too small. */
 void usb_storage_alloc_buffers(void)
 {
 #ifndef USB_STATIC_ALLOC
@@ -1410,7 +1386,6 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
 #endif
         case SCSI_WRITE_10:
             logf("scsi write10 %d",lun);
-            host_wrote = true;
             if(!lun_present) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_NOT_READY;
@@ -1440,6 +1415,7 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 cur_sense_data.ascq=0;
             }
             else {
+                host_wrote = true;
                 receive_block_data(cur_cmd.data[0],
                         MIN(WRITE_BUFFER_SIZE, cur_cmd.count*cur_cmd.block_size));
             }
@@ -1447,7 +1423,6 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
 #ifdef STORAGE_64BIT_SECTOR
         case SCSI_WRITE_16:
             logf("scsi write16 %d",lun);
-            host_wrote = true;
             if(!lun_present) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_NOT_READY;
@@ -1477,6 +1452,7 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 cur_sense_data.ascq=0;
             }
             else {
+                host_wrote = true;
                 receive_block_data(cur_cmd.data[0],
                         MIN(WRITE_BUFFER_SIZE, cur_cmd.count*cur_cmd.block_size));
             }

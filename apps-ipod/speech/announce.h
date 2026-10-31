@@ -30,4 +30,9 @@ void announce_init(void);
 /* On the UI thread, for the two events above and their data. */
 void announce_event(long event, intptr_t data);
 
+/* The user paused or resumed. An announcement that paused the music then
+ * leaves it as the user did when it ends. On the UI thread, from every path
+ * that pauses or resumes at the user's word. */
+void announce_user_pause(void);
+
 #endif /* __ANNOUNCE_H */

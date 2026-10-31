@@ -21,9 +21,9 @@
  * Framing is a byte-at-a-time state machine (ST_SOF -> ... -> ST_CHECK), so a
  * packet is recognised as bytes arrive rather than by buffering and scanning.
  *
- * Incoming bytes arrive from the serial interrupt, so iap_handlepkt() runs on
- * the main thread against a buffer the ISR fills -- the two are kept apart by
- * only handing over complete packets.
+ * Incoming bytes arrive from the serial interrupt, and iap_handlepkt() runs on
+ * the "iap" thread (iap_thread()) against the buffer the ISR fills -- the two
+ * are kept apart by only handing over complete packets.
  *
  * Parts, in order:
  *   - packet buffers and the shared accessory/device state
@@ -427,6 +427,11 @@ void iap_reset_state(IF_IAP_MP_NONVOID(int port))
 void iap_power_reset(void)
 {
     post_reset(false);
+}
+
+bool iap_reset_is_pending(void)
+{
+    return reset_pending;
 }
 
 /* iAP thread. An accessory that identified itself was the output -- a dock's
@@ -999,13 +1004,17 @@ void iap_send_tx(void)
 #endif
     for (i=0; i <= (iap_txnext - txstart); i++)
     {
-        /* A port that never drains would hold the core for good, and
-         * nothing else runs while this thread waits */
+        /* A port that never drains is given up on. The wait yields: a
+         * byte is half a millisecond at 19200 baud, and a cover thousands
+         * of them. */
         long end = current_tick + HZ / 10;
 
         while (!tx_rdy())
+        {
             if (TIME_AFTER(current_tick, end))
                 return;
+            yield();
+        }
         tx_writec(txstart[i]);
     }
 }

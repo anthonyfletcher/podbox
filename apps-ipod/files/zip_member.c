@@ -17,6 +17,11 @@
 
 #define ZIP_CHUNK 512           /* bytes unpacked per write */
 
+/* Largest member unpacked. The size is the zip's own claim, so this is what
+ * stops a deflate bomb filling the disk; no picture a book carries comes
+ * near it. A base64 member is bounded by its text instead. */
+#define ZIP_MEMBER_MAX (16 * 1024 * 1024)
+
 static long fd_read(void *ctx, void *buf, size_t n)
 {
     return read(*(int *)ctx, buf, n);
@@ -49,6 +54,11 @@ bool zip_member_to_file(const char *book, long at, uint32_t csize,
 
     if (in < 0)
         return false;
+    if (!to_end && usize > ZIP_MEMBER_MAX)
+    {
+        close(in);
+        return false;
+    }
     s = chunk ? bs_file_stream(&a, &io, at, csize) : NULL;
     if (s)
         s = to_end ? bs_base64_stream(&a, s)

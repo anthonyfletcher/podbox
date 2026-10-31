@@ -124,6 +124,7 @@ enum
     USB_HOST_AUTO,           /* Event - the next step of looking for a DAC */
     USB_HOST_DAC,            /* Event - data: DAC output on now, or off */
     USB_HOST_HUB,            /* Event - read the hub port a DAC is on */
+    USB_HOST_STREAM,         /* Event - data: stream to the probe's DAC, or stop */
 #endif
 #ifdef USB_ENABLE_IAP
     USB_CAR_RECONNECT,       /* Event - a car: again without the sound card */
@@ -287,6 +288,7 @@ enum usb_waypoint
 };
 
 void usb_record_waypoint(enum usb_waypoint w, int a, int b);
+/* Also refreshes the record's acks_remaining and storage_handed_over */
 const struct usb_insert_record *usb_get_insert_record(void);
 #ifdef HAVE_USBSTACK
 /* Give the port to the USB host probe (true) or back to the device stack.
@@ -306,6 +308,9 @@ void usb_set_dac_output(int mode);
  * on a DAC. */
 void usb_set_dac_active(bool on);
 bool usb_dac_searching(void);
+/* Start or stop the stream to a DAC the host probe already sees, on the USB
+ * thread, which owns the role. For the host probe's debug screen. */
+void usb_host_stream(bool on);
 bool usb_dac_playing(void);
 /* While a DAC behind a hub plays, read its hub port once a second: taking
  * the DAC off the hub leaves the player's own port connected. */

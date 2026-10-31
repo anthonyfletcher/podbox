@@ -640,17 +640,17 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     {
                         case 0x00:
                         {
+                            /* Chapter Count: the playing track's is loaded.
+                             * Read before the artwork's file I/O yields. */
+                            const int chapters = id3->cuesheet ?
+                                id3->cuesheet->track_count : 0;
                             /* Track Capabilities 10Bytes Data: bit 1,
                              * chapters; bit 2, album artwork */
                             IAP_TX_PUT_U32((iap_artwork_exists(index) ?
                                             BIT_N(2) : 0)
-                                           | (id3->cuesheet
-                                              && id3->cuesheet->track_count
-                                              ? BIT_N(1) : 0));
+                                           | (chapters ? BIT_N(1) : 0));
                             IAP_TX_PUT_U32(id3->length); /* Track Length */
-                            /* Chapter Count: the playing track's is loaded */
-                            IAP_TX_PUT_U16(id3->cuesheet ?
-                                           id3->cuesheet->track_count : 0);
+                            IAP_TX_PUT_U16(chapters);
                             break;
                         }
                         case 0x02:
@@ -1379,7 +1379,10 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             if (read_count > total - start_index)
                 read_count = total - start_index;
 
-            for (uint32_t i = start_index; i < start_index + read_count; i++)
+            /* A whole library is minutes at 19200 baud: an accessory that
+             * leaves meanwhile is not sent the rest */
+            for (uint32_t i = start_index;
+                 i < start_index + read_count && !iap_reset_is_pending(); i++)
             {
                 if (queue)
                 {
@@ -2796,7 +2799,6 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              */
         {
             CHECKLEN(7);
-            int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
             long tracknum = get_u32(&buf[3]);
 
             /* Unvalidated, this is the worst of the audio_skip() paths:
@@ -2808,19 +2810,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-
-            /* Stopped, a skip has nothing to move: start there */
-            if (!(audio_status() & AUDIO_STATUS_PLAY))
-            {
-                playlist_start((playlist_get_first_index(NULL) + tracknum)
-                               % playlist_amount(), 0, 0);
-                cmd_ok(cmd);
-                break;
-            }
-            audio_pause();
-            audio_skip(tracknum - iap_get_trackindex());
-            if (!paused)
-                audio_resume();
+            iap_skip_to(tracknum);
 
             /* respond with cmd ok packet */
             cmd_ok(cmd);

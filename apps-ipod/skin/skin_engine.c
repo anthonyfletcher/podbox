@@ -115,8 +115,8 @@ static void skin_reset_buffers(int item, int screen)
      * into is freed. Only an SBS render re-sets it (skin_render.c), so a list
      * drawn after the reload otherwise reaches skinlist_draw() with listcfg
      * still pointing into freed memory and renders through a garbage buffer.
-     * The same guard is applied at every other hand-off -- menu.c, activity.c,
-     * list.c, viewport.c -- but not here, where the memory actually goes. */
+     * menu.c, activity.c, list.c and viewport.c clear it at their hand-offs
+     * too; this one is where the memory actually goes. */
     skinlist_set_cfg(screen, NULL);
 
     /* The album art slots go back inside skin_data_free_buflib_allocs(), with

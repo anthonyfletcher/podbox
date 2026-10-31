@@ -69,7 +69,8 @@ uint64_t iap_library_key(const char *path);
  * none is in the database or a list is still being built. */
 bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start);
 /* An iAP2 car's shuffle and repeat buttons, as iAP1 accessories set them:
- * shuffle on or off, and repeat off, all, one, off. */
+ * shuffle on or off, and repeat off, all, one, off. Done on the library's
+ * worker, and not at all when it cannot be started. */
 void iap_library_shuffle_toggle(void);
 void iap_library_repeat_next(void);
 

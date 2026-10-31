@@ -103,15 +103,12 @@ struct mood_def
  * loudness would predict, which is what "dark" means, and not simply a quiet
  * one.
  *
- * Those three, and A_WIDTH, A_CLARITY and A_PEAK with them, are now derived
- * against a 3439-record index rather than the 90-record one the table was
- * written on. Eleven targets sat above that library's ninetieth percentile --
- * Dark's A_LOW at the 97th, Bright's A_BRIGHT at the 96th -- which is the
- * failure named at the top of this file: nothing can approach such a target,
- * so it penalises every candidate about equally and the mood stops choosing
- * on its own headline axis. Each was brought to the 85th or 90th percentile
- * of the measured distribution, keeping the order the table was written with,
- * and the three sitting below the tenth went to the fifteenth. */
+ * Those three, and A_WIDTH, A_CLARITY and A_PEAK with them, are set against
+ * a 3439-record index. No target sits above that library's ninetieth
+ * percentile or below its fifteenth: past either, nothing can approach the
+ * target, so it penalises every candidate about equally and the mood stops
+ * choosing on its own headline axis -- the failure named at the top of this
+ * file. */
 
 /* A_SPEED here, and not because Calm is about tempo.
  *
@@ -349,28 +346,28 @@ static void mood_axis_at(const struct mood_def *m, int cal,
     *weight = 0;
 }
 
-int sound_mood_score_between(const struct sound_axes *a, int from, int to,
-                             int t)
+void sound_mood_point(struct mood_point *p, int from, int to, int t)
 {
     const struct mood_def *ma, *mb;
-    uint32_t sum = 0;
-    int total_w = 0;
-    int d;
     unsigned int i, j;
 
-    if (from < 0 || from >= MOOD_COUNT || to < 0 || to >= MOOD_COUNT)
-        return -1;
+    p->n = -1;
 
-    if (from == to)
-        return sound_mood_score(a, from);
+    if (from < 0 || from >= MOOD_COUNT || to < 0 || to >= MOOD_COUNT)
+        return;
 
     sound_cal_ensure();
 
     ma = &moods[from];
     mb = &moods[to];
 
-    if ((ma->needs_tempo || mb->needs_tempo) && a->tempo < 0)
-        return -1;
+    p->n = 0;
+    p->needs_tempo = ma->needs_tempo || mb->needs_tempo;
+
+    /* The mode of whichever end this point is nearer. There is no half a
+     * mode, and a journey between two moods that name different ones should
+     * change over rather than want neither. */
+    p->mode = t < SOUND_AX / 2 ? ma->mode : mb->mode;
 
     /* Every axis either mood names, once. The second loop skips what the
      * first has already covered, which is what makes this the union rather
@@ -379,7 +376,7 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
     {
         int cal;
         int ta = 0, wa = 0, tb = 0, wb = 0;
-        int target, weight, v;
+        int target, weight;
 
         if (i < ma->count)
         {
@@ -417,14 +414,33 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
         if (weight <= 0)
             continue;
 
-        v = axis_value(a, cal);
+        p->ax[p->n].cal = (uint8_t)cal;
+        p->ax[p->n].target = (int16_t)target;
+        p->ax[p->n].weight = (int16_t)weight;
+        p->n++;
+    }
+}
+
+int sound_mood_point_score(const struct sound_axes *a,
+                           const struct mood_point *p)
+{
+    uint32_t sum = 0;
+    int total_w = 0;
+    int d, i;
+
+    if (p->n < 0 || (p->needs_tempo && a->tempo < 0))
+        return -1;
+
+    for (i = 0; i < p->n; i++)
+    {
+        int v = axis_value(a, p->ax[i].cal);
 
         if (v < 0)
             continue;
 
-        d = v - target;
-        sum += (uint32_t)(d * d / SOUND_AX) * weight;
-        total_w += weight;
+        d = v - p->ax[i].target;
+        sum += (uint32_t)(d * d / SOUND_AX) * p->ax[i].weight;
+        total_w += p->ax[i].weight;
     }
 
     if (total_w == 0)
@@ -432,8 +448,18 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
 
     d = (int)mood_root(sum * SOUND_AX / total_w);
 
-    /* The mode of whichever end this point is nearer. There is no half a
-     * mode, and a journey between two moods that name different ones should
-     * change over rather than want neither. */
-    return d + mode_cost(a, t < SOUND_AX / 2 ? ma->mode : mb->mode);
+    return d + mode_cost(a, p->mode);
+}
+
+int sound_mood_score_between(const struct sound_axes *a, int from, int to,
+                             int t)
+{
+    struct mood_point p;
+
+    if (from == to && from >= 0 && from < MOOD_COUNT)
+        return sound_mood_score(a, from);
+
+    sound_mood_point(&p, from, to, t);
+
+    return sound_mood_point_score(a, &p);
 }

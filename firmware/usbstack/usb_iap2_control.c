@@ -403,8 +403,9 @@ static struct
     bool pending;           /* the worker was busy: the find is asked again */
     uint32_t size, sent;
     uint32_t off;           /* how much of the worker's chunk has gone */
-    long started;
+    long started;           /* when the find, or the setup, began */
 } aw;
+static bool no_file_session;      /* a file packet found the link without one */
 /* The library on its way to the car: see the media library part */
 static struct
 {
@@ -502,6 +503,7 @@ void usb_iap2_control_reset(void)
         iap_library_artwork_stop();
     aw.phase = ART_IDLE;
     aw.blank = 0;
+    no_file_session = false;
     lib.active = false;
     lib.waiting = false;
     lib.lists = LS_IDLE;
@@ -1181,7 +1183,8 @@ static int play_state(void)
  * pieces after the first from Nocturne (session/file_transfer.rs), facts
  * only. */
 
-/* False when it did not go: no free slot, or more than a packet holds */
+/* False when it did not go: no free slot, more than a packet holds, or no
+ * file transfer session on the link */
 static bool file_packet(uint8_t id, uint8_t op, const uint8_t *data,
                         size_t n)
 {
@@ -1193,7 +1196,11 @@ static bool file_packet(uint8_t id, uint8_t op, const uint8_t *data,
     b[1] = op;
     if (n)
         memcpy(b + 2, data, n);
-    usb_iap2_file_send(n + 2);
+    if (!usb_iap2_file_send(n + 2))
+    {
+        no_file_session = true;
+        return false;
+    }
     return true;
 }
 
@@ -1209,8 +1216,14 @@ static void announce_artwork(uint32_t size)
 {
     const uint8_t setup[10] = {0, 0, 0, 0, size >> 24, size >> 16,
                                size >> 8, size, 0, 2};
-    file_packet(aw.id, 0x04, setup, sizeof(setup));
+    if (!file_packet(aw.id, 0x04, setup, sizeof(setup)) && no_file_session)
+    {
+        iap_library_artwork_stop();
+        aw.phase = ART_IDLE;
+        return;
+    }
     aw.size = size;
+    aw.started = current_tick;
     aw.phase = ART_ANNOUNCED;
 }
 
@@ -1222,7 +1235,11 @@ static void start_artwork(uint8_t id, const struct mp3entry *id3)
         iap_library_artwork_stop();
         if (aw.id)
             file_packet(aw.id, 0x02, NULL, 0);
+        aw.phase = ART_IDLE;
     }
+    /* No cover goes without a file transfer session */
+    if (no_file_session)
+        return;
     aw.id = id;
     aw.sent = 0;
     aw.off = 0;
@@ -1314,6 +1331,15 @@ static void artwork_pump(void)
         else if (!aw.late && usb_iap2_room() > 0 &&
                  TIME_AFTER(current_tick, aw.started + HZ * 3 / 10))
             blank_artwork();
+    }
+    /* A car that never answers the setup does not hold up the worker, whose
+     * ring stays full until the cover goes */
+    if (aw.phase == ART_ANNOUNCED &&
+        TIME_AFTER(current_tick, aw.started + 5 * HZ))
+    {
+        file_packet(aw.id, 0x02, NULL, 0);
+        iap_library_artwork_stop();
+        aw.phase = ART_IDLE;
     }
     while (aw.phase == ART_SENDING && usb_iap2_room() > 1)
     {
@@ -2005,7 +2031,8 @@ void usb_iap2_control_tick(void)
             watch_queue();
     }
     artwork_pump();
-    if (now_playing && aw.phase == ART_IDLE && (media_mask & 1u << MI_ARTWORK))
+    if (now_playing && aw.phase == ART_IDLE && !no_file_session &&
+        (media_mask & 1u << MI_ARTWORK))
         iap_library_artwork_prefetch();
     list_pump();
     if (lib.waiting && !lib.active)

@@ -113,6 +113,11 @@ void announce_event(long event, intptr_t data)
         announce_done();
 }
 
+void announce_user_pause(void)
+{
+    paused_for_us = false;
+}
+
 void announce_init(void)
 {
     add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_changed);

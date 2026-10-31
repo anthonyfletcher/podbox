@@ -1024,7 +1024,7 @@ static void load_sylt(void)
 
 enum lyrics_result lyrics_load(const struct mp3entry *id3)
 {
-    lyrics_close();
+    reset_data();
 
     /* An mp3entry is filled in as its track buffers, so it can be handed over
      * still empty -- audio_get_track_metadata() wipes it when even the
@@ -1046,13 +1046,19 @@ enum lyrics_result lyrics_load(const struct mp3entry *id3)
     track.codectype  = id3->codectype;
     track.id3version = id3->id3version;
 
-    lyrics_handle = core_alloc_ex(LYRICS_BUFFER_SIZE, &buflib_ops_locked);
+    /* The buffer is kept from one track to the next and freed only by
+     * lyrics_close(): a 32 KiB allocation per track change can shrink the
+     * audio buffer and rebuffer the music. */
     if (lyrics_handle <= 0)
     {
-        lyrics_handle = 0;
-        return LYRICS_NO_MEMORY;
+        lyrics_handle = core_alloc_ex(LYRICS_BUFFER_SIZE, &buflib_ops_locked);
+        if (lyrics_handle <= 0)
+        {
+            lyrics_handle = 0;
+            return LYRICS_NO_MEMORY;
+        }
+        buffer = core_get_data(lyrics_handle);
     }
-    buffer = core_get_data(lyrics_handle);
 
     reset_data();
     lrc.length = track.length;
@@ -1068,7 +1074,7 @@ enum lyrics_result lyrics_load(const struct mp3entry *id3)
 
     if (!lrc.loaded)
     {
-        lyrics_close();
+        reset_data();
         return LYRICS_NOT_FOUND;
     }
     return LYRICS_OK;

@@ -829,8 +829,8 @@ bool img_filter_compile(const char *spec, unsigned allowed,
  * Trap: the fraction has to survive the fold to be worth rounding. Round each
  * filter's output to a level before the next one runs and the table arrives
  * here exact, with nothing left for a cell to move -- the dither then costs a
- * pass and changes almost no pixel. Over 470 covers that difference is a
- * banding figure of 1.23 against 0.14, and on the worst cover the exact table
+ * pass and changes almost no pixel. Measured over 470 covers, an exact table
+ * bands at 1.23 against 0.14 for a fractional one, and on the worst cover it
  * dithers to something worse than not dithering at all.
  *
  * Rounding the output is not the whole of it, because it cannot break a run:
@@ -839,8 +839,8 @@ bool img_filter_compile(const char *spec, unsigned allowed,
  * value is also jittered on the way *in*, across `lut_span` levels. A gain
  * never needs it -- it compresses, but each input still lands on its own
  * fraction, so the span is 1 and BAYER_JITTER returns zero. Doing both to a
- * gain anyway is measurably worse than doing neither: 1.16 banding, and the
- * worst grain of any option tried.
+ * gain is worse than doing neither: 1.16 banding, and the coarsest grain of
+ * any of these schemes.
  */
 static const unsigned char bayer8[64] =
 {
@@ -870,9 +870,8 @@ static const unsigned char bayer8[64] =
 /* Each stage's arithmetic lives here once, so the dithered and plain loops
  * below differ only in where the rounding comes from. FORCE_INLINE, not a
  * plain `inline`: the build is -Os, where GCC declines to inline anything
- * with two callers, and it turned levels_pixel into a real call with its six
- * arguments pushed on the stack -- 11 instructions a pixel became a function
- * call per pixel. */
+ * with two callers, and levels_pixel then becomes a real call per pixel with
+ * its six arguments pushed on the stack, in place of 11 instructions. */
 
 /* Greyscale, the shape §6 of the design note settles on: one luminance, with
  * the other two channels derived from it rather than computed on their own.

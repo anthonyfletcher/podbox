@@ -25,6 +25,10 @@ bool find_albumart(const struct mp3entry *id3, char *buf, int buflen,
 bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
                            char *buf, int buflen);
 
+/* Whether the image file at path exists and its decoder takes it, by its
+ * headers; one that fails further in passes. */
+bool art_file_usable(const char *path);
+
 void get_albumart_size(struct bitmap *bmp);
 
 /* Where a track's cover comes from, by the Album Art setting's rules: the

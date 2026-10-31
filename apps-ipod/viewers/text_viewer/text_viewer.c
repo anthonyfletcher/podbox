@@ -928,8 +928,6 @@ static off_t tv_page(off_t start, bool render)
     return off;
 }
 
-/* A whole-screen viewport filled with the reading background. Used to wipe the
- * margin border and any loading splash before the page is drawn inset. */
 /* ---- the page held sideways ------------------------------------------ */
 
 /* Sideways the page is 240 x 320: drawn into a buffer of that shape and
@@ -999,6 +997,8 @@ static void tv_side_push(void)
     lcd_set_viewport(prev);
 }
 
+/* A whole-screen viewport filled with the reading background. Used to wipe the
+ * margin border and any loading splash before the page is drawn inset. */
 static void tv_fullscreen_vp(struct viewport *vp)
 {
     /* Both fields must be set before viewport_set_fullscreen(), which writes
@@ -2591,16 +2591,13 @@ static void tv_setup_screen(void)
      * (viewport_set_defaults -> viewport_set_fullscreen). With the theme off,
      * the skin engine's status-bar re-render is gated out for this screen --
      * viewportmanager_redraw only pumps sb_skin_update while the theme is
-     * enabled -- so nothing repaints over the page between our own draws. That
-     * race is what made the reading area flicker with status-bar content while
-     * paging under a themed (SBS) status bar. */
+     * enabled -- so nothing repaints over the page between our own draws;
+     * under a themed (SBS) status bar that repaint makes the reading area
+     * flicker while paging. */
     viewportmanager_theme_enable(SCREEN_MAIN, false, &tv.vp);
     tv_apply_settings();
 }
 
-/* Hold-Menu settings menu, shared with Library > Viewers > Text Viewer.
- * Re-enables the theme just for the menu chrome, then drops back to our own
- * full-screen drawing and re-applies whatever the reader changed. */
 /* ---- contents --------------------------------------------------------- */
 
 /* Rows the contents list holds, and the bytes of each title and anchor
@@ -3144,6 +3141,9 @@ static enum tv_key tv_side_button(long b)
     return TV_KEY_NONE;
 }
 
+/* Hold-Menu settings menu, shared with Library > Viewers > Text Viewer.
+ * Re-enables the theme just for the menu chrome, then drops back to our own
+ * full-screen drawing and re-applies whatever the reader changed. */
 static int tv_menu(void)
 {
     int sel = 0, ret;

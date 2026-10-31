@@ -1172,7 +1172,7 @@ static int clipboard_paste_many(void)
 {
     char dst[MAX_PATH], src[MAX_PATH], name[MAX_PATH];
     int fd = open(CLIPBOARD_LIST, O_RDONLY);
-    int rest = -1;
+    int done = 0;           /* lines ahead of the one a cancel stopped at */
     bool stopped = false;
 
     strmemccpy(dst, getcwd(NULL, 0), sizeof(dst));
@@ -1183,29 +1183,21 @@ static int clipboard_paste_many(void)
     }
     while (read_line(fd, name, sizeof(name)) > 0)
     {
-        int rc;
-
-        if (!name[0])
-            continue;
-        if (!stopped)
+        if (name[0])
         {
+            int rc;
+
             path_append(src, clipboard.path, name, sizeof(src));
             rc = copy_move_fileobject(src, dst, clipboard.flags);
             if (rc == FORC_CANCELLED)
             {
                 stopped = true;
-                rest = open(CLIPBOARD_LIST ".tmp",
-                            O_WRONLY | O_CREAT | O_TRUNC, 0666);
+                break;
             }
-            else
-            {
-                if (rc < FORC_SUCCESS)
-                    splashf(HZ, "%s: %s", str(LANG_FAILED), name);
-                continue;
-            }
+            if (rc < FORC_SUCCESS)
+                splashf(HZ, "%s: %s", str(LANG_FAILED), name);
         }
-        if (rest >= 0)
-            fdprintf(rest, "%s\n", name);
+        done++;
     }
     close(fd);
     context_menu_result = ONPLAY_RELOAD_DIR;
@@ -1214,13 +1206,26 @@ static int clipboard_paste_many(void)
         clipboard_clear_selection(&clipboard);
     else
     {
+        /* The list is opened again for the names left: a cancel can be a
+         * USB session, which closes every file open before it. */
+        int rest = -1, i = 0;
+
         splash_cancelled();
+        fd = open(CLIPBOARD_LIST, O_RDONLY);
+        if (fd >= 0)
+            rest = open(CLIPBOARD_LIST ".tmp",
+                        O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (rest >= 0)
         {
+            while (read_line(fd, name, sizeof(name)) > 0)
+                if (i++ >= done && name[0])
+                    fdprintf(rest, "%s\n", name);
             close(rest);
             remove(CLIPBOARD_LIST);
             rename(CLIPBOARD_LIST ".tmp", CLIPBOARD_LIST);
         }
+        if (fd >= 0)
+            close(fd);
     }
     return 1;
 }

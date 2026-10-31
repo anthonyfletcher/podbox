@@ -719,7 +719,10 @@ static void mp3_callback(const void** start, size_t* size, int *text)
     *text = -1;
     if (qe->synth)
     {
+        /* the phoneme ring is queue_text()'s too, filled under the lock */
+        talk_queue_lock();
         speech_release(qe->item);
+        talk_queue_unlock();
         qe->remaining = 0;
     }
     else

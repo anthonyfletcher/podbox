@@ -46,6 +46,10 @@ enum {
     /* show_menu()'s Zoom row, which the decode loop answers, since it holds
      * what the list needs */
     IV_MENU_ZOOM,
+
+    /* The USB hook freed the buffer and no USB session followed: take it
+     * again and show the same picture */
+    IV_RELOAD,
 };
 
 /* The downscale value naming the fit-to-screen rendering, as opposed to the

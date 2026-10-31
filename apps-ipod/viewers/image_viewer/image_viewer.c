@@ -29,7 +29,8 @@
  * the app buffer first, which leaves playback alone; a file, or a cover too
  * large for it, takes a core_alloc_maximum() block. That is pinned for the
  * whole session, so a USB connect would deadlock on it -- iv_usb_inserted()
- * drops it from the USB thread before that can happen.
+ * drops it from the USB thread before that can happen, and the viewer takes
+ * it back if no USB session follows (a charger).
  *
  * Parts, in order:
  *   - session state and the shared iv_settings
@@ -68,6 +69,7 @@
 #include "core_alloc.h"
 #include "system/app_buffer.h"
 #include "events.h"          /* add_event/remove_event, SYS_EVENT_USB_INSERTED */
+#include "usb.h"             /* usb_inserted, usb_host_is_present */
 #include "audio.h"           /* audio_current_track, audio_status, audio_hard_stop */
 #include "metadata/albumart.h"        /* search_albumart_files */
 #include "metadata.h"        /* AA_CLEAR_FLAGS_MASK */
@@ -107,8 +109,13 @@ static bool iv_app_buf = false;
 static volatile bool iv_buf_idle = false;
 
 /* Set by the USB hook once it has freed the buffer; the main thread must then
- * leave without touching buf or image_info again. */
+ * not touch buf or image_info again until it has taken a new one. */
 static volatile bool iv_usb_dropped = false;
+
+/* When the hook freed it. A host that has not spoken by IV_HOST_WAIT after
+ * that is taken to be none: a charger, which never ends in a USB session. */
+static volatile long iv_usb_drop_tick;
+#define IV_HOST_WAIT (2*HZ)
 
 static int ds, ds_min, ds_max; /* downscaling and limits */
 static struct image_info image_info;
@@ -172,11 +179,10 @@ static void iv_release_buffer(void)
 /* SYS_EVENT_USB_INSERTED handler.
  *
  * Runs on the USB thread, and -- crucially -- before usb_set_host_present()
- * asks for exclusive storage (firmware/usb.c). By the time the main thread is
- * handed SYS_USB_CONNECTED via button_get() the USB machinery has already run,
- * which is far too late: connecting USB froze the device (a deadlock, no panic)
- * even when the viewer ignored the event entirely. Holding the whole heap
- * pinned is what blocks buflib, so the buffer has to go here.
+ * asks for exclusive storage (firmware/usb.c). The whole heap held pinned
+ * blocks buflib and deadlocks the USB connect, however the viewer answers
+ * SYS_USB_CONNECTED: button_get() hands that over only after the USB
+ * machinery has run, so the buffer has to go here.
  *
  * Only safe while the main thread is idle in button_get(); mid-decode the
  * decoder holds pointers into the buffer. Rockbox threading is cooperative, so
@@ -189,7 +195,24 @@ static void iv_usb_inserted(unsigned short id, void *event_data)
         return;
 
     iv_release_buffer();
+    iv_usb_drop_tick = current_tick;
     iv_usb_dropped = true;
+}
+
+/* After the hook dropped the buffer, with no SYS_USB_CONNECTED seen: waits
+ * out what is left of IV_HOST_WAIT for a host to speak. IV_RELOAD when none
+ * has -- a charger, or the cable gone again -- else PLUGIN_USB_CONNECTED, to
+ * leave as for any USB session. */
+static int iv_after_drop(void)
+{
+    long until = iv_usb_drop_tick + IV_HOST_WAIT;
+
+    while (usb_inserted() && !usb_host_is_present()
+           && TIME_BEFORE(current_tick, until))
+        sleep(HZ/20);
+    if (usb_inserted() && usb_host_is_present())
+        return PLUGIN_USB_CONNECTED;
+    return IV_RELOAD;
 }
 
 /* Append 'name' to the file list, taking its pointer from the front of buf. */
@@ -208,12 +231,12 @@ static void add_pic(char *name, const char *pname)
  * about this directory (see get_pic_list()).
  *
  * The names are copied into the working buffer. The cache path can point
- * straight at the browser's own strings because the browser owns them for as
- * long as the viewer is up; nothing owns a readdir() name past the next call,
- * so these have to be kept. The pointer table grows from the front of the
- * buffer and the names from the back, and they stop when they would meet --
- * the buffer is also what the images decode into, so this takes what it needs
- * and no more. */
+ * straight at the browser's own strings because image_viewer() holds
+ * browser_lock_cache() for as long as the viewer is up; nothing owns a
+ * readdir() name past the next call, so these have to be kept. The pointer
+ * table grows from the front of the buffer and the names from the back, and
+ * they stop when they would meet -- the buffer is also what the images decode
+ * into, so this takes what it needs and no more. */
 static void get_pic_list_from_dir(const char *dir, const char *pname)
 {
     char *names = (char *)buf + buf_size;   /* names fill downwards */
@@ -577,15 +600,17 @@ static int scroll_bmp(struct image_info *info)
         iv_buf_idle = false;
 
         /* USB took the buffer while we waited: `info` and everything else
-         * pointing into it is dangling now, so leave without drawing. The
+         * pointing into it is dangling now, so return without drawing. The
          * event that woke us can be SYS_USB_CONNECTED itself, and USB never
          * mounts unless it is acknowledged, so system events still go to the
-         * handler. */
+         * handler. Any other wake may be a charger, which the picture
+         * survives. */
         if (iv_usb_dropped)
         {
-            if (button & SYS_EVENT)
-                default_event_handler(button);
-            return PLUGIN_USB_CONNECTED;
+            if ((button & SYS_EVENT)
+                && default_event_handler(button) == SYS_USB_CONNECTED)
+                return PLUGIN_USB_CONNECTED;
+            return iv_after_drop();
         }
 
         iv_running_slideshow = false;
@@ -990,6 +1015,15 @@ static int load_and_show(char *filename, struct image_info *info,
          * quickly never flashes one up. */
         splash_progress_set_delay(HZ/4);
         status = imgdec->get_image(info, frame, ds); /* decode or fetch from cache */
+        if (status == PLUGIN_OUTOFMEM && ds == DS_FIT)
+        {
+            /* A fit rendering made from a larger rung needs room for both,
+             * which the memory check above cannot see. Drop the rung. */
+            iv_fit_width = iv_fit_height = 0;
+            ds = ds_max;
+            scaled_centre(info, ds, &cx, &cy);
+            status = imgdec->get_image(info, frame, ds);
+        }
         if (status == PLUGIN_ABORT || status == PLUGIN_USB_CONNECTED)
         {
             status = iv_decode_stopped();
@@ -1005,15 +1039,6 @@ static int load_and_show(char *filename, struct image_info *info,
             ds = DS_FIT;
             scaled_centre(info, ds, &cx, &cy);
             continue;
-        }
-        if (status == PLUGIN_OUTOFMEM && ds == DS_FIT)
-        {
-            /* A fit rendering made from a larger rung needs room for both,
-             * which the memory check above cannot see. Drop the rung. */
-            iv_fit_width = iv_fit_height = 0;
-            ds = ds_max;
-            scaled_centre(info, ds, &cx, &cy);
-            status = imgdec->get_image(info, frame, ds);
         }
         if (status == PLUGIN_OUTOFMEM && iv_app_buf)
             return PLUGIN_OUTOFMEM;
@@ -1041,6 +1066,8 @@ static int load_and_show(char *filename, struct image_info *info,
         while (1)
         {
             status = scroll_bmp(info);
+            if (status == IV_RELOAD)
+                return status;          /* the buffer is gone */
 
             /* Always on to the redraw below, even when the rung is the one
              * showing: the list drew over the picture. */
@@ -1338,6 +1365,10 @@ int image_viewer(const char *file)
     iv_usb_dropped = false;
     add_event(SYS_EVENT_USB_INSERTED, iv_usb_inserted);
 
+    /* file_pt[] points into the browser's name cache, which would otherwise
+     * move under any allocation the session makes */
+    browser_lock_cache(browser_get_context());
+
     curfile = -1;
     direction = DIR_NEXT;
     entries = 0;
@@ -1347,6 +1378,7 @@ int image_viewer(const char *file)
     {
         iv_release_buffer();
         remove_event(SYS_EVENT_USB_INSERTED, iv_usb_inserted);
+        browser_unlock_cache(browser_get_context());
         splash(HZ * 2, "No supported files");
         return GO_TO_PREVIOUS;
     }
@@ -1376,6 +1408,28 @@ int image_viewer(const char *file)
             get_pic_list(true);
             continue;
         }
+        if (condition == IV_RELOAD)
+        {
+            /* The hook freed the buffer and no USB session followed: take
+             * another and show the same picture again. The file list lived
+             * in the old one. */
+            iv_usb_dropped = false;
+            if (!iv_take_buffer(false))
+            {
+                splash(HZ * 2, "Out of memory");
+                condition = PLUGIN_ERROR;
+                break;
+            }
+            curfile = -1;
+            entries = 0;
+            get_pic_list(is_album_art);
+            if (entries == 0)
+            {
+                condition = PLUGIN_ERROR;
+                break;
+            }
+            continue;
+        }
         if (condition >= PLUGIN_OTHER)
         {
             if(!is_album_art)
@@ -1390,6 +1444,7 @@ int image_viewer(const char *file)
 
     remove_event(SYS_EVENT_USB_INSERTED, iv_usb_inserted);
     iv_release_buffer();
+    browser_unlock_cache(browser_get_context());
 
     viewportmanager_theme_undo(SCREEN_MAIN, false);
     pop_current_activity();

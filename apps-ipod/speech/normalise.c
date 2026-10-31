@@ -409,9 +409,11 @@ static const char *const tens[10] =
     "eighty", "ninety",
 };
 
-/* 0 to 999 */
+/* 0 to 999. Anything larger is clamped, since n / 100 indexes ones[]. */
 static void put_hundreds(struct out *o, unsigned n)
 {
+    if (n > 999)
+        n = 999;
     if (n >= 100)
     {
         put(o, ones[n / 100]);
@@ -549,7 +551,10 @@ static void read_number(const unsigned char **p, struct out *o)
     /* times: 3:42, 1:02:03 */
     if (*s == ':' && is_digit(s[1]) && is_digit(s[2]) && !is_digit(s[3]))
     {
-        put_cardinal(o, value);
+        if (n > 12)
+            put_digits(o, digits, n);
+        else
+            put_cardinal(o, value);
         while (*s == ':' && is_digit(s[1]) && is_digit(s[2]))
         {
             unsigned m = (s[1] - '0') * 10 + s[2] - '0';

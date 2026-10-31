@@ -316,16 +316,6 @@ enum skin_token_type {
     SKIN_TOKEN_SUBSTRING,
 
     SKIN_TOKEN_DRAWRECTANGLE,
-
-    /* This build's extra tokens. The token type field is a short-enum (1 byte),
-     * so these must live in this enum to fit and to be stored/matched. Their
-     * tag-table rows are kept out of tag_table.c (see apps custom_tags.c). */
-    SKIN_TOKEN_SPECTRUM_BARS,
-    SKIN_TOKEN_LIST_ITEM_ALBUMART,
-    SKIN_TOKEN_LIST_HAS_ART_ROWS,
-    SKIN_TOKEN_VLED_BUILDING,
-    SKIN_TOKEN_VLED_WORKING,
-    SKIN_TOKEN_LOADING_ANIM,
 };
 
 /*

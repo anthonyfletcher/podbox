@@ -705,7 +705,7 @@ int sound_index_finish(bool prune)
     }
 
     /* One seek and one record at a time, from the working file. The whole
-     * set would be 800K at twenty thousand tracks and taking that from core
+     * set would be 1.28 MB at twenty thousand tracks and taking that from core
      * stops playback; the seeks cost a few seconds once, at the end of a scan
      * that took hours. */
     for (i = 0; i < table_used; i++)
@@ -816,6 +816,7 @@ bool sound_index_exists(void)
 int sound_index_reader_open(struct sound_index_reader *r)
 {
     struct sound_header h;
+    off_t room;
 
     r->next = -1;
 
@@ -831,7 +832,13 @@ int sound_index_reader_open(struct sound_index_reader *r)
         return SOUND_ERR_NONE;
     }
 
-    r->count = (int)h.count;
+    /* Bounded by what the file holds, as file_count() is: a truncated file
+     * would otherwise send a reader looping over records that fail to read */
+    room = (ffilesize(r->fd) - (off_t)sizeof (h))
+           / (off_t)sizeof (struct sound_record);
+    if (room < 0)
+        room = 0;
+    r->count = (off_t)h.count < room ? (int)h.count : (int)room;
     r->next = 0;    /* The header read above left it at record zero */
 
     return SOUND_OK;

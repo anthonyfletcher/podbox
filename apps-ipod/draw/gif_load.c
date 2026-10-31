@@ -28,6 +28,7 @@
 
 struct gif {
     bs_stream *in;
+    int skip;                   /* bytes before the signature, after a reset */
     int w, h;
     bool interlaced;
     int trns;                   /* the transparent index, or -1 */
@@ -111,9 +112,11 @@ static bool read_header(struct gif *g)
             g->w = b[4] | b[5] << 8;
             g->h = b[6] | b[7] << 8;
             g->interlaced = b[8] & 0x40;
+            /* 32767 keeps w * h, an interlaced image's indices, in an int */
             if (((b[8] & 0x80) && !read_table(g, b[8]))
                 || bs_read(g->in, b, 1) != BS_OK
-                || b[0] < 2 || b[0] > 8 || g->w < 1 || g->h < 1)
+                || b[0] < 2 || b[0] > 8 || g->w < 1 || g->h < 1
+                || g->w > 32767 || g->h > 32767)
                 return false;
             g->min_size = b[0];
             return true;
@@ -285,7 +288,7 @@ static bool load_band(struct gif *g, int y0)
     if (y0 > 0)
     {
         if (!g->in->reset || g->in->reset(g->in) != BS_OK
-            || !read_header(g))
+            || bs_skip(g->in, g->skip) != BS_OK || !read_header(g))
             return false;
         g->sp = g->nbits = g->blen = g->bpos = 0;
         g->bits = 0;
@@ -310,7 +313,7 @@ static bool load_band(struct gif *g, int y0)
     return true;
 }
 
-int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
+int read_gif_stream(bs_stream *in, int skip, bs_arena *a, struct bitmap *bm,
                     int maxsize, int format,
                     const struct custom_format *cformat)
 {
@@ -322,6 +325,7 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     if (!g)
         return -1;
     g->in = in;
+    g->skip = skip;
     if (!read_header(g))
         return -3;
 

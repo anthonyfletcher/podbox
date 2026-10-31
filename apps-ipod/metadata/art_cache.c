@@ -69,8 +69,6 @@
  * standing rather than a partial one that reads as "the rest are fine". */
 #define AA_NOART_ALBUMS  LIB_NO_ART_ALBUMS_FILE
 #define AA_NOART_ARTISTS LIB_NO_ART_ARTISTS_FILE
-/* Entry count the cache was last completed for, so a restart with an
- * unchanged library does not re-walk the whole database. */
 /* What each folder's thumbnails were made from, so a pass can tell a replaced
  * or deleted image from an unchanged one: one struct aa_stamp per folder, in a
  * libfile. Later records override earlier ones, which is what lets
@@ -161,7 +159,7 @@ static char aa_tmp_path[MAX_PATH];
 static struct aa_stamp aa_stamp_io[AA_STAMP_BATCH];
 
 /* Names collected by one round of aa_purge_thumbs(). A thumbnail is
- * "%08x.aat" and the shared placeholder "_fallback.aat", so 32 bytes holds
+ * "%08x.aat" and the shared placeholder "fallback.aat", so 32 bytes holds
  * any of them with room to spare; anything longer is left alone rather than
  * truncated, since a truncated name names a different file. */
 #define AA_PURGE_BATCH 64
@@ -1286,11 +1284,9 @@ static void aa_render_placeholder(const fb_data *src, int sw, int sh,
     }
 }
 
-/* Render podboxnoart into both the album and artist placeholder .aat of every
- * size. One shared square source, so COVER is a plain downscale. */
-/* One placeholder, used for album and artist rows alike. There were two files
- * and two bitmaps once; they have since become the same image, so the second
- * file only cost a render and a copy of the same pixels. */
+/* Render podboxnoart into the placeholder .aat of every size, one file that
+ * album and artist rows share. A square source, so COVER is a plain
+ * downscale. */
 static void aa_ensure_fallback(void *workbuf, size_t workbuf_sz)
 {
     (void)workbuf_sz;
@@ -1573,9 +1569,9 @@ static size_t aa_work_bytes(void)
 
 #define AA_COVER_TMP LIB_CACHE_DIR "/cover.tmp"
 
-/* An image named after the book, `<book>.jpg` and so on, into aa_artpath:
- * how a cover is given to a book without one, or replaced. A folder.jpg
- * beside it is the author's, not this book's. */
+/* An image named after the book, `<book>.jpg` and so on, that its decoder
+ * takes, into aa_artpath: how a cover is given to a book without one, or
+ * replaced. A folder.jpg beside it is the author's, not this book's. */
 static bool aa_book_file(const char *path)
 {
     static const char * const exts[] = { ".jpg", ".jpeg", ".png", ".bmp",
@@ -1590,7 +1586,7 @@ static bool aa_book_file(const char *path)
             return false;
         memcpy(aa_artpath, path, stem);
         strcpy(aa_artpath + stem, exts[i]);
-        if (file_exists(aa_artpath))
+        if (art_file_usable(aa_artpath))
             return true;
     }
     return false;
@@ -2017,8 +2013,10 @@ static void aa_handle_offer(void)
         yield();
     }
 
-    /* So the next pass replaces these if the folder gains an image. */
-    aa_stamp_append(dh, AA_STAMP_EMBEDDED);
+    /* So the next pass replaces these if the folder gains an image. Unstamped
+     * where the loop stopped short, so the pass makes what is missing. */
+    if (aa_thumbs_exist(dh))
+        aa_stamp_append(dh, AA_STAMP_EMBEDDED);
 
     core_unpin(wh);
     core_free(wh);
@@ -2048,8 +2046,8 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
 }
 
 /* A pass trusts each folder's stamp for what its tags hold, so a change of
- * source needs the pass that reads them again. */
-/* The source the last change was acted on for, or -1 before the first. */
+ * source needs the pass that reads them again. aa_applied_source is the
+ * source the last change was acted on for, or -1 before the first. */
 static int aa_applied_source = -1;
 
 void art_cache_album_source_callback(int source)
@@ -2090,11 +2088,10 @@ static void aa_task_event(const struct queue_event *ev)
         aa_handle_offer();
 }
 
-/* The marker is read back at init rather than started at -1 -- starting at -1
- * meant the first settled count after a boot never matched, so a full pass ran
- * on every startup, walking the whole database with cache_busy set, which is
- * what held the "Building" indicator up with nothing actually to do. */
-/* bg_task.read_marks and write_marks: the stamp file's header */
+/* bg_task.read_marks and write_marks: the stamp file's header. The marks are
+ * read back at init, never started at -1: -1 matches no settled count, so
+ * every boot would run a full pass with cache_busy set, holding the
+ * "Building" indicator up with nothing to do. */
 static void aa_read_marks(struct bg_marks *m)
 {
     struct libfile_header h;
@@ -2190,12 +2187,10 @@ void art_cache_init(void)
     if (debug_log_enabled(DEBUG_LOG_ARTCACHE))
         debug_log_header(DEBUG_LOG_ARTCACHE, "started");
 
-    /* A format bump leaves every cached thumbnail unreadable without moving
-     * the database's marks. The stamp file carries the format as its version,
-     * so aa_read_marks() finds none then and the task is stale; the purge
-     * itself stays inside the pass. */
-    /* A pass holds the decode scratch and the folder table at once, so the peak
-     * declared to bg_task is both. */
+    /* A pass holds the decode scratch and the folder table at once, so the
+     * peak declared to bg_task is both. A format bump needs nothing here: the
+     * stamp file carries the format as its version, so aa_read_marks() finds
+     * no marks, the task is stale, and the pass purges. */
     art_cache_task.work_bytes = aa_work_bytes() + AA_TABLE_BYTES;
 
     bg_task_init(&art_cache_task);

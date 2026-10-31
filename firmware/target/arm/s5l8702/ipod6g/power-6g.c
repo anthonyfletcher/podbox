@@ -110,8 +110,9 @@ bool ide_powered()
 
 /* The current the USB side has committed to: 500 from a computer that
  * configured the player, from USB Charging = Force with no computer, or from
- * a charger feeding a USB DAC. power_input_status() trusts such a source
- * without probing it. */
+ * a charger feeding a USB DAC. Such a source keeps C1 low while
+ * power_input_status() is not probing; it is still probed, and reported as a
+ * charger only once proven. */
 static int usb_committed_ma;
 
 /* A charger proven by power_input_status() while it probes. It keeps
@@ -202,25 +203,22 @@ unsigned int power_input_status(void)
         }
         else if (probing)
         {
-            /* Check high-frequency monitor flag */
-            if (chrg_saw_discharge)
+            /* Proven by eight polls in a row with no dropout */
+            if (!usb_charger_detected)
             {
-                chrg_saw_discharge = false;
-                usb_charger_detected = false;
-                debounce = 0;
-            }
-            else if (!usb_charger_detected)
-            {
-                if (++debounce >= 8)
+                if (chrg_saw_discharge)
+                    debounce = 0;
+                else if (++debounce >= 8)
                 {
                     usb_charger_detected = true;
                     debounce = 0;
                 }
             }
-            /* For charger removal (PB toggled off): only count
-             * false readings.  Don't reset on true — oscillation
-             * (~50/50) must accumulate false readings to clear. */
-            else if (!charging_state())
+            /* Dropped once the supply has cut out and come back eight
+             * times, as a power bank switched off behind a DAC does. Not
+             * reset between them, so a ~50/50 oscillation still adds up.
+             * !CHRG held high is a full battery, not a dropout. */
+            else if (chrg_saw_discharge && charging_state())
             {
                 if (++debounce >= 8)
                 {
@@ -228,8 +226,7 @@ unsigned int power_input_status(void)
                     debounce = 0;
                 }
             }
-            /* true readings: don't reset — oscillation must
-             * be able to clear via accumulated false readings. */
+            chrg_saw_discharge = false;
         }
         else
         {

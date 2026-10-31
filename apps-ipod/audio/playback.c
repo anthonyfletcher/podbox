@@ -720,9 +720,9 @@ static inline void clear_cached_aa_handles(int* aa_handles)
 {
     /* When a track is freed, don't bufclose() a handle that's cached for reuse
      * by a later same-folder/same-album track -- zero those slots so only
-     * genuinely per-track handles get closed. Both caches must be spared; the
-     * embedded-art one was not, so same-album tracks reused a handle that this
-     * freed, breaking WPS album art on the next track. */
+     * genuinely per-track handles get closed. Both caches must be spared: a
+     * freed embedded-art handle leaves the next same-album track's WPS album
+     * art reading a closed handle. */
     FOREACH_ALBUMART(i)
     {
         if (last_folder_aa_path[0] != 0 && aa_handles[i] == last_folder_aa_hid[i])
@@ -1444,6 +1444,10 @@ static void write_playbacklog(struct mp3entry *id3)
     ssize_t used = 0;
     ssize_t bufsz = 0;
     char *buf = NULL;
+    /* Before core_get_data(): the RTC read can block, and a compaction then
+     * moves the buffer */
+    if (id3 && id3->elapsed > PLAYBACK_LOG_MIN_ELAPSED_MS)
+        timestamp = mktime(get_time());
     /* if the user just enabled playback logging rather than stopping playback
      * to allocate a buffer or if buffer too large just flush direct to disk
      * buffer will attempt to be allocated next start-up */
@@ -1460,7 +1464,6 @@ static void write_playbacklog(struct mp3entry *id3)
     }
     if (id3 && id3->elapsed > PLAYBACK_LOG_MIN_ELAPSED_MS)
     {
-        timestamp = mktime(get_time());
         /* Lines of another mode are flushed first rather than joined. */
         if (buf && (used == 0 ||
                     playback_log_buf_mode == global_settings.playback_log))

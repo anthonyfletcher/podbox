@@ -1156,6 +1156,21 @@ static int usb_core_do_set_config(uint8_t new_config)
     return 0;
 }
 
+#if defined(USB_ENABLE_STORAGE) && !defined(BOOTLOADER)
+/* USB thread, once the host has ejected the disk: the boost and priority
+ * usb_core_do_set_config() chose, now without mass storage */
+void usb_core_storage_ejected(void)
+{
+    for(int i = 0; i < USB_NUM_DRIVERS; i++) {
+        if(i != USB_DRIVER_MASS_STORAGE && is_active(drivers[i]) &&
+           drivers[i]->needs_cpu_boost)
+            return;
+    }
+    thread_set_priority(thread_self(), PRIORITY_SYSTEM);
+    cancel_cpu_boost();
+}
+#endif
+
 static void usb_core_do_clear_feature(int recip, int recip_nr, int feature)
 {
     logf("usb_core: CLEAR FEATURE (%d,%d,%d)", recip, recip_nr, feature);

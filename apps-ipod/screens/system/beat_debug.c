@@ -256,7 +256,11 @@ bool beat_debug_screen(void)
             break;
         }
 
-        default_event_handler(button);
+        if (default_event_handler(button) == SYS_USB_CONNECTED)
+        {
+            to_root = true;
+            break;
+        }
 
         beat_analyse_poll();
         draw_screen();

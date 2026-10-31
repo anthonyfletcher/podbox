@@ -880,22 +880,45 @@ static bool cover_insert(int position, bool queue, bool create_new)
     return added > 0;
 }
 
+struct cover_write_ctx
+{
+    int fd;
+    bool failed;
+};
+
+/* The track walk stops at a failed sink but still returns the count so far,
+ * so the failure is recorded here */
 static bool cover_write_sink(const char *path, void *data)
 {
-    return fdprintf(*(int *)data, "%s\n", path) > 0;
+    struct cover_write_ctx *ctx = data;
+
+    if (fdprintf(ctx->fd, "%s\n", path) != (int)strlen(path) + 1)
+        ctx->failed = true;
+    return !ctx->failed;
 }
 
+/* A failed write removes a new playlist and cuts an existing one back to
+ * where the album began, so no playlist is left with half an album */
 static int cover_write(const char *playlist, bool new_playlist)
 {
-    int fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
-                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    struct cover_write_ctx ctx = { .failed = false };
+    off_t start = 0;
     int n;
 
-    if (fd < 0)
+    ctx.fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
+                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    if (ctx.fd < 0)
         return -1;
-    n = db_summary_album_tracks(&cover_album, cover_write_sink, &fd);
-    close(fd);
-    return n > 0 ? 0 : -1;
+    if (!new_playlist)
+        start = lseek(ctx.fd, 0, SEEK_END);
+    n = db_summary_album_tracks(&cover_album, cover_write_sink, &ctx);
+    if (ctx.failed && !new_playlist)
+        ftruncate(ctx.fd, start);
+    if (close(ctx.fd) < 0)
+        ctx.failed = true;
+    if (ctx.failed && new_playlist)
+        remove(playlist);
+    return n > 0 && !ctx.failed ? 0 : -1;
 }
 
 static int cover_go_to_artist(void)

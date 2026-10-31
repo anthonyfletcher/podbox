@@ -43,7 +43,8 @@ static bool search_for_cuesheet(const char *path, struct cuesheet_file *cue_file
 {
     size_t len;
     char cuepath[MAX_PATH];
-    char *dot, *slash, *slash_cuepath;
+    char *dot, *slash_cuepath;
+    const char *slash;
 
     cue_file->pos = 0;
     cue_file->size = 0;
@@ -278,7 +279,7 @@ bool parse_cuesheet(struct cuesheet_file *cue_file, struct cuesheet *cue)
         }
         s = skip_whitespace(line);
 
-/*   RECOGNIZED  TAGS *********************** 
+/*   RECOGNIZED  TAGS ***********************
 *    eCS_TRACK = 0, eCS_INDEX_01, eCS_TITLE,
 *    eCS_PERFORMER, eCS_SONGWRITER, eCS_FILE,
 */
@@ -289,9 +290,21 @@ bool parse_cuesheet(struct cuesheet_file *cue_file, struct cuesheet *cue)
         }
         else if (option == eCS_INDEX_01)
         {
+#if 0
+            s = strchr(s,' ');
+            s = skip_whitespace(s);
+            s = strchr(s,' ');
+            s = skip_whitespace(s);
+            cue->tracks[cue->track_count-1].offset = 60*1000 * atoi(s);
+            s = strchr(s,':') + 1;
+            cue->tracks[cue->track_count-1].offset += 1000 * atoi(s);
+            s = strchr(s,':') + 1;
+            cue->tracks[cue->track_count-1].offset += 13 * atoi(s);
+#else
             cue->tracks[cue->track_count-1].offset = parse_cue_index(s);
+#endif
         }
-        else if (option != eCS_NOTFOUND) 
+        else if (option != eCS_NOTFOUND)
         {
             char *dest = NULL;
             char *string = get_string(s);
@@ -465,9 +478,9 @@ static enum list_row_kind list_get_kind_cb(int selected_item, void *data)
 
 /* Voices a row: the track number, then the performer and the title, using
  * talk clips from the cuesheet's own directory where it has them. */
-static int cuesheet_list_voice_cb(int list_index, void *data)
+static int cuesheet_list_voice_cb(int list_index, void* data)
 {
-    struct cuesheet *cue = (struct cuesheet *)data;
+    struct cuesheet *cue = (struct cuesheet *) data;
     int index = cue->chapters ? list_index : list_index / 2;
     const char *nameptr;
     size_t dirlen;
@@ -535,13 +548,12 @@ enum cue_browse_result browse_cuesheet(struct cuesheet *cue)
     if ((unsigned) len > sizeof(title))
         title[sizeof(title) - 2] = '~'; /* give indication of truncation */
 
-
     gui_synclist_init(&lists, list_get_name_cb, cue, false, rows, NULL);
     gui_synclist_set_nb_items(&lists, rows*cue->track_count + first);
     gui_synclist_set_title(&lists, title, 0);
     gui_synclist_set_row_callbacks(&lists, list_get_kind_cb, NULL, NULL);
 
-    if (global_settings.talk_menu)
+    if(global_settings.talk_menu)
         gui_synclist_set_voice_callback(&lists, cuesheet_list_voice_cb);
 
     /* A book opened from the shelf starts on its Resume row, which is the

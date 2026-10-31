@@ -79,24 +79,13 @@ static int handle_usb_events(void)
 struct usb_screen_vps_t
 {
     struct viewport parent;
-    struct viewport logo;
     struct viewport title;
 };
 
 static void usb_screen_fix_viewports(struct screen *screen,
         struct usb_screen_vps_t *usb_screen_vps)
 {
-    int logo_width, logo_height;
     struct viewport *parent = &usb_screen_vps->parent;
-    struct viewport *logo = &usb_screen_vps->logo;
-
-    /* Vestigial: nothing is drawn into the logo viewport. The literals stay
-     * because the HID title viewport is positioned relative to them and is
-     * passed to scroll_stop_viewport(), so the geometry still has to come out
-     * the same. Left intact rather than unpicked -- this screen is delicate on
-     * PP502x, see the note below. */
-    logo_width  = 176;   /* dimensions of the logo bitmap this replaced */
-    logo_height = 48;
 
     /* No theme for the whole USB session: full screen, no SBS, no backdrop, and
      * no skin update at any point. The message below is plain fill and text
@@ -112,30 +101,11 @@ static void usb_screen_fix_viewports(struct screen *screen,
      * SYS_USB_CONNECTED ack delay the handover the same way. */
     viewportmanager_theme_enable(screen->screen_type, false, parent);
 
-    if (logo_width  > parent->width)
-        logo_width  = parent->width;
-    if (logo_height > parent->height)
-        logo_height = parent->height;
-
-    *logo = *parent;
-    logo->x = parent->x + parent->width - logo_width;
-    logo->y = parent->y + (parent->height - logo_height) / 2;
-    logo->width = logo_width;
-    logo->height = logo_height;
-
     if (usb_hid)
     {
         struct viewport *title = &usb_screen_vps->title;
-        int char_height = font_get(parent->font)->height;
         *title = *parent;
-        title->y = logo->y + logo->height + char_height;
-        title->height = char_height;
-        /* try to fit logo and title to parent */
-        if (parent->y + parent->height < title->y + title->height)
-        {
-            logo->y = parent->y;
-            title->y = parent->y + logo->height;
-        }
+        title->height = font_get(parent->font)->height;
 
         int i =0, langid = LANG_USB_KEYPAD_MODE;
         while (langid >= 0) /* ensure the USB mode strings get cached */
@@ -147,14 +117,10 @@ static void usb_screen_fix_viewports(struct screen *screen,
 }
 
 /* The message in a centred box, the same one every other modal in the UI uses,
- * drawn over whatever was on screen.
- *
- * The screen is not blanked first, and attempts to blank it belong here only if
- * they are known to work: clearing the full-screen parent viewport and dropping
- * the backdrop before clear_display() were both tried on hardware and neither
- * blanked anything. The cost of leaving it is visible on wake -- a device left
- * plugged in comes back with fragments of the screen it came from around the
- * message.
+ * drawn over whatever was on screen. The screen is not blanked first: neither
+ * clearing the full-screen parent viewport nor dropping the backdrop before
+ * clear_display() blanks it on hardware. So a device left plugged in wakes
+ * with fragments of the screen it came from around the message.
  *
  * Plain fill and text drawing, never the skin engine, so this is safe to repeat
  * after the storage handover. */

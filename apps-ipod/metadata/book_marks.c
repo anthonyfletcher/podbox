@@ -42,7 +42,9 @@
 
 #define MARKS_FILE  LIB_BOOKMARKS_FILE
 
-/* The UI adds and deletes; the background task carries old bookmarks over */
+/* Held around each read or rewrite of the file. Every caller is on the UI
+ * thread, the carry-over of Rockbox's bookmarks included: that runs outside
+ * it, taking it once per mark it adds. */
 static struct mutex marks_mutex;
 
 void book_marks_init(void)
@@ -450,9 +452,12 @@ bool book_marks_add_playing(void)
     char path[MAX_PATH];
     char title[BOOK_MARK_LABEL_MAX];
     unsigned long elapsed, offset;
-    struct mp3entry *id3 = book_resume_loaded(id, sizeof(id));
+    struct mp3entry *id3;
 
+    /* The carry-over first: it yields, and the track is copied out of the
+     * live id3 before anything else does */
     import_once();
+    id3 = book_resume_loaded(id, sizeof(id));
     if (id3 == NULL)
         return false;
     strmemccpy(path, id3->path, sizeof(path));

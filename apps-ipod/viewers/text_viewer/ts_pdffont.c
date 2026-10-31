@@ -379,7 +379,10 @@ static bfr *cmap_add(bs_arena *a, cmap_t *cm)
 {
     bfr *e = bs_alloc(a, sizeof *e);
     if (!e) return NULL;
-    if (!cm->nr) cm->r = e;      /* bump allocation keeps these contiguous */
+    /* cm->r is read as an array, so nothing else may allocate from `a`
+     * while a CMap is parsed; a gap between entries refuses the CMap */
+    if (!cm->nr) cm->r = e;
+    else if (e != cm->r + cm->nr) return NULL;
     cm->nr++;
     return e;
 }

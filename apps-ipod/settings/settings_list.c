@@ -67,9 +67,6 @@
 #include "metadata/tag_trim.h"     /* tag_trim_init */
 #include "metadata/art_cache.h"    /* enum art_album_source */
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
-#include "screens/system/sound_scan.h"  /* sound_scan_screen */
-#include "database/sound_index.h"       /* sound_index_exists */
-#include "database/tagcache.h"          /* tagcache_is_usable */
 #include "database/sound_mix.h"         /* SOUND_MIX_MAX */
 
 #include "audio/voice_thread.h"
@@ -560,7 +557,8 @@ static const uint32_t context_hidden_default = 0;
 /* "cutoff, q, gain" in the old format, "cutoff, q, gain, TYPE" in the new one.
  * A config written before the type existed carries no fourth field, and its
  * type comes from the setting name instead -- see the EQ_BAND_OLD entries
- * below. */
+ * below. Each value is held to the editor's range: the curve and the filter
+ * design divide by terms that reach zero far outside it. */
 static void eq_load_from_cfg(void *setting, char *value, bool has_type)
 {
     struct eq_band_setting *eq = setting;
@@ -572,7 +570,7 @@ static void eq_load_from_cfg(void *setting, char *value, bool has_type)
     end = strchr(value, ',');
     if (!end) return;
     *end = '\0';
-    eq->cutoff = atoi(value);
+    eq->cutoff = MIN(MAX(atoi(value), EQ_CUTOFF_MIN), EQ_CUTOFF_MAX);
 
     /* q */
     value = end + 1;
@@ -580,7 +578,7 @@ static void eq_load_from_cfg(void *setting, char *value, bool has_type)
     end = strchr(value, ',');
     if (!end) return;
     *end = '\0';
-    eq->q = atoi(value);
+    eq->q = MIN(MAX(atoi(value), EQ_Q_MIN), EQ_Q_MAX);
 
     /* gain */
     value = end + 1;
@@ -590,7 +588,7 @@ static void eq_load_from_cfg(void *setting, char *value, bool has_type)
         end = strchr(value, ',');
         if (!end) return;
     }
-    eq->gain = atoi(value);
+    eq->gain = MIN(MAX(atoi(value), EQ_GAIN_MIN), EQ_GAIN_MAX);
 
     if (!has_type) return;
 
@@ -716,26 +714,6 @@ static void segregate_podcasts_callback(bool segregate)
     root_menu_set_podcasts_row(segregate);
 }
 
-/* Switching the engine on is how the analysis gets started. Nothing can be
- * matched against until it has run, so a setting that only set a flag would
- * appear to do nothing for as long as it took somebody to find Maintenance.
- * An index already on disk is left alone; the scan screen asks before it
- * starts, and can be declined.
- *
- * Trap: the database test is load-bearing here and is not the scan screen's
- * own. F_CB_ON_SELECT_ONLY is honoured by the menu and not by settings.c's
- * cfg reader, which runs this callback for every boot that loads "playlist
- * engine: on" -- and settings_load() runs ahead of init_tagcache(). Without
- * the test, a player whose analysis has not run yet opens the scan screen
- * during boot and splashes at a database that is not up, on every boot until
- * one does. With it, the three conditions together are simply "there is work
- * this screen could do". */
-static void playlist_engine_callback(bool on)
-{
-    if (on && !sound_index_exists() && tagcache_is_usable())
-        sound_scan_screen(false);
-}
-
 /* The pattern files are read at startup, so switching this on is also how an
  * edited trim.config or trim.txt is picked up without a reboot. */
 static void trim_titles_callback(bool trim)
@@ -805,7 +783,13 @@ static void qs_load_from_cfg(void *var, char *value)
     if (*value == '-')
         *item = NULL;
     else
+    {
+        /* Only what the menu could have put there: the quick-setting skin
+         * tokens read a slot without checking it again */
         *item = find_setting_by_cfgname(value);
+        if (!is_setting_quickscreenable(*item))
+            *item = NULL;
+    }
 }
 
 static char* qs_write_to_cfg(void *var, char *buf, int buf_len)
@@ -1428,9 +1412,10 @@ const struct settings_list settings[] = {
     TEXT_SETTING(0, autoresume_paths, "autoresume next track paths",
                  "/podcast:/podcasts", NULL, NULL),
 
-    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, playlist_engine,
-                  LANG_ACTION_ENABLED, false, "playlist engine",
-                  playlist_engine_callback),
+    /* A flag only: the menu row offers the analysis when it is switched on
+     * (general_settings.c), which neither a .cfg nor the Quick Screen should */
+    OFFON_SETTING(0, playlist_engine,
+                  LANG_ACTION_ENABLED, false, "playlist engine", NULL),
     OFFON_SETTING(0, continue_playing, LANG_CONTINUE_PLAYING, false,
                   "continue playing", NULL),
     OFFON_SETTING(0, mix_starts_with_selected, LANG_MIX_STARTS_WITH_SELECTED,

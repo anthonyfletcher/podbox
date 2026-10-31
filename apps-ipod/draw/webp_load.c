@@ -1394,8 +1394,14 @@ static FORCE_INLINE uint32_t clip6(int v)
 static int16_t yuv_y[256];
 static int32_t yuv_u[256], yuv_v[256];
 
+/* Built once, by whichever decode comes first: the loop does not yield, so
+ * a thread cannot find the tables half made. */
 static void yuv_tables(void)
 {
+    static bool built;
+
+    if (built)
+        return;
     for (int i = 0; i < 256; i++)
     {
         yuv_y[i] = (i * 19077) >> 8;
@@ -1404,6 +1410,7 @@ static void yuv_tables(void)
         yuv_v[i] = (uint16_t)(8708 - ((i * 13320) >> 8))
                    | (uint32_t)(((i * 26149) >> 8) - 14234) << 16;
     }
+    built = true;
 }
 
 /* One pixel as a little-endian word: blue, green, red, alpha */

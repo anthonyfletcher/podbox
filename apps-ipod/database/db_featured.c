@@ -366,8 +366,8 @@ static void scan_titles(void)
 static void add_artist_tracks(int32_t seek,
                               const struct db_featured_names *names)
 {
-    struct tagcache_search tcs;
-    char buf[TAGCACHE_BUFSZ];
+    static struct tagcache_search tcs;
+    static char buf[TAGCACHE_BUFSZ];
 
     if (!tagcache_search(&tcs, tag_title))
         return;
@@ -384,12 +384,17 @@ static void add_artist_tracks(int32_t seek,
 }
 
 /* "A feat. B" in the per-track artist tag -- the better-quality source, since
- * everything after the marker is a clean name with no bracket around it. */
+ * everything after the marker is a clean name with no bracket around it.
+ *
+ * The search state here and in add_artist_tracks() is static, as
+ * db_spoken.c's is: the two are open at once, which is some two and a half
+ * kilobytes of the UI thread's stack. Only the UI thread builds, so one
+ * build runs at a time. */
 static void scan_track_artists(void)
 {
-    struct tagcache_search tcs;
-    char buf[TAGCACHE_BUFSZ];
-    struct db_featured_names names;
+    static struct tagcache_search tcs;
+    static char buf[TAGCACHE_BUFSZ];
+    static struct db_featured_names names;
 
     if (!tagcache_search(&tcs, tag_artist))
         return;

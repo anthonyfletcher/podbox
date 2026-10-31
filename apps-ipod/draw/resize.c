@@ -563,7 +563,7 @@ static void output_row_32_native(uint32_t row, void * row_in,
                 }
 }
 
-/* Also built for the core image viewer (colour targets), not just plugins. */
+/* Bytes a native-format bitmap of bm's size takes. */
 unsigned int get_size_native(struct bitmap *bm)
 {
     return BM_SIZE(bm->width,bm->height,FORMAT_NATIVE,0);
@@ -622,7 +622,7 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
      * by dw - 1: with one output pixel there is no pair to interpolate
      * between, and a one-pixel-wide picture fitted to a box reaches here
      * with sw and dw both 1. The area scaler divides by sw instead, which
-     * the decoders now guarantee is at least 1. */
+     * the decoders guarantee is at least 1. */
     if (sw > dw || dw < 2)
     {
         ctx.h_scaler = rgb24 ? scale_h_area_rgb24

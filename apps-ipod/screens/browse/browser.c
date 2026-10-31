@@ -1459,22 +1459,34 @@ static bool name_one(const char *path, int attr, void *data)
 }
 
 /* Cut or Copy: the names go to the clipboard's list, the folder to the
- * clipboard itself */
+ * clipboard itself. The list is written aside and swapped in only whole, so
+ * a full disk leaves the clipboard as it was. */
 static int select_clip(bool copy)
 {
-    int fd = open(CLIPBOARD_LIST, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    int n;
+    int fd = open(CLIPBOARD_LIST ".tmp", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int n = -1;
 
     select_acted = true;
-    if (fd < 0)
+    if (fd >= 0)
     {
+        n = list_select_saved_each(name_one, &fd);
+        if (close(fd) < 0)
+            n = -1;
+    }
+    if (n <= 0 || n != list_select_count())
+    {
+        remove(CLIPBOARD_LIST ".tmp");
         splash(HZ, ID2P(LANG_FAILED));
         return 0;
     }
-    n = list_select_saved_each(name_one, &fd);
-    close(fd);
-    if (n > 0)
-        context_menu_clip_many(tc.currdir, copy);
+    remove(CLIPBOARD_LIST);
+    if (rename(CLIPBOARD_LIST ".tmp", CLIPBOARD_LIST) < 0)
+    {
+        remove(CLIPBOARD_LIST ".tmp");
+        splash(HZ, ID2P(LANG_FAILED));
+        return 0;
+    }
+    context_menu_clip_many(tc.currdir, copy);
     return 0;
 }
 

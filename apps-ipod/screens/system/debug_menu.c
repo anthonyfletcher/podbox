@@ -1548,14 +1548,9 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     struct usb_drv_host_iso_stats iso;
     usb_drv_host_iso_get_stats(&iso);
     if (dac_on && !iso.running)
-        usb_host_audio_stop();
+        usb_host_stream(false);
     else if (btn == ACTION_STD_OK)
-    {
-        if (dac_on)
-            usb_host_audio_stop();
-        else
-            usb_host_audio_start();
-    }
+        usb_host_stream(!dac_on);
     if (btn == ACTION_STD_OK)
         btn = ACTION_REDRAW;
 #endif
@@ -2216,5 +2211,6 @@ bool run_debug_screen(char* screen)
         if (!strcasecmp(screen, menuitems[i].desc))
             return run_item(i);
 
+    splash(HZ, ID2P(LANG_FILE_NOT_FOUND));
     return false;
 }

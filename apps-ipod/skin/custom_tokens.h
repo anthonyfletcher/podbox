@@ -14,7 +14,7 @@
 #ifndef CUSTOM_TOKENS_H
 #define CUSTOM_TOKENS_H
 
-/* The upstream enum currently ends at 195. Basing well above that leaves it
+/* The upstream enum currently ends below 200. Basing well above that leaves it
  * ample room to grow before a merge could tread on these. */
 #define SKIN_TOKEN_CUSTOM_BASE      1000
 
@@ -40,6 +40,12 @@
 #define SKIN_TOKEN_LIST_SELECTED_DESC (SKIN_TOKEN_CUSTOM_BASE + 19)
 #define SKIN_TOKEN_LIST_ITEM_MARKED (SKIN_TOKEN_CUSTOM_BASE + 20)
 #define SKIN_TOKEN_LIST_HEADER      (SKIN_TOKEN_CUSTOM_BASE + 21)
+#define SKIN_TOKEN_SPECTRUM_BARS    (SKIN_TOKEN_CUSTOM_BASE + 22)
+#define SKIN_TOKEN_LIST_ITEM_ALBUMART (SKIN_TOKEN_CUSTOM_BASE + 23)
+#define SKIN_TOKEN_LIST_HAS_ART_ROWS (SKIN_TOKEN_CUSTOM_BASE + 24)
+#define SKIN_TOKEN_VLED_BUILDING    (SKIN_TOKEN_CUSTOM_BASE + 25)
+#define SKIN_TOKEN_VLED_WORKING     (SKIN_TOKEN_CUSTOM_BASE + 26)
+#define SKIN_TOKEN_LOADING_ANIM     (SKIN_TOKEN_CUSTOM_BASE + 27)
 
 /* %LH's fields: what its word names, held in the token's value */
 enum browser_header_field {

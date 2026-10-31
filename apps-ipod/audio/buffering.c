@@ -986,6 +986,8 @@ static int load_image(int fd, const char *path,
     struct bitmap *bmp = ringbuf_ptr(bufidx);
     struct dim *dim = data->dim;
     struct mp3_albumart *aa = data->embedded_albumart;
+    /* The pixels' share of the handle, which also holds the struct */
+    int data_size = (int)(max_size - sizeof(struct bitmap));
 
     /* get the desired image size */
     bmp->width = dim->width, bmp->height = dim->height;
@@ -1004,7 +1006,7 @@ static int load_image(int fd, const char *path,
          * rather than the theme's treatment of it -- a bw chain here would
          * turn every derived colour grey. Skin art has its own filter, on the
          * %Cl that loads it. */
-        rc = art_cache_load_aat(fd, bmp, (int)max_size, NULL);
+        rc = art_cache_load_aat(fd, bmp, data_size, NULL);
     }
     else {
         struct image_src src = {
@@ -1013,7 +1015,7 @@ static int load_image(int fd, const char *path,
             .len = aa ? aa->size : -1,
             .flags = aa ? aa->type & ~AA_CLEAR_FLAGS_MASK : 0,
         };
-        rc = image_load(&src, bmp, (int)max_size, format, NULL);
+        rc = image_load(&src, bmp, data_size, format, NULL);
     }
 
     return rc + (rc > 0 ? sizeof(struct bitmap) : 0);

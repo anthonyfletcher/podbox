@@ -51,7 +51,7 @@
 #include "draw/screen_access.h"    /* FOR_NB_SCREENS, screens[] */
 #include "kernel.h"           /* threads, mutex, queue, current_tick */
 #include "core_alloc.h"       /* buflib types for buf_ctx (see init()) */
-#include "system/app_buffer.h"           /* app_get_buffer() -- see init() */
+#include "system/app_buffer.h"           /* app_claim_buffer() -- see init() */
 #include "database/tagcache.h"
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
@@ -1689,7 +1689,7 @@ static const struct img_filter *carousel_filter(void)
 static int read_aat(int fh, int prio)
 {
     struct art_cache_header hdr;
-    pix_t rowbuf[DISPLAY_WIDTH];
+    static pix_t rowbuf[DISPLAY_WIDTH];  /* off the loader thread's stack */
     const ssize_t most = sizeof(hdr)
                        + sizeof(pix_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT;
     ssize_t len = ffilesize(fh);
@@ -1783,7 +1783,7 @@ static inline bool load_and_prepare_surface(const int slide_index,
     unsigned int art_hash = model->art_key(slide_index);
     if (pf_cover_size_idx >= 0 && art_hash != 0)
     {
-        char aat_file[MAX_PATH];
+        static char aat_file[MAX_PATH];  /* off the loader thread's stack */
         int fh;
 
         /* Opened rather than looked up: this runs while an animation is
@@ -3827,25 +3827,12 @@ static bool init(void)
 
     pf_update_dynamic_colors();
 
-    /* app_claim_buffer() -- the same region the original plugin used in its
-     * PF_PLAYBACK_CAPABLE branch (pictureflow.c's init(), guarded by
-     * PLUGIN_BUFFER_SIZE > 0x10000: true for both of this fork's targets,
-     * ipod6g at 3 MiB and ipodvideo at 512 KiB, per firmware/export/config/
-     * *.h) -- NOT core_alloc_maximum()/plugin_get_audio_buffer(), which was
-     * tried here first and reverted: those hand back the largest free block
-     * of the *audio* buflib pool, which requires the audio system to free
-     * its own buffer first, stopping playback (and, with it, the dynamic
-     * colour scheme that depends on a current track).
-     *
-     * pluginbuf[] (see app_buffer.c) is a plain static array -- a fixed,
-     * always-resident region completely separate from the audio buffer
-     * pool, reserved for whichever plugin is currently loaded, or, when
-     * none is (current_plugin_handle is NULL -- true here, since this is
-     * core-linked code, never a loaded plugin), returned to the caller in
-     * full. It costs nothing new: this RAM was already permanently
-     * reserved for plugin use, sitting idle whenever no plugin is loaded;
-     * Album covers is simply borrowing it back the same way the original
-     * plugin did. Not a buflib handle, so nothing to free in cleanup(). */
+    /* The shared app buffer (app_buffer.h), a static region apart from the
+     * audio buffer pool, held for as long as this screen is up and handed
+     * back by app_release_buffer() in cleanup(). Trap: not
+     * core_alloc_maximum(), whose block comes out of the audio pool and so
+     * stops playback -- and with it the dynamic colours, which need a
+     * current track. */
     buf = app_claim_buffer(&buf_size, "album covers");
 
     /* No failure to check for: the region is a static array, so the call either

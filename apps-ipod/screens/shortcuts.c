@@ -233,77 +233,102 @@ static void init_shortcut(struct shortcut* sc)
     sc->icon = Icon_NOICON;
 }
 
+/* One [shortcut] record, formatted whole so that its write can be checked */
+static bool write_shortcut(int fd, const struct shortcut *sc)
+{
+    static char data[MAX_PATH + 64];
+    static char rec[MAX_SHORTCUT_NAME + 2 * MAX_PATH + 160];
+    int len;
+
+    if (sc->type == SHORTCUT_TIME)
+    {
+        if (sc->u.timedata.talktime)
+            strcpy(data, "talk");
+        else if (sc->u.timedata.sleep_timeout >= 0)
+            snprintf(data, sizeof(data), "sleep %d",
+                     sc->u.timedata.sleep_timeout);
+        else
+            strcpy(data, "sleep");
+    }
+    else if (sc->type == SHORTCUT_SETTING_APPLY)
+        snprintf(data, sizeof(data), "%s: %s",
+                 sc->setting->cfg_name, sc->u.path);
+    else if (sc->type == SHORTCUT_SETTING)
+        strmemccpy(data, sc->setting->cfg_name, sizeof(data));
+    else
+        strmemccpy(data, sc->u.path, sizeof(data));
+
+    len = snprintf(rec, sizeof(rec), SHORTCUTS_HDR "\ntype: %s\ndata: %s"
+                   "\nname: %s\nicon: %d\ntalkclip: %s\n\n",
+                   type_strings[sc->type], data, sc->name, sc->icon,
+                   sc->talk_clip);
+    return len < (int)sizeof(rec) && write(fd, rec, len) == len;
+}
+
+/* first_idx_to_writeback >= 0 is a write still owed; it stays set until a
+ * write succeeds */
 static int first_idx_to_writeback = -1;
 static bool overwrite_shortcuts = false;
 static void shortcuts_ata_idle_callback(void)
 {
     int fd;
-
+    off_t start = 0;
+    bool ok = true;
     int current_idx = first_idx_to_writeback;
-    int append = overwrite_shortcuts ? O_TRUNC : O_APPEND;
+    bool overwrite = overwrite_shortcuts;
 
     if (first_idx_to_writeback < 0)
         return;
 
-    /* This runs on the storage thread. A lock already taken means the
-     * menu is up and something is holding a raw shortcut pointer, and
-     * the reload at the end of this function frees the whole chain --
-     * which the lock does not prevent, since a free is not a move. Come
-     * back when the menu has closed; call_storage_idle_notifys() will
-     * not ask again for another thirty seconds. */
+    /* A lock already taken means the menu is up and something is holding a
+     * raw shortcut pointer, and the reload at the end of this function frees
+     * the whole chain -- which the lock does not prevent, since a free is not
+     * a move. The write stays owed and do_shortcut_menu() registers it again
+     * as it closes; registering it from here is a no-op, because this
+     * one-shot event is still in its slot while it runs. */
     if (buflib_move_lock > 0)
-    {
-        register_storage_idle_func(shortcuts_ata_idle_callback);
-        return;
-    }
-
-    fd = open(SHORTCUTS_FILENAME, append|O_RDWR|O_CREAT, 0644);
-    if (fd < 0)
         return;
 
     /* ensure pointer returned by get_shortcut()
        survives the yield() of write() */
     ++buflib_move_lock;
 
-    while (current_idx < shortcut_count)
+    /* A rewrite goes to a .part file renamed into place, so a failed one
+     * leaves the old list; a failed append is cut back to where it began */
+    if (overwrite)
+        fd = open(SHORTCUTS_FILENAME ".part", O_CREAT|O_TRUNC|O_WRONLY, 0644);
+    else
+    {
+        fd = open(SHORTCUTS_FILENAME, O_APPEND|O_WRONLY|O_CREAT, 0644);
+        if (fd >= 0)
+            start = lseek(fd, 0, SEEK_END);
+    }
+    if (fd < 0)
+    {
+        --buflib_move_lock;
+        return;
+    }
+
+    while (ok && current_idx < shortcut_count)
     {
         struct shortcut* sc = get_shortcut(current_idx++, NULL);
-        const char *type;
 
         if (!sc)
             break;
-        type = type_strings[sc->type];
-
-        fdprintf(fd, SHORTCUTS_HDR "\ntype: %s\ndata: ", type);
-
-        if (sc->type == SHORTCUT_TIME)
-        {
-            if (sc->u.timedata.talktime)
-                write(fd, "talk", 4);
-            else
-            {
-                write(fd, "sleep", 5);
-                if(sc->u.timedata.sleep_timeout >= 0)
-                    fdprintf(fd, " %d", sc->u.timedata.sleep_timeout);
-            }
-        }
-        else if (sc->type == SHORTCUT_SETTING_APPLY)
-        {
-            fdprintf(fd, "%s: %s", sc->setting->cfg_name, sc->u.path);
-        }
-        else if (sc->type == SHORTCUT_SETTING)
-        {
-            write(fd, sc->setting->cfg_name, strlen(sc->setting->cfg_name));
-        }
-        else
-            write(fd, sc->u.path, strlen(sc->u.path));
-
-        /* write name:, icon:, talkclip: */
-        fdprintf(fd, "\nname: %s\nicon: %d\ntalkclip: %s\n\n",
-                 sc->name, sc->icon, sc->talk_clip);
+        ok = write_shortcut(fd, sc);
     }
-    close(fd);
-    if (first_idx_to_writeback == 0)
+    if (!ok && !overwrite)
+        ftruncate(fd, start);
+    if (close(fd) < 0)
+        ok = false;
+    if (overwrite
+        && (!ok || rename(SHORTCUTS_FILENAME ".part", SHORTCUTS_FILENAME) < 0))
+    {
+        remove(SHORTCUTS_FILENAME ".part");
+        ok = false;
+    }
+
+    if (ok && first_idx_to_writeback == 0)
     {
         /* reload all shortcuts because we appended to the shortcuts file which
          * has not been read yet.
@@ -312,7 +337,8 @@ static void shortcuts_ata_idle_callback(void)
          shortcuts_init();
     }
     --buflib_move_lock;
-    first_idx_to_writeback = -1;
+    if (ok)
+        first_idx_to_writeback = -1;
 }
 
 void shortcuts_add(enum shortcut_type type, const char* value)
@@ -331,9 +357,13 @@ void shortcuts_add(enum shortcut_type type, const char* value)
     else
         strmemccpy(sc->u.path, value, MAX_PATH);
 
+    /* A write already owed covers this one: an append from its own first
+     * index, or a rewrite of the whole list */
     if (first_idx_to_writeback < 0)
+    {
         first_idx_to_writeback = shortcut_count - 1;
-    overwrite_shortcuts = false;
+        overwrite_shortcuts = false;
+    }
     register_storage_idle_func(shortcuts_ata_idle_callback);
 }
 
@@ -680,12 +710,12 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
     return 0;
 }
 
-/* The whole list again, written back once the disk is next idle */
+/* The whole list again, written back once the menu has closed and the disk is
+ * next idle */
 static void shortcuts_changed(void)
 {
     first_idx_to_writeback = 0;
     overwrite_shortcuts = true;
-    shortcuts_ata_idle_callback();
 }
 
 /* Move carries the shortcut by swapping it along to wherever the cursor is,
@@ -1059,6 +1089,10 @@ int do_shortcut_menu(void *ignored)
     else
         pop_current_activity();
     --buflib_move_lock;
+
+    /* the write the callback could not make while the menu was up */
+    if (first_idx_to_writeback >= 0)
+        register_storage_idle_func(shortcuts_ata_idle_callback);
 
     return done;
 }

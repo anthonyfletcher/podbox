@@ -183,6 +183,10 @@ ssize_t playlist_line_path(const char *playlist, char *line, char *dest,
 void playlist_skip_entry(struct playlist_info *playlist, int steps);
 int playlist_delete(struct playlist_info* playlist, int index);
 int playlist_move(struct playlist_info* playlist, int index, int new_index);
+int playlist_move_tracks(struct playlist_info* playlist, const int *from,
+                         const int *to, int n);
+int playlist_delete_tracks(struct playlist_info* playlist, const int *index,
+                           int n);
 
 /* The longest playlist playlist_reorder() will take. The caller holds one
  * struct sound_axes per track to work the order out (see sound_mix_chain()),

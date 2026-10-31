@@ -21,6 +21,9 @@
 #include "dsp_core.h"
 #include "pcm.h"
 #include "pcm_mixer.h"
+#ifdef HAVE_CS42L55
+#include "audiohw.h"
+#endif
 #include "codecs/libspeex/speex/speex.h"
 #include "settings/settings.h"
 
@@ -225,6 +228,12 @@ static void voice_start_playback(void)
         .get_more = voice_pcm_callback,
     };
     mixer_channel_play_data(PCM_MIXER_CHAN_VOICE, &cbs, frame->pcm, frame->size);
+#ifdef HAVE_CS42L55
+    /* pcmbuf_play_stop() leaves the codec powered down; it leaves PDN_CODEC
+     * only with MCLK running, so after the channel starts. */
+    if (mixer_channel_status(PCM_MIXER_CHAN_PLAYBACK) == CHANNEL_STOPPED)
+        audiohw_idle_powerup();
+#endif
 }
 
 /* Stop the voice channel */

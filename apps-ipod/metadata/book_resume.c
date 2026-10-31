@@ -759,9 +759,13 @@ bool book_resume_mark(const char *book, enum book_left left)
 
 void book_resume_save(void)
 {
+    static char cur_path[MAX_PATH];
     struct mp3entry *id3;
     const char *name = NULL;
     uint64_t book = 0;
+    struct entry cur = { .pos = { .left = BOOK_LEFT_PARTWAY } };
+    unsigned long length = 0;
+    int discnum = 0, tracknum = 0;
 
     if (!global_settings.segregate_audiobooks)
         return;
@@ -769,6 +773,23 @@ void book_resume_save(void)
     mutex_lock(&book_mutex);
     rekey();
     id3 = loaded_book(&name, &book);
+
+    /* The playing track copied out at once: the rewrite below yields, and
+     * a track change then would save this book's key with the next one's
+     * place */
+    if (id3 != NULL)
+    {
+        strmemccpy(cur_path, id3->path, sizeof (cur_path));
+        cur.book = book;
+        cur.path = name == id3->path ? cur_path : NULL;
+        cur.pos.track = path_key(cur_path);
+        cur.pos.index = playlist_get_display_index() - 1;
+        cur.pos.elapsed = id3->elapsed;
+        cur.pos.offset = id3->offset;
+        length = id3->length;
+        discnum = id3->discnum;
+        tracknum = id3->tracknum;
+    }
 
     if (ended_pending)
     {
@@ -798,30 +819,17 @@ void book_resume_save(void)
 
     if (id3 != NULL)
     {
-        struct entry e = {
-            .book = book,
-            .path = name == id3->path ? id3->path : NULL,
-            .pos = {
-                .track   = path_key(id3->path),
-                .index   = playlist_get_display_index() - 1,
-                .elapsed = id3->elapsed,
-                .offset  = id3->offset,
-                .left    = BOOK_LEFT_PARTWAY,
-            },
-        };
-
         /* Stopped in the last 2% of the book, the credits or an outro:
          * finished, as the shelf's percentage would say. A book keyed by its
          * file is that one track. */
-        if (e.path != NULL
-            ? id3->length > 0
-              && (unsigned long long)id3->elapsed * 50
-                 >= (unsigned long long)id3->length * 49
-            : book_shelf_near_end(name, id3->discnum, id3->tracknum,
-                                  id3->elapsed))
-            e.pos.left = BOOK_LEFT_FINISHED;
+        if (cur.path != NULL
+            ? length > 0
+              && (unsigned long long)cur.pos.elapsed * 50
+                 >= (unsigned long long)length * 49
+            : book_shelf_near_end(name, discnum, tracknum, cur.pos.elapsed))
+            cur.pos.left = BOOK_LEFT_FINISHED;
 
-        rewrite(&e);
+        rewrite(&cur);
     }
     mutex_unlock(&book_mutex);
 }

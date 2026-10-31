@@ -29,6 +29,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "config.h"
 #include "file.h"
 #include "rbunicode.h"
@@ -266,11 +267,16 @@ static long title_key(const char *t)
 long db_episode_key(const char *title, unsigned long mtime)
 {
     long k = title_key(title);
-    unsigned date = mtime >> 16;    /* FAT: year since 1980, month, day */
+    time_t t = mtime;
+    struct tm *tm;
 
     if (k)
         return k;
-    return ymd(1980 + (date >> 9), (date >> 5) & 15, date & 31);
+    /* gmtime(), not gmtime_r(): the desktop tool's C library lacks the
+     * second, and nothing yields before tm is read */
+    if (!mtime || !(tm = gmtime(&t)))
+        return 0;
+    return ymd(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
 }
 
 /* ------------------------------------------------------------------ *
@@ -473,6 +479,9 @@ bool db_episode_comment(const char *path, char *buf, size_t size)
         if (lseek(fd, pos, SEEK_SET) < 0 || read(fd, f, 10) != 10 || !f[0])
             break;
         n = h[3] == 4 ? syncsafe(f + 4) : be32(f + 4);
+        /* a frame running past the tag would carry pos round to the start */
+        if (n > end - pos - 10)
+            break;
         if (!memcmp(f, "COMM", 4) && !f[9] && n > 4)
         {
             size_t got = n < sizeof(raw) ? n : sizeof(raw);

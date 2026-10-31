@@ -332,6 +332,8 @@ bool spike_tap_screen(void)
     long next_frame;
     unsigned long pulse_at = 0;
     bool pulse = false;
+    bool usb = false;
+    unsigned fg, bg;
 
     if (!(audio_status() & AUDIO_STATUS_PLAY))
     {
@@ -342,6 +344,8 @@ bool spike_tap_screen(void)
     viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
     lcd_set_backdrop(NULL);
     lcd_setfont(FONT_SYSFIXED);
+    fg = lcd_get_foreground();
+    bg = lcd_get_background();
     lcd_set_foreground(LCD_BLACK);
     lcd_set_background(LCD_WHITE);
 
@@ -373,7 +377,11 @@ bool spike_tap_screen(void)
         else if (button == ACTION_SPIKE_PAUSE)
             bt_clear();
 
-        default_event_handler(button);
+        if (default_event_handler(button) == SYS_USB_CONNECTED)
+        {
+            usb = true;
+            break;
+        }
 
         if (TIME_BEFORE(current_tick, next_frame))
             continue;
@@ -417,7 +425,9 @@ bool spike_tap_screen(void)
 
     beat_analyse_stop();
     lcd_setfont(FONT_UI);
+    lcd_set_foreground(fg);
+    lcd_set_background(bg);
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 
-    return false;
+    return usb;
 }

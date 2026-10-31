@@ -281,6 +281,14 @@ bool string_to_cfg(const char *name, char *value, bool *theme_changed)
     return find_setting_by_cfgname(name) != NULL;
 }
 
+/* qs_load_from_cfg() in settings_list.c, reached only from settings.c,
+ * which CheckWPS does not link. */
+bool is_setting_quickscreenable(const struct settings_list *setting)
+{
+    (void)setting;
+    return false;
+}
+
 /* ------------------------------------------------------------------------
  * The settings table's callbacks
  *
@@ -426,11 +434,8 @@ void set_battery_capacity(int capacity) { (void)capacity; }
 void set_keypress_restarts_sleep_timer(bool enable) { (void)enable; }
 void set_poweroff_timeout(int timeout) { (void)timeout; }
 int  sound_max(int setting) { (void)setting; return 0; }
-bool sound_index_exists(void) { return false; }
-bool sound_scan_screen(bool rebuild) { (void)rebuild; return false; }
 void sound_set_channels(int value) { (void)value; }
 void tag_trim_init(void) { }
-bool tagcache_is_usable(void) { return false; }
 
 void talk_speech_changed(void) { }
 

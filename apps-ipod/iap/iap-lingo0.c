@@ -246,6 +246,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                  */
                 if (lingo == 0x04)
                     device.lingoes |= BIT_N(0x03);
+                accessory_connected();
             } else {
                 device.lingoes = 0;
             }

@@ -628,7 +628,10 @@ static int parse_listitem(struct skin_element *element,
     li->filter_hash = 0;
     li->centre = false;
     if (element->params_count == 0)
+    {
         li->offset = 0;
+        li->wrap = true;
+    }
     else
     {
         li->offset = get_param(element, 0)->data.number;
@@ -806,6 +809,13 @@ static int parse_listitemviewport(struct skin_element *element,
         !strcmp(get_param_text(element, 3), "tile"))
         cfg->tile = true;
 
+    /* A tiled list divides by both sizes on every draw, so each must be a
+     * real one; a non-tiled list falls back to the font height only for an
+     * unnamed height, so an explicit 0 is refused there too. */
+    if (cfg->height == 0 ||
+        (cfg->tile && (cfg->width < 1 || cfg->height < 1)))
+        return -1;
+
     /* The row height for a list that draws art. Zero means the theme says
      * nothing and the setting still answers -- see list_item_height(). */
     if (element->params_count > 4 && !isdefault(get_param(element, 4)))
@@ -909,6 +919,9 @@ static int parse_viewporttextstyle(struct skin_element *element,
               * will select the number for something which looks like a colour
               * making the "colour" case (above) harder to parse */
             num_lines = atoi(get_param_text(element, 1));
+        /* The gradient is spread over nlines rows and divides by them. */
+        if (num_lines < 1)
+            return 1;
         line->style = STYLE_GRADIENT;
         line->nlines = num_lines;
     }
@@ -2704,12 +2717,16 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_LIST_TITLE_TEXT:
                     sb_skin_has_title(curr_screen);
                     break;
+                /* Only the statusbar skin's parse resets these two flags, so
+                 * only it may set them. */
                 case SKIN_TOKEN_LIST_HEADER:
-                    sb_skin_uses_header(curr_screen);
+                    if (curr_skin == CUSTOM_STATUSBAR)
+                        sb_skin_uses_header(curr_screen);
                     function = parse_list_header;
                     break;
                 case SKIN_TOKEN_LIST_ITEM_MARKED:
-                    sb_skin_uses_mark(curr_screen);
+                    if (curr_skin == CUSTOM_STATUSBAR)
+                        sb_skin_uses_mark(curr_screen);
                     function = parse_listitem;
                     break;
                 case SKIN_TOKEN_TOP_QUICKSETTING_NAME:
@@ -2746,10 +2763,15 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_LINE_HEIGHT:
                     /* 0 stands for "the viewport's own height", which is only
-                     * known at render; a written height is taken as it is. */
+                     * known at render; a written height is taken as it is, and
+                     * a negative one is refused, since value.i is unsigned. */
                     if (element->params_count > 0 &&
                         !isdefault(get_param(element, 0)))
+                    {
+                        if (get_param(element, 0)->data.number < 0)
+                            return CALLBACK_ERROR;
                         token->value.i = get_param(element, 0)->data.number;
+                    }
                     else
                         token->value.i = 0;
                     break;

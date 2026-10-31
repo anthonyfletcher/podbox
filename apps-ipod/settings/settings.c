@@ -161,29 +161,6 @@ const char* setting_get_cfgvals(const struct settings_list *setting)
     return NULL;
 }
 
-/* Longest configuration line, and the longest value within one.
- *
- * Both the reader and the writer used fixed buffers that truncate rather than
- * fail, and neither rejects a truncated line -- it simply parses as a shorter
- * value, losing whatever fell off the end. "root menu order" is the line that
- * outgrew them: every enabled main-menu entry contributes its key, so it grows
- * with the menu. At the old 128-byte read buffer the last entries vanished from
- * the menu while the configuration on disk still named them; at the writer's
- * MAX_PATH they would have been dropped on the way out instead.
- *
- * Sized from the ceiling the writer already enforces rather than from what a
- * menu happens to hold today. main_menu_config.c caps its own output at
- * CFG_STR_SIZE -- MAX_ITEMS keys of at most 14 bytes, an item turned off
- * carrying a '!', currently 616 -- so 633 with the setting name is the most
- * that line can be, and main_menu_config.c fails to build if it outgrows
- * this. A menu as it stands (13 fixed entries and all 20 tagnavi slots) is
- * about 370.
- *
- * Deliberately one constant for reading and writing. Sizing them differently is
- * how a value gets written that cannot be read back, which is the more
- * confusing half of this bug: the configuration on disk names entries that do
- * not appear. */
-
 /* The write path's scratch line, static rather than on the stack.
  *
  * Saving happens from flush_config_block_callback(), a storage-idle callback,
@@ -622,6 +599,21 @@ void settings_mark_user_tweak(const struct settings_list *setting)
      * for the next time the disk is idle. */
     if (mark_tweak(setting))
         write_theme_overlay();
+}
+
+/* A reset takes the setting out of the overlay too, or re-selecting the theme
+ * would apply the value the user reset away from */
+static void unmark_tweak(const struct settings_list *setting)
+{
+    for (int i = 0; i < tweak_count; i++)
+    {
+        if (tweaked[i] == setting)
+        {
+            tweaked[i] = tweaked[--tweak_count];
+            write_theme_overlay();
+            return;
+        }
+    }
 }
 
 /* The theme name, from the path of the .cfg that described it. */
@@ -1590,6 +1582,8 @@ void reset_setting(const struct settings_list *setting, void *var)
 void reset_setting_by_user(const struct settings_list *setting)
 {
     uint32_t flags = setting->flags;
+
+    unmark_tweak(setting);
 
     if ((flags & F_BOOL_SETTING) == F_BOOL_SETTING)
     {

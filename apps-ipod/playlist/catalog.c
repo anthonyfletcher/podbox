@@ -329,7 +329,7 @@ int catalog_insert_into(const char* playlist, bool new_playlist,
             int n;
 
             n = read(f, buf, sizeof(buf));
-            if (n < 0)
+            if (n <= 0)
                 break;
 
             if (write(fd, buf, n) < 0)

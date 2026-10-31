@@ -64,9 +64,11 @@ static void set_mark(int row, bool on)
     ls.count += on ? 1 : -1;
 }
 
+/* Bounded by marks[] as well as the list: a list that grows past
+ * LIST_SELECT_MAX_ROWS mid-mode leaves its extra rows unmarkable. */
 static bool eligible(int row)
 {
-    return row >= 0 && row < ls.list->nb_items
+    return row >= 0 && row < ls.list->nb_items && row < LIST_SELECT_MAX_ROWS
            && (!ls.eligible || ls.eligible(row, ls.data));
 }
 
@@ -94,7 +96,9 @@ int list_select_next(int after)
 {
     if (!ls.list)
         return -1;
-    for (int row = after + 1; row < ls.list->nb_items; row++)
+    int rows = MIN(ls.list->nb_items, LIST_SELECT_MAX_ROWS);
+
+    for (int row = after + 1; row < rows; row++)
         if (get_mark(marks, row))
             return row;
     return -1;
@@ -136,7 +140,8 @@ static bool track_run(void)
         if (ls.run_start < 0)
         {
             ls.run_start = ls.run_end = ls.cursor;
-            ls.run_state = !get_mark(marks, ls.cursor);
+            ls.run_state = !(ls.cursor < LIST_SELECT_MAX_ROWS
+                             && get_mark(marks, ls.cursor));
             memcpy(before_run, marks, sizeof(marks));
         }
         extend_run(cursor);
@@ -282,7 +287,11 @@ bool list_select_save(list_select_path_of *path_of, void *data)
             ok = fdprintf(fd, "%d %s\n", attr, line) > 0;
     }
     if (fd >= 0)
+    {
         close(fd);
+        if (!ok)
+            remove(LIST_SELECT_SAVED);
+    }
     return ok;
 }
 

@@ -12,6 +12,9 @@
 #include "settings/settings.h"
 #include "pcm.h"
 #include "pcm_mixer.h"
+#ifdef HAVE_CS42L55
+#include "audiohw.h"
+#endif
 #include "system/app_util.h"
 #include "fixedpoint.h"
 
@@ -84,4 +87,10 @@ void beep_play(unsigned int frequency, unsigned int duration,
     static struct mixer_play_cbs cbs;
     cbs.get_more = beep_count ? beep_get_more : NULL;
     mixer_channel_play_data(PCM_MIXER_CHAN_BEEP, &cbs, start, size);
+#ifdef HAVE_CS42L55
+    /* pcmbuf_play_stop() leaves the codec powered down; it leaves PDN_CODEC
+     * only with MCLK running, so after the channel starts. */
+    if (mixer_channel_status(PCM_MIXER_CHAN_PLAYBACK) == CHANNEL_STOPPED)
+        audiohw_idle_powerup();
+#endif
 }

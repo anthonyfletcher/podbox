@@ -201,8 +201,8 @@ static const char *image_exts[] = {"bmp","jpg","jpe","jpeg","png","ppm"};
 static const char *video_exts[] = {"mpg","mpeg","mpv","m2v"};
 
 /* Progress/throttle state for collect_dir_stats(). File-scoped so a fresh
- * top-level scan can zero it: as a plugin these were function statics reset by
- * BSS on each launch, but the core caller persists across invocations. */
+ * top-level scan can zero it: the caller lives across scans, so nothing else
+ * resets it between them. */
 static unsigned int cds_id3_count;
 static unsigned long cds_last_displayed, cds_last_get_action;
 

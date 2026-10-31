@@ -360,10 +360,10 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b)
      * committed to one. An abstention is not evidence of anything, so it
      * costs nothing.
      *
-     * Halved now that harmony carries the note content directly. The mode is
+     * Small, because harmony carries the note content directly. The mode is
      * one bit squeezed out of the same twelve numbers, and it abstains on two
-     * fifths of a library; charging heavily for it was paying for a summary
-     * of an axis that is now in the table above. */
+     * fifths of a library; charging heavily for it pays twice for an axis
+     * the table above already holds. */
     if (a->mode >= 0 && b->mode >= 0 && a->mode != b->mode)
         d += 30;
 
@@ -472,8 +472,7 @@ static const uint16_t mix_exp[40] = {
  *
  * Short, not empty. Everything nearer than this is still offered, in order,
  * and a mood with nothing inside it at all falls through to the caller's
- * "nothing near enough" -- which sound_mix.h has always promised and nothing
- * ever produced.
+ * "nothing near enough", as sound_mix.h promises.
  *
  * The rule is one standard deviation below the mean distance between two
  * records picked at random, which is the point where a candidate stops being
@@ -564,22 +563,49 @@ struct mix_goal
     int steps;                       /* 1, or the length of a journey */
 };
 
+/* How far along a journey 'step' is, 0..SOUND_AX */
+static int goal_t(const struct mix_goal *g, int step)
+{
+    return g->steps > 1 ? step * SOUND_AX / (g->steps - 1) : 0;
+}
+
+/* Each step of the journey being built, interpolated once rather than per
+ * track per step; goal_points_n is 0 for any other goal. Set at the start of
+ * every build, which is the only caller of goal_score(). */
+static struct mood_point goal_points[SOUND_MIX_MAX];
+static int goal_points_n;
+
+static void goal_points_set(const struct mix_goal *g)
+{
+    int s;
+
+    goal_points_n = 0;
+    if (g->seed != NULL || g->mood_to == g->mood_from
+        || g->steps > SOUND_MIX_MAX)
+        return;
+
+    for (s = 0; s < g->steps; s++)
+        sound_mood_point(&goal_points[s], g->mood_from, g->mood_to,
+                         goal_t(g, s));
+    goal_points_n = g->steps;
+}
+
 /* How far this track is from what the goal wants at 'step', or negative where
  * the goal cannot judge it at all. */
 static int goal_score(const struct mix_goal *g, const struct sound_axes *a,
                       int step)
 {
-    int t;
-
     if (g->seed != NULL)
         return sound_mix_distance(g->seed, a);
 
     if (g->mood_to == g->mood_from)
         return sound_mood_score(a, g->mood_from);
 
-    t = g->steps > 1 ? step * SOUND_AX / (g->steps - 1) : 0;
+    if (step < goal_points_n)
+        return sound_mood_point_score(a, &goal_points[step]);
 
-    return sound_mood_score_between(a, g->mood_from, g->mood_to, t);
+    return sound_mood_score_between(a, g->mood_from, g->mood_to,
+                                    goal_t(g, step));
 }
 
 struct pick
@@ -1009,6 +1035,7 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     cpu_boost(true);
     if (ask)
         splash_progress_set_delay(HZ / 2);
+    goal_points_set(g);
 
     /* Pass one: every record, scored against every step of the goal and kept
      * at whichever step suits it best.
@@ -1357,8 +1384,11 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
 
     for (i = 0; i < chosen; i++)
     {
+        /* By key as well as by entry: a commit during the erase warning or
+         * playlist_create() renumbers the entries */
         if (!tagcache_retrieve(&tcs, cand[order[i]].idx, tag_filename,
-                               buf, sizeof (buf)))
+                               buf, sizeof (buf))
+            || path_key(buf) != cand[order[i]].key)
             continue;
 
         if (playlist_insert_context_add(&context, buf) < 0)

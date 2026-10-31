@@ -1238,6 +1238,47 @@ void tagcache_album_played(int idx_id, long serial)
     }
 }
 
+/* The albums' and artists' play figures totalled again from their entries,
+ * once saved figures are folded into a RAM copy that totalled them before */
+static void albums_retotal(void)
+{
+    int albums = tagcache_album_count();
+    int artists = tagcache_artist_count();
+
+    for (int r = 0; r < albums; r++)
+        tcrc_albums[r].playcount = tcrc_albums[r].lastplayed = 0;
+    for (int a = 0; a < artists; a++)
+        tcrc_artists[a].playcount = tcrc_artists[a].lastplayed = 0;
+    if (albums == 0)
+        return;
+
+    for (int i = 0; i < current_tcmh.tch.entry_count; i++)
+    {
+        const struct index_entry *e = &tcramcache.hdr->indices[i];
+        long plays = e->tag_seek[tag_playcount];
+        int n;
+
+        if ((e->flag & FLAG_DELETED) || plays <= 0
+            || (n = entry_album_row(i)) < 0)
+            continue;
+        tcrc_albums[n].playcount += plays;
+        if (e->tag_seek[tag_lastplayed] > tcrc_albums[n].lastplayed)
+            tcrc_albums[n].lastplayed = e->tag_seek[tag_lastplayed];
+    }
+
+    for (int r = 0; r < albums; r++)
+    {
+        const struct tagcache_album *al = &tcrc_albums[r];
+        int a = artist_row(al->artist_seek);
+
+        if (a < 0)
+            continue;
+        tcrc_artists[a].playcount += al->playcount;
+        if (al->lastplayed > tcrc_artists[a].lastplayed)
+            tcrc_artists[a].lastplayed = al->lastplayed;
+    }
+}
+
 /* The live entry whose filename has this path_key(), or -1. Refuses unless
  * the RAM copy is in use, which is exactly when the index describes the
  * database: load_tagcache() builds it, and a commit turns the RAM copy off
@@ -5388,6 +5429,7 @@ static bool import_runtime_data(bool from_export)
     write_lock--;
 
     update_master_header();
+    albums_retotal();
 
     return true;
 }
@@ -6007,12 +6049,11 @@ static bool load_tagcache(void)
         bytesleft -= sizeof (struct tagcache_header);
 
         fd = open_tag_fd(tch, tag, false);
-        /* fd, not rc: rc last held an alignment gap and is never
-         * negative, so a tag file that would not open was not noticed
-         * here. *tch is then whatever the buffer held, and an
-         * entry_count of zero or less walks past the loop below
-         * without a read ever failing -- leaving the load reporting
-         * success with one tag block never filled in. */
+        /* fd, not rc: rc holds an alignment gap here and is never
+         * negative. A tag file that will not open leaves *tch as whatever
+         * the buffer held, and an entry_count of zero or less there walks
+         * past the loop below without a read failing, so the load would
+         * report success with this tag block never filled in. */
         if (fd < 0)
             goto failure;
 
@@ -6055,15 +6096,13 @@ static bool load_tagcache(void)
                     goto failure;
                 }
 
-                /* Not for a deleted entry: delete_entry() deliberately
-                 * replaces tag_seek with a CRC of the tag text, so that
-                 * runtime statistics survive a file coming back. Comparing
-                 * that against a file position is meaningless, and treating
-                 * the mismatch as corruption abandoned the whole load -- so
-                 * one deleted track left the database unable to enter RAM on
-                 * every boot thereafter, until something rebuilt it. Searches
-                 * skip deleted entries anyway, so the hash is never read as a
-                 * seek by anything downstream. */
+                /* Not for a deleted entry: delete_entry() replaces tag_seek
+                 * with a CRC of the tag text, so that runtime statistics
+                 * survive a file coming back, and a CRC is no file position.
+                 * Taken as corruption it would abandon the load, keeping the
+                 * database out of RAM on every boot for one deleted track.
+                 * Searches skip deleted entries, so nothing reads the hash
+                 * as a seek. */
                 if (!(idx->flag & FLAG_DELETED) && idx->tag_seek[tag] != pos)
                 {
                     logf("corrupt data structures!:");
@@ -7092,16 +7131,13 @@ static void tagcache_thread(void)
                 mutex_unlock(&command_queue_mutex);
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
-                /* Load it back, as Q_UPDATE below does. commit() unloads the
-                 * RAM copy before it starts, so without this a rebuild from
-                 * the menu leaves the database on the disk for the rest of the
-                 * session: every search a seek, no album tables, the browser
-                 * slow, and get_progress() with no entry count to divide by. It returns only on the next USB session
-                 * or reboot, which is what makes it look like a USB fault.
-                 *
-                 * No check_deleted_files() to go with it: a rebuild has just
-                 * regenerated the whole database from what is on the disk, so
-                 * there is nothing stale left for it to find. */
+                /* Load it back, as Q_UPDATE below does: commit() unloads the
+                 * RAM copy before it starts, and unreloaded the database
+                 * stays on the disk until the next USB session or reboot --
+                 * every search a seek, no album tables, the browser slow,
+                 * and get_progress() with no entry count to divide by. No
+                 * check_deleted_files() with it: a rebuild regenerates the
+                 * whole database from the disk, so nothing is stale. */
                 load_ramcache();
                 break;
 
