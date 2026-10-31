@@ -5,7 +5,8 @@
  * GNU General Public License (version 2+)
  *
  * Image scaler. Area-average and linear scaling between bitmaps, plus
- * recalc_dimension() for fitting an image to a target box.
+ * recalc_dimension() for fitting an image to a target box, and the bitmap
+ * sizing and row output the PNG, GIF and WebP readers share.
  ****************************************************************************/
 
 /*
@@ -659,4 +660,58 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
     if (!ret)
         return 0;
     return 1;
+}
+
+int image_fit_bitmap(struct bitmap *bm, struct dim *src, int format,
+                     const struct custom_format *cformat)
+{
+    if (format & FORMAT_RESIZE)
+    {
+        struct dim d = { .width = bm->width, .height = bm->height };
+        if (format & FORMAT_KEEP_ASPECT)
+            recalc_dimension(&d, src);
+        bm->width = d.width;
+        bm->height = d.height;
+    }
+    else
+    {
+        bm->width = src->width;
+        bm->height = src->height;
+    }
+    bm->alpha_offset = 0;
+    if (cformat)
+        return cformat->get_size(bm);
+    return BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
+}
+
+bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,
+                      unsigned char *buf, unsigned int len,
+                      const struct custom_format *cformat, int format_index,
+                      struct img_part *(*store_part)(void *args), void *args)
+{
+    struct scaler_context ctx = { .bm = bm, .dither = dither };
+    void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
+        cformat ? cformat->output_row_8 : output_row_8_native;
+    int row;
+
+    if (bm->width != src->width || bm->height != src->height)
+    {
+        struct rowset rset = {
+            .rowstart = 0, .rowstop = bm->height, .rowstep = 1
+        };
+        return resize_on_load(bm, dither, src, &rset, buf, len, cformat,
+                              format_index, store_part, args);
+    }
+    for (row = 0; row < bm->height; row++)
+    {
+        struct img_part *part;
+
+        if (image_row_hook && !image_row_hook(row, bm->height))
+            return false;
+        part = store_part(args);
+        if (!part)
+            return false;
+        output_row_8(row, part->buf, &ctx);
+    }
+    return true;
 }

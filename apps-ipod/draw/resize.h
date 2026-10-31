@@ -103,4 +103,16 @@ int resize_on_load(struct bitmap *bm, bool dither,
                    struct img_part* (*store_part)(void *args),
                    void *args);
 
+/* The shared ends of the PNG, GIF and WebP readers. image_fit_bitmap() sizes
+ * the bitmap for a source of `src` as `format` asks and returns its size in
+ * bytes. image_store_rows() writes every row from store_part(args): through
+ * the scaler, in `buf`, when the sizes differ, else straight out. False if a
+ * row fails or image_row_hook stops it. */
+int image_fit_bitmap(struct bitmap *bm, struct dim *src, int format,
+                     const struct custom_format *cformat);
+bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,
+                      unsigned char *buf, unsigned int len,
+                      const struct custom_format *cformat, int format_index,
+                      struct img_part *(*store_part)(void *args), void *args);
+
 #endif /* _RESIZE_H_ */

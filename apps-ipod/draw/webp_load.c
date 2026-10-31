@@ -1533,9 +1533,8 @@ static size_t state_bytes(int mb_w, int width)
 int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
                  int maxsize, int format, const struct custom_format *cformat)
 {
-    bool resize = format & FORMAT_RESIZE, dither = format & FORMAT_DITHER;
+    bool resize;
     struct dim src_dim;
-    struct rowset rset;
     struct vp8 *d;
     uint8_t h[10], *at, *end, *free_start, *tokbuf;
     off_t data, size;
@@ -1560,26 +1559,8 @@ int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
 
     src_dim.width = width;
     src_dim.height = height;
-    if (resize)
-    {
-        struct dim dd = { .width = bm->width, .height = bm->height };
-        if (format & FORMAT_KEEP_ASPECT)
-            recalc_dimension(&dd, &src_dim);
-        bm->width = dd.width;
-        bm->height = dd.height;
-    }
-    else
-    {
-        bm->width = width;
-        bm->height = height;
-    }
-    bm->alpha_offset = 0;
-    if (cformat)
-        bm_size = cformat->get_size(bm);
-    else
-        bm_size = BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
-    if (bm->width == width && bm->height == height)
-        resize = false;
+    bm_size = image_fit_bitmap(bm, &src_dim, format, cformat);
+    resize = bm->width != width || bm->height != height;
     lines = resize ? (int)sizeof(struct uint32_argb) * 3 * bm->width : 0;
     if (format & FORMAT_RETURN_SIZE)
         return bm_size + lines + sizeof(long) + state_bytes(mb_w, width);
@@ -1638,32 +1619,8 @@ int read_webp_fd(int fd, off_t pos, off_t len, struct bitmap *bm,
     if (!d->cache_y || !d->cache_u || !d->cache_v)
         return -6;
 
-    if (resize)
-    {
-        rset.rowstart = 0;
-        rset.rowstop = bm->height;
-        rset.rowstep = 1;
-        if (!resize_on_load(bm, dither, &src_dim, &rset, free_start, free_len,
-                            cformat, IF_PIX_FMT(0,) store_part_webp, d))
-            return -9;
-    }
-    else
-    {
-        struct scaler_context ctx = { .bm = bm, .dither = dither };
-        void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
-            cformat ? cformat->output_row_8 : output_row_8_native;
-
-        for (int row = 0; row < bm->height; row++)
-        {
-            struct img_part *part;
-
-            if (image_row_hook && !image_row_hook(row, bm->height))
-                return -9;
-            part = store_part_webp(d);
-            if (!part)
-                return -9;
-            output_row_8(row, part->buf, &ctx);
-        }
-    }
+    if (!image_store_rows(bm, format & FORMAT_DITHER, &src_dim, free_start,
+                          free_len, cformat, 0, store_part_webp, d))
+        return -9;
     return bm_size;
 }

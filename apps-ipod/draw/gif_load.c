@@ -314,10 +314,7 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
                     const struct custom_format *cformat)
 {
     struct gif *g = bs_alloc(a, sizeof *g);
-    bool resize = format & FORMAT_RESIZE;
-    bool dither = format & FORMAT_DITHER;
     struct dim src_dim;
-    struct rowset rset;
     unsigned char *free_start;
     int bm_size, free_len, lines;
 
@@ -329,29 +326,11 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
 
     src_dim.width = g->w;
     src_dim.height = g->h;
-    if (resize)
-    {
-        struct dim d = { .width = bm->width, .height = bm->height };
-        if (format & FORMAT_KEEP_ASPECT)
-            recalc_dimension(&d, &src_dim);
-        bm->width = d.width;
-        bm->height = d.height;
-    }
-    else
-    {
-        bm->width = src_dim.width;
-        bm->height = src_dim.height;
-    }
-    bm->alpha_offset = 0;
-    if (cformat)
-        bm_size = cformat->get_size(bm);
-    else
-        bm_size = BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
-    if (bm->width == src_dim.width && bm->height == src_dim.height)
-        resize = false;
+    bm_size = image_fit_bitmap(bm, &src_dim, format, cformat);
 
     /* the scaler's line buffers; an interlaced image's indices after them */
-    lines = resize ? (int)sizeof(struct uint32_argb) * 3 * bm->width : 0;
+    lines = bm->width != src_dim.width || bm->height != src_dim.height
+            ? (int)sizeof(struct uint32_argb) * 3 * bm->width : 0;
     if (format & FORMAT_RETURN_SIZE)
         return bm_size + lines + sizeof(long) + (int)a->size
                + (g->interlaced ? g->w * g->h : 0);
@@ -378,33 +357,8 @@ int read_gif_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     if (g->interlaced && !load_band(g, 0))
         return -9;
 
-    if (resize)
-    {
-        rset.rowstart = 0;
-        rset.rowstop = bm->height;
-        rset.rowstep = 1;
-        if (!resize_on_load(bm, dither, &src_dim, &rset, free_start, free_len,
-                            cformat, IF_PIX_FMT(0,) store_part_gif, g))
-            return -9;
-    }
-    else
-    {
-        struct scaler_context ctx = { .bm = bm, .dither = dither };
-        void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
-            cformat ? cformat->output_row_8 : output_row_8_native;
-        int row;
-
-        for (row = 0; row < bm->height; row++)
-        {
-            struct img_part *part;
-
-            if (image_row_hook && !image_row_hook(row, bm->height))
-                return -9;
-            part = store_part_gif(g);
-            if (!part)
-                return -9;
-            output_row_8(row, part->buf, &ctx);
-        }
-    }
+    if (!image_store_rows(bm, format & FORMAT_DITHER, &src_dim, free_start,
+                          free_len, cformat, 0, store_part_gif, g))
+        return -9;
     return bm_size;
 }

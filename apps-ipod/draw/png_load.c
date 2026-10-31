@@ -650,10 +650,8 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
 {
     struct png *p = bs_alloc(a, sizeof *p);
     bs_stream *idat = bs_alloc(a, sizeof *idat);
-    bool resize = format & FORMAT_RESIZE;
-    bool dither = format & FORMAT_DITHER;
+    bool resize;
     struct dim src_dim;
-    struct rowset rset;
     unsigned char *free_start;
     int bm_size, free_len, lines;
 
@@ -665,24 +663,7 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
 
     src_dim.width = p->h.width;
     src_dim.height = p->h.height;
-    if (resize)
-    {
-        struct dim d = { .width = bm->width, .height = bm->height };
-        if (format & FORMAT_KEEP_ASPECT)
-            recalc_dimension(&d, &src_dim);
-        bm->width = d.width;
-        bm->height = d.height;
-    }
-    else
-    {
-        bm->width = src_dim.width;
-        bm->height = src_dim.height;
-    }
-    bm->alpha_offset = 0;
-    if (cformat)
-        bm_size = cformat->get_size(bm);
-    else
-        bm_size = BM_SIZE(bm->width, bm->height, FORMAT_NATIVE, false);
+    bm_size = image_fit_bitmap(bm, &src_dim, format, cformat);
 
     /* The scaler's line buffers, or one whole row of RGB without it. An
      * interlaced image may be read at a reduced size, which then needs the
@@ -768,34 +749,9 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     }
     p->x = p->pw;
 
-    if (resize)
-    {
-        rset.rowstart = 0;
-        rset.rowstop = bm->height;
-        rset.rowstep = 1;
-        if (!resize_on_load(bm, dither, &src_dim, &rset, free_start, free_len,
-                            cformat, IF_PIX_FMT(p->raw ? RESIZE_RGB24 : 0,)
-                            store_part_png, p))
-            return -9;
-    }
-    else
-    {
-        struct scaler_context ctx = { .bm = bm, .dither = dither };
-        void (*output_row_8)(uint32_t, void *, struct scaler_context *) =
-            cformat ? cformat->output_row_8 : output_row_8_native;
-        int row;
-
-        for (row = 0; row < bm->height; row++)
-        {
-            struct img_part *part;
-
-            if (image_row_hook && !image_row_hook(row, bm->height))
-                return -9;
-            part = store_part_png(p);
-            if (!part)
-                return -9;
-            output_row_8(row, part->buf, &ctx);
-        }
-    }
+    if (!image_store_rows(bm, format & FORMAT_DITHER, &src_dim, free_start,
+                          free_len, cformat, p->raw ? RESIZE_RGB24 : 0,
+                          store_part_png, p))
+        return -9;
     return bm_size;
 }
