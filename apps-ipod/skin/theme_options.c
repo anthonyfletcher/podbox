@@ -292,6 +292,18 @@ static void option_field(const char *field, char *value)
     /* Any other field belongs to a later format */
 }
 
+/* The option ends, and goes to `each` if it is good. True if it was. */
+static bool hand_over(void (*each)(const struct theme_option *opt,
+                                   void *data),
+                      void *data)
+{
+    if (!finish())
+        return false;
+    if (each)
+        each(&p.opt, data);
+    return true;
+}
+
 int theme_options_parse(const char *path, struct theme_options_head *head,
                         void (*each)(const struct theme_option *opt,
                                      void *data),
@@ -311,23 +323,32 @@ int theme_options_parse(const char *path, struct theme_options_head *head,
 
     while ((rd = read_line(fd, line, sizeof line)) > 0)
     {
-        char *s = trim(line);
-        char *eq;
+        char *s, *eq;
 
         p.line++;
         if (strlen(line) >= sizeof line - 1)
-            *s = '?';       /* a line cut short is an error line */
+        {
+            /* A line too long is an error, read to its end */
+            while (read_line(fd, line, sizeof line) > 0
+                   && strlen(line) >= sizeof line - 1)
+                ;
+            if (p.open)
+                drop("line too long");
+            else
+            {
+                error("line too long");
+                head_bad = true;
+            }
+            continue;
+        }
+        s = trim(line);
 
         if (!*s || *s == '#')
             continue;
         if (*s == '[' && s[strlen(s) - 1] == ']')
         {
-            if (finish())
-            {
-                if (each)
-                    each(&p.opt, data);
+            if (hand_over(each, data))
                 good++;
-            }
             else if (!p.open && (head_bad || format != 1))
             {
                 if (format != 1)
@@ -377,13 +398,7 @@ int theme_options_parse(const char *path, struct theme_options_head *head,
 
     if (!p.open)
         return format == 1 && !head_bad ? 0 : -1;
-    if (finish())
-    {
-        if (each)
-            each(&p.opt, data);
-        good++;
-    }
-    return good;
+    return good + hand_over(each, data);
 }
 
 /* --- read ---------------------------------------------------------------- */
@@ -481,6 +496,10 @@ bool theme_options_write(const char *path, const char * const *keys,
         return false;
 
     src = open_utf8(path, O_RDONLY);
+    /* Only a missing file is started afresh: one that will not open is
+     * left as it is */
+    if (src < 0 && file_exists(path))
+        return false;
     if (src >= 0 && ffilesize(src) > PREFS_LIMIT)
     {
         close(src);
@@ -630,6 +649,15 @@ static void complete_one(const struct theme_option *opt, void *data)
 static const char prefs_ext[] = ".preferences";
 #define PREFS_EXT_LEN (sizeof prefs_ext - 1)
 
+/* Whether `path` names a .preferences file, short enough to record */
+static bool prefs_path(const char *path)
+{
+    size_t len = strlen(path);
+
+    return len > PREFS_EXT_LEN && len < MAX_PATH
+           && !strcasecmp(path + len - PREFS_EXT_LEN, prefs_ext);
+}
+
 bool theme_options_options_path(const char *prefs, char *buf, int bufsize)
 {
     size_t len = strlen(prefs) - PREFS_EXT_LEN;
@@ -646,11 +674,9 @@ void theme_options_met(const char *path)
 {
     char opts[MAX_PATH];
     char *title;
-    size_t len = strlen(path);
     int fd;
 
-    if (len <= PREFS_EXT_LEN || len >= MAX_PATH
-        || strcasecmp(path + len - PREFS_EXT_LEN, prefs_ext))
+    if (!prefs_path(path))
         return;
     for (int i = 0; i < recs; i++)
         if (!strcasecmp(rec[i].path, path))
@@ -774,11 +800,9 @@ static bool key_listed(char (*keys)[THEME_OPTION_KEY_MAX + 1], int count,
 
 void theme_options_check(const char *path, const char *key, int keylen)
 {
-    size_t len = strlen(path);
     int n;
 
-    if (len <= PREFS_EXT_LEN || len >= MAX_PATH
-        || strcasecmp(path + len - PREFS_EXT_LEN, prefs_ext))
+    if (!prefs_path(path))
         return;
     for (n = 0; n < chks; n++)
         if (!strcasecmp(chk[n].path, path))

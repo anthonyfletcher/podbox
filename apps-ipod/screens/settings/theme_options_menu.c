@@ -70,9 +70,13 @@ static void set_value(int n, const char *value)
 
     if (!strcmp(f.values[n], value))
         return;
+    if (!theme_options_write(f.prefs, &key, &value, 1))
+    {
+        splash(HZ, ID2P(LANG_FAILED));
+        return;
+    }
     strmemccpy(f.values[n], value, sizeof f.values[n]);
-    if (theme_options_write(f.prefs, &key, &value, 1))
-        changed = true;
+    changed = true;
 }
 
 static void restore_title(struct gui_synclist *lists, const char *title)
@@ -179,12 +183,17 @@ static void reset_all(void)
 
     for (int i = 0; i < f.count; i++)
     {
-        strcpy(f.values[i], f.opts[i].def);
         keys[i] = f.opts[i].key;
-        values[i] = f.values[i];
+        values[i] = f.opts[i].def;
     }
-    if (theme_options_write(f.prefs, keys, values, f.count))
-        changed = true;
+    if (!theme_options_write(f.prefs, keys, values, f.count))
+    {
+        splash(HZ, ID2P(LANG_FAILED));
+        return;
+    }
+    for (int i = 0; i < f.count; i++)
+        strcpy(f.values[i], f.opts[i].def);
+    changed = true;
 }
 
 static int option_action(int action, struct gui_synclist *lists)
