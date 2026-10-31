@@ -30,3 +30,10 @@ play-pause icon: current
 # scrim only; reload the theme after changing it.
 # Possible Values: on, off
 spectrum peaks: on
+#
+#-- Episode Notes --#
+# The selected podcast episode's notes in a box below its list, which is
+# shorter for it. Off, the lists keep all their rows. Reload the theme
+# after changing it.
+# Possible Values: on, off
+episode notes: on

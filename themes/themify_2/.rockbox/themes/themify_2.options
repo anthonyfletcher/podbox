@@ -1,0 +1,51 @@
+# Themify 2's options, shown in Appearance > Theme Options.
+format = 1
+title  = Themify 2
+
+[sub-line mode]
+name    = Sub Line
+help    = The line under the track title in the music player. Volume Meter
+help    = takes the extra sub line's place too.
+type    = choice
+choice  = artist        | Artist
+choice  = album         | Album
+choice  = genre         | Genre
+choice  = playlist_name | Playlist
+choice  = song_playtime | Playing Time
+choice  = bitrate       | Bitrate
+choice  = volume_meter  | Volume Meter
+choice  = off           | Off
+default = artist
+
+[extra sub-line mode]
+name    = Extra Sub Line
+help    = A second line under the sub line.
+type    = choice
+choice  = artist        | Artist
+choice  = album         | Album
+choice  = genre         | Genre
+choice  = playlist_name | Playlist
+choice  = song_playtime | Playing Time
+choice  = bitrate       | Bitrate
+choice  = file_format   | File Format
+choice  = rating        | Rating
+choice  = year          | Year
+choice  = off           | Off
+default = off
+
+[minimal player mode]
+name    = Minimal Player
+help    = Hides the playlist position and the shuffle, repeat and
+help    = high-quality audio icons in the music player.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = off
+
+[animations]
+name    = Animations
+help    = The animated disk activity spinner. Off shows a still icon.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = on

@@ -1,0 +1,54 @@
+# Scrim's options, shown in Appearance > Theme Options.
+format = 1
+title  = Scrim
+
+[sub-line mode]
+name    = Sub Line
+help    = The line under the track title in the music player, in both scrim
+help    = and scrim_p.
+type    = choice
+choice  = artist        | Artist
+choice  = album         | Album
+choice  = artist-album  | Artist – Album
+choice  = album-artist  | Album – Artist
+choice  = playlist_name | Playlist
+default = artist
+
+[auto-hide]
+name    = Auto-hide
+help    = Hides the track title, sub line, progress, times and status icons
+help    = after this long without a button press or wheel turn. Any input
+help    = brings them back. scrim only.
+type    = choice
+choice  = off | Off
+choice  = 5   | 5 seconds
+choice  = 10  | 10 seconds
+choice  = 30  | 30 seconds
+default = off
+
+[play-pause icon]
+name    = Play-Pause Icon
+help    = Current shows the state: play while playing. Next shows what Play
+help    = will do: pause while playing. scrim only; scrim_p shows large pause
+help    = bars over the cover instead.
+type    = choice
+choice  = current | Current
+choice  = next    | Next
+default = current
+
+[spectrum peaks]
+name    = Spectrum Peaks
+help    = Falling peak caps on the spectrum analyser. scrim only.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = on
+
+[episode notes]
+name    = Episode Notes
+help    = The selected podcast episode's notes in a box below its list, which
+help    = is shorter for it. Off, the lists keep all their rows.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = on
