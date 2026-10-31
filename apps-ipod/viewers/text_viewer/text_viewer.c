@@ -1400,6 +1400,9 @@ static bool tv_slow_open(const char *file)
     return size > TV_WINDOW_SIZE;
 }
 
+/* Opening on the contents, with the theme still on: no page yet */
+static bool tv_listing;
+
 /* Names the file being opened: over the page, sideways with it if it is,
  * or upright over a list */
 static void tv_splash_loading(bool over_page)
@@ -1408,7 +1411,7 @@ static void tv_splash_loading(bool over_page)
 
     /* A format, not the name: a '%' in a filename would be read as a
      * conversion. Until overdrawn. */
-    if (over_page)
+    if (over_page && !tv_listing)
         tv_splashf("%s\n%s", str(LANG_WAIT), name ? name + 1 : tv.path);
     else
         splashf(0, "%s\n%s", str(LANG_WAIT), name ? name + 1 : tv.path);
@@ -1645,9 +1648,14 @@ static void tv_next_page(void)
         tv_speak_page();
 }
 
+/* A page laid out before its picture was tried, as reopening a book lays out
+ * the pages to its place, starts at the picture; when that will not decode,
+ * the page shows the one after it. Such a page is passed over, so that one
+ * press goes back a page. */
 static void tv_prev_page(void)
 {
     int part = tv.part;
+    off_t was_next = tv.next;
 
     reading_stats_touch();
     if (tv.sp == 0)
@@ -1660,14 +1668,21 @@ static void tv_prev_page(void)
             tv_enter_part(part);       /* every chapter before is empty */
             return;
         }
+        tv_draw();
     }
     else
     {
-        if (!tv_reach(tv.stack[tv.sp - 1]))
-            return;
-        tv.sp--;
+        do
+        {
+            if (!tv_reach(tv.stack[tv.sp - 1]))
+                return;
+            tv.sp--;
+            /* known to fail already: passed over without being drawn */
+            if (tv.sp > 0 && tv_page(tv.pos, false) == was_next)
+                continue;
+            tv_draw();
+        } while (tv.sp > 0 && tv.next == was_next);
     }
-    tv_draw();
     tv_speak_page();
 }
 
@@ -3402,14 +3417,27 @@ int text_viewer(const char *file)
 
     /* Take the screen (theme off) and put up a clean loading frame before the
      * slow open -- the name splash for the container formats, a cleared
-     * reading area otherwise -- so the browser never shows through it. */
-    tv_setup_screen();
-    tv_show_loading();
+     * reading area otherwise -- so the browser never shows through it. Opened
+     * on its contents, the theme stays until a chapter is picked: the list
+     * and the wait for it are the theme's. */
+    tv_listing = contents;
+    if (contents)
+    {
+        tv_apply_settings();
+        if (tv_slow_open(file))
+            tv_splash_loading(false);
+    }
+    else
+    {
+        tv_setup_screen();
+        tv_show_loading();
+    }
 
     if (!tv_open(file))
     {
         tv_close();
-        viewportmanager_theme_undo(SCREEN_MAIN, false);
+        if (!contents)
+            viewportmanager_theme_undo(SCREEN_MAIN, false);
         pop_current_activity();
         return GO_TO_PREVIOUS;
     }
@@ -3424,18 +3452,16 @@ int text_viewer(const char *file)
      * as it was */
     if (contents)
     {
-        int picked;
+        int picked = text_viewer_contents();
 
-        viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
-        picked = text_viewer_contents();
-        viewportmanager_theme_undo(SCREEN_MAIN, false);
+        tv_listing = false;
         if (picked != 1)
         {
             tv_close();
-            viewportmanager_theme_undo(SCREEN_MAIN, false);
             pop_current_activity();
             return picked == MENU_ATTACHED_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
         }
+        tv_setup_screen();
     }
     reading_stats_begin(file);
     tv_open_part = tv.part;
