@@ -534,8 +534,10 @@ hand-built zip with every **Explain** entry silently empty looks finished.
 double-click `ThemeLens.cmd`) edits that folder live; `ctl.py` drives a running
 one from a script. **It carries its own copy of the tag table**, so a change to
 `apps-ipod/skin/custom_tags.c` has to be mirrored into `index.html` or the lens
-explains tags that no longer exist. Its list fixtures are not mirrored —
-`extract-lists.py` reads them out of this checkout, so re-run it with `--embed
+explains tags that no longer exist. It also carries a copy of the `.options`
+parser, `apps-ipod/skin/theme_options.c`, as `parseOptions()` in
+`skin-core.js`; change one and change the other. Its list fixtures are not
+mirrored — `extract-lists.py` reads them out of this checkout, so re-run it with `--embed
 index.html` after a menu change.
 
 It is not ready to ship, so it is not versioned here. A fresh clone will not
