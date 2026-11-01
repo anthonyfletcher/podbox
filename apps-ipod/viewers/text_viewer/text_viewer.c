@@ -3467,7 +3467,7 @@ int text_viewer_add_bookmark(void)
 
     tv_mark_label(label, sizeof(label));
     splash(HZ, book_marks_add_labelled(book_resume_key(tv.path), tv.path,
-                                       tv.part, tv.pos, label)
+                                       tv.part, tv.pos, label, true)
                ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
                : ID2P(LANG_BOOKMARK_CREATE_FAILURE));
     return 0;
@@ -3511,7 +3511,8 @@ static int tv_marks_action(int action, struct gui_synclist *lists)
     if (action != ACTION_STD_CONTEXT || sel < 0 || sel >= t->n)
         return action;
     if (yesno_pop(ID2P(LANG_REALLY_DELETE))
-        && book_marks_delete(tv_marks_path, tv_marks_path, t->part[sel]))
+        && book_marks_delete(tv_marks_path, tv_marks_path, t->part[sel],
+                             t->off[sel]))
     {
         /* Gone from the file: the list closes rather than show it */
         return ACTION_STD_CANCEL;
@@ -3566,7 +3567,9 @@ int text_viewer_at_mark(const char *file)
     if (rc != 1)
         return rc == MENU_ATTACHED_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
     tv_mark_pending = true;
-    return text_viewer(file);
+    rc = text_viewer(file);
+    tv_mark_pending = false;    /* unused when the book did not open */
+    return rc;
 }
 
 /* Set by text_viewer_chapters() for the next text_viewer() */

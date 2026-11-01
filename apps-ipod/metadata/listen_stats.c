@@ -42,8 +42,6 @@
 #define LS_PENDING  4               /* plays held between saves */
 #define LS_END_SLACK_MS 10000       /* stopped this near the end is the end */
 
-#define LS_EPOCH pv_days_from_civil(1999, 12, 31)
-
 /* ---- the record and file ---------------------------------------------- */
 
 static int ls_open_file(struct libfile_header *h)
@@ -185,8 +183,11 @@ static void track_change_event(unsigned short id, void *ev_data)
     if (!cur.live)
         return;
     cur.track = path_key(id3->path);
-    cur.key = book_resume_key(book_resume_name(id3, name, sizeof(name)));
     cur.kind = db_spoken_is_podcast_genre(id3->genre_string) ? 2 : 1;
+    /* A show is its album whoever each episode names as its artist */
+    cur.key = cur.kind == 2 && id3->album && id3->album[0]
+              ? book_resume_key(id3->album)
+              : book_resume_key(book_resume_name(id3, name, sizeof(name)));
     cur.elapsed = id3->elapsed;
     cur.tick = current_tick;
 }
@@ -226,9 +227,12 @@ static void take(const struct mp3entry *id3, bool ended)
     p->day = ls_today();
     if (ended && cur.kind == 1)
     {
+        const char *name = book_resume_name(id3, p->book, sizeof(p->book));
+
         p->ended = true;
         p->track = cur.track;
-        book_resume_name(id3, p->book, sizeof(p->book));
+        if (name != p->book)            /* a book known by its path */
+            strmemccpy(p->book, name, sizeof(p->book));
     }
 }
 
@@ -241,6 +245,14 @@ static void track_finish_event(unsigned short id, void *ev_data)
 
     if (!cur.live || !id3 || path_key(id3->path) != cur.track)
         return;
+    /* A seek to the track's start: the same track goes on from there */
+    if (te->flags & TEF_REWIND)
+    {
+        take(id3, false);
+        cur.elapsed = 0;
+        cur.tick = current_tick;
+        return;
+    }
     cur.live = false;
     take(id3, (te->flags & TEF_AUTO_SKIP)
               && id3->elapsed + LS_END_SLACK_MS >= id3->length);
@@ -276,12 +288,18 @@ static void ls_apply(const struct ls_pending *p)
     ls_save(&r);
 }
 
+/* Held across a flush: the UI, the background thread's spin-down save and
+ * the iAP worker each save a book's place, and a flush yields in its writes */
+static struct mutex ls_mutex;
+
 void listen_stats_flush(void)
 {
     static struct ls_pending copy[LS_PENDING];
-    const struct mp3entry *id3 = audio_status() ? audio_current_track()
-                                                : NULL;
+    const struct mp3entry *id3;
     int n;
+
+    mutex_lock(&ls_mutex);
+    id3 = audio_status() ? audio_current_track() : NULL;
 
     /* The track still playing counts what it has so far, from a fresh
      * baseline: a save comes with a pause, a stop or a shutdown */
@@ -296,10 +314,12 @@ void listen_stats_flush(void)
     pending_ct = 0;
     for (int i = 0; i < n; i++)
         ls_apply(&copy[i]);
+    mutex_unlock(&ls_mutex);
 }
 
 void listen_stats_init(void)
 {
+    mutex_init(&ls_mutex);
     add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_change_event);
     add_event(PLAYBACK_EVENT_TRACK_FINISH, track_finish_event);
 }

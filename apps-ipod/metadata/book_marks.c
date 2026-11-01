@@ -136,16 +136,23 @@ struct copy_ctx
     uint64_t book;              /* the mark to leave out, or the one added */
     const char *path;
     unsigned long elapsed;
+    unsigned long offset;
+    bool exact;                 /* a reader's mark, or one being deleted */
     int kept;
     bool dropped;
     bool ok;
 };
 
+/* One place: an audiobook mark added to the second, a reader's mark and a
+ * mark being deleted exactly */
 static bool same_mark(const struct copy_ctx *ctx, uint64_t book,
                       const struct book_mark *m)
 {
-    return book == ctx->book && m->elapsed / 1000 == ctx->elapsed / 1000
-           && strcmp(m->path, ctx->path) == 0;
+    if (book != ctx->book || strcmp(m->path, ctx->path) != 0)
+        return false;
+    if (ctx->exact)
+        return m->elapsed == ctx->elapsed && m->offset == ctx->offset;
+    return m->elapsed / 1000 == ctx->elapsed / 1000;
 }
 
 static bool copy_one(uint64_t book, const struct book_mark *m, void *data)
@@ -424,10 +431,11 @@ static void import_once(void)
 
 bool book_marks_add_labelled(uint64_t book, const char *path,
                              unsigned long elapsed, unsigned long offset,
-                             const char *label)
+                             const char *label, bool exact)
 {
     struct book_mark m = { path, label, elapsed, offset };
-    struct copy_ctx ctx = { .book = book, .path = path, .elapsed = elapsed };
+    struct copy_ctx ctx = { .book = book, .path = path, .elapsed = elapsed,
+                            .offset = offset, .exact = exact };
     bool ok;
 
     lock();
@@ -452,7 +460,8 @@ bool book_marks_add(uint64_t book, const char *path, unsigned long elapsed,
     }
     format_time(time, sizeof(time), elapsed);
     snprintf(label, sizeof(label), "%s \xc2\xb7 %s", title, time);
-    return book_marks_add_labelled(book, path, elapsed, offset, label);
+    return book_marks_add_labelled(book, path, elapsed, offset, label,
+                                   false);
 }
 
 bool book_marks_add_playing(void)
@@ -517,10 +526,11 @@ bool book_marks_any(const char *book)
 }
 
 bool book_marks_delete(const char *book, const char *path,
-                       unsigned long elapsed)
+                       unsigned long elapsed, unsigned long offset)
 {
     struct copy_ctx ctx = { .book = book_resume_key(book), .path = path,
-                            .elapsed = elapsed };
+                            .elapsed = elapsed, .offset = offset,
+                            .exact = true };
     bool ok;
 
     import_once();

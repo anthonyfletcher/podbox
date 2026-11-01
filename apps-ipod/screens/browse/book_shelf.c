@@ -956,7 +956,7 @@ static int marks_action_cb(int action, struct gui_synclist *lists)
     if (n < 0 || n >= shown_ct || !yesno_pop(ID2P(LANG_REALLY_DELETE)))
         return ACTION_REDRAW;
     if (shown_mark(n, &m, path))
-        book_marks_delete(shown_book, path, m.elapsed);
+        book_marks_delete(shown_book, path, m.elapsed, m.offset);
     shown_deleted = true;
     return ACTION_STD_CANCEL;
 }

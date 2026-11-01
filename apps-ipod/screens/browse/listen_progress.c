@@ -185,15 +185,13 @@ static bool walk_album(long seek, bool list, int *total, int *played)
         if (ls_book && ls_track_ct < LS_TRACKS)
         {
             char path[MAX_PATH];
-            uint32_t key = (uint32_t)(((tagcache_get_numeric(&tcs,
-                                tag_discnumber) & 0x7fff) << 16)
-                           | (tagcache_get_numeric(&tcs, tag_tracknumber)
-                              & 0xffff));
+            long d = tagcache_get_numeric(&tcs, tag_discnumber);
+            long t = tagcache_get_numeric(&tcs, tag_tracknumber);
+            long ms = tagcache_get_numeric(&tcs, tag_length);
+            uint32_t key = (uint32_t)(((d & 0x7fff) << 16) | (t & 0xffff));
 
             ls_tracks[ls_track_ct].key = key;
-            ls_tracks[ls_track_ct].ms = MAX(tagcache_get_numeric(&tcs,
-                                                                 tag_length),
-                                            0);
+            ls_tracks[ls_track_ct].ms = MAX(ms, 0);
             ls_track_ct++;
             if (!ls_at && ls_pos.track
                 && tagcache_retrieve(&tcs, tcs.idx_id, tag_filename, path,
@@ -331,8 +329,6 @@ static bool scan_artist(void)
  * Listening Stats' lines                                             *
  * ------------------------------------------------------------------ */
 
-#define LS_EPOCH pv_days_from_civil(1999, 12, 31)
-
 /* A line "label: value", value formatted */
 static void ls_add(int label, const char *fmt, ...)
 {
@@ -374,18 +370,15 @@ static const char *ls_days(char *buf, size_t size, int n)
  * -1 when the book is finished or its place was not found */
 static long ls_left(void)
 {
+    const bool unstarted = !ls_pos.track
+                           || ls_pos.left == BOOK_LEFT_UNSTARTED;
     uint64_t ms = 0;
     int i;
 
-    if (ls_pos.left == BOOK_LEFT_FINISHED)
-        return -1;
-    if (ls_pos.track && ls_pos.left != BOOK_LEFT_UNSTARTED && !ls_at)
+    if (ls_pos.left == BOOK_LEFT_FINISHED || (!unstarted && !ls_at))
         return -1;
     for (i = 0; i < ls_track_ct; i++)
     {
-        const bool unstarted = !ls_pos.track
-                               || ls_pos.left == BOOK_LEFT_UNSTARTED;
-
         if (unstarted || ls_tracks[i].key > ls_at_key)
             ms += ls_tracks[i].ms;
         else if (ls_tracks[i].key == ls_at_key
@@ -630,26 +623,26 @@ int listen_progress_show_book(long album_seek, long artist_seek,
 
     /* A book's or a show's stats are kept under the book resume file's
      * key; a file with no album has none */
-    {
-        char id[BOOK_ID_MAX];
-        struct tagcache_album al;
-        uint64_t key = 0;
-        int row = tagcache_album_find(album_seek, artist_seek);
+    char id[BOOK_ID_MAX];
+    struct tagcache_album al;
+    uint64_t key = 0;
+    int row = tagcache_album_find(album_seek, artist_seek);
 
-        ls_book = false;
-        if (book_resume_id_of(album_seek, artist_seek, id, sizeof(id)))
+    ls_book = false;
+    if (book_resume_id_of(album_seek, artist_seek, id, sizeof(id)))
+    {
+        ls_book = row >= 0 && tagcache_album_get(row, &al)
+                  && db_spoken_album_kind(&al) == 1;
+        /* A show's are kept by its name alone, as listen_stats.c keeps
+         * them, whatever artist each episode names */
+        key = book_resume_key(ls_book ? id : title);
+        if (!ls_book || !book_resume_find(id, &ls_pos))
         {
-            key = book_resume_key(id);
-            ls_book = row >= 0 && tagcache_album_get(row, &al)
-                      && db_spoken_album_kind(&al) == 1;
-            if (!ls_book || !book_resume_find(id, &ls_pos))
-            {
-                memset(&ls_pos, 0, sizeof(ls_pos));
-                ls_pos.left = BOOK_LEFT_UNSTARTED;
-            }
+            memset(&ls_pos, 0, sizeof(ls_pos));
+            ls_pos.left = BOOK_LEFT_UNSTARTED;
         }
-        return show(title, key);
     }
+    return show(title, key);
 }
 
 int listen_progress_show_books(void)

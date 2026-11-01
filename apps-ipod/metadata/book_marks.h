@@ -37,11 +37,12 @@ bool book_marks_add_playing(void);
 bool book_marks_add(uint64_t book, const char *path, unsigned long elapsed,
                     unsigned long offset, const char *title);
 
-/* A mark labelled 'label' as it is. An ebook's: 'book' and 'path' its file,
- * 'elapsed' the reader's part and 'offset' the place in it. */
+/* A mark labelled 'label' as it is; 'exact', a reader's, for any document:
+ * 'book' and 'path' its file, 'elapsed' the reader's part and 'offset' the
+ * place in it, and another mark the same only at the same part and place */
 bool book_marks_add_labelled(uint64_t book, const char *path,
                              unsigned long elapsed, unsigned long offset,
-                             const char *label);
+                             const char *label, bool exact);
 
 /* Whether book id 'book' has any marks */
 bool book_marks_any(const char *book);
@@ -51,8 +52,9 @@ bool book_marks_any(const char *book);
 typedef bool (*book_marks_fn)(const struct book_mark *m, void *data);
 void book_marks_each(const char *book, book_marks_fn fn, void *data);
 
-/* Deletes the mark of 'book' at that chapter and time */
+/* Deletes the mark of 'book' at exactly that chapter, time and offset (or
+ * a reader's part and place), as the mark was read back */
 bool book_marks_delete(const char *book, const char *path,
-                       unsigned long elapsed);
+                       unsigned long elapsed, unsigned long offset);
 
 #endif /* _BOOK_MARKS_H */

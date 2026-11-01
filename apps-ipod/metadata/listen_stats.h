@@ -9,7 +9,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* One book's or show's figures. Days count from 1999-12-31; 0 unknown. */
+/* One book's or show's figures. Days count from 1999-12-31, LS_EPOCH in
+ * pv_stats.h's calendar; 0 unknown. */
+#define LS_EPOCH pv_days_from_civil(1999, 12, 31)
+
 struct listen_stats
 {
     uint64_t key;               /* book_resume_key() of its id */

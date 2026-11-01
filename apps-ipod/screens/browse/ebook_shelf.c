@@ -600,16 +600,20 @@ static bool book_info(int b)
              names + e->author);
     for (int k = 0; k < e->nsubjects; k++, s += strlen(s) + 1)
         snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_ID3_GENRE), s);
-    if (e->series != NO_SERIES && e->series_pos % 100)
-        snprintf(info_line[n++], MAX_PATH, "%s: %s, %d.%d", str(LANG_SERIES),
-                 names + e->series, e->series_pos / 100,
-                 e->series_pos % 100 / 10);
-    else if (e->series != NO_SERIES && e->series_pos)
-        snprintf(info_line[n++], MAX_PATH, "%s: %s, %d", str(LANG_SERIES),
-                 names + e->series, e->series_pos / 100);
-    else if (e->series != NO_SERIES)
-        snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_SERIES),
-                 names + e->series);
+    if (e->series != NO_SERIES)
+    {
+        if (e->series_pos % 100)
+            snprintf(info_line[n++], MAX_PATH, "%s: %s, %d.%d",
+                     str(LANG_SERIES), names + e->series,
+                     e->series_pos / 100, e->series_pos % 100 / 10);
+        else if (e->series_pos)
+            snprintf(info_line[n++], MAX_PATH, "%s: %s, %d",
+                     str(LANG_SERIES), names + e->series,
+                     e->series_pos / 100);
+        else
+            snprintf(info_line[n++], MAX_PATH, "%s: %s", str(LANG_SERIES),
+                     names + e->series);
+    }
     if (e->state == BOOK_SHELF_IN_PROGRESS && e->pct >= 0)
         snprintf(info_line[n++], MAX_PATH, str(LANG_BOOK_SHELF_ROW),
                  str(LANG_BOOKS_IN_PROGRESS), e->pct);
