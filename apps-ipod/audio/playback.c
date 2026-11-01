@@ -1820,7 +1820,7 @@ static void resume_rewind_adjust_progress(const struct mp3entry *id3,
                                           unsigned long *elapsed,
                                           unsigned long *offset)
 {
-    unsigned int rewind = MAX(global_settings.resume_rewind, 0);
+    unsigned int rewind = MAX(spoken_resume_rewind(id3), 0);
     unsigned long d_e = rewind*1000;
     *elapsed = id3->elapsed - MIN(id3->elapsed, d_e);
     unsigned long d_o = rewind * id3->bitrate * (1000/8);

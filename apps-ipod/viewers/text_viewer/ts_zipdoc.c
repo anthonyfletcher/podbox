@@ -708,6 +708,8 @@ typedef struct {
     char      cover_meta[64];     /* <meta name="cover" content=...> */
     char      cover_prop[256];    /* the item marked cover-image */
     char      cover_named[256];   /* an image item called cover */
+    int       coll;               /* in an EPUB 3 collection's meta (1), or
+                                     its group-position's (2) */
     book_img *img;
     int       nimg;
 } book_ctx;
@@ -769,12 +771,36 @@ static int book_tag(void *ud, const char *tag, const char *text)
             book_text(s, sizeof s, text);
             ts_book_subject(b->out, s);
         }
+        else if (tag_is(name, "meta") && b->coll) {
+            char s[TS_BOOK_SERIES];
+
+            book_text(s, sizeof s, text);
+            if (b->coll == 1 && !b->out->series[0])
+                book_copy(b->out->series, s, sizeof b->out->series);
+            else if (b->coll == 2 && !b->out->series_pos)
+                b->out->series_pos = ts_series_pos(s);
+            b->coll = 0;
+        }
         return 0;
     }
 
-    if (tag_is(tag, "meta") && attr(tag, "name", value, sizeof value) &&
-        !ts_ascii_casecmp(value, "cover"))
-        attr(tag, "content", b->cover_meta, sizeof b->cover_meta);
+    if (tag_is(tag, "meta") && attr(tag, "name", value, sizeof value)) {
+        char s[TS_BOOK_SERIES];
+
+        if (!ts_ascii_casecmp(value, "cover"))
+            attr(tag, "content", b->cover_meta, sizeof b->cover_meta);
+        else if (!ts_ascii_casecmp(value, "calibre:series") &&
+                 !b->out->series[0] && attr(tag, "content", s, sizeof s))
+            book_text(b->out->series, sizeof b->out->series, s);
+        else if (!ts_ascii_casecmp(value, "calibre:series_index") &&
+                 !b->out->series_pos && attr(tag, "content", s, sizeof s))
+            b->out->series_pos = ts_series_pos(s);
+    }
+    /* EPUB 3: the collection's name is the meta's text, read at its end */
+    if (b->in_meta && tag_is(tag, "meta") &&
+        attr(tag, "property", value, sizeof value))
+        b->coll = !ts_ascii_casecmp(value, "belongs-to-collection") ? 1
+                : !ts_ascii_casecmp(value, "group-position") ? 2 : 0;
 
     if (tag_is(tag, "item") && attr(tag, "href", href, sizeof href) &&
         attr(tag, "media-type", type, sizeof type) &&
@@ -795,6 +821,21 @@ static int book_tag(void *ud, const char *tag, const char *text)
     if (tag_is(tag, "itemref") && tag[0] != '/')
         b->out->parts++;
     return 0;
+}
+
+int ts_series_pos(const char *s)
+{
+    int whole = 0, tenths = 0, digits = 0;
+
+    while (*s == ' ' || *s == '#')
+        s++;
+    for (; *s >= '0' && *s <= '9' && digits < 4; s++, digits++)
+        whole = whole * 10 + (*s - '0');
+    if (!digits)
+        return 0;
+    if (*s == '.' && s[1] >= '0' && s[1] <= '9')
+        tenths = s[1] - '0';
+    return whole * 100 + tenths * 10;
 }
 
 int ts_book_read(const bs_io *io, void *arena, size_t arena_size,

@@ -27592,3 +27592,171 @@
     *: ""
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SPOKEN_RESUME_REWIND
+  desc: Rewind Before Resume for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind Before Resume"
+  </source>
+  <dest>
+    *: "Spoken Word Rewind Before Resume"
+  </dest>
+  <voice>
+    *: "Spoken Word Rewind Before Resume"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPOKEN_PAUSE_REWIND
+  desc: Rewind on Pause for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind on Pause"
+  </source>
+  <dest>
+    *: "Spoken Word Rewind on Pause"
+  </dest>
+  <voice>
+    *: "Spoken Word Rewind on Pause"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ID3_NARRATOR
+  desc: in track info: the composer field of an audiobook, where its narrator is kept
+  user: core
+  <source>
+    *: "Narrator"
+  </source>
+  <dest>
+    *: "Narrator"
+  </dest>
+  <voice>
+    *: "Narrator"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_ALL_PLAYED
+  desc: in a podcast show's context menu: delete the files of every show's finished episodes
+  user: core
+  <source>
+    *: "Delete All Finished Episodes"
+  </source>
+  <dest>
+    *: "Delete All Finished Episodes"
+  </dest>
+  <voice>
+    *: "Delete All Finished Episodes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTENING_STATS
+  desc: an audiobook's or podcast show's menu, and the Audiobooks menu: time listened, days, time left
+  user: core
+  <source>
+    *: "Listening Stats"
+  </source>
+  <dest>
+    *: "Listening Stats"
+  </dest>
+  <voice>
+    *: "Listening Stats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_TIME
+  desc: Listening Stats: the time spent listening
+  user: core
+  <source>
+    *: "Time listened"
+  </source>
+  <dest>
+    *: "Time listened"
+  </dest>
+  <voice>
+    *: "Time listened"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_LAST
+  desc: Listening Stats: the day last listened to
+  user: core
+  <source>
+    *: "Last listened"
+  </source>
+  <dest>
+    *: "Last listened"
+  </dest>
+  <voice>
+    *: "Last listened"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_NOT_HEARD
+  desc: Listening Stats, with no book listened to yet
+  user: core
+  <source>
+    *: "Not listened to yet"
+  </source>
+  <dest>
+    *: "Not listened to yet"
+  </dest>
+  <voice>
+    *: "Not listened to yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_BOOKS
+  desc: Listening Stats for every book: how many listened to, and finished
+  user: core
+  <source>
+    *: "Books listened to"
+  </source>
+  <dest>
+    *: "Books listened to"
+  </dest>
+  <voice>
+    *: "Books listened to"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SINCE
+  desc: Listening Stats for every book: the first day listened
+  user: core
+  <source>
+    *: "Listening since"
+  </source>
+  <dest>
+    *: "Listening since"
+  </dest>
+  <voice>
+    *: "Listening since"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SERIES
+  desc: Books and Audiobooks menus: the books listed by the series they belong to
+  user: core
+  <source>
+    *: "By Series"
+  </source>
+  <dest>
+    *: "By Series"
+  </dest>
+  <voice>
+    *: "By Series"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SERIES
+  desc: Book Info: the series a book belongs to, and its number in it
+  user: core
+  <source>
+    *: "Series"
+  </source>
+  <dest>
+    *: "Series"
+  </dest>
+  <voice>
+    *: "Series"
+  </voice>
+</phrase>

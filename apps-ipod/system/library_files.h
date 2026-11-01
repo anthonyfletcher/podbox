@@ -48,6 +48,7 @@
 #define LIB_SPIKE_FILE      LIB_USER_DIR "/spike_scores.dat"
 #define LIB_READING_FILE    LIB_USER_DIR "/reading.dat"
 #define LIB_READING_STATS_FILE LIB_USER_DIR "/reading_stats.dat"
+#define LIB_LISTEN_STATS_FILE LIB_USER_DIR "/listen_stats.dat"
 #define LIB_KNOWN_ARTISTS_FILE LIB_USER_DIR "/known_artists.txt"
 #define LIB_PLAYER_NAME_FILE   LIB_USER_DIR "/player_name.txt"
 #define LIB_TRIM_FILE       LIB_USER_DIR "/trim.txt"
@@ -95,7 +96,7 @@
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */
 #define LIB_BOOKS_VERSION   2       /* 1: books keyed by album alone */
 #define LIB_BOOK_INDEX_MAGIC 0x58444e49u    /* "INDX" */
-#define LIB_BOOK_INDEX_VERSION 2   /* 1: no subjects */
+#define LIB_BOOK_INDEX_VERSION 3   /* 2: no series; 1: no subjects */
 #define LIB_MARKS_MAGIC     0x4b52414du     /* "MARK" */
 #define LIB_MARKS_VERSION   1
 #define LIB_QUIZ_MAGIC      0x5a495551u     /* "QUIZ" */
@@ -107,6 +108,8 @@
 #define LIB_READING_VERSION 3       /* 2: no flags; 1: no parts */
 #define LIB_READING_STATS_MAGIC 0x41545352u  /* "RSTA" */
 #define LIB_READING_STATS_VERSION 1
+#define LIB_LISTEN_STATS_MAGIC 0x4154534cu   /* "LSTA" */
+#define LIB_LISTEN_STATS_VERSION 1
 #define LIB_PATHS_MAGIC     0x48544150u     /* "PATH" */
 #define LIB_PATHS_VERSION   1
 #define LIB_UNREADABLE_MAGIC 0x44524e55u    /* "UNRD" */

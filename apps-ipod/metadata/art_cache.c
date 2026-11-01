@@ -1717,9 +1717,12 @@ static struct aa_person *aa_person_get(unsigned int key, bool claim)
             return p;
         }
     }
-    if (claim && !aa_unreached)
-        debug_log(DEBUG_LOG_ARTCACHE, "too many people");
-    aa_unreached |= claim;
+    if (claim)
+    {
+        if (!aa_unreached)
+            debug_log(DEBUG_LOG_ARTCACHE, "too many people");
+        aa_unreached = true;
+    }
     return NULL;
 }
 
@@ -1747,9 +1750,12 @@ static struct aa_libdir *aa_dir_entry(struct aa_dirs *d, unsigned int dir,
             return l;
         }
     }
-    if (who && !d->full)
-        debug_log(DEBUG_LOG_ARTCACHE, "too many folders");
-    d->full |= who != 0;
+    if (who)
+    {
+        if (!d->full)
+            debug_log(DEBUG_LOG_ARTCACHE, "too many folders");
+        d->full = true;
+    }
     return NULL;
 }
 
@@ -2603,13 +2609,13 @@ static enum bg_result aa_run_pass(void)
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
-    completed = !aborted && !failed;
     /* What the walk did not visit is not missing when it saw only the
-     * added tracks */
-    noart_close(completed && !aa_added_only && !aa_unreached);
-    if (completed && !aa_added_only && !aa_unreached)
+     * added tracks, or could not reach all it saw */
+    completed = !aborted && !failed && !aa_added_only && !aa_unreached;
+    noart_close(completed);
+    if (completed)
         aa_remove_orphans();
-    aa_stamps_save(completed && !aa_added_only && !aa_unreached);
+    aa_stamps_save(completed);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);

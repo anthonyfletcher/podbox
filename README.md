@@ -122,11 +122,21 @@ their own.
   - `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows` (on by default)/`Audiobook Author Art Rows`
 - See which books you have finished, not started or are part-way through
   - `Audiobooks` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started`,
-    `By Title` and `By Author` below. A list with no books in it is not shown
+    `By Title`, `By Author`, `By Series` and `Listening Stats` below. A list with no books in it
+    is not shown
   - Choosing a book plays it, from where you left off if you have started it
   - Hold `Select` on a book and select `Mark as...` to move it between the lists. The mark lasts
-    until the book is next played. The same menu has `Listening Progress`, `Book Info` and
+    until the book is next played. The same menu has `Listening Stats`, `Book Info` and
     `Show in Files`
+- See how long you have listened to a book, how long is left at your speed, when you started and
+  finished it, your longest sitting and your best streak of days
+  - Hold `Select` on a book or a podcast show and select `Listening Stats`; every book's
+    together is at the foot of `Audiobooks`, and a book's chapters not yet heard are listed
+    below its figures
+- Books in a series together, in the order they came out
+  - `Audiobooks > By Series`. The series is the grouping tag; give each book of a series the
+    same one, with no number in it
+  - `Book Info` shows the grouping as `Series`, and the composer as `Narrator`
 - Bookmark places in a book to come back to
   - While a book plays, hold `Select` and select `More... > Create Bookmark`
   - A book with bookmarks has a `Bookmarks` row in its menu, in Now Playing's `More...` and when
@@ -140,6 +150,9 @@ their own.
   - `Settings > Playback > Spoken Word Speed`, or hold `Select` on the Now Playing screen
 - Skip a fixed time in a book rather than a whole track
   - `Settings > Playback > Spoken Word Skip Length`. Follows `Skip Length` until you set it
+- Hear a few seconds again when you come back to a book, and leave music where it stopped
+  - `Settings > Playback > Fast-Forward/Rewind > Spoken Word Rewind Before Resume` and
+    `Spoken Word Rewind on Pause`. Each follows its music setting until you set it
 - Fall asleep at the end of a chapter
   - While a book plays, hold `Select` on the Now Playing screen, choose `Sleep Timer` and then
     `End of Chapter`
@@ -161,8 +174,8 @@ Each episode keeps its place, and a show opens on its newest episode.
 - An episode's notes under the list
   - Theme dependent. Scrim shows them, and `Episode Notes` in its Theme Options turns them off
 - Hold `Select` on an episode for `Mark as...` (`Finished` or `Not started`) and
-  `Mark Older as Finished`, and on a show for `Mark All as Finished` and
-  `Delete Finished Episodes`
+  `Mark Older as Finished`, and on a show for `Mark All as Finished`,
+  `Delete Finished Episodes` and, when other shows have some too, `Delete All Finished Episodes`
 - Show art beside the rows
   - Theme dependent
   - `Settings > Appearance > Interface Elements > Art Rows > Podcast Art Rows` (on by default)
@@ -225,10 +238,12 @@ GIF, WebP and BMP pictures.
     `Not Started` below. `Search` finds books by title or author. `In Progress` and `Finished`
     list the book you read last first
   - Press `>>|` on a book's last page and it closes, shown in `Finished`
-  - `By Title`, `By Author`, and `By Subject` for the subjects the books name, each book under
-    every one of its subjects
+  - `By Title`, `By Author`, `By Subject` for the subjects the books name, each book under
+    every one of its subjects, and `By Series` for the series they name, in their order
   - Hold `Select` on a book for `Mark as...`, which moves it between the lists, `Browse Chapters`,
-    `Book Info`, `Reading Stats` and `Show in Files`
+    `Bookmarks`, `Book Info`, `Reading Stats` and `Show in Files`
+  - Bookmark a page: hold `Menu` while reading and select `Create Bookmark`; `Bookmarks` in the
+    same menu, or on the book's menu, goes back to one, and holding `Select` on one deletes it
   - `Reading Stats`, on a book's menu or at the foot of `Books`, shows your time reading, pages a day, reading speed in words a minute, the
     time left at that speed, when you started and finished, your longest sitting and your best
     streak of days, for one book or for all of them

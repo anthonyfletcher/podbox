@@ -1,10 +1,12 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Bookmarks inside audiobooks: places in a book to come back to, beside the
- * one place book_resume.c keeps for where it was left. A mark names its book
- * by book_resume_key() and its chapter by the file's path, which is what
- * playing it again needs.
+ * Bookmarks inside audiobooks and ebooks: places in a book to come back to,
+ * beside the one place book_resume.c or the reader keeps for where it was
+ * left. A mark names its book by book_resume_key() and its chapter by the
+ * file's path, which is what playing it again needs. An ebook's mark names
+ * the book's own file for both, and holds the reader's part and place where
+ * an audiobook's holds a time and a byte offset.
  *
  * One libfile of marks that each say their length, newest first. Marks are
  * made by hand, so every change simply rewrites the file.
@@ -420,15 +422,27 @@ static void import_once(void)
  * adding, listing and deleting                                       *
  * ------------------------------------------------------------------ */
 
+bool book_marks_add_labelled(uint64_t book, const char *path,
+                             unsigned long elapsed, unsigned long offset,
+                             const char *label)
+{
+    struct book_mark m = { path, label, elapsed, offset };
+    struct copy_ctx ctx = { .book = book, .path = path, .elapsed = elapsed };
+    bool ok;
+
+    lock();
+    /* The same place marked twice is one mark, moved to the top */
+    ok = rewrite(&ctx, &m);
+    mutex_unlock(&marks_mutex);
+    return ok;
+}
+
 bool book_marks_add(uint64_t book, const char *path, unsigned long elapsed,
                     unsigned long offset, const char *title)
 {
     char label[BOOK_MARK_LABEL_MAX];
     char time[16];
-    struct book_mark m = { path, label, elapsed, offset };
-    struct copy_ctx ctx = { .book = book, .path = path, .elapsed = elapsed };
     const char *base;
-    bool ok;
 
     /* A chapter with no title is called by its file's name */
     if (title == NULL || title[0] == '\0')
@@ -438,12 +452,7 @@ bool book_marks_add(uint64_t book, const char *path, unsigned long elapsed,
     }
     format_time(time, sizeof(time), elapsed);
     snprintf(label, sizeof(label), "%s \xc2\xb7 %s", title, time);
-
-    lock();
-    /* The same place marked twice is one mark, moved to the top */
-    ok = rewrite(&ctx, &m);
-    mutex_unlock(&marks_mutex);
-    return ok;
+    return book_marks_add_labelled(book, path, elapsed, offset, label);
 }
 
 bool book_marks_add_playing(void)

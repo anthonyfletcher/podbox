@@ -1696,8 +1696,8 @@ static int episode_mark_run(void *param)
 
     if (how == BROWSER_DB_MARK_PLAYED)
     {
-        int was = browser_db_episode_state(c, c->selected_item)
-                  == BROWSER_DB_EPISODE_FINISHED;
+        bool was = browser_db_episode_state(c, c->selected_item)
+                   == BROWSER_DB_EPISODE_FINISHED;
         int choice = was;
 
         MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
@@ -1707,7 +1707,7 @@ static int episode_mark_run(void *param)
         choice = do_menu(&menu, &choice, NULL, false);
         if (get_current_activity() == ACTIVITY_CONTEXTMENU)
             pop_current_activity();
-        if (choice < 0 || choice > 1 || (choice == was && was))
+        if (choice < 0 || choice > 1 || (choice && was))
             return 0;
         how = choice ? BROWSER_DB_MARK_PLAYED : BROWSER_DB_MARK_UNPLAYED;
     }
@@ -1767,6 +1767,47 @@ static int delete_played_callback(int action,
 
 MENUITEM_FUNCTION(delete_played_item, 0, ID2P(LANG_PODCAST_DELETE_PLAYED),
                   delete_played_run, delete_played_callback, Icon_NOICON);
+
+/* Every show's finished episodes, from any show's menu */
+static int delete_all_played_run(void)
+{
+    int gone;
+
+    if (!yesno_pop(ID2P(LANG_PODCAST_DELETE_ALL_PLAYED)))
+        return 0;
+    gone = browser_db_delete_played_all();
+    splashf(HZ * 2, str(LANG_PODCAST_DELETED_N), gone);
+    if (gone > 0)
+    {
+        bg_task_update(&tagcache_task);
+        context_menu_result = ONPLAY_RELOAD_DIR;
+    }
+    return 0;
+}
+
+static int delete_all_played_callback(int action,
+                                      const struct menu_item_ex *this_item,
+                                      struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+
+    (void)this_item;
+    (void)this_list;
+    /* On a show's row, and only when other shows have some too */
+    if (action == ACTION_REQUEST_MENUITEM
+        && (selected_file.context != CONTEXT_ID3DB
+            || browser_db_list_spoken_kind(c) != 2
+            || browser_db_episode_state(c, c->selected_item) >= 0
+            || browser_db_played_episodes_all()
+               <= browser_db_played_episodes(c, c->selected_item)))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(delete_all_played_item, 0,
+                  ID2P(LANG_PODCAST_DELETE_ALL_PLAYED),
+                  delete_all_played_run, delete_all_played_callback,
+                  Icon_NOICON);
 
 static int episode_mark_callback(int action,
                                  const struct menu_item_ex *this_item,
@@ -1997,9 +2038,9 @@ static bool context_menu_listen_progress(void)
 static int listen_progress_callback(int action,
                                     const struct menu_item_ex *this_item,
                                     struct gui_synclist *this_list);
-/* A book's own figures sit at the top of its menu; an album's or an
- * artist's, under More. */
-MENUITEM_FUNCTION(listen_book_item, 0, ID2P(LANG_LISTEN_PROGRESS),
+/* A book's or a show's Listening Stats sit at the top of its menu; an
+ * album's or an artist's Listening Progress, under More. */
+MENUITEM_FUNCTION(listen_book_item, 0, ID2P(LANG_LISTENING_STATS),
                   context_menu_listen_progress,
                   listen_progress_callback, Icon_NOICON);
 MENUITEM_FUNCTION(listen_progress_item, 0, ID2P(LANG_LISTEN_PROGRESS),
@@ -2380,7 +2421,7 @@ MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            context_menu_callback, Icon_file_view_menu,
            &mark_book_item,
            &episode_mark_item, &episode_older_item, &show_mark_item,
-           &delete_played_item,
+           &delete_played_item, &delete_all_played_item,
            &book_marks_item,
            &listen_book_item,
            &view_playlist_item,
@@ -2919,18 +2960,18 @@ static const short folder_rows[] = {
     LANG_SELECT_MANY,
 };
 static const short audiobook_rows[] = {
-    LANG_BOOK_MARK_AS, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL, LANG_QUEUE_MENU,
+    LANG_BOOK_MARK_AS, LANG_LISTENING_STATS, LANG_ADD_TO_PL, LANG_QUEUE_MENU,
     LANG_SHOW_IN_FILES,
 };
 static const short podcast_rows[] = {
     LANG_BOOK_MARK_AS, LANG_PODCAST_MARK_OLDER, LANG_PODCAST_MARK_ALL,
-    LANG_PODCAST_DELETE_PLAYED, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL,
-    LANG_QUEUE_MENU, LANG_SHOW_IN_FILES,
+    LANG_PODCAST_DELETE_PLAYED, LANG_LISTENING_STATS, LANG_ADD_TO_PL,
+    LANG_QUEUE_MENU, LANG_SHOW_IN_FILES, LANG_PODCAST_DELETE_ALL_PLAYED,
 };
 /* Books' own menu, in ebook_shelf.c: Book Info is the row that stays */
 static const short book_rows[] = {
     LANG_BOOK_MARK_AS, LANG_BROWSE_CHAPTERS, LANG_READING_STATS,
-    LANG_SHOW_IN_FILES,
+    LANG_SHOW_IN_FILES, LANG_BOOKMARK_MENU,
 };
 
 static const struct {

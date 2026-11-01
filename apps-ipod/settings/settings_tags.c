@@ -141,6 +141,8 @@ static const struct tag_row tag_rows[] = {
 { "rewind across tracks",TAG_ADVANCED|TAG_PLAYBACK,              "rewind previous" },
 { "resume rewind",       TAG_ADVANCED|TAG_PLAYBACK,              "rewind before resume" },
 { "rewind duration on pause", TAG_ADVANCED|TAG_PLAYBACK,         "rewind unpause" },
+{ "spoken word resume rewind", TAG_ADVANCED|TAG_PLAYBACK,        "audiobook podcast rewind before resume" },
+{ "spoken word rewind on pause", TAG_ADVANCED|TAG_PLAYBACK,      "audiobook podcast rewind unpause" },
 { "antiskip",            TAG_ADVANCED|TAG_PLAYBACK,              "stutter skipping buffer" },
 { "beep",                TAG_ADVANCED|TAG_PLAYBACK,              "skip beep" },
 { "playback frequency",  TAG_ADVANCED|TAG_PLAYBACK|TAG_SYSTEM,   "sample rate hz" },

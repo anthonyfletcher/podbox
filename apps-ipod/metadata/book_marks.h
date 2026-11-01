@@ -37,6 +37,12 @@ bool book_marks_add_playing(void);
 bool book_marks_add(uint64_t book, const char *path, unsigned long elapsed,
                     unsigned long offset, const char *title);
 
+/* A mark labelled 'label' as it is. An ebook's: 'book' and 'path' its file,
+ * 'elapsed' the reader's part and 'offset' the place in it. */
+bool book_marks_add_labelled(uint64_t book, const char *path,
+                             unsigned long elapsed, unsigned long offset,
+                             const char *label);
+
 /* Whether book id 'book' has any marks */
 bool book_marks_any(const char *book);
 

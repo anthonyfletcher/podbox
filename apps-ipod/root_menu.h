@@ -131,6 +131,9 @@ enum {
     /* tagnavi.config's "podcasts" menu, opened from a root row of its own:
      * the main menu's tagnavi slots are all taken. */
     GO_TO_PODCASTS,
+    /* Every book's Listening Stats (screens/browse/listen_progress.c), from
+     * the Audiobooks menu's built-in row */
+    GO_TO_LISTEN_STATS,
 };
 extern struct menu_item_ex root_menu_;
 

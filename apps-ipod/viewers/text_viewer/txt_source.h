@@ -169,10 +169,14 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
 
 /* ---- a book's details ------------------------------------------------ */
 
+/* "3", "3.0" or "2.5" as a series_pos: 300, 300, 250; 0 for none */
+int ts_series_pos(const char *s);
+
 #define TS_BOOK_TITLE    128
 #define TS_BOOK_AUTHOR   96
 #define TS_BOOK_SUBJECTS 192
 #define TS_BOOK_SUBJECT_MAX 4
+#define TS_BOOK_SERIES   96
 
 /* What the book index keeps of an EPUB, FB2 or MOBI: its title and first
  * author, empty where it names none, its parts (1 for an FB2), and where its
@@ -181,11 +185,15 @@ int ts_picture_extent(ts_source *s, int part, const char *href, long *at,
  * page's first image is not looked for); an FB2's is its coverpage's; a
  * MOBI's is the image EXTH 201 names. Its subjects, up to
  * TS_BOOK_SUBJECT_MAX of them, are one to a line: an EPUB's dc:subject, an
- * FB2's genre, a MOBI's EXTH 105. */
+ * FB2's genre, a MOBI's EXTH 105. Its series, empty for none, is an EPUB's
+ * calibre:series or EPUB 3 collection, or an FB2's sequence; series_pos is
+ * 100 times its place in it ("2.5" is 250), 0 when not given. */
 typedef struct {
     char     title[TS_BOOK_TITLE];
     char     author[TS_BOOK_AUTHOR];
     char     subjects[TS_BOOK_SUBJECTS];
+    char     series[TS_BOOK_SERIES];
+    int      series_pos;
     int      parts;
     long     cover_at;
     uint32_t cover_csize, cover_usize;

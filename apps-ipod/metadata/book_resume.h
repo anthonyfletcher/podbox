@@ -69,8 +69,8 @@ uint64_t book_resume_key(const char *book);
 void book_resume_init(void);
 
 /* Write down where the playing track is, if it is a book. Silent about
- * everything else, so a caller does not have
- * to ask what is playing before calling.
+ * everything else, so a caller does not have to ask what is playing before
+ * calling. Then writes what Listening Stats has kept since the last call.
  *
  * Also writes down a book whose track played to its end since the last call,
  * which the audio thread can only note in RAM.
@@ -102,6 +102,13 @@ bool book_resume_convert(const char *text_file);
  * what is needed from it at once. */
 struct mp3entry;
 struct mp3entry *book_resume_loaded(char *buf, size_t size);
+
+/* The id a book is saved under: its album and author, built in 'buf'. A book
+ * held in one file with no album tag has only its path to be known by, and
+ * is reached by playing the file rather than by opening a book, so that is
+ * the key it is looked up under too: the path itself is returned. */
+const char *book_resume_name(const struct mp3entry *id3, char *buf,
+                             size_t size);
 
 /* Every saved book, most recently played first, ended and marked ones
  * included. 'path' is the file for a book keyed by its path, NULL for one

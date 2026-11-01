@@ -56,6 +56,7 @@
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
 #include "screens/browse/book_shelf.h"   /* book_shelf_near_end */
+#include "metadata/listen_stats.h"       /* written as the place is */
 #include "system/strutil.h"     /* read_line */
 #include "system/bg_task.h"     /* the save at spin-down runs there */
 #include "ata_idle_notify.h"
@@ -553,11 +554,7 @@ static void rekey(void)
  * the track that ended                                               *
  * ------------------------------------------------------------------ */
 
-/* The id a book is saved under: its album and author, built in 'buf'. A book
- * held in one file with no album tag has only its path to be known by, and is
- * reached by playing the file rather than by opening a book, so that is the
- * key it is looked up under too. */
-static const char *book_name(const struct mp3entry *id3, char *buf,
+const char *book_resume_name(const struct mp3entry *id3, char *buf,
                              size_t size)
 {
     if (id3->album == NULL || id3->album[0] == '\0')
@@ -599,7 +596,7 @@ static void track_finish_event(unsigned short id, void *ev_data)
         return;
 
     ended_pending = false;
-    name = book_name(id3, id_buf, sizeof(id_buf));
+    name = book_resume_name(id3, id_buf, sizeof(id_buf));
     ended_track.book = book_resume_key(name);
     ended_track.by_path = name == id3->path;
     strmemccpy(ended_track.track, id3->path, sizeof (ended_track.track));
@@ -703,7 +700,7 @@ static struct mp3entry *loaded_book(const char **name, uint64_t *book)
     if (id3 == NULL || !db_spoken_is_book_genre(id3->genre_string))
         return NULL;
 
-    *name = book_name(id3, id_buf, sizeof(id_buf));
+    *name = book_resume_name(id3, id_buf, sizeof(id_buf));
     *book = book_resume_key(*name);
     return id3;
 }
@@ -825,6 +822,7 @@ void book_resume_save(void)
         rewrite(&cur);
     }
     mutex_unlock(&book_mutex);
+    listen_stats_flush();
 }
 
 /* ------------------------------------------------------------------ *

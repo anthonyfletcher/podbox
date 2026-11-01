@@ -152,6 +152,7 @@ static char build_buf[TAGCACHE_BUFSZ];
 
 bool db_spoken_build(void)
 {
+    spoken_read = false;    /* not "none" while the table is half built */
     spoken_ct = 0;
     /* The album and artist seeks below are into tag files the commit that
      * brought us here re-sorted, so they are as stale as the genre ones. */

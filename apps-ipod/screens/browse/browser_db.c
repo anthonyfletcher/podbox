@@ -164,6 +164,7 @@ enum table {
     TABLE_MUSIC_QUIZ,
     TABLE_PLAY_UNPLAYED,
     TABLE_SHUFFLE_ALBUMS,
+    TABLE_LISTEN_STATS,
 };
 
 static const struct id3_to_search_mapping {
@@ -245,6 +246,8 @@ static const struct builtin_row {
       BOOK_SHELF_NOT_STARTED, shelf_not_started_available },
     { "book_in_progress", LANG_BOOK_SHELF_ROW_PROGRESS, TABLE_BOOK_SHELF,
       BOOK_SHELF_IN_PROGRESS, shelf_in_progress_available },
+    /* Every book's Listening Stats (listen_progress.c) */
+    { "book_stats", LANG_LISTENING_STATS, TABLE_LISTEN_STATS, 0, NULL },
 };
 
 /* The setting says what the user asked for. An empty table means the library
@@ -1800,6 +1803,10 @@ static const char *const builtin_menu_lines[] = {
     "\"By Title\"  -> album       ? spoken == \"1\" -> title = \"fmt_title\"",
     "\"By Author\" -> albumartist ? spoken == \"1\" -> album -> title = "
         "\"fmt_title\"",
+    /* A series is the grouping tag; its books come out in year order */
+    "\"By Series\" -> grouping ? spoken == \"1\" & grouping != "
+        "\"<Untagged>\" -> album -> title = \"fmt_title\"",
+    "\"Listening Stats\" ==> \"book_stats\"",
     "",
     /* The album is the show. PodBox's Podcasts row opens this row straight
      * away; above the shows go Search and the episode states. */
@@ -2285,11 +2292,14 @@ static int album_sort_order(int level)
     int ctx = album_sort_ctx(level);
     int order = browser_db_album_sort_get(ctx);
 
-    /* Audiobooks' books have a setting of their own */
+    /* Audiobooks' books have a setting of their own, and a series' come in
+     * the order they were published, which is the series' as a rule */
     if (csi_spoken_kind() == 1)
-        order = global_settings.audiobook_sort_books_by
-                == BOOKS_SORT_AUTHOR_NAME ? DB_SORT_ALBUMS_ARTIST_NAME
-                                          : DB_SORT_ALBUMS_NAME;
+        order = level > 0 && csi->tagorder[level - 1] == tag_grouping
+                ? DB_SORT_ALBUMS_YEAR
+                : global_settings.audiobook_sort_books_by
+                  == BOOKS_SORT_AUTHOR_NAME ? DB_SORT_ALBUMS_ARTIST_NAME
+                                            : DB_SORT_ALBUMS_NAME;
     else if (order < 0)
         order = global_settings.database_sort_albums_by;
     if (browser_db_album_sort_artist_first_moot(ctx)
@@ -5185,6 +5195,8 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     }
     if (newextra == TABLE_MUSIC_QUIZ)
         return GO_TO_MUSIC_QUIZ;
+    if (newextra == TABLE_LISTEN_STATS)
+        return GO_TO_LISTEN_STATS;
 
     if (newextra == TABLE_DB_SEARCH)
     {
@@ -6113,6 +6125,50 @@ int browser_db_delete_played(struct browser_context *c, int id)
     if (!tagcache_search(&d.tcs, tag_filename))
         return 0;
     show_each(c, id, delete_if_played, &d);
+    tagcache_search_finish(&d.tcs);
+    loaded_entries_crc = 0;
+    return d.gone;
+}
+
+/* Each finished episode of every show */
+static void each_played(void (*fn)(int idx_id, void *data), void *data)
+{
+    struct tagcache_album al;
+    int n, i;
+
+    for (n = 0; tagcache_album_get(n, &al); n++)
+    {
+        if (db_spoken_album_kind(&al) != 2)
+            continue;
+        for (i = al.first; i <= al.last; i++)
+            if (tagcache_album_of(i) == n
+                && episode_state(i) == EPISODES_FINISHED)
+                fn(i, data);
+    }
+}
+
+static void count_played(int idx_id, void *data)
+{
+    (void)idx_id;
+    (*(int *)data)++;
+}
+
+int browser_db_played_episodes_all(void)
+{
+    int n = 0;
+
+    each_played(count_played, &n);
+    return n;
+}
+
+int browser_db_delete_played_all(void)
+{
+    static struct delete_played d;
+
+    d.gone = 0;
+    if (!tagcache_search(&d.tcs, tag_filename))
+        return 0;
+    each_played(delete_if_played, &d);
     tagcache_search_finish(&d.tcs);
     loaded_entries_crc = 0;
     return d.gone;

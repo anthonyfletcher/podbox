@@ -220,10 +220,33 @@ MENUITEM_FUNCTION(text_viewer_contents_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_BROWSE_CHAPTERS), text_viewer_contents,
                   contents_callback, Icon_NOICON);
 
+/* Only inside the reader too; the list only when the book has marks */
+static int marks_callback(int action, const struct menu_item_ex *this_item,
+                          struct gui_synclist *this_list);
+MENUITEM_FUNCTION(text_viewer_mark_item, 0, ID2P(LANG_BOOKMARK_MENU_CREATE),
+                  text_viewer_add_bookmark, marks_callback, Icon_Bookmark);
+MENUITEM_FUNCTION(text_viewer_marks_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_BOOKMARK_MENU), text_viewer_bookmarks,
+                  marks_callback, Icon_Bookmark);
+
+static int marks_callback(int action, const struct menu_item_ex *this_item,
+                          struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && (!text_viewer_reading()
+            || (this_item == &text_viewer_marks_item
+                && !text_viewer_has_marks())))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 /* The book, then the type, the page, colour and light, holding the player
  * and listening: the rows most often wanted first in each */
 MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_contents_item,
+          &text_viewer_mark_item,
+          &text_viewer_marks_item,
           &text_viewer_larger_item,
           &text_viewer_smaller_item,
           &text_viewer_font_item,

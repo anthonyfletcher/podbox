@@ -33,6 +33,7 @@
 #include "system/format_time.h"
 #include "system/shutdown.h"
 #include "sound_props.h"
+#include "database/db_spoken.h"   /* a book's composer is its narrator */
 #include "track_info.h"
 
 static const int id3_headers[]=
@@ -73,6 +74,23 @@ struct id3view_info {
     int playlist_amount;
     int info_id[ARRAYLEN(id3_headers)];
 };
+
+/* The label of the info_no'th field shown: an audiobook's composer is its
+ * narrator and its grouping its series, where audiobook tools put them and
+ * where By Series reads it */
+static int header_lang(const struct id3view_info *info, int info_no)
+{
+    int id = id3_headers[info->info_id[info_no]];
+
+    if (info->id3 && db_spoken_is_book_genre(info->id3->genre_string))
+    {
+        if (id == LANG_ID3_COMPOSER)
+            return LANG_ID3_NARRATOR;
+        if (id == LANG_ID3_GROUPING)
+            return LANG_SERIES;
+    }
+    return id;
+}
 
 /* Spell out a buffer, but when successive digits are encountered, say
    the whole number. Useful for some ID3 tags that usually contain a
@@ -174,9 +192,8 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
     if(!(selected_item%2))
     {/* header */
         if(say_it)
-            talk_id(id3_headers[info->info_id[info_no]], false);
-        snprintf(buffer, buffer_len, "%s",
-                 str(id3_headers[info->info_id[info_no]]));
+            talk_id(header_lang(info, info_no), false);
+        snprintf(buffer, buffer_len, "%s", str(header_lang(info, info_no)));
         return buffer;
     }
     else
@@ -453,7 +470,7 @@ static const char* id3_get_name_cb(int selected_item, void* data,
     const char *val = id3_get_or_speak_info(selected_item * 2 + 1, data,
                                             value, sizeof(value), false);
     snprintf(buffer, buffer_len, "%s: %s",
-             str(id3_headers[info->info_id[selected_item]]), val ? val : "");
+             str(header_lang(info, selected_item)), val ? val : "");
     return buffer;
 }
 

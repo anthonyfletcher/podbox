@@ -224,6 +224,11 @@ static const int tv_backlight_times[] = {-1, 0, 30, 60, 120, 300, 600};
 /* Spoken Word Skip Length's: Same as Music, then Skip Length's own */
 static const int spoken_skip_times[] = {-2,-1,0,5,10,15,20,25,30,45,60,90,
                                         120,180,240,300,600,900};
+/* The spoken-word rewinds': Same as Music, then the music setting's own */
+static const int spoken_resume_rewind_times[] = {-1,0,5,10,15,20,25,30,35,40,
+                                                 45,50,55,60};
+static const int spoken_pause_rewind_times[] = {-1,0,1,2,3,4,5,6,7,8,9,10,11,
+                                                12,13,14,15};
 static const int timeout_sec_common[] = {-1,0,1,2,3,4,5,6,7,8,9,10,15,20,25,30,
                                         45,60,90,120,180,240,300,600,900,1200,
                                         1500,1800,2700,3600,4500,5400,6300,7200};
@@ -415,6 +420,21 @@ static int32_t getlang_spoken_skip(int value, int unit)
     if (value == -2)
         return LANG_SAME_AS_MUSIC;
     return getlang_time_unit_0_is_skip_track(value, unit);
+}
+
+static const char* formatter_spoken_rewind(char *buffer, size_t buffer_size,
+                                           int val, const char *unit)
+{
+    if (val == -1)
+        return str(LANG_SAME_AS_MUSIC);
+    return formatter_time_unit_0_is_off(buffer, buffer_size, val, unit);
+}
+
+static int32_t getlang_spoken_rewind(int value, int unit)
+{
+    if (value == -1)
+        return LANG_SAME_AS_MUSIC;
+    return getlang_time_unit_0_is_off(value, unit);
 }
 
 static const char* formatter_time_unit_0_is_eternal(char *buffer,
@@ -1775,6 +1795,10 @@ const struct settings_list settings[] = {
     INT_SETTING(F_TIME_SETTING, pause_rewind, LANG_PAUSE_REWIND, 0,
                 "rewind duration on pause", UNIT_SEC, 0, 15, 1,
                 formatter_time_unit_0_is_off, getlang_time_unit_0_is_off, NULL),
+    TABLE_SETTING_LIST(F_TIME_SETTING, spoken_pause_rewind,
+                  LANG_SPOKEN_PAUSE_REWIND, -1, "spoken word rewind on pause",
+                  "music,off", UNIT_SEC, formatter_spoken_rewind,
+                  getlang_spoken_rewind, NULL, 17, spoken_pause_rewind_times),
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, font_file, "font",
                      DEFAULT_FONTNAME, FONT_DIR "/", ".fnt"),
     /* No font of its own: unset means the regular UI font, so a theme naming
@@ -2336,6 +2360,10 @@ const struct settings_list settings[] = {
     INT_SETTING(F_TIME_SETTING, resume_rewind, LANG_RESUME_REWIND, 0,
                 "resume rewind", UNIT_SEC, 0, 60, 5,
                 formatter_time_unit_0_is_off, getlang_time_unit_0_is_off, NULL),
+    TABLE_SETTING_LIST(F_TIME_SETTING, spoken_resume_rewind,
+                  LANG_SPOKEN_RESUME_REWIND, -1, "spoken word resume rewind",
+                  "music,off", UNIT_SEC, formatter_spoken_rewind,
+                  getlang_spoken_rewind, NULL, 14, spoken_resume_rewind_times),
    CUSTOM_SETTING(0, root_menu_customized,
                   LANG_ROCKBOX_TITLE, /* lang string here is never actually used */
                   NULL, "root menu order",

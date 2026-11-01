@@ -19,14 +19,22 @@
  * unheard tracks run to hundreds and say nothing about where the gaps are,
  * where "Pablo Honey, 0%" does.
  *
+ * A book or a podcast show opens as its Listening Stats: the figures
+ * metadata/listen_stats.c keeps -- time listened, the days, the longest
+ * sitting -- and for a book the time left from where it was left, at the
+ * Spoken Word Speed, above the same summary and unheard tracks. Every book
+ * together has the screen too, from the Audiobooks menu.
+ *
  * Parts, in order:
  *   - the arena the row text is written into
  *   - walking one album's tracks
  *   - collecting an artist's albums
+ *   - Listening Stats' lines
  *   - the two lists
  *   - the way in
  ****************************************************************************/
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -46,6 +54,13 @@
 #include "system/activity.h"
 #include "system/app_buffer.h"       /* where the row text is written */
 #include "database/tagcache.h"
+#include "database/db_spoken.h"
+#include "database/path_key.h"
+#include "metadata/book_resume.h"
+#include "metadata/listen_stats.h"
+#include "speech/talk.h"             /* UNIT_SEC */
+#include "system/format_time.h"
+#include "viewers/playback_viewer/pv_stats.h"   /* the calendar */
 #include "screens/browse/browser_db.h"
 #include "root_menu.h"
 #include "listen_progress.h"
@@ -91,6 +106,26 @@ static struct lp_track tracks[TRACKS_MAX];
 static int track_ct;
 static int track_total, track_played;
 
+/* Listening Stats' lines, above the summary row; none for an album or an
+ * artist */
+#define LS_LINES 8
+static char ls_line[LS_LINES][80];
+static int ls_n;
+
+/* While a book's tracks are walked: where it was left, and each track's
+ * place and length, from which what is left to hear is summed */
+#define LS_TRACKS 512
+static bool ls_book;
+static struct book_resume ls_pos;
+static struct
+{
+    uint32_t key;
+    uint32_t ms;
+} ls_tracks[LS_TRACKS];
+static int ls_track_ct;
+static uint32_t ls_at_key;      /* the place's track, once found */
+static bool ls_at;
+
 /* Whole percent, rounded down, so 100% means every track rather than nearly
  * every track. */
 static int percent(int played, int total)
@@ -126,6 +161,8 @@ static bool walk_album(long seek, bool list, int *total, int *played)
     *total = *played = 0;
     if (list)
         track_ct = 0;
+    ls_track_ct = 0;
+    ls_at = false;
 
     if (!tagcache_search(&tcs, tag_title))
         return false;
@@ -145,6 +182,28 @@ static bool walk_album(long seek, bool list, int *total, int *played)
         size_t avail = arena_sz - used;
 
         (*total)++;
+        if (ls_book && ls_track_ct < LS_TRACKS)
+        {
+            char path[MAX_PATH];
+            uint32_t key = (uint32_t)(((tagcache_get_numeric(&tcs,
+                                tag_discnumber) & 0x7fff) << 16)
+                           | (tagcache_get_numeric(&tcs, tag_tracknumber)
+                              & 0xffff));
+
+            ls_tracks[ls_track_ct].key = key;
+            ls_tracks[ls_track_ct].ms = MAX(tagcache_get_numeric(&tcs,
+                                                                 tag_length),
+                                            0);
+            ls_track_ct++;
+            if (!ls_at && ls_pos.track
+                && tagcache_retrieve(&tcs, tcs.idx_id, tag_filename, path,
+                                     sizeof(path))
+                && path_key(path) == ls_pos.track)
+            {
+                ls_at = true;
+                ls_at_key = key;
+            }
+        }
         if (tagcache_get_numeric(&tcs, tag_playcount) > 0)
         {
             (*played)++;
@@ -269,6 +328,122 @@ static bool scan_artist(void)
 }
 
 /* ------------------------------------------------------------------ *
+ * Listening Stats' lines                                             *
+ * ------------------------------------------------------------------ */
+
+#define LS_EPOCH pv_days_from_civil(1999, 12, 31)
+
+/* A line "label: value", value formatted */
+static void ls_add(int label, const char *fmt, ...)
+{
+    char value[64];
+    va_list ap;
+
+    if (ls_n == LS_LINES)
+        return;
+    va_start(ap, fmt);
+    vsnprintf(value, sizeof(value), fmt, ap);
+    va_end(ap);
+    snprintf(ls_line[ls_n++], sizeof(ls_line[0]), "%s: %s", str(label),
+             value);
+}
+
+static const char *ls_time(char *buf, size_t size, uint32_t secs)
+{
+    return format_time_auto(buf, size, secs, UNIT_SEC, false);
+}
+
+static void ls_date(char *buf, size_t size, int day)
+{
+    int y, m, d;
+
+    pv_civil_from_days(day + LS_EPOCH, &y, &m, &d);
+    snprintf(buf, size, "%s %d %d", str(LANG_MONTH_JANUARY + m - 1), d, y);
+}
+
+/* n days, or one */
+static const char *ls_days(char *buf, size_t size, int n)
+{
+    if (n == 1)
+        return str(LANG_RS_ONE_DAY);
+    snprintf(buf, size, str(LANG_RS_DAYS), n);
+    return buf;
+}
+
+/* What is left of the book walked, at the Spoken Word Speed, in seconds;
+ * -1 when the book is finished or its place was not found */
+static long ls_left(void)
+{
+    uint64_t ms = 0;
+    int i;
+
+    if (ls_pos.left == BOOK_LEFT_FINISHED)
+        return -1;
+    if (ls_pos.track && ls_pos.left != BOOK_LEFT_UNSTARTED && !ls_at)
+        return -1;
+    for (i = 0; i < ls_track_ct; i++)
+    {
+        const bool unstarted = !ls_pos.track
+                               || ls_pos.left == BOOK_LEFT_UNSTARTED;
+
+        if (unstarted || ls_tracks[i].key > ls_at_key)
+            ms += ls_tracks[i].ms;
+        else if (ls_tracks[i].key == ls_at_key
+                 && ls_pos.left == BOOK_LEFT_PARTWAY
+                 && ls_tracks[i].ms > ls_pos.elapsed)
+            ms += ls_tracks[i].ms - ls_pos.elapsed;
+    }
+    return (long)(ms * 100 / MAX(global_settings.spoken_speed, 1) / 1000);
+}
+
+/* The figures that every Listening Stats screen has */
+static void ls_add_figures(const struct listen_stats *r)
+{
+    char t[32];
+
+    if (r->seconds)
+        ls_add(LANG_LS_TIME, "%s", ls_time(t, sizeof(t), r->seconds));
+    if (r->longest)
+        ls_add(LANG_RS_LONGEST, "%s", ls_time(t, sizeof(t), r->longest));
+    if (r->best_streak)
+        ls_add(LANG_RS_STREAK, "%s", ls_days(t, sizeof(t), r->best_streak));
+}
+
+/* One book's or show's lines, 'key' its book_resume_key() */
+static void ls_build(uint64_t key)
+{
+    struct listen_stats r;
+    char d[40], n[24];
+    long left;
+
+    ls_n = 0;
+    listen_stats_get(key, &r);
+    ls_add_figures(&r);
+    if (ls_book && (left = ls_left()) > 0)
+        ls_add(LANG_RS_LEFT, str(LANG_RS_ABOUT),
+               ls_time(n, sizeof(n), (uint32_t)left));
+    if (r.started)
+    {
+        ls_date(d, sizeof(d), r.started);
+        ls_add(LANG_RS_STARTED, "%s", d);
+    }
+    if (r.last && r.last != r.finished)
+    {
+        ls_date(d, sizeof(d), r.last);
+        ls_add(LANG_LS_LAST, "%s", d);
+    }
+    if (r.finished)
+    {
+        ls_date(d, sizeof(d), r.finished);
+        if (r.started && r.finished >= r.started)
+            ls_add(LANG_BOOKS_FINISHED, str(LANG_RS_IN_DAYS), d,
+                   ls_days(n, sizeof(n), r.finished - r.started + 1));
+        else
+            ls_add(LANG_BOOKS_FINISHED, "%s", d);
+    }
+}
+
+/* ------------------------------------------------------------------ *
  * the two lists                                                      *
  * ------------------------------------------------------------------ */
 
@@ -305,6 +480,9 @@ static const char *track_get_name(int n, void *data, char *buffer,
 {
     (void)data;
 
+    if (n < ls_n)
+        return ls_line[n];
+    n -= ls_n;
     if (n == 0)
         return summary_row(buffer, buffer_len, track_played, track_total);
 
@@ -333,7 +511,7 @@ static int run_track_list(const char *title)
 {
     struct simplelist_info info;
 
-    simplelist_info_init(&info, (char *)title, track_ct + 1, NULL);
+    simplelist_info_init(&info, (char *)title, ls_n + track_ct + 1, NULL);
     info.get_name = track_get_name;
     info.action_callback = track_action_cb;
 
@@ -388,8 +566,9 @@ static int run_album_list(const char *title)
  * the way in                                                         *
  * ------------------------------------------------------------------ */
 
-/* Whatever 'scope' names, under 'title' */
-static int show(const char *title)
+/* Whatever 'scope' names, under 'title'; with Listening Stats when 'stats'
+ * names a book or show by its book_resume_key() */
+static int show(const char *title, uint64_t stats)
 {
     bool artist = (scope.scope == BROWSER_DB_SCOPE_ARTIST);
     bool ok;
@@ -403,6 +582,9 @@ static int show(const char *title)
     ok = artist ? scan_artist()
                 : walk_album(-1, true, &track_total, &track_played);
     cpu_boost(false);
+    ls_n = 0;
+    if (ok && stats)
+        ls_build(stats);
 
     if (!ok)
     {
@@ -431,7 +613,8 @@ int listen_progress_show(void)
     if (!browser_db_current_filters(&scope))
         return GO_TO_PREVIOUS;
     browser_db_current_entry_name(title, sizeof(title));
-    return show(title);
+    ls_book = false;
+    return show(title, 0);
 }
 
 int listen_progress_show_book(long album_seek, long artist_seek,
@@ -444,5 +627,54 @@ int listen_progress_show_book(long album_seek, long artist_seek,
     scope.tag[1] = tag_album;
     scope.seek[1] = album_seek;
     scope.count = 2;
-    return show(title);
+
+    /* A book's or a show's stats are kept under the book resume file's
+     * key; a file with no album has none */
+    {
+        char id[BOOK_ID_MAX];
+        struct tagcache_album al;
+        uint64_t key = 0;
+        int row = tagcache_album_find(album_seek, artist_seek);
+
+        ls_book = false;
+        if (book_resume_id_of(album_seek, artist_seek, id, sizeof(id)))
+        {
+            key = book_resume_key(id);
+            ls_book = row >= 0 && tagcache_album_get(row, &al)
+                      && db_spoken_album_kind(&al) == 1;
+            if (!ls_book || !book_resume_find(id, &ls_pos))
+            {
+                memset(&ls_pos, 0, sizeof(ls_pos));
+                ls_pos.left = BOOK_LEFT_UNSTARTED;
+            }
+        }
+        return show(title, key);
+    }
+}
+
+int listen_progress_show_books(void)
+{
+    struct simplelist_info info;
+    struct listen_stats all;
+    int books, finished;
+    char d[40];
+
+    ls_n = 0;
+    listen_stats_sum(1, &all, &books, &finished);
+    if (!books)
+        strmemccpy(ls_line[ls_n++], str(LANG_LS_NOT_HEARD),
+                   sizeof(ls_line[0]));
+    else
+    {
+        ls_add(LANG_LS_BOOKS, str(LANG_RS_BOOKS_FINISHED), books, finished);
+        ls_add_figures(&all);
+        if (all.started)
+        {
+            ls_date(d, sizeof(d), all.started);
+            ls_add(LANG_LS_SINCE, "%s", d);
+        }
+    }
+    simplelist_info_init(&info, str(LANG_LISTENING_STATS), ls_n, NULL);
+    info.get_name = track_get_name;
+    return simplelist_show_list(&info) ? GO_TO_ROOT : GO_TO_PREVIOUS;
 }

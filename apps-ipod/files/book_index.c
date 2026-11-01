@@ -41,7 +41,8 @@
  * the record, and reading the file                                   *
  * ------------------------------------------------------------------ */
 
-/* One book; its path, title, author and subjects follow it, unterminated */
+/* One book; its path, title, author, subjects and series follow it,
+ * unterminated */
 struct book_rec
 {
     uint64_t key;               /* path_key() of the path */
@@ -52,6 +53,7 @@ struct book_rec
     uint8_t  cover_method;
     uint8_t  pad;
     uint16_t path_len, title_len, author_len, subjects_len;
+    uint16_t series_len, series_pos;
 };
 
 bool book_index_stale(void)
@@ -86,9 +88,9 @@ void book_index_each(book_index_fn fn, void *data,
                      struct book_index_text *text)
 {
     char *path = text->path, *title = text->title, *author = text->author,
-         *subjects = text->subjects;
+         *subjects = text->subjects, *series = text->series;
     struct book_entry e = { .path = path, .title = title, .author = author,
-                            .subjects = subjects };
+                            .subjects = subjects, .series = series };
     struct libfile_header h;
     struct book_rec r;
     int fd = libfile_open(BOOK_INDEX_FILE, LIB_BOOK_INDEX_MAGIC,
@@ -102,15 +104,19 @@ void book_index_each(book_index_fn fn, void *data,
             || r.title_len >= sizeof(text->title)
             || r.author_len >= sizeof(text->author)
             || r.subjects_len >= sizeof(text->subjects)
+            || r.series_len >= sizeof(text->series)
             || read(fd, path, r.path_len) != r.path_len
             || read(fd, title, r.title_len) != r.title_len
             || read(fd, author, r.author_len) != r.author_len
-            || read(fd, subjects, r.subjects_len) != r.subjects_len)
+            || read(fd, subjects, r.subjects_len) != r.subjects_len
+            || read(fd, series, r.series_len) != r.series_len)
             break;
         path[r.path_len] = '\0';
         title[r.title_len] = '\0';
         author[r.author_len] = '\0';
         subjects[r.subjects_len] = '\0';
+        series[r.series_len] = '\0';
+        e.series_pos = r.series_pos;
         e.parts = r.parts;
         e.cover_at = r.cover_at;
         e.cover_csize = r.cover_csize;
@@ -141,7 +147,7 @@ struct book_work
 {
     struct book_old old[BOOK_INDEX_MAX];
     uint8_t copy[sizeof(struct book_rec) + MAX_PATH + TS_BOOK_TITLE
-                 + TS_BOOK_AUTHOR + TS_BOOK_SUBJECTS];
+                 + TS_BOOK_AUTHOR + TS_BOOK_SUBJECTS + TS_BOOK_SERIES];
     uint8_t arena[TS_ARENA_ZIP];
 };
 
@@ -169,7 +175,7 @@ static void load_old(void)
            && read(old_fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
     {
         size_t len = sizeof(r) + r.path_len + r.title_len + r.author_len
-                     + r.subjects_len;
+                     + r.subjects_len + r.series_len;
         struct book_old *o = &work->old[old_count++];
 
         if (len > sizeof(work->copy))
@@ -253,12 +259,15 @@ static bool write_new(const char *path, uint64_t key, unsigned long size,
     r.title_len = strlen(b.title);
     r.author_len = strlen(b.author);
     r.subjects_len = strlen(b.subjects);
+    r.series_len = strlen(b.series);
+    r.series_pos = (uint16_t)MIN(MAX(b.series_pos, 0), UINT16_MAX);
     return libfile_write(&writer, &r, sizeof(r), sizeof(r))
            && libfile_write(&writer, path, r.path_len, r.path_len)
            && libfile_write(&writer, b.title, r.title_len, r.title_len)
            && libfile_write(&writer, b.author, r.author_len, r.author_len)
            && libfile_write(&writer, b.subjects, r.subjects_len,
-                            r.subjects_len);
+                            r.subjects_len)
+           && libfile_write(&writer, b.series, r.series_len, r.series_len);
 }
 
 void book_index_found(const char *path, unsigned long size,

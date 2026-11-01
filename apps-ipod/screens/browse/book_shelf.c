@@ -243,11 +243,13 @@ static struct tagcache_search_clause spoken_clause = {
     .str = NULL,
 };
 
+/* On the stack, not static: Listening Stats asks from the background
+ * thread as well as the UI's */
 bool book_shelf_is_last_track(const char *book, uint64_t track)
 {
     struct tagcache_search tcs;
-    static char file[MAX_PATH];
-    static char id[BOOK_ID_MAX];
+    char file[MAX_PATH];
+    char id[BOOK_ID_MAX];
     struct tagcache_album al;
     uint64_t want = book_resume_key(book);
     uint32_t last = 0, mine = 0;
@@ -1239,7 +1241,7 @@ static bool book_menu(const char *book, const char *name)
     static const struct context_menu_row marks =
         { LANG_BOOKMARK_MENU,    menu_bookmarks,       false };
     static const struct context_menu_row progress =
-        { LANG_LISTEN_PROGRESS,  menu_listen_progress, false };
+        { LANG_LISTENING_STATS,  menu_listen_progress, false };
     static const struct context_menu_row tail[] = {
         { LANG_BOOK_INFO,        menu_info,            false },
         { LANG_SHOW_IN_FILES,    menu_show_in_files,   true },
@@ -1252,7 +1254,7 @@ static bool book_menu(const char *book, const char *name)
     rows[n++] = mark;
     if (book_marks_any(book))
         rows[n++] = marks;
-    /* A file with no album has no figures for Listening Progress to give */
+    /* A file with no album has no figures for Listening Stats to give */
     if (menu_seek >= 0)
         rows[n++] = progress;
     rows[n++] = tail[0];

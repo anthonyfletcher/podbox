@@ -57,10 +57,15 @@ MENUITEM_SETTING_W_LABEL(ff_rewind_min_step,
                          ID2P(LANG_FFRW_STEP_SHORT), NULL);
 MENUITEM_SETTING(rewind_across_tracks, &global_settings.rewind_across_tracks, NULL);
 MENUITEM_SETTING(resume_rewind, &global_settings.resume_rewind, NULL);
+MENUITEM_SETTING(spoken_resume_rewind, &global_settings.spoken_resume_rewind,
+                 NULL);
 MENUITEM_SETTING(pause_rewind, &global_settings.pause_rewind, NULL);
+MENUITEM_SETTING(spoken_pause_rewind, &global_settings.spoken_pause_rewind,
+                 NULL);
 MAKE_MENU(ff_rewind_settings_menu, ID2P(LANG_WIND_MENU), 0, Icon_NOICON,
           &ff_rewind_min_step, &ff_rewind_accel, &rewind_across_tracks,
-          &resume_rewind, &pause_rewind);
+          &resume_rewind, &spoken_resume_rewind, &pause_rewind,
+          &spoken_pause_rewind);
 static int buffermargin_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)

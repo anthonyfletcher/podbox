@@ -359,6 +359,16 @@ rather than restarting mid-word.
 Backs up a few seconds every time you unpause, so you hear a little of what came
 before rather than restarting mid-word.
 
+[spoken word resume rewind]
+Rewind Before Resume for audiobooks and podcasts alone, so a book can back up
+a few seconds while music starts where it stopped. Same as Music uses Rewind
+Before Resume.
+
+[spoken word rewind on pause]
+Rewind on Pause for audiobooks and podcasts alone, so a book can back up a few
+seconds while music carries on where it paused. Same as Music uses Rewind on
+Pause.
+
 [beep]
 A short beep when skipping tracks, as feedback that the press registered.
 

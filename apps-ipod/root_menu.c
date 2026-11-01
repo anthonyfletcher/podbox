@@ -57,6 +57,7 @@
 #include "dircache.h"                 /* whether the file search has a source */
 #include "screens/browse/album_charts.h"
 #include "screens/browse/book_shelf.h"
+#include "screens/browse/listen_progress.h"   /* every book's stats */
 #include "games/quiz/quiz.h"
 #include "screens/browse/featured_artists.h"
 #include "screens/browse/browser_flat.h"
@@ -472,7 +473,8 @@ static int browser(void* param)
             if (ret_val == GO_TO_BOOK_SHELF || ret_val == GO_TO_ALBUM_CHARTS
                 || ret_val == GO_TO_DB_SEARCH
                 || ret_val == GO_TO_FEATURED_ARTISTS
-                || ret_val == GO_TO_MUSIC_QUIZ)
+                || ret_val == GO_TO_MUSIC_QUIZ
+                || ret_val == GO_TO_LISTEN_STATS)
             {
                 row_slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
                 row_dirlevel = tc->dirlevel;
@@ -849,6 +851,12 @@ static int playback_viewer_scrn(void* param)
     return pv_row_screen();
 }
 
+static int listen_stats_scrn(void* param)
+{
+    (void)param;
+    return listen_progress_show_books();
+}
+
 static int music_quiz_scrn(void* param)
 {
     (void)param;
@@ -916,6 +924,7 @@ static const struct root_items items[] = {
     [GO_TO_PODCASTS] = { browser, (void*)GO_TO_PODCASTS, &tagcache_menu },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
     [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
+    [GO_TO_LISTEN_STATS] = { listen_stats_scrn, NULL, &tagcache_menu },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
 /* One reserved slot per tagnavi.config root-menu tag-browse row (see
  * GO_TO_TAGNAVI_FIRST in root_menu.h); all share the same dispatch function
@@ -1598,11 +1607,52 @@ static int write_key(char *buf, int buf_len, bool off, int idx)
     return written >= buf_len ? buf_len - 1 : written;
 }
 
+/* Whether 'item', a row Segregate owns, is out of the menu only because the
+ * library holds none of its kind: not there, not turned off, its setting
+ * Auto. Saved as shown, or a save made meanwhile would turn it off. */
+static bool auto_absent(const struct menu_item_ex *item, unsigned count)
+{
+    bool on;
+    int kind;
+
+    if (item == NULL)
+        return false;
+    if (item == &podcasts_item)
+    {
+        on = global_settings.segregate_podcasts;
+        kind = 2;
+    }
+    else if (item == audiobooks_item())
+    {
+        on = global_settings.segregate_audiobooks;
+        kind = 1;
+    }
+    else
+        return false;
+    return on && !spoken_held(kind) && root_menu_find(item, count) >= count
+           && root_menu_off_find(item) < 0;
+}
+
+static void write_shown(char **buf, int *buf_len,
+                        const struct menu_item_ex *item)
+{
+    for (unsigned j = 0; j < MAX_MENU_ITEMS && *buf_len > 0; j++)
+        if (menu_table[j].item == item)
+        {
+            int written = write_key(*buf, *buf_len, false, j);
+
+            *buf_len -= written;
+            *buf += written;
+            return;
+        }
+}
+
 char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
 {
     (void)setting;
     unsigned i, written, j;
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
+    const struct menu_item_ex *books = audiobooks_item();
 
     for (i = 0; i <= count; i++)
     {
@@ -1641,6 +1691,15 @@ char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
                 break;
             }
         }
+
+        /* The rows Auto keeps out for now, where they would stand */
+        if (root_menu__[i] == &db_browser && auto_absent(books, count))
+            write_shown(&buf, &buf_len, books);
+        if ((root_menu__[i] == books
+             || (root_menu__[i] == &db_browser
+                 && root_menu_find(books, count) >= count))
+            && auto_absent(&podcasts_item, count))
+            write_shown(&buf, &buf_len, &podcasts_item);
     }
     return buf;
 }
@@ -2032,15 +2091,17 @@ void root_menu(void)
             case MENU_SELECTED_EXIT:
                 /* fall through */
             case GO_TO_ROOT:
+                /* The library may have gained or lost its books since:
+                 * before the cursor is placed, which a row added or taken
+                 * away above it would move */
+                audiobooks_row(global_settings.segregate_audiobooks, false);
+                podcasts_row(global_settings.segregate_podcasts, false);
                 if (last_screen != GO_TO_ROOT)
                     selected = get_selection(last_screen);
                 global_status.last_screen = GO_TO_ROOT; /* We've returned to ROOT */
                 /* When we are in the main menu we want the hardware BACK
                  * button to be handled by HOST instead of rockbox */
                 ignore_back_button_stub(true);
-                /* The library may have gained or lost its books since */
-                audiobooks_row(global_settings.segregate_audiobooks, false);
-                podcasts_row(global_settings.segregate_podcasts, false);
 
                 next_screen = do_menu(&root_menu_, &selected, NULL, false);
 

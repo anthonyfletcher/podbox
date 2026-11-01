@@ -64,6 +64,10 @@
 #include "files/zip_member.h"
 #include "crc32.h"
 #include "audio/sound_feedback.h"   /* keyclick_click */
+#include "metadata/book_marks.h"
+#include "rbunicode.h"          /* utf8decode, a mark's label */
+#include "metadata/book_resume.h"       /* book_resume_key */
+#include "widgets/yesno.h"
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -3394,6 +3398,177 @@ static void tv_open_at(int part, off_t off)
         tv_resume_to(off);
 }
 
+/* ---- bookmarks -------------------------------------------------------- */
+
+/* The first words of the page on screen, which a mark is listed by:
+ * pictures' and notes' references left out, headings kept */
+static void tv_mark_label(char *buf, size_t size)
+{
+    const unsigned char *p, *end;
+    size_t n = 0, cut = 0;
+    bool hidden = false, gap = false;
+
+    buf[0] = '\0';
+    if (tv.pos < tv.win_start || size < 8)
+        return;
+    p = (const unsigned char *)tv.win + (tv.pos - tv.win_start);
+    end = (const unsigned char *)tv.win + tv.win_len;
+    while (p < end && n < 40)
+    {
+        const unsigned char *at = p;
+        ucschar_t c;
+
+        p = utf8decode(p, &c);
+        if (c == TS_PICTURE_OPEN || c == TS_NOTE_OPEN)
+            hidden = true;
+        else if (c == TS_PICTURE_CLOSE || c == TS_NOTE_CLOSE)
+            hidden = false;
+        if (hidden || (c >= 0xE000 && c <= 0xF8FF))
+            continue;
+        if (c <= ' ')
+        {
+            gap = n > 0;
+            continue;
+        }
+        if (gap)
+        {
+            cut = n;
+            buf[n++] = ' ';
+            gap = false;
+        }
+        if (n + (p - at) + 4 >= size)
+            break;
+        memcpy(buf + n, at, p - at);
+        n += p - at;
+    }
+    if (p < end && cut > 0)
+        n = cut;                        /* at a word's end, then ... */
+    if (p < end && n + 4 < size)
+    {
+        memcpy(buf + n, "\xe2\x80\xa6", 3);
+        n += 3;
+    }
+    buf[n] = '\0';
+}
+
+bool text_viewer_reading(void)
+{
+    return tv.src != NULL && !tv_listing;
+}
+
+bool text_viewer_has_marks(void)
+{
+    return text_viewer_reading() && book_marks_any(tv.path);
+}
+
+int text_viewer_add_bookmark(void)
+{
+    char label[BOOK_MARK_LABEL_MAX];
+
+    tv_mark_label(label, sizeof(label));
+    splash(HZ, book_marks_add_labelled(book_resume_key(tv.path), tv.path,
+                                       tv.part, tv.pos, label)
+               ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
+               : ID2P(LANG_BOOKMARK_CREATE_FAILURE));
+    return 0;
+}
+
+/* The marks of the book at 'path', listed; one picked into *part and *off */
+struct tv_marks
+{
+    int n;
+    long part[TV_MARKS_MAX];
+    long off[TV_MARKS_MAX];
+    char label[TV_MARKS_MAX][BOOK_MARK_LABEL_MAX];
+};
+
+static bool tv_mark_one(const struct book_mark *m, void *data)
+{
+    struct tv_marks *t = data;
+
+    if (t->n == TV_MARKS_MAX)
+        return false;
+    t->part[t->n] = m->elapsed;
+    t->off[t->n] = m->offset;
+    strmemccpy(t->label[t->n], m->label, sizeof(t->label[0]));
+    t->n++;
+    return true;
+}
+
+static const char *tv_mark_name(int item, void *data, char *buf, size_t len)
+{
+    (void)buf; (void)len;
+    return ((struct tv_marks *)data)->label[item];
+}
+
+/* Hold Select on a mark deletes it, after asking */
+static const char *tv_marks_path;
+static int tv_marks_action(int action, struct gui_synclist *lists)
+{
+    struct tv_marks *t = lists->data;
+    int sel = gui_synclist_get_sel_pos(lists);
+
+    if (action != ACTION_STD_CONTEXT || sel < 0 || sel >= t->n)
+        return action;
+    if (yesno_pop(ID2P(LANG_REALLY_DELETE))
+        && book_marks_delete(tv_marks_path, tv_marks_path, t->part[sel]))
+    {
+        /* Gone from the file: the list closes rather than show it */
+        return ACTION_STD_CANCEL;
+    }
+    return ACTION_REDRAW;
+}
+
+/* 1 a mark picked, 0 none, MENU_ATTACHED_USB */
+static int tv_pick_mark(const char *path, long *part, long *off)
+{
+    static struct tv_marks t;
+    struct simplelist_info info;
+
+    t.n = 0;
+    tv_marks_path = path;
+    book_marks_each(path, tv_mark_one, &t);
+    if (!t.n)
+    {
+        splash(HZ, ID2P(LANG_BOOKMARK_LOAD_EMPTY));
+        return 0;
+    }
+    simplelist_info_init(&info, str(LANG_BOOKMARK_MENU), t.n, &t);
+    info.get_name = tv_mark_name;
+    info.action_callback = tv_marks_action;
+    if (simplelist_show_list(&info))
+        return MENU_ATTACHED_USB;
+    if (info.selection < 0 || info.selection >= t.n)
+        return 0;
+    *part = t.part[info.selection];
+    *off = t.off[info.selection];
+    return 1;
+}
+
+int text_viewer_bookmarks(void)
+{
+    long part, off;
+    int rc = tv_pick_mark(tv.path, &part, &off);
+
+    if (rc == 1)
+        tv_reopen(part, (off_t)off);
+    return rc;
+}
+
+/* Set by text_viewer_at_mark() for the next text_viewer(): where to open */
+static bool tv_mark_pending;
+static long tv_mark_part, tv_mark_off;
+
+int text_viewer_at_mark(const char *file)
+{
+    int rc = tv_pick_mark(file, &tv_mark_part, &tv_mark_off);
+
+    if (rc != 1)
+        return rc == MENU_ATTACHED_USB ? GO_TO_ROOT : GO_TO_PREVIOUS;
+    tv_mark_pending = true;
+    return text_viewer(file);
+}
+
 /* Set by text_viewer_chapters() for the next text_viewer() */
 static bool tv_open_contents;
 
@@ -3447,6 +3622,12 @@ int text_viewer(const char *file)
     }
 
     resume = tv_resume_load(file, tv.file_size, &part);
+    if (tv_mark_pending)
+    {
+        tv_mark_pending = false;
+        part = tv_mark_part;
+        resume = tv_mark_off;
+    }
     /* Before the pages to the saved place are laid out, which see headings */
     tv_heads_seen = false;
     tv_open_at(part, resume);

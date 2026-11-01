@@ -47,6 +47,7 @@ database/db_episode.c
 database/unreadable.c
 metadata/book_marks.c
 metadata/book_resume.c
+metadata/listen_stats.c
 screens/browse/browser_db.c
 screens/browse/album_charts.c
 screens/browse/featured_artists.c

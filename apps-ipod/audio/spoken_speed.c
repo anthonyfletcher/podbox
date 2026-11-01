@@ -27,6 +27,20 @@ bool spoken_word_track(const struct mp3entry *id3)
     return id3 != NULL && db_spoken_is_spoken_genre(id3->genre_string);
 }
 
+int spoken_resume_rewind(const struct mp3entry *id3)
+{
+    return global_settings.spoken_resume_rewind >= 0 && spoken_word_track(id3)
+           ? global_settings.spoken_resume_rewind
+           : global_settings.resume_rewind;
+}
+
+int spoken_pause_rewind(const struct mp3entry *id3)
+{
+    return global_settings.spoken_pause_rewind >= 0 && spoken_word_track(id3)
+           ? global_settings.spoken_pause_rewind
+           : global_settings.pause_rewind;
+}
+
 bool spoken_speed_playing(void)
 {
     return (audio_status() & AUDIO_STATUS_PLAY)

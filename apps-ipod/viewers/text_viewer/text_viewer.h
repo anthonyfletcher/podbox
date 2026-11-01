@@ -29,6 +29,17 @@ int text_viewer_contents(void);
  * without one it closes, unread */
 int text_viewer_chapters(const char *file);
 
+/* Bookmarks. While a book is open in the reader: whether one is, and the
+ * menu's two rows -- a mark at the page, and the book's marks, a pick going
+ * there (1), MENU_ATTACHED_USB on USB. From the Books screen, the book's
+ * marks and the book opened at the one picked; a GO_TO_* code. */
+#define TV_MARKS_MAX 64
+bool text_viewer_reading(void);
+bool text_viewer_has_marks(void);
+int text_viewer_add_bookmark(void);
+int text_viewer_bookmarks(void);
+int text_viewer_at_mark(const char *file);
+
 /* Path of the most recently read document, for a caller that wants to reopen
  * it. False if nothing has been read, or the record is unusable. The document
  * may since have been deleted; the caller checks. */

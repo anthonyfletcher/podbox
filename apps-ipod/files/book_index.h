@@ -1,8 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to book_index.c: the title, author, subjects and cover of
- * every ebook.
+ * Interface to book_index.c: the title, author, subjects, series and cover
+ * of every ebook.
  ****************************************************************************/
 #ifndef _BOOK_INDEX_H
 #define _BOOK_INDEX_H
@@ -16,13 +16,16 @@
 #define BOOK_INDEX_WORK_BYTES (160 * 1024)
 
 /* One book. title and author are empty where the book names none, and
- * subjects too, else one to a line. */
+ * subjects too, else one to a line; series too, its place in it
+ * series_pos (ts_book's). */
 struct book_entry
 {
     const char *path;
     const char *title;
     const char *author;
     const char *subjects;
+    const char *series;
+    int series_pos;
     int parts;                  /* spine items */
     long cover_at;              /* the cover's offset in the file, or -1 */
     uint32_t cover_csize;       /* its size as stored */
@@ -55,6 +58,7 @@ struct book_index_text
     char title[TS_BOOK_TITLE];
     char author[TS_BOOK_AUTHOR];
     char subjects[TS_BOOK_SUBJECTS];
+    char series[TS_BOOK_SERIES];
 };
 
 /* Every indexed book, until `fn` returns false. The strings are in `text`,

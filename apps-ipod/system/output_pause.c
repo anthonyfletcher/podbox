@@ -19,6 +19,7 @@
 #include "kernel.h"
 #include "events.h"
 #include "audio.h"
+#include "audio/spoken_speed.h"   /* spoken_pause_rewind */
 #include "pcm.h"
 #include "pcm_sink.h"
 #include "settings/settings.h"
@@ -60,7 +61,8 @@ static void note_pause(enum paused_by by)
 static bool still_ours(enum paused_by by)
 {
     unsigned long now = elapsed();
-    unsigned long slack = 2000 + global_settings.pause_rewind * 1000;
+    unsigned long slack = 2000
+                          + spoken_pause_rewind(audio_current_track()) * 1000;
 
     return paused_by == by && (audio_status() & AUDIO_STATUS_PAUSE) &&
            playlist_get_display_index() == paused_index &&

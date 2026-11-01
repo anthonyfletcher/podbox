@@ -20,6 +20,11 @@ struct mp3entry;
 /* Whether 'id3' is spoken word, by its genre: what Spoken Word Speed and
  * Spoken Word Skip Length apply to */
 bool spoken_word_track(const struct mp3entry *id3);
+
+/* The seconds Rewind Before Resume and Rewind on Pause back up for 'id3':
+ * their spoken-word values for spoken word, unless Same as Music */
+int spoken_resume_rewind(const struct mp3entry *id3);
+int spoken_pause_rewind(const struct mp3entry *id3);
 /* The audio thread, before the codec decodes 'id3': its speed */
 void spoken_speed_track(const struct mp3entry *id3);
 

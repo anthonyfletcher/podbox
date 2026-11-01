@@ -210,6 +210,14 @@ static int book_tag(void *ud, const char *tag, const char *text, bs_off_t end)
             for (u = s; *u; u++)
                 if (*u == '_') *u = ' ';
             ts_book_subject(b->out, s);
+        } else if (fb2_is(tag, "sequence") && !close &&
+                   !b->out->series[0]) {
+            char s[TS_BOOK_SERIES];
+
+            if (fb2_attr(tag, "name", s, sizeof s))
+                fb2_text(b->out->series, sizeof b->out->series, s, b->cs);
+            if (fb2_attr(tag, "number", s, sizeof s))
+                b->out->series_pos = ts_series_pos(s);
         } else if (fb2_is(tag, "coverpage")) {
             b->in_cover = !close;
         } else if (b->in_cover && !close && fb2_is(tag, "image") &&

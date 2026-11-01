@@ -85,7 +85,7 @@
 #include "metadata.h"
 #include "skin/wps_internals.h"
 #include "speech/talk.h"
-#include "audio/spoken_speed.h"   /* spoken_word_track */
+#include "audio/spoken_speed.h"   /* spoken_word_track, the rewinds */
 
 #define FF_REWIND_MAX_PERCENT 3 /* cap ff/rewind step size at max % of file */
                                 /* 3% of 30min file == 54s step size */
@@ -141,9 +141,11 @@ void wps_do_action(enum wps_do_action_type action, bool updatewps)
     {
         audio_pause();
 
-        if (global_settings.pause_rewind) {
+        int rewind = spoken_pause_rewind(audio_current_track());
+
+        if (rewind) {
             unsigned long elapsed = audio_current_track()->elapsed;
-            long newpos = elapsed - (global_settings.pause_rewind * 1000);
+            long newpos = elapsed - (rewind * 1000);
 
             audio_pre_ff_rewind();
             audio_ff_rewind(newpos > 0 ? newpos : 0);

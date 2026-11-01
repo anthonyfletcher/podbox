@@ -138,7 +138,9 @@ Settings
 | Acceleration | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | Normal | **Adv** |
 | Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | No | **Adv** |
 | Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | Off | **Adv** |
+| Spoken Word Rewind Before Resume | Rewind Before Resume for audiobooks and podcasts alone, so a book can back up a few seconds while music starts where it stopped. Same as Music uses Rewind Before Resume. | Same as Music | **Adv** |
 | Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | Off | **Adv** |
+| Spoken Word Rewind on Pause | Rewind on Pause for audiobooks and podcasts alone, so a book can back up a few seconds while music carries on where it paused. Same as Music uses Rewind on Pause. | Same as Music | **Adv** |
 
 ### Playback — Crossfade
 

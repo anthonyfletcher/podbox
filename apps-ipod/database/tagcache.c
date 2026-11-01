@@ -5863,8 +5863,9 @@ static size_t ramcache_size(struct master_header *tcmh)
     return size;
 }
 
-/* Set by the last allocate_tagcache() that found no room for the RAM copy;
- * cleared by one that did. */
+/* Set by the last allocate_tagcache() that found no room for the RAM copy,
+ * or by a load into the room it found that failed; cleared by the next one
+ * that finds room. */
 static bool ram_refused;
 
 bool tagcache_ram_refused(void)
@@ -7010,6 +7011,7 @@ static void load_ramcache(void)
          * disk-based access. Do not set tc_stat.ready = false here;
          * the on-disk database may still be valid and usable. */
         free_ramcache();
+        ram_refused = true;
     }
 
     cpu_boost(false);
