@@ -22,8 +22,9 @@ struct menu_table {
 
 struct menu_table *root_menu_get_options(int *nb_options);
 /* Add or remove the Audiobooks and Podcasts rows, which Segregate Audiobooks
- * and Segregate Podcasts own -- see root_menu_set_audiobooks_row() for why the
- * setting rather than Customize Main Menu decides whether they are there. */
+ * and Segregate Podcasts own, while the library holds that kind -- see
+ * spoken_row() for why the setting rather than Customize Main Menu decides
+ * whether they are there. */
 void root_menu_set_audiobooks_row(bool on);
 void root_menu_set_podcasts_row(bool on);
 /* %Lk of a row that does not open a menu: a Music row on the main menu says

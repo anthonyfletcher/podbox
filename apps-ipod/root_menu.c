@@ -50,6 +50,7 @@
 #include "playlist/catalog.h"
 #include "screens/settings/exported_settings.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"    /* whether the library holds any */
 #include "screens/covers/album_covers.h"
 #include "screens/system/db_search.h"
 #include "screens/system/file_search.h"
@@ -1348,8 +1349,8 @@ static void root_menu_fixup_tagnavi_slots(void)
 }
 
 /* Segregate Audiobooks owns the Audiobooks row: one setting, one feature.
- * Turning the setting on puts the row in the main menu and turning it off
- * takes it away, so nobody has to visit Customize Main Menu to finish
+ * Auto puts the row in the main menu while the library holds any books and
+ * Off takes it away, so nobody has to visit Customize Main Menu to finish
  * switching the thing on.
  *
  * Customize Main Menu still lists it, which is deliberate -- that screen is
@@ -1431,12 +1432,21 @@ static struct menu_item_ex *audiobooks_item(void)
         menu_table[MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS + slot].item;
 }
 
+/* Whether the library holds spoken word of 'kind', counting genres not read
+ * yet as holding it: a row shown for nothing beats one missing at boot */
+static bool spoken_held(int kind)
+{
+    int held = db_spoken_kinds_held();
+
+    return held < 0 || (held & (1 << kind));
+}
+
 static void audiobooks_row(bool on, bool unhide)
 {
     struct menu_item_ex *books = audiobooks_item();
 
     if (books)
-        spoken_row(books, &db_browser, on, unhide);
+        spoken_row(books, &db_browser, on && spoken_held(1), unhide);
 }
 
 /* After Audiobooks where that is on, else after Music */
@@ -1444,7 +1454,7 @@ static void podcasts_row(bool on, bool unhide)
 {
     if (audiobooks_item())
         spoken_row((struct menu_item_ex *)&podcasts_item, audiobooks_item(),
-                   on, unhide);
+                   on && spoken_held(2), unhide);
 }
 
 void root_menu_set_audiobooks_row(bool on)
@@ -2028,6 +2038,9 @@ void root_menu(void)
                 /* When we are in the main menu we want the hardware BACK
                  * button to be handled by HOST instead of rockbox */
                 ignore_back_button_stub(true);
+                /* The library may have gained or lost its books since */
+                audiobooks_row(global_settings.segregate_audiobooks, false);
+                podcasts_row(global_settings.segregate_podcasts, false);
 
                 next_screen = do_menu(&root_menu_, &selected, NULL, false);
 

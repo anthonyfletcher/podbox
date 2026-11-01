@@ -22839,7 +22839,7 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_PROGRESS
-  desc: a row of the Audiobooks and Books menus: the books in progress
+  desc: a row of the Audiobooks, Books and Podcasts menus: the books or episodes in progress
   user: core
   <source>
     *: "In Progress"
@@ -22853,7 +22853,7 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_NEW
-  desc: a row of the Audiobooks and Books menus: the books not started
+  desc: a row of the Audiobooks, Books and Podcasts menus: the books or episodes not started
   user: core
   <source>
     *: "Not Started"
@@ -22867,7 +22867,7 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_SHELF_ROW_FINISHED
-  desc: a row of the Audiobooks and Books menus: the books finished
+  desc: a row of the Audiobooks, Books and Podcasts menus: the books or episodes finished
   user: core
   <source>
     *: "Finished"
@@ -26705,58 +26705,58 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_PLAYED
-  desc: in a podcast episode's context menu: count it as heard
+  desc: deprecated
   user: core
   <source>
-    *: "Mark as Played"
+    *: none
   </source>
   <dest>
-    *: "Mark as Played"
+    *: none
   </dest>
   <voice>
-    *: "Mark as Played"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_UNPLAYED
-  desc: in a podcast episode's context menu: count it as not heard
+  desc: deprecated
   user: core
   <source>
-    *: "Mark as Unplayed"
+    *: none
   </source>
   <dest>
-    *: "Mark as Unplayed"
+    *: none
   </dest>
   <voice>
-    *: "Mark as Unplayed"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_OLDER
-  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  desc: in a podcast episode's context menu: mark every older episode of the list Finished
   user: core
   <source>
-    *: "Mark Older as Played"
+    *: "Mark Older as Finished"
   </source>
   <dest>
-    *: "Mark Older as Played"
+    *: "Mark Older as Finished"
   </dest>
   <voice>
-    *: "Mark Older as Played"
+    *: "Mark Older as Finished"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_ALL
-  desc: in a podcast show's context menu: count every episode as heard
+  desc: in a podcast show's context menu: mark every episode Finished
   user: core
   <source>
-    *: "Mark All as Played"
+    *: "Mark All as Finished"
   </source>
   <dest>
-    *: "Mark All as Played"
+    *: "Mark All as Finished"
   </dest>
   <voice>
-    *: "Mark All as Played"
+    *: "Mark All as Finished"
   </voice>
 </phrase>
 <phrase>
@@ -26848,18 +26848,18 @@
   desc: in a podcast show's context menu: delete the files of its finished episodes
   user: core
   <source>
-    *: "Delete Played Episodes"
+    *: "Delete Finished Episodes"
   </source>
   <dest>
-    *: "Delete Played Episodes"
+    *: "Delete Finished Episodes"
   </dest>
   <voice>
-    *: "Delete Played Episodes"
+    *: "Delete Finished Episodes"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_DELETED_N
-  desc: splash after Delete Played Episodes; %d is how many files went
+  desc: splash after Delete Finished Episodes; %d is how many files went
   user: core
   <source>
     *: "Episodes deleted: %d"
@@ -27251,44 +27251,44 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_PROGRESS
-  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  desc: deprecated
   user: core
   <source>
-    *: "[In Progress]"
+    *: none
   </source>
   <dest>
-    *: "[In Progress]"
+    *: none
   </dest>
   <voice>
-    *: "In progress"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_NEW
-  desc: a row above the Podcasts list of shows: the episodes not started
+  desc: deprecated
   user: core
   <source>
-    *: "[Not Started]"
+    *: none
   </source>
   <dest>
-    *: "[Not Started]"
+    *: none
   </dest>
   <voice>
-    *: "Not started"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_FINISHED
-  desc: a row above the Podcasts list of shows: the episodes finished
+  desc: deprecated
   user: core
   <source>
-    *: "[Finished]"
+    *: none
   </source>
   <dest>
-    *: "[Finished]"
+    *: none
   </dest>
   <voice>
-    *: "Finished"
+    *: none
   </voice>
 </phrase>
 <phrase>

@@ -20,9 +20,9 @@ bool db_spoken_is_podcast_genre(const char *genre);
 /* Whether 'genre' names a book: spoken word, not a podcast */
 bool db_spoken_is_book_genre(const char *genre);
 
-/* Whether a track of 'genre' (NULL for none) is an episode of a podcast kept
- * apart by Segregate Podcasts: one that keeps its own place in the database
- * whatever Automatic Resume says. */
+/* Whether a track of 'genre' (NULL for none) is a podcast episode: one that
+ * keeps its own place in the database whatever Automatic Resume or Segregate
+ * Podcasts says. */
 bool db_spoken_is_episode(const char *genre);
 
 /* Read the library's genres and keep the seeks of the spoken-word ones.
@@ -71,6 +71,11 @@ bool db_spoken_group_is_book(int tag, long seek);
  * when every list is music. */
 int db_spoken_apart(void);
 bool db_spoken_kind_apart(int kind);
+
+/* The kinds of spoken word the library holds, as bits 1 << kind, from the
+ * genres it has; -1 before the genres have been read. A genre outlives its
+ * last track until the database is rebuilt. */
+int db_spoken_kinds_held(void);
 
 /* Make 'c' the clause a list keeps its music by: the tracks of no kind kept
  * apart. For a list to insert while db_spoken_apart() is not 0. */

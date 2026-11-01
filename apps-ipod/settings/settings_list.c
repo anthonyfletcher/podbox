@@ -2198,10 +2198,13 @@ const struct settings_list settings[] = {
                   NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_podcastart,
                   LANG_DB_PODCAST_ART, true, "database podcast art", NULL),
-    OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
-                  false, "segregate audiobooks", segregate_audiobooks_callback),
-    OFFON_SETTING(F_BANFROMQS, segregate_podcasts, LANG_SEGREGATE_PODCASTS,
-                  false, "segregate podcasts", segregate_podcasts_callback),
+    /* Auto, saved as "on": kept apart whenever the library holds any */
+    BOOL_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
+                 true, "segregate audiobooks", off_on, LANG_AUTO, LANG_OFF,
+                 segregate_audiobooks_callback),
+    BOOL_SETTING(F_BANFROMQS, segregate_podcasts, LANG_SEGREGATE_PODCASTS,
+                 true, "segregate podcasts", off_on, LANG_AUTO, LANG_OFF,
+                 segregate_podcasts_callback),
     /* 0 leaves the skin's own row height; the bounds stop a hand-edited .cfg
      * giving a row taller than the screen. */
     INT_SETTING(F_THEMESETTING, db_art_row_height, -1, 52,

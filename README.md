@@ -114,24 +114,26 @@ Audiobooks remember where you stopped, with nothing to save by hand, and can liv
 their own.
 
 - Give audiobooks their own main menu entry, and keep them out of Music and the carousels
-  - Off by default. `Settings > Library > Music > Segregate Audiobooks`
-  - A book is a track with the genre "audiobook", "spoken word" or "book"
+  - `Auto` by default, whenever there are audiobooks. `Settings > Library > Music > Segregate Audiobooks`
+  - A book is a track whose genre contains "audiobook", "audio book" or "spoken word", or is
+    "book", "books", "spoken" or "speech"
 - Book covers and author photos beside their rows
   - Theme dependent
   - `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows` (on by default)/`Audiobook Author Art Rows`
 - See which books you have finished, not started or are part-way through
-  - `Audiobooks` has `Search`, `Finished`, `Not Started`, `In Progress`, `By Title` and
-    `By Author`. A list with no books in it is not shown
+  - `Audiobooks` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started`,
+    `By Title` and `By Author` below. A list with no books in it is not shown
   - Choosing a book plays it, from where you left off if you have started it
   - Hold `Select` on a book and select `Mark as...` to move it between the lists. The mark lasts
-    until the book is next played
+    until the book is next played. The same menu has `Listening Progress`, `Book Info` and
+    `Show in Files`
 - Bookmark places in a book to come back to
   - While a book plays, hold `Select` and select `More... > Create Bookmark`
   - A book with bookmarks has a `Bookmarks` row in its menu, in Now Playing's `More...` and when
     you hold `Select` on the book. Choosing one plays the book from there; hold `Select` on one to
     delete it
 - See the chapters of a book held in a single file
-  - Off by default. `Settings > Playback > Chapter Marks`
+  - On by default for audiobooks and podcasts. `Settings > Playback > Chapter Marks`
   - Reads the chapter marks in `.m4b` books and the chapter frames in `.mp3` ones
   - While a book plays, hold `Select` on the Now Playing screen and choose `Browse Chapters`
 - Play audiobooks and podcasts faster or slower without changing the voice, and leave music as it is
@@ -149,16 +151,18 @@ their own.
 Each episode keeps its place, and a show opens on its newest episode.
 
 - Give podcasts their own main menu entry, and keep them out of Music and the carousels
-  - Off by default. `Settings > Library > Music > Segregate Podcasts`
+  - `Auto` by default, whenever there are podcasts. `Settings > Library > Music > Segregate Podcasts`
   - A podcast is a track with the genre "podcast" or "podcasts"
 - Shows listed by name, or the show with the newest episode first
   - `Settings > Library > Music > Sort > Shows By`
-- `Search`, `[In Progress]`, `[Not Started]`, `[Finished]` and `[All Episodes]` above the shows
+- `Podcasts` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started` and
+  `[All Episodes]` below, then the shows
 - A show opens on its newest episode, with `[Play Unplayed]` above it
 - An episode's notes under the list
   - Theme dependent. Scrim shows them, and `Episode Notes` in its Theme Options turns them off
-- Hold `Select` on an episode for `Mark as Played`, `Mark as Unplayed` and `Mark Older as Played`,
-  and on a show for `Mark All as Played` and `Delete Played Episodes`
+- Hold `Select` on an episode for `Mark as...` (`Finished` or `Not started`) and
+  `Mark Older as Finished`, and on a show for `Mark All as Finished` and
+  `Delete Finished Episodes`
 - Show art beside the rows
   - Theme dependent
   - `Settings > Appearance > Interface Elements > Art Rows > Podcast Art Rows` (on by default)
@@ -217,14 +221,15 @@ GIF, WebP and BMP pictures.
 - `Books` on the main menu shows every EPUB, FB2 and Kindle (MOBI, AZW3) book on the player,
   with its cover
   - A MOBI locked to a Kindle account will not open
-  - `Search` finds books by title or author, and `Finished`, `Not Started` and `In Progress`
-    are as `Audiobooks` has them
+  - Opens on `In Progress`, as `Audiobooks` does, with `Search` and `Finished` above it and
+    `Not Started` below. `Search` finds books by title or author. `In Progress` and `Finished`
+    list the book you read last first
   - Press `>>|` on a book's last page and it closes, shown in `Finished`
   - `By Title`, `By Author`, and `By Subject` for the subjects the books name, each book under
     every one of its subjects
-  - Hold `Select` on a book for `Mark as...`, which moves it between the lists, `Book Info`,
-    `Reading Stats` and `Show in Files`
-  - `Reading Stats` shows your time reading, pages a day, reading speed in words a minute, the
+  - Hold `Select` on a book for `Mark as...`, which moves it between the lists, `Browse Chapters`,
+    `Book Info`, `Reading Stats` and `Show in Files`
+  - `Reading Stats`, on a book's menu or at the foot of `Books`, shows your time reading, pages a day, reading speed in words a minute, the
     time left at that speed, when you started and finished, your longest sitting and your best
     streak of days, for one book or for all of them
   - See pictures inside books

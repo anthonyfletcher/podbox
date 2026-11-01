@@ -68,8 +68,8 @@ uint64_t book_resume_key(const char *book);
  * last word is noticed. Once, at boot. */
 void book_resume_init(void);
 
-/* Write down where the playing track is, if it is a book and Segregate
- * Audiobooks is on. Silent about everything else, so a caller does not have
+/* Write down where the playing track is, if it is a book. Silent about
+ * everything else, so a caller does not have
  * to ask what is playing before calling.
  *
  * Also writes down a book whose track played to its end since the last call,

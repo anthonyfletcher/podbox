@@ -759,18 +759,21 @@ kind: the answers start five years apart and end one apart, and they are only
 as right as the year tags.
 
 [segregate audiobooks]
-Keeps audiobooks out of the music and gives them an Audiobooks row on the main
-menu; albums, artists, the carousel and search then show music only. Only the
-genre tag counts: one containing "audiobook", "audio book" or "spoken word",
-or exactly "book", "speech" and the like. Podcasts have their own setting.
+Auto keeps audiobooks out of the music and gives them an Audiobooks row on the
+main menu, whenever the library has any; albums, artists, the carousel and
+search then show music only. Off lists them with the music. Only the genre tag
+counts: one containing "audiobook", "audio book" or "spoken word", or exactly
+"book", "speech" and the like. Podcasts have their own setting.
 
-Books keep their place: open one again under Audiobooks and a Resume row heads
-its chapters. An album with one music track on it stays with the music.
+Books keep their place either way: open one again under Audiobooks and a
+Resume row heads its chapters. An album with one music track stays with the
+music.
 
 [segregate podcasts]
-Keeps podcasts out of the music and gives them a Podcasts row on the main
-menu, listing each show with its newest episode first. A podcast is a track
-whose genre is exactly "Podcast" or "Podcasts". Off, podcasts are music.
+Auto keeps podcasts out of the music and gives them a Podcasts row on the main
+menu, listing each show with its newest episode first, whenever the library
+has any. Off lists them with the music. A podcast is a track whose genre is
+exactly "Podcast" or "Podcasts". Either way, each episode keeps its place.
 
 [trim titles]
 Shortens the album and track names on the now playing screen by dropping a

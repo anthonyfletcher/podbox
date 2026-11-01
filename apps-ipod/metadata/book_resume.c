@@ -56,7 +56,6 @@
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
 #include "screens/browse/book_shelf.h"   /* book_shelf_near_end */
-#include "settings/settings.h"
 #include "system/strutil.h"     /* read_line */
 #include "system/bg_task.h"     /* the save at spin-down runs there */
 #include "ata_idle_notify.h"
@@ -590,8 +589,6 @@ static void track_finish_event(unsigned short id, void *ev_data)
     const char *name;
     (void)id;
 
-    if (!global_settings.segregate_audiobooks)
-        return;
     if (!(te->flags & TEF_AUTO_SKIP) || id3->length == 0)
         return;
     /* The flag outlives the transition it was set for, so a stop partway
@@ -741,8 +738,7 @@ bool book_resume_mark(const char *book, enum book_left left)
     mutex_lock(&book_mutex);
     rekey();
     e.book = book_resume_key(book);
-    if (global_settings.segregate_audiobooks
-        && loaded_book(&name, &loaded) != NULL && loaded == e.book)
+    if (loaded_book(&name, &loaded) != NULL && loaded == e.book)
     {
         if (left == BOOK_LEFT_PARTWAY)
         {
@@ -766,9 +762,6 @@ void book_resume_save(void)
     struct entry cur = { .pos = { .left = BOOK_LEFT_PARTWAY } };
     unsigned long length = 0;
     int discnum = 0, tracknum = 0;
-
-    if (!global_settings.segregate_audiobooks)
-        return;
 
     mutex_lock(&book_mutex);
     rekey();
@@ -853,8 +846,7 @@ static bool book_playing(void)
 {
     const struct mp3entry *id3;
 
-    if (!global_settings.segregate_audiobooks
-        || !(audio_status() & AUDIO_STATUS_PLAY))
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
         return false;
     id3 = audio_current_track();
     return id3 != NULL && db_spoken_is_book_genre(id3->genre_string);

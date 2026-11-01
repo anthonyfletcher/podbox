@@ -2,8 +2,9 @@
  * GNU General Public License (version 2+)
  *
  * The Books screen: every EPUB, FB2 and MOBI on the player, reached through
- * Search, the three lists the Audiobooks shelf has -- Finished, Not started
- * and In progress -- and By Title, By Author and By Subject. A book that
+ * Search, the three lists the Audiobooks shelf has -- Finished, In progress
+ * and Not started, the first two the last read first -- and By Title, By
+ * Author and By Subject. A book that
  * names no author is filed under its folder; one may name several subjects,
  * and is listed under each.
  *
@@ -73,6 +74,7 @@ struct ebook
     int16_t  pct;               /* how far through, or -1 */
     uint8_t  state;             /* enum book_shelf */
     uint8_t  nsubjects;
+    uint16_t recent;            /* 0 the last read; UINT16_MAX never read */
 };
 
 /* The app buffer, claimed while the screen is up: the books, the rows, and
@@ -109,8 +111,8 @@ static const struct
 } top_row[] = {
     { LANG_DB_SEARCH,               SHOW_SEARCH },
     { LANG_BOOK_SHELF_ROW_FINISHED, BOOK_SHELF_FINISHED },
-    { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
     { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
+    { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
     { LANG_BY_TITLE,                SHOW_TITLES },
     { LANG_BY_AUTHOR,               SHOW_AUTHORS },
     { LANG_BY_SUBJECT,              SHOW_SUBJECTS },
@@ -225,13 +227,18 @@ static bool collect_book(const struct book_entry *e, void *data)
         return false;
     b->pct = -1;
     b->state = BOOK_SHELF_NOT_STARTED;
+    b->recent = UINT16_MAX;
     return ++book_ct < EBOOKS_MAX;
 }
 
+/* The places come newest first, so 'data', counting them, is how recently
+ * each was read */
 static bool collect_place(const char *path, int pct, bool finished,
                           void *data)
 {
-    (void)data;
+    int *order = data;
+
+    (*order)++;
     for (int i = 0; i < book_ct; i++)
     {
         struct ebook *b = &books[i];
@@ -239,6 +246,7 @@ static bool collect_place(const char *path, int pct, bool finished,
         if (strcmp(names + b->path, path))
             continue;
         b->state = finished ? BOOK_SHELF_FINISHED : BOOK_SHELF_IN_PROGRESS;
+        b->recent = MIN(*order - 1, UINT16_MAX - 1);
         if (!finished)
             b->pct = MIN(pct, 99);
         break;
@@ -250,6 +258,13 @@ static int compare_rows(const void *a, const void *b)
 {
     return strnatcasecmp(names + books[*(const int *)a].title,
                          names + books[*(const int *)b].title);
+}
+
+static int compare_recent(const void *a, const void *b)
+{
+    int c = books[*(const int *)a].recent - books[*(const int *)b].recent;
+
+    return c ? c : compare_rows(a, b);
 }
 
 static int compare_authors(const void *a, const void *b)
@@ -315,12 +330,13 @@ static void load(void)
 {
     static struct book_index_text text;
     int counts[3] = { 0, 0, 0 };
+    int order = 0;
     bool subjects = false;
 
     book_ct = row_ct = 0;
     names_used = 0;
     book_index_each(collect_book, NULL, &text);
-    text_viewer_each_place(collect_place, NULL);
+    text_viewer_each_place(collect_place, &order);
 
     for (int i = 0; i < book_ct; i++)
     {
@@ -342,6 +358,10 @@ static void load(void)
                 rows[n++] = rows[i];
         row_ct = n;
     }
+    else if (showing == BOOK_SHELF_IN_PROGRESS
+             || showing == BOOK_SHELF_FINISHED)
+        /* The last read first, as the Audiobooks shelves have them */
+        qsort(rows, row_ct, sizeof(*rows), compare_recent);
     else
         /* One author's books are in name order whichever is set */
         qsort(rows, row_ct, sizeof(*rows),

@@ -136,6 +136,7 @@ bool db_spoken_is_spoken_genre(const char *genre)
 static long spoken_seek[SPOKEN_SEEK_MAX];
 static bool spoken_podcast[SPOKEN_SEEK_MAX];   /* that genre is a podcast's */
 static int spoken_ct;
+static bool spoken_read;        /* a build has finished since boot */
 
 /* Cleared by db_spoken_build(), which runs when the commit the tables were
  * read at is no longer the current one -- a commit moves their seeks too. */
@@ -178,6 +179,7 @@ bool db_spoken_build(void)
     }
 
     tagcache_search_finish(&build_tcs);
+    spoken_read = !build_tcs.failed;
 
     logf("db_spoken: %d spoken genres", spoken_ct);
 
@@ -230,8 +232,18 @@ int db_spoken_kind_seek(long genre_seek)
 
 bool db_spoken_is_episode(const char *genre)
 {
-    return global_settings.segregate_podcasts && genre
-           && db_spoken_is_podcast_genre(genre);
+    return db_spoken_is_podcast_genre(genre);
+}
+
+int db_spoken_kinds_held(void)
+{
+    int i, kinds = 0;
+
+    if (!spoken_read)
+        return -1;
+    for (i = 0; i < spoken_ct; i++)
+        kinds |= 1 << (spoken_podcast[i] ? 2 : 1);
+    return kinds;
 }
 
 int db_spoken_apart(void)

@@ -1686,39 +1686,31 @@ static int mark_book_run(void)
 MENUITEM_FUNCTION(mark_book_item, 0, ID2P(LANG_BOOK_MARK_AS),
                   mark_book_run, mark_book_callback, Icon_NOICON);
 
-/* A podcast's episodes: one played or not, those older played, or a show's
- * all played */
-static int episode_mark_lang(void)
-{
-    struct browser_context *c = browser_get_context();
-
-    return browser_db_episode_state(c, c->selected_item)
-           == BROWSER_DB_EPISODE_FINISHED ? LANG_PODCAST_MARK_UNPLAYED
-                                          : LANG_PODCAST_MARK_PLAYED;
-}
-
-static char *episode_mark_name(int selected_item, void *data,
-                               char *buffer, size_t buffer_len)
-{
-    (void)selected_item; (void)data; (void)buffer; (void)buffer_len;
-    return str(episode_mark_lang());
-}
-
-static int episode_mark_speak(int selected_item, void *data)
-{
-    (void)selected_item; (void)data;
-    talk_id(episode_mark_lang(), false);
-    return 0;
-}
-
+/* A podcast's episodes: one marked Finished or Not Started, as a book is
+ * marked, those older finished, or a show's all finished. An episode has no
+ * In Progress mark: its place is what puts it there. */
 static int episode_mark_run(void *param)
 {
     struct browser_context *c = browser_get_context();
     enum browser_db_mark how = (intptr_t)param;
 
-    if (how == BROWSER_DB_MARK_PLAYED && episode_mark_lang()
-                                         == LANG_PODCAST_MARK_UNPLAYED)
-        how = BROWSER_DB_MARK_UNPLAYED;
+    if (how == BROWSER_DB_MARK_PLAYED)
+    {
+        int was = browser_db_episode_state(c, c->selected_item)
+                  == BROWSER_DB_EPISODE_FINISHED;
+        int choice = was;
+
+        MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
+                            ID2P(LANG_BOOKS_NOT_STARTED),
+                            ID2P(LANG_BOOKS_FINISHED));
+        push_current_activity(ACTIVITY_CONTEXTMENU);
+        choice = do_menu(&menu, &choice, NULL, false);
+        if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+            pop_current_activity();
+        if (choice < 0 || choice > 1 || (choice == was && was))
+            return 0;
+        how = choice ? BROWSER_DB_MARK_PLAYED : BROWSER_DB_MARK_UNPLAYED;
+    }
     if (browser_db_mark_episodes(c, c->selected_item, how))
         context_menu_result = ONPLAY_RELOAD_DIR;
     return 0;
@@ -1728,9 +1720,8 @@ static int episode_mark_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list);
 
-MENUITEM_FUNCTION_DYNTEXT_W_PARAM(episode_mark_item, 0, episode_mark_run,
-                  (void *)BROWSER_DB_MARK_PLAYED,
-                  episode_mark_name, episode_mark_speak, NULL,
+MENUITEM_FUNCTION_W_PARAM(episode_mark_item, 0, ID2P(LANG_BOOK_MARK_AS),
+                  episode_mark_run, (void *)BROWSER_DB_MARK_PLAYED,
                   episode_mark_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(episode_older_item, 0,
                   ID2P(LANG_PODCAST_MARK_OLDER), episode_mark_run,
@@ -1878,8 +1869,7 @@ static int wps_marks_callback(int action,
     (void)this_list;
     if (action != ACTION_REQUEST_MENUITEM)
         return action;
-    if (!global_settings.segregate_audiobooks
-        || book_resume_loaded(marks_book, sizeof(marks_book)) == NULL)
+    if (book_resume_loaded(marks_book, sizeof(marks_book)) == NULL)
         return ACTION_EXIT_MENUITEM;
     if (this_item != &wps_mark_create_item && !book_marks_any(marks_book))
         return ACTION_EXIT_MENUITEM;
@@ -2933,7 +2923,7 @@ static const short audiobook_rows[] = {
     LANG_SHOW_IN_FILES,
 };
 static const short podcast_rows[] = {
-    LANG_PODCAST_MARK_PLAYED, LANG_PODCAST_MARK_OLDER, LANG_PODCAST_MARK_ALL,
+    LANG_BOOK_MARK_AS, LANG_PODCAST_MARK_OLDER, LANG_PODCAST_MARK_ALL,
     LANG_PODCAST_DELETE_PLAYED, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL,
     LANG_QUEUE_MENU, LANG_SHOW_IN_FILES,
 };
@@ -3042,8 +3032,6 @@ static int row_lang_id(const struct menu_item_ex *row)
 
         if (row == &sleep_timer_item)
             return LANG_SLEEP_TIMER;
-        if (row == &episode_mark_item)
-            return LANG_PODCAST_MARK_PLAYED;
         if (d->list_get_name == item_row_name)
         {
             int i = item_row_index(d->list_get_name_data);

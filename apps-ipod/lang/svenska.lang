@@ -26717,30 +26717,30 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_PLAYED
-  desc: in a podcast episode's context menu: count it as heard
+  desc: deprecated
   user: core
   <source>
-    *: "Mark as Played"
+    *: none
   </source>
   <dest>
-    *: "Markera som hörd"
+    *: none
   </dest>
   <voice>
-    *: "Markera som hörd"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_UNPLAYED
-  desc: in a podcast episode's context menu: count it as not heard
+  desc: deprecated
   user: core
   <source>
-    *: "Mark as Unplayed"
+    *: none
   </source>
   <dest>
-    *: "Markera som ohörd"
+    *: none
   </dest>
   <voice>
-    *: "Markera som ohörd"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -27263,44 +27263,44 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_PROGRESS
-  desc: a row above the Podcasts list of shows: the episodes started and not finished
+  desc: deprecated
   user: core
   <source>
-    *: "[In Progress]"
+    *: none
   </source>
   <dest>
-    *: "[Påbörjade]"
+    *: none
   </dest>
   <voice>
-    *: "Påbörjade"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_NEW
-  desc: a row above the Podcasts list of shows: the episodes not started
+  desc: deprecated
   user: core
   <source>
-    *: "[Not Started]"
+    *: none
   </source>
   <dest>
-    *: "[Ej påbörjade]"
+    *: none
   </dest>
   <voice>
-    *: "Ej påbörjade"
+    *: none
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_ROW_FINISHED
-  desc: a row above the Podcasts list of shows: the episodes finished
+  desc: deprecated
   user: core
   <source>
-    *: "[Finished]"
+    *: none
   </source>
   <dest>
-    *: "[Avslutade]"
+    *: none
   </dest>
   <voice>
-    *: "Avslutade"
+    *: none
   </voice>
 </phrase>
 <phrase>

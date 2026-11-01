@@ -258,14 +258,12 @@ static bool featured_artists_available(void)
     return global_settings.featured_artists && db_featured_count() > 0;
 }
 
-/* A shelf's row while Segregate Audiobooks keeps the books apart, unless
- * the shelf is empty. Kept where the books cannot be counted. */
+/* A shelf's row, unless the shelf is empty. Kept where the books cannot be
+ * counted. */
 static bool shelf_available(enum book_shelf kind)
 {
     int counts[3];
 
-    if (!global_settings.segregate_audiobooks)
-        return false;
     return !book_shelf_count(counts) || counts[kind] > 0;
 }
 
@@ -417,9 +415,10 @@ static int extra_history[MAX_DIR_LEVELS];
  * special-row count is known. */
 static int pending_top_item = -1;
 
-/* Whether the root menu's first drawn row is Search. Set by load_root(), read
- * once the row count is known -- see browser_db_load(). */
-static bool root_opens_on_search;
+/* The rows a root menu opens past: Search when it is the first drawn row, and
+ * a Finished shelf just below it. Set by load_root(), read once the row count
+ * is known -- see browser_db_load(). */
+static int root_open_row;
 
 /* a few memory alloc helper */
 static int browser_db_handle;
@@ -1790,13 +1789,14 @@ static const char *const builtin_format_lines[] = {
 
 static const char *const builtin_menu_lines[] = {
     /* "spoken" is answered from the genre alone (db_spoken.c): 1 a book, 2 a
-     * podcast. Search leads, so the menu opens one row below it; the three
-     * shelves (book_shelf.c) are built-in rows, each hidden while empty. */
+     * podcast. Search and Finished lead, so the menu opens below them; the
+     * three shelves (book_shelf.c) are built-in rows, each hidden while
+     * empty. */
     "%menu_start \"" BROWSER_DB_MENU_AUDIOBOOKS "\" \"Audiobooks\"",
     "\"Search\" ==> \"db_search\"",
     "\"Finished\" ==> \"book_finished\"",
-    "\"Not Started\" ==> \"book_not_started\"",
     "\"In Progress\" ==> \"book_in_progress\"",
+    "\"Not Started\" ==> \"book_not_started\"",
     "\"By Title\"  -> album       ? spoken == \"1\" -> title = \"fmt_title\"",
     "\"By Author\" -> albumartist ? spoken == \"1\" -> album -> title = "
         "\"fmt_title\"",
@@ -2496,8 +2496,6 @@ static const char *level_book(struct browser_context *c, int level, int tag)
 {
     static char id[BOOK_ID_MAX];
 
-    if (!global_settings.segregate_audiobooks)
-        return NULL;
     if (c->currtable != TABLE_NAVIBROWSE || tag != tag_title)
         return NULL;
     if (!csi || level < 1 || level >= csi->tagorder_count)
@@ -2758,9 +2756,9 @@ static int header_rows_fill(int level, char *buf, long bufsz)
  * the rows above a podcast's shows                                   *
  * ------------------------------------------------------------------ */
 
-/* Above the list of shows: Search, All Episodes and Finished, scrolled off
- * the top, then In Progress and Not Started. Each state row is hidden while
- * it has no episode, and is an <All tracks> row whose seek names the state,
+/* Above the list of shows: Search and Finished, scrolled off the top, then
+ * In Progress, Not Started and [All Episodes]. Each is hidden while it has no
+ * episode, and is an <All tracks> row whose seek names the state,
  * which the track list it opens turns into clauses. */
 enum {
     EPISODES_IN_PROGRESS = 1,
@@ -2773,9 +2771,12 @@ static const struct episode_row {
     int lang_id;
     const char *format;     /* the tagnavi.config %format to list them by */
 } episode_rows[] = {
-    [EPISODES_IN_PROGRESS] = { LANG_PODCAST_ROW_PROGRESS, "fmt_episode_heard" },
-    [EPISODES_NOT_STARTED] = { LANG_PODCAST_ROW_NEW, "fmt_episode_new" },
-    [EPISODES_FINISHED]    = { LANG_PODCAST_ROW_FINISHED, "fmt_episode_heard" },
+    /* The states are named as the Audiobooks and Books shelves name them */
+    [EPISODES_IN_PROGRESS] = { LANG_BOOK_SHELF_ROW_PROGRESS,
+                               "fmt_episode_heard" },
+    [EPISODES_NOT_STARTED] = { LANG_BOOK_SHELF_ROW_NEW, "fmt_episode_new" },
+    [EPISODES_FINISHED]    = { LANG_BOOK_SHELF_ROW_FINISHED,
+                               "fmt_episode_heard" },
     [EPISODES_ALL]         = { LANG_PODCAST_ALL_EPISODES, "fmt_episode_new" },
 };
 
@@ -3301,9 +3302,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                             ID2P(LANG_PODCAST_PLAY_UNPLAYED), -1);
     if (podcast_shows)
     {
-        static const int order[] = { EPISODES_ALL, EPISODES_FINISHED,
+        static const int order[] = { EPISODES_FINISHED,
                                      EPISODES_IN_PROGRESS,
-                                     EPISODES_NOT_STARTED };
+                                     EPISODES_NOT_STARTED, EPISODES_ALL };
 
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
                             ID2P(LANG_DB_SEARCH), DB_SEARCH_PODCAST);
@@ -3804,7 +3805,7 @@ static int load_root(struct browser_context *c)
 
     tc = c;
     c->currtable = TABLE_ROOT;
-    root_opens_on_search = false;
+    root_open_row = 0;
     /* Not while loading the root only to find a row in it: the jump straight
      * into a named album runs load_root_for_shortcut() first, and clearing
      * here wiped the exemption before the browse it exists to protect --
@@ -3901,7 +3902,11 @@ static int load_root(struct browser_context *c)
                     &builtin_rows[menu->items[i]->link];
 
                 if (rows == 0 && b->table == TABLE_DB_SEARCH)
-                    root_opens_on_search = true;
+                    root_open_row = 1;
+                else if (rows == 1 && root_open_row == 1
+                         && b->table == TABLE_BOOK_SHELF
+                         && b->param == BOOK_SHELF_FINISHED)
+                    root_open_row = 2;
 
                 /* The config's label is documentation; this one is
                  * translated. */
@@ -4795,17 +4800,18 @@ int browser_db_load(struct browser_context* c)
      * (settings_scrn() in root_menu.c). A search box as the first row reads as
      * though that is where the library starts, and one flick of the wheel
      * brings it back -- the same treatment the album lists give their special
-     * rows just below.
+     * rows just below. The Audiobooks menu opens past its Finished shelf too,
+     * which is rarely what it is opened for.
      *
      * Only when Search really is the first row: it can be turned off or moved
      * in the Music settings, and a tagnavi_user.config may not have it at all.
      * selected_item == 0 is what tells an opening list from one restoring a
      * position, exactly as it does below. */
-    if (table == TABLE_ROOT && root_opens_on_search
-        && c->selected_item == 0 && count > 1)
+    if (table == TABLE_ROOT && root_open_row > 0
+        && c->selected_item == 0 && count > root_open_row)
     {
-        c->selected_item = 1;
-        pending_top_item = 1;
+        c->selected_item = root_open_row;
+        pending_top_item = root_open_row;
     }
 
     /* Every list shows with its special rows -- <All tracks>, <Random> --
@@ -4823,11 +4829,10 @@ int browser_db_load(struct browser_context* c)
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
         /* A podcast's episodes in progress and not started are what its
-         * list is for; Search, All Episodes and Finished go off the top */
+         * list is for; Search and Finished go off the top */
         int first = table == TABLE_ROOT ? c->special_entry_count
                     : podcast_shows
-                      ? 1 + (episode_counts[EPISODES_ALL] > 0)
-                          + (episode_counts[EPISODES_FINISHED] > 0)
+                      ? 1 + (episode_counts[EPISODES_FINISHED] > 0)
                     : c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
@@ -5216,8 +5221,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         char path[MAX_PATH];
         char book[BOOK_ID_MAX];
         char name[BOOK_KEY_MAX];
-        bool spoken = global_settings.segregate_audiobooks
-                      && csi_mentions_spoken() && csi_spoken_kind() != 2;
+        bool spoken = csi_mentions_spoken() && csi_spoken_kind() != 2;
         bool one;
 
         book[0] = '\0';
@@ -6678,13 +6682,11 @@ bool browser_db_get_book_album(struct browser_context* c, int item,
     struct tagcache_album al;
     bool spoken = browser_db_is_spoken_list(c);
 
-    /* Outside the Audiobooks browse too -- a book Search opened lands in the
-     * music lists -- while books are kept apart, which is when they have a
-     * place to be marked and a position saved. There an album name is a book
-     * only when every album of it is one; in the Audiobooks browse when any
-     * is, as its list shows them. */
-    if (!(spoken || global_settings.segregate_audiobooks)
-        || item < c->special_entry_count
+    /* Outside the Audiobooks browse too: a book Search opened lands in the
+     * music lists, as every book does with Segregate Audiobooks off. There an
+     * album name is a book only when every album of it is one; in the
+     * Audiobooks browse when any is, as its list shows them. */
+    if (item < c->special_entry_count
         || c->currtable != TABLE_NAVIBROWSE
         || !(entry = browser_db_get_entry(c, item)))
         return false;
