@@ -104,7 +104,8 @@ struct aa_stamp
  * has no picture that pass. */
 #define AA_PEOPLE_SLOTS  8192   /* power of two */
 #define AA_LIBDIR_SLOTS  1024   /* power of two */
-#define AA_BOOKDIR_SLOTS 2048   /* power of two */
+#define AA_BOOKDIR_SLOTS 8192   /* power of two: a Calibre library has a
+                                 * folder per book */
 #define AA_CENTRAL_MAX   2048   /* files in /Artwork/People and Covers */
 #define AA_CENTRAL_NAMES (48 * 1024)
 
@@ -173,8 +174,16 @@ static unsigned int aa_fold_key(uint64_t key)
 static struct aa_stamp *aa_stamps;
 static unsigned char *aa_visited;
 static struct aa_person *aa_people;
-static struct aa_libdir *aa_libdirs;
-static struct aa_libdir *aa_bookdirs;
+/* A folder table: library folders, or books' folders. A table that ran out
+ * of room may be missing any folder, so one not in it counts as shared. */
+struct aa_dirs
+{
+    struct aa_libdir *t;
+    unsigned int slots;
+    bool full;
+};
+static struct aa_dirs aa_libdirs = { NULL, AA_LIBDIR_SLOTS, false };
+static struct aa_dirs aa_bookdirs = { NULL, AA_BOOKDIR_SLOTS, false };
 static struct aa_central *aa_central;
 static char *aa_central_names;
 
@@ -777,9 +786,10 @@ static bool aa_was_visited(unsigned int h)
     return false;
 }
 
-/* A folder this pass skipped for want of a slot. Its thumbnails are not
- * orphans, so the pass then removes none. */
-static bool aa_table_full;
+/* Thumbnails this pass could not reach: a folder or person skipped for want
+ * of a slot, or the people step skipped without the database in RAM. They
+ * are not orphans, so the pass then removes none and keeps every stamp. */
+static bool aa_unreached;
 
 /* The slot for 'h' the first time this pass reaches it; NULL if the pass has
  * been here already, or the table is full (the folder is then skipped). */
@@ -790,7 +800,7 @@ static struct aa_stamp *aa_visit(unsigned int h)
 
     if (!s)
     {
-        aa_table_full = true;
+        aa_unreached = true;
         return NULL;
     }
     i = s - aa_stamps;
@@ -1707,21 +1717,24 @@ static struct aa_person *aa_person_get(unsigned int key, bool claim)
             return p;
         }
     }
+    if (claim && !aa_unreached)
+        debug_log(DEBUG_LOG_ARTCACHE, "too many people");
+    aa_unreached |= claim;
     return NULL;
 }
 
-/* The entry of 'dir' in a folder table of 'slots'; with 'who', claimed for
- * them if new */
-static struct aa_libdir *aa_dir_entry(struct aa_libdir *t, unsigned int slots,
-                                      unsigned int dir, unsigned int who)
+/* The entry of 'dir' in folder table 'd'; with 'who', claimed for them if
+ * new */
+static struct aa_libdir *aa_dir_entry(struct aa_dirs *d, unsigned int dir,
+                                      unsigned int who)
 {
     unsigned int i;
 
     if (!dir)
         return NULL;
-    for (i = 0; i < slots; i++)
+    for (i = 0; i < d->slots; i++)
     {
-        struct aa_libdir *l = &t[(dir + i) & (slots - 1)];
+        struct aa_libdir *l = &d->t[(dir + i) & (d->slots - 1)];
 
         if (l->dir == dir)
             return l;
@@ -1734,30 +1747,31 @@ static struct aa_libdir *aa_dir_entry(struct aa_libdir *t, unsigned int slots,
             return l;
         }
     }
+    if (who && !d->full)
+        debug_log(DEBUG_LOG_ARTCACHE, "too many folders");
+    d->full |= who != 0;
     return NULL;
 }
 
 /* 'dir' holds 'who', in a folder table: two of them make 'who' 0 */
-static void aa_dir_note(struct aa_libdir *t, unsigned int slots,
-                        unsigned int dir, unsigned int who)
+static void aa_dir_note(struct aa_dirs *d, unsigned int dir, unsigned int who)
 {
-    struct aa_libdir *l = aa_dir_entry(t, slots, dir, who);
+    struct aa_libdir *l = aa_dir_entry(d, dir, who);
 
     if (l && l->who != who)
         l->who = 0;
 }
 
-static bool aa_dir_shared(struct aa_libdir *t, unsigned int slots,
-                          unsigned int dir)
+static bool aa_dir_shared(struct aa_dirs *d, unsigned int dir)
 {
-    struct aa_libdir *l = aa_dir_entry(t, slots, dir, 0);
+    struct aa_libdir *l = aa_dir_entry(d, dir, 0);
 
-    return l && l->who == 0;
+    return l ? l->who == 0 : d->full;
 }
 
 static bool aa_is_library(unsigned int dir)
 {
-    return aa_dir_shared(aa_libdirs, AA_LIBDIR_SLOTS, dir);
+    return aa_dir_shared(&aa_libdirs, dir);
 }
 
 /* Whether the folder of the book at 'path' stands for the book alone: it
@@ -1769,8 +1783,7 @@ static bool aa_book_folder(const char *path, unsigned int salt,
 {
     const char *end = strrchr(path, '/'), *start;
 
-    if (!end || aa_dir_shared(aa_bookdirs, AA_BOOKDIR_SLOTS,
-                              aa_hash_n(path, end - path) ^ salt))
+    if (!end || aa_dir_shared(&aa_bookdirs, aa_hash_n(path, end - path) ^ salt))
         return false;
     for (start = end; start > path && start[-1] != '/'; start--)
         ;
@@ -1785,8 +1798,7 @@ static void aa_book_noted(const char *path, unsigned int salt,
     const char *end = strrchr(path, '/');
 
     if (end)
-        aa_dir_note(aa_bookdirs, AA_BOOKDIR_SLOTS,
-                    aa_hash_n(path, end - path) ^ salt, who);
+        aa_dir_note(&aa_bookdirs, aa_hash_n(path, end - path) ^ salt, who);
 }
 
 /* The length of the volume part of 'path', "/<HDD0>", or 0 */
@@ -1844,8 +1856,8 @@ static void aa_people_note(const char *path, unsigned int key, unsigned int alt)
                 p->level = level;
             }
             if (start - 1 > root)
-                aa_dir_note(aa_libdirs, AA_LIBDIR_SLOTS,
-                            aa_hash_n(path, start - 1 - path), key);
+                aa_dir_note(&aa_libdirs, aa_hash_n(path, start - 1 - path),
+                            key);
         }
         end = start - 1;
     }
@@ -2430,9 +2442,9 @@ static enum bg_result aa_run_pass(void)
     aa_stamps = core_get_data_pinned(sh);
     aa_visited = (unsigned char *)(aa_stamps + AA_SEEN_SLOTS);
     aa_people = (struct aa_person *)(aa_visited + AA_SEEN_SLOTS / 8);
-    aa_libdirs = (struct aa_libdir *)(aa_people + AA_PEOPLE_SLOTS);
-    aa_bookdirs = aa_libdirs + AA_LIBDIR_SLOTS;
-    aa_central = (struct aa_central *)(aa_bookdirs + AA_BOOKDIR_SLOTS);
+    aa_libdirs.t = (struct aa_libdir *)(aa_people + AA_PEOPLE_SLOTS);
+    aa_bookdirs.t = aa_libdirs.t + AA_LIBDIR_SLOTS;
+    aa_central = (struct aa_central *)(aa_bookdirs.t + AA_BOOKDIR_SLOTS);
     aa_central_names = (char *)(aa_central + AA_CENTRAL_MAX);
     memset(aa_stamps, 0, AA_TABLE_BYTES);
 
@@ -2448,7 +2460,7 @@ static enum bg_result aa_run_pass(void)
         core_free(wh);
         return BG_INTERRUPTED;
     }
-    aa_table_full = false;
+    aa_unreached = aa_libdirs.full = aa_bookdirs.full = false;
     aa_ensure_fallback(workbuf, worksz);
     aa_stamps_load();
     /* A Rebuild renumbers the entries, which the file at the old last entry
@@ -2526,6 +2538,15 @@ static enum bg_result aa_run_pass(void)
         {
             struct aa_work w = { aa_name, aa_title, false, true };
 
+            /* No album row without the RAM copy: the names /Artwork/Covers
+             * is matched on come from the disk, once a folder */
+            if (!aa_row.ok)
+            {
+                tagcache_retrieve(&tcs, tcs.idx_id, tag_albumartist, aa_name,
+                                  sizeof(aa_name));
+                tagcache_retrieve(&tcs, tcs.idx_id, tag_album, aa_title,
+                                  sizeof(aa_title));
+            }
             aa_counts.albums++;
             if (aa_cache_dir(tcs.result, dh, slot, &w, workbuf, worksz,
                              &aborted))
@@ -2567,18 +2588,28 @@ static enum bg_result aa_run_pass(void)
         book_index_each(aa_book_note, &books, &aa_book_text);
         book_index_each(aa_book_visit, &books, &aa_book_text);
     }
+    /* People and audiobook covers are found through the album rows, which
+     * only the RAM copy has. Refused one, the pass leaves them as they are. */
     if (!aborted && !failed)
-        aa_people_pass(workbuf, worksz, &aborted);
+    {
+        if (tagcache_is_in_ram())
+            aa_people_pass(workbuf, worksz, &aborted);
+        else
+        {
+            debug_log(DEBUG_LOG_ARTCACHE, "people skipped: no RAM copy");
+            aa_unreached = true;
+        }
+    }
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
     completed = !aborted && !failed;
     /* What the walk did not visit is not missing when it saw only the
      * added tracks */
-    noart_close(completed && !aa_added_only);
-    if (completed && !aa_added_only && !aa_table_full)
+    noart_close(completed && !aa_added_only && !aa_unreached);
+    if (completed && !aa_added_only && !aa_unreached)
         aa_remove_orphans();
-    aa_stamps_save(completed && !aa_added_only);
+    aa_stamps_save(completed && !aa_added_only && !aa_unreached);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);
@@ -2756,6 +2787,10 @@ static enum bg_result aa_task_run(void)
 {
     enum bg_result result;
 
+    /* The RAM copy loads after the database is usable: a pass begun before
+     * it would find nobody's picture. Waited for unless it was refused. */
+    if (!tagcache_is_in_ram() && !tagcache_ram_refused())
+        return BG_INTERRUPTED;
     debug_log(DEBUG_LOG_ARTCACHE, "starting pass");
     aa_offer_posted = false;
     result = aa_run_pass();
