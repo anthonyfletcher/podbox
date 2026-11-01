@@ -70,7 +70,7 @@ or promoted onto the main menu.
 
 - Album covers and artist photos beside their rows
   - Theme dependent
-  - See [Album and artist art](#album-and-artist-art) for setting up your art
+  - See [Artwork](#artwork) for setting up your art
   - `Settings > Appearance > Interface Elements > Art Rows > Album Art Rows`/`Artist Art Rows`
 - Show each album's release year before or after its name
   - Off by default. `Settings > Library > Music > Show Year in Album Lists`
@@ -511,7 +511,7 @@ Artist Three
 
 Audiobooks and podcasts follow the same shape, with the author or host in place of the artist
 and the book or show in place of the album. Give each book its own folder, whether it is one
-file or many: covers are found per folder, so books sharing a folder share a cover.
+file or many, with its cover in it.
 
 ```text
 Audiobooks
@@ -554,18 +554,12 @@ Books
     └── The Dispossessed.epub
 ```
 
-## Album and artist art
+## Artwork
 
-Album art goes with the album's tracks as `folder.jpg` or `cover.jpg`, e.g.
-`Artist/Album/folder.jpg`, or embedded in the tracks themselves. The image file is used first,
-and the embedded cover when there is none; `Settings > Library > Art Cache > Album Art Source`
-changes that order, or limits the cache to one kind.
+Put the art beside your files, as the layouts above show:
 
-Artist art goes in the artist's folder as `folder.jpg` or `cover.jpg`, e.g.
-`Artist/folder.jpg`. Artist art only ever comes from image files. An artist folder with no image
-of its own borrows one from the folder above it, so if your albums are grouped one level deeper,
-as in `Artist/Albums/Album One`, artist art can stay in `Artist/folder.jpg`; an image in the
-grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums under it.
+- a cover as `folder.jpg` in its album's, book's or show's folder, or embedded in its files
+- an artist's or author's picture as `folder.jpg` in their folder
 
 All artwork should be:
 
@@ -577,8 +571,11 @@ All artwork should be:
 
 Artwork is processed quietly in the background while the database is idle, so browsing stays
 fast, but it can take a while for art to appear. `System > Background Tasks` shows what the cache
-is doing. After adding art to your tags, run `Settings > Library > Maintenance > Update Art Cache`
-to pick it up.
+is doing. After adding art, run `Settings > Library > Maintenance > Update Art Cache` to pick it
+up.
+
+Art can also be kept in one folder of its own, away from your music, and a library laid out
+differently still finds its art: see the [Artwork guide](docs/podbox/artwork-guide.md).
 
 To fill your library with album and artist art, try
 [rockbox-library-manager](https://github.com/cyberdeliaAI/rockbox-library-manager), or the

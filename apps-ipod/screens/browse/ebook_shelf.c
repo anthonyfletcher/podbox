@@ -44,6 +44,7 @@
 #include "system/app_buffer.h"
 #include "files/book_index.h"
 #include "metadata/art_cache.h"
+#include "metadata/art_name.h"
 #include "root_menu.h"
 #include "screens/context_menu.h"    /* the Book Menu's hidden rows */
 #include "screens/browse/browser.h"      /* browser_art_row */
@@ -421,33 +422,14 @@ static const struct bitmap *get_art(int n, void *data, struct dim *size,
     return browser_art_row(n, data, art_hash, size, filter, filter_hash);
 }
 
-/* An author's photograph, from one of their books: the folder above the
- * book's own when that has a picture of its own (author, book, file), else
- * the book's folder (author, file) */
+/* An author's photograph, keyed by their name */
 static unsigned int author_art_hash(int n, void *data)
 {
-    char dir[MAX_PATH], out[MAX_PATH];
-    char *slash;
-    unsigned int up;
-    bool placeholder;
     (void)data;
 
     if (showing != SHOW_AUTHORS || n < 0 || n >= row_ct)
         return 0;
-    strmemccpy(dir, names + books[rows[n]].path, sizeof(dir));
-    if (!(slash = strrchr(dir, '/')) || slash == dir)
-        return 0;
-    *slash = '\0';
-    if ((slash = strrchr(dir, '/')) && slash != dir)
-    {
-        *slash = '\0';
-        up = art_cache_dir_hash(dir);
-        if (art_cache_lookup_hash(up, 0, out, sizeof(out), &placeholder)
-            && !placeholder)
-            return up;
-        *slash = '/';
-    }
-    return art_cache_dir_hash(dir);
+    return art_name_hash(names + books[rows[n]].author);
 }
 
 static const struct bitmap *get_author_art(int n, void *data,

@@ -280,7 +280,7 @@ struct tagcache_album {
     int32_t  lastplayed;
     uint32_t art_hash;           /* art_cache_dir_hash() of its first track's
                                     folder, 0 for none */
-    uint32_t artist_art_hash;    /* and of the folder above that */
+    uint32_t artist_art_hash;    /* art_name_hash() of its artist */
     uint32_t file_art_hash;      /* and of its first track's own path, which
                                     a book's art_hash is: books share folders */
     int16_t  year;               /* the latest of its tracks' */
@@ -293,7 +293,7 @@ struct tagcache_artist {
     int32_t  seek;               /* tag_albumartist */
     int32_t  playcount;
     int32_t  lastplayed;
-    uint32_t art_hash;           /* its first album's artist_art_hash */
+    uint32_t art_hash;           /* art_name_hash() of its name */
     uint16_t albums;
     uint16_t spoken_albums;      /* albums all of whose tracks are spoken */
     uint16_t podcast_albums;     /* of them, all of whose are podcasts */

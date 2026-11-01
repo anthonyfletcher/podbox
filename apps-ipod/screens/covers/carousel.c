@@ -69,7 +69,7 @@
 #include "system/strutil.h"
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/context_menu.h"           /* context_menu_show_playlist_cat/menu */
-#include "metadata/albumart.h"         /* find_albumart / search_albumart_files */
+#include "metadata/albumart.h"         /* struct dim */
 #include "metadata/art_cache.h"   /* shared database-driven thumbnail cache */
 #include "metadata.h"         /* struct mp3entry, get_metadata */
 #include "dir.h"

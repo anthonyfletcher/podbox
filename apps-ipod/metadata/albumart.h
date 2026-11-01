@@ -15,15 +15,26 @@
 #include "metadata.h"
 #include "skin/skin_engine.h"
 
-/* Look for albumart bitmap in the same dir as the track and in its parent dir.
- * Calls size_func to get the dimensions to look for
- * Stores the found filename in the buf parameter.
- * Returns true if a bitmap was found, false otherwise */
-bool find_albumart(const struct mp3entry *id3, char *buf, int buflen,
-                    const struct dim *dim);
+/* Where a cover named for its work is kept: "<Artist> - <Album>.jpg", or
+ * "<Album>.jpg", the names fuzzy-matched as art_name.h matches them */
+#define ART_COVERS_DIR "/Artwork/Covers"
 
-bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
-                           char *buf, int buflen);
+/* The image file standing for a track's cover, into buf: the first of
+ * art_covers_find() for its album and art_folder_file() for its path */
+bool art_cover_file(const struct mp3entry *id3, char *buf, int buflen);
+
+/* The file in ART_COVERS_DIR named for the work 'title' by 'artist', or else
+ * for 'title' alone */
+bool art_covers_find(const char *artist, const char *title, char *buf,
+                     int buflen);
+
+/* An image beside the file at 'path' named after it, else cover.* or
+ * folder.* in its folder, else in the folder above when its own is a disc
+ * folder ("CD1") */
+bool art_folder_file(const char *path, char *buf, int buflen);
+
+/* Whether the extension at 'dot' is one an image file is looked for with */
+bool art_image_ext(const char *dot);
 
 /* Whether the image file at path exists and its decoder takes it, by its
  * headers; one that fails further in passes. */
@@ -35,7 +46,7 @@ void get_albumart_size(struct bitmap *bmp);
  * preference (AA_PREFER_*) names the source tried first, and the others
  * follow in the order playback tries them -- art embedded in the file (a
  * JPEG, the one kind decoded from inside a file), an image file as
- * search_albumart_files() finds it, then the thumbnail cache. as_stored asks
+ * art_cover_file() finds it, then the thumbnail cache. as_stored asks
  * for a JPEG exactly as the source holds it, or the cache's raw thumbnail,
  * for a caller that sends the bytes on rather than decoding them. False when
  * no source has art. */

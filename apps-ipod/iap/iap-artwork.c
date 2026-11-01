@@ -52,15 +52,13 @@ static struct {
 
 static int wps_size = -2;
 
-/* The thumbnail of the track's folder, keyed as the playback engine keys
- * it; there is a file at the path only if the folder has art. None with
+/* The thumbnail of the track's cover, keyed as the playback engine keys
+ * it; there is a file at the path only if the cover has art. None with
  * Accessory Artwork off, so no track has art to send. */
 static bool art_path(uint32_t track, char *out, int out_len)
 {
     struct playlist_track_info info;
-    char dir[MAX_PATH];
-    const char *sep;
-    int tracknum, dlen;
+    int tracknum;
 
     if (global_settings.car_artwork == CAR_ARTWORK_OFF)
         return false;
@@ -75,14 +73,8 @@ static bool art_path(uint32_t track, char *out, int out_len)
     if (playlist_get_track_info(NULL, tracknum, &info) < 0)
         return false;
 
-    sep = strrchr(info.filename, '/');
-    dlen = sep ? sep - info.filename : 0;
-    if (dlen <= 0 || dlen >= (int)sizeof(dir))
-        return false;
-    memcpy(dir, info.filename, dlen);
-    dir[dlen] = '\0';
-
-    art_cache_thumb_path(art_cache_dir_hash(dir), wps_size, out, out_len);
+    art_cache_thumb_path(art_cache_track_key(info.filename), wps_size, out,
+                         out_len);
     return true;
 }
 

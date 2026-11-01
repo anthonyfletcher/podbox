@@ -63,6 +63,7 @@
 #include "ata_idle_notify.h"         /* DISK_EVENT_SPINUP */
 #include "string-extra.h"
 #include "metadata/art_cache.h"      /* the palette's own source */
+#include "metadata/art_name.h"       /* and a portrait's key */
 #include "playlist/playlist.h"       /* playlist_is_from_artist -- Auto's rule */
 #include "draw/bmp.h"                /* struct bitmap, FORMAT_NATIVE */
 #include "draw/color.h"              /* blending, HSV and contrast helpers */
@@ -945,41 +946,12 @@ static int palette_size_idx = -2;      /* -2 not looked up, -1 no such size */
  * render pass while the timeout below runs down; with it, once per track. */
 static unsigned int palette_miss;
 
-/* The folder of a track path, hashed the way the cache keys on it: no
- * normalisation and no trailing slash. Anything else silently misses.
- *
- * `artist` rises one more level, which is where the cache keeps a portrait --
- * the same arithmetic load_cached_albumart() does, including refusing to rise
- * past the volume root, where truncating to "" would key on the whole volume. */
-static unsigned int track_folder_hash(const char *path, bool artist)
+/* The cache key of a track's artist's portrait: the name the database files
+ * it under, its album artist or else its artist */
+static unsigned int id3_artist_key(const struct mp3entry *id3)
 {
-    const char *slash;
-
-    if (!path || !path[0])
-        return 0;
-    slash = strrchr(path, '/');
-    if (!slash || slash == path)
-        return 0;
-
-    {
-        char dir[MAX_PATH];
-        size_t n = (size_t)(slash - path);
-
-        if (n == 0 || n >= sizeof(dir))
-            return 0;
-        memcpy(dir, path, n);
-        dir[n] = '\0';
-
-        if (artist)
-        {
-            char *psep = strrchr(dir, '/');
-
-            if (!psep || psep == dir)
-                return 0;
-            *psep = '\0';
-        }
-        return art_cache_dir_hash(dir);
-    }
+    return art_name_hash(id3->albumartist && id3->albumartist[0]
+                         ? id3->albumartist : id3->artist);
 }
 
 /* The edge of the thumbnails the palette is taken from, or 0 if this build
@@ -1117,26 +1089,28 @@ static bool palette_from_slot(int handle)
  * screen is showing -- and the caller falls back to the skin's slot if there is
  * nothing there.
  *
- * The cache holds portraits as well as covers, keyed by folder either way, so
- * every setting can be served from here; only the folder differs. The rule is
+ * The cache holds portraits as well as covers, a cover keyed by its folder and
+ * a portrait by the artist's name ('artist', 0 when not known), so every
+ * setting can be served from here. The rule is
  * load_cached_albumart()'s, and the asymmetry in it is deliberate there: Auto
  * asks for a portrait only for a playlist built from an artist browse and falls
  * back to the cover, while the explicit Artist setting does not fall back,
  * because a missing portrait is meant to be visible rather than papered over. */
-static int palette_candidates(const char *path, unsigned int cand[2])
+static int palette_candidates(const char *path, unsigned int artist,
+                              unsigned int cand[2])
 {
     int n = 0;
 
     if (global_settings.wps_art_source == WPS_ART_ARTIST)
-        cand[n++] = track_folder_hash(path, true);
+        cand[n++] = artist;
     else
     {
         if (global_settings.wps_art_source == WPS_ART_AUTO &&
             playlist_is_from_artist())
         {
-            cand[n++] = track_folder_hash(path, true);
+            cand[n++] = artist;
         }
-        cand[n++] = track_folder_hash(path, false);
+        cand[n++] = art_cache_track_key(path);
     }
     return n;
 }
@@ -1159,14 +1133,14 @@ static bool palette_from_cache(void)
     if (!id3 || !id3->path[0])
         return false;
     strmemccpy(path, id3->path, sizeof(path));
-    n = palette_candidates(path, cand);
+    n = palette_candidates(path, id3_artist_key(id3), cand);
 
     /* The negative cache is keyed on the album folder whichever candidate was
-     * tried, because that is the one hash every setting can compute: it only has
+     * tried, because that is the one key every setting can compute: it only has
      * to name this track's folder set, and it is read back before any of them are
      * opened. Set only when they all failed, or a fallback would be skipped the
      * moment the portrait was missing. */
-    miss_key = track_folder_hash(path, false);
+    miss_key = art_cache_track_key(path);
     if (miss_key != 0 && miss_key == palette_miss)
         return false;
 
@@ -1437,7 +1411,7 @@ static void track_change_cb(unsigned short id, void *param)
  * Runs on the audio and storage threads, so a disk that is not running is left
  * alone: a spin-up here stalls playback's queue. The first candidate that
  * reads is the one palette_from_cache() would settle on too. */
-static void prefetch_path(const char *track_path)
+static void prefetch_path(const char *track_path, unsigned int artist)
 {
     /* Static for the storage thread's stack, as in read_folder_palette().
      * Shared safely: nothing between the copy and palette_candidates()
@@ -1456,8 +1430,8 @@ static void prefetch_path(const char *track_path)
         return;
 
     strmemccpy(path, track_path, sizeof(path));
-    n = palette_candidates(path, cand);
-    miss_key = track_folder_hash(path, false);
+    n = palette_candidates(path, artist, cand);
+    miss_key = art_cache_track_key(path);
     for (i = 0; miss_key != 0 && i < PREFETCH_MISSES; i++)
     {
         if (prefetch_missed[i] == miss_key)
@@ -1495,7 +1469,7 @@ static void prefetch_cb(unsigned short id, void *param)
     const char *p;
 
     if (id3)
-        prefetch_path(id3->path);
+        prefetch_path(id3->path, id3_artist_key(id3));
     if (id != PLAYBACK_EVENT_TRACK_BUFFER || !global_settings.dynamic_colors
         || palette_dim() == 0 || !storage_disk_is_active())
         return;
@@ -1504,7 +1478,7 @@ static void prefetch_cb(unsigned short id, void *param)
         p = playlist_peek(offset, path, sizeof(path));
         if (!p)
             break;
-        prefetch_path(p);
+        prefetch_path(p, 0);    /* a path names no artist: no portrait */
     }
 }
 
@@ -1527,7 +1501,7 @@ static void prefetch_idle_cb(unsigned short id, void *param)
     {
         if (!audio_peek_buffered_track(&id3, offset))
             break;
-        prefetch_path(id3.path);
+        prefetch_path(id3.path, id3_artist_key(&id3));
     }
 }
 

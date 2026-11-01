@@ -91,6 +91,11 @@ The output filename can be changed to `cover.jpg`:
 --output-name cover.jpg
 ```
 
+PodBox also reads art from an `Artwork` folder at the root of the player: artist pictures as
+`Artwork/People/<Artist>.jpg` and album covers as `Artwork/Covers/<Artist> - <Album>.jpg`.
+These take precedence over the images beside the music. To keep the images out of your music
+folders, move the files this tool writes there and rename them to match.
+
 ---
 
 ## Installation

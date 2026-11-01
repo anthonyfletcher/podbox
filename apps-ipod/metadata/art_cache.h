@@ -50,7 +50,8 @@ struct art_cache_header
  * ready and idle, resolves each album folder's cover art, and renders it to
  * a set of square thumbnails (see metadata/art_sizes.h) under
  * library/cache/art/<sizename>/<hash>.aat. Thumbnails are keyed by a hash
- * of the album's folder path, so keys stay valid across database rebuilds.
+ * of the album's folder path, and a person's by art_name_hash() of their name
+ * (art_name.h), so keys stay valid across database rebuilds.
  * Each folder also has a stamp of the image its thumbnails came from -- its
  * path, size and modification time -- so a pass regenerates a folder whose
  * image was replaced and deletes the thumbnails of one whose image is gone. */
@@ -152,6 +153,12 @@ bool art_cache_lookup(const char *dir, int size_index,
  * use 0 as their "folder not resolved" marker; a real path can hash to 0 too,
  * and the cost of that collision is one folder's art not being found. */
 unsigned int art_cache_dir_hash(const char *dir);
+
+/* The key of the cover a track at 'path' is shown with: its album's, as the
+ * database's album rows have it -- a book's first file's, an album's first
+ * track's folder -- or, for a track the RAM database does not hold, its own
+ * folder's. 0 for a path with no folder. */
+unsigned int art_cache_track_key(const char *path);
 bool art_cache_lookup_hash(unsigned int dir_hash, int size_index,
                            char *out, int out_len, bool *is_fallback);
 

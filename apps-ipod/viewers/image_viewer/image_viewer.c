@@ -71,7 +71,7 @@
 #include "events.h"          /* add_event/remove_event, SYS_EVENT_USB_INSERTED */
 #include "usb.h"             /* usb_inserted, usb_host_is_present */
 #include "audio.h"           /* audio_current_track, audio_status, audio_hard_stop */
-#include "metadata/albumart.h"        /* search_albumart_files */
+#include "metadata/albumart.h"        /* art_cover_file */
 #include "metadata.h"        /* AA_CLEAR_FLAGS_MASK */
 #include "draw/image_load.h"  /* image_embedded_usable */
 #include "image_viewer.h"
@@ -1135,7 +1135,7 @@ static bool find_album_art(int *offset, int *filesize, int *status)
     iv_src_flags = 0;
     if (!embedded || AA_PREFER_IMAGE_FILE == global_settings.album_art)
     {
-        if (search_albumart_files(current_track, "", np_file, MAX_PATH))
+        if (art_cover_file(current_track, np_file, MAX_PATH))
         {
             (*status) = get_image_type(np_file, false);
             return true;

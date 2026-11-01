@@ -438,8 +438,8 @@ Stops the player resuming at power-on when nothing is plugged in, which
 otherwise plays into a dock or an empty socket.
 
 [album art]
-Where cover art comes from: the thumbnail cache, files beside the music, or
-tags embedded in the files. Prefer Cache is fastest.
+Where cover art comes from: the thumbnail cache, image files in /Artwork/Covers
+or beside the music, or tags embedded in the files. Prefer Cache is fastest.
 
 [crossfade fade in delay]
 How long to wait after the incoming track starts before its volume begins to
@@ -793,11 +793,12 @@ unless an album is under it. List such names one per line in
 Artists off and on.
 
 [art cache album source]
-Where album covers come from: the image in the album's folder, the art embedded
-in a track's tags, or both, the first named taking precedence. Artist pictures
-only ever come from image files.
+Where covers of albums, books and podcasts come from: the image in the folder,
+the art embedded in the files, or both, the first named taking precedence. An
+image in /Artwork/Covers, or one named after a book, is used whichever is
+chosen. Pictures of artists and authors only ever come from image files.
 
-Changing it reads every album again, which takes a while on a large library.
+Changing it reads every cover again, which takes a while on a large library.
 
 [art cache fast build]
 Decodes each image once for the largest thumbnail and derives the smaller sizes
@@ -817,30 +818,33 @@ Draws album thumbnails beside the rows in the database browser. Needs a theme
 that supports artwork in lists, or the rows are tall and empty.
 
 [database artist art]
-Draws artist photographs beside the rows in the database browser. Needs a theme
-that supports artwork in lists, or the rows are tall and empty.
+Draws artist photographs beside the rows in the database browser, from
+/Artwork/People or the artist's folder. Needs a theme that supports artwork in
+lists, or the rows are tall and empty.
 
 [database audiobook art]
 Draws cover art beside the rows in the Audiobooks browser. Needs a theme that
 supports artwork in lists, or the rows are tall and empty.
 
 [database author art]
-Draws a photograph beside each author in the Audiobooks browser, from a
-folder.jpg in the author's folder. Without one the row shows a placeholder.
+Draws a photograph beside each author in the Audiobooks browser, from an image
+named after them in /Artwork/People or a folder.jpg in the author's folder.
+Without one the row shows a placeholder.
 
 [database book art]
 Draws each book's cover beside its row in the Books lists. Needs a theme that
 supports artwork in lists, or the rows are tall and empty.
 
 [database book author art]
-Draws a photograph beside each author in Books > By Author, from a folder.jpg
-in the author's folder: the one above a book's own folder when books are kept
-as author, book, file, or else the folder the book is in.
+Draws a photograph beside each author in Books > By Author, from an image named
+after them in /Artwork/People, or a folder.jpg in a folder named after them,
+or else in the folder the book is in or the one above.
 
 [database podcast art]
-Draws each show's art beside its row in the Podcasts list, from the art its
-episodes carry or a folder.jpg beside them. Needs a theme that supports
-artwork in lists, or the rows are tall and empty.
+Draws each show's art beside its row in the Podcasts list, from an image named
+after the show in /Artwork/Covers, the art its episodes carry or a folder.jpg
+beside them. Needs a theme that supports artwork in lists, or the rows are tall
+and empty.
 
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
@@ -1949,7 +1953,7 @@ have just added images.
 [action: Missing Artist Portraits]
 Lists the artists that have no photograph.
 
-Artist images are looked for beside the music and in the artist art folder.
+Artist images are looked for in /Artwork/People and beside the music.
 
 [action: Create Playlist]
 Builds a playlist from the folder you are in, including everything below it, and

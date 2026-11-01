@@ -97,6 +97,7 @@
 #include "db_spoken.h"
 #include "database/db_episode.h"
 #include "metadata/art_cache.h"   /* art_cache_dir_hash */
+#include "metadata/art_name.h"    /* art_name_hash */
 #include "core_alloc.h"
 #include "audio.h"
 #include "crc32.h"
@@ -1093,11 +1094,6 @@ static void albums_note_path(int idx_id, const char *filename)
         return;
     *sep = '\0';                     /* track file -> album folder */
     r->art_hash = art_cache_dir_hash(dir);
-    sep = strrchr(dir, '/');
-    if (!sep || sep == dir)
-        return;
-    *sep = '\0';                     /* album -> artist folder */
-    r->artist_art_hash = art_cache_dir_hash(dir);
 }
 
 /* Once every tag is in: what needs the genres, and the artists' figures */
@@ -1149,8 +1145,17 @@ static void albums_finish(int entries)
         ar->playcount += al->playcount;
         if (al->lastplayed > ar->lastplayed)
             ar->lastplayed = al->lastplayed;
-        if (ar->art_hash == 0)
-            ar->art_hash = al->artist_art_hash;
+        if (ar->art_hash == 0 && ar->seek >= 0
+            && ar->seek <= hdr->tag_size[tag_albumartist]
+                          - (long)sizeof(struct tagfile_entry))
+        {
+            const char *name = ((const struct tagfile_entry *)
+                &hdr->tags[tag_albumartist][ar->seek])->tag_data;
+
+            if (strcmp(name, UNTAGGED))
+                ar->art_hash = art_name_hash(name);
+        }
+        al->artist_art_hash = ar->art_hash;
     }
 }
 

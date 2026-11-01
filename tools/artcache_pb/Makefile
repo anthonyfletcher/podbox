@@ -39,6 +39,7 @@ INCLUDES = -I. -I$(APPS)/sim/include -I$(BUILD) -I$(BUILD)/lang \
 # database it walks, and the parts of the firmware a hosted build needs.
 SRC := artcache_pb.c stubs.c \
        $(APPS)/metadata/art_cache.c \
+       $(APPS)/metadata/art_name.c \
        $(APPS)/metadata/albumart.c \
        $(APPS)/draw/image_load.c \
        $(APPS)/draw/jpeg_load.c \

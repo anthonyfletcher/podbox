@@ -142,7 +142,7 @@ static bool fi_check_abort(void)
  * These lists are for images filed deliberately, and a music library holds far
  * more album art than anything else -- unfiltered, the art buries the rest.
  * The names matched are the conventional ones the artwork search itself looks
- * for (see search_albumart_files() in metadata/albumart.c): cover.* and
+ * for (see art_folder_file() in metadata/albumart.c): cover.* and
  * folder.*, any extension.
  *
  * It cannot catch everything. Album art is also commonly named after the album
@@ -210,7 +210,9 @@ static void fi_walk(int depth)
         info = dir_get_info(dir, entry);
         if (info.attribute & ATTR_DIRECTORY)
         {
-            fi_walk(depth + 1);
+            /* /Artwork holds the art cache's pictures, as cover.* does */
+            if (depth > 0 || strcasecmp((char *)entry->d_name, "Artwork"))
+                fi_walk(depth + 1);
         }
         else
         {

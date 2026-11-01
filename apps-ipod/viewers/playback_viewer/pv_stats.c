@@ -52,6 +52,7 @@
 #include "audio/playback.h"  /* playback_log_flush() */
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
+#include "metadata/art_name.h"
 #endif
 #include "pv_badges.h"
 #include "pv_index.h"
@@ -384,46 +385,6 @@ static void day_skip(long day)
             return;
         }
     }
-}
-
-/* The artwork cache's key for the folder holding 'path', or for that folder's
- * parent when 'up' is set -- which under an <artist>/<album>/<track> layout is
- * the artist's own folder, and is exactly how art_cache generates its keys
- * (see aa_dirname() in metadata/art_cache.c).
- *
- * The path is hashed with no normalisation and no trailing slash, because
- * that is what the cache does. Anything else here silently misses every
- * lookup. */
-static unsigned int folder_hash(const char *path, bool up)
-{
-    char dir[MAX_PATH];
-    const char *slash;
-    size_t n;
-
-    if (!path || !path[0])
-        return 0;
-
-    slash = strrchr(path, '/');
-    if (!slash || slash == path)
-        return 0;
-    n = (size_t)(slash - path);
-
-    if (up)
-    {
-        /* Step to the parent by finding the slash before this one. */
-        while (n > 0 && path[n - 1] != '/')
-            n--;
-        if (n <= 1)
-            return 0;       /* no distinct parent: a flat or rooted layout */
-        n--;
-    }
-
-    if (n == 0 || n >= sizeof(dir))
-        return 0;
-
-    memcpy(dir, path, n);
-    dir[n] = '\0';
-    return art_cache_dir_hash(dir);
 }
 #endif /* HAVE_ALBUMART */
 
@@ -837,8 +798,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
                 ar->y_seconds += elapsed;
             }
 #ifdef HAVE_ALBUMART
-            if (ar->art_hash == 0 && path && path[0])
-                ar->art_hash = folder_hash(path, true);
+            if (ar->art_hash == 0)
+                ar->art_hash = art_name_hash(artist);
 #endif
         }
 
@@ -859,7 +820,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
             /* A song's picture is its album's, which is the folder the file
              * itself sits in -- the same key the album row takes. */
             if (ti->art_hash == 0 && path && path[0])
-                ti->art_hash = folder_hash(path, false);
+                ti->art_hash = art_cache_track_key(path);
 #endif
         }
 
@@ -874,7 +835,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
             }
 #ifdef HAVE_ALBUMART
             if (al->art_hash == 0 && path && path[0])
-                al->art_hash = folder_hash(path, false);
+                al->art_hash = art_cache_track_key(path);
 #endif
         }
 

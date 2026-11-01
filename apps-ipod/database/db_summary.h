@@ -37,7 +37,7 @@ struct album_data {
     long artist_seek; /* album artist taglist position */
     long seek;        /* album taglist position */
     /* art_cache keys for the folder holding the album's first track, and for
-     * the folder above it, which is the artist's own; 0 for none */
+     * its artist, by name (art_name.h); 0 for none */
     unsigned int art_hash;
     unsigned int artist_art_hash;
 };
@@ -48,7 +48,7 @@ struct artist_data {
     int playcount;
     long lastplayed;
     long seek;    /* album artist taglist position */
-    unsigned int art_hash;  /* its first album's artist_art_hash */
+    unsigned int art_hash;  /* art_name_hash() of its name */
 };
 
 /* The lists, and the database commit they were copied at. Seeks are seeks

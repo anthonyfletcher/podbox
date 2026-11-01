@@ -305,7 +305,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | Image Files, Then Embedded |  |
+| Album Art Source | Where covers of albums, books and podcasts come from: the image in the folder, the art embedded in the files, or both, the first named taking precedence. An image in /Artwork/Covers, or one named after a book, is used whichever is chosen. Pictures of artists and authors only ever come from image files. Changing it reads every cover again, which takes a while on a large library. | Image Files, Then Embedded |  |
 | Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. Much faster, slightly softer. Applies only to thumbnails made from now on. | No | **Adv** |
 
 ### Library — Playlist Engine
@@ -392,12 +392,12 @@ Separator set above zero.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
-| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser, from /Artwork/People or the artist's folder. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
 | Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
-| Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
+| Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from an image named after them in /Artwork/People or a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
 | Art Rows ▸ Book Art Rows | Draws each book's cover beside its row in the Books lists. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
-| Art Rows ▸ Book Author Art Rows | Draws a photograph beside each author in Books > By Author, from a folder.jpg in the author's folder: the one above a book's own folder when books are kept as author, book, file, or else the folder the book is in. | No |  |
-| Art Rows ▸ Podcast Art Rows | Draws each show's art beside its row in the Podcasts list, from the art its episodes carry or a folder.jpg beside them. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
+| Art Rows ▸ Book Author Art Rows | Draws a photograph beside each author in Books > By Author, from an image named after them in /Artwork/People, or a folder.jpg in a folder named after them, or else in the folder the book is in or the one above. | No |  |
+| Art Rows ▸ Podcast Art Rows | Draws each show's art beside its row in the Podcasts list, from an image named after the show in /Artwork/Covers, the art its episodes carry or a folder.jpg beside them. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 px | **Cfg** |
 | Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | Yes |  |
 | Status Bar | Whether the clock and battery strip is drawn, and at which edge. | Top |  |
@@ -421,7 +421,7 @@ Separator set above zero.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | Album Art |  |
-| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | Prefer Cache |  |
+| Album Art | Where cover art comes from: the thumbnail cache, image files in /Artwork/Covers or beside the music, or tags embedded in the files. Prefer Cache is fastest. | Prefer Cache |  |
 | Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | No |  |
 
 Also reached as **Appearance** under `Settings > Playback > Now Playing Screen`.

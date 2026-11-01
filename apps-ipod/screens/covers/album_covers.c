@@ -59,7 +59,6 @@
 #include "system/shutdown.h"
 #include "system/strutil.h"
 #include "screens/context_menu.h"           /* a cover's menu */
-#include "metadata/albumart.h"         /* find_albumart / search_albumart_files */
 #include "metadata/art_cache.h"   /* shared database-driven thumbnail cache */
 #include "metadata.h"         /* struct mp3entry, get_metadata */
 #include "dir.h"

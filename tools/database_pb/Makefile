@@ -41,6 +41,7 @@ INCLUDES = -I. -I$(APPS)/sim/include -I$(BUILD) -I$(BUILD)/lang \
 # hosted build of it needs.
 SRC := database_pb.c stubs.c \
        $(APPS)/database/tagcache.c \
+       $(APPS)/metadata/art_name.c \
        $(APPS)/database/libfile.c \
        $(APPS)/database/path_key.c \
        $(APPS)/database/db_spoken.c \

@@ -78,6 +78,7 @@
 
 #include "metadata/albumart.h"
 #include "metadata/art_cache.h"
+#include "metadata/art_name.h"
 #include "draw/image_load.h"       /* image_embedded_usable() */
 #include "skin/skin_albumart_color.h"   /* art loads invalidate the %Cl guard */
 
@@ -2124,49 +2125,32 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
  * the placeholder is rejected so an artless album falls through to the theme's
  * own no-art state rather than showing the cache's "?" thumbnail.
  *
- * Which picture that is, 'artist' says. The cache holds album and
- * artist art alike, both keyed by a folder path, so choosing between them is
- * only a matter of which folder to ask about: the track's own folder for the
- * album, its parent for the artist. That mirrors how art_cache.c fills them
- * (see the parent-folder pass in aa_run_pass()), and it is why artist art
- * exists only for <artist>/<album>/<track> layouts -- a library with no
- * distinct parent folder has nothing for the artist to be keyed on, and falls
- * through to the no-art state above. */
+ * Which picture that is, 'artist' says: the album's, by the key the browser
+ * shows it with (art_cache_track_key()), or the artist's, keyed by the name the
+ * database files the track under -- its album artist, or else its artist. */
 static int load_cached_albumart(struct mp3entry *track_id3,
                                 struct bufopen_bitmap_data *user_data,
                                 bool is_current_track, int i, bool artist)
 {
     static int wps_size_idx = -2;   /* -2 until first looked up */
-    char dir[MAX_PATH], path[MAX_PATH];
+    char path[MAX_PATH];
     bool is_fallback;
-    const char *sep;
-    int dlen;
+    unsigned int key;
 
     if (wps_size_idx == -2)
         wps_size_idx = art_cache_size_index("wps");
     if (wps_size_idx < 0)
         return ERR_UNSUPPORTED_TYPE;
 
-    sep = strrchr(track_id3->path, '/');
-    if (!sep)
-        return ERR_UNSUPPORTED_TYPE;
-    dlen = sep - track_id3->path;
-    if (dlen <= 0 || dlen >= (int)sizeof(dir))
-        return ERR_UNSUPPORTED_TYPE;
-    memcpy(dir, track_id3->path, dlen);
-    dir[dlen] = '\0';
-
     if (artist)
-    {
-        /* Up one level. A track sitting at the volume root has no parent to
-         * rise to, and truncating to "" would key on the whole volume. */
-        char *psep = strrchr(dir, '/');
-        if (!psep || psep == dir)
-            return ERR_UNSUPPORTED_TYPE;
-        *psep = '\0';
-    }
+        key = art_name_hash(track_id3->albumartist && track_id3->albumartist[0]
+                            ? track_id3->albumartist : track_id3->artist);
+    else
+        key = art_cache_track_key(track_id3->path);
 
-    if (!art_cache_lookup(dir, wps_size_idx, path, sizeof(path), &is_fallback)
+    if (!key
+        || !art_cache_lookup_hash(key, wps_size_idx, path, sizeof(path),
+                                  &is_fallback)
         || is_fallback)
         return ERR_UNSUPPORTED_TYPE;
 
@@ -2229,8 +2213,7 @@ static int audio_load_albumart(struct track_info *infop,
         else if(!artist_art &&
                 global_settings.album_art == AA_PREFER_IMAGE_FILE)
         {
-            if (find_albumart(track_id3, path, sizeof(path),
-                          &albumart_slots[i].dim))
+            if (art_cover_file(track_id3, path, sizeof(path)))
             {
                 hid = load_album_art_from_path(path, &user_data, is_current_track, i);
             }
@@ -2287,8 +2270,7 @@ static int audio_load_albumart(struct track_info *infop,
             hid < 0 && hid != ERR_BUFFER_FULL)
         {
             /* No embedded AA or it couldn't be loaded - try other sources */
-            if (find_albumart(track_id3, path, sizeof(path),
-                              &albumart_slots[i].dim))
+            if (art_cover_file(track_id3, path, sizeof(path)))
             {
                 hid = load_album_art_from_path(path, &user_data, is_current_track, i);
             }

@@ -64,6 +64,7 @@
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
 #include "metadata/art_cache.h"    /* art keys of album and artist rows */
+#include "metadata/art_name.h"     /* an artist's, by name */
 #include "database/path_key.h"
 #include "metadata/cuesheet.h"      /* the chapter list screen */
 #include "metadata/chapters.h"      /* reading a book's chapter marks */
@@ -6764,16 +6765,13 @@ bool browser_db_current_under_artist_level(void)
 /* Resolve browse row `item` to a folder on disk: ask the tagcache for the first
  * track filed under that row's selection (ancestor levels -- genre, artist, ...
  * -- still filtered, so the right entry wins when two share a name), then take
- * its filename and climb `extra_parents` directory levels above the track's own
- * folder. extra_parents == 0 yields the track's folder (the album); == 1 yields
- * its parent (the artist), for <artist>/<album>/<track> layouts. Those folder
- * paths are the keys the art thumbnail cache hashes on. False for a row with no
- * retrievable track, or one too shallow for the requested level.
+ * its filename's folder, the key the art thumbnail cache hashes an album on.
+ * False for a row with no retrievable track, or one at the volume root.
  *
  * This is a tagcache search, i.e. far too expensive to call per row per redraw;
  * callers are expected to cache the result. */
 static bool browser_db_get_track_dir(struct browser_context* c, int item,
-                                  char *buf, int buflen, int extra_parents)
+                                  char *buf, int buflen)
 {
     struct tagcache_search tcs;
     char tcs_buf[TAGCACHE_BUFSZ];
@@ -6803,19 +6801,12 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
     {
         /* Copy first, then truncate the COPY. tcs.result can point into shared
          * tagcache memory, so writing a NUL into it would corrupt the cache. */
-        char *sep = NULL;
+        char *sep;
         strlcpy(buf, tcs.result, buflen);
-        for (i = 0; i <= extra_parents; i++)
-        {
-            sep = strrchr(buf, '/');
-            if (!sep || sep == buf)
-            {
-                sep = NULL;     /* too shallow to climb to this folder level */
-                break;
-            }
-            *sep = '\0';        /* strip one component: no trailing slash */
-        }
-        ok = (sep != NULL);
+        sep = strrchr(buf, '/');
+        ok = sep && sep != buf;
+        if (ok)
+            *sep = '\0';        /* no trailing slash */
     }
 
     tagcache_search_finish(&tcs);
@@ -6868,9 +6859,8 @@ static int artist_plays(int tag, long seek)
     return MIN(ar.playcount, PLAYS_MAX);
 }
 
-/* The art key of a row tagcache's album tables can place: an album artist, an
- * artist named as one, or an album table_album_row() finds. 0 for any other
- * row. */
+/* The art key of a row: an artist's, by name, or that of an album
+ * table_album_row() finds. 0 for any other row. */
 static unsigned int table_art_hash(struct browser_context* c,
                                    const struct tagentry *entry)
 {
@@ -6881,7 +6871,12 @@ static unsigned int table_art_hash(struct browser_context* c,
     if (is_artist_tag(tag))
     {
         struct tagcache_artist ar;
-        return artist_by_name(tag, entry->extraseek, &ar) ? ar.art_hash : 0;
+        char name[MAX_PATH];
+
+        if (artist_by_name(tag, entry->extraseek, &ar))
+            return ar.art_hash;
+        return tagcache_seek_string(tag, entry->extraseek, name, sizeof(name))
+               ? art_name_hash(name) : 0;
     }
     if (tag == tag_album)
     {
@@ -6904,12 +6899,8 @@ unsigned int browser_db_get_art_hash(struct browser_context* c, int item)
         || !(entry = browser_db_get_entry(c, item)))
         return 0;
     hash = table_art_hash(c, entry);
-    /* A track-artist row has no folder search: it would read the disk for
-     * every row in view, and its folder is a guess. */
-    if (hash == 0
-        && (album
-            || csi->tagorder[shown_level(c->currextra)] == tag_albumartist)
-        && browser_db_get_track_dir(c, item, dir, sizeof(dir), album ? 0 : 1))
+    if (hash == 0 && album
+        && browser_db_get_track_dir(c, item, dir, sizeof(dir)))
         hash = art_cache_dir_hash(dir);
     return hash;
 }

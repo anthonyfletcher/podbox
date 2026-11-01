@@ -69,6 +69,7 @@ metadata/tag_trim.c
 #ifdef HAVE_ALBUMART
 metadata/albumart.c
 metadata/art_cache.c
+metadata/art_name.c
 #endif
 
 /* -- the interface, by altitude --------------------------------------- */

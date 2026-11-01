@@ -4,12 +4,14 @@
  * Disk cache for cover art -- album art, artist art and ebook covers. Pre-scales each
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder's image or a
- * track's embedded art, as the album art source setting orders them; artist
- * art from an image in its parent or, failing that, the folder above. Each has
- * its own placeholder for when nothing is found. A book's cover, keyed by the
- * book's own path, is an image named after the book or the one inside it, and
- * keeps its shape rather than being cropped square: a cover is taller than
- * wide.
+ * track's embedded art, as the album art source setting orders them. A
+ * person's picture -- an artist's or an author's -- is keyed by their name
+ * (art_name.h), not by a folder: from /Artwork/People, else a folder above
+ * their works named for them, else the folder above a work unless that is a
+ * library folder holding several people's. Each has its own placeholder for
+ * when nothing is found. A book's cover, keyed by the book's own path, is an
+ * image named after the book or the one inside it, and keeps its shape rather
+ * than being cropped square: a cover is taller than wide.
  *
  * A pass after a library update that only added tracks visits the folders of
  * those tracks alone. One after a deletion, an Update, a Rebuild or a change
@@ -37,6 +39,7 @@
 #include "metadata.h"
 #include "albumart.h"
 #include "art_cache.h"
+#include "art_name.h"
 #include "art_sizes.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "system/debug_log.h"
@@ -46,7 +49,6 @@
 #include "files/book_index.h"       /* the books the pass visits */
 #include "files/zip_member.h"       /* a deflated cover, inflated */
 #include "files/path_list.h"        /* the "found nothing" lists */
-#include "system/strutil.h"         /* is_disc_folder() */
 #include "lcd.h"
 #include "draw/bmp.h"
 #include "draw/img_filter.h"
@@ -84,9 +86,9 @@
  * A magic/version lets a future format change be detected per file rather than
  * needing a global cache wipe. */
 
-/* Folder table: open-addressed by directory-path hash, holding album folders
- * and their parent (artist) folders alike. Sized generously; a folder that
- * finds it full is skipped for that pass. */
+/* Folder table: open-addressed by key, holding album folders, books and
+ * people alike. Sized generously; a key that finds it full is skipped for
+ * that pass. */
 #define AA_SEEN_SLOTS 16384  /* power of two */
 
 /* One folder's entry in the table: its path hash and the stamp of the image
@@ -97,8 +99,47 @@ struct aa_stamp
     unsigned int key;    /* folder path hash; 0 marks an empty slot */
     unsigned int stamp;
 };
+/* People, by name key (see "people" below), and the tables their pictures
+ * and the books' covers are found with. A person who finds the table full
+ * has no picture that pass. */
+#define AA_PEOPLE_SLOTS  8192   /* power of two */
+#define AA_LIBDIR_SLOTS  1024   /* power of two */
+#define AA_BOOKDIR_SLOTS 2048   /* power of two */
+#define AA_CENTRAL_MAX   2048   /* files in /Artwork/People and Covers */
+#define AA_CENTRAL_NAMES (48 * 1024)
+
+struct aa_person
+{
+    unsigned int key;           /* art_name_hash(); 0 marks an empty slot */
+    unsigned int alt;           /* art_name_alt_hash(), or 0 */
+    unsigned int match;         /* the highest folder named for them, or 0 */
+    unsigned short level;       /* how far above a track's folder it is */
+    unsigned short flags;
+};
+
+/* A folder and the one thing in it, or 0 for who once there are two: the
+ * people whose named folders it holds, which makes it a library folder, or
+ * the books it holds, whose cover its image then is not */
+struct aa_libdir
+{
+    unsigned int dir;           /* folder path hash; 0 marks an empty slot */
+    unsigned int who;
+};
+
+struct aa_central
+{
+    unsigned int key, alt;      /* of the file name without its extension */
+    unsigned short name;        /* offset of the file name in the names */
+    bool covers;                /* in /Artwork/Covers, not People */
+};
+
+#define AA_PEOPLE_BYTES (AA_PEOPLE_SLOTS * sizeof(struct aa_person) \
+                         + AA_LIBDIR_SLOTS * sizeof(struct aa_libdir) \
+                         + AA_BOOKDIR_SLOTS * sizeof(struct aa_libdir) \
+                         + AA_CENTRAL_MAX * sizeof(struct aa_central) \
+                         + AA_CENTRAL_NAMES)
 #define AA_TABLE_BYTES (AA_SEEN_SLOTS * sizeof(struct aa_stamp) \
-                        + AA_SEEN_SLOTS / 8)
+                        + AA_SEEN_SLOTS / 8 + AA_PEOPLE_BYTES)
 
 /* Stamps that are not an image's. NONE is a folder with no record, whose
  * thumbnails a pass adopts as they stand rather than regenerating -- the case
@@ -110,6 +151,14 @@ struct aa_stamp
 #define AA_STAMP_NONE     0u
 #define AA_STAMP_EMBEDDED 1u
 #define AA_STAMP_NO_EMBED 3u
+
+/* The stamp file's first record says how its keys are made: key AA_SCHEME_KEY,
+ * stamp AA_SCHEME, people by name. A file without it keys people by folder,
+ * so its marks are read as none and the next pass is a whole one, which moves
+ * their thumbnails to their names. A folder hashing to AA_SCHEME_KEY is
+ * tabled as the one below it, as one hashing to 0 is as 1. */
+#define AA_SCHEME_KEY 0xFFFFFFFFu
+#define AA_SCHEME     1u
 
 /* tagcache_entry_key() of the last entry the marks cover, folded to 32 bits;
  * 0 for none. Read with the table. */
@@ -123,6 +172,11 @@ static unsigned int aa_fold_key(uint64_t key)
 /* The table, while a pass holds it; NULL otherwise. */
 static struct aa_stamp *aa_stamps;
 static unsigned char *aa_visited;
+static struct aa_person *aa_people;
+static struct aa_libdir *aa_libdirs;
+static struct aa_libdir *aa_bookdirs;
+static struct aa_central *aa_central;
+static char *aa_central_names;
 
 static volatile bool cache_busy;
 
@@ -135,8 +189,8 @@ static volatile unsigned int aa_generation;
  * buffer the pass already keeps the current directory in. */
 static struct art_cache_counts aa_counts;
 
-/* Scratch id3 used only to feed search_albumart_files(); kept out of the
- * thread stack because struct mp3entry is large. */
+/* Scratch id3 a track's tags are read into for its embedded art; kept out of
+ * the thread stack because struct mp3entry is large. */
 static struct mp3entry aa_id3;
 
 /* Scratch buffers used only by the background thread (aa_run_pass /
@@ -146,8 +200,9 @@ static struct mp3entry aa_id3;
 static char aa_tcs_buf[TAGCACHE_BUFSZ];
 static char aa_artpath[MAX_PATH];
 static char aa_dir[MAX_PATH];
-static char aa_artist_dir[MAX_PATH];
 static char aa_probe[MAX_PATH];
+static char aa_name[TAGCACHE_BUFSZ];
+static char aa_title[TAGCACHE_BUFSZ];
 static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
@@ -237,16 +292,14 @@ int art_cache_size_index(const char *name)
     return -1;
 }
 
-/* Modified FNV hash (same as PictureFlow's, good avalanche/distribution). */
-static unsigned int aa_hash(const char *str)
+/* Modified FNV hash (same as PictureFlow's, good avalanche/distribution),
+ * of the first 'len' bytes of 'str' */
+static unsigned int aa_hash_n(const char *str, size_t len)
 {
     const unsigned int p = 16777619;
     unsigned int hash = 0x811C9DC5;
 
-    if (!str)
-        return 0;
-
-    while (*str)
+    while (len-- && *str)
         hash = (hash ^ (unsigned char)*str++) * p;
     hash += hash << 13;
     hash ^= hash >> 7;
@@ -254,6 +307,11 @@ static unsigned int aa_hash(const char *str)
     hash ^= hash >> 17;
     hash += hash << 5;
     return hash;
+}
+
+static unsigned int aa_hash(const char *str)
+{
+    return str ? aa_hash_n(str, strlen(str)) : 0;
 }
 
 static void aa_cache_path(char *out, int out_len, int size_index,
@@ -376,6 +434,21 @@ unsigned int art_cache_dir_hash(const char *dir)
     return aa_hash(dir);
 }
 
+unsigned int art_cache_track_key(const char *path)
+{
+    struct tagcache_album al;
+    const char *sep;
+    int idx;
+
+    if (!path || !(sep = strrchr(path, '/')))
+        return 0;
+    idx = tagcache_find_path(path);
+    if (idx >= 0 && tagcache_album_get(tagcache_album_of(idx), &al)
+        && al.art_hash)
+        return al.art_hash;
+    return aa_hash_n(path, sep - path);
+}
+
 void art_cache_thumb_path(unsigned int dir_hash, int size_index,
                           char *out, int out_len)
 {
@@ -439,10 +512,11 @@ static void aa_ensure_dirs(void)
 static void aa_stamps_clear(void)
 {
     struct libfile_writer w;
+    struct aa_stamp scheme = { AA_SCHEME_KEY, AA_SCHEME };
 
     if (libfile_begin(&w, AA_STAMP_FILE, AA_STAMP_MAGIC,
                       ART_CACHE_FORMAT_VERSION, sizeof(struct aa_stamp), NULL))
-        libfile_finish(&w, true);
+        libfile_finish(&w, libfile_write(&w, &scheme, sizeof(scheme), 1));
 }
 
 static bool aa_check_abort(void);
@@ -656,34 +730,6 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
     dir[len] = 0;
 }
 
-/* Whether 'art', found for the folder of 'probe', can stand for it. The search
- * falls back to the folder above, which is the album for a disc folder but the
- * artist for an album folder -- and the artist's picture is no album's cover.
- * So for an album an image from above counts only for a disc folder. For an
- * artist it always counts, except from the volume root: under
- * <artist>/<album_type>/<album> the folder above the album is the type, and
- * the artist's picture is one further up. Trap: under <Music>/<artist> or
- * <genre>/<artist> the folder above is not the artist's, and an image there
- * becomes the picture of every artist without one of their own. */
-static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
-{
-    const char *end = strrchr(probe, '/');
-    const char *start;
-    size_t dirlen;
-
-    if (!end)
-        return true;
-    dirlen = end - probe + 1;
-    if (!strncmp(probe, art, dirlen) && !strchr(art + dirlen, '/'))
-        return true;
-    if (artist)
-        return strrchr(art, '/') != art;
-
-    for (start = end; start > probe && start[-1] != '/'; start--)
-        ;
-    return is_disc_folder(start, end);
-}
-
 /* The table slot for folder hash 'h', claimed with no stamp if it is new.
  * NULL when the table is full. h==0 is remapped so 0 can mark an empty slot. */
 static struct aa_stamp *aa_slot(unsigned int h)
@@ -691,6 +737,8 @@ static struct aa_stamp *aa_slot(unsigned int h)
     unsigned int i, idx;
     if (h == 0)
         h = 1;
+    else if (h == AA_SCHEME_KEY)
+        h--;
     idx = h & (AA_SEEN_SLOTS - 1);
     for (i = 0; i < AA_SEEN_SLOTS; i++)
     {
@@ -714,6 +762,8 @@ static bool aa_was_visited(unsigned int h)
 
     if (h == 0)
         h = 1;
+    else if (h == AA_SCHEME_KEY)
+        h--;
     idx = h & (AA_SEEN_SLOTS - 1);
     for (i = 0; i < AA_SEEN_SLOTS; i++)
     {
@@ -780,6 +830,8 @@ static void aa_stamps_load(void)
                 aa_marks_key = aa_stamp_io[i].stamp;
                 continue;
             }
+            if (aa_stamp_io[i].key == AA_SCHEME_KEY)
+                continue;
             s = aa_slot(aa_stamp_io[i].key);
             if (s)
                 s->stamp = aa_stamp_io[i].stamp;
@@ -810,6 +862,8 @@ static void aa_stamps_save(bool completed)
                        &lm))
         return;
     ok = true;
+    aa_stamp_io[n].key = AA_SCHEME_KEY;
+    aa_stamp_io[n++].stamp = AA_SCHEME;
     if (aa_marks_key)
     {
         aa_stamp_io[n].key = 0;
@@ -840,6 +894,9 @@ static void aa_stamps_save(bool completed)
 static void aa_stamp_append(unsigned int h, unsigned int stamp)
 {
     struct aa_stamp rec = { h ? h : 1, stamp };
+
+    if (h == AA_SCHEME_KEY)
+        rec.key--;
 
     libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
                    sizeof(rec), &rec, 1);
@@ -1322,15 +1379,22 @@ static bool aa_added_only;
 static bool aa_reread_tags;
 
 /* Find the image file standing for the folder of `probe_path`, into
- * aa_artpath. album/albumartist left NULL: only folder-based art is searched
- * (cover.bmp, folder.jpg, and for a disc folder ../cover.bmp). */
-static bool aa_find_file(const char *probe_path, bool artist)
+ * aa_artpath: art_folder_file()'s */
+static bool aa_find_file(const char *probe_path)
 {
-    memset(&aa_id3, 0, sizeof(aa_id3));
-    strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
-    return search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath))
-           && aa_art_is_folders(probe_path, aa_artpath, artist);
+    return art_folder_file(probe_path, aa_artpath, sizeof(aa_artpath));
 }
+
+/* What a work's cover may come from beyond its embedded art */
+struct aa_work
+{
+    const char *artist, *title; /* for /Artwork/Covers, or NULL */
+    bool named;                 /* an image named after the file, first */
+    bool folder;                /* its folder's images */
+};
+
+static bool aa_covers_central(const char *artist, const char *title);
+static bool aa_book_file(const char *path);
 
 /* Find the JPEG or PNG embedded in the track at `path` */
 static bool aa_find_embedded(const char *path, struct aa_src *src)
@@ -1408,47 +1472,30 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
     return false;
 }
 
-/* Resolve one folder's cover art and bring its thumbnails in line with it.
- * `probe_path` is a track filename under the folder (real for an album folder,
- * synthetic "<dir>/_" for an artist folder); `dh` is that folder's hash (the
- * cache key) and `slot` its table entry. An album takes its art from the
- * sources the album art source setting names, in its order, reading one track's
- * tags for the embedded kind; an `artist` takes it from an image file only, and
- * with no image of its own takes the one above it, cached under its own key so
- * that every reader keying artist art on the album's parent finds it. Sets
- * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the folder is
+/* Resolve one work's cover art and bring its thumbnails in line with it.
+ * `probe_path` is its first track; `dh` is the cache key and `slot` its table
+ * entry. A file in /Artwork/Covers named for it comes first, then, as 'w'
+ * allows, an image named after the track; then its folder's image and the
+ * track's embedded art, in the order the album art source setting names. Sets
+ * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the work is
  * cached: an existence check per size, plus the image lookup and stamp under
  * aa_check_all, and no image or track is read. */
-/* Set while a book's own art is cached: the cover inside its file before
- * the folder's, which the folder's other books share */
-static bool aa_book_track;
-
 static bool aa_cache_dir(const char *probe_path, unsigned int dh,
-                         struct aa_stamp *slot, bool artist,
+                         struct aa_stamp *slot, const struct aa_work *w,
                          void *workbuf, size_t worksz, bool *aborted)
 {
-    int source = artist ? ART_SOURCE_FILES
-               : aa_book_track ? ART_SOURCE_EMBEDDED_FIRST
-               : global_settings.art_cache_album_source;
+    int source = global_settings.art_cache_album_source;
     bool embedded = source != ART_SOURCE_FILES;
     struct aa_src src;
 
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
         return true;
 
-    /* A folder of loose tracks beside album folders is also an album, and
-     * one visit serves both. Its embedded cover yields only where the album
-     * art source would yield it, to an image of its own -- never to one from
-     * above. */
-    if (artist && slot->stamp == AA_STAMP_EMBEDDED && aa_thumbs_exist(dh))
-    {
-        if (global_settings.art_cache_album_source <= ART_SOURCE_FILES_FIRST
-            && aa_find_file(probe_path, false))
-            goto from_file;
-        return true;
-    }
-
-    if (source <= ART_SOURCE_FILES_FIRST && aa_find_file(probe_path, artist))
+    if (aa_covers_central(w->artist, w->title)
+        || (w->named && aa_book_file(probe_path)))
+        goto from_file;
+    if (source <= ART_SOURCE_FILES_FIRST && w->folder
+        && aa_find_file(probe_path))
         goto from_file;
 
     if (embedded)
@@ -1477,7 +1524,8 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
         }
     }
 
-    if (source == ART_SOURCE_EMBEDDED_FIRST && aa_find_file(probe_path, artist))
+    if (source == ART_SOURCE_EMBEDDED_FIRST && w->folder
+        && aa_find_file(probe_path))
         goto from_file;
 
     /* Nothing found. Thumbnails stamped EMBEDDED came from tags all the same:
@@ -1516,10 +1564,9 @@ static void aa_log_miss(const char *kind, const char *dir)
 }
 
 /* One full generation pass: walk every track filename, dedup by directory,
- * resolve folder art, and render any missing thumbnails -- both the track's own
- * (album) folder and its parent (artist) folder, for libraries laid out as
- * <artist>/<album>/<track>. Returns BG_INTERRUPTED if it was aborted (USB/DB
- * busy/no memory) and BG_FAILED if the database could not be read to the end. */
+ * resolve folder art, and render any missing thumbnails; then the books, then
+ * the people. Returns BG_INTERRUPTED if it was aborted (USB/DB busy/no memory)
+ * and BG_FAILED if the database could not be read to the end. */
 /* The two miss lists a pass is writing. One open file each for the whole pass
  * rather than an open/append/close per folder, which on a library with a lot
  * of coverless folders would be thousands of them. */
@@ -1565,13 +1612,683 @@ static size_t aa_work_bytes(void)
            + IMAGE_DECODE_OVERHEAD;
 }
 
+/* ---- people ----
+ *
+ * A person's picture is keyed by their name, and found by the first of:
+ * a file named for them in /Artwork/People; the highest folder up to three
+ * above one of their tracks (its own counted) named for them; the folder
+ * above one of their works, or the one above that, unless it is the volume
+ * root or a library folder. A library folder holds the folders named for
+ * two or more people, as Music/ does; Prince/ holding folders named for
+ * Prince and for Prince & The Revolution is still Prince's. Only cover.*
+ * and folder.* in the folder itself count.
+ *
+ * So a pass takes three walks for people: one notes every track's named
+ * folders and library folders, which the album walk does when it sees the
+ * whole library, one settles pictures, and one, only when needed, gives the
+ * people whose named folder had no image their fallback -- which cannot be
+ * tried before every named folder has been.
+ *
+ * The first walk also notes which folders hold more than one book of a kind,
+ * whose images are then no book's cover, so a book's own cover is settled on
+ * the second. */
+
+#define AA_PEOPLE_DIR "/Artwork/People"
+
+/* Ebooks' folders in the book-folder table, apart from audiobooks': a
+ * folder holding one of each holds one book of each kind */
+#define AA_EBOOK_DIRS 0x9E3779B9u
+
+enum aa_people_stage
+{
+    AA_PEOPLE_COLLECT,
+    AA_PEOPLE_RESOLVE,
+    AA_PEOPLE_FALLBACK,
+};
+
+#define AA_PERSON_SEEN  1       /* checked against the cache and /Artwork */
+#define AA_PERSON_TRIED 2       /* their named folder was looked in */
+#define AA_PERSON_DONE  4       /* settled this pass */
+#define AA_PERSON_ART   8       /* and has a picture */
+
+static int aa_central_count;
+static size_t aa_central_used;
+/* People whose named folder had no image, for the fallback walk */
+static int aa_people_waiting;
+/* Moving an old key's thumbnails rather than copying them: on a whole
+ * pass, once the walk has visited every key a work has */
+static bool aa_people_move;
+/* The previous item's folder and person, which a fallback has tried */
+static unsigned int aa_people_last_dir, aa_people_last_key;
+/* The album row of the track a walk is on, with its artist's name keys and,
+ * in aa_name and aa_title, its artist and title. Read once per row; row -2
+ * before any. */
+static struct
+{
+    int row;
+    bool ok;
+    struct tagcache_album al;
+    unsigned int key, alt;
+} aa_row;
+static struct book_index_text aa_book_text;
+
+struct aa_people_ctx
+{
+    int stage;
+    void *workbuf;
+    size_t worksz;
+    bool *aborted;
+};
+
+/* Whether either key of one name equals either key of the other */
+static bool aa_keys_match(unsigned int k1, unsigned int a1,
+                          unsigned int k2, unsigned int a2)
+{
+    return (k1 && (k1 == k2 || k1 == a2)) || (a1 && (a1 == k2 || a1 == a2));
+}
+
+static struct aa_person *aa_person_get(unsigned int key, bool claim)
+{
+    unsigned int i;
+
+    if (!key)
+        return NULL;
+    for (i = 0; i < AA_PEOPLE_SLOTS; i++)
+    {
+        struct aa_person *p = &aa_people[(key + i) & (AA_PEOPLE_SLOTS - 1)];
+
+        if (p->key == key)
+            return p;
+        if (p->key == 0)
+        {
+            if (!claim)
+                return NULL;
+            p->key = key;
+            return p;
+        }
+    }
+    return NULL;
+}
+
+/* The entry of 'dir' in a folder table of 'slots'; with 'who', claimed for
+ * them if new */
+static struct aa_libdir *aa_dir_entry(struct aa_libdir *t, unsigned int slots,
+                                      unsigned int dir, unsigned int who)
+{
+    unsigned int i;
+
+    if (!dir)
+        return NULL;
+    for (i = 0; i < slots; i++)
+    {
+        struct aa_libdir *l = &t[(dir + i) & (slots - 1)];
+
+        if (l->dir == dir)
+            return l;
+        if (l->dir == 0)
+        {
+            if (!who)
+                return NULL;
+            l->dir = dir;
+            l->who = who;
+            return l;
+        }
+    }
+    return NULL;
+}
+
+/* 'dir' holds 'who', in a folder table: two of them make 'who' 0 */
+static void aa_dir_note(struct aa_libdir *t, unsigned int slots,
+                        unsigned int dir, unsigned int who)
+{
+    struct aa_libdir *l = aa_dir_entry(t, slots, dir, who);
+
+    if (l && l->who != who)
+        l->who = 0;
+}
+
+static bool aa_dir_shared(struct aa_libdir *t, unsigned int slots,
+                          unsigned int dir)
+{
+    struct aa_libdir *l = aa_dir_entry(t, slots, dir, 0);
+
+    return l && l->who == 0;
+}
+
+static bool aa_is_library(unsigned int dir)
+{
+    return aa_dir_shared(aa_libdirs, AA_LIBDIR_SLOTS, dir);
+}
+
+/* Whether the folder of the book at 'path' stands for the book alone: it
+ * holds no other book of its kind ('salt' 0 for an audiobook, AA_EBOOK_DIRS
+ * for an ebook), and is not named for the book's person 'name', whose
+ * picture its image is */
+static bool aa_book_folder(const char *path, unsigned int salt,
+                           const char *name)
+{
+    const char *end = strrchr(path, '/'), *start;
+
+    if (!end || aa_dir_shared(aa_bookdirs, AA_BOOKDIR_SLOTS,
+                              aa_hash_n(path, end - path) ^ salt))
+        return false;
+    for (start = end; start > path && start[-1] != '/'; start--)
+        ;
+    return !aa_keys_match(art_name_hash_n(start, end - start),
+                          art_name_alt_hash_n(start, end - start),
+                          art_name_hash(name), art_name_alt_hash(name));
+}
+
+static void aa_book_noted(const char *path, unsigned int salt,
+                          unsigned int who)
+{
+    const char *end = strrchr(path, '/');
+
+    if (end)
+        aa_dir_note(aa_bookdirs, AA_BOOKDIR_SLOTS,
+                    aa_hash_n(path, end - path) ^ salt, who);
+}
+
+/* The length of the volume part of 'path', "/<HDD0>", or 0 */
+static size_t aa_root_len(const char *path)
+{
+    const char *e;
+
+    if (path[0] != '/' || path[1] != '<' || !(e = strchr(path, '>'))
+        || (e[1] && e[1] != '/'))
+        return 0;
+    return e + 1 - path;
+}
+
+/* Where the folder 'level' above the track or book at 'path' ends -- 0 its
+ * own -- or NULL when that is the volume root or above it */
+static const char *aa_level_end(const char *path, int level)
+{
+    const char *root = path + aa_root_len(path);
+    const char *end = strrchr(path, '/');
+
+    while (end && end > root && level-- > 0)
+    {
+        do
+            end--;
+        while (end > root && *end != '/');
+    }
+    return end && end > root ? end : NULL;
+}
+
+/* What one track or book says about its person: the folders above it named
+ * for them, and which folders hold such folders */
+static void aa_people_note(const char *path, unsigned int key, unsigned int alt)
+{
+    struct aa_person *p = aa_person_get(key, true);
+    const char *root, *end, *start;
+    int level;
+
+    if (!p)
+        return;
+    p->alt = alt;
+    root = path + aa_root_len(path);
+    end = strrchr(path, '/');
+    for (level = 0; level < 4 && end && end > root; level++)
+    {
+        for (start = end; start > root && start[-1] != '/'; start--)
+            ;
+        if (start < end
+            && aa_keys_match(art_name_hash_n(start, end - start),
+                             art_name_alt_hash_n(start, end - start),
+                             key, alt))
+        {
+            if (!p->match || level > p->level)
+            {
+                p->match = aa_hash_n(path, end - path);
+                p->level = level;
+            }
+            if (start - 1 > root)
+                aa_dir_note(aa_libdirs, AA_LIBDIR_SLOTS,
+                            aa_hash_n(path, start - 1 - path), key);
+        }
+        end = start - 1;
+    }
+}
+
+/* The album row of the track idx_id into aa_row */
+static void aa_track_row(int idx_id)
+{
+    int row = tagcache_album_of(idx_id);
+
+    if (row == aa_row.row)
+        return;
+    aa_row.row = row;
+    aa_row.key = aa_row.alt = 0;
+    aa_name[0] = aa_title[0] = '\0';
+    aa_row.ok = tagcache_album_get(row, &aa_row.al);
+    if (!aa_row.ok)
+        return;
+    if (tagcache_seek_string(tag_albumartist, aa_row.al.artist_seek,
+                             aa_name, sizeof(aa_name)))
+    {
+        aa_row.key = art_name_hash(aa_name);
+        aa_row.alt = art_name_alt_hash(aa_name);
+    }
+    if (!tagcache_seek_string(tag_album, aa_row.al.album_seek, aa_title,
+                              sizeof(aa_title)))
+        aa_title[0] = '\0';
+}
+
+/* Whether the track idx_id is the first of a book, the track that gives the
+ * book its key */
+static bool aa_track_is_book(int idx_id)
+{
+    return aa_row.ok && aa_row.al.first == idx_id
+           && db_spoken_album_kind(&aa_row.al) == 1;
+}
+
+/* What one track says, for the people step and the books' covers */
+static void aa_track_note(const char *path, int idx_id)
+{
+    aa_track_row(idx_id);
+    if (aa_row.key)
+        aa_people_note(path, aa_row.key, aa_row.alt);
+    if (aa_row.ok && db_spoken_album_kind(&aa_row.al) == 1)
+        aa_book_noted(path, 0, aa_row.row + 1);
+}
+
+/* The files of /Artwork/People or, with 'covers', /Artwork/Covers, by name
+ * key, after those already loaded */
+static void aa_central_load(bool covers)
+{
+    const char *dir = covers ? ART_COVERS_DIR : AA_PEOPLE_DIR;
+    DIR *d;
+    struct dirent *e;
+
+    if (!(d = opendir(dir)))
+        return;
+    while ((e = readdir(d)))
+    {
+        const char *dot = strrchr(e->d_name, '.');
+        size_t len = strlen(e->d_name) + 1;
+        struct aa_central *c = &aa_central[aa_central_count];
+
+        if (e->d_name[0] == '.' || !art_image_ext(dot)
+            || (dir_get_info(d, e).attribute & ATTR_DIRECTORY))
+            continue;
+        if (aa_central_count == AA_CENTRAL_MAX
+            || aa_central_used + len > AA_CENTRAL_NAMES)
+        {
+            debug_log(DEBUG_LOG_ARTCACHE, "%s: too many files", dir);
+            break;
+        }
+        c->key = art_name_hash_n(e->d_name, dot - e->d_name);
+        c->alt = art_name_alt_hash_n(e->d_name, dot - e->d_name);
+        if (!c->key)
+            continue;
+        c->covers = covers;
+        c->name = aa_central_used;
+        memcpy(aa_central_names + aa_central_used, e->d_name, len);
+        aa_central_used += len;
+        aa_central_count++;
+    }
+    closedir(d);
+}
+
+/* The first file of /Artwork/People named for 'p', into aa_artpath */
+static bool aa_central_find(const struct aa_person *p)
+{
+    int i;
+
+    for (i = 0; i < aa_central_count; i++)
+    {
+        const struct aa_central *c = &aa_central[i];
+
+        if (c->covers || !aa_keys_match(c->key, c->alt, p->key, p->alt))
+            continue;
+        snprintf(aa_artpath, sizeof(aa_artpath), AA_PEOPLE_DIR "/%s",
+                 aa_central_names + c->name);
+        if (art_file_usable(aa_artpath))
+            return true;
+    }
+    return false;
+}
+
+/* The first file of /Artwork/Covers named for 'title' by 'artist', else
+ * for 'title' alone, into aa_artpath */
+static bool aa_covers_central(const char *artist, const char *title)
+{
+    unsigned int kw = art_name_work_hash(artist, title);
+    unsigned int kt = art_name_hash(title);
+    int i, pass;
+
+    if (!kt)
+        return false;
+    for (pass = 0; pass < 2; pass++)
+    {
+        for (i = 0; i < aa_central_count; i++)
+        {
+            const struct aa_central *c = &aa_central[i];
+
+            if (!c->covers || c->key != (pass ? kt : kw))
+                continue;
+            snprintf(aa_artpath, sizeof(aa_artpath), ART_COVERS_DIR "/%s",
+                     aa_central_names + c->name);
+            if (art_file_usable(aa_artpath))
+                return true;
+        }
+    }
+    return false;
+}
+
+/* An image in the folder [path, end) itself, into aa_artpath */
+static bool aa_folder_image(const char *path, const char *end)
+{
+    size_t n = end - path;
+
+    if (n + 3 > sizeof(aa_probe))
+        return false;
+    memcpy(aa_probe, path, n);
+    strcpy(aa_probe + n, "/_");
+    return aa_find_file(aa_probe);
+}
+
+static bool aa_copy_file(const char *from, const char *to, void *buf,
+                         size_t size)
+{
+    int in = open(from, O_RDONLY), out;
+    ssize_t n;
+    bool ok = true;
+
+    if (in < 0)
+        return false;
+    out = open(to, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (out < 0)
+    {
+        close(in);
+        return false;
+    }
+    while ((n = read(in, buf, size)) > 0)
+    {
+        if (write(out, buf, n) != n)
+        {
+            ok = false;
+            break;
+        }
+    }
+    close(in);
+    close(out);
+    if (n < 0 || !ok)
+    {
+        remove(to);
+        return false;
+    }
+    return true;
+}
+
+/* Every size of key 'from''s thumbnails as key 'to''s: moved, or copied
+ * where 'from' is still a work's */
+static bool aa_adopt(unsigned int from, unsigned int to, bool move,
+                     void *buf, size_t size)
+{
+    int s;
+
+    aa_generation++;
+    for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
+    {
+        aa_cache_path(aa_check_path, sizeof(aa_check_path), s, from);
+        aa_cache_path(aa_out_path, sizeof(aa_out_path), s, to);
+        remove(aa_out_path);
+        if (move ? rename(aa_check_path, aa_out_path) != 0
+                 : !aa_copy_file(aa_check_path, aa_out_path, buf, size))
+            return false;
+    }
+    return true;
+}
+
+static void aa_person_settled(struct aa_person *p, bool art)
+{
+    p->flags |= AA_PERSON_DONE | (art ? AA_PERSON_ART : 0);
+    aa_visit(p->key);
+}
+
+/* Settle 'p' from the image in aa_artpath, found for the item at 'path'.
+ * Before the people were keyed by name, their thumbnails were keyed by the
+ * folder 'old' levels above the item, up to the one above its own; those
+ * made from this same image are taken over rather than made again. */
+static void aa_person_fill(struct aa_person *p, struct aa_stamp *slot,
+                           const char *path, int old,
+                           const struct aa_people_ctx *c)
+{
+    unsigned int stamp = aa_art_stamp(aa_artpath);
+    struct aa_src src = { .path = aa_artpath, .emb_pos = -1 };
+
+    for (; old <= 1 && slot->stamp == AA_STAMP_NONE
+           && !aa_thumbs_exist(p->key); old++)
+    {
+        const char *end = aa_level_end(path, old);
+        unsigned int oh;
+        struct aa_stamp *os;
+
+        if (!end)
+            break;
+        oh = aa_hash_n(path, end - path);
+        os = aa_slot(oh);
+        if (os && os->stamp == stamp && aa_thumbs_exist(oh)
+            && aa_adopt(oh, p->key, aa_people_move && !aa_was_visited(oh),
+                        c->workbuf, c->worksz))
+        {
+            debug_log(DEBUG_LOG_ARTCACHE, "person kept: %s", aa_artpath);
+            slot->stamp = stamp;
+        }
+    }
+    aa_person_settled(p, aa_fill(&src, stamp, p->key, slot, c->workbuf,
+                                 c->worksz, c->aborted));
+}
+
+/* One item on a walk that settles pictures. 'up' is where its fallback
+ * starts: 1, the folder above a track's, or 0, a book's own. */
+static void aa_people_settle(const char *path, unsigned int key, int up,
+                             const struct aa_people_ctx *c)
+{
+    struct aa_person *p = aa_person_get(key, false);
+    struct aa_stamp *slot;
+    const char *end;
+    unsigned int dh;
+    int lv;
+
+    if (!p || (p->flags & AA_PERSON_DONE))
+        return;
+    if (aa_was_visited(key) || !(slot = aa_slot(key)))
+    {
+        p->flags |= AA_PERSON_DONE;       /* a work's key, or no room */
+        return;
+    }
+    if (!(p->flags & AA_PERSON_SEEN))
+    {
+        p->flags |= AA_PERSON_SEEN;
+        if (!aa_check_all && slot->stamp != AA_STAMP_NONE
+            && aa_thumbs_exist(key))
+        {
+            aa_person_settled(p, true);
+            return;
+        }
+        if (aa_central_find(p))
+        {
+            aa_person_fill(p, slot, path, up, c);
+            return;
+        }
+    }
+
+    if (p->match && !(p->flags & AA_PERSON_TRIED))
+    {
+        end = aa_level_end(path, p->level);
+        if (!end || aa_hash_n(path, end - path) != p->match)
+            return;                     /* for an item under it */
+        p->flags |= AA_PERSON_TRIED;
+        if (aa_folder_image(path, end))
+        {
+            aa_person_fill(p, slot, path, up, c);
+            return;
+        }
+        aa_people_waiting++;
+    }
+    if (p->match && c->stage != AA_PEOPLE_FALLBACK)
+        return;
+
+    if (!(end = strrchr(path, '/')))
+        return;
+    dh = aa_hash_n(path, end - path);
+    if (dh == aa_people_last_dir && key == aa_people_last_key)
+        return;
+    aa_people_last_dir = dh;
+    aa_people_last_key = key;
+    for (lv = up; lv < up + 2 && (end = aa_level_end(path, lv)); lv++)
+    {
+        if (aa_is_library(aa_hash_n(path, end - path)))
+            continue;
+        if (aa_folder_image(path, end))
+        {
+            aa_person_fill(p, slot, path, up, c);
+            return;
+        }
+    }
+}
+
+/* A book's first track: the book's cover, keyed by that track's path. Its
+ * folder's images stand for it only as aa_book_folder() says. */
+static void aa_book_track_cover(const char *path, const struct aa_people_ctx *c)
+{
+    unsigned int bh = aa_hash(path);
+    struct aa_stamp *slot = aa_visit(bh);
+    struct aa_work w = { aa_name, aa_title, aa_row.al.tracks == 1,
+                         aa_book_folder(path, 0, aa_name) };
+
+    if (slot && !aa_cache_dir(path, bh, slot, &w, c->workbuf, c->worksz,
+                              c->aborted) && !*c->aborted)
+        aa_log_miss("book", path);
+}
+
+/* One walk of the database's tracks for people. False if stopped. */
+static bool aa_people_walk(const struct aa_people_ctx *c)
+{
+    struct tagcache_search tcs;
+    int since_yield = 0;
+
+    if (!tagcache_search(&tcs, tag_filename))
+    {
+        *c->aborted = true;
+        return false;
+    }
+    aa_row.row = -2;
+    aa_people_last_dir = aa_people_last_key = 0;
+    while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
+    {
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            *c->aborted = true;
+            break;
+        }
+        if (c->stage == AA_PEOPLE_COLLECT)
+            aa_track_note(tcs.result, tcs.idx_id);
+        else
+        {
+            aa_track_row(tcs.idx_id);
+            if (c->stage == AA_PEOPLE_RESOLVE && aa_track_is_book(tcs.idx_id))
+                aa_book_track_cover(tcs.result, c);
+            if (aa_row.key && !*c->aborted)
+                aa_people_settle(tcs.result, aa_row.key, 1, c);
+        }
+        if (*c->aborted)
+            break;
+        if (++since_yield >= 16)
+        {
+            since_yield = 0;
+            yield();
+        }
+    }
+    if (tcs.failed)
+        *c->aborted = true;
+    tagcache_search_finish(&tcs);
+    return !*c->aborted;
+}
+
+/* One book's author, on a walk that settles pictures */
+static bool aa_book_person(const struct book_entry *e, void *data)
+{
+    const struct aa_people_ctx *c = data;
+    unsigned int key = art_name_hash(e->author);
+
+    if (aa_check_abort() || tagcache_is_busy())
+    {
+        *c->aborted = true;
+        return false;
+    }
+    if (key)
+        aa_people_settle(e->path, key, 0, c);
+    return !*c->aborted;
+}
+
+/* The database's artists with no picture, into the health list */
+static void aa_people_report(void)
+{
+    struct tagcache_artist ar;
+    int i, n = tagcache_artist_count();
+
+    for (i = 0; i < n; i++)
+    {
+        const struct aa_person *p;
+
+        if (!tagcache_artist_get(i, &ar) || !ar.art_hash)
+            continue;
+        aa_counts.artists++;
+        p = aa_person_get(ar.art_hash, false);
+        if (p && (p->flags & AA_PERSON_ART))
+            aa_counts.artist_art++;
+        else if (tagcache_seek_string(tag_albumartist, ar.seek, aa_name,
+                                      sizeof(aa_name)))
+        {
+            path_list_write_record(&noart_artists, aa_name);
+            debug_log(DEBUG_LOG_ARTCACHE, "no art: artist %s", aa_name);
+        }
+    }
+}
+
+/* Every person's picture, once the album walk and the books are done */
+static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
+{
+    struct aa_people_ctx c = { AA_PEOPLE_COLLECT, workbuf, worksz, aborted };
+
+    aa_people_move = !aa_added_only;
+    if (aa_added_only && !aa_people_walk(&c))
+        return false;
+
+    aa_people_waiting = 0;
+    c.stage = AA_PEOPLE_RESOLVE;
+    if (!aa_people_walk(&c))
+        return false;
+    aa_people_last_dir = aa_people_last_key = 0;
+    book_index_each(aa_book_person, &c, &aa_book_text);
+    if (*aborted)
+        return false;
+
+    if (aa_people_waiting)
+    {
+        c.stage = AA_PEOPLE_FALLBACK;
+        if (!aa_people_walk(&c))
+            return false;
+        aa_people_last_dir = aa_people_last_key = 0;
+        book_index_each(aa_book_person, &c, &aa_book_text);
+        if (*aborted)
+            return false;
+    }
+    aa_people_report();
+    return true;
+}
+
 /* ---- books ---- */
 
 #define AA_COVER_TMP LIB_CACHE_DIR "/cover.tmp"
 
 /* An image named after the book, `<book>.jpg` and so on, that its decoder
  * takes, into aa_artpath: how a cover is given to a book without one, or
- * replaced. A folder.jpg beside it is the author's, not this book's. */
+ * replaced, which an image in the folder or inside the book does not. */
 static bool aa_book_file(const char *path)
 {
     static const char * const exts[] = { ".jpg", ".jpeg", ".png", ".bmp",
@@ -1599,33 +2316,22 @@ struct aa_books_ctx
     bool *aborted;
 };
 
-/* The folders an author's photograph may be in, as an artist's is: the
- * book's own, for books kept as author, file, and the one above it, for
- * author, book, file. Each once, whatever number of books share it. */
-static void aa_book_folders(const char *path, struct aa_books_ctx *c)
+/* One book of the index noted: its author for the people step, and its
+ * folder for the books' covers */
+static bool aa_book_note(const struct book_entry *e, void *data)
 {
-    char dir[MAX_PATH];
-
-    strmemccpy(dir, path, sizeof(dir));
-    for (int up = 0; up < 2 && !*c->aborted; up++)
-    {
-        char *slash = strrchr(dir, '/');
-        unsigned int dh;
-        struct aa_stamp *slot;
-
-        if (!slash || slash == dir)
-            return;                     /* at the top: no author's folder */
-        *slash = '\0';
-        dh = aa_hash(dir);
-        if (!(slot = aa_visit(dh)))
-            continue;
-        snprintf(aa_probe, sizeof(aa_probe), "%s/_", dir);
-        aa_cache_dir(aa_probe, dh, slot, true, c->workbuf, c->worksz,
-                     c->aborted);
-    }
+    (void)data;
+    aa_people_note(e->path, art_name_hash(e->author),
+                   art_name_alt_hash(e->author));
+    aa_book_noted(e->path, AA_EBOOK_DIRS, aa_hash(e->path));
+    return true;
 }
 
-/* One book of the index: a visit, as a folder has one */
+/* One book of the index: a visit, as a folder has one. A file in
+ * /Artwork/Covers named for it comes first, then an image named after it;
+ * then its folder's image, when aa_book_folder() lets it stand for the
+ * book, and the cover inside it, in the order the album art source setting
+ * names. */
 static bool aa_book_visit(const struct book_entry *e, void *data)
 {
     struct aa_books_ctx *c = data;
@@ -1633,34 +2339,37 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
     struct aa_stamp *slot;
     struct aa_src src = { .emb_pos = -1 };
     unsigned int stamp;
-    bool tmp = false;
+    bool tmp = false, folder, inside;
+    int source;
 
     if (aa_check_abort() || tagcache_is_busy())
     {
         *c->aborted = true;
         return false;
     }
-    aa_book_folders(e->path, c);
-    if (*c->aborted)
-        return false;
     if (!(slot = aa_visit(bh)))
         return true;
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(bh))
         return true;
 
-    if (aa_book_file(e->path))
+    source = global_settings.art_cache_album_source;
+    folder = aa_book_folder(e->path, AA_EBOOK_DIRS, e->author);
+    inside = source != ART_SOURCE_FILES && e->cover_at >= 0;
+    if (aa_covers_central(e->author, e->title) || aa_book_file(e->path)
+        || ((source <= ART_SOURCE_FILES_FIRST || !inside) && folder
+            && source != ART_SOURCE_EMBEDDED && aa_find_file(e->path)))
     {
         src.path = aa_artpath;
         stamp = aa_art_stamp(aa_artpath);
     }
-    else if (e->cover_at >= 0 && e->cover_method == 0)
+    else if (inside && e->cover_method == 0)
     {
         src.path = e->path;
         src.emb_pos = e->cover_at;
         src.emb_size = e->cover_csize;
         stamp = aa_art_stamp(e->path);
     }
-    else if (e->cover_at >= 0)
+    else if (inside)
     {
         stamp = aa_art_stamp(e->path);
         if (slot->stamp != stamp || !aa_thumbs_exist(bh))
@@ -1720,6 +2429,11 @@ static enum bg_result aa_run_pass(void)
     workbuf = core_get_data_pinned(wh);
     aa_stamps = core_get_data_pinned(sh);
     aa_visited = (unsigned char *)(aa_stamps + AA_SEEN_SLOTS);
+    aa_people = (struct aa_person *)(aa_visited + AA_SEEN_SLOTS / 8);
+    aa_libdirs = (struct aa_libdir *)(aa_people + AA_PEOPLE_SLOTS);
+    aa_bookdirs = aa_libdirs + AA_LIBDIR_SLOTS;
+    aa_central = (struct aa_central *)(aa_bookdirs + AA_BOOKDIR_SLOTS);
+    aa_central_names = (char *)(aa_central + AA_CENTRAL_MAX);
     memset(aa_stamps, 0, AA_TABLE_BYTES);
 
     aa_ensure_dirs();
@@ -1782,9 +2496,14 @@ static enum bg_result aa_run_pass(void)
      * changes), so the extra clock is a brief one-off. */
     cpu_boost(true);
 
+    aa_central_count = 0;
+    aa_central_used = 0;
+    aa_central_load(false);
+    aa_central_load(true);
+    aa_row.row = -2;
     while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
     {
-        unsigned int dh, ah;
+        unsigned int dh;
         struct aa_stamp *slot;
 
         /* Abort promptly on USB/shutdown (the thread loop then acknowledges)
@@ -1802,10 +2521,13 @@ static enum bg_result aa_run_pass(void)
          * cheap. */
         aa_dirname(tcs.result, aa_dir, sizeof(aa_dir));
         dh = aa_hash(aa_dir);
+        aa_track_row(tcs.idx_id);
         if ((slot = aa_visit(dh)))
         {
+            struct aa_work w = { aa_name, aa_title, false, true };
+
             aa_counts.albums++;
-            if (aa_cache_dir(tcs.result, dh, slot, false, workbuf, worksz,
+            if (aa_cache_dir(tcs.result, dh, slot, &w, workbuf, worksz,
                              &aborted))
                 aa_counts.album_art++;
             else if (!aborted)
@@ -1817,49 +2539,11 @@ static enum bg_result aa_run_pass(void)
         if (aborted)
             break;
 
-        /* A book's first track, the key tagcache gives the book's art: the
-         * art inside that file, or else its folder's */
-        {
-            struct tagcache_album al;
-
-            if (tagcache_album_get(tagcache_album_of(tcs.idx_id), &al)
-                && al.first == tcs.idx_id && db_spoken_album_kind(&al) == 1
-                && (slot = aa_visit(aa_hash(tcs.result))))
-            {
-                aa_book_track = true;
-                aa_cache_dir(tcs.result, aa_hash(tcs.result), slot, false,
-                             workbuf, worksz, &aborted);
-                aa_book_track = false;
-            }
-        }
-        if (aborted)
-            break;
-
-        /* The parent folder (the artist), cached from <artist>/folder.jpg etc.
-         * for <artist>/<album>/<track> layouts, and from the folder above it
-         * for <artist>/<album_type>/<album>/<track>. Deduped independently of
-         * the album so an artist whose first album has no cover still gets
-         * resolved. Skipped when there is no distinct parent (flat/rooted layouts). */
-        aa_dirname(aa_dir, aa_artist_dir, sizeof(aa_artist_dir));
-        if (aa_artist_dir[0] && strcmp(aa_artist_dir, aa_dir) != 0)
-        {
-            ah = aa_hash(aa_artist_dir);
-            if ((slot = aa_visit(ah)))
-            {
-                snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
-                aa_counts.artists++;
-                if (aa_cache_dir(aa_probe, ah, slot, true, workbuf, worksz,
-                                 &aborted))
-                    aa_counts.artist_art++;
-                else if (!aborted)
-                {
-                    path_list_write_record(&noart_artists, aa_artist_dir);
-                    aa_log_miss("artist", aa_artist_dir);
-                }
-            }
-        }
-        if (aborted)
-            break;
+        /* What the track says about its artist and its book, for the
+         * people step: a walk of only the added tracks does not see enough,
+         * and the people step takes its own */
+        if (!aa_added_only)
+            aa_track_note(tcs.result, tcs.idx_id);
 
         if (++since_yield >= 16)
         {
@@ -1878,11 +2562,13 @@ static enum bg_result aa_run_pass(void)
     /* Every book in the index, which the orphan sweep below then spares */
     if (!aborted)
     {
-        static struct book_index_text text;
         struct aa_books_ctx books = { workbuf, worksz, &aborted };
 
-        book_index_each(aa_book_visit, &books, &text);
+        book_index_each(aa_book_note, &books, &aa_book_text);
+        book_index_each(aa_book_visit, &books, &aa_book_text);
     }
+    if (!aborted && !failed)
+        aa_people_pass(workbuf, worksz, &aborted);
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
@@ -2088,16 +2774,34 @@ static void aa_task_event(const struct queue_event *ev)
         aa_handle_offer();
 }
 
+/* Whether the stamp file's first record is this scheme's: see AA_SCHEME */
+static bool aa_scheme_current(void)
+{
+    struct aa_stamp first;
+    int fd = open(AA_STAMP_FILE, O_RDONLY);
+    bool ok;
+
+    if (fd < 0)
+        return false;
+    ok = lseek(fd, sizeof(struct libfile_header), SEEK_SET)
+            == (off_t)sizeof(struct libfile_header)
+         && read(fd, &first, sizeof(first)) == (ssize_t)sizeof(first)
+         && first.key == AA_SCHEME_KEY && first.stamp == AA_SCHEME;
+    close(fd);
+    return ok;
+}
+
 /* bg_task.read_marks and write_marks: the stamp file's header. The marks are
  * read back at init, never started at -1: -1 matches no settled count, so
  * every boot would run a full pass with cache_busy set, holding the
- * "Building" indicator up with nothing to do. */
+ * "Building" indicator up with nothing to do. A file of the old scheme gives
+ * none, once, for the pass that moves it to this one. */
 static void aa_read_marks(struct bg_marks *m)
 {
     struct libfile_header h;
 
     if (libfile_peek(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
-                     &h))
+                     &h) && aa_scheme_current())
     {
         m->entries = h.marks.entries;
         m->commitid = h.marks.commitid;

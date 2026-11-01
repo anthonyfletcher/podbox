@@ -4,8 +4,9 @@
  * Copyright (C) 2007 Nicolas Pennequin
  * GNU General Public License (version 2+)
  *
- * Finds album art for a track: searches the conventional filenames and
- * directories, and reports the best match for a requested size.
+ * Finds the image file standing for a track's cover: one in /Artwork/Covers
+ * named for its album, else one named after the track, cover.* or folder.*
+ * in its folder, or in the folder above a disc folder.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -15,6 +16,7 @@
 #include "metadata.h"
 #include "rbpaths.h"
 #include "audio/buffering.h"
+#include "dir.h"
 #include "dircache.h"
 #include "system/strutil.h"
 #include "pathfuncs.h"
@@ -25,6 +27,7 @@
 #include "draw/image_load.h"
 #include "draw/gif_load.h"
 #include "draw/webp_load.h"
+#include "art_name.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -32,38 +35,6 @@
 
 #define USE_JPEG_COVER
 
-
-/* Strip filename from a full path
- *
- * buf      - buffer to extract directory to.
- * buf_size - size of buffer.
- * fullpath - fullpath to extract from.
- *
- * Split the directory part of the given fullpath and store it in buf
- *   (including last '/').
- * The function return parameter is a pointer to the filename
- *   inside the given fullpath.
- */
-static char* strip_filename(char* buf, int buf_size, const char* fullpath)
-{
-    char* sep;
-    int   len;
-
-    if (!buf || buf_size <= 0 || !fullpath)
-        return NULL;
-
-    /* if 'fullpath' is only a filename return immediately */
-    sep = strrchr(fullpath, '/');
-    if (sep == NULL)
-    {
-        buf[0] = 0;
-        return (char*)fullpath;
-    }
-
-    len = MIN(sep - fullpath + 1, buf_size - 1);
-    strmemccpy(buf, fullpath, len + 1);
-    return (sep + 1);
-}
 
 /* Whether an image the search has found can be drawn. The JPEG decoder takes
  * baseline and progressive Huffman-coded images only, the PNG reader no
@@ -144,197 +115,108 @@ static bool try_exts(char *path, int len)
     return false;
 }
 
-/* folder.jpg, then folder.png, folder.gif and folder.webp, in dir */
-static bool try_folder(char *path, size_t size, const char *dir)
+/* An image called 'stem' plus one of the extensions in the folder [dir,
+ * dir + dirlen), the length counting its slash, into p */
+static bool try_named(char *p, const char *dir, size_t dirlen,
+                      const char *stem, size_t stemlen)
 {
-    snprintf(path, size, "%sfolder.jpg", dir);
-    if (art_file_usable(path))
-        return true;
-    snprintf(path, size, "%sfolder.png", dir);
-    if (art_file_usable(path))
-        return true;
-    snprintf(path, size, "%sfolder.gif", dir);
-    if (art_file_usable(path))
-        return true;
-    snprintf(path, size, "%sfolder.webp", dir);
-    return art_file_usable(path);
+    if (dirlen + stemlen + 1 + 4 >= MAX_PATH)
+        return false;
+    memcpy(p, dir, dirlen);
+    memcpy(p + dirlen, stem, stemlen);
+    p[dirlen + stemlen] = '.';
+    p[dirlen + stemlen + 1] = '\0';
+    return try_exts(p, dirlen + stemlen + 1);
 }
 
-/* Deliberately empty: it marks where an extension goes in the path-building
- * format strings below, e.g. "%scover%s." EXT builds "...cover.100x100."
- * for try_exts() to complete. */
-#define EXT
-
-/* Look for the first matching album art bitmap in the following list:
- *  ./<trackname><size>.{jpeg,jpg,bmp,png,gif,webp}
- *  ./<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
- *  ./cover<size>.bmp
- *  ./folder.{jpg,png,gif,webp}
- *  ../<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
- *  ../cover<size>.{jpeg,jpg,bmp,png,gif,webp}
- *  ../folder.{jpg,png,gif,webp}
- *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp,png,gif,webp}
- * <size> is the value of the size_string parameter, <trackname> and
- * <albumname> are read from the ID3 metadata.
- * If a matching bitmap is found, its filename is stored in buf.
- * Return value is true if a bitmap was found, false otherwise.
- *
- * If the first symbol in size_string is a colon (e.g. ":100x100")
- * then the colon is skipped ("100x100" will be used) and the track
- * specific image (./<trackname><size>.bmp) is tried last instead of first.
- */
-bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
-                           char *buf, int buflen)
+bool art_image_ext(const char *dot)
 {
-    char path[MAX_PATH + 11]; /* need room for filename and null termination */
-    char dir[MAX_PATH + 1];
-    bool found = false;
-    int track_first = 1;
-    int pass;
-    const char *trackname;
-    const char *artist;
-    int dirlen;
-    int albumlen;
-    int pathlen;
+    int i;
 
-    if (!id3 || !buf)
+    if (!dot || *dot != '.')
         return false;
+    for (i = 0; i < (int)ARRAYLEN(extensions); i++)
+        if (!strcasecmp(dot + 1, extensions[i]))
+            return true;
+    return false;
+}
 
-    trackname = id3->path;
+bool art_folder_file(const char *path, char *buf, int buflen)
+{
+    char p[MAX_PATH + 8];
+    const char *sep = strrchr(path, '/');
+    const char *name, *dot, *start;
+    size_t dirlen;
 
-    if (strcmp(trackname, "No file!") == 0)
+    if (!sep)
         return false;
+    dirlen = sep - path + 1;
+    name = sep + 1;
+    dot = strrchr(name, '.');
+    if (try_named(p, path, dirlen, name, dot ? (size_t)(dot - name)
+                                             : strlen(name))
+        || try_named(p, path, dirlen, "cover", 5)
+        || try_named(p, path, dirlen, "folder", 6))
+        goto found;
 
-    if (*size_string == ':')
-    {
-        size_string++;
-        track_first = 0;
-    }
+    for (start = sep; start > path && start[-1] != '/'; start--)
+        ;
+    if (start - 1 > path && is_disc_folder(start, sep)
+        && (try_named(p, path, start - path, "cover", 5)
+            || try_named(p, path, start - path, "folder", 6)))
+        goto found;
+    return false;
 
-    strip_filename(dir, sizeof(dir), trackname);
-    dirlen = strlen(dir);
-    albumlen = id3->album ? strlen(id3->album) : 0;
-
-    for(pass = 0; pass < 2 - track_first; pass++)
-    {
-        if (track_first || pass)
-        {
-            /* the first file we look for is one specific to the
-               current track */
-            strip_extension(path, sizeof(path) - strlen(size_string) - 4,
-                            trackname);
-            strcat(path, size_string);
-            strcat(path, "." EXT);
-            pathlen = strlen(path);
-            found = try_exts(path, pathlen);
-        }
-        if (pass)
-            break;
-        if (!found && albumlen > 0)
-        {
-            /* if it doesn't exist,
-            * we look for a file specific to the track's album name */
-            pathlen = snprintf(path, sizeof(path),
-                            "%s%s%s." EXT, dir, id3->album, size_string);
-            fix_path_part(path, dirlen, albumlen);
-            found = try_exts(path, pathlen);
-        }
-
-        if (!found)
-        {
-            /* if it still doesn't exist, we look for a generic file */
-            pathlen = snprintf(path, sizeof(path),
-                            "%scover%s." EXT, dir, size_string);
-            found = try_exts(path, pathlen);
-        }
-
-        if (!found && !*size_string)
-            found = try_folder(path, sizeof(path), dir);
-
-        artist = id3->albumartist != NULL ? id3->albumartist : id3->artist;
-
-        if (!found && artist && id3->album)
-        {
-            /* look in the albumart subdir of .rockbox */
-            pathlen = snprintf(path, sizeof(path),
-                            ROCKBOX_DIR "/albumart/%s-%s%s." EXT,
-                            artist,
-                            id3->album,
-                            size_string);
-            fix_path_part(path, strlen(ROCKBOX_DIR "/albumart/"), MAX_PATH);
-            found = try_exts(path, pathlen);
-        }
-
-        if (!found)
-        {
-            /* if it still doesn't exist,
-            * we continue to search in the parent directory */
-            strcpy(path, dir);
-            path[dirlen - 1] = 0;
-            strip_filename(dir, sizeof(dir), path);
-            dirlen = strlen(dir);
-        }
-
-        /* only try parent if there is one */
-        if (dirlen > 0)
-        {
-            if (!found && albumlen > 0)
-            {
-                /* we look in the parent directory
-                * for a file specific to the track's album name */
-                pathlen = snprintf(path, sizeof(path),
-                                "%s%s%s." EXT, dir, id3->album, size_string);
-                fix_path_part(path, dirlen, albumlen);
-                found = try_exts(path, pathlen);
-            }
-
-            if (!found)
-            {
-                /* if it still doesn't exist, we look in the parent directory
-                * for a generic file */
-                pathlen = snprintf(path, sizeof(path),
-                                "%scover%s." EXT, dir, size_string);
-                found = try_exts(path, pathlen);
-            }
-
-            if (!found && !*size_string)
-                found = try_folder(path, sizeof(path), dir);
-        }
-        if (found)
-            break;
-    }
-
-    if (!found)
-        return false;
-
-    strmemccpy(buf, path, buflen);
-    logf("Album art found: %s", path);
+found:
+    strmemccpy(buf, p, buflen);
+    logf("Album art found: %s", p);
     return true;
 }
 
-/* Look for albumart bitmap in the same dir as the track and in its parent dir.
- * Stores the found filename in the buf parameter.
- * Returns true if a bitmap was found, false otherwise */
-bool find_albumart(const struct mp3entry *id3, char *buf, int buflen,
-                    const struct dim *dim)
+bool art_covers_find(const char *artist, const char *title, char *buf,
+                     int buflen)
 {
-    if (!id3 || !buf)
+    unsigned int kw = art_name_work_hash(artist, title);
+    unsigned int kt = art_name_hash(title);
+    bool found = false, by_title = false;
+    DIR *d;
+    struct dirent *e;
+
+    if (!kt || !(d = opendir(ART_COVERS_DIR)))
         return false;
+    while (!found && (e = readdir(d)))
+    {
+        const char *dot = strrchr(e->d_name, '.');
+        unsigned int k;
+        char p[MAX_PATH];
 
-    char size_string[15];/* .-32768x-32768\0 */
-    logf("Looking for album art for %s", id3->path);
+        if (e->d_name[0] == '.' || !art_image_ext(dot))
+            continue;
+        k = art_name_hash_n(e->d_name, dot - e->d_name);
+        if (k != kw && (by_title || k != kt))
+            continue;
+        snprintf(p, sizeof(p), ART_COVERS_DIR "/%s", e->d_name);
+        if (!art_file_usable(p))
+            continue;
+        strmemccpy(buf, p, buflen);
+        if (k == kw)
+            found = true;
+        else
+            by_title = true;    /* unless a later one names the artist too */
+    }
+    closedir(d);
+    return found || by_title;
+}
 
-    /* Write the size string, e.g. ".100x100". */
-    snprintf(size_string, sizeof(size_string), ".%dx%d",
-              dim->width, dim->height);
+bool art_cover_file(const struct mp3entry *id3, char *buf, int buflen)
+{
+    const char *artist = id3->albumartist && id3->albumartist[0]
+                         ? id3->albumartist : id3->artist;
 
-    /* First we look for a bitmap of the right size */
-    if (search_albumart_files(id3, size_string, buf, buflen))
-        return true;
-
-    /* Then we look for generic bitmaps */
-    *size_string = 0;
-    return search_albumart_files(id3, size_string, buf, buflen);
+    if (strcmp(id3->path, "No file!") == 0)
+        return false;
+    return art_covers_find(artist, id3->album, buf, buflen)
+           || art_folder_file(id3->path, buf, buflen);
 }
 
 /* One source, if the track has it. */
@@ -356,7 +238,7 @@ static bool try_source(const struct mp3entry *id3, int kind, bool as_stored,
         break;
     case AA_SOURCE_FILE:
     {
-        if (!search_albumart_files(id3, "", src->path, sizeof(src->path)))
+        if (!art_cover_file(id3, src->path, sizeof(src->path)))
             return false;
         const char *dot = strrchr(src->path, '.');
         if (as_stored && !(dot && (!strcasecmp(dot, ".jpg") ||
@@ -369,16 +251,13 @@ static bool try_source(const struct mp3entry *id3, int kind, bool as_stored,
     case AA_SOURCE_CACHE:
     {
         /* Raw thumbnail pixels: as_stored takes them to encode itself */
-        char dir[MAX_PATH];
-        const char *sep = strrchr(id3->path, '/');
         const int size_index = art_cache_size_index("wps");
         bool fallback;
-        if (!sep || size_index < 0 ||
-            sep - id3->path >= (int)sizeof(dir))
-            return false;
-        strmemccpy(dir, id3->path, sep - id3->path + 1);
-        if (!art_cache_lookup(dir, size_index, src->path, sizeof(src->path),
-                              &fallback) || fallback)
+        if (size_index < 0
+            || !art_cache_lookup_hash(art_cache_track_key(id3->path),
+                                      size_index, src->path,
+                                      sizeof(src->path), &fallback)
+            || fallback)
             return false;
         src->pos = 0;
         src->size = -1;
