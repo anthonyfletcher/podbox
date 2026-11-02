@@ -1701,8 +1701,9 @@ static int episode_mark_run(void *param)
          * and 'choice' count the three rows. */
         int state = browser_db_episode_state(c, c->selected_item);
         bool partway = state == BROWSER_DB_EPISODE_IN_PROGRESS;
+        int first = partway ? 0 : 1;    /* the two rows start at Not Started */
         int was = partway ? 0 : state == BROWSER_DB_EPISODE_FINISHED ? 2 : 1;
-        int choice = partway ? was : was - 1;
+        int choice = was - first;
 
         MENUITEM_STRINGLIST(three, ID2P(LANG_BOOK_MARK_AS), NULL,
                             ID2P(LANG_BOOKS_IN_PROGRESS),
@@ -1717,8 +1718,7 @@ static int episode_mark_run(void *param)
             pop_current_activity();
         if (choice < 0)
             return 0;
-        if (!partway)
-            choice++;
+        choice += first;
         if (choice > 2 || choice == was)
             return 0;
         how = choice == 2 ? BROWSER_DB_MARK_PLAYED : BROWSER_DB_MARK_UNPLAYED;

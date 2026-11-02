@@ -1682,7 +1682,9 @@ char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
         {
             if (auto_absent(books, count))
                 write_shown(&buf, &buf_len, books);
-            if (auto_absent(&podcasts_item, count))
+            /* After a shown Audiobooks row it is written below, with it */
+            if (root_menu_find(books, count) >= count
+                && auto_absent(&podcasts_item, count))
                 write_shown(&buf, &buf_len, &podcasts_item);
         }
         /* The items turned off that stood before this one, or at the end */

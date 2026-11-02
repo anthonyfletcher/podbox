@@ -791,8 +791,9 @@ static bool aa_was_visited(unsigned int h)
  * are not orphans, so the pass then removes none and keeps every stamp. */
 static bool aa_unreached;
 
-/* The stamp file keys people by folder (see AA_SCHEME), until a pass with the
- * RAM copy has moved their thumbnails to their names */
+/* The stamp file this pass began from keys people by folder (see
+ * AA_SCHEME). Its pass is a whole one, which reads no tags again, and keeps
+ * every thumbnail when it cannot reach the people. */
 static bool aa_old_scheme;
 static bool aa_scheme_current(void);
 
@@ -903,11 +904,8 @@ static void aa_stamps_save(bool completed)
                        &lm))
         return;
     ok = true;
-    if (!aa_old_scheme)
-    {
-        aa_stamp_io[n].key = AA_SCHEME_KEY;
-        aa_stamp_io[n++].stamp = AA_SCHEME;
-    }
+    aa_stamp_io[n].key = AA_SCHEME_KEY;
+    aa_stamp_io[n++].stamp = AA_SCHEME;
     if (aa_marks_key)
     {
         aa_stamp_io[n].key = 0;
@@ -2240,7 +2238,6 @@ static bool aa_author_spare(const struct book_entry *e, void *data)
 static void aa_people_spare(bool *aborted)
 {
     struct tagcache_search tcs;
-    const struct aa_stamp *s;
     int since_yield = 0;
 
     if (aa_old_scheme)
@@ -2263,10 +2260,12 @@ static void aa_people_spare(bool *aborted)
             *aborted = true;
             break;
         }
-        if (key)
+        if (key && strcmp(tcs.result, UNTAGGED))
         {
+            const struct aa_stamp *s = aa_spare(key);
+
             aa_counts.artists++;
-            if ((s = aa_spare(key)) && s->stamp != AA_STAMP_NONE)
+            if (s && s->stamp != AA_STAMP_NONE)
                 aa_counts.artist_art++;
             else
                 path_list_write_record(&noart_artists, tcs.result);
@@ -2705,8 +2704,8 @@ static enum bg_result aa_run_pass(void)
     {
         if (!tagcache_is_in_ram())
             aa_people_spare(&aborted);
-        else if (aa_people_pass(workbuf, worksz, &aborted))
-            aa_old_scheme = false;
+        else
+            aa_people_pass(workbuf, worksz, &aborted);
     }
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 

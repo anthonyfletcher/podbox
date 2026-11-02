@@ -331,7 +331,9 @@ bool book_shelf_time(const char *path, unsigned long elapsed,
                     || !tagcache_entry_numeric(i, tag_length, &ms) || ms <= 0)
                     continue;
                 length += (unsigned long)ms;
-                if (entry_key(i) < mine)
+                /* Tracks with the same numbers, or none, in the order the
+                 * database holds them */
+                if (entry_key(i) < mine || (entry_key(i) == mine && i < idx))
                     before += (unsigned long)ms;
             }
         }
