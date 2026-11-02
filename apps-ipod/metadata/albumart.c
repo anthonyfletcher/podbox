@@ -28,6 +28,7 @@
 #include "draw/gif_load.h"
 #include "draw/webp_load.h"
 #include "art_name.h"
+#include "database/db_spoken.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -141,7 +142,11 @@ bool art_image_ext(const char *dot)
     return false;
 }
 
-bool art_folder_file(const char *path, char *buf, int buflen)
+/* The image for the file at 'path' in its folder: one named for the file,
+ * then, unless 'own_only', cover.* and folder.* there or above a disc
+ * folder */
+static bool folder_file(const char *path, char *buf, int buflen,
+                        bool own_only)
 {
     char p[MAX_PATH + 8];
     const char *sep = strrchr(path, '/');
@@ -154,8 +159,11 @@ bool art_folder_file(const char *path, char *buf, int buflen)
     name = sep + 1;
     dot = strrchr(name, '.');
     if (try_named(p, path, dirlen, name, dot ? (size_t)(dot - name)
-                                             : strlen(name))
-        || try_named(p, path, dirlen, "cover", 5)
+                                             : strlen(name)))
+        goto found;
+    if (own_only)
+        return false;
+    if (try_named(p, path, dirlen, "cover", 5)
         || try_named(p, path, dirlen, "folder", 6))
         goto found;
 
@@ -171,6 +179,29 @@ found:
     strmemccpy(buf, p, buflen);
     logf("Album art found: %s", p);
     return true;
+}
+
+bool art_folder_file(const char *path, char *buf, int buflen)
+{
+    return folder_file(path, buf, buflen, false);
+}
+
+/* Whether the folder of the file at 'path' is named for 'person', matched as
+ * the art cache matches names: a book's cover.* and folder.* there are then
+ * its author's picture, not its cover */
+static bool in_person_folder(const char *path, const char *person)
+{
+    const char *end = strrchr(path, '/'), *start;
+    unsigned int k1, a1, k2 = art_name_hash(person);
+    unsigned int a2 = art_name_alt_hash(person);
+
+    if (!end)
+        return false;
+    for (start = end; start > path && start[-1] != '/'; start--)
+        ;
+    k1 = art_name_hash_n(start, end - start);
+    a1 = art_name_alt_hash_n(start, end - start);
+    return (k1 && (k1 == k2 || k1 == a2)) || (a1 && (a1 == k2 || a1 == a2));
 }
 
 bool art_covers_find(const char *artist, const char *title, char *buf,
@@ -216,7 +247,10 @@ bool art_cover_file(const struct mp3entry *id3, char *buf, int buflen)
     if (strcmp(id3->path, "No file!") == 0)
         return false;
     return art_covers_find(artist, id3->album, buf, buflen)
-           || art_folder_file(id3->path, buf, buflen);
+           || folder_file(id3->path, buf, buflen,
+                          artist && artist[0]
+                          && db_spoken_is_book_genre(id3->genre_string)
+                          && in_person_folder(id3->path, artist));
 }
 
 /* One source, if the track has it. */

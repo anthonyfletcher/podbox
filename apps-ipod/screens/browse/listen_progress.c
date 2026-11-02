@@ -645,21 +645,32 @@ int listen_progress_show_book(long album_seek, long artist_seek,
     return show(title, key);
 }
 
-int listen_progress_show_books(void)
+static int ls_all_kind = 1;
+
+void listen_progress_arm(int kind)
+{
+    ls_all_kind = kind == 2 ? 2 : 1;
+}
+
+int listen_progress_show_all(void)
 {
     struct simplelist_info info;
     struct listen_stats all;
-    int books, finished;
+    int items, finished;
     char d[40];
 
     ls_n = 0;
-    listen_stats_sum(1, &all, &books, &finished);
-    if (!books)
+    listen_stats_sum(ls_all_kind, &all, &items, &finished);
+    if (!items)
         strmemccpy(ls_line[ls_n++], str(LANG_LS_NOT_HEARD),
                    sizeof(ls_line[0]));
     else
     {
-        ls_add(LANG_LS_BOOKS, str(LANG_RS_BOOKS_FINISHED), books, finished);
+        if (ls_all_kind == 2)           /* a show never finishes */
+            ls_add(LANG_LS_SHOWS, "%d", items);
+        else
+            ls_add(LANG_LS_BOOKS, str(LANG_RS_BOOKS_FINISHED), items,
+                   finished);
         ls_add_figures(&all);
         if (all.started)
         {

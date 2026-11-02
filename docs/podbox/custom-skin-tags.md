@@ -49,6 +49,7 @@ preceding group repeats.
 | [`%ma(a, op, b)`](#maa-op-b--integer-arithmetic) | integer arithmetic |
 | [`%Sb(bars[, align, radius, gap, peak, peakcolour, segment, segmentgap])`](#sbbars-align-radius-gap-peak-peakcolour-segment-segmentgap--spectrum-analyser) | spectrum analyser |
 | [`%bsp`](#bsp--sleep-timer-remaining-as-a-percentage) | sleep timer remaining, as a percentage |
+| [`%prb`, `%pbp`](#prb--pbp--the-audiobooks-time-left-and-how-much-is-heard) | the audiobook's time left, and how much is heard |
 | [`%lb`](#lb--background-index-building) | background work running |
 | [`%lw`](#lw--foreground-work-in-progress) | foreground work running |
 | [`%la`](#la--animated-spinner-frame) | spinner frame |
@@ -429,6 +430,24 @@ it also takes the last branch, so test `%?bs` first to tell the two apart:
 
 ```
 %?bs<%?bsp<%xd(Sleep,1)|%xd(Sleep,2)|%xd(Sleep,3)|%xd(Sleep,4)>|%xd(SleepOff)>
+```
+
+### `%prb` / `%pbp` — the audiobook's time left, and how much is heard
+
+`%prb` is the time left in the whole audiobook that is playing, at Spoken Word
+Speed, written as `%pr` writes a track's. `%pbp` is how much of the book has
+been heard, from 0 to 100, as a bare number for `%ma` and comparisons; it
+rounds down, so it reads 100 only at the very end. Both count every track of
+the book, in the order the Audiobooks screens play it.
+
+Both are empty for music, podcasts and anything else that is not an
+audiobook, and while the library is too large to hold in memory, so test
+`%?prb` before showing either. As a conditional `%pbp` divides the book into
+equal parts, lowest first:
+
+```
+%?prb<%prb left in the book|%pr left>
+%?prb<%?pbp<%xd(Book,1)|%xd(Book,2)|%xd(Book,3)|%xd(Book,4)>>
 ```
 
 ### `%lb` — background index building

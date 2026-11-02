@@ -4211,7 +4211,9 @@ static int album_covers_loop(void)
         {
             if (!check_database())
             {
-                splash(HZ, tagcache_ram_refused()
+                splash(HZ, tagcache_ram_failed()
+                           ? ID2P(LANG_TAGCACHE_RAM_FAILED)
+                           : tagcache_ram_refused()
                            ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
                            : ID2P(LANG_TAGCACHE_BUSY));
                 return GO_TO_PREVIOUS;
@@ -4607,7 +4609,9 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
          * it waits stops with it, so without this the screen simply hands
          * back to whatever opened it and the press reads as ignored. A
          * refused RAM copy never loads, so that says why instead. */
-        splash(HZ, tagcache_ram_refused()
+        splash(HZ, tagcache_ram_failed()
+                   ? ID2P(LANG_TAGCACHE_RAM_FAILED)
+                   : tagcache_ram_refused()
                    ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
                    : ID2P(LANG_TAGCACHE_BUSY));
         pop_current_activity();

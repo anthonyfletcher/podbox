@@ -219,6 +219,10 @@ bool tagcache_search_add_clause(struct tagcache_search *tcs,
 bool tagcache_get_next(struct tagcache_search *tcs, char *buf, long size);
 bool tagcache_retrieve(struct tagcache_search *tcs, int idxid, 
                        int tag, char *buf, long size);
+/* Two tags of one entry, its index read once */
+bool tagcache_retrieve_two(struct tagcache_search *tcs, int idxid,
+                           int tag_a, char *buf_a, long size_a,
+                           int tag_b, char *buf_b, long size_b);
 void tagcache_search_finish(struct tagcache_search *tcs);
 long tagcache_get_numeric(const struct tagcache_search *tcs, int tag);
 bool tagcache_get_values(const struct tagcache_search *tcs,
@@ -349,6 +353,8 @@ bool tagcache_changed_over_usb(void);
  * session unless a later reload finds room. False while it may still load,
  * and while it is loaded. */
 bool tagcache_ram_refused(void);
+/* True when it was refused because loading it failed, not for room */
+bool tagcache_ram_failed(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
 #ifdef DBTOOL

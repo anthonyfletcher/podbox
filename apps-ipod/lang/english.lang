@@ -23631,6 +23631,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TAGCACHE_RAM_FAILED
+  desc: album screens, when loading the database into memory failed this session
+  user: core
+  <source>
+    *: "Library could not be loaded into memory"
+  </source>
+  <dest>
+    *: "Library could not be loaded into memory"
+  </dest>
+  <voice>
+    *: "Library could not be loaded into memory"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_ALBUM_NOT_FOUND
   desc: Album Covers, when the album playing is not among the covers
   user: core
@@ -26963,6 +26977,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_PODCAST_EPISODES_N
+  desc: under the Delete Finished Episodes question; %d is how many it deletes
+  user: core
+  <source>
+    *: "Episodes: %d"
+  </source>
+  <dest>
+    *: "Episodes: %d"
+  </dest>
+  <voice>
+    *: "Episodes"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_AUDIOBOOK_SEARCH_ORDER
   desc: Library > Search: which kind of result Audiobooks' search lists first
   user: core
@@ -27716,6 +27744,20 @@
   </dest>
   <voice>
     *: "Books listened to"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SHOWS
+  desc: Listening Stats for every podcast: how many shows listened to
+  user: core
+  <source>
+    *: "Shows listened to"
+  </source>
+  <dest>
+    *: "Shows listened to"
+  </dest>
+  <voice>
+    *: "Shows listened to"
   </voice>
 </phrase>
 <phrase>

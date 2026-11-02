@@ -24,7 +24,9 @@ int listen_progress_show(void);
 int listen_progress_show_book(long album_seek, long artist_seek,
                               const char *title);
 
-/* Every book's Listening Stats together */
-int listen_progress_show_books(void);
+/* Every book's Listening Stats together, or with 'kind' 2 every show's:
+ * armed, then shown */
+void listen_progress_arm(int kind);
+int listen_progress_show_all(void);
 
 #endif /* _LISTEN_PROGRESS_H */

@@ -613,6 +613,14 @@ itself as the start point -- read from origin, since nothing is tagged locally
 commit this script published, which is why no `--since` escape hatch is needed
 any more.
 
+**Upgrade notes.** A change an owner should know about before updating -- a
+default that moves, a library file rebuilt or read again, a setting renamed --
+goes in `docs/podbox/upgrade-notes.md` as one bullet, written to the owner, in
+the same commit as the change. `release.sh` prints the file under **Before you
+update**, above the commit list, whenever it holds any text. Once a release
+has gone out, empty the file (keep it, with nothing in it) in a commit of its
+own, so the next release starts clean.
+
 Four things about publishing that are easy to get wrong by hand, all handled
 inside the script:
 

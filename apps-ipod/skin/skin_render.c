@@ -186,6 +186,15 @@ static void draw_pending_aa(struct screen *display,
                           centre ? ax : 0, centre ? ay : 0, aw, ah,
                           li->radius, SKINOFFSETTOPTR(skin_buffer, li->mask));
     }
+    else if (bmp->format == FORMAT_NATIVE && !bmp->alpha_offset)
+    {
+        /* A cover is a picture: bmp_part() would take its pure cyan for the
+         * text colour and its pure magenta for transparent */
+        display->set_drawmode(DRMODE_SOLID);
+        display->bitmap_part((const fb_data *)bmp->data, 0, 0,
+                             LCD_FBSTRIDE(bmp->width, bmp->height),
+                             centre ? ax : 0, centre ? ay : 0, aw, ah);
+    }
     else
     {
         display->set_drawmode(DRMODE_SOLID);

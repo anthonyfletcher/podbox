@@ -286,6 +286,63 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
     return found && mine == last;
 }
 
+/* An entry's place in its book, as track_key() gives a search's */
+static uint32_t entry_key(int idx_id)
+{
+    long disc = 0, track = 0;
+
+    tagcache_entry_numeric(idx_id, tag_discnumber, &disc);
+    tagcache_entry_numeric(idx_id, tag_tracknumber, &track);
+    return (uint32_t)(((MAX(disc, 0) & 0x7fff) << 16)
+                      | (MAX(track, 0) & 0xffff));
+}
+
+bool book_shelf_time(const char *path, unsigned long elapsed,
+                     unsigned long long *left, unsigned long long *total)
+{
+    /* The book's length and what comes before the track, kept until the
+     * track changes: asked at every refresh of the screen */
+    static uint64_t had_track;
+    static int32_t had_commit;
+    static unsigned long long length, before;
+    uint64_t track = path_key(path);
+
+    if (!tagcache_is_in_ram())
+        return false;
+    if (track != had_track || tagcache_commit_id() != had_commit)
+    {
+        struct tagcache_album al;
+        int idx = tagcache_find_path(path);
+        int row = idx < 0 ? -1 : tagcache_album_of(idx);
+
+        had_track = track;
+        had_commit = tagcache_commit_id();
+        length = before = 0;
+        if (row >= 0 && tagcache_album_get(row, &al)
+            && db_spoken_album_kind(&al) == 1)
+        {
+            uint32_t mine = entry_key(idx);
+
+            for (int i = al.first; i <= al.last; i++)
+            {
+                long ms;
+
+                if (tagcache_album_of(i) != row
+                    || !tagcache_entry_numeric(i, tag_length, &ms) || ms <= 0)
+                    continue;
+                length += (unsigned long)ms;
+                if (entry_key(i) < mine)
+                    before += (unsigned long)ms;
+            }
+        }
+    }
+    if (length == 0)
+        return false;
+    *total = length;
+    *left = length - MIN(before + elapsed, length);
+    return true;
+}
+
 bool book_shelf_near_end(const char *book, int disc, int tracknum,
                          unsigned long elapsed)
 {

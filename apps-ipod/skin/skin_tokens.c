@@ -84,6 +84,7 @@
 #include "screens/browse/browser.h"  /* browser_showing_art -- %La in chrome */
 #include "widgets/option_select.h"
 #include "screens/playback/wps.h"
+#include "screens/browse/book_shelf.h"  /* %prb, %pbp */
 
 #define NOINLINE __attribute__ ((noinline))
 
@@ -526,6 +527,33 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
                     *intval = length/1000;
                 format_time(buf, buf_size, length);
                 return buf;
+
+            case SKIN_TOKEN_BOOK_TIME_LEFT:
+            case SKIN_TOKEN_BOOK_HEARD_PERCENT:
+            {
+                unsigned long long left, total;
+                int pc;
+
+                /* The playing track's, which alone has an elapsed time */
+                if (id3 != state->id3
+                    || !book_shelf_time(id3->path, elapsed, &left, &total))
+                    return NULL;
+                if (token->type == SKIN_TOKEN_BOOK_TIME_LEFT)
+                {
+                    left = left * 100 / MAX(global_settings.spoken_speed, 1);
+                    if (intval && limit == TOKEN_VALUE_ONLY)
+                        *intval = left / 1000;
+                    format_time(buf, buf_size, (long)left);
+                    return buf;
+                }
+                /* Rounded down: 100 only once the whole book is heard */
+                pc = (int)((total - left) * 100 / total);
+                if (intval)
+                    *intval = limit == TOKEN_VALUE_ONLY
+                              ? pc : MIN(limit * pc / 100 + 1, limit);
+                itoa_buf(buf, buf_size, pc);
+                return buf;
+            }
 
             case SKIN_TOKEN_TRACK_ELAPSED_PERCENT:
                 if (length <= 0)

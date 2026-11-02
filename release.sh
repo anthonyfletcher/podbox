@@ -278,6 +278,7 @@ fi
 
 echo "  $(printf '%s\n' "$CHANGES" | wc -l | tr -d ' ') commits to list"
 
+UPGRADE_NOTES=docs/podbox/upgrade-notes.md
 NOTES=$(mktemp)
 SIM_NOTES=$(mktemp)
 THEMES_NOTES=$(mktemp)
@@ -301,6 +302,13 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES" "$VOICES_NOTES"'
         "$THEMES_RELEASE" "$SLUG" "$THEMES_RELEASE"
     printf 'again with this build: the themes there are made for this firmware.\n'
     printf 'Scrim ships inside the firmware zip and needs nothing.\n\n'
+    # What an owner should know before updating, written by hand and emptied
+    # once it has gone out
+    if grep -q '[^[:space:]]' "$UPGRADE_NOTES" 2>/dev/null; then
+        printf '### Before you update\n\n'
+        cat "$UPGRADE_NOTES"
+        printf '\n'
+    fi
     printf '### %s\n\n' "$HEADING"
     printf '%s\n' "$CHANGES"
 } > "$NOTES"

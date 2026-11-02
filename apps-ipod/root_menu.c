@@ -267,7 +267,9 @@ static bool wait_for_album_tables(void)
     {
         if (tagcache_get_stat()->ramcache_allocated <= 0)
         {
-            splash(HZ*2, tagcache_ram_refused()
+            splash(HZ*2, tagcache_ram_failed()
+                       ? ID2P(LANG_TAGCACHE_RAM_FAILED)
+                       : tagcache_ram_refused()
                        ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
                        : ID2P(LANG_TAGCACHE_BUSY));
             return false;
@@ -290,7 +292,9 @@ static int browser(void* param)
     /* and stuff for the database browser */
     static int last_db_dirlevel = 0, last_db_selection = 0, last_ft_dirlevel = 0;
     /* A main-menu row's browse left for a screen one of its rows opens, kept
-     * so BACK from that screen lands on the list it was opened from */
+     * so BACK from that screen lands on the list it was opened from: a
+     * tagnavi row's slot, or ROW_SLOT_PODCASTS */
+    enum { ROW_SLOT_PODCASTS = -2 };
     static int row_slot = -1, row_dirlevel, row_selection, row_table;
 
     switch ((intptr_t)param)
@@ -395,6 +399,16 @@ static int browser(void* param)
                 return GO_TO_PREVIOUS;
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
+            if (came_back && row_slot == ROW_SLOT_PODCASTS)
+            {
+                tc->dirlevel = row_dirlevel;
+                tc->selected_item = row_selection;
+                tc->currtable = row_table;
+                row_slot = -1;
+                push_current_activity(ACTIVITY_DATABASEBROWSER);
+                break;
+            }
+            row_slot = -1;
             /* A fresh root, as a tagnavi row's above */
             tc->dirlevel = 0;
             tc->currtable = 0;
@@ -508,6 +522,13 @@ static int browser(void* param)
         /* The same as a tagnavi row: Podcasts' table history is the Music
          * menu's, so Music cannot resume inside its own list after it. */
         case GO_TO_PODCASTS:
+            if (ret_val == GO_TO_DB_SEARCH || ret_val == GO_TO_LISTEN_STATS)
+            {
+                row_slot = ROW_SLOT_PODCASTS;
+                row_dirlevel = tc->dirlevel;
+                row_selection = tc->selected_item;
+                row_table = tc->currtable;
+            }
             tc->dirlevel = last_ft_dirlevel;
             tc->currtable = 0;
             last_db_dirlevel = 0;
@@ -854,7 +875,7 @@ static int playback_viewer_scrn(void* param)
 static int listen_stats_scrn(void* param)
 {
     (void)param;
-    return listen_progress_show_books();
+    return listen_progress_show_all();
 }
 
 static int music_quiz_scrn(void* param)
@@ -1656,6 +1677,14 @@ char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
 
     for (i = 0; i <= count; i++)
     {
+        /* With Music off the menu, the rows Auto keeps out go at the end */
+        if (i == count && root_menu_find(&db_browser, count) >= count)
+        {
+            if (auto_absent(books, count))
+                write_shown(&buf, &buf_len, books);
+            if (auto_absent(&podcasts_item, count))
+                write_shown(&buf, &buf_len, &podcasts_item);
+        }
         /* The items turned off that stood before this one, or at the end */
         for (unsigned k = 0; k < root_menu_off_count && buf_len > 0; k++)
         {

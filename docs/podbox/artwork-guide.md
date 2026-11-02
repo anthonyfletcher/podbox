@@ -82,5 +82,8 @@ writes the reason for each to `art.log`.
 ## Now Playing
 
 With `Settings > Appearance > Now Playing Screen > Album Art` set to `Prefer Image File`, Now
-Playing reads the image itself rather than the cached copy: the `Artwork/Covers` file, or
-`cover.jpg` or `folder.jpg` in the track's folder.
+Playing reads the image itself rather than the cached copy: the `Artwork/Covers` file, an
+image named after the track, or `cover.jpg` or `folder.jpg` in the track's folder. An
+audiobook in a folder named after its author skips that folder's image, as above. Several
+books loose in one folder all show the folder's image here, so name each one's image after
+the book.

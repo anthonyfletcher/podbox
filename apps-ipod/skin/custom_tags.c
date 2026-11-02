@@ -29,6 +29,11 @@ static const struct tag_info custom_tags[] =
     /* The sleep timer's remaining time as a percentage of the length it was
      * started from; empty with no timer running, as %bs is. */
     TAG(SKIN_TOKEN_SLEEP_TIMER_PERCENT, "bsp", "",   SKIN_REFRESH_DYNAMIC),
+    /* The playing audiobook's time left at Spoken Word Speed, as %pr gives a
+     * track's, and the share of it heard; both empty for anything not an
+     * audiobook. Names stop at three letters (MAX_TAG_LENGTH). */
+    TAG(SKIN_TOKEN_BOOK_TIME_LEFT,     "prb", "",    SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_BOOK_HEARD_PERCENT, "pbp", "",    SKIN_REFRESH_DYNAMIC),
     /* The wrap argument is lowercase 's' for the same reason as the filter
      * chain after it: upstream's 'S' would make the arguments past it
      * reachable only by also writing wrap or nowrap.

@@ -1696,20 +1696,32 @@ static int episode_mark_run(void *param)
 
     if (how == BROWSER_DB_MARK_PLAYED)
     {
-        bool was = browser_db_episode_state(c, c->selected_item)
-                   == BROWSER_DB_EPISODE_FINISHED;
-        int choice = was;
+        /* A book's rows, opening on the episode's state; In Progress only
+         * while it is, since only then has it a place to go on from. 'was'
+         * and 'choice' count the three rows. */
+        int state = browser_db_episode_state(c, c->selected_item);
+        bool partway = state == BROWSER_DB_EPISODE_IN_PROGRESS;
+        int was = partway ? 0 : state == BROWSER_DB_EPISODE_FINISHED ? 2 : 1;
+        int choice = partway ? was : was - 1;
 
-        MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
+        MENUITEM_STRINGLIST(three, ID2P(LANG_BOOK_MARK_AS), NULL,
+                            ID2P(LANG_BOOKS_IN_PROGRESS),
+                            ID2P(LANG_BOOKS_NOT_STARTED),
+                            ID2P(LANG_BOOKS_FINISHED));
+        MENUITEM_STRINGLIST(two, ID2P(LANG_BOOK_MARK_AS), NULL,
                             ID2P(LANG_BOOKS_NOT_STARTED),
                             ID2P(LANG_BOOKS_FINISHED));
         push_current_activity(ACTIVITY_CONTEXTMENU);
-        choice = do_menu(&menu, &choice, NULL, false);
+        choice = do_menu(partway ? &three : &two, &choice, NULL, false);
         if (get_current_activity() == ACTIVITY_CONTEXTMENU)
             pop_current_activity();
-        if (choice < 0 || choice > 1 || (choice && was))
+        if (choice < 0)
             return 0;
-        how = choice ? BROWSER_DB_MARK_PLAYED : BROWSER_DB_MARK_UNPLAYED;
+        if (!partway)
+            choice++;
+        if (choice > 2 || choice == was)
+            return 0;
+        how = choice == 2 ? BROWSER_DB_MARK_PLAYED : BROWSER_DB_MARK_UNPLAYED;
     }
     if (browser_db_mark_episodes(c, c->selected_item, how))
         context_menu_result = ONPLAY_RELOAD_DIR;
@@ -1731,6 +1743,21 @@ MENUITEM_FUNCTION_W_PARAM(show_mark_item, 0, ID2P(LANG_PODCAST_MARK_ALL),
                   episode_mark_run, (void *)BROWSER_DB_MARK_SHOW,
                   episode_mark_callback, Icon_NOICON);
 
+/* Asks the question 'what', saying how many episodes it deletes */
+static bool delete_played_ask(int what, int count)
+{
+    char line[32];
+    const char *lines[] = { ID2P(what), line };
+    const struct text_message message = { lines, 2 };
+    bool yes;
+
+    snprintf(line, sizeof(line), str(LANG_PODCAST_EPISODES_N), count);
+    yes = gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES;
+    FOR_NB_SCREENS(i)
+        screens[i].clear_viewport();
+    return yes;
+}
+
 /* A show's finished episodes, their files deleted after asking. The
  * database lets them go at the Update that follows. */
 static int delete_played_run(void)
@@ -1738,7 +1765,8 @@ static int delete_played_run(void)
     struct browser_context *c = browser_get_context();
     int gone;
 
-    if (!yesno_pop(ID2P(LANG_PODCAST_DELETE_PLAYED)))
+    if (!delete_played_ask(LANG_PODCAST_DELETE_PLAYED,
+                           browser_db_played_episodes(c, c->selected_item)))
         return 0;
     gone = browser_db_delete_played(c, c->selected_item);
     splashf(HZ * 2, str(LANG_PODCAST_DELETED_N), gone);
@@ -1773,7 +1801,8 @@ static int delete_all_played_run(void)
 {
     int gone;
 
-    if (!yesno_pop(ID2P(LANG_PODCAST_DELETE_ALL_PLAYED)))
+    if (!delete_played_ask(LANG_PODCAST_DELETE_ALL_PLAYED,
+                           browser_db_played_episodes_all()))
         return 0;
     gone = browser_db_delete_played_all();
     splashf(HZ * 2, str(LANG_PODCAST_DELETED_N), gone);

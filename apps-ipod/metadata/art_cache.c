@@ -787,9 +787,40 @@ static bool aa_was_visited(unsigned int h)
 }
 
 /* Thumbnails this pass could not reach: a folder or person skipped for want
- * of a slot, or the people step skipped without the database in RAM. They
+ * of a slot, or people of the old scheme without the database in RAM. They
  * are not orphans, so the pass then removes none and keeps every stamp. */
 static bool aa_unreached;
+
+/* The stamp file keys people by folder (see AA_SCHEME), until a pass with the
+ * RAM copy has moved their thumbnails to their names */
+static bool aa_old_scheme;
+static bool aa_scheme_current(void);
+
+/* Keeps the thumbnail of 'h' if it is tabled, without tabling it: the
+ * slot, or NULL */
+static struct aa_stamp *aa_spare(unsigned int h)
+{
+    unsigned int i, idx;
+
+    if (h == 0)
+        h = 1;
+    else if (h == AA_SCHEME_KEY)
+        h--;
+    idx = h & (AA_SEEN_SLOTS - 1);
+    for (i = 0; i < AA_SEEN_SLOTS; i++)
+    {
+        unsigned int at = (idx + i) & (AA_SEEN_SLOTS - 1);
+
+        if (aa_stamps[at].key == 0)
+            return NULL;
+        if (aa_stamps[at].key == h)
+        {
+            aa_visited[at / 8] |= 1u << (at % 8);
+            return &aa_stamps[at];
+        }
+    }
+    return NULL;
+}
 
 /* The slot for 'h' the first time this pass reaches it; NULL if the pass has
  * been here already, or the table is full (the folder is then skipped). */
@@ -872,8 +903,11 @@ static void aa_stamps_save(bool completed)
                        &lm))
         return;
     ok = true;
-    aa_stamp_io[n].key = AA_SCHEME_KEY;
-    aa_stamp_io[n++].stamp = AA_SCHEME;
+    if (!aa_old_scheme)
+    {
+        aa_stamp_io[n].key = AA_SCHEME_KEY;
+        aa_stamp_io[n++].stamp = AA_SCHEME;
+    }
     if (aa_marks_key)
     {
         aa_stamp_io[n].key = 0;
@@ -1625,8 +1659,8 @@ static size_t aa_work_bytes(void)
 /* ---- people ----
  *
  * A person's picture is keyed by their name, and found by the first of:
- * a file named for them in /Artwork/People; the highest folder up to three
- * above one of their tracks (its own counted) named for them; the folder
+ * a file named for them in /Artwork/People; the highest of a track's own
+ * folder and the three above it named for them; the folder
  * above one of their works, or the one above that, unless it is the volume
  * root or a library folder. A library folder holds the folders named for
  * two or more people, as Music/ does; Prince/ holding folders named for
@@ -2183,6 +2217,73 @@ static void aa_book_track_cover(const char *path, const struct aa_people_ctx *c)
         aa_log_miss("book", path);
 }
 
+/* One book's author, kept on a pass without the RAM copy */
+static bool aa_author_spare(const struct book_entry *e, void *data)
+{
+    bool *aborted = data;
+    unsigned int key = art_name_hash(e->author);
+
+    if (aa_check_abort() || tagcache_is_busy())
+    {
+        *aborted = true;
+        return false;
+    }
+    if (key)
+        aa_spare(key);
+    return true;
+}
+
+/* The people step without the RAM copy, which the album rows it settles
+ * pictures through need: no picture is looked for, but those of the album
+ * artists and authors still in the library are kept, and the artists with
+ * none are listed */
+static void aa_people_spare(bool *aborted)
+{
+    struct tagcache_search tcs;
+    const struct aa_stamp *s;
+    int since_yield = 0;
+
+    if (aa_old_scheme)
+    {
+        debug_log(DEBUG_LOG_ARTCACHE, "people kept: old scheme, no RAM copy");
+        aa_unreached = true;
+        return;
+    }
+    if (!tagcache_search(&tcs, tag_albumartist))
+    {
+        aa_unreached = true;
+        return;
+    }
+    while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
+    {
+        unsigned int key = art_name_hash(tcs.result);
+
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            *aborted = true;
+            break;
+        }
+        if (key)
+        {
+            aa_counts.artists++;
+            if ((s = aa_spare(key)) && s->stamp != AA_STAMP_NONE)
+                aa_counts.artist_art++;
+            else
+                path_list_write_record(&noart_artists, tcs.result);
+        }
+        if (++since_yield >= 16)
+        {
+            since_yield = 0;
+            yield();
+        }
+    }
+    if (tcs.failed && !*aborted)
+        aa_unreached = true;
+    tagcache_search_finish(&tcs);
+    if (!*aborted)
+        book_index_each(aa_author_spare, aborted, &aa_book_text);
+}
+
 /* One walk of the database's tracks for people. False if stopped. */
 static bool aa_people_walk(const struct aa_people_ctx *c)
 {
@@ -2429,10 +2530,12 @@ static enum bg_result aa_run_pass(void)
     int since_yield = 0;
 
     worksz = aa_work_bytes();
-    /* No marks to have covered: a trigger, a first pass or a format bump */
+    /* No marks to have covered: a trigger, a first pass, a format bump or the
+     * old scheme. An upgrade only renames, so its pass reads no tags again. */
+    aa_old_scheme = aa_format_current() && !aa_scheme_current();
     aa_check_all = dircache_is_ready()
                 || art_cache_task.done_marks.entries < 0;
-    aa_reread_tags = art_cache_task.done_marks.entries < 0;
+    aa_reread_tags = art_cache_task.done_marks.entries < 0 && !aa_old_scheme;
     wh = core_alloc(worksz);
     if (wh <= 0)
         return BG_INTERRUPTED; /* not enough free memory right now */
@@ -2547,12 +2650,10 @@ static enum bg_result aa_run_pass(void)
             /* No album row without the RAM copy: the names /Artwork/Covers
              * is matched on come from the disk, once a folder */
             if (!aa_row.ok)
-            {
-                tagcache_retrieve(&tcs, tcs.idx_id, tag_albumartist, aa_name,
-                                  sizeof(aa_name));
-                tagcache_retrieve(&tcs, tcs.idx_id, tag_album, aa_title,
-                                  sizeof(aa_title));
-            }
+                tagcache_retrieve_two(&tcs, tcs.idx_id,
+                                      tag_albumartist, aa_name,
+                                      sizeof(aa_name),
+                                      tag_album, aa_title, sizeof(aa_title));
             aa_counts.albums++;
             if (aa_cache_dir(tcs.result, dh, slot, &w, workbuf, worksz,
                              &aborted))
@@ -2571,6 +2672,10 @@ static enum bg_result aa_run_pass(void)
          * and the people step takes its own */
         if (!aa_added_only)
             aa_track_note(tcs.result, tcs.idx_id);
+        /* A book's cover is keyed by its first track, which only an album
+         * row says: without one, every track's is kept */
+        if (!aa_row.ok)
+            aa_spare(aa_hash(tcs.result));
 
         if (++since_yield >= 16)
         {
@@ -2595,16 +2700,13 @@ static enum bg_result aa_run_pass(void)
         book_index_each(aa_book_visit, &books, &aa_book_text);
     }
     /* People and audiobook covers are found through the album rows, which
-     * only the RAM copy has. Refused one, the pass leaves them as they are. */
+     * only the RAM copy has. Refused one, the pass keeps those still there. */
     if (!aborted && !failed)
     {
-        if (tagcache_is_in_ram())
-            aa_people_pass(workbuf, worksz, &aborted);
-        else
-        {
-            debug_log(DEBUG_LOG_ARTCACHE, "people skipped: no RAM copy");
-            aa_unreached = true;
-        }
+        if (!tagcache_is_in_ram())
+            aa_people_spare(&aborted);
+        else if (aa_people_pass(workbuf, worksz, &aborted))
+            aa_old_scheme = false;
     }
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 

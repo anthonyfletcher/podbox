@@ -1089,8 +1089,8 @@ static bool palette_from_slot(int handle)
  * screen is showing -- and the caller falls back to the skin's slot if there is
  * nothing there.
  *
- * The cache holds portraits as well as covers, a cover keyed by its folder and
- * a portrait by the artist's name ('artist', 0 when not known), so every
+ * The cache holds portraits as well as covers, a cover keyed by its album row
+ * and a portrait by the artist's name ('artist', 0 when not known), so every
  * setting can be served from here. The rule is
  * load_cached_albumart()'s, and the asymmetry in it is deliberate there: Auto
  * asks for a portrait only for a playlist built from an artist browse and falls
@@ -1135,7 +1135,7 @@ static bool palette_from_cache(void)
     strmemccpy(path, id3->path, sizeof(path));
     n = palette_candidates(path, id3_artist_key(id3), cand);
 
-    /* The negative cache is keyed on the album folder whichever candidate was
+    /* The negative cache is keyed on the album row whichever candidate was
      * tried, because that is the one key every setting can compute: it only has
      * to name this track's folder set, and it is read back before any of them are
      * opened. Set only when they all failed, or a fallback would be skipped the

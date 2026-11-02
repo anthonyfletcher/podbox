@@ -327,7 +327,8 @@ static bool shown(const struct ebook *b)
         case SHOW_AUTHOR:  return !strcmp(names + b->author, author_shown);
         case SHOW_SUBJECT: return has_subject(b, subject_shown);
         case SHOW_SERIES:  return b->series != NO_SERIES
-                                  && !strcmp(names + b->series, series_shown);
+                                  && !strcasecmp(names + b->series,
+                                                 series_shown);
         default:           return b->state == showing;
     }
 }
@@ -342,7 +343,7 @@ static void series_rows(void)
             rows[row_ct++] = (int)books[i].series;
     qsort(rows, row_ct, sizeof(*rows), compare_subjects);
     for (int i = 0; i < row_ct; i++)
-        if (n == 0 || strcmp(names + rows[i], names + rows[n - 1]))
+        if (n == 0 || strcasecmp(names + rows[i], names + rows[n - 1]))
             rows[n++] = rows[i];
     row_ct = n;
 }

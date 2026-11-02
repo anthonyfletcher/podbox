@@ -69,6 +69,7 @@
 #include "metadata/cuesheet.h"      /* the chapter list screen */
 #include "metadata/chapters.h"      /* reading a book's chapter marks */
 #include "screens/browse/featured_artists.h"
+#include "screens/browse/listen_progress.h"
 #include "screens/system/db_search.h"   /* db_search_arm_scope */
 #include "browser_db.h"
 #include "lang.h"
@@ -246,8 +247,9 @@ static const struct builtin_row {
       BOOK_SHELF_NOT_STARTED, shelf_not_started_available },
     { "book_in_progress", LANG_BOOK_SHELF_ROW_PROGRESS, TABLE_BOOK_SHELF,
       BOOK_SHELF_IN_PROGRESS, shelf_in_progress_available },
-    /* Every book's Listening Stats (listen_progress.c) */
-    { "book_stats", LANG_LISTENING_STATS, TABLE_LISTEN_STATS, 0, NULL },
+    /* Every book's Listening Stats (listen_progress.c), the kind in the
+     * param */
+    { "book_stats", LANG_LISTENING_STATS, TABLE_LISTEN_STATS, 1, NULL },
 };
 
 /* The setting says what the user asked for. An empty table means the library
@@ -2767,9 +2769,10 @@ static int header_rows_fill(int level, char *buf, long bufsz)
  * ------------------------------------------------------------------ */
 
 /* Above the list of shows: Search and Finished, scrolled off the top, then
- * In Progress, Not Started and [All Episodes]. Each is hidden while it has no
- * episode, and is an <All tracks> row whose seek names the state,
- * which the track list it opens turns into clauses. */
+ * In Progress, Not Started and [All Episodes], and Listening Stats. Each
+ * state is hidden while it has no episode, and is an <All tracks> row whose
+ * seek names the state, which the track list it opens turns into
+ * clauses. */
 enum {
     EPISODES_IN_PROGRESS = 1,
     EPISODES_NOT_STARTED,
@@ -3324,6 +3327,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                                     TABLE_ALLSUBENTRIES,
                                     ID2P(episode_rows[order[i]].lang_id),
                                     order[i]);
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_LISTEN_STATS,
+                            ID2P(LANG_LISTENING_STATS), 2);
     }
     if (tag == tag_album && featured_row_count(level) > 0)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
@@ -5196,7 +5201,10 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     if (newextra == TABLE_MUSIC_QUIZ)
         return GO_TO_MUSIC_QUIZ;
     if (newextra == TABLE_LISTEN_STATS)
+    {
+        listen_progress_arm(seek);
         return GO_TO_LISTEN_STATS;
+    }
 
     if (newextra == TABLE_DB_SEARCH)
     {

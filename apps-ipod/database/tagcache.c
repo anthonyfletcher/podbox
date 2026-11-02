@@ -2780,6 +2780,21 @@ bool tagcache_retrieve(struct tagcache_search *tcs, int idxid,
     return retrieve(tcs, &idx, tag, buf, size);
 }
 
+bool tagcache_retrieve_two(struct tagcache_search *tcs, int idxid,
+                           int tag_a, char *buf_a, long size_a,
+                           int tag_b, char *buf_b, long size_b)
+{
+    struct index_entry idx;
+    bool a, b;
+
+    *buf_a = *buf_b = '\0';
+    if (!get_index(tcs->masterfd, idxid, &idx, true))
+        return false;
+    a = retrieve(tcs, &idx, tag_a, buf_a, size_a);
+    b = retrieve(tcs, &idx, tag_b, buf_b, size_b);
+    return a && b;
+}
+
 void tagcache_search_finish(struct tagcache_search *tcs)
 {
     int i;
@@ -5867,10 +5882,16 @@ static size_t ramcache_size(struct master_header *tcmh)
  * or by a load into the room it found that failed; cleared by the next one
  * that finds room. */
 static bool ram_refused;
+static bool ram_failed;     /* refused because the load failed */
 
 bool tagcache_ram_refused(void)
 {
     return ram_refused;
+}
+
+bool tagcache_ram_failed(void)
+{
+    return ram_refused && ram_failed;
 }
 
 static bool allocate_tagcache(void)
@@ -5918,6 +5939,7 @@ static bool allocate_tagcache(void)
                   (unsigned long)(available / 1024),
                   (unsigned long)(TAGCACHE_MIN_AUDIO_RESERVE / 1024));
         ram_refused = true;
+        ram_failed = false;
         return false;
     }
 
@@ -5927,6 +5949,7 @@ static bool allocate_tagcache(void)
         debug_log(DEBUG_LOG_TAGCACHE, "ramcache: alloc of %luKB refused",
                   (unsigned long)(alloc_size / 1024));
         ram_refused = true;
+        ram_failed = false;
         return false;
     }
     ram_refused = false;
@@ -7012,6 +7035,7 @@ static void load_ramcache(void)
          * the on-disk database may still be valid and usable. */
         free_ramcache();
         ram_refused = true;
+        ram_failed = true;
     }
 
     cpu_boost(false);

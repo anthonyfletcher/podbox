@@ -61,4 +61,11 @@ bool book_shelf_is_last_track(const char *book, uint64_t track);
 bool book_shelf_near_end(const char *book, int disc, int tracknum,
                          unsigned long elapsed);
 
+/* The audiobook the file at 'path' is a track of: its whole length, and what
+ * is left of it from 'elapsed' ms into that track, at its own pace. False for
+ * a file that is no book's, and without the database in RAM, which holds the
+ * book's tracks. */
+bool book_shelf_time(const char *path, unsigned long elapsed,
+                     unsigned long long *left, unsigned long long *total);
+
 #endif /* _BOOK_SHELF_H */
