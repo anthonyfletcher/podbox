@@ -402,15 +402,14 @@ int search_dialog_run(const struct search_provider *p, void *ctx,
     /* Rows are buttons, but a list of forty outlined boxes reads as clutter.
      * An unselected row is therefore borderless and takes the box's own fill,
      * so it is just text and an icon on the dialog; only the selected one
-     * becomes a shape, in the accent. A property of "a list of results in a
-     * box" rather than of any one provider, so it is the default here. */
+     * becomes a shape, in Dialog Colour Mode's selection colours. A property
+     * of "a list of results in a box" rather than of any one provider, so it
+     * is the default here. */
     style = *dialog_get_default_style();
     style.box_margin = BOX_PAD;     /* the default 10 costs a row of height */
     style.button_border_width = 0;
     style.button_bg = DIALOG_COLOR_INHERIT;
     style.button_fg = DIALOG_COLOR_INHERIT;
-    style.button_bg_selected = DIALOG_COLOR_ACCENT;
-    style.button_fg_selected = DIALOG_COLOR_ON_ACCENT;
 
     push_current_activity(p->activity);
     dialog_init(&d, CONTEXT_KEYBOARD, p->title, &style, &cb, &s);

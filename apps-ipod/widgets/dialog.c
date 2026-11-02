@@ -153,9 +153,16 @@ static bool theme_pair_broken(unsigned fg, unsigned bg)
  * a theme whose own background is the darker of its pair gets the album's
  * dominant colour taken dark and its vivid one taken light, whichever way
  * round the album's pair fell. Otherwise the theme's pair as resolved, which
- * dynamic_colors_resolve() maps by value to the album's. */
+ * dynamic_colors_resolve() maps by value to the album's.
+ *
+ * The toned pair is kept until the album's colours change: every colour of
+ * every button comes through here, and each tone bound is a bisection over
+ * OKLab costing thousands of cycles. Nothing here yields, so the cache needs
+ * no lock. */
 static void dialog_theme_pair(unsigned *fg, unsigned *bg)
 {
+    static unsigned toned_dominant, toned_vivid, toned_fg, toned_bg;
+    static bool toned_valid;
     unsigned black = LCD_RGBPACK(0, 0, 0);
     unsigned dominant, vivid;
 
@@ -163,8 +170,17 @@ static void dialog_theme_pair(unsigned *fg, unsigned *bg)
             color_contrast(global_settings.fg_color, black) &&
         dynamic_colors_roles(&dominant, &vivid))
     {
-        *fg = color_tone_bound(vivid, DIALOG_LIGHT_TONE, 1);
-        *bg = color_tone_bound(dominant, DIALOG_DARK_TONE, -1);
+        if (!toned_valid || dominant != toned_dominant ||
+            vivid != toned_vivid)
+        {
+            toned_fg = color_tone_bound(vivid, DIALOG_LIGHT_TONE, 1);
+            toned_bg = color_tone_bound(dominant, DIALOG_DARK_TONE, -1);
+            toned_dominant = dominant;
+            toned_vivid = vivid;
+            toned_valid = true;
+        }
+        *fg = toned_fg;
+        *bg = toned_bg;
         return;
     }
 
@@ -198,12 +214,13 @@ static unsigned dialog_theme_bg(void)
  * is left alone, and the shadow does that job. */
 static unsigned dialog_surface(void)
 {
-    unsigned fg = dialog_theme_fg();
-    unsigned bg = dialog_theme_bg();
+    unsigned fg, bg;
     unsigned black = LCD_RGBPACK(0, 0, 0);
-    int floor = color_contrast(fg, bg) * DIALOG_LIFT_SHARE / 100;
+    int floor;
     int t;
 
+    dialog_theme_pair(&fg, &bg);
+    floor = color_contrast(fg, bg) * DIALOG_LIFT_SHARE / 100;
     if (color_contrast(bg, black) >= color_contrast(fg, black))
         return bg;
     if (floor > DIALOG_LIFT_FLOOR)
@@ -222,10 +239,11 @@ static unsigned dialog_surface(void)
  * less only the lift. */
 static unsigned dialog_accent(void)
 {
-    unsigned fg = dialog_theme_fg();
+    unsigned fg, bg;
 
+    dialog_theme_pair(&fg, &bg);
     if (color_chroma(fg) < DIALOG_GREY_CHROMA &&
-        color_chroma(dialog_theme_bg()) < DIALOG_GREY_CHROMA)
+        color_chroma(bg) < DIALOG_GREY_CHROMA)
         return color_blend(fg, dialog_surface(), DIALOG_GREY_DIM);
     return fg;
 }
@@ -251,8 +269,7 @@ static bool resolve_derived(unsigned color, unsigned *out)
                                DIALOG_TINT);
             return true;
         case DIALOG_COLOR_SHADE:
-            *out = color_blend(dialog_theme_bg(), LCD_RGBPACK(0, 0, 0),
-                               DIALOG_SHADE);
+            *out = color_blend(dialog_theme_bg(), LCD_BLACK, DIALOG_SHADE);
             return true;
         case DIALOG_COLOR_ACCENT:
             *out = dialog_accent();

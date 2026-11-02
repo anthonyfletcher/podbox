@@ -48,7 +48,9 @@ struct dialog;
 
 /* Colours that resolve, also at draw time, to the theme's own foreground and
  * background -- album-derived while dynamic colours are running, so a dialog
- * follows the music the way the rest of the UI does.
+ * follows the music the way the rest of the UI does. On a theme whose
+ * background is the darker of its pair, the album's colours are its vivid one
+ * at tone 85 for FG and its dominant one at tone 15 for BG.
  *
  * Not the same as INHERIT, which takes whatever the screen happens to carry:
  * inside a button that is the *box's* fill, so INHERIT there would give the box

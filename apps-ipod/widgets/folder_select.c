@@ -918,15 +918,14 @@ bool folder_select(char * header_text, char* setting, int setting_len)
 
     /* Rows are buttons, but a tree of outlined boxes reads as clutter. An
      * unselected row is borderless and takes the box's own fill, so it is just
-     * the glyph and the name; only the selected one becomes a shape, in the
-     * accent. Same treatment as the database search dialog. */
+     * the glyph and the name; only the selected one becomes a shape, in
+     * Dialog Colour Mode's selection colours. Same treatment as the database
+     * search dialog. */
     style = *dialog_get_default_style();
     style.box_margin = BOX_PAD;     /* the default 10 costs a row of height */
     style.button_border_width = 0;
     style.button_bg = DIALOG_COLOR_INHERIT;
     style.button_fg = DIALOG_COLOR_INHERIT;
-    style.button_bg_selected = DIALOG_COLOR_ACCENT;
-    style.button_fg_selected = DIALOG_COLOR_ON_ACCENT;
 
     /* Distinct activity so a theme can style the status bar behind the box
      * without colliding with the settings list it was opened from. The enum is
