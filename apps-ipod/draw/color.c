@@ -122,19 +122,6 @@ unsigned color_from_hsv(int h, int s, int v)
     return LCD_RGBPACK(r, g, b);
 }
 
-unsigned color_hue_rotate(unsigned base, int degrees, int sat, int val)
-{
-    int h, s, v;
-
-    color_get_hsv(base, &h, &s, &v);
-
-    /* Back to RGB at the caller's saturation and brightness rather than
-     * base's. A theme background is usually dark and unsaturated and has
-     * neither to spare -- keeping them would give a colour too close to the
-     * one we were asked to move away from. */
-    return color_from_hsv(h + degrees, sat, val);
-}
-
 /* WCAG relative luminance. sRGB is linearised with a gamma of 2.0 rather than
  * the exact piecewise curve -- a multiply instead of a lookup table, and well
  * inside the tolerance of a pass/fail threshold. */

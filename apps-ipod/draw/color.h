@@ -90,13 +90,6 @@ int color_chroma(unsigned c);
  * ones the album-art colours produce. */
 unsigned color_blend(unsigned c1, unsigned c2, int t);
 
-/* A colour in base's family but distinctly not it: base's hue turned by
- * `degrees`, rebuilt at saturation `sat` and brightness `val` (both 0..255).
- * Saturation and brightness are given rather than kept because the colours
- * this is asked about -- theme and album backgrounds -- are typically dark and
- * flat, and keeping theirs would return something as unusable as the input. */
-unsigned color_hue_rotate(unsigned base, int degrees, int sat, int val);
-
 /* Where an accent sits from the background it belongs to, as a turn around the
  * colour wheel.
  *

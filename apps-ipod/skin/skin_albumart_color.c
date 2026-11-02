@@ -1977,3 +1977,20 @@ bool dynamic_colors_pending(void)
     return needs_extraction && global_settings.dynamic_colors;
 }
 
+bool dynamic_colors_roles(unsigned int *dominant, unsigned int *vivid)
+{
+    unsigned int black = LCD_RGBPACK(0, 0, 0);
+
+    if (!global_settings.dynamic_colors || !cache.valid)
+        return false;
+    *dominant = cache.dominant;
+    if (cache.has_vivid)
+        *vivid = cache.vivid;
+    else if (color_contrast(cache.accent, black) >
+             color_contrast(cache.dominant, black))
+        *vivid = cache.accent;
+    else
+        *vivid = cache.dominant;
+    return true;
+}
+

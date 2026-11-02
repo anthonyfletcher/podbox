@@ -1050,11 +1050,13 @@ darker colour, which may be harder to read where a skin draws it over the art.
 [dialog colours]
 How the confirmation and message boxes are coloured.
 
-Auto, the default, uses the theme's own two colours plus one accent on the
-selected button -- and the accent follows the album while Dynamic Colors is
-running. Off is the same two colours with no accent: the selected button is
-simply drawn inverted. On ignores both and uses the nine colours below, which
-appear only in that mode.
+Auto, the default, works from the theme's own two colours, or the album's
+while Dynamic Colors is running: the selected button is filled with the text
+colour, the box is lifted slightly off a dark screen, and outlines are muted.
+On a dark theme the album's colours are taken dark for the box and light for
+the text, as the screen behind it does.
+Off is the same two colours drawn flat, with plain outlines. On ignores both
+and uses the nine colours below, which appear only in that mode.
 
 [dialog box foreground]
 The text colour inside a dialog. Only used when Dialog Colour Mode is On.
@@ -1080,7 +1082,8 @@ without taking over all nine colours.
 
 [dialog box shadow colour]
 The colour of the drop shadow behind confirmation and message boxes. Black by
-default; pick a colour that contrasts with the box.
+default, which Dialog Colour Mode Auto replaces with a darker shade of the
+background; any other colour is used as given.
 
 [dialog button foreground]
 The text colour of an unselected dialog button.

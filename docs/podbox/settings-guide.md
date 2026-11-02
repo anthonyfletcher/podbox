@@ -459,10 +459,10 @@ Also reached as **Appearance** under `Settings > Library > Carousel`.
 | Box Border Width | The thickness of a dialog's border, in pixels. Zero draws none. | 2 px | **Adv** |
 | Box Margin | How far the dialog is inset from the edges of the screen. | 10 px | **Adv** |
 | Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. Applies whatever Dialog Colour Mode is set to, so a theme can style the shadow without taking over all nine colours. | 4 px | **Adv** |
-| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default; pick a colour that contrasts with the box. | 000000 |  |
+| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default, which Dialog Colour Mode Auto replaces with a darker shade of the background; any other colour is used as given. | 000000 |  |
 | Button Border Width | The thickness of a dialog button's border, in pixels. | 2 px | **Adv** |
 | Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 px | **Adv** |
-| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted. On ignores both and uses the nine colours below, which appear only in that mode. | Auto |  |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, works from the theme's own two colours, or the album's while Dynamic Colors is running: the selected button is filled with the text colour, the box is lifted slightly off a dark screen, and outlines are muted. On a dark theme the album's colours are taken dark for the box and light for the text, as the screen behind it does. Off is the same two colours drawn flat, with plain outlines. On ignores both and uses the nine colours below, which appear only in that mode. | Auto |  |
 | Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
 | Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
 | Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |

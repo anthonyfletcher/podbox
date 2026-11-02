@@ -17,13 +17,13 @@
 #include "input/action.h"
 #include "backlight.h"
 #include "draw/icon.h"          /* Icon_NOICON */
-#include "draw/color.h"         /* color_hue_rotate, color_contrast */
+#include "draw/color.h"         /* color_blend, color_contrast, tone */
 #include "draw/round_rect.h"    /* fill_round_rect/draw_round_rect */
 #include "draw/text_wrap.h"
 #include "settings/settings.h"  /* theme fg/bg for the derived colours */
 #include "skin/statusbar_skinned.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
-#include "skin/skin_albumart_color.h" /* dynamic_colors_resolve/_needs_repaint */
+#include "skin/skin_albumart_color.h" /* dynamic_colors_* */
 #include "dialog.h"
 
 #define DIALOG_MARGIN 10   /* default content inset inside the box */
@@ -104,26 +104,25 @@ static void draw_box_border(struct screen *s, int w, int h, int bw)
     s->fillrect(w - bw, bw, bw, h - 2 * bw);         /* right  */
 }
 
-/* The accent's saturation, fixed rather than taken from the background, which
- * is typically too dark and too flat to yield anything usable. With
- * COLOR_ACCENT_ROTATE this gives roughly 6.2:1 against the background it came
- * from. */
-#define DIALOG_ACCENT_SAT    107   /* 0.42 of full */
+/* How far the box's fill is lifted from a dark background toward the text,
+ * out of 256 (about 8%), and the contrast the text must keep on it: 7:1, or
+ * 85% of the pair's own where the pair has less to give. */
+#define DIALOG_LIFT          20
+#define DIALOG_LIFT_FLOOR    700
+#define DIALOG_LIFT_SHARE    85
 
-/* Brightnesses to try for the accent, preferred one first.
- *
- * A fixed brightness cannot work, because it is not tied to the pair it was
- * derived from: 204 against a dark background gives the pink above, but
- * against a *light* album it lands on a light green with the text at 1.4:1 --
- * the unreadable selection this list exists to avoid. The rest are fallbacks,
- * reached only when the preferred one is not legible, so a theme whose accent
- * already works never has it changed underneath it. */
-static const unsigned char dialog_accent_vals[] =
-    { 204, 240, 160, 128, 96, 64, 32 };
+/* Outlines are the fill this far toward the text, out of 256 (about 35%):
+ * enough to mark the shape without competing with the selection. */
+#define DIALOG_TINT          90
 
-/* Contrast the accent and its text must reach before the search stops: WCAG's
- * 4.5:1 for body text, in hundredths. */
-#define DIALOG_ACCENT_TARGET 450
+/* The shadow is the background this far toward black, out of 256. */
+#define DIALOG_SHADE         128
+
+/* A pair with no colour in it -- white on black -- dims the selected button
+ * this far toward the fill, out of 256, so it is not a block of pure white:
+ * white on black gives #d0d0d0. */
+#define DIALOG_GREY_DIM      47
+#define DIALOG_GREY_CHROMA   1311   /* 0.02 in color_chroma()'s units */
 
 /* An unusable theme pair. A dialog fills with the background, borders and
  * draws its text in the foreground, so a pair with no contrast between them
@@ -144,71 +143,97 @@ static bool theme_pair_broken(unsigned fg, unsigned bg)
 #define DIALOG_FALLBACK_FG  LCD_BLACK
 #define DIALOG_FALLBACK_BG  LCD_LIGHTGRAY
 
-/* The theme's live foreground and background, album-derived when dynamic
- * colours are running. dynamic_colors_resolve() matches by value against the
- * saved theme colours, which is exactly what these are. */
+/* The tones, CIELAB L*, a dark theme's dialog takes the album's colours to:
+ * Scrim's own `dominant<15` and `vivid>85`, so the box matches the screen
+ * behind it rather than standing out as the album's raw colour. */
+#define DIALOG_DARK_TONE     15
+#define DIALOG_LIGHT_TONE    85
+
+/* The theme's live foreground and background. With dynamic colours running,
+ * a theme whose own background is the darker of its pair gets the album's
+ * dominant colour taken dark and its vivid one taken light, whichever way
+ * round the album's pair fell. Otherwise the theme's pair as resolved, which
+ * dynamic_colors_resolve() maps by value to the album's. */
+static void dialog_theme_pair(unsigned *fg, unsigned *bg)
+{
+    unsigned black = LCD_RGBPACK(0, 0, 0);
+    unsigned dominant, vivid;
+
+    if (color_contrast(global_settings.bg_color, black) <
+            color_contrast(global_settings.fg_color, black) &&
+        dynamic_colors_roles(&dominant, &vivid))
+    {
+        *fg = color_tone_bound(vivid, DIALOG_LIGHT_TONE, 1);
+        *bg = color_tone_bound(dominant, DIALOG_DARK_TONE, -1);
+        return;
+    }
+
+    *fg = dynamic_colors_resolve(global_settings.fg_color);
+    *bg = dynamic_colors_resolve(global_settings.bg_color);
+    if (theme_pair_broken(*fg, *bg))
+    {
+        *fg = DIALOG_FALLBACK_FG;
+        *bg = DIALOG_FALLBACK_BG;
+    }
+}
+
 static unsigned dialog_theme_fg(void)
 {
-    unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
-    unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
+    unsigned fg, bg;
 
-    return theme_pair_broken(fg, bg) ? DIALOG_FALLBACK_FG : fg;
+    dialog_theme_pair(&fg, &bg);
+    return fg;
 }
 
 static unsigned dialog_theme_bg(void)
 {
-    unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
-    unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
+    unsigned fg, bg;
 
-    return theme_pair_broken(fg, bg) ? DIALOG_FALLBACK_BG : bg;
+    dialog_theme_pair(&fg, &bg);
+    return bg;
 }
 
-/* Pick the accent and the colour that goes on it together -- they are chosen
- * against each other, so neither can be resolved alone.
- *
- * Take the preferred brightness, ask which of the foreground and background
- * reads better on the result, and stop there if that pairing is legible. Only
- * when it is not does this go looking, which keeps a working accent from being
- * quietly retuned. */
-static void resolve_accent(unsigned *accent_out, unsigned *text_out)
+/* The box's fill. A dark background is lifted toward the text so the box
+ * reads as a surface over the screen, where no shadow can show; a light one
+ * is left alone, and the shadow does that job. */
+static unsigned dialog_surface(void)
 {
     unsigned fg = dialog_theme_fg();
     unsigned bg = dialog_theme_bg();
-    unsigned best_accent = 0, best_text = 0;
-    int best_contrast = -1;
-    unsigned i;
+    unsigned black = LCD_RGBPACK(0, 0, 0);
+    int floor = color_contrast(fg, bg) * DIALOG_LIFT_SHARE / 100;
+    int t;
 
-    for (i = 0; i < sizeof(dialog_accent_vals); i++)
+    if (color_contrast(bg, black) >= color_contrast(fg, black))
+        return bg;
+    if (floor > DIALOG_LIFT_FLOOR)
+        floor = DIALOG_LIFT_FLOOR;
+    for (t = DIALOG_LIFT; t > 0; t -= 2)
     {
-        unsigned accent = color_hue_rotate(bg, COLOR_ACCENT_ROTATE,
-                                           DIALOG_ACCENT_SAT,
-                                           dialog_accent_vals[i]);
-        int on_bg = color_contrast(bg, accent);
-        int on_fg = color_contrast(fg, accent);
-        bool bg_wins = on_bg >= on_fg;
-        int contrast = bg_wins ? on_bg : on_fg;
-
-        if (contrast > best_contrast)
-        {
-            best_contrast = contrast;
-            best_accent   = accent;
-            best_text     = bg_wins ? bg : fg;
-        }
-
-        if (i == 0 && contrast >= DIALOG_ACCENT_TARGET)
-            break;
+        unsigned s = color_blend(bg, fg, t);
+        if (color_contrast(fg, s) >= floor)
+            return s;
     }
+    return bg;
+}
 
-    *accent_out = best_accent;
-    *text_out   = best_text;
+/* The selected button's fill: the text colour, so the selection is the
+ * album's own colour and its label, in the fill's, keeps the pair's contrast
+ * less only the lift. */
+static unsigned dialog_accent(void)
+{
+    unsigned fg = dialog_theme_fg();
+
+    if (color_chroma(fg) < DIALOG_GREY_CHROMA &&
+        color_chroma(dialog_theme_bg()) < DIALOG_GREY_CHROMA)
+        return color_blend(fg, dialog_surface(), DIALOG_GREY_DIM);
+    return fg;
 }
 
 /* The absolute sentinels. Returns false for anything else, including INHERIT,
  * which is screen-relative and resolved by the callers below. */
 static bool resolve_derived(unsigned color, unsigned *out)
 {
-    unsigned accent, text;
-
     switch (color)
     {
         case DIALOG_COLOR_FG:
@@ -217,13 +242,20 @@ static bool resolve_derived(unsigned color, unsigned *out)
         case DIALOG_COLOR_BG:
             *out = dialog_theme_bg();
             return true;
-        case DIALOG_COLOR_ACCENT:
-            resolve_accent(&accent, &text);
-            *out = accent;
-            return true;
+        case DIALOG_COLOR_SURFACE:
         case DIALOG_COLOR_ON_ACCENT:
-            resolve_accent(&accent, &text);
-            *out = text;
+            *out = dialog_surface();
+            return true;
+        case DIALOG_COLOR_TINT:
+            *out = color_blend(dialog_surface(), dialog_theme_fg(),
+                               DIALOG_TINT);
+            return true;
+        case DIALOG_COLOR_SHADE:
+            *out = color_blend(dialog_theme_bg(), LCD_RGBPACK(0, 0, 0),
+                               DIALOG_SHADE);
+            return true;
+        case DIALOG_COLOR_ACCENT:
+            *out = dialog_accent();
             return true;
     }
     return false;

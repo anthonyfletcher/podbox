@@ -52,21 +52,29 @@ struct dialog;
  *
  * Not the same as INHERIT, which takes whatever the screen happens to carry:
  * inside a button that is the *box's* fill, so INHERIT there would give the box
- * background rather than the theme's. These four are absolute.
+ * background rather than the theme's. These are all absolute.
  *
- * ACCENT is the selection colour, and is derived from the background's hue
- * rather than mixed from the pair. Mixing spends contrast -- a muted foreground
- * is by definition nearer the background than the foreground was -- while
- * turning the hue keeps the distance and changes the colour instead.
+ * SURFACE is the box's fill: the background, lifted a little toward the
+ * foreground when the background is the darker of the two, so the box stands
+ * off the screen where a shadow cannot show. The text keeps at least 7:1 on
+ * it, or 85% of the pair's own contrast where the pair has less.
  *
- * ON_ACCENT is whichever of the foreground and the background reads better on
- * ACCENT, and means nothing apart from it. A single fixed choice cannot work:
- * the accent's lightness is not tied to the pair it came from, so with a light
- * album the background-coloured text it was designed for falls to 1.4:1. */
+ * TINT is SURFACE about a third of the way to the foreground: outlines that
+ * mark a shape without competing with the selection.
+ *
+ * SHADE is the background halfway to black, for the shadow.
+ *
+ * ACCENT is the selection colour: the foreground, so the selection is in the
+ * album's own colour, dimmed a little when the pair has no colour in it so a
+ * white-on-black theme does not get a block of pure white. ON_ACCENT is the
+ * text on it, which is SURFACE. */
 #define DIALOG_COLOR_FG        ((unsigned)-2)
 #define DIALOG_COLOR_BG        ((unsigned)-3)
 #define DIALOG_COLOR_ACCENT    ((unsigned)-4)
+#define DIALOG_COLOR_SURFACE   ((unsigned)-5)
 #define DIALOG_COLOR_ON_ACCENT ((unsigned)-6)
+#define DIALOG_COLOR_TINT      ((unsigned)-7)
+#define DIALOG_COLOR_SHADE     ((unsigned)-8)
 
 /* A font that resolves to the one the parent (theme) viewport already carries. */
 #define DIALOG_FONT_INHERIT  (-1)

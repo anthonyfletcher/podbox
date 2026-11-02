@@ -87,5 +87,11 @@ bool dynamic_colors_screen_clear_needed(void);
 /* Returns true when color extraction is queued but not yet performed */
 bool dynamic_colors_pending(void);
 
+/* The album's `dominant` and `vivid` colours, before any tone bound: what
+ * the palette words start from, with vivid falling back to the lighter of the
+ * pair as `vivid>` does. False, and nothing written, when no palette is in
+ * use. */
+bool dynamic_colors_roles(unsigned int *dominant, unsigned int *vivid);
+
 
 #endif /* SKIN_ALBUMART_COLOR_H */
