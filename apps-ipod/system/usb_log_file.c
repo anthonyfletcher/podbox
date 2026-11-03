@@ -735,7 +735,7 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      (unsigned long)e->c / 1000, e->a ? ", TIMED OUT" : "");
             break;
         case USB_LOG_HANG:
-            if (e->a == 0)
+            if (e->a == 0 || e->a == 4)
             {
                 char name[9];
 
@@ -746,9 +746,20 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                     name[i] = ch >= 0x20 && ch < 0x7f ? ch : '\0';
                 }
                 name[8] = '\0';
-                snprintf(p, size, "HANG: thread \"%s\" held the core",
-                         name);
+                if (e->a == 0)
+                    snprintf(p, size, "HANG: thread \"%s\" held the core",
+                             name);
+                else
+                    snprintf(p, size, "HANG: thread \"%s\", state %c", name,
+                             e->b);
             }
+            else if (e->a == 3)
+                snprintf(p, size, "HANG: the UI thread blocked %lu s with "
+                         "keys unread", (unsigned long)e->c);
+            else if (e->a == 5)
+                snprintf(p, size, "HANG:   lr %08lx, caller %08lx%s",
+                         (unsigned long)e->c, (unsigned long)e->d,
+                         e->b ? " (drawing this; stale)" : "");
             else if (e->a == 1)
                 snprintf(p, size, "HANG: pc %08lx lr %08lx",
                          (unsigned long)e->c, (unsigned long)e->d);

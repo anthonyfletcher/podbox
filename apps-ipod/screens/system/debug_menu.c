@@ -177,6 +177,21 @@ static int dbg_threads_action_callback(int action, struct gui_synclist *lists)
     (void) lists;
     return action;
 }
+
+#if defined(CPU_PP502x) || CONFIG_CPU == S5L8702
+/* Blocks the UI thread for good, as a deadlock does: press a key and the
+ * hang catcher's screen follows in twenty seconds */
+static bool dbg_deadlock_test(void)
+{
+    struct semaphore never;
+
+    splash(HZ * 3, "Press a key: the hang screen follows in 20 s");
+    semaphore_init(&never, 1, 0);
+    semaphore_wait(&never, TIMEOUT_BLOCK);
+    return false;
+}
+#endif
+
 /* Test code!!! */
 static bool dbg_os(void)
 {
@@ -2058,6 +2073,9 @@ static const struct {
     bool *toggle;
 } menuitems[] = {
         { "Threads", dbg_os, false, NULL },
+#if defined(CPU_PP502x) || CONFIG_CPU == S5L8702
+        { "Deadlock test", dbg_deadlock_test, false, NULL },
+#endif
 #ifdef __linux__
         { "View CPU stats", dbg_cpuinfo, false, NULL },
 #endif

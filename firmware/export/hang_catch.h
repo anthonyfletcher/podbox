@@ -22,7 +22,7 @@
 
 #if !defined(BOOTLOADER) && (defined(CPU_PP502x) || CONFIG_CPU == S5L8702)
 /* Stops the player on a screen of evidence when one thread has held the
- * core for seconds. Started once booting is done, as init itself runs long
+ * core for seconds, or the UI thread has sat blocked with keys unread. Started once booting is done, as init itself runs long
  * stretches before any other thread exists. */
 void hang_catch_init(void);
 /* Before powering off or rebooting, whose last step spins until the

@@ -23,7 +23,13 @@
  * long. The tick then sends that thread to a screen naming it, with a
  * backtrace from the instruction the tick interrupted. A hang with
  * interrupts off stops the tick too, and is not caught: a frozen player with
- * no such screen is evidence of that. */
+ * no such screen is evidence of that.
+ *
+ * A deadlock lets the core switch freely, so the tick watches for it apart:
+ * the UI thread blocked with no time limit while key presses wait unread.
+ * A wait for a key ends at the first one, so this is a wait on another
+ * thread or a lock that has not come back, and the screen lists what every
+ * thread was doing. */
 
 #include "config.h"
 #include "system.h"
@@ -37,9 +43,15 @@
 #include "string-extra.h"
 #include "thread-internal.h"
 #include "usb_log.h"
+#include "button.h"
 #include "hang_catch.h"
 
 #define HANG_SECS   5
+/* Longer than the core check: the UI thread can wait this long on the
+ * audio thread through slow disk work, where a thread that never yields
+ * has no excuse at all. Long work done on the UI thread itself, such as a
+ * playlist being built, keeps it running and never counts. */
+#define STUCK_SECS  20
 
 static const uint32_t *irq_stack_top;
 
@@ -61,12 +73,12 @@ static bool after_call(uint32_t a)
  * never ends never reaches. The words on the stack that follow a call are
  * the callers, with some stale ones among them, from the innermost. */
 #define STACK_CALLS 32
-static int stack_scan(uint32_t sp, uint32_t top, uint32_t *found)
+static int stack_scan(uint32_t sp, uint32_t top, uint32_t *found, int most)
 {
     uint32_t w;
     int n = 0;
 
-    for (; sp < top && n < STACK_CALLS; sp += 4)
+    for (; sp < top && n < most; sp += 4)
         if (safe_read32((uint32_t *)sp, &w) && after_call(w))
             found[n++] = w;
     return n;
@@ -75,6 +87,84 @@ static int stack_scan(uint32_t sp, uint32_t top, uint32_t *found)
 /* Where the stuck thread was, taken by the tick */
 static const struct thread_entry *hang_thread;
 static uint32_t hang_pc, hang_sp, hang_lr;
+
+/* The UI thread, which starts the catcher; when it was first seen blocked
+ * with keys unread, or 0; and whether that, not the core, is the report */
+static const struct thread_entry *ui_thread;
+static long stuck_since;
+static bool hang_stuck;
+
+static char state_letter(unsigned char state)
+{
+    switch (state)
+    {
+        case STATE_RUNNING:       return 'R';
+        case STATE_BLOCKED:       return 'B';
+        case STATE_SLEEPING:      return 'S';
+        case STATE_BLOCKED_W_TMO: return 'T';
+        case STATE_FROZEN:        return 'F';
+        default:                  return '?';
+    }
+}
+
+static void name8(const struct thread_entry *t, char name[8])
+{
+    memset(name, 0, 8);
+    strlcpy(name, t && t->name ? t->name : "?", 8);
+}
+
+/* Every live thread: its name and state, the return address its switch
+ * saved -- inside the call it is waiting in -- and the first caller found
+ * on its stack. The thread the tick interrupted is drawing this, so its
+ * saved registers are stale; it is marked. */
+static void stuck_log(void)
+{
+    char name[8];
+
+    usb_log(USB_LOG_HANG, 3, 0, STUCK_SECS, 0);
+    for (unsigned i = 0; i < MAXTHREADS; i++)
+    {
+        const struct thread_entry *t = __thread_slot_entry(i);
+        uint32_t call = 0;
+
+        if (t->state == STATE_KILLED)
+            continue;
+        stack_scan(t->context.sp, (uint32_t)t->stack + t->stack_size, &call,
+                   1);
+        name8(t, name);
+        const uint8_t *c = (const uint8_t *)name;
+        usb_log(USB_LOG_HANG, 4, state_letter(t->state),
+                (uint32_t)c[0] << 24 | c[1] << 16 | c[2] << 8 | c[3],
+                (uint32_t)c[4] << 24 | c[5] << 16 | c[6] << 8 | c[7]);
+        usb_log(USB_LOG_HANG, 5, t == hang_thread, t->context.lr, call);
+    }
+    usb_log_sync();
+}
+
+static void stuck_draw(unsigned int *y)
+{
+    lcd_putsf(1, (*y)++, "%s blocked %ds, keys unread",
+              ui_thread && ui_thread->name ? ui_thread->name : "?",
+              STUCK_SECS);
+    lcd_puts(1, (*y)++, "thread  s lr       calls");
+    for (unsigned i = 0; i < MAXTHREADS; i++)
+    {
+        const struct thread_entry *t = __thread_slot_entry(i);
+        uint32_t calls[2] = { 0, 0 };
+        char name[9];
+
+        if (t->state == STATE_KILLED)
+            continue;
+        stack_scan(t->context.sp, (uint32_t)t->stack + t->stack_size,
+                   calls, 2);
+        name8(t, name);
+        name[8] = '\0';
+        lcd_putsf(1, (*y)++, "%-7.7s %c %08lx %08lx %08lx", name,
+                  t == hang_thread ? '*' : state_letter(t->state),
+                  (unsigned long)t->context.lr, (unsigned long)calls[0],
+                  (unsigned long)calls[1]);
+    }
+}
 
 /* The report goes to the USB log first, and waits up to three seconds for
  * the log's writer: once interrupts are off for the screen, nothing else
@@ -107,9 +197,12 @@ static void NORETURN_ATTR hang_show(void)
     uint32_t calls[STACK_CALLS];
     unsigned int y = 1;
     int n = t ? stack_scan(hang_sp, (uint32_t)t->stack + t->stack_size,
-                           calls) : 0;
+                           calls, STACK_CALLS) : 0;
 
-    hang_log(t, calls, n);
+    if (hang_stuck)
+        stuck_log();
+    else
+        hang_log(t, calls, n);
     disable_interrupt(IRQ_FIQ_STATUS);
     lcd_set_viewport(NULL);
 #if LCD_DEPTH > 1
@@ -119,16 +212,22 @@ static void NORETURN_ATTR hang_show(void)
     lcd_clear_display();
     lcd_setfont(FONT_SYSFIXED);
     lcd_puts(1, y++, "*HANG* (" RBVERSION ")");
-    lcd_putsf(1, y++, "%s held the core %ds", t && t->name ? t->name : "?",
-              HANG_SECS);
-    lcd_putsf(1, y++, "lr:%08lx", (unsigned long)hang_lr);
-    rb_backtrace(hang_pc, hang_sp, &y);
-    lcd_puts(1, y++, "stack:");
-    for (int i = 0; i < n; i += 4)
-        lcd_putsf(1, y++, "%08lx %08lx %08lx %08lx", (unsigned long)calls[i],
-                  (unsigned long)(i + 1 < n ? calls[i + 1] : 0),
-                  (unsigned long)(i + 2 < n ? calls[i + 2] : 0),
-                  (unsigned long)(i + 3 < n ? calls[i + 3] : 0));
+    if (hang_stuck)
+        stuck_draw(&y);
+    else
+    {
+        lcd_putsf(1, y++, "%s held the core %ds",
+                  t && t->name ? t->name : "?", HANG_SECS);
+        lcd_putsf(1, y++, "lr:%08lx", (unsigned long)hang_lr);
+        rb_backtrace(hang_pc, hang_sp, &y);
+        lcd_puts(1, y++, "stack:");
+        for (int i = 0; i < n; i += 4)
+            lcd_putsf(1, y++, "%08lx %08lx %08lx %08lx",
+                      (unsigned long)calls[i],
+                      (unsigned long)(i + 1 < n ? calls[i + 1] : 0),
+                      (unsigned long)(i + 2 < n ? calls[i + 2] : 0),
+                      (unsigned long)(i + 3 < n ? calls[i + 3] : 0));
+    }
     lcd_update();
 
     /* Waiting for a button, as a panic leaves it */
@@ -152,7 +251,19 @@ static void hang_tick(void)
     struct core_entry *corep = __core_id_entry(CURRENT_CORE);
     uint32_t *ret = (uint32_t *)irq_stack_top - 1;
 
-    if (hang_thread ||
+    if (hang_thread)
+        return;
+    if (ui_thread && ui_thread->state == STATE_BLOCKED
+        && button_queue_count() > 0)
+    {
+        if (!stuck_since)
+            stuck_since = current_tick;
+        else if (TIME_AFTER(current_tick, stuck_since + STUCK_SECS * HZ))
+            hang_stuck = true;
+    }
+    else
+        stuck_since = 0;
+    if (!hang_stuck &&
         !TIME_AFTER(current_tick, corep->next_tmo_check + HANG_SECS * HZ))
         return;
     /* The IRQ handler's prologue pushes lr, already the interrupted pc,
@@ -181,6 +292,7 @@ void hang_catch_init(void)
                   "msr cpsr_c, r2    \n"
                   : "=r" (irq_stack_top) : : "r2");
     restore_irq(oldlevel);
+    ui_thread = __core_id_entry(CURRENT_CORE)->running;
     tick_add_task(hang_tick);
 }
 

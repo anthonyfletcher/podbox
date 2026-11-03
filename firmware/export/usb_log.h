@@ -159,7 +159,12 @@ enum usb_log_type
     USB_LOG_HANG,        /* the hang catcher's report: a = 0, c, d = the
                           * thread's name, eight bytes; a = 1, c = pc,
                           * d = lr; a = 2, b = index, c, d = return
-                          * addresses found on its stack */
+                          * addresses found on its stack. For the UI
+                          * thread blocked with keys unread: a = 3, c =
+                          * the seconds; then per thread a = 4, b = its
+                          * state's letter, c, d = its name; a = 5, b = 1
+                          * for the thread drawing the report, c = the lr
+                          * its switch saved, d = its first caller */
     USB_LOG_OUTPUT,      /* Pause on Unplug: a = USB_LOG_OUTPUT_*, b = the
                           * output, 0 the jack, 1 a DAC, 2 an accessory,
                           * c = 1 if it paused or resumed, d = the setting |
