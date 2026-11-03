@@ -723,6 +723,20 @@ Applies to the Music lists and By First Letter. The carousel has its own.
 Shows each album's release year in the Music lists, before or after its name,
 so a discography reads in order at a glance. The carousel has its own setting.
 
+[show all tracks row]
+Shows the [All Tracks] row at the top of the Music lists above the tracks,
+which plays everything below it: every track by an artist, in a genre and so
+on. Off only hides the row: playing or queueing an artist or genre from
+its context menu still takes every track.
+
+[show random row]
+Shows the [Random] row at the top of the Music lists, which opens a random
+entry of the list, or plays a random track of an album.
+
+[show shuffle albums row]
+Shows the [Shuffle Albums] row at the top of a list of albums, which plays
+the albums in a random order, each whole and in order.
+
 [debug log tagcache]
 Writes database scan progress to tagcache.log in the .rockbox/logs folder. For
 working out why a track is missing from the database.
@@ -1385,7 +1399,15 @@ Which browser the root and the now-playing screen return to: Music, Files or
 Playlists.
 
 [wps select action]
-Where Select goes from the now-playing screen.
+Where a press of Select goes from the now-playing screen: back to the
+previous screen, the music library, Cover Flow, Files, the lyrics or the
+queue. Holding Select always opens the now-playing menu, and Select + Play
+below sets what the two buttons pressed together do.
+
+[context_wps]
+What pressing Select and Play together does on the now-playing screen: one
+of the now-playing menu's actions, such as the lyrics or the queue, or the
+whole menu. The row shows the current choice.
 
 [shortcuts instead of quickscreen]
 Whether a long press opens the quick screen or the shortcuts menu.
