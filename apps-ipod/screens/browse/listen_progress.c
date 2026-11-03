@@ -656,7 +656,7 @@ int listen_progress_show_all(void)
 {
     struct simplelist_info info;
     struct listen_stats all;
-    int items, finished;
+    int items, finished, ret;
     char d[40];
 
     ls_n = 0;
@@ -680,5 +680,8 @@ int listen_progress_show_all(void)
     }
     simplelist_info_init(&info, str(LANG_LISTENING_STATS), ls_n, NULL);
     info.get_name = track_get_name;
-    return simplelist_show_list(&info) ? GO_TO_ROOT : GO_TO_PREVIOUS;
+    push_current_activity(ACTIVITY_LISTENPROGRESS);
+    ret = simplelist_show_list(&info) ? GO_TO_ROOT : GO_TO_PREVIOUS;
+    pop_current_activity();
+    return ret;
 }
