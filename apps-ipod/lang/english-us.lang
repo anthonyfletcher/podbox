@@ -10719,19 +10719,19 @@
 </phrase>
 <phrase>
   id: LANG_HOTKEY_WPS
-  desc: hotkey menu
+  desc: in Now Playing Screen settings, what Select and Play pressed together do
   user: core
   <source>
     *: none
-    hotkey: "Hotkey"
+    hotkey: "Select + Play"
   </source>
   <dest>
     *: none
-    hotkey: "Hotkey"
+    hotkey: "Select + Play"
   </dest>
   <voice>
     *: none
-    hotkey: "Hotkey"
+    hotkey: "Select and Play"
   </voice>
 </phrase>
 <phrase>

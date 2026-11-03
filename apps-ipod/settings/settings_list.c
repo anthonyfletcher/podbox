@@ -1954,13 +1954,14 @@ const struct settings_list settings[] = {
                   ),
     CHOICE_SETTING(0, wps_select_action, LANG_WPS_SELECT_ACTION, 0,
                    "wps select action",
-                   "default,database,coverflow,files,lyrics",
-                   NULL, 5,
+                   "default,database,coverflow,files,lyrics,queue",
+                   NULL, 6,
                    ID2P(LANG_PREVIOUS_SCREEN),
                    ID2P(LANG_TAGCACHE),
                    ID2P(LANG_COVERFLOW),
                    ID2P(LANG_DIR_BROWSER),
-                   ID2P(LANG_LYRICS)),
+                   ID2P(LANG_LYRICS),
+                   ID2P(LANG_CURRENT_PLAYLIST)),
 
     /* Customizable icons */
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, icon_file, "iconset", DEFAULT_ICONSET,

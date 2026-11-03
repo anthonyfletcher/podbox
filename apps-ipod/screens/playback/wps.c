@@ -868,6 +868,11 @@ long gui_wps_show(void)
                     }
                     restore = true;
                 }
+                else if (sel_action == 5) /* queue */
+                {
+                    gwps_leave_wps(true);
+                    return GO_TO_PLAYLIST_VIEWER;
+                }
                 else /* default — previous browser */
                 {
                     gwps_leave_wps(true);
