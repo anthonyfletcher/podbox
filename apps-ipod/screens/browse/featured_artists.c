@@ -426,15 +426,18 @@ static int run_track_list(const char *title)
         info.get_kind = track_get_kind;
         info.action_callback = context_action_cb;
         info.selection = MIN(selection, track_ct - 1);
+        info.wps_on_play = true;
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
+        else if (info.selection == -2)
+            ret = GO_TO_WPS;
 
         /* Given back before anything is played: the insert context wants
          * it. */
         app_release_buffer("featured tracks");
         track_rows = NULL;
 
-        if (ret == GO_TO_ROOT || pending_row < 0)
+        if (ret != GO_TO_PREVIOUS || pending_row < 0)
             break;
 
         selection = pending_row;
@@ -443,7 +446,7 @@ static int run_track_list(const char *title)
             return ret;
     }
 
-    if (ret != GO_TO_ROOT && info.selection >= 0)
+    if (ret == GO_TO_PREVIOUS && info.selection >= 0)
         ret = play_from(info.selection);
 
     return ret;
@@ -504,9 +507,15 @@ int featured_artists_show(void)
         info.get_kind = guest_get_kind;
         info.action_callback = context_action_cb;
         info.selection = selection;
+        info.wps_on_play = true;
         if (simplelist_show_list(&info))
         {
             ret = GO_TO_ROOT;
+            break;
+        }
+        if (info.selection == -2)
+        {
+            ret = GO_TO_WPS;
             break;
         }
 

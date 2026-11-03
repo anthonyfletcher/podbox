@@ -791,10 +791,13 @@ static int show(char *path, size_t size, int *selection, int *list)
                 *selection = info.selection = n;
         select_path[0] = '\0';
 
+        info.wps_on_play = true;
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
         else if (menu_exit != GO_TO_PREVIOUS)
             ret = menu_exit;
+        else if (info.selection == -2)
+            ret = GO_TO_WPS;
         else if (chapters_book >= 0)
         {
             *selection = chapters_row;
@@ -987,7 +990,7 @@ int ebook_shelf_run(void)
             }
             continue;
         }
-        if (ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER)
+        if (ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER || ret == GO_TO_WPS)
             break;
         if (list >= 0)
         {

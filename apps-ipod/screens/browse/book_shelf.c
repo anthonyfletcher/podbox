@@ -1532,11 +1532,14 @@ int book_shelf_run(void)
         }
         info.action_callback = shelf_action_cb;
         info.selection = MIN(selection, row_ct - 1);
+        info.wps_on_play = true;
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
         else if (menu_exit != GO_TO_PREVIOUS)
             ret = menu_exit;
+        else if (info.selection == -2)
+            ret = GO_TO_WPS;
         else if (info.selection >= 0 && info.selection < row_ct)
         {
             choose(rows[info.selection]);

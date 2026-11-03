@@ -305,8 +305,11 @@ static int types_run(void)
         info.get_icon = type_icon;
         info.get_kind = type_kind;
         info.selection = MIN(sel, type_ct - 1);
+        info.wps_on_play = true;
         if (simplelist_show_list(&info))
             return GO_TO_ROOT;
+        if (info.selection == -2)
+            return GO_TO_WPS;
         if (info.selection < 0)
             return GO_TO_PREVIOUS;
         sel = info.selection;
@@ -382,10 +385,16 @@ static int show_list(const char *type, char *title)
             info.top_item = heads;
         }
         info.selection = MIN(sel, heads + shown_ct - 1);
+        info.wps_on_play = true;
 
         if (simplelist_show_list(&info))
         {
             ret = GO_TO_ROOT;
+            break;
+        }
+        if (info.selection == -2)
+        {
+            ret = GO_TO_WPS;
             break;
         }
         if (info.selection < 0)

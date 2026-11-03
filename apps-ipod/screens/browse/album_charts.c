@@ -349,9 +349,12 @@ int album_charts_show(enum album_chart kind)
     {
         simplelist_info_init(&info, str(chart_title(kind)), chart_len, NULL);
         info.get_name = chart_get_name;
+        info.wps_on_play = true;
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
+        else if (info.selection == -2)
+            ret = GO_TO_WPS;
         else if (info.selection >= 0 && !db_summary_current(&idx))
             /* A commit while the list was up: its seeks name other entries */
             splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
