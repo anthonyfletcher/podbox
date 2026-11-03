@@ -5992,16 +5992,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE
-  desc: The verb/action Queue
+  desc: in the context menu: play once, after anything added before
   user: core
   <source>
-    *: "Play Once"
+    *: "Play Once Later"
   </source>
   <dest>
-    *: "Einmal abspielen"
+    *: "Einmal später abspielen"
   </dest>
   <voice>
-    *: "Einmal abspielen"
+    *: "Einmal später abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -6020,30 +6020,30 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST
-  desc: in onplay menu.  queue a track/playlist at end of playlist.
+  desc: in the context menu: play once, at the end of the queue
   user: core
   <source>
-    *: "Play Once at End"
+    *: "Play Once Last"
   </source>
   <dest>
-    *: "Einmal am Ende"
+    *: "Einmal zuletzt abspielen"
   </dest>
   <voice>
-    *: "Einmal am Ende"
+    *: "Einmal zuletzt abspielen"
   </voice>
 </phrase>
 <phrase>
   id: LANG_QUEUE_SHUFFLED
-  desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled"
+    *: none
   </source>
   <dest>
-    *: "Einmal gemischt"
+    *: none
   </dest>
   <voice>
-    *: "Einmal gemischt"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -7112,7 +7112,8 @@
     gigabeatfx: "POWER to abort"
     gigabeats,sansafuzeplus: "BACK to abort"
     iaudiom5,iaudiox5: "Long PLAY to abort"
-    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
+    ipod*: "PREV to abort"
+    iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
     iriverh100,iriverh120,iriverh300: "STOP to abort"
   </source>
   <dest>
@@ -10150,16 +10151,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST_SHUFFLED
-  desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled at End"
+    *: none
   </source>
   <dest>
-    *: "Einmal gemischt am Ende"
+    *: none
   </dest>
   <voice>
-    *: "Einmal gemischt am Ende"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -10665,19 +10666,19 @@
 </phrase>
 <phrase>
   id: LANG_HOTKEY_WPS
-  desc: hotkey menu
+  desc: in Now Playing Screen settings, what Select and Play pressed together do
   user: core
   <source>
     *: none
-    hotkey: "Hotkey"
+    hotkey: "Select + Play"
   </source>
   <dest>
     *: none
-    hotkey: "Schnelltaste"
+    hotkey: "Auswahl + Wiedergabe"
   </dest>
   <voice>
     *: none
-    hotkey: "Schnelltaste"
+    hotkey: "Auswahl und Wiedergabe"
   </voice>
 </phrase>
 <phrase>
@@ -15013,16 +15014,16 @@
 </phrase>
 <phrase>
   id: LANG_ADD
-  desc:
+  desc: in the context menu: add after anything added before
   user: core
   <source>
-    *: "Add to Queue"
+    *: "Play Later"
   </source>
   <dest>
-    *: "Zur Warteschlange hinzufügen"
+    *: "Später abspielen"
   </dest>
   <voice>
-    *: "Zur Warteschlange hinzufügen"
+    *: "Später abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -15125,16 +15126,16 @@
 </phrase>
 <phrase>
   id: LANG_SHOW_QUEUE_OPTIONS
-  desc: in Current Playlist settings
+  desc: deprecated
   user: core
   <source>
-    *: "Show Play-Once Options"
+    *: none
   </source>
   <dest>
-    *: "Einmal-abspielen-Optionen zeigen"
+    *: none
   </dest>
   <voice>
-    *: "Einmal-abspielen-Optionen zeigen"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15153,16 +15154,16 @@
 </phrase>
 <phrase>
   id: LANG_IN_SUBMENU
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "In Submenu"
+    *: none
   </source>
   <dest>
-    *: "Im Untermenü"
+    *: none
   </dest>
   <voice>
-    *: "Im Untermenü"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15478,16 +15479,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAY_SHUFFLED
-  desc: play selected files in shuffled order, in playlist context menu
+  desc: deprecated
   user: core
   <source>
-    *: "Play Shuffled"
+    *: none
   </source>
   <dest>
-    *: "Gemischt abspielen"
+    *: none
   </dest>
   <voice>
-    *: "Gemischt abspielen"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15621,16 +15622,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAYING_NEXT
-  desc: used in the onplay menu
+  desc: in a context menu: the ways of playing the selection
   user: core
   <source>
-    *: "Add to Queue..."
+    *: "Play..."
   </source>
   <dest>
-    *: "Zur Warteschlange..."
+    *: "Abspielen..."
   </dest>
   <voice>
-    *: "Zur Warteschlange"
+    *: "Abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -15649,44 +15650,44 @@
 </phrase>
 <phrase>
   id: LANG_ADD_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Later, in a shuffled order
   user: core
   <source>
-    *: "Shuffle into Queue"
+    *: "Play Later Shuffled"
   </source>
   <dest>
-    *: "Gemischt in Warteschlange"
+    *: "Später gemischt abspielen"
   </dest>
   <voice>
-    *: "Gemischt in Warteschlange"
+    *: "Später gemischt abspielen"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST
-  desc: used in the onplay menu
+  desc: in the context menu: add at the end of the queue
   user: core
   <source>
-    *: "Add to End"
+    *: "Play Last"
   </source>
   <dest>
-    *: "Ans Ende anfügen"
+    *: "Zuletzt abspielen"
   </dest>
   <voice>
-    *: "Ans Ende anfügen"
+    *: "Zuletzt abspielen"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Last, in a shuffled order
   user: core
   <source>
-    *: "Shuffle onto End"
+    *: "Play Last Shuffled"
   </source>
   <dest>
-    *: "Gemischt ans Ende"
+    *: "Zuletzt gemischt abspielen"
   </dest>
   <voice>
-    *: "Gemischt ans Ende"
+    *: "Zuletzt gemischt abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -17766,7 +17767,7 @@
   desc: Ordered set of characters the click-wheel text editor cycles through
   user: core
   <source>
-    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+    *: " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
   </source>
   <dest>
     *: "~ ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß0123456789-_.'&"
@@ -18463,16 +18464,16 @@
 </phrase>
 <phrase>
   id: LANG_SET_CONTEXT_ITEM
-  desc: WPS context item
+  desc: deprecated
   user: core
   <source>
-    *: "Set Context Item"
+    *: none
   </source>
   <dest>
-    *: "Kontextelement festlegen"
+    *: none
   </dest>
   <voice>
-    *: "Kontextelement festlegen"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -20227,16 +20228,16 @@
 </phrase>
 <phrase>
   id: LANG_RESET_CONTEXT_ITEMS
-  desc: clears the four while-playing context menu slots
+  desc: deprecated
   user: core
   <source>
-    *: "Reset Context Menu"
+    *: none
   </source>
   <dest>
-    *: "Kontextmenü zurücksetzen"
+    *: none
   </dest>
   <voice>
-    *: "Kontextmenü zurücksetzen"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -26756,30 +26757,30 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_OLDER
-  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  desc: in a podcast episode's context menu: mark every older episode of the list Finished
   user: core
   <source>
-    *: "Mark Older as Played"
+    *: "Mark Older as Finished"
   </source>
   <dest>
-    *: "Ältere als gehört markieren"
+    *: "Ältere als beendet markieren"
   </dest>
   <voice>
-    *: "Ältere als gehört markieren"
+    *: "Ältere als beendet markieren"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_ALL
-  desc: in a podcast show's context menu: count every episode as heard
+  desc: in a podcast show's context menu: mark every episode Finished
   user: core
   <source>
-    *: "Mark All as Played"
+    *: "Mark All as Finished"
   </source>
   <dest>
-    *: "Alle als gehört markieren"
+    *: "Alle als beendet markieren"
   </dest>
   <voice>
-    *: "Alle als gehört markieren"
+    *: "Alle als beendet markieren"
   </voice>
 </phrase>
 <phrase>
@@ -26871,13 +26872,13 @@
   desc: in a podcast show's context menu: delete the files of its finished episodes
   user: core
   <source>
-    *: "Delete Played Episodes"
+    *: "Delete Finished Episodes"
   </source>
   <dest>
-    *: "Gehörte Folgen löschen"
+    *: "Beendete Folgen löschen"
   </dest>
   <voice>
-    *: "Gehörte Folgen löschen"
+    *: "Beendete Folgen löschen"
   </voice>
 </phrase>
 <phrase>
@@ -27354,5 +27355,411 @@
   </dest>
   <voice>
     *: "Zum Autor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_FAILED
+  desc: album screens, when loading the database into memory failed this session
+  user: core
+  <source>
+    *: "Library could not be loaded into memory"
+  </source>
+  <dest>
+    *: "Bibliothek konnte nicht in den Speicher geladen werden"
+  </dest>
+  <voice>
+    *: "Bibliothek konnte nicht in den Speicher geladen werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_EPISODES_N
+  desc: under the Delete Finished Episodes question; %d is how many it deletes
+  user: core
+  <source>
+    *: "Episodes: %d"
+  </source>
+  <dest>
+    *: "Folgen: %d"
+  </dest>
+  <voice>
+    *: "Folgen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DISPLAY_NUMBERED_FROMTAGS
+  desc: track display options: disc and track number, title and album
+  user: core
+  <source>
+    *: "Number, Title & Album from Tags"
+  </source>
+  <dest>
+    *: "Nummer, Titel & Album aus Tags"
+  </dest>
+  <voice>
+    *: "Nummer, Titel und Album aus Tags"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGNAVI_SHUFFLE_ALBUMS
+  desc: "[Shuffle Albums]" entry in tag browser: plays every album listed, albums in a random order, each in its own order
+  user: core
+  <source>
+    *: "[Shuffle Albums]"
+  </source>
+  <dest>
+    *: "[Alben mischen]"
+  </dest>
+  <voice>
+    *: "Alben mischen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SELECT_MANY
+  desc: in a track's or a file's context menu: tick several rows to act on together
+  user: core
+  <source>
+    *: "Select…"
+  </source>
+  <dest>
+    *: "Auswählen…"
+  </dest>
+  <voice>
+    *: "Auswählen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_SELECTED
+  desc: a list's title while rows are being ticked: how many are
+  user: core
+  <source>
+    *: "%d selected"
+  </source>
+  <dest>
+    *: "%d ausgewählt"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_TRACKS_TITLE
+  desc: the title of the menu for several ticked tracks
+  user: core
+  <source>
+    *: "%d tracks"
+  </source>
+  <dest>
+    *: "%d Titel"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_ITEMS_TITLE
+  desc: the title of the menu for several ticked files and folders
+  user: core
+  <source>
+    *: "%d items"
+  </source>
+  <dest>
+    *: "%d Elemente"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOVE_HERE
+  desc: in the playlist viewer's menu for ticked tracks: move them to after the cursor
+  user: core
+  <source>
+    *: "Move Here"
+  </source>
+  <dest>
+    *: "Hierher verschieben"
+  </dest>
+  <voice>
+    *: "Hierher verschieben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REALLY_DELETE_N
+  desc: asked before deleting several ticked files and folders
+  user: core
+  <source>
+    *: "Delete %d items?"
+  </source>
+  <dest>
+    *: "%d Elemente löschen?"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_FIT
+  desc: in the image viewer's Zoom list: the whole picture on screen
+  user: core
+  <source>
+    *: "Fit to Screen"
+  </source>
+  <dest>
+    *: "An Bildschirm anpassen"
+  </dest>
+  <voice>
+    *: "An Bildschirm anpassen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_PAN
+  desc: in the image viewer's menu: the wheel and Left and Right move round a zoomed picture
+  user: core
+  <source>
+    *: "Pan"
+  </source>
+  <dest>
+    *: "Schwenken"
+  </dest>
+  <voice>
+    *: "Schwenken"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_TRACK_TITLE
+  desc: the title of the menu for one ticked track
+  user: core
+  <source>
+    *: "1 track"
+  </source>
+  <dest>
+    *: "1 Titel"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_ITEM_TITLE
+  desc: the title of the menu for one ticked file or folder
+  user: core
+  <source>
+    *: "1 item"
+  </source>
+  <dest>
+    *: "1 Element"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPOKEN_RESUME_REWIND
+  desc: Rewind Before Resume for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind Before Resume"
+  </source>
+  <dest>
+    *: "Gesprochene Inhalte: Zurückspulen vor dem Fortsetzen"
+  </dest>
+  <voice>
+    *: "Gesprochene Inhalte, Zurückspulen vor dem Fortsetzen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPOKEN_PAUSE_REWIND
+  desc: Rewind on Pause for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind on Pause"
+  </source>
+  <dest>
+    *: "Gesprochene Inhalte: Zurückspulen bei Pause"
+  </dest>
+  <voice>
+    *: "Gesprochene Inhalte, Zurückspulen bei Pause"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ID3_NARRATOR
+  desc: in track info: the composer field of an audiobook, where its narrator is kept
+  user: core
+  <source>
+    *: "Narrator"
+  </source>
+  <dest>
+    *: "Sprecher"
+  </dest>
+  <voice>
+    *: "Sprecher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_ALL_PLAYED
+  desc: in a podcast show's context menu: delete the files of every show's finished episodes
+  user: core
+  <source>
+    *: "Delete All Finished Episodes"
+  </source>
+  <dest>
+    *: "Alle beendeten Folgen löschen"
+  </dest>
+  <voice>
+    *: "Alle beendeten Folgen löschen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTENING_STATS
+  desc: an audiobook's or podcast show's menu, and the Audiobooks menu: time listened, days, time left
+  user: core
+  <source>
+    *: "Listening Stats"
+  </source>
+  <dest>
+    *: "Hörstatistik"
+  </dest>
+  <voice>
+    *: "Hörstatistik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_TIME
+  desc: Listening Stats: the time spent listening
+  user: core
+  <source>
+    *: "Time listened"
+  </source>
+  <dest>
+    *: "Hörzeit"
+  </dest>
+  <voice>
+    *: "Hörzeit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_LAST
+  desc: Listening Stats: the day last listened to
+  user: core
+  <source>
+    *: "Last listened"
+  </source>
+  <dest>
+    *: "Zuletzt gehört"
+  </dest>
+  <voice>
+    *: "Zuletzt gehört"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_NOT_HEARD
+  desc: Listening Stats, with no book listened to yet
+  user: core
+  <source>
+    *: "Not listened to yet"
+  </source>
+  <dest>
+    *: "Noch nicht gehört"
+  </dest>
+  <voice>
+    *: "Noch nicht gehört"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_BOOKS
+  desc: Listening Stats for every book: how many listened to, and finished
+  user: core
+  <source>
+    *: "Books listened to"
+  </source>
+  <dest>
+    *: "Gehörte Bücher"
+  </dest>
+  <voice>
+    *: "Gehörte Bücher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SHOWS
+  desc: Listening Stats for every podcast: how many shows listened to
+  user: core
+  <source>
+    *: "Shows listened to"
+  </source>
+  <dest>
+    *: "Gehörte Sendungen"
+  </dest>
+  <voice>
+    *: "Gehörte Sendungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SINCE
+  desc: Listening Stats for every book: the first day listened
+  user: core
+  <source>
+    *: "Listening since"
+  </source>
+  <dest>
+    *: "Hört seit"
+  </dest>
+  <voice>
+    *: "Hört seit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SERIES
+  desc: Books and Audiobooks menus: the books listed by the series they belong to
+  user: core
+  <source>
+    *: "By Series"
+  </source>
+  <dest>
+    *: "Nach Reihe"
+  </dest>
+  <voice>
+    *: "Nach Reihe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SERIES
+  desc: Book Info: the series a book belongs to, and its number in it
+  user: core
+  <source>
+    *: "Series"
+  </source>
+  <dest>
+    *: "Reihe"
+  </dest>
+  <voice>
+    *: "Reihe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EXTRA_ROWS
+  desc: in Settings > Library > Music, the rows shown above a Music list
+  user: core
+  <source>
+    *: "Extra Rows"
+  </source>
+  <dest>
+    *: "Zusätzliche Zeilen"
+  </dest>
+  <voice>
+    *: "Zusätzliche Zeilen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_BY_SHOW
+  desc: in the Podcasts menu: the shows, each opening on its episodes
+  user: core
+  <source>
+    *: "By Show"
+  </source>
+  <dest>
+    *: "Nach Sendung"
+  </dest>
+  <voice>
+    *: "Nach Sendung"
   </voice>
 </phrase>

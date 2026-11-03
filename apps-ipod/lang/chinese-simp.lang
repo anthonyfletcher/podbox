@@ -3512,16 +3512,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE
-  desc: The verb/action Queue
+  desc: in the context menu: play once, after anything added before
   user: core
   <source>
-    *: "Play Once"
+    *: "Play Once Later"
   </source>
   <dest>
-    *: "播放一次"
+    *: "稍后播放一次"
   </dest>
   <voice>
-    *: "播放一次"
+    *: "稍后播放一次"
   </voice>
 </phrase>
 <phrase>
@@ -3540,10 +3540,10 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST
-  desc: in onplay menu.  queue a track/playlist at end of playlist.
+  desc: in the context menu: play once, at the end of the queue
   user: core
   <source>
-    *: "Play Once at End"
+    *: "Play Once Last"
   </source>
   <dest>
     *: "最后播放一次"
@@ -3554,16 +3554,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_SHUFFLED
-  desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled"
+    *: none
   </source>
   <dest>
-    *: "随机播放一次"
+    *: none
   </dest>
   <voice>
-    *: "随机播放一次"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -6361,7 +6361,8 @@
     gigabeatfx: "POWER to abort"
     gigabeats,sansafuzeplus: "BACK to abort"
     iaudiom5,iaudiox5: "Long PLAY to abort"
-    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
+    ipod*: "PREV to abort"
+    iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
     iriverh100,iriverh120,iriverh300: "STOP to abort"
   </source>
   <dest>
@@ -9888,16 +9889,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST_SHUFFLED
-  desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled at End"
+    *: none
   </source>
   <dest>
-    *: "最后随机播放一次"
+    *: none
   </dest>
   <voice>
-    *: "最后随机播放一次"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -10682,19 +10683,19 @@
 </phrase>
 <phrase>
   id: LANG_HOTKEY_WPS
-  desc: hotkey menu
+  desc: in Now Playing Screen settings, what Select and Play pressed together do
   user: core
   <source>
     *: none
-    hotkey: "Hotkey"
+    hotkey: "Select + Play"
   </source>
   <dest>
     *: none
-    hotkey: "热键"
+    hotkey: "选择 + 播放"
   </dest>
   <voice>
     *: none
-    hotkey: "热键"
+    hotkey: "选择和播放"
   </voice>
 </phrase>
 <phrase>
@@ -14988,16 +14989,16 @@
 </phrase>
 <phrase>
   id: LANG_ADD
-  desc:
+  desc: in the context menu: add after anything added before
   user: core
   <source>
-    *: "Add to Queue"
+    *: "Play Later"
   </source>
   <dest>
-    *: "添加到播放队列"
+    *: "稍后播放"
   </dest>
   <voice>
-    *: "添加到播放队列"
+    *: "稍后播放"
   </voice>
 </phrase>
 <phrase>
@@ -15100,16 +15101,16 @@
 </phrase>
 <phrase>
   id: LANG_SHOW_QUEUE_OPTIONS
-  desc: in Current Playlist settings
+  desc: deprecated
   user: core
   <source>
-    *: "Show Play-Once Options"
+    *: none
   </source>
   <dest>
-    *: "显示播放一次选项"
+    *: none
   </dest>
   <voice>
-    *: "显示播放一次选项"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15128,16 +15129,16 @@
 </phrase>
 <phrase>
   id: LANG_IN_SUBMENU
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "In Submenu"
+    *: none
   </source>
   <dest>
-    *: "子目录中"
+    *: none
   </dest>
   <voice>
-    *: "子目录中"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15453,16 +15454,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAY_SHUFFLED
-  desc: play selected files in shuffled order, in playlist context menu
+  desc: deprecated
   user: core
   <source>
-    *: "Play Shuffled"
+    *: none
   </source>
   <dest>
-    *: "随机播放"
+    *: none
   </dest>
   <voice>
-    *: "随机播放"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15596,16 +15597,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAYING_NEXT
-  desc: used in the onplay menu
+  desc: in a context menu: the ways of playing the selection
   user: core
   <source>
-    *: "Add to Queue..."
+    *: "Play..."
   </source>
   <dest>
-    *: "添加到播放队列..."
+    *: "播放..."
   </dest>
   <voice>
-    *: "添加到播放队列"
+    *: "播放"
   </voice>
 </phrase>
 <phrase>
@@ -15624,44 +15625,44 @@
 </phrase>
 <phrase>
   id: LANG_ADD_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Later, in a shuffled order
   user: core
   <source>
-    *: "Shuffle into Queue"
+    *: "Play Later Shuffled"
   </source>
   <dest>
-    *: "随机加入播放队列"
+    *: "稍后随机播放"
   </dest>
   <voice>
-    *: "随机加入播放队列"
+    *: "稍后随机播放"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST
-  desc: used in the onplay menu
+  desc: in the context menu: add at the end of the queue
   user: core
   <source>
-    *: "Add to End"
+    *: "Play Last"
   </source>
   <dest>
-    *: "添加到末尾"
+    *: "最后播放"
   </dest>
   <voice>
-    *: "添加到末尾"
+    *: "最后播放"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Last, in a shuffled order
   user: core
   <source>
-    *: "Shuffle onto End"
+    *: "Play Last Shuffled"
   </source>
   <dest>
-    *: "随机添加到末尾"
+    *: "最后随机播放"
   </dest>
   <voice>
-    *: "随机添加到末尾"
+    *: "最后随机播放"
   </voice>
 </phrase>
 <phrase>
@@ -17755,7 +17756,7 @@
   desc: Ordered set of characters the click-wheel text editor cycles through
   user: core
   <source>
-    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+    *: " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
   </source>
   <dest>
     *: "~ ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
@@ -18452,16 +18453,16 @@
 </phrase>
 <phrase>
   id: LANG_SET_CONTEXT_ITEM
-  desc: WPS context item
+  desc: deprecated
   user: core
   <source>
-    *: "Set Context Item"
+    *: none
   </source>
   <dest>
-    *: "设为快捷菜单项"
+    *: none
   </dest>
   <voice>
-    *: "设为快捷菜单项"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -20216,16 +20217,16 @@
 </phrase>
 <phrase>
   id: LANG_RESET_CONTEXT_ITEMS
-  desc: clears the four while-playing context menu slots
+  desc: deprecated
   user: core
   <source>
-    *: "Reset Context Menu"
+    *: none
   </source>
   <dest>
-    *: "重置快捷菜单"
+    *: none
   </dest>
   <voice>
-    *: "重置快捷菜单"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -26745,30 +26746,30 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_OLDER
-  desc: in a podcast episode's context menu: count every older episode of the list as heard
+  desc: in a podcast episode's context menu: mark every older episode of the list Finished
   user: core
   <source>
-    *: "Mark Older as Played"
+    *: "Mark Older as Finished"
   </source>
   <dest>
-    *: "将更早单集标记为已听"
+    *: "将更早单集标记为已听完"
   </dest>
   <voice>
-    *: "将更早单集标记为已听"
+    *: "将更早单集标记为已听完"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PODCAST_MARK_ALL
-  desc: in a podcast show's context menu: count every episode as heard
+  desc: in a podcast show's context menu: mark every episode Finished
   user: core
   <source>
-    *: "Mark All as Played"
+    *: "Mark All as Finished"
   </source>
   <dest>
-    *: "全部标记为已听"
+    *: "全部标记为已听完"
   </dest>
   <voice>
-    *: "全部标记为已听"
+    *: "全部标记为已听完"
   </voice>
 </phrase>
 <phrase>
@@ -26860,13 +26861,13 @@
   desc: in a podcast show's context menu: delete the files of its finished episodes
   user: core
   <source>
-    *: "Delete Played Episodes"
+    *: "Delete Finished Episodes"
   </source>
   <dest>
-    *: "删除已听单集"
+    *: "删除已听完单集"
   </dest>
   <voice>
-    *: "删除已听单集"
+    *: "删除已听完单集"
   </voice>
 </phrase>
 <phrase>
@@ -27343,5 +27344,411 @@
   </dest>
   <voice>
     *: "转到作者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_FAILED
+  desc: album screens, when loading the database into memory failed this session
+  user: core
+  <source>
+    *: "Library could not be loaded into memory"
+  </source>
+  <dest>
+    *: "无法将资料库载入内存"
+  </dest>
+  <voice>
+    *: "无法将资料库载入内存"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_EPISODES_N
+  desc: under the Delete Finished Episodes question; %d is how many it deletes
+  user: core
+  <source>
+    *: "Episodes: %d"
+  </source>
+  <dest>
+    *: "单集：%d"
+  </dest>
+  <voice>
+    *: "单集"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DISPLAY_NUMBERED_FROMTAGS
+  desc: track display options: disc and track number, title and album
+  user: core
+  <source>
+    *: "Number, Title & Album from Tags"
+  </source>
+  <dest>
+    *: "编号、标题和专辑（来自标签）"
+  </dest>
+  <voice>
+    *: "编号、标题和专辑，来自标签"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGNAVI_SHUFFLE_ALBUMS
+  desc: "[Shuffle Albums]" entry in tag browser: plays every album listed, albums in a random order, each in its own order
+  user: core
+  <source>
+    *: "[Shuffle Albums]"
+  </source>
+  <dest>
+    *: "[随机专辑]"
+  </dest>
+  <voice>
+    *: "随机专辑"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SELECT_MANY
+  desc: in a track's or a file's context menu: tick several rows to act on together
+  user: core
+  <source>
+    *: "Select…"
+  </source>
+  <dest>
+    *: "选择…"
+  </dest>
+  <voice>
+    *: "选择"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_SELECTED
+  desc: a list's title while rows are being ticked: how many are
+  user: core
+  <source>
+    *: "%d selected"
+  </source>
+  <dest>
+    *: "已选择 %d 项"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_TRACKS_TITLE
+  desc: the title of the menu for several ticked tracks
+  user: core
+  <source>
+    *: "%d tracks"
+  </source>
+  <dest>
+    *: "%d 首曲目"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_N_ITEMS_TITLE
+  desc: the title of the menu for several ticked files and folders
+  user: core
+  <source>
+    *: "%d items"
+  </source>
+  <dest>
+    *: "%d 项"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOVE_HERE
+  desc: in the playlist viewer's menu for ticked tracks: move them to after the cursor
+  user: core
+  <source>
+    *: "Move Here"
+  </source>
+  <dest>
+    *: "移到此处"
+  </dest>
+  <voice>
+    *: "移到此处"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REALLY_DELETE_N
+  desc: asked before deleting several ticked files and folders
+  user: core
+  <source>
+    *: "Delete %d items?"
+  </source>
+  <dest>
+    *: "删除 %d 项？"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_FIT
+  desc: in the image viewer's Zoom list: the whole picture on screen
+  user: core
+  <source>
+    *: "Fit to Screen"
+  </source>
+  <dest>
+    *: "适应屏幕"
+  </dest>
+  <voice>
+    *: "适应屏幕"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_PAN
+  desc: in the image viewer's menu: the wheel and Left and Right move round a zoomed picture
+  user: core
+  <source>
+    *: "Pan"
+  </source>
+  <dest>
+    *: "平移"
+  </dest>
+  <voice>
+    *: "平移"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_TRACK_TITLE
+  desc: the title of the menu for one ticked track
+  user: core
+  <source>
+    *: "1 track"
+  </source>
+  <dest>
+    *: "1 首曲目"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ONE_ITEM_TITLE
+  desc: the title of the menu for one ticked file or folder
+  user: core
+  <source>
+    *: "1 item"
+  </source>
+  <dest>
+    *: "1 项"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPOKEN_RESUME_REWIND
+  desc: Rewind Before Resume for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind Before Resume"
+  </source>
+  <dest>
+    *: "有声内容恢复播放时自动快退时长"
+  </dest>
+  <voice>
+    *: "有声内容恢复播放时自动快退时长"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPOKEN_PAUSE_REWIND
+  desc: Rewind on Pause for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word Rewind on Pause"
+  </source>
+  <dest>
+    *: "有声内容暂停后倒回"
+  </dest>
+  <voice>
+    *: "有声内容暂停后倒回"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ID3_NARRATOR
+  desc: in track info: the composer field of an audiobook, where its narrator is kept
+  user: core
+  <source>
+    *: "Narrator"
+  </source>
+  <dest>
+    *: "朗读者"
+  </dest>
+  <voice>
+    *: "朗读者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_DELETE_ALL_PLAYED
+  desc: in a podcast show's context menu: delete the files of every show's finished episodes
+  user: core
+  <source>
+    *: "Delete All Finished Episodes"
+  </source>
+  <dest>
+    *: "删除所有已听完单集"
+  </dest>
+  <voice>
+    *: "删除所有已听完单集"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTENING_STATS
+  desc: an audiobook's or podcast show's menu, and the Audiobooks menu: time listened, days, time left
+  user: core
+  <source>
+    *: "Listening Stats"
+  </source>
+  <dest>
+    *: "收听统计"
+  </dest>
+  <voice>
+    *: "收听统计"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_TIME
+  desc: Listening Stats: the time spent listening
+  user: core
+  <source>
+    *: "Time listened"
+  </source>
+  <dest>
+    *: "收听时间"
+  </dest>
+  <voice>
+    *: "收听时间"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_LAST
+  desc: Listening Stats: the day last listened to
+  user: core
+  <source>
+    *: "Last listened"
+  </source>
+  <dest>
+    *: "最近收听"
+  </dest>
+  <voice>
+    *: "最近收听"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_NOT_HEARD
+  desc: Listening Stats, with no book listened to yet
+  user: core
+  <source>
+    *: "Not listened to yet"
+  </source>
+  <dest>
+    *: "尚未收听"
+  </dest>
+  <voice>
+    *: "尚未收听"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_BOOKS
+  desc: Listening Stats for every book: how many listened to, and finished
+  user: core
+  <source>
+    *: "Books listened to"
+  </source>
+  <dest>
+    *: "已听图书"
+  </dest>
+  <voice>
+    *: "已听图书"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SHOWS
+  desc: Listening Stats for every podcast: how many shows listened to
+  user: core
+  <source>
+    *: "Shows listened to"
+  </source>
+  <dest>
+    *: "已听节目"
+  </dest>
+  <voice>
+    *: "已听节目"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LS_SINCE
+  desc: Listening Stats for every book: the first day listened
+  user: core
+  <source>
+    *: "Listening since"
+  </source>
+  <dest>
+    *: "开始收听于"
+  </dest>
+  <voice>
+    *: "开始收听于"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BY_SERIES
+  desc: Books and Audiobooks menus: the books listed by the series they belong to
+  user: core
+  <source>
+    *: "By Series"
+  </source>
+  <dest>
+    *: "按系列"
+  </dest>
+  <voice>
+    *: "按系列"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SERIES
+  desc: Book Info: the series a book belongs to, and its number in it
+  user: core
+  <source>
+    *: "Series"
+  </source>
+  <dest>
+    *: "系列"
+  </dest>
+  <voice>
+    *: "系列"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EXTRA_ROWS
+  desc: in Settings > Library > Music, the rows shown above a Music list
+  user: core
+  <source>
+    *: "Extra Rows"
+  </source>
+  <dest>
+    *: "额外行"
+  </dest>
+  <voice>
+    *: "额外行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PODCAST_BY_SHOW
+  desc: in the Podcasts menu: the shows, each opening on its episodes
+  user: core
+  <source>
+    *: "By Show"
+  </source>
+  <dest>
+    *: "按节目"
+  </dest>
+  <voice>
+    *: "按节目"
   </voice>
 </phrase>
