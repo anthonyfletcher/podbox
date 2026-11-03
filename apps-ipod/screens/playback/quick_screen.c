@@ -499,6 +499,7 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
 int quick_screen_quick(int button_enter)
 {
     struct gui_quickscreen qs;
+    int before[QUICKSCREEN_ITEM_COUNT];
     bool usb = false;
 
     qs.volume_item = QUICKSCREEN_ITEM_COUNT;
@@ -509,13 +510,25 @@ int quick_screen_quick(int button_enter)
 
         if (!is_setting_quickscreenable(qs.items[i]))
             qs.items[i] = NULL;
-        else if (qs.items[i]->lang_id == LANG_VOLUME)
-            qs.volume_item = i;
+        else if (qs.items[i])
+        {
+            before[i] = option_value_as_int(qs.items[i]);
+            if (qs.items[i]->lang_id == LANG_VOLUME)
+                qs.volume_item = i;
+        }
     }
 
     int ret = gui_syncquickscreen_run(&qs, button_enter, &usb);
     if (ret & QUICKSCREEN_CHANGED)
+    {
+        /* As option_screen() does: a theme setting moved here belongs in the
+         * theme's overlay, or the next theme load discards it. Once per
+         * setting at the end, not per press, since each mark is a write. */
+        for (int i = 0; i < QUICKSCREEN_ITEM_COUNT; ++i)
+            if (qs.items[i] && option_value_as_int(qs.items[i]) != before[i])
+                settings_mark_user_tweak(qs.items[i]);
         settings_save();
+    }
     if (usb)
         return QUICKSCREEN_IN_USB;
     return ret & QUICKSCREEN_GOTO_SHORTCUTS_MENU ? QUICKSCREEN_GOTO_SHORTCUTS_MENU :
