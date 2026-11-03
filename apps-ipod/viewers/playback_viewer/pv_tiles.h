@@ -14,9 +14,7 @@
  *
  * "Newly unlocked" is first and is the only one whose existence is
  * conditional, so the list a screen actually shows is built when Spun opens
- * rather than being this table. With nothing new, Spun opens on In numbers.
- *
- * .specifications/spun-tiles.md is the schedule this implements. */
+ * rather than being this table. With nothing new, Spun opens on In numbers. */
 enum pv_sec
 {
     PV_SEC_NEW,

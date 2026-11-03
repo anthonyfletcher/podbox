@@ -181,9 +181,10 @@ int ts_series_pos(const char *s);
 /* What the book index keeps of an EPUB, FB2 or MOBI: its title and first
  * author, empty where it names none, its parts (1 for an FB2), and where its
  * cover image lies in the file -- cover_at is -1 when it has none. An EPUB's
- * cover is found as reading.md 6 orders it, the first three ways (the cover
- * page's first image is not looked for); an FB2's is its coverpage's; a
- * MOBI's is the image EXTH 201 names. Its subjects, up to
+ * cover is the manifest item marked cover-image, else the one
+ * <meta name="cover"> names, else an image item whose id or href holds
+ * "cover" (the cover page's first image is not looked for); an FB2's is its
+ * coverpage's; a MOBI's is the image EXTH 201 names. Its subjects, up to
  * TS_BOOK_SUBJECT_MAX of them, are one to a line: an EPUB's dc:subject, an
  * FB2's genre, a MOBI's EXTH 105. Its series, empty for none, is an EPUB's
  * calibre:series or EPUB 3 collection, or an FB2's sequence; series_pos is

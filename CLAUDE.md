@@ -528,7 +528,7 @@ hand-built zip with every **Explain** entry silently empty looks finished.
   (`cmudict.bin`), `gen_phonemes.py` (`synth_phonemes.c` from NV Speech
   Player's `data.py`) and `text_render.c`, which renders text to a WAV on
   the build server. The synthesiser itself is `apps-ipod/speech/`, and
-  `.specifications/on-device-speech.md` is its specification
+  `.specifications/COMPLETED/on-device-speech.md` is its specification
 **Theme Lens lives outside the tree**, in the git-ignored `.build/theme-lens/`
 — the skin reader, linter and previewer. `python serve.py <theme folder>` (or
 double-click `ThemeLens.cmd`) edits that folder live; `ctl.py` drives a running

@@ -10,9 +10,6 @@
  * This owns the screen outright -- no status bar, no themed viewport, no list
  * widget -- and it owns the working memory while it is up, because every name
  * a card shows is a pointer into the aggregate tables.
- *
- * See .specifications/spun-card-engine.md for the engine and
- * .specifications/spun-tiles.md for what each card says.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -82,7 +79,7 @@
  * This is the one thing held between frames. Finished cards are not cached --
  * measured on a 5G, holding them cost 387 KB and was slower, because the art
  * had to come out of the same buffer and what was left could not hold a
- * screen's worth of cards (spun-card-engine.md §5.1). */
+ * screen's worth of cards. */
 #define ART_PX      128
 #define ART_SLOTS     6
 

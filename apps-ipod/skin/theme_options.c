@@ -3,7 +3,7 @@
  *
  * Theme options: a theme's .options files, which describe the values its
  * .preferences files may hold, and the writes to those .preferences files.
- * .specifications/theme-options.md is the format.
+ * docs/podbox/theme-guide.md, "Options on the player", is the format.
  *
  * Parts:
  *   parse      theme_options_parse() streams an options file, one option

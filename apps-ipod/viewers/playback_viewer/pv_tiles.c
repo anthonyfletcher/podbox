@@ -13,9 +13,6 @@
  * draw/card_paint.c knows nothing about a playback log, and nothing below
  * knows how a card is laid out -- a tile says what it shows and the painter
  * decides where it goes.
- *
- * .specifications/spun-tiles.md is the schedule; every id below is a row of
- * one of its tables.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -1528,8 +1525,7 @@ void pv_tiles_content(int idx, struct card_content *out)
      * A year of listening is not a guaranteed shape -- a month of history, a
      * player that skips everything, a week the log has no names for -- and a
      * card that resolves to nothing has to say something rather than draw an
-     * empty field. The wordings of spun-tiles.md §5a are better than this
-     * wherever they apply, and the cases above set them. */
+     * empty field. Wherever a case above has a better wording, it sets it. */
     if (!out->text.n && !out->title && !out->level && !out->series
         && !out->art && !out->n_table)
         card_text_add(&out->text, str(LANG_PV_NOTHING_YET), body, ink.dim);

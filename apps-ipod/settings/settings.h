@@ -102,11 +102,10 @@ enum {
 /* global_settings.settings_mode -- how much of the settings tree is shown.
  *
  * There is one tree now, not two. STANDARD hides the rows tagged advanced;
- * EVERYTHING shows them. What counts as advanced is settings_tags.c, and the
- * rule behind it is in .specifications/settings-revamp-proposal.md: a setting
- * is advanced if you need to know how the feature works to set it, if it
- * shapes something whose on/off row is elsewhere, if it exists for one
- * hardware case, or if it is theme-author territory.
+ * EVERYTHING shows them. What counts as advanced is settings_tags.c, by one
+ * rule: a setting is advanced if you need to know how the feature works to
+ * set it, if it shapes something whose on/off row is elsewhere, if it
+ * exists for one hardware case, or if it is theme-author territory.
  *
  * Two exceptions hold whatever the level: a destructive action is never
  * hidden -- hiding Update Database hides the fix for "my new album isn't

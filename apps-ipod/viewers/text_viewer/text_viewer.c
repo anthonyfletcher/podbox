@@ -2539,7 +2539,10 @@ static void tv_apply_settings(void)
             tv.vp.fg_pattern = LCD_WHITE;
             tv.vp.bg_pattern = LCD_BLACK;
             break;
-        /* The reading schemes: reading.md §5.1 has where each comes from */
+        /* The reading schemes. Cream is the British Dyslexia Association's
+         * dark-on-cream; Peach and Yellow read fastest in Rello and Bigham
+         * (ASSETS 2017); Sepia is the usual e-reader pair; Night is dim
+         * amber for a dark room. */
         case TV_COLOUR_CREAM:
             tv.vp.fg_pattern = LCD_RGBPACK(0x33, 0x33, 0x33);
             tv.vp.bg_pattern = LCD_RGBPACK(0xfa, 0xf3, 0xdc);
@@ -3058,7 +3061,7 @@ enum tv_key { TV_KEY_NONE, TV_KEY_MENU, TV_KEY_NOTES, TV_KEY_LEAVE,
 
 static void tv_event_save(void *param);
 
-/* A raw button while sideways (reading.md 4.1). Forward is the button on the
+/* A raw button while sideways. Forward is the button on the
  * right as the player is held, and Select; back is the one on the left. The
  * button now at the top does what MENU does upright: leaves, and opens the
  * settings when held. The one at the bottom swaps hands on a double-click

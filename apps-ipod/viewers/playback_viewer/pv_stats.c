@@ -14,7 +14,7 @@
  * The tables live in memory the caller lends us and are gone when this
  * returns; only the summary survives. That is deliberate: the aggregates are
  * the expensive part to produce and the cheap part to keep, so the eventual
- * on-disk index (see .specifications/SPUN_INTEGRATION.md) replaces this
+ * on-disk index replaces this
  * working set without changing what a record means. Which is why a record is
  * plain data with no pointers in it -- it is already the shape it needs to be
  * to be written to a file.

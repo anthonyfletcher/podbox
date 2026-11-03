@@ -2,7 +2,7 @@
  * GNU General Public License (version 2+)
  *
  * Interface to card_row.c -- the geometry and motion of a scrolling row of
- * cards. See .specifications/spun-card-engine.md.
+ * cards.
  ****************************************************************************/
 #ifndef _CARD_ROW_H
 #define _CARD_ROW_H
