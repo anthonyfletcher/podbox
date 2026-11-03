@@ -1756,7 +1756,8 @@ static long episode_key(int idx_id, const struct index_entry *idx)
         close(fd);
     }
 
-    return db_episode_key(title, idx->tag_seek[tag_mtime]);
+    return db_episode_key(title, idx->tag_seek[tag_tracknumber],
+                          idx->tag_seek[tag_mtime]);
 }
 
 /* The length of a title as lists show it: a podcast episode's without the

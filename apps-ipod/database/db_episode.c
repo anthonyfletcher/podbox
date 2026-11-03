@@ -10,9 +10,9 @@
  * podcast episode whose title gives no order of its own is stored with the
  * date after it, " (2024-07-30)", from a full release date in the tags or
  * else from the file name. tag_virt_episode then reads every episode's order
- * from its stored title, and lists sort on it. The date is the scan's own
- * marker, not the publisher's, so whatever shows a title cuts it off; the
- * tag on disk is not touched.
+ * from its stored title, then from its track number, and lists sort on it.
+ * The date is the scan's own marker, not the publisher's, so whatever shows
+ * a title cuts it off; the tag on disk is not touched.
  *
  * The description is the file's COMM frame, which the tag reader keeps only
  * the first 500 bytes of, mid-word; the scan reads it again itself and keeps
@@ -264,7 +264,7 @@ static long title_key(const char *t)
     return 0;
 }
 
-long db_episode_key(const char *title, unsigned long mtime)
+long db_episode_key(const char *title, long tracknum, unsigned long mtime)
 {
     long k = title_key(title);
     time_t t = mtime;
@@ -272,6 +272,8 @@ long db_episode_key(const char *title, unsigned long mtime)
 
     if (k)
         return k;
+    if (tracknum > 0)
+        return tracknum;
     /* gmtime(), not gmtime_r(): the desktop tool's C library lacks the
      * second, and nothing yields before tm is read */
     if (!mtime || !(tm = gmtime(&t)))

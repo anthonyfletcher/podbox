@@ -13,9 +13,10 @@
 /* The order an episode's stored title gives, as tag_virt_episode answers
  * it, larger for newer: season x 10000 + episode for S01E04 or 1x04, the
  * number of Ep 12 or #12, YYYYMMDD for a date, YYYYMM00 for a month. With
- * none, the date of the file's time (tag_mtime, seconds since 1970 of the
- * player's local time) as YYYYMMDD, or 0 where that is 0. */
-long db_episode_key(const char *title, unsigned long mtime);
+ * none, the track number, on the same scale as Ep 12; then the date of the
+ * file's time (tag_mtime, seconds since 1970 of the player's local time) as
+ * YYYYMMDD, or 0 where that is 0. */
+long db_episode_key(const char *title, long tracknum, unsigned long mtime);
 
 /* The title the scan stores for a podcast episode: `title` itself when it
  * gives an order, else with " (YYYY-MM-DD)" after it from `date` (the tags'
