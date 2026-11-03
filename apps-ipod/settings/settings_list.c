@@ -2081,6 +2081,14 @@ const struct settings_list settings[] = {
      * crawl, not one that only hides its result. */
     OFFON_SETTING(F_BANFROMQS, featured_artists, LANG_FEATURED_ARTISTS, false,
                   "featured artists", NULL),
+    /* Named by the rows themselves, so the setting reads as what it hides */
+    OFFON_SETTING(F_BANFROMQS, show_all_tracks_row, LANG_TAGNAVI_ALL_TRACKS,
+                  true, "show all tracks row", NULL),
+    OFFON_SETTING(F_BANFROMQS, show_random_row, LANG_TAGNAVI_RANDOM,
+                  true, "show random row", NULL),
+    OFFON_SETTING(F_BANFROMQS, show_shuffle_albums_row,
+                  LANG_TAGNAVI_SHUFFLE_ALBUMS, true,
+                  "show shuffle albums row", NULL),
     /* Cosmetic and reversible: the tag keeps whatever it said, so this only
      * ever changes what is on the screen. Off by default because the list of
      * what to drop is a judgement about someone else's library. */

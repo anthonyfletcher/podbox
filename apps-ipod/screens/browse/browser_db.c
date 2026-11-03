@@ -3275,20 +3275,24 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * offer. A hidden load still gets <All tracks>, because
      * goto_allsubentries() descends through it to act on every book, and
      * sorted by album with the title level's disc and track, so each book
-     * is inserted whole and in order. */
+     * is inserted whole and in order -- and whatever Extra Rows says, since
+     * without it the descent reaches only the first album. */
     if (tag != tag_title && tag != tag_filename
-        && (!csi_mentions_spoken() || loading_hidden))
+        && (loading_hidden
+            || (!csi_mentions_spoken() && global_settings.show_all_tracks_row)))
         dptr = add_head_row(c, dptr, offset, &sidx,
                             csi_mentions_spoken()
                             ? TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
                             : TABLE_ALLSUBENTRIES,
                             ID2P(LANG_TAGNAVI_ALL_TRACKS), 0);
-    if (tag != tag_filename && !csi_mentions_spoken())
+    if (tag != tag_filename && !csi_mentions_spoken()
+        && global_settings.show_random_row)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_NAVIBROWSE,
                             ID2P(LANG_TAGNAVI_RANDOM), -1);
     /* [Shuffle Albums] on a list of albums: its rows are what it shuffles,
      * and the album table it reads them through is only in RAM */
     if (tag == tag_album && !csi_mentions_spoken()
+        && global_settings.show_shuffle_albums_row
         && tagcache_album_count() > 0)
     {
         if (offset <= sidx)

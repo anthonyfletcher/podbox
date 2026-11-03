@@ -1156,6 +1156,13 @@ MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
           &audiobook_sort_books_by, &podcast_sort_shows_by,
           &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
+MENUITEM_SETTING(show_all_tracks_row, &global_settings.show_all_tracks_row,
+                 NULL);
+MENUITEM_SETTING(show_random_row, &global_settings.show_random_row, NULL);
+MENUITEM_SETTING(show_shuffle_albums_row,
+                 &global_settings.show_shuffle_albums_row, NULL);
+MAKE_MENU(extra_rows_menu, ID2P(LANG_EXTRA_ROWS), 0, Icon_NOICON,
+          &show_all_tracks_row, &show_random_row, &show_shuffle_albums_row);
 
 MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
@@ -1194,6 +1201,7 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
           &album_show_year,
+          &extra_rows_menu,
           &featured_artists, &segregate_audiobooks, &segregate_podcasts,
           &quiz_menu,
           &music_appearance_menu    /* theme_settings.c */

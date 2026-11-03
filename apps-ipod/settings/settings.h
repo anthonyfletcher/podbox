@@ -665,6 +665,11 @@ struct user_settings
     /* Read guest credits ("feat. X") out of titles and per-track artists, so
      * the browser can list them. Off, the table is never built. */
     bool featured_artists;
+    /* Which of the rows above a Music list are shown: [All Tracks],
+     * [Random] and [Shuffle Albums] */
+    bool show_all_tracks_row;
+    bool show_random_row;
+    bool show_shuffle_albums_row;
     /* Drop a trailing "(feat. X)", "(Taylor's Version)" or "- 2021 Remaster"
      * from the album and track names the skin shows. The tags themselves are
      * untouched; /.rockbox/trim.config says what counts. */

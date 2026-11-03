@@ -27802,3 +27802,17 @@
     *: "Series"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EXTRA_ROWS
+  desc: in Settings > Library > Music, the rows shown above a Music list
+  user: core
+  <source>
+    *: "Extra Rows"
+  </source>
+  <dest>
+    *: "Extra Rows"
+  </dest>
+  <voice>
+    *: "Extra Rows"
+  </voice>
+</phrase>
