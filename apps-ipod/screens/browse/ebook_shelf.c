@@ -1048,6 +1048,6 @@ int ebook_shelf_run(void)
         break;
     }
     pop_current_activity();
-    return ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER ? ret
-                                                         : GO_TO_PREVIOUS;
+    return ret == GO_TO_ROOT || ret == GO_TO_FILEBROWSER || ret == GO_TO_WPS
+           ? ret : GO_TO_PREVIOUS;
 }
