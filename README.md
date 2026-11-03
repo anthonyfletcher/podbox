@@ -559,8 +559,8 @@ What makes a book or a podcast is its tags, not its folder:
 - the album is the book's title or the show's name, on every track
 - the album artist is the author or the host
 - an episode's place in its show comes from its title (`S01E04`, `Episode 12`, `#12` or a
-  date), else its full release date or a date in its file name, else its track number, else
-  when the file arrived
+  date), else its full release date or a date in its file name, else its track number if no
+  other episode of the show has the same one, else when the file arrived
 - a book in one file (`.m4b`, or `.mp3` with chapter frames) shows its chapters, with
   `Settings > Playback > Chapter Marks` on
 

@@ -9,7 +9,8 @@
   pictures already made are kept.
 - **Podcast episodes with a track number**, and no episode number or date in
   their title, tags or file name, are now ordered by the track number, highest
-  first, rather than by when their files arrived.
+  first, rather than by when their files arrived. A show where two episodes
+  share a track number keeps the old order.
 - **The Playback Report reads its log again** the first time it opens, so
   plays of a track that a tagger renamed in its own folder (renumbering
   "03 - Song" to "05 - Song") count under the track as it is now, instead of

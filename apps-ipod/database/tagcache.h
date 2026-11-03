@@ -291,6 +291,8 @@ struct tagcache_album {
     uint16_t tracks;
     uint16_t spoken;             /* of them, in a spoken genre */
     uint16_t podcast;            /* of those, in a podcast genre */
+    bool     track_repeats;      /* two of its tracks share a track number
+                                    from 1 to 1024 */
 };
 
 struct tagcache_artist {

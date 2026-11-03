@@ -975,6 +975,9 @@ static int entry_album_row(int idx_id)
     return album_row(e->tag_seek[tag_album], e->tag_seek[tag_albumartist]);
 }
 
+/* The track numbers an album is checked for repeats of */
+#define TRACKS_SEEN 1024
+
 /* During a load, once the master index is in: the album rows and the artist
  * rows, from the master alone, placed at *pp. scratch has room for a word per
  * entry and is free until the filename pass. False, with no tables, when
@@ -985,6 +988,7 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
     struct ramcache_header *hdr = tcramcache.hdr;
     struct tagcache_album *rows;
     struct tagcache_artist *arts;
+    uint8_t tracks_seen[TRACKS_SEEN / 8];
     ssize_t gap;
     char *p;
     int n = 0, nrows = 0, nart = 0;
@@ -1019,6 +1023,7 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
     {
         const struct index_entry *e = &hdr->indices[scratch[i]];
         long plays = e->tag_seek[tag_playcount];
+        long track = e->tag_seek[tag_tracknumber];
 
         if (r < 0 || rows[r].album_seek != e->tag_seek[tag_album]
             || rows[r].artist_seek != e->tag_seek[tag_albumartist])
@@ -1027,9 +1032,19 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
             rows[r].album_seek = e->tag_seek[tag_album];
             rows[r].artist_seek = e->tag_seek[tag_albumartist];
             rows[r].first = scratch[i];
+            memset(tracks_seen, 0, sizeof(tracks_seen));
         }
         rows[r].last = scratch[i];
         rows[r].tracks++;
+        if (track >= 1 && track <= TRACKS_SEEN)
+        {
+            uint8_t bit = 1u << ((track - 1) & 7);
+            uint8_t *seen = &tracks_seen[(track - 1) >> 3];
+
+            if (*seen & bit)
+                rows[r].track_repeats = true;
+            *seen |= bit;
+        }
         if (e->tag_seek[tag_year] > rows[r].year)
             rows[r].year = e->tag_seek[tag_year];
         if (plays > 0)
@@ -1728,22 +1743,31 @@ static bool is_podcast(int idx_id, const struct index_entry *idx)
 }
 
 /* tag_virt_episode: 0 for anything but a podcast episode. The title is read
- * from RAM where the database is loaded, else from its file. */
+ * from RAM where the database is loaded, else from its file. The track
+ * number counts only where no two of the show's episodes share one -- many
+ * podcast apps number every episode 1 -- and so only with the album table,
+ * which knows the show. */
 static long episode_key(int idx_id, const struct index_entry *idx)
 {
     long seek = idx->tag_seek[tag_title];
+    long track = 0;
     char buf[256];
     const char *title = buf;
     struct tagcache_header hdr;
     struct tagfile_entry tfe;
-    int fd;
+    int fd, row;
 
     if ((idx->flag & FLAG_DELETED) || !is_podcast(idx_id, idx))
         return 0;
 
     if (tc_stat.ramcache)
+    {
         title = ((struct tagfile_entry *)
                  &tcramcache.hdr->tags[tag_title][seek])->tag_data;
+        row = tagcache_album_of(idx_id);
+        if (row >= 0 && !tcrc_albums[row].track_repeats)
+            track = idx->tag_seek[tag_tracknumber];
+    }
     else
     {
         fd = open_tag_fd(&hdr, tag_title, false);
@@ -1756,8 +1780,7 @@ static long episode_key(int idx_id, const struct index_entry *idx)
         close(fd);
     }
 
-    return db_episode_key(title, idx->tag_seek[tag_tracknumber],
-                          idx->tag_seek[tag_mtime]);
+    return db_episode_key(title, track, idx->tag_seek[tag_mtime]);
 }
 
 /* The length of a title as lists show it: a podcast episode's without the
