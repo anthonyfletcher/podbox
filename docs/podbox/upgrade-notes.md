@@ -20,4 +20,9 @@
   as it already did from the library lists and menus.
 - **Hotkey on the Now Playing Screen settings is now Select + Play**, which is
   what it always was: the two buttons pressed together. **Select Action**
-  gains **Queue**, to open the queue with a press of Select.
+  gains **View Queue**, to open the queue with a press of Select, and its
+  Database and Coverflow are now called Music and Album Covers, as on the main
+  menu.
+- **Podcasts is a menu like Audiobooks**: Search, Finished, In Progress, Not
+  Started, All Episodes, then By Show for the shows, and Listening Stats.
+  **By Series** in Audiobooks is hidden until a book has a series.

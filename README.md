@@ -123,7 +123,7 @@ their own.
 - See which books you have finished, not started or are part-way through
   - `Audiobooks` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started`,
     `By Title`, `By Author`, `By Series` and `Listening Stats` below. A list with no books in it
-    is not shown
+    is not shown, and `By Series` only appears once a book has a series
   - Choosing a book plays it, from where you left off if you have started it
   - Hold `Select` on a book and select `Mark as...` to move it between the lists. The mark lasts
     until the book is next played. The same menu has `Listening Stats`, `Book Info` and
@@ -131,8 +131,8 @@ their own.
 - See how long you have listened to a book, how long is left at your speed, when you started and
   finished it, your longest sitting and your best streak of days
   - Hold `Select` on a book or a podcast show and select `Listening Stats`; every book's
-    together is at the foot of `Audiobooks`, and a book's chapters not yet heard are listed
-    below its figures
+    together is at the foot of `Audiobooks`, every show's at the foot of `Podcasts`, and a
+    book's chapters not yet heard are listed below its figures
 - Books in a series together, in the order they came out
   - `Audiobooks > By Series`. The series is the grouping tag; give each book of a series the
     same one, with no number in it
@@ -168,8 +168,9 @@ Each episode keeps its place, and a show opens on its newest episode.
   - A podcast is a track with the genre "podcast" or "podcasts"
 - Shows listed by name, or the show with the newest episode first
   - `Settings > Library > Music > Sort > Shows By`
-- `Podcasts` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started` and
-  `[All Episodes]` below, then the shows
+- `Podcasts` opens on `In Progress`, with `Search` and `Finished` above it and `Not Started`,
+  `All Episodes`, `By Show` and `Listening Stats` below. A list with no episodes in it is not
+  shown
 - A show opens on its newest episode, with `[Play Unplayed]` above it
 - An episode's notes under the list
   - Theme dependent. Scrim shows them, and `Episode Notes` in its Theme Options turns them off

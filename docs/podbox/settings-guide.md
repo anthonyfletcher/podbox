@@ -194,8 +194,8 @@ Settings
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Default Browser | Which browser the root and the now-playing screen return to: Music, Files or Playlists. | Music |  |
-| Select Action | Where a press of Select goes from the now-playing screen: back to the previous screen, the music library, Cover Flow, Files, the lyrics or the queue. Holding Select always opens the now-playing menu, and Select + Play below sets what the two buttons pressed together do. | Previous Screen | **Adv** |
-| Select + Play | What pressing Select and Play together does on the now-playing screen: one of the now-playing menu's actions, such as the lyrics or the queue, or the whole menu. The row shows the current choice. | Lyrics |  |
+| Select Action | Where a press of Select goes from the now-playing screen: back to the previous screen, Music, Album Covers, Files, the lyrics or the queue. Holding Select always opens the now-playing menu, and Select + Play below sets what the two buttons pressed together do. | Previous Screen | **Adv** |
+| Select + Play | What pressing Select and Play together does on the now-playing screen: one of the now-playing menu's actions, such as the lyrics or the queue, or the whole menu. | Lyrics |  |
 
 **Appearance** opens `Settings > Appearance > Now Playing Screen`, below.
 

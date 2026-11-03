@@ -1400,14 +1400,13 @@ Playlists.
 
 [wps select action]
 Where a press of Select goes from the now-playing screen: back to the
-previous screen, the music library, Cover Flow, Files, the lyrics or the
-queue. Holding Select always opens the now-playing menu, and Select + Play
+previous screen, Music, Album Covers, Files, the lyrics or the queue. Holding Select always opens the now-playing menu, and Select + Play
 below sets what the two buttons pressed together do.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: one
 of the now-playing menu's actions, such as the lyrics or the queue, or the
-whole menu. The row shows the current choice.
+whole menu.
 
 [shortcuts instead of quickscreen]
 Whether a long press opens the quick screen or the shortcuts menu.
