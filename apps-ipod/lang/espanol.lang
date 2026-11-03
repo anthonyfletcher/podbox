@@ -26676,13 +26676,13 @@
 </phrase>
 <phrase>
   id: LANG_PODCAST_ALL_EPISODES
-  desc: a row above the Podcasts list of shows: every episode of every show
+  desc: in the Podcasts menu: every episode of every show
   user: core
   <source>
-    *: "[All Episodes]"
+    *: "All Episodes"
   </source>
   <dest>
-    *: "[Todos los episodios]"
+    *: "Todos los episodios"
   </dest>
   <voice>
     *: "Todos los episodios"

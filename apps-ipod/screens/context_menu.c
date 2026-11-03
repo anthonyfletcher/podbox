@@ -1595,7 +1595,7 @@ static int go_to_spoken(const char *menu_id, int row_lang, bool author)
 
 static int go_to_podcast(void)
 {
-    return go_to_spoken(BROWSER_DB_MENU_PODCASTS, LANG_PODCASTS, false);
+    return go_to_spoken(BROWSER_DB_MENU_PODCASTS, LANG_PODCAST_BY_SHOW, false);
 }
 
 static int go_to_audiobook(void)

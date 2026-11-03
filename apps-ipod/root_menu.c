@@ -413,8 +413,7 @@ static int browser(void* param)
             tc->dirlevel = 0;
             tc->currtable = 0;
             browser_db_clear_shortcut_base();
-            browser_db_enter_menu_row_on_next_load(BROWSER_DB_MENU_PODCASTS,
-                                                   str(LANG_PODCASTS));
+            browser_db_enter_menu_on_next_load(BROWSER_DB_MENU_PODCASTS);
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         break;
 

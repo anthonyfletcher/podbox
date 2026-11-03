@@ -166,6 +166,7 @@ enum table {
     TABLE_PLAY_UNPLAYED,
     TABLE_SHUFFLE_ALBUMS,
     TABLE_LISTEN_STATS,
+    TABLE_PODCAST_EPISODES,
 };
 
 static const struct id3_to_search_mapping {
@@ -215,6 +216,19 @@ static bool featured_artists_available(void);
 static bool shelf_finished_available(void);
 static bool shelf_not_started_available(void);
 static bool shelf_in_progress_available(void);
+static bool episodes_finished_available(void);
+static bool episodes_not_started_available(void);
+static bool episodes_in_progress_available(void);
+static bool episodes_all_available(void);
+
+/* A podcast episode's state, and every episode, as the Podcasts menu lists
+ * them */
+enum {
+    EPISODES_IN_PROGRESS = 1,
+    EPISODES_NOT_STARTED,
+    EPISODES_FINISHED,
+    EPISODES_ALL,
+};
 
 static const struct builtin_row {
     const char *id;
@@ -250,6 +264,20 @@ static const struct builtin_row {
     /* Every book's Listening Stats (listen_progress.c), the kind in the
      * param */
     { "book_stats", LANG_LISTENING_STATS, TABLE_LISTEN_STATS, 1, NULL },
+    /* The Podcasts menu's episodes in each state, the state in the param,
+     * and every show's Listening Stats */
+    { "podcast_finished", LANG_BOOK_SHELF_ROW_FINISHED,
+      TABLE_PODCAST_EPISODES, EPISODES_FINISHED,
+      episodes_finished_available },
+    { "podcast_in_progress", LANG_BOOK_SHELF_ROW_PROGRESS,
+      TABLE_PODCAST_EPISODES, EPISODES_IN_PROGRESS,
+      episodes_in_progress_available },
+    { "podcast_not_started", LANG_BOOK_SHELF_ROW_NEW,
+      TABLE_PODCAST_EPISODES, EPISODES_NOT_STARTED,
+      episodes_not_started_available },
+    { "podcast_all", LANG_PODCAST_ALL_EPISODES,
+      TABLE_PODCAST_EPISODES, EPISODES_ALL, episodes_all_available },
+    { "podcast_stats", LANG_LISTENING_STATS, TABLE_LISTEN_STATS, 2, NULL },
 };
 
 /* The setting says what the user asked for. An empty table means the library
@@ -285,6 +313,28 @@ static bool shelf_not_started_available(void)
 static bool shelf_in_progress_available(void)
 {
     return shelf_available(BOOK_SHELF_IN_PROGRESS);
+}
+
+static bool episodes_available(int state);
+
+static bool episodes_finished_available(void)
+{
+    return episodes_available(EPISODES_FINISHED);
+}
+
+static bool episodes_not_started_available(void)
+{
+    return episodes_available(EPISODES_NOT_STARTED);
+}
+
+static bool episodes_in_progress_available(void)
+{
+    return episodes_available(EPISODES_IN_PROGRESS);
+}
+
+static bool episodes_all_available(void)
+{
+    return episodes_available(EPISODES_ALL);
 }
 
 /* Capacity 10 000 entries (for example 10k different artists) */
@@ -1810,11 +1860,16 @@ static const char *const builtin_menu_lines[] = {
         "\"<Untagged>\" -> album -> title = \"fmt_title\"",
     "\"Listening Stats\" ==> \"book_stats\"",
     "",
-    /* The album is the show. PodBox's Podcasts row opens this row straight
-     * away; above the shows go Search and the episode states. */
+    /* Laid out as Audiobooks is, each episode state hidden while empty. The
+     * album is the show. */
     "%menu_start \"" BROWSER_DB_MENU_PODCASTS "\" \"Podcasts\"",
-    "\"Podcasts\" -> album ? spoken == \"2\" -> title = "
-        "\"fmt_episode\"",
+    "\"Search\" ==> \"db_search\"",
+    "\"Finished\" ==> \"podcast_finished\"",
+    "\"In Progress\" ==> \"podcast_in_progress\"",
+    "\"Not Started\" ==> \"podcast_not_started\"",
+    "\"All Episodes\" ==> \"podcast_all\"",
+    "\"By Show\" -> album ? spoken == \"2\" -> title = \"fmt_episode\"",
+    "\"Listening Stats\" ==> \"podcast_stats\"",
     "",
 };
 
@@ -2765,32 +2820,19 @@ static int header_rows_fill(int level, char *buf, long bufsz)
 /* Special row *sidx at the head of the list, written at dptr only when the
  * page starting at 'offset' holds it. Returns where the next row goes. */
 /* ------------------------------------------------------------------ *
- * the rows above a podcast's shows                                   *
+ * the Podcasts menu's episode states                                 *
  * ------------------------------------------------------------------ */
 
-/* Above the list of shows: Search and Finished, scrolled off the top, then
- * In Progress, Not Started and [All Episodes], and Listening Stats. Each
- * state is hidden while it has no episode, and is an <All tracks> row whose
- * seek names the state, which the track list it opens turns into
- * clauses. */
-enum {
-    EPISODES_IN_PROGRESS = 1,
-    EPISODES_NOT_STARTED,
-    EPISODES_FINISHED,
-    EPISODES_ALL,
-};
-
+/* Each state's row in the Podcasts menu is hidden while it has no episode,
+ * and opens the By Show row's <All tracks> list with the state as its seek,
+ * which that list turns into clauses (podcast_episodes_enter()). */
 static const struct episode_row {
-    int lang_id;
     const char *format;     /* the tagnavi.config %format to list them by */
 } episode_rows[] = {
-    /* The states are named as the Audiobooks and Books shelves name them */
-    [EPISODES_IN_PROGRESS] = { LANG_BOOK_SHELF_ROW_PROGRESS,
-                               "fmt_episode_heard" },
-    [EPISODES_NOT_STARTED] = { LANG_BOOK_SHELF_ROW_NEW, "fmt_episode_new" },
-    [EPISODES_FINISHED]    = { LANG_BOOK_SHELF_ROW_FINISHED,
-                               "fmt_episode_heard" },
-    [EPISODES_ALL]         = { LANG_PODCAST_ALL_EPISODES, "fmt_episode_new" },
+    [EPISODES_IN_PROGRESS] = { "fmt_episode_heard" },
+    [EPISODES_NOT_STARTED] = { "fmt_episode_new" },
+    [EPISODES_FINISHED]    = { "fmt_episode_heard" },
+    [EPISODES_ALL]         = { "fmt_episode_new" },
 };
 
 static struct tagcache_search_clause episode_elapsed_clause = {
@@ -2800,10 +2842,11 @@ static struct tagcache_search_clause episode_plays_clause = {
     .tag = tag_playcount, .numeric = true, .source = source_constant,
 };
 
-/* Episodes in each state, counted when the list of shows loads; 0 for a
- * state with none */
+/* Episodes in each state, counted once per load of a menu that asks; 0 for
+ * a state with none */
 static int episode_counts[EPISODES_ALL + 1];
-/* The list being loaded is a podcast's shows, whose Search alone scrolls off */
+static bool episode_counts_valid;
+/* The list being loaded is a podcast's shows */
 static bool podcast_shows;
 
 static bool is_podcast_shows(struct browser_context *c, int tag, int level)
@@ -2849,6 +2892,16 @@ static void episode_counts_fill(void)
                 episode_counts[EPISODES_ALL]++;
             }
     }
+}
+
+static bool episodes_available(int state)
+{
+    if (!episode_counts_valid)
+    {
+        episode_counts_fill();
+        episode_counts_valid = true;
+    }
+    return episode_counts[state] > 0;
 }
 
 /* A show's list opens with Play Unplayed while any of its episodes is not
@@ -3036,8 +3089,6 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                               : 0;
         resume_row = book_resume_row(c, level, tag);
         podcast_shows = is_podcast_shows(c, tag, level);
-        if (podcast_shows)
-            episode_counts_fill();
         show_unplayed = c->currtable == TABLE_NAVIBROWSE && tag == tag_title
                         && csi_spoken_kind() == 2 && show_has_unplayed(level);
     }
@@ -3317,23 +3368,6 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     if (show_unplayed)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_PLAY_UNPLAYED,
                             ID2P(LANG_PODCAST_PLAY_UNPLAYED), -1);
-    if (podcast_shows)
-    {
-        static const int order[] = { EPISODES_FINISHED,
-                                     EPISODES_IN_PROGRESS,
-                                     EPISODES_NOT_STARTED, EPISODES_ALL };
-
-        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_DB_SEARCH,
-                            ID2P(LANG_DB_SEARCH), DB_SEARCH_PODCAST);
-        for (i = 0; i < (int)ARRAYLEN(order); i++)
-            if (episode_counts[order[i]] > 0)
-                dptr = add_head_row(c, dptr, offset, &sidx,
-                                    TABLE_ALLSUBENTRIES,
-                                    ID2P(episode_rows[order[i]].lang_id),
-                                    order[i]);
-        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_LISTEN_STATS,
-                            ID2P(LANG_LISTENING_STATS), 2);
-    }
     if (tag == tag_album && featured_row_count(level) > 0)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
                             ID2P(LANG_FEATURED_IN), -1);
@@ -3714,6 +3748,34 @@ static bool root_row_drawable(const struct menu_entry *item)
     return true;
 }
 
+/* Whether a row browsing the grouping tag -- By Series -- has anything to
+ * list: most libraries leave that tag empty, where the other tags a row
+ * opens on are filled. A row whose clauses need input is taken to have. */
+static bool row_lists_anything(const struct search_instruction *si)
+{
+    char buf[TAGCACHE_BUFSZ];
+    struct tagcache_search tcs;
+    bool any;
+    int j;
+
+    if (si->tagorder_count < 1 || si->tagorder[0] != tag_grouping)
+        return true;
+    for (j = 0; j < si->clause_count[0]; j++)
+        if (si->clause[0][j]->type != clause_logical_or
+            && si->clause[0][j]->source != source_constant)
+            return true;
+    if (!tagcache_search(&tcs, tag_grouping))
+        return true;
+    /* The search keeps the clauses, which live in the movable buffer */
+    core_pin(browser_db_handle);
+    for (j = 0; j < si->clause_count[0]; j++)
+        tagcache_search_add_clause(&tcs, si->clause[0][j]);
+    any = tagcache_get_next(&tcs, buf, sizeof(buf));
+    tagcache_search_finish(&tcs);
+    core_unpin(browser_db_handle);
+    return any;
+}
+
 /* The root menu as parsed, or NULL when there is none. */
 static struct menu_root *parsed_root_menu(void)
 {
@@ -3836,6 +3898,7 @@ static int load_root(struct browser_context *c)
      * whether it is empty. The crawl happens once per boot; after that this
      * is a comparison against what the database looked like then. */
     db_featured_ensure();
+    episode_counts_valid = false;
     /* The root menu has no <All tracks>/<Random> rows. Only retrieve_entries()
      * cleared this, so without it the count from the last browse level would
      * still be standing when a root submenu is loaded -- and anything keyed on
@@ -3871,6 +3934,10 @@ static int load_root(struct browser_context *c)
         /* Turned off in the Music settings. Only the root menu is offered
          * there, and only while the mask still describes this row set. */
         if (hide_mask && (hide_mask & row_hide_bit(i)))
+            continue;
+
+        if (menu->items[i]->type == menu_next
+            && !row_lists_anything(&menu->items[i]->si))
             continue;
 
         /* The Audiobooks row belongs to Segregate Audiobooks and is a
@@ -3923,8 +3990,10 @@ static int load_root(struct browser_context *c)
                 if (rows == 0 && b->table == TABLE_DB_SEARCH)
                     root_open_row = 1;
                 else if (rows == 1 && root_open_row == 1
-                         && b->table == TABLE_BOOK_SHELF
-                         && b->param == BOOK_SHELF_FINISHED)
+                         && ((b->table == TABLE_BOOK_SHELF
+                              && b->param == BOOK_SHELF_FINISHED)
+                             || (b->table == TABLE_PODCAST_EPISODES
+                                 && b->param == EPISODES_FINISHED)))
                     root_open_row = 2;
 
                 /* The config's label is documentation; this one is
@@ -4435,8 +4504,7 @@ static struct menu_entry *main_menu_slot(int index, struct menu_root **in)
 }
 
 /* A root row PodBox has a main menu row of its own for: Podcasts, whose own
- * row goes through this one to open on the shows. Offered as well, it would
- * be a second Podcasts that opens a menu of one row. */
+ * row opens the same menu. Offered as well, it would be a second Podcasts. */
 static bool main_menu_row_owned(const struct menu_entry *item)
 {
     return item->type == menu_load && menus[item->link]
@@ -4505,6 +4573,32 @@ static int menu_spoken_scope(const struct menu_root *m)
         if (search_spoken_kind(&m->items[i]->si) == 2)
             return DB_SEARCH_PODCAST;
     return DB_SEARCH_SPOKEN;
+}
+
+/* An episode state's row of the Podcasts menu: the menu's list of shows,
+ * entered as its <All tracks> list with the state as the show level's seek
+ * and the row's name as its title. False where the menu has no such list. */
+static bool podcast_episodes_enter(struct browser_context *c, int state,
+                                   const unsigned char *name)
+{
+    int i;
+
+    for (i = 0; i < menu->itemcount; i++)
+    {
+        struct search_instruction *si = &menu->items[i]->si;
+
+        if (menu->items[i]->type == menu_next && si->tagorder_count > 1
+            && si->tagorder[0] == tag_album && search_spoken_kind(si) == 2)
+        {
+            csi = si;
+            csi->result_seek[0] = state;
+            c->currextra = 1;
+            strmemccpy(current_title[1], P2STR(name),
+                       sizeof(current_title[0]));
+            return true;
+        }
+    }
+    return false;
 }
 
 /* Whether any row of 'm' asks about spoken word. Used to recognise the
@@ -4847,12 +4941,7 @@ int browser_db_load(struct browser_context* c)
      * book rather than a chapter of it. */
     if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
-        /* A podcast's episodes in progress and not started are what its
-         * list is for; Search and Finished go off the top */
-        int first = table == TABLE_ROOT ? c->special_entry_count
-                    : podcast_shows
-                      ? 1 + (episode_counts[EPISODES_FINISHED] > 0)
-                    : c->special_entry_count;
+        int first = c->special_entry_count;
 
         /* [Untagged] sorts to the head of a list of names, where it reads as
          * one more special row, and goes with them. Asked only when the
@@ -5213,13 +5302,10 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     if (newextra == TABLE_DB_SEARCH)
     {
         /* Which menu the row sits in is the scope: the Audiobooks menu's
-         * Search covers books, every other menu's covers music. The main
-         * menu's own Search row is not this one -- root_menu.c arms that,
-         * and it covers both. */
-        /* A row above a list carries its scope */
-        db_search_arm_scope(c->currtable == TABLE_ROOT
-                            ? menu_spoken_scope(menus[c->currextra])
-                            : seek);
+         * Search covers books, the Podcasts menu's podcasts, every other
+         * menu's music. The main menu's own Search row is not this one --
+         * root_menu.c arms that, and it covers both. */
+        db_search_arm_scope(menu_spoken_scope(menus[c->currextra]));
         return GO_TO_DB_SEARCH;
     }
 
@@ -5327,6 +5413,18 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             {
                 menu = menus[seek];
                 c->currextra = seek;
+            }
+
+            else if (newextra == TABLE_PODCAST_EPISODES)
+            {
+                if (!podcast_episodes_enter(c, seek,
+                                            (unsigned char *)dptr->name))
+                {
+                    c->dirlevel--;
+                    c->currextra = extra_history[c->dirlevel];
+                    break;
+                }
+                newextra = TABLE_ALLSUBENTRIES;
             }
 
             else if (newextra == TABLE_NAVIBROWSE)
