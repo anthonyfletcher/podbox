@@ -1028,11 +1028,15 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
         if (r < 0 || rows[r].album_seek != e->tag_seek[tag_album]
             || rows[r].artist_seek != e->tag_seek[tag_albumartist])
         {
+            /* Repeats are looked for across an album name's rows, which
+             * are adjacent: a podcast show is its album, and its artists
+             * can differ by episode */
+            if (r < 0 || rows[r].album_seek != e->tag_seek[tag_album])
+                memset(tracks_seen, 0, sizeof(tracks_seen));
             r++;
             rows[r].album_seek = e->tag_seek[tag_album];
             rows[r].artist_seek = e->tag_seek[tag_albumartist];
             rows[r].first = scratch[i];
-            memset(tracks_seen, 0, sizeof(tracks_seen));
         }
         rows[r].last = scratch[i];
         rows[r].tracks++;
@@ -1755,17 +1759,23 @@ static long episode_key(int idx_id, const struct index_entry *idx)
     const char *title = buf;
     struct tagcache_header hdr;
     struct tagfile_entry tfe;
-    int fd, row;
+    int fd;
 
     if ((idx->flag & FLAG_DELETED) || !is_podcast(idx_id, idx))
         return 0;
 
     if (tc_stat.ramcache)
     {
+        long album = idx->tag_seek[tag_album];
+        int row = tagcache_album_find_name(album);
+        bool repeats = row < 0;
+
         title = ((struct tagfile_entry *)
                  &tcramcache.hdr->tags[tag_title][seek])->tag_data;
-        row = tagcache_album_of(idx_id);
-        if (row >= 0 && !tcrc_albums[row].track_repeats)
+        for (; !repeats && row < tagcache_album_count()
+               && tcrc_albums[row].album_seek == album; row++)
+            repeats = tcrc_albums[row].track_repeats;
+        if (!repeats)
             track = idx->tag_seek[tag_tracknumber];
     }
     else
