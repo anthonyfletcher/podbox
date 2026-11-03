@@ -22,8 +22,9 @@ struct pv_moves_db
 bool pv_moves_stale(const struct pv_moves_db *db);
 
 /* Match the log's missing folders to where their files are now, and missing
- * files to what they were renamed to in place, and save the table. Reads the whole playback log and walks the database's filenames
- * twice, so pv_names_init() runs it only when the saved table is stale.
+ * files to what they were renamed to in place, and save the table. Reads
+ * the whole playback log and walks the database's filenames twice, so
+ * pv_names_init() runs it only when the saved table is stale.
  * 'scratch' is working memory only; nothing in it survives the call. */
 void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db);
 
