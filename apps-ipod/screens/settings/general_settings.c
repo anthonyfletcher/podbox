@@ -991,30 +991,23 @@ MENUITEM_SETTING(browser_default,
 /* Where Select from the now-playing screen goes. */
 MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
 
-/* The hotkey button, showing what it is currently assigned to; selecting it
-   opens the list of available actions. */
+/* What Select and Play pressed together do; selecting it opens the list of
+   available actions. Named without its value, as the setting rows are. */
 static char *wps_context_menu_get_name(int selected_item, void *data,
                                        char *buffer, size_t buffer_len)
 {
     (void)selected_item;
     (void)data;
-    const struct hotkey_assignment *cur =
-        get_hotkey(HK_CTX_GET(0, global_settings.context_wps));
-
-    snprintf(buffer, buffer_len, "%s [%s]",
-             str(LANG_HOTKEY_WPS), str(cur->lang_id));
-    return buffer;
+    (void)buffer;
+    (void)buffer_len;
+    return str(LANG_HOTKEY_WPS);
 }
 
 static int wps_context_menu_speak_item(int selected_item, void *data)
 {
     (void)selected_item;
     (void)data;
-    const struct hotkey_assignment *cur =
-        get_hotkey(HK_CTX_GET(0, global_settings.context_wps));
-
     talk_id(LANG_HOTKEY_WPS, false);
-    talk_id(cur->lang_id, true);
     return 0;
 }
 

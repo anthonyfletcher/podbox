@@ -1957,11 +1957,11 @@ const struct settings_list settings[] = {
                    "default,database,coverflow,files,lyrics,queue",
                    NULL, 6,
                    ID2P(LANG_PREVIOUS_SCREEN),
-                   ID2P(LANG_TAGCACHE),
-                   ID2P(LANG_COVERFLOW),
+                   ID2P(LANG_MUSIC_BROWSER),
+                   ID2P(LANG_ALBUM_COVERS),
                    ID2P(LANG_DIR_BROWSER),
                    ID2P(LANG_LYRICS),
-                   ID2P(LANG_CURRENT_PLAYLIST)),
+                   ID2P(LANG_VIEW_DYNAMIC_PLAYLIST)),
 
     /* Customizable icons */
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, icon_file, "iconset", DEFAULT_ICONSET,

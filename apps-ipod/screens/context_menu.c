@@ -2699,6 +2699,13 @@ static enum themable_icons hotkey_get_icon(int selected_item, void *data)
     return hk_menu[selected_item]->icon;
 }
 
+static enum list_row_kind hotkey_option_kind(int selected_item, void *data)
+{
+    (void)selected_item;
+    (void)data;
+    return LIST_ROW_OPTION;
+}
+
 int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
 {
     const struct hotkey_assignment *hk_menu[ARRAYLEN(hotkey_items)];
@@ -2706,6 +2713,8 @@ int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
     char *title = str(LANG_ONPLAY_MENU_TITLE);
     if (flag & HOTKEY_FLAG_TREE)
         title = str(LANG_HOTKEY_FILE_BROWSER);
+    else if (!execute)
+        title = str(LANG_HOTKEY_WPS);
 
     struct simplelist_info info;
     int selected = 0;
@@ -2729,10 +2738,20 @@ int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
 
     simplelist_info_init(&info, title, count, (void*)&hk_menu);
     info.get_name = hotkey_get_name;
-    info.get_icon = hotkey_get_icon;
     info.get_talk = hotkey_get_talk;
     info.selection = selected;
+    /* Choosing the setting's value looks as every setting's picker does */
+    if (execute)
+        info.get_icon = hotkey_get_icon;
+    else
+    {
+        info.get_kind = hotkey_option_kind;
+        info.title_icon = Icon_Questionmark;
+        push_current_activity(ACTIVITY_OPTIONSELECT);
+    }
     bool to_root = simplelist_show_list(&info);
+    if (!execute)
+        pop_current_activity();
 
     if (execute)
     {
