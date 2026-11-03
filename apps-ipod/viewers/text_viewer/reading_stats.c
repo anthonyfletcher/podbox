@@ -7,7 +7,9 @@
  *   keeping  - a sitting, from opening a book to closing it: the time on
  *              each page turned forward, up to RS_PAGE_CAP of it so a
  *              player left open does not count, the words on the page, and
- *              the day it falls on
+ *              the day it falls on; a page counts once a sitting, past
+ *              where it opened, and only when on screen long enough to
+ *              read
  *   records  - one a book, keyed by path, newest first, in
  *              user/reading_stats.dat
  *   showing  - a book's figures, and every book's together
@@ -37,6 +39,11 @@
 
 #define RS_MAX      256             /* books kept, as reading.dat keeps */
 #define RS_PAGE_CAP (5 * 60 * HZ)   /* the most one page counts */
+/* The least a page must be on screen to count: its words at RS_WPM_MAX,
+ * which is past fast reading and into skimming, so the font's words a page
+ * set it; and never under RS_PAGE_MIN */
+#define RS_WPM_MAX  1000
+#define RS_PAGE_MIN HZ
 
 struct rs_record
 {
@@ -58,6 +65,7 @@ static struct rs_record rs_cur;
 static bool rs_open, rs_day_done;
 static long rs_mark;                /* the clock's last event */
 static long rs_ticks;               /* this sitting's time */
+static int64_t rs_furthest;         /* pages before this one have counted */
 
 #define RS_EPOCH pv_days_from_civil(1999, 12, 31)
 
@@ -138,12 +146,13 @@ static void rs_save(const struct rs_record *r)
     libfile_finish(&w, ok);
 }
 
-void reading_stats_begin(const char *path)
+void reading_stats_begin(const char *path, int64_t at)
 {
     rs_load(path, &rs_cur);
     rs_open = true;
     rs_day_done = false;
     rs_ticks = 0;
+    rs_furthest = at;
     rs_mark = current_tick;
 }
 
@@ -152,14 +161,21 @@ void reading_stats_touch(void)
     rs_mark = current_tick;
 }
 
-void reading_stats_page(int words)
+void reading_stats_page(int words, int64_t at)
 {
     long t = current_tick - rs_mark;
+    long need = MAX(RS_PAGE_MIN,
+                    (long)((int64_t)words * 60 * HZ / RS_WPM_MAX));
 
     if (!rs_open)
         return;
-    rs_ticks += t > RS_PAGE_CAP ? RS_PAGE_CAP : t;
     rs_mark = current_tick;
+    /* Paged past, or read already in this sitting: nothing counts, and
+     * a page paged past still counts once it is read */
+    if (t < need || at < rs_furthest)
+        return;
+    rs_furthest = at + 1;
+    rs_ticks += t > RS_PAGE_CAP ? RS_PAGE_CAP : t;
     rs_cur.pages++;
     rs_cur.words += words;
     if (!rs_day_done)

@@ -247,7 +247,8 @@ GIF, WebP and BMP pictures.
     same menu, or on the book's menu, goes back to one, and holding `Select` on one deletes it
   - `Reading Stats`, on a book's menu or at the foot of `Books`, shows your time reading, pages a day, reading speed in words a minute, the
     time left at that speed, when you started and finished, your longest sitting and your best
-    streak of days, for one book or for all of them
+    streak of days, for one book or for all of them. A page flicked past, or read again in the
+    same sitting, does not count
   - See pictures inside books
 - Zoom into a picture and move around it
   - Hold `Menu` in the image viewer and select `Zoom` for a list of zoom levels

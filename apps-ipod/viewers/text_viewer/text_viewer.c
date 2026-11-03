@@ -1625,12 +1625,20 @@ static int tv_page_words(void)
 /* Next on a book's last page: the book is closed, Finished */
 static bool tv_book_done;
 
+/* Where the page on screen lies in the book, for the statistics: larger for
+ * a later page */
+static int64_t tv_book_at(void)
+{
+    return (int64_t)tv.part << 32 | (uint32_t)tv.pos;
+}
+
 /* A page read by eye counts toward the statistics; one Read Aloud says
  * does not. At the end of a chapter, the page is drawn again: looking past
  * it may have put the loading box over it. At the book's end it closes. */
 static void tv_next_page(void)
 {
     int words = tv_page_words();
+    int64_t at = tv_book_at();
     bool moved;
 
     if (tv_at_last_page())
@@ -1644,7 +1652,7 @@ static void tv_next_page(void)
     }
     moved = tv_advance();
     if (moved && global_settings.text_viewer_read_aloud == TV_READ_OFF)
-        reading_stats_page(words);
+        reading_stats_page(words, at);
     else
         reading_stats_touch();
     tv_draw();
@@ -3654,7 +3662,7 @@ int text_viewer(const char *file)
         }
         tv_setup_screen();
     }
-    reading_stats_begin(file);
+    reading_stats_begin(file, tv_book_at());
     tv_open_part = tv.part;
     tv_open_pos = tv.pos;
 
