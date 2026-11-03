@@ -369,8 +369,9 @@ void debug_log_sync(enum debug_log_id id, const char *fmt, ...)
     va_start(ap, fmt);
     len = format_line(line, sizeof line, fmt, ap);
     va_end(ap);
-    if (len > 0)
-        write_through(id, line, len);
+    if (len < 0)
+        return;
+    write_through(id, line, len);
 }
 
 void debug_log(enum debug_log_id id, const char *fmt, ...)

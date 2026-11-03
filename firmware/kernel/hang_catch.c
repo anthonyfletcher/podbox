@@ -151,14 +151,13 @@ static void stuck_draw(unsigned int *y)
     {
         const struct thread_entry *t = __thread_slot_entry(i);
         uint32_t calls[2] = { 0, 0 };
-        char name[9];
+        char name[8];
 
         if (t->state == STATE_KILLED)
             continue;
         stack_scan(t->context.sp, (uint32_t)t->stack + t->stack_size,
                    calls, 2);
         name8(t, name);
-        name[8] = '\0';
         lcd_putsf(1, (*y)++, "%-7.7s %c %08lx %08lx %08lx", name,
                   t == hang_thread ? '*' : state_letter(t->state),
                   (unsigned long)t->context.lr, (unsigned long)calls[0],

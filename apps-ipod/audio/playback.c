@@ -2101,14 +2101,21 @@ void set_albumart_mode(int setting)
  * is on disk first, so a decode that never returns leaves it last. */
 static void art_log_result(int hid)
 {
+    const char *why;
+
     if (hid >= 0)
+    {
         debug_log_sync(DEBUG_LOG_PLAYBACK, "art: loaded");
-    else
-        debug_log_sync(DEBUG_LOG_PLAYBACK, "art: failed, %s",
-                       hid == ERR_BUFFER_FULL ? "buffer full"
-                       : hid == ERR_BITMAP_TOO_LARGE ? "too large"
-                       : hid == ERR_FILE_ERROR ? "could not read or decode"
-                       : "other error");
+        return;
+    }
+    switch (hid)
+    {
+        case ERR_BUFFER_FULL:      why = "buffer full"; break;
+        case ERR_BITMAP_TOO_LARGE: why = "too large"; break;
+        case ERR_FILE_ERROR:       why = "could not read or decode"; break;
+        default:                   why = "other error"; break;
+    }
+    debug_log_sync(DEBUG_LOG_PLAYBACK, "art: failed, %s", why);
 }
 
 static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user_data, bool is_current_track, int i)

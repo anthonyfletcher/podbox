@@ -2826,13 +2826,12 @@ static int header_rows_fill(int level, char *buf, long bufsz)
 /* Each state's row in the Podcasts menu is hidden while it has no episode,
  * and opens the By Show row's <All tracks> list with the state as its seek,
  * which that list turns into clauses (podcast_episodes_enter()). */
-static const struct episode_row {
-    const char *format;     /* the tagnavi.config %format to list them by */
-} episode_rows[] = {
-    [EPISODES_IN_PROGRESS] = { "fmt_episode_heard" },
-    [EPISODES_NOT_STARTED] = { "fmt_episode_new" },
-    [EPISODES_FINISHED]    = { "fmt_episode_heard" },
-    [EPISODES_ALL]         = { "fmt_episode_new" },
+/* The tagnavi.config %format each state is listed by */
+static const char *const episode_formats[] = {
+    [EPISODES_IN_PROGRESS] = "fmt_episode_heard",
+    [EPISODES_NOT_STARTED] = "fmt_episode_new",
+    [EPISODES_FINISHED]    = "fmt_episode_heard",
+    [EPISODES_ALL]         = "fmt_episode_new",
 };
 
 static struct tagcache_search_clause episode_elapsed_clause = {
@@ -3000,7 +2999,7 @@ static int add_episode_clauses(struct tagcache_search *tcs, long state)
         tagcache_search_add_clause(tcs, &episode_plays_clause);
     }
     for (i = 0; i < format_count; i++)
-        if (!strcmp(formats[i]->name, episode_rows[state].format))
+        if (!strcmp(formats[i]->name, episode_formats[state]))
             return formats[i]->group_id;
     return -1;
 }
