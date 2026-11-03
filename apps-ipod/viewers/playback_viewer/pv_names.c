@@ -21,7 +21,8 @@
  *   reason the database path exists.
  *
  * Between the two sits pv_moves.c: a file the database does not know at its
- * logged path may be one whose folder has since moved, and pv_names_locate()
+ * logged path may be one whose folder has since moved, or which a tagger
+ * renumbered in place, and pv_names_locate()
  * gives the path it has now, which the database may well know.
  *
  * The database is asked by path_key(), which ignores case and a volume

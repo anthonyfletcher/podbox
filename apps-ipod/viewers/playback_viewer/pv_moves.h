@@ -21,8 +21,8 @@ struct pv_moves_db
  * database than this one -- or there is none. */
 bool pv_moves_stale(const struct pv_moves_db *db);
 
-/* Match the log's missing folders to where their files are now, and save the
- * table. Reads the whole playback log and walks the database's filenames
+/* Match the log's missing folders to where their files are now, and missing
+ * files to what they were renamed to in place, and save the table. Reads the whole playback log and walks the database's filenames
  * twice, so pv_names_init() runs it only when the saved table is stale.
  * 'scratch' is working memory only; nothing in it survives the call. */
 void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db);
@@ -35,8 +35,8 @@ size_t pv_moves_load(void *buf, size_t size, const struct pv_moves_db *db);
 /* Drop the loaded table, for when its memory is about to be reused. */
 void pv_moves_forget(void);
 
-/* Where 'path' lives now if its folder moved, or NULL. The result is a static
- * buffer, valid until the next call. */
+/* Where 'path' lives now if its folder moved or it was renamed in place, or
+ * NULL. The result is valid until the next call. */
 const char *pv_moves_apply(const char *path);
 
 /* A value that changes whenever the saved table does, for a cache built from

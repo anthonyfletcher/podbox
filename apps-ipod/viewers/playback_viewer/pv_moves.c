@@ -1,19 +1,23 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Folders that have moved since their files were played.
+ * Folders that have moved, and files renamed in place, since they were played.
  *
  * A logged path is where the file was on the day it was heard. Rename an
  * artist folder or move the library under a new root, and every play before
  * that names a file the database no longer knows -- so it falls to folder
  * guesswork, under the OLD folder's names, and its artwork is lost with it.
+ * A tagger that renumbers a tracklist does the same to single files, renaming
+ * "03 - Song.flac" to "05 - Song.flac" in the same folder.
  *
  * This finds where such a folder went, by the names of the files in it. For
  * each logged folder with files the database lacks, every database folder
  * holding a file of the same name is a candidate, and a candidate holding
- * enough of them is taken as the folder's new home (see accept()). The
- * result is a table of old folder -> new folder, applied as a path is read;
- * the log itself is never rewritten.
+ * enough of them is taken as the folder's new home (see accept()). A missing
+ * file whose folder still holds exactly one file of the same name past its
+ * track number (see stem_hash()) is taken as renamed to it. The result is a
+ * table of old folder -> new folder and old path -> new path, applied as a
+ * path is read; the log itself is never rewritten.
  *
  * It is saved with the database state it was worked out for, and built
  * again when a track has been deleted since -- a move is a deletion and an
@@ -44,9 +48,9 @@
 #include "pv_moves.h"
 
 /* A libfile: struct move records, then as its tail tagcache_entry_key() of
- * the database's last entry, the count and file-name hashes of the missing
- * files left unplaced (uint32_t each; UNPLACED_ALL for more than
- * UNPLACED_MAX) and the pool of the moved folders. Its marks are the database
+ * the database's last entry, the count and file-name and stem hashes of the
+ * missing files left unplaced (uint32_t each; UNPLACED_ALL for more than
+ * UNPLACED_MAX) and the pool of the new paths. Its marks are the database
  * the table was worked out for. */
 #define UNPLACED_MAX 512
 #define UNPLACED_ALL 0xffffffffu
@@ -71,9 +75,14 @@ struct lfile                /* a distinct file the log names */
 {
     uint32_t path_h;
     uint32_t base_h;        /* of the name after the last '/' */
+    uint32_t stem_h;        /* stem_hash() of that name */
     int      dir;           /* into dirs[] */
+    int      renamed;       /* its new path in the scan pool + 1; 0 none,
+                               RENAMED_AMBIGUOUS for more than one */
     bool     found;         /* the database holds this exact path */
 };
+
+#define RENAMED_AMBIGUOUS (-1)
 
 struct ldir                 /* a distinct folder the log names */
 {
@@ -95,14 +104,22 @@ struct cand
 
 struct move
 {
-    uint32_t dir_h;         /* the folder as logged */
+    uint32_t dir_h;         /* the folder as logged, or with MOVE_FILE in off
+                               the whole path */
     unsigned off;           /* where it is now, in the table's pool */
 };
+
+#define MOVE_FILE 0x80000000u
+
+/* The finished table is written over the files as they are read */
+_Static_assert(sizeof(struct move) * 2 <= sizeof(struct lfile),
+               "a move record must stay behind the file being read");
 
 static struct
 {
     struct lfile *files;
     int *fslots;            /* by path, then (after walk 1) by file name */
+    int *rslots;            /* the missing files by stem, after walk 1 */
     int f_n, f_cap, f_mask;
     struct ldir *dirs;
     int *dslots;
@@ -128,6 +145,28 @@ static uint32_t leaf_hash(const char *dir, size_t n)
     while (i > 0 && dir[i - 1] != '/')
         i--;
     return fnv1a_bytes(dir + i, n - i);
+}
+
+static bool is_digit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+/* A file name past its track number: "05 - Song.flac", "1-05 Song.flac" and
+ * "Song.flac" all give "Song.flac". 0 when nothing but the extension would be
+ * left, as of "05.flac" or "1999.mp3", which say nothing about the song. */
+static uint32_t stem_hash(const char *name)
+{
+    const char *s = name;
+
+    while (is_digit(*s))
+        s++;
+    if ((*s == '-' || *s == '.') && is_digit(s[1]) && s > name)
+        for (s++; is_digit(*s); s++)
+            ;
+    while (*s == ' ' || *s == '-' || *s == '.' || *s == '_')
+        s++;
+    return strchr(s, '.') ? fnv1a_str(s) : 0;
 }
 
 /* The largest power of two at or below v, or 0. */
@@ -197,10 +236,12 @@ static void log_cb(const struct pv_entry *e, void *ctx)
     if (d < 0)
         return;
 
-    sc.files[sc.f_n].path_h = h;
-    sc.files[sc.f_n].base_h = fnv1a_str(slash + 1);
-    sc.files[sc.f_n].dir    = d;
-    sc.files[sc.f_n].found  = sc.ram && tagcache_find_path(p) >= 0;
+    sc.files[sc.f_n].path_h  = h;
+    sc.files[sc.f_n].base_h  = fnv1a_str(slash + 1);
+    sc.files[sc.f_n].stem_h  = stem_hash(slash + 1);
+    sc.files[sc.f_n].dir     = d;
+    sc.files[sc.f_n].renamed = 0;
+    sc.files[sc.f_n].found   = sc.ram && tagcache_find_path(p) >= 0;
     sc.fslots[s] = ++sc.f_n;
 }
 
@@ -278,9 +319,39 @@ static void vote(struct ldir *ld, uint32_t dir_h, const char *dir, size_t n)
     sc.pool_used += (unsigned)n + 1;
 }
 
+/* A database file in a missing file's own folder, with its stem but another
+ * name, is what the file was renamed to -- unless a second one is too. */
+static void rename_to(uint32_t dh, uint32_t bh, uint32_t st, const char *fname)
+{
+    int s = (int)(st & (unsigned)sc.f_mask);
+    size_t n;
+
+    while (sc.rslots[s])
+    {
+        struct lfile *f = &sc.files[sc.rslots[s] - 1];
+
+        s = (s + 1) & sc.f_mask;
+        if (f->stem_h != st || f->base_h == bh
+            || sc.dirs[f->dir].dir_h != dh)
+            continue;
+        if (f->renamed)
+        {
+            f->renamed = RENAMED_AMBIGUOUS;
+            continue;
+        }
+        n = strlen(fname) + 1;
+        if (sc.pool_used + n > sc.pool_cap)
+            continue;
+        memcpy(sc.pool + sc.pool_used, fname, n);
+        f->renamed = (int)sc.pool_used + 1;
+        sc.pool_used += (unsigned)n;
+    }
+}
+
 /* Walk 2: every database file named like a missing one votes for its folder
- * as that file's new home. fslots is keyed by file name by now, and holds
- * only the missing files. */
+ * as that file's new home, and one stemmed like a missing one in the same
+ * folder may be its new name. fslots is keyed by file name by now, rslots by
+ * stem, and both hold only the missing files. */
 static bool collect_votes(void)
 {
     struct tagcache_search tcs;
@@ -295,7 +366,7 @@ static bool collect_votes(void)
     while (tagcache_get_next(&tcs, fname, sizeof(fname)))
     {
         const char *slash = strrchr(fname, '/');
-        uint32_t bh, dh;
+        uint32_t bh, dh, st;
         int s;
 
         splash_progress(++n, total, "%s",
@@ -305,6 +376,8 @@ static bool collect_votes(void)
 
         bh = fnv1a_str(slash + 1);
         dh = fnv1a_bytes(fname, (size_t)(slash - fname));
+        if ((st = stem_hash(slash + 1)))
+            rename_to(dh, bh, st, fname);
         s = (int)(bh & (unsigned)sc.f_mask);
         while (sc.fslots[s])
         {
@@ -369,18 +442,18 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
 {
     char *p = scratch;
     size_t used;
-    int fs, ds, missing_dirs = 0, n_moves = 0;
+    int fs, ds, missing_dirs = 0, n_moves = 0, folder_moves = 0;
     struct move *out;
     char *out_pool;
-    unsigned out_used = 0, out_cap;
+    unsigned out_used = 0, out_cap, folder_bytes = 0;
     size_t rest;
 
-    /* At most half for the files (16 bytes and two slots of 4 each), an
-     * eighth for the folders (20 and two slots), the rest for candidates and
-     * their paths. */
+    /* At most half for the files (24 bytes and four slots of 4 each, two by
+     * name and two by stem), an eighth for the folders (20 and two slots),
+     * the rest for candidates and the paths found. */
     p = (char *)(((size_t)p + 3u) & ~(size_t)3u);
     size -= (size_t)(p - (char *)scratch);
-    fs = floor_pow2(size / 24);
+    fs = floor_pow2(size / 40);
     ds = floor_pow2(size / 112);
     if (fs < 64 || ds < 16)
         return;
@@ -389,8 +462,10 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
     sc.files  = (struct lfile *)p;
     sc.f_cap  = fs / 2;
     sc.fslots = (int *)(p + (size_t)sc.f_cap * sizeof(struct lfile));
+    sc.rslots = sc.fslots + fs;
     sc.f_mask = fs - 1;
-    used = (size_t)sc.f_cap * sizeof(struct lfile) + (size_t)fs * sizeof(int);
+    used = (size_t)sc.f_cap * sizeof(struct lfile)
+         + (size_t)fs * 2 * sizeof(int);
     sc.dirs   = (struct ldir *)(p + used);
     sc.d_cap  = ds / 2;
     sc.dslots = (int *)(p + used + (size_t)sc.d_cap * sizeof(struct ldir));
@@ -407,8 +482,8 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
     if (!sc.ram && !mark_found())
         return;
 
-    /* From here the slots index the missing files by name. */
-    memset(sc.fslots, 0, (size_t)fs * sizeof(int));
+    /* From here the slots index the missing files by name and by stem. */
+    memset(sc.fslots, 0, (size_t)fs * 2 * sizeof(int));
     for (int i = 0; i < sc.f_n; i++)
     {
         struct lfile *f = &sc.files[i];
@@ -422,6 +497,12 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
         while (sc.fslots[s])
             s = (s + 1) & sc.f_mask;
         sc.fslots[s] = i + 1;
+        if (!f->stem_h)
+            continue;
+        s = (int)(f->stem_h & (unsigned)sc.f_mask);
+        while (sc.rslots[s])
+            s = (s + 1) & sc.f_mask;
+        sc.rslots[s] = i + 1;
     }
 
     /* Candidates for as many missing folders as half the rest holds; the
@@ -472,21 +553,62 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
     {
         const struct lfile *f = &sc.files[i];
 
-        if (f->found || sc.dirs[f->dir].best >= 0)
+        if (f->found || f->renamed > 0 || sc.dirs[f->dir].best >= 0)
             continue;
-        if (unplaced_n == UNPLACED_MAX)
+        if (unplaced_n + 2 > UNPLACED_MAX)
             unplaced_n = UNPLACED_ALL;
         else
+        {
             unplaced[unplaced_n++] = f->base_h;
+            if (f->stem_h)
+                unplaced[unplaced_n++] = f->stem_h;
+        }
+    }
+
+    /* What the moved folders will take, which the renamed files leave them:
+     * a folder speaks for all its files, a rename for one */
+    for (int i = 0; i < sc.d_n; i++)
+    {
+        const struct ldir *ld = &sc.dirs[i];
+
+        if (ld->best < 0)
+            continue;
+        folder_moves++;
+        folder_bytes += (unsigned)strlen(sc.pool
+                                         + sc.cands[ld->cand + ld->best].off)
+                        + 1;
     }
 
     /* The files and their slots are finished with: the table is assembled
-     * where they were. */
+     * where they were. The renamed files go first, read as they are
+     * overwritten -- a record is at most half the size of a file, so the one
+     * written never reaches a file not yet read. */
     out = (struct move *)sc.files;
     out_pool = (char *)sc.fslots;
-    out_cap = (unsigned)fs * sizeof(int);
+    out_cap = (unsigned)fs * 2 * sizeof(int);
     if (out_cap > MOVES_POOL_MAX)
         out_cap = MOVES_POOL_MAX;
+
+    for (int i = 0; i < sc.f_n && n_moves + folder_moves < MOVES_MAX; i++)
+    {
+        const struct lfile *f = &sc.files[i];
+        uint32_t path_h = f->path_h;
+        const char *path;
+        unsigned len;
+
+        if (f->found || f->renamed <= 0)
+            continue;
+
+        path = sc.pool + f->renamed - 1;
+        len = (unsigned)strlen(path) + 1;
+        if (out_used + len + folder_bytes > out_cap)
+            break;
+        memcpy(out_pool + out_used, path, len);
+        out[n_moves].dir_h = path_h;
+        out[n_moves].off = out_used | MOVE_FILE;
+        out_used += len;
+        n_moves++;
+    }
 
     for (int i = 0; i < sc.d_n && n_moves < MOVES_MAX
                     && n_moves < sc.f_cap; i++)
@@ -515,7 +637,7 @@ void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
 /* ------------------------------------------------------------------- use */
 
 /* Whether a track added since entry 'from' -- new entries are appended --
- * bears the name of an unplaced missing file */
+ * bears the name or the stem of an unplaced missing file */
 static bool added_matches(int from, int to)
 {
     struct tagcache_search tcs;
@@ -529,11 +651,14 @@ static bool added_matches(int from, int to)
     tagcache_search_set_range(&tcs, from, to - 1);
     while (!hit && tagcache_get_next(&tcs, fname, sizeof(fname)))
     {
-        const char *slash = strrchr(fname, '/');
-        uint32_t h = fnv1a_str(slash ? slash + 1 : fname);
+        const char *base = strrchr(fname, '/');
+        uint32_t h, st;
 
+        base = base ? base + 1 : fname;
+        h = fnv1a_str(base);
+        st = stem_hash(base);
         for (uint32_t i = 0; i < unplaced_n && !hit; i++)
-            hit = unplaced[i] == h;
+            hit = unplaced[i] == h || (st && unplaced[i] == st);
     }
     tagcache_search_finish(&tcs);
     return hit;
@@ -654,7 +779,7 @@ size_t pv_moves_load(void *buf, size_t size, const struct pv_moves_db *db)
                    && pool[pool_bytes - 1] == '\0';
 
             for (int i = 0; ok && i < n; i++)
-                ok = m[i].off < pool_bytes;
+                ok = (m[i].off & ~MOVE_FILE) < pool_bytes;
 
             if (ok)
             {
@@ -679,12 +804,26 @@ size_t pv_moves_load(void *buf, size_t size, const struct pv_moves_db *db)
     return mv_n ? (need + 3u) & ~(size_t)3u : 0;
 }
 
+/* The record keyed 'h' of the kind 'file' says, or NULL */
+static const struct move *find_move(uint32_t h, unsigned file)
+{
+    int s = (int)(h & (unsigned)mv_mask);
+
+    while (mv_slots[s])
+    {
+        const struct move *m = &mv[mv_slots[s] - 1];
+        if (m->dir_h == h && (m->off & MOVE_FILE) == file)
+            return m;
+        s = (s + 1) & mv_mask;
+    }
+    return NULL;
+}
+
 const char *pv_moves_apply(const char *path)
 {
     static char moved[MAX_PATH];
+    const struct move *m;
     const char *slash;
-    uint32_t h;
-    int s;
 
     if (!mv_n || !path)
         return NULL;
@@ -692,17 +831,13 @@ const char *pv_moves_apply(const char *path)
     if (!slash || slash == path)
         return NULL;
 
-    h = fnv1a_bytes(path, (size_t)(slash - path));
-    s = (int)(h & (unsigned)mv_mask);
-    while (mv_slots[s])
+    if ((m = find_move(fnv1a_str(path), MOVE_FILE)))
+        return mv_pool + (m->off & ~MOVE_FILE);
+
+    if ((m = find_move(fnv1a_bytes(path, (size_t)(slash - path)), 0)))
     {
-        const struct move *m = &mv[mv_slots[s] - 1];
-        if (m->dir_h == h)
-        {
-            snprintf(moved, sizeof(moved), "%s%s", mv_pool + m->off, slash);
-            return moved;
-        }
-        s = (s + 1) & mv_mask;
+        snprintf(moved, sizeof(moved), "%s%s", mv_pool + m->off, slash);
+        return moved;
     }
     return NULL;
 }
