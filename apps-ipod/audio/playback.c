@@ -2097,6 +2097,20 @@ void set_albumart_mode(int setting)
     albumart_mode = setting;
 }
 
+/* The Playback Errors log's account of an art load. The line before a decode
+ * is on disk first, so a decode that never returns leaves it last. */
+static void art_log_result(int hid)
+{
+    if (hid >= 0)
+        debug_log_sync(DEBUG_LOG_PLAYBACK, "art: loaded");
+    else
+        debug_log_sync(DEBUG_LOG_PLAYBACK, "art: failed, %s",
+                       hid == ERR_BUFFER_FULL ? "buffer full"
+                       : hid == ERR_BITMAP_TOO_LARGE ? "too large"
+                       : hid == ERR_FILE_ERROR ? "could not read or decode"
+                       : "other error");
+}
+
 static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user_data, bool is_current_track, int i)
 {
     user_data->embedded_albumart = NULL;
@@ -2113,7 +2127,10 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
         clear_last_folder_album_art();
         strcpy(last_folder_aa_path, path);
     }
+    debug_log_sync(DEBUG_LOG_PLAYBACK, "art: decoding %s for %dx%d", path,
+                   user_data->dim->width, user_data->dim->height);
     int hid = bufopen(path, 0, TYPE_BITMAP, user_data);
+    art_log_result(hid);
     skin_albumart_art_opened(hid);
     if (hid != ERR_BUFFER_FULL && (same_path || is_cacheable))
         last_folder_aa_hid[i] = hid;
@@ -2258,7 +2275,14 @@ static int audio_load_albumart(struct track_info *infop,
                 }
 
                 user_data.embedded_albumart = &track_id3->albumart;
+                debug_log_sync(DEBUG_LOG_PLAYBACK, "art: decoding the art in "
+                               "%s, %d bytes at %ld, type %d, for %dx%d",
+                               track_id3->path, track_id3->albumart.size,
+                               (long)track_id3->albumart.pos,
+                               (int)track_id3->albumart.type,
+                               user_data.dim->width, user_data.dim->height);
                 hid = bufopen(track_id3->path, 0, TYPE_BITMAP, &user_data);
+                art_log_result(hid);
                 skin_albumart_art_opened(hid);
                 if (hid != ERR_BUFFER_FULL && (same_album || is_cacheable))
                     last_embedded_aa_hid[i] = hid;
@@ -2302,6 +2326,8 @@ static int audio_load_albumart(struct track_info *infop,
             if (hid < 0)
             {
                 logf("Album art loading failed");
+                debug_log(DEBUG_LOG_PLAYBACK, "art: none for %s",
+                          track_id3->path);
                 hid = ERR_UNSUPPORTED_TYPE;
             }
             else

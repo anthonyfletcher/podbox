@@ -12,7 +12,8 @@
  * open the file for every line. A log that must be on disk before it goes on
  * -- the USB log's last line before a hang -- or that keeps its own ring
  * writes through debug_log_open() and debug_log_close() instead; so does
- * debug_log() for a log registered with nothing held.
+ * debug_log() for a log registered with nothing held, and debug_log_sync()
+ * for one line of a log that holds.
  ****************************************************************************/
 #ifndef _DEBUG_LOG_H
 #define _DEBUG_LOG_H
@@ -42,6 +43,11 @@ enum debug_log_id {
  * log is off a call costs a test and a return, so call sites can sit in hot
  * loops. */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
+    ATTRIBUTE_PRINTF(2, 3);
+
+/* As debug_log(), but on disk before it returns, below whatever was held:
+ * for the line before a step that might not come back. */
+void debug_log_sync(enum debug_log_id id, const char *fmt, ...)
     ATTRIBUTE_PRINTF(2, 3);
 
 /* True if this log is currently enabled -- for skipping work that exists

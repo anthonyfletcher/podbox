@@ -328,37 +328,70 @@ static void disk_idle_cb(unsigned short id, void *data)
     flush_all();
 }
 
+/* One line, stamped and ended, in `line`; its length, or -1 */
+static int format_line(char *line, size_t size, const char *fmt, va_list ap)
+{
+    int len, n;
+
+    /* Ticks since boot rather than the clock: what matters here is how long
+     * something took and in what order, and every header gives the tick
+     * against the clock. */
+    len = snprintf(line, size, "[%8ld] ", (long)current_tick);
+    n = vsnprintf(line + len, size - len, fmt, ap);
+    if (n < 0)
+        return -1;
+    len += MIN(n, (int)(size - len - 1));
+    line[len++] = '\n';
+    return len;
+}
+
+/* Below the held lines, so the file stays in order */
+static void write_through(enum debug_log_id id, const char *line, int len)
+{
+    int fd = debug_log_open(id);
+
+    if (fd < 0)
+        return;
+    if (log_info[id].held)
+        flush_into(id, fd);
+    write(fd, line, len);
+    debug_log_close(id, fd);
+}
+
+void debug_log_sync(enum debug_log_id id, const char *fmt, ...)
+{
+    char line[256];
+    int len;
+    va_list ap;
+
+    if (!ready || !debug_log_enabled(id))
+        return;
+    va_start(ap, fmt);
+    len = format_line(line, sizeof line, fmt, ap);
+    va_end(ap);
+    if (len > 0)
+        write_through(id, line, len);
+}
+
 void debug_log(enum debug_log_id id, const char *fmt, ...)
 {
     char line[256];
-    int len, n;
+    int len;
     va_list ap;
 
     if (!ready || !debug_log_enabled(id))
         return;
 
-    /* Ticks since boot rather than the clock: what matters here is how long
-     * something took and in what order, and every header gives the tick
-     * against the clock. */
-    len = snprintf(line, sizeof line, "[%8ld] ", (long)current_tick);
     va_start(ap, fmt);
-    n = vsnprintf(line + len, sizeof line - len, fmt, ap);
+    len = format_line(line, sizeof line, fmt, ap);
     va_end(ap);
-    if (n < 0)
+    if (len < 0)
         return;
-    len += MIN(n, (int)(sizeof line - len - 1));
-    line[len++] = '\n';
 
     /* A log with nothing held is on disk before the caller goes on */
     if (!log_info[id].held)
     {
-        int fd = debug_log_open(id);
-
-        if (fd >= 0)
-        {
-            write(fd, line, len);
-            debug_log_close(id, fd);
-        }
+        write_through(id, line, len);
         return;
     }
 

@@ -1553,8 +1553,9 @@ Writes a line to playback_errors.log in the .rockbox/logs folder for every
 track playback skips or cannot finish, saying why: the file would not open,
 had no codec, or the codec failed. For working out why tracks skip.
 
-Costs nothing until a track fails. Switches itself off after the time set in
-Switch Off After.
+Also each cover Now Playing loads, written before it is decoded, so a cover
+that never appears, or a freeze while one loads, is the last line. Switches
+itself off after the time set in Switch Off After.
 
 [debug log theme]
 Writes a line to theme.log in the .rockbox/logs folder for each skin file a
