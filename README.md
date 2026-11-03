@@ -50,6 +50,9 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   screen
   - Off by default. `Settings > Appearance > Now Playing Screen > Trim Titles`
   - Add your own patterns in `.rockbox/library/user/trim.txt`, which an update leaves alone
+- Choose what Select, and Select and Play pressed together, do on the Now Playing screen: open
+  the queue, the lyrics, Music, Album Covers and more
+  - `Settings > Playback > Now Playing Screen > Select Action` and `Select + Play`
 - Message, input, confirmation, search, colour, date and time and folder dialogs share one
   themed design
   - `Settings > Appearance > Dialogs`
@@ -85,6 +88,10 @@ or promoted onto the main menu.
 - Shuffle albums rather than tracks: every album in a list, in a random order, each whole and in
   order
   - `[Shuffle Albums]` at the top of any list of two or more albums
+- Hide the [All Tracks], [Random] and [Shuffle Albums] rows at the top of the Music lists
+  - `Settings > Library > Music > Extra Rows`
+  - Hiding [All Tracks] only hides the row: playing an artist or genre from its menu still
+    plays every track
 - See an album's cover, artist, year, track count and length above its tracks
   - Theme dependent. Scrim shows it, and `Album Header` in its Theme Options turns it off
 - See your most played, most recently played and forgotten albums and artists
