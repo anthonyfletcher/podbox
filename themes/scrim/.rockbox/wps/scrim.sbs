@@ -60,9 +60,9 @@
 # - Title
 %Vl(Chrome,0,0,320,35,3)
 %Vl(ChromeG,10,8,200,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Sx(Album)|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
 %Vl(ChromeN,10,8,152,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Sx(Album)|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
 #
 # - Status icons. The charging glyphs mirror the level glyphs band for
 #   band; one covers levels 2 to 5, so it stands in four places.
@@ -236,14 +236,15 @@
 %s%wt(%LD,tl)
 #
 # An album's header: the cover, then its name, artist, and year, tracks and
-# length
+# length, the last two in the unselected rows' colour. With it on, the title
+# reads Album rather than the name the header shows.
 %Vl(AlbumHead,18,40,44,70,-)
 %LH(art,2)
 %Vl(AlbumHead,74,46,233,20,3)%Vf(!ffffff)
 %s%LH(name)
-%Vl(AlbumHead,74,66,233,20,4)%Vf(!ffffff)
+%Vl(AlbumHead,74,66,233,20,4)%Vf(vivid>85:bdbdbd)
 %s%LH(artist)
-%Vl(AlbumHead,74,86,233,20,4)%Vf(!ffffff)
+%Vl(AlbumHead,74,86,233,20,4)%Vf(vivid>85:bdbdbd)
 %s%?LH(year)<%LH(year) · >%LH(tracks) %Sx(tracks)%?LH(length)< · %LH(length)>
 #
 # Volume overlay
