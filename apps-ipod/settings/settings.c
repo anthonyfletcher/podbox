@@ -58,6 +58,7 @@
 #include "storage.h"
 #include "ctype.h"
 #include "file.h"
+#include "pathfuncs.h"
 #include "system.h"
 #include "general.h"
 #include "system/app_util.h"
@@ -770,8 +771,12 @@ bool settings_load_config(const char* file, bool apply)
              * which theme it belongs to. Only a file in THEME_DIR becomes "the
              * current theme": a saved settings .cfg names a font too, and its
              * overlay and Forget Tweaks would point at a theme that is not
-             * there. Such a file can still name one with its own theme line. */
-            if (!strncasecmp(file, THEME_DIR "/", sizeof(THEME_DIR)))
+             * there. Such a file can still name one with its own theme line.
+             * The browser hands over the path with its volume ("/<0>/...") on
+             * the player and without it in the simulator. */
+            const char *rel;
+            path_strip_volume(file, &rel, false);
+            if (!strncasecmp(rel, THEME_DIR "/", sizeof(THEME_DIR)))
                 set_theme_file(file);
             else
                 global_settings.theme_file[0] = '\0';

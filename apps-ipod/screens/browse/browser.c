@@ -79,6 +79,7 @@
 #include "rtc.h"
 #include "dircache.h"
 #include "database/tagcache.h"
+#include "database/path_key.h"
 #include "widgets/yesno.h"
 #include "eeprom_settings.h"
 #include "playlist/catalog.h"
@@ -307,7 +308,9 @@ static bool browser_is_playing(int selected_item, void * data)
     len = strlen(local_tc->currdir);
     snprintf(path, sizeof(path), "%s%s%s", local_tc->currdir,
              len && local_tc->currdir[len - 1] == '/' ? "" : "/", entry->name);
-    return strcmp(path, id3->path) == 0;
+    /* Without the volume ("/<HDD0>"), which a folder entered from the root
+     * carries and a track queued by another route may not. */
+    return strcmp(path_key_strip(path), path_key_strip(id3->path)) == 0;
 }
 
 /* Album art for database album rows, drawn by the skin's %La tag.

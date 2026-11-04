@@ -32,6 +32,7 @@
 #include "rbpaths.h"         /* ROCKBOX_DIR */
 #include "system/library_files.h"
 #include "database/libfile.h"
+#include "database/path_key.h"
 #include "input/action.h"
 #include "draw/screen_access.h"   /* screens[] */
 #include "kernel.h"          /* HZ, SYS_USB_CONNECTED */
@@ -2105,12 +2106,17 @@ static bool tv_places_begin(struct libfile_writer *w)
                          LIB_READING_VERSION, sizeof(struct tv_place), NULL);
 }
 
-/* The next record, its path terminated whatever the file holds */
+/* The next record, its path terminated whatever the file holds and without
+ * a volume, as text_viewer() keeps it */
 static bool tv_place_read(int fd, struct tv_place *p)
 {
+    const char *path;
+
     if (read(fd, p, sizeof(*p)) != (ssize_t)sizeof(*p))
         return false;
     p->path[sizeof(p->path) - 1] = '\0';
+    path = path_key_strip(p->path);
+    memmove(p->path, path, strlen(path) + 1);
     return true;
 }
 
@@ -3601,6 +3607,9 @@ int text_viewer(const char *file)
     bool play_wait = false;     /* a tap that pauses, unless a second comes */
     bool contents = tv_open_contents;
 
+    /* A place matches on its path, and the file browser puts the volume on
+     * the front ("/<HDD0>/...") where the file index and the menus do not. */
+    file = path_key_strip(file);
     tv_open_contents = false;
     push_current_activity(ACTIVITY_TEXTVIEWER);
     tv.path = file;

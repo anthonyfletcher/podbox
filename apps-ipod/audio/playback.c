@@ -54,6 +54,7 @@
 #include "speech/talk.h"
 #include "playlist/playlist.h"
 #include "database/sound_mix.h"
+#include "database/path_key.h"
 #include "ab_repeat.h"
 #include "pcm_mixer.h"
 #include "pcmbuf.h"
@@ -1885,22 +1886,31 @@ static bool autoresumable(struct mp3entry *id3)
 
     if (*id3->path)
     {
+        /* Both without the volume ("/<HDD0>"), which a path from the file
+         * browser carries and one from elsewhere may not. */
+        const char *track = path_key_strip(id3->path);
+
         for (path = global_settings.autoresume_paths;
              *path;                     /* search terms left? */
              path++)
         {
+            const char *dir;
+            size_t dir_len;
+
             if (*path == ':')           /* Skip empty search patterns */
                 continue;
 
             len = strcspn(path, ":");
 
-            /* Note: At this point, len is always > 0 */
+            /* Note: At this point, len is always > 0, and so is dir_len */
+            dir = path_key_strip(path);
+            dir_len = len - (dir - path);
 
-            if (strncasecmp(id3->path, path, len) == 0)
+            if (strncasecmp(track, dir, dir_len) == 0)
             {
                 /* Full directory-name matches only.  Trailing '/' in
                    search path OK. */
-                if (id3->path[len] == '/' || id3->path[len - 1] == '/')
+                if (track[dir_len] == '/' || track[dir_len - 1] == '/')
                 {
                     is_resumable = true;
                     break;

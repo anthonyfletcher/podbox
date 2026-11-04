@@ -128,6 +128,7 @@
 #include "logf.h"
 #include "panic.h"
 #include "crc32.h"
+#include "database/path_key.h"
 #include "widgets/yesno.h"
 #include "dir.h"
 
@@ -961,11 +962,16 @@ static int get_next_dir(char *dir, int direction)
     struct browser_context* tc = browser_get_context();
     int saved_dirfilter = *(tc->dirfilter);
     unsigned int base_len;
+    /* The current file and the start directory both without the volume
+     * ("/<HDD0>"), which a path from the file browser carries and one from
+     * elsewhere may not: the walk below compares them by length. */
+    const char *current = path_key_strip(playlist->filename);
+    size_t current_dirlen = playlist->dirlen - (current - playlist->filename);
 
     if (global_settings.next_folder >= FOLDER_ADVANCE_NEXT_START)
     {
         /* constrain results to directories below user's start directory */
-        strcpy(dir, global_settings.start_directory);
+        strcpy(dir, path_key_strip(global_settings.start_directory));
         base_len = strlen(dir);
 
         /* strip any trailing slash from base directory */
@@ -995,8 +1001,8 @@ static int get_next_dir(char *dir, int direction)
     }
 
     /* if the current file is within our base dir, use its dir instead */
-    if (base_len == 0 || !strncmp(playlist->filename, dir, base_len))
-        strmemccpy(dir, playlist->filename, playlist->dirlen);
+    if (base_len == 0 || !strncmp(current, dir, base_len))
+        strmemccpy(dir, current, current_dirlen);
 
     /* use the tree browser dircache to load files */
     *(tc->dirfilter) = SHOW_ALL;
