@@ -38,7 +38,6 @@
 #define CHUNK_SHIFT 4
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
-#define REACH     32            /* how far a liquid looks for a drop */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
 
@@ -60,7 +59,8 @@ static uint32_t rule_len(int f)
 }
 
 /* cells.rules(): a record of Uint8Arrays for the cart to fill -- per
- * material move (MOVE.*), spread, density, decay (a chance a tick out of
+ * material move (MOVE.*), spread (how far along a liquid or gas looks
+ * for somewhere lower to flow into), density, decay (a chance a tick out of
  * 256) and becomes; per reaction a, b, c, d and chance */
 NATIVE(cells_rules)
 {
@@ -300,16 +300,16 @@ static inline int stuck(const struct stepper *s, const uint8_t *p, uint8_t m,
 
 /* How far along row y from x, in direction side, the nearest open cell
  * that m could fall (dy 1) or rise (dy -1) from is, through cells it
- * could move into, up to REACH; 0 when there is none */
+ * could move into, up to reach; 0 when there is none */
 static int32_t drop_along(const struct stepper *s, int32_t x, int32_t y,
-                          int32_t dy, int32_t side, uint8_t m)
+                          int32_t dy, int32_t side, uint8_t m, int32_t reach)
 {
     int32_t ny = y + dy;
     if (ny < 0 || ny >= s->f.h)
         return 0;
     int32_t room = side > 0 ? s->f.w - 1 - x : x;
-    if (room > REACH)
-        room = REACH;
+    if (room > reach)
+        room = reach;
     const int32_t w = s->f.w;
     const uint8_t *dens = s->r.f[R_DENSITY], *moved = s->moved;
     const uint8_t dm = dens[m];
@@ -392,19 +392,23 @@ static void step_cell(struct stepper *s, int32_t x, int32_t y)
         }
     if (mv == MOVE_POWDER)
         return;
-    /* Liquids and gases flow sideways toward the nearest place along the
-     * open row, up to REACH away, they could fall (or rise) from, one way
-     * then the other, moving up to spread a tick. With none in reach they
-     * stay: a level pool goes quiet and its chunks sleep, and a lone cell
-     * more than a level holds stays as a bump. */
-    int32_t far = r[R_SPREAD][m] ? r[R_SPREAD][m] : 1;
-    int32_t k = drop_along(s, x, y, dy, side, m);
-    if (!k) {
+    /* Liquids and gases look along their open row, as far as spread, for
+     * the nearest place they could fall (or rise) into -- the nearer
+     * side's, a random one's on a tie -- and go straight into it, along
+     * and down in one move. Moving partway toward it instead makes a
+     * draining pool's edge flick between ragged and solid every other
+     * tick, every step of it sliding and then dropping together. With
+     * none in reach they stay: a level pool goes quiet, and a lone extra
+     * cell stays a bump. */
+    int32_t reach = r[R_SPREAD][m] ? r[R_SPREAD][m] : 1;
+    int32_t k = drop_along(s, x, y, dy, side, m, reach);
+    int32_t other = drop_along(s, x, y, dy, -side, m, reach);
+    if (other && (!k || other < k)) {
         side = -side;
-        k = drop_along(s, x, y, dy, side, m);
+        k = other;
     }
     if (k)
-        swap(s, x, y, x + side * (k < far ? k : far), y);
+        swap(s, x, y, x + side * k, y + dy);
 }
 
 /* Every awake chunk's cells, bottom up, a row left to right or right to
