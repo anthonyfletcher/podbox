@@ -246,3 +246,80 @@ size_t lcd_e2_push(unsigned bcmaddr, const fb_data *src, size_t bytes)
     }
     return done;
 }
+
+/*** a push in the background ***
+ * The same pieces, each started by lcd_e2_poll() once the last has landed,
+ * so the caller works while they move. */
+static unsigned bg_addr;
+static const char *bg_src;
+static size_t bg_bytes, bg_done, bg_piece;
+static unsigned long bg_t0;
+static bool bg_on;
+
+bool lcd_e2_begin(unsigned bcmaddr, const fb_data *src, size_t bytes)
+{
+    if (bytes < PUSH_MIN || (bytes & 3) || (bcmaddr & 3) ||
+        ((uintptr_t)src & 3) || (uintptr_t)src >= 0x40000000 ||
+        !e2_on || thread_self() != lcd_port_pusher)
+        return false;
+    bg_addr = bcmaddr;
+    bg_src = (const char *)src;
+    bg_bytes = bytes;
+    bg_done = bg_piece = 0;
+    bg_on = true;
+    lcd_e2_poll();
+    return true;
+}
+
+bool lcd_e2_poll(void)
+{
+    if (!bg_on)
+        return false;
+    if (bg_piece)
+    {
+        if (e2_busy())
+        {
+            if (USEC_TIMER - bg_t0 <= PIECE_US)
+                return true;
+            /* The CPU sends this piece again, and every one after */
+            e2_stop();
+            e2_on = false;
+            e2_moving = false;
+            bg_on = false;
+            return false;
+        }
+        e2_moving = false;
+        /* The CPU sends a piece that was cut short, and the rest */
+        if (e2_cut)
+        {
+            e2_cut = false;
+            bg_on = false;
+            return false;
+        }
+        bg_done += bg_piece;
+        bg_piece = 0;
+        if (!port_ready() || bg_done >= bg_bytes)
+        {
+            bg_on = false;
+            return false;
+        }
+    }
+    size_t n = MIN(bg_bytes - bg_done, PIECE_MAX);
+    e2_moving = true;
+    if (!e2_start(bg_addr + bg_done, bg_src + bg_done, n))
+    {
+        e2_moving = false;
+        bg_on = false;
+        return false;
+    }
+    bg_piece = n;
+    bg_t0 = USEC_TIMER;
+    return true;
+}
+
+size_t lcd_e2_end(void)
+{
+    while (lcd_e2_poll())
+        yield();
+    return bg_done;
+}

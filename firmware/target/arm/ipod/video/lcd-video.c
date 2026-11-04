@@ -529,6 +529,10 @@ void lcd_update_rect(int x, int y, int width, int height)
 {
     bool locked;
 
+#ifdef HAVE_LCD_UPDATE_ASYNC
+    if (!lcd_port_held_elsewhere())
+        lcd_update_finish();
+#endif
     if (lcd_port_held_elsewhere())
     {
         defer_rect(x, y, width, height);
@@ -545,6 +549,80 @@ void lcd_update(void)
 {
     lcd_update_rect(0, 0, LCD_WIDTH, LCD_HEIGHT);
 }
+
+#ifdef HAVE_LCD_UPDATE_ASYNC
+/* A band sent in the background by lcd_update_start(): the port is held,
+ * and the tick blocked, until lcd_update_finish(). */
+static struct
+{
+    bool on;
+    unsigned bcmaddr;
+    const fb_data *addr;
+    size_t bytes;
+} bg;
+
+void lcd_update_start(int y, int height)
+{
+    lcd_update_finish();
+    if (y + height > LCD_HEIGHT)
+        height = LCD_HEIGHT - y;
+    if (y < 0 || height <= 0 || lcd_port_held_elsewhere()
+#ifdef HAVE_LCD_SLEEP
+        || !lcd_state.display_on
+#endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+        || tv_on || tv_starting
+#endif
+       )
+    {
+        lcd_update_rect(0, y, LCD_WIDTH, height);
+        return;
+    }
+    bool locked = lcd_port_lock();
+    const fb_data *addr = FBADDRBUF(lcd_current_viewport->buffer, 0, y);
+    unsigned bcmaddr = BCMA_CMDPARAM + (LCD_WIDTH*2) * y;
+    size_t bytes = LCD_WIDTH * height * 2;
+
+    lcd_block_tick();
+    if (!locked || !lcd_e2_begin(bcmaddr, addr, bytes))
+    {
+        bcm_write_addr(bcmaddr);
+        lcd_write_data(addr, bytes / 2);
+        lcd_unblock_and_update();
+        port_unlock(locked);
+        return;
+    }
+    bg.on = true;
+    bg.bcmaddr = bcmaddr;
+    bg.addr = addr;
+    bg.bytes = bytes;
+}
+
+void lcd_update_poll(void)
+{
+    if (bg.on)
+        lcd_e2_poll();
+}
+
+void lcd_update_finish(void)
+{
+    if (!bg.on)
+        return;
+    bg.on = false;
+    /* With interrupts off, a panic: its own update stops the piece, as
+     * lcd_port_lock() fails, and sends the whole screen by CPU */
+    if (!irq_enabled())
+        return;
+    size_t done = lcd_e2_end();
+    if (done < bg.bytes)
+    {
+        bcm_write_addr(bg.bcmaddr + done);
+        lcd_write_data(bg.addr + done / 2, (bg.bytes - done) / 2);
+    }
+    lcd_unblock_and_update();
+    port_unlock(true);
+}
+#endif
 
 /* Line write helper function for lcd_yuv_blit. Writes two lines of yuv420. */
 extern void lcd_write_yuv420_lines(unsigned char const * const src[3],

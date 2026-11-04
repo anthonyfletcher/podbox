@@ -141,6 +141,9 @@ static void host_print(void *ctx, const char *s, int len)
 static void host_yield(void *ctx)
 {
     (void)ctx;
+#ifdef HAVE_LCD_UPDATE_ASYNC
+    lcd_update_poll();
+#endif
     yield();
 }
 
@@ -164,13 +167,23 @@ static const struct arcade_host host = {
 /* ---- present ---------------------------------------------------------------
  * The 160x120 screen fills the panel, each pixel two wide and two high;
  * only rows drawn since the last present are converted, and they go to
- * the panel as one full-width band, the shape the 5G pushes cheapest. */
+ * the panel as one full-width band, the shape the 5G pushes cheapest. On
+ * the 5G the band goes by DMA while the next tick runs, moved along by
+ * the script's yields; it is read from the framebuffer, so it lands before
+ * anything draws there again. */
 
 static uint32_t lut2[256];
 
 static uint16_t pack(uint32_t c)
 {
     return LCD_RGBPACK((c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff);
+}
+
+static void present_wait(void)
+{
+#ifdef HAVE_LCD_UPDATE_ASYNC
+    lcd_update_finish();
+#endif
 }
 
 static void present(struct vm *vm, bool all)
@@ -184,8 +197,13 @@ static void present(struct vm *vm, bool all)
     int r0 = all ? 0 : s->dirty_lo, r1 = all ? s->height - 1 : s->dirty_hi;
     if (r0 <= r1) {
         int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
+        present_wait();
         arcade_present_rows(s, lut2, FBADDR(0, 0), stride, r0, r1);
+#ifdef HAVE_LCD_UPDATE_ASYNC
+        lcd_update_start(r0 * 2, (r1 - r0 + 1) * 2);
+#else
         lcd_update_rect(0, r0 * 2, LCD_WIDTH, (r1 - r0 + 1) * 2);
+#endif
     }
     arcade_presented(vm);
 }
@@ -307,6 +325,7 @@ static void give_screen(void)
 {
     if (!screen_held)
         return;
+    present_wait();
     screen_held = false;
     cpu_boost(false);
     hold_backlight(false);
@@ -317,6 +336,7 @@ static void give_screen(void)
 /* A system event: saved first, since USB or a shutdown may follow. */
 static int event(struct vm *vm, long button)
 {
+    present_wait();
     save_write(vm);
     if (default_event_handler(button) == SYS_USB_CONNECTED)
         return USB;
@@ -346,6 +366,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
 {
     struct simplelist_info info;
     int selection = 0;
+    present_wait();
     save_write(vm);
     give_screen();
     for (;;) {
@@ -386,6 +407,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
 /* The hold switch: the game waits, the screen shows it, until released. */
 static int hold_pause(struct vm *vm)
 {
+    present_wait();
     save_write(vm);
     while (button_hold()) {
         long b = button_get_w_tmo(HZ / 10);
@@ -466,6 +488,11 @@ static int run(const char *path, void *mem, size_t size)
         long due = start + (long)(((uint64_t)(frame + 1) * HZ) / rate);
         long now = current_tick;
 
+        /* Waiting for the next tick: the last frame lands meanwhile */
+        if (TIME_BEFORE(now, due)) {
+            present_wait();
+            now = current_tick;
+        }
         if (TIME_BEFORE(now, due)) {
             long b = button_get_w_tmo(due - now);
             if (b & SYS_EVENT) {

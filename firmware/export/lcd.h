@@ -255,6 +255,16 @@ extern bool lcd_putsxy_scroll_func(int x, int y, const unsigned char *string,
 /* update a fraction of the screen */
 extern void lcd_update_rect(int x, int y, int width, int height);
 
+#ifdef HAVE_LCD_UPDATE_ASYNC
+/* Full-width rows y..y+height-1 sent while the caller works on: start
+ * returns at once, poll moves the send along (call it often), and finish
+ * waits for the rest. Nothing may change those rows of the framebuffer
+ * until finish; the next start or update finishes first. */
+extern void lcd_update_start(int y, int height);
+extern void lcd_update_poll(void);
+extern void lcd_update_finish(void);
+#endif
+
 #ifdef HAVE_REMOTE_LCD
     extern void lcd_remote_update(void);
     /* update a fraction of the screen */

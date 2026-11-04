@@ -49,6 +49,15 @@ bool lcd_port_outermost(bool locked);
  * thread's LCD update may yield. The port lock is held and the tick
  * blocked. */
 size_t lcd_e2_push(unsigned bcmaddr, const fb_data *src, size_t bytes);
+
+/* The same push without the wait, whether or not playback plays: begin
+ * starts it, false and nothing sent when the engine cannot take it; poll
+ * starts each next piece, true while one moves; end waits, yielding, and
+ * returns the bytes sent, in whole pieces. The port lock and the tick are
+ * held from begin to end, and src stays as it is. */
+bool lcd_e2_begin(unsigned bcmaddr, const fb_data *src, size_t bytes);
+bool lcd_e2_poll(void);
+size_t lcd_e2_end(void);
 #else
 #define lcd_port_init()         do { } while (0)
 #define lcd_port_lock()         false

@@ -121,6 +121,10 @@
 /* Composite TV output through the BCM, PAL or NTSC */
 #define HAVE_COMPOSITE_VIDEO_OUT
 #define HAVE_VIDEOOUT_STANDARD
+#ifndef SIMULATOR
+/* lcd_update_start(): the screen sent by DMA while the caller works on */
+#define HAVE_LCD_UPDATE_ASYNC
+#endif
 #endif
 
 /* We can fade the backlight by using PWM */
