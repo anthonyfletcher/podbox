@@ -21,6 +21,7 @@
  *   sprites        spr, sspr, sget/sset, fget/fset, images
  *   the map
  *   state          camera, clip, colour, cursor, palettes, target
+ *   memory         the engine's arrays as Uint8Arrays; copy and fill
  *   the host's view of the screen
  ***************************************************************************/
 #include <string.h>
@@ -30,6 +31,9 @@
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
                                   struct value *out)
 #define FAR (1 << 20)
+/* Near the surface: within this of its corner, the fast paths' arithmetic
+ * fits in 32 bits */
+#define NEAR32 8192
 
 /* ---- setup ------------------------------------------------------------- */
 
@@ -75,13 +79,28 @@ static void reshow(struct draw *d)
 
 static void full_clip(struct vm *vm);
 
+/* An engine array, laid out as a Uint8Array whose header sits just before
+ * the bytes, so mem() can hand it to the cart as one. Its offset is the
+ * bytes'; outside the heap, the collector leaves it alone. */
+static uint32_t region(struct vm *vm, uint32_t bytes)
+{
+    uint32_t off = perm_alloc(vm, sizeof(struct u8a) + bytes);
+    if (!off)
+        return 0;
+    struct u8a *a = MEM(vm, off);
+    a->h.info = T_U8;
+    a->h.size = (sizeof(struct u8a) + bytes + 7) & ~7u;
+    a->len = bytes;
+    return off + sizeof(struct u8a);
+}
+
 int core_draw_init(struct vm *vm)
 {
     struct draw *d = &vm->d;
-    if (!(vm->screen = perm_alloc(vm, SCREEN_W * SCREEN_H)) ||
-        !(vm->sheet = perm_alloc(vm, SHEET_W * SHEET_H)) ||
-        !(vm->flags = perm_alloc(vm, 256)) ||
-        !(vm->map = perm_alloc(vm, MAP_W * MAP_H)))
+    if (!(vm->screen = region(vm, SCREEN_W * SCREEN_H)) ||
+        !(vm->sheet = region(vm, SHEET_W * SHEET_H)) ||
+        !(vm->flags = region(vm, 256)) ||
+        !(vm->map = region(vm, MAP_W * MAP_H)))
         return 0;
     memset(d, 0, sizeof(*d));
     d->target = mk(T_INT, 0);
@@ -108,9 +127,13 @@ static int bad(struct vm *vm, const char *fn, const char *what,
     return vm_fail(vm, fn, what, vm_typename(v.tag));
 }
 
+/* The argument helpers are inlined: called, each costs some 50 cycles on
+ * the 5G, most of it passing seven arguments, three on the stack. */
+#define ARG_INLINE static inline __attribute__((always_inline))
+
 /* Argument i as a whole number, def when missing or null. */
-static int whole(struct vm *vm, struct value *a, int argc, int i, int32_t def,
-                 const char *fn, int32_t *out)
+ARG_INLINE int whole(struct vm *vm, struct value *a, int argc, int i,
+                     int32_t def, const char *fn, int32_t *out)
 {
     *out = def;
     if (i >= argc || a[i].tag == T_NULL)
@@ -122,9 +145,10 @@ static int whole(struct vm *vm, struct value *a, int argc, int i, int32_t def,
 }
 
 /* A drawing call's colour: given, it becomes the pen, as in PICO-8. */
-static int colour(struct vm *vm, struct value *a, int argc, int i,
-                  const char *fn, uint32_t *c)
+ARG_INLINE int colour(struct vm *vm, struct value *a, int argc, int i,
+                      const char *fn, uint32_t *c)
 {
+    *c = 0;
     if (i < argc && a[i].tag != T_NULL) {
         if (!is_num(a[i]))
             return bad(vm, fn, "() needs a colour number, not a ", a[i]);
@@ -145,6 +169,25 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
     if (!colour(vm, a, argc, i, fn, &c)) return 0
 
 /* ---- pens --------------------------------------------------------------- */
+
+/* What a drawing call is charged, in units, from its cycles on the 5G: a
+ * call's setup, then each row a shape works out, glyph or map tile, and
+ * each pixel by its kind as units per 16 pixels -- the pixels drawn, or
+ * for copies and tline the pixels read, which cost the same whether or
+ * not they are transparent. */
+#define COST_CALL      20
+#define COST_COPY      25   /* copy_rect's setup, on top of the call's */
+#define COST_ROW       2
+#define COST_GLYPH     12
+#define COST_BIG_GLYPH 25
+#define COST_TILE      5
+#define PER16_FILL     1
+#define PER16_PATTERN  10
+#define PER16_TILE     5
+#define PER16_COPY     9
+#define PER16_SCALED   16
+#define PER16_DOT      18
+#define PER16_TLINE    48
 
 struct surf
 {
@@ -184,7 +227,9 @@ struct pen
     uint8_t c, alt;
     int alt_on;
     uint16_t pat;
-    uint32_t count;
+    uint32_t count;                 /* pixels drawn */
+    uint32_t cost;                  /* units, besides the pixels */
+    uint16_t per16;                 /* units per 16 pixels */
     int32_t lo, hi;
     const struct draw *d;
     const uint16_t *xl;
@@ -211,6 +256,8 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->alt_on = p->pat && ((c >> 8) & 0xff);
     p->alt = d->dpal[(c >> 8) & 0xff];
     p->count = 0;
+    p->cost = COST_CALL;
+    p->per16 = p->pat ? PER16_PATTERN : PER16_FILL;
     p->lo = 0x7fffffff;
     p->hi = -1;
     p->d = d;
@@ -233,7 +280,7 @@ static void finish(struct vm *vm, struct pen *p)
         if (p->hi > vm->d.dirty_hi)
             vm->d.dirty_hi = (int16_t)p->hi;
     }
-    vm_charge(vm, p->count / PIXELS_PER_UNIT);
+    vm_charge(vm, p->cost + p->count * p->per16 / 16);
 }
 
 /* Pixels x0..x1 of row y, in surface coordinates, clipped. */
@@ -248,11 +295,12 @@ static void span(struct pen *p, int64_t y, int64_t x0, int64_t x1)
     if (x0 > x1)
         return;
     uint8_t *row = p->s.px + (int32_t)y * p->s.w;
+    p->cost += COST_ROW;
     if (!p->pat)
         memset(row + x0, p->c, (size_t)(x1 - x0 + 1));
     else {
         int shift = 12 - ((int)(y & 3) << 2);
-        for (int64_t x = x0; x <= x1; x++) {
+        for (int32_t x = (int32_t)x0; x <= (int32_t)x1; x++) {
             if (!((p->pat >> (shift + 3 - (x & 3))) & 1))
                 row[x] = p->c;
             else if (p->alt_on)
@@ -310,8 +358,14 @@ static uint64_t isqrt64(uint64_t v)
     return r;
 }
 
+/* In 32 bits when both fit: the 5G divides 64-bit numbers in software, at
+ * about a thousand cycles each. */
 static int64_t floor_div(int64_t n, int64_t d)
 {
+    if (n == (int32_t)n && d > 0 && d <= INT32_MAX) {
+        int32_t a = (int32_t)n, b = (int32_t)d, q32 = a / b;
+        return a % b != 0 && a < 0 ? q32 - 1 : q32;
+    }
     int64_t q = n / d;
     return (n % d != 0 && ((n < 0) != (d < 0))) ? q - 1 : q;
 }
@@ -359,18 +413,23 @@ static void draw_shape(struct pen *p, const struct figure *s, int outline)
 {
     int64_t y0 = s->y0 + p->oy < p->cy0 ? p->cy0 - p->oy : s->y0;
     int64_t y1 = s->y1 + p->oy >= p->cy1 ? p->cy1 - 1 - p->oy : s->y1;
-    for (int64_t y = y0; y <= y1; y++) {
-        int64_t l, r, ul, ur, dl, dr;
-        if (!shape_row(s, y, &l, &r))
+    /* Each row is worked out once: an outline's row below becomes the
+     * next row, and that row the one above. */
+    int64_t l = 0, r = 0, ul = 0, ur = 0, dl = 0, dr = 0;
+    int cur = 0, up = 0, dn = 0;
+    if (y0 <= y1) {
+        cur = shape_row(s, y0, &l, &r);
+        if (outline)
+            up = shape_row(s, y0 - 1, &ul, &ur);
+    }
+    for (int64_t y = y0; y <= y1;
+         y++, up = cur, ul = l, ur = r, cur = dn, l = dl, r = dr) {
+        if (outline || y < y1)
+            dn = shape_row(s, y + 1, &dl, &dr);
+        if (!cur)
             continue;
         int64_t sy = y + p->oy;
-        if (!outline) {
-            span(p, sy, l + p->ox, r + p->ox);
-            continue;
-        }
-        int up = shape_row(s, y - 1, &ul, &ur);
-        int dn = shape_row(s, y + 1, &dl, &dr);
-        if (!up || !dn) {
+        if (!outline || !up || !dn) {
             span(p, sy, l + p->ox, r + p->ox);
             continue;
         }
@@ -390,6 +449,90 @@ static void draw_shape(struct pen *p, const struct figure *s, int outline)
     }
 }
 
+/* span() for a row inside the clip, in 32 bits, unpatterned */
+static void span32(struct pen *p, int32_t y, int32_t l, int32_t r)
+{
+    if (l < p->cx0)
+        l = p->cx0;
+    if (r >= p->cx1)
+        r = p->cx1 - 1;
+    if (l > r)
+        return;
+    memset(p->s.px + y * p->s.w + l, p->c, (size_t)(r - l + 1));
+    p->count += (uint32_t)(r - l + 1);
+    p->cost += COST_ROW;
+    row_touched(p, y);
+}
+
+/* The integer square root of v, found from w, the last row's */
+static int32_t sqrt_from(int32_t v, int32_t w)
+{
+    while ((w + 1) * (w + 1) <= v)
+        w++;
+    while (w * w > v)
+        w--;
+    return w;
+}
+
+/* draw_shape() of circle_row for an unpatterned circle near the surface,
+ * in 32 bits, each half-width stepped from the row before's rather than
+ * taken by a square root. 0 when it does not apply. */
+static int circle_near(struct pen *p, int64_t a, int64_t b, int64_t r,
+                       int outline)
+{
+    if (p->pat || r > 4096 || a + p->ox < -NEAR32 || a + p->ox > NEAR32 ||
+        b + p->oy < -NEAR32 || b + p->oy > NEAR32)
+        return 0;
+    int32_t ca = (int32_t)(a + p->ox), cb = (int32_t)(b + p->oy);
+    int32_t R = (int32_t)r, top = cb - R, bot = cb + R;
+    int32_t y0 = top < p->cy0 ? p->cy0 : top;
+    int32_t y1 = bot >= p->cy1 ? p->cy1 - 1 : bot;
+    if (y0 > y1)
+        return 1;
+    int32_t rr = R * R + R / 2, d = y0 - cb;
+    int32_t wc = (int32_t)isqrt64((uint64_t)(rr - d * d)), wu = 0, wd = wc;
+    if (!outline) {
+        for (int32_t y = y0; y <= y1; y++) {
+            d = y - cb;
+            wc = sqrt_from(rr - d * d, wc);
+            span32(p, y, ca - wc, ca + wc);
+        }
+        return 1;
+    }
+    int up = y0 - 1 >= top;
+    if (up) {
+        d = y0 - 1 - cb;
+        wu = sqrt_from(rr - d * d, wc);
+    }
+    for (int32_t y = y0; y <= y1; y++, up = 1, wu = wc, wc = wd) {
+        int dn = y + 1 <= bot;
+        if (dn) {
+            d = y + 1 - cb;
+            wd = sqrt_from(rr - d * d, wc);
+        }
+        int32_t l = ca - wc, rt = ca + wc;
+        p->cost += 2 * COST_ROW;
+        if (!up || !dn) {
+            span32(p, y, l, rt);
+            continue;
+        }
+        int32_t in_l = ca - (wu < wd ? wu : wd), in_r = ca + (wu < wd ? wu : wd);
+        int32_t left_end = in_l - 1 < l ? l : in_l - 1;
+        int32_t right_start = in_r + 1 > rt ? rt : in_r + 1;
+        if (left_end > rt)
+            left_end = rt;
+        if (right_start < l)
+            right_start = l;
+        if (left_end + 1 >= right_start)
+            span32(p, y, l, rt);
+        else {
+            span32(p, y, l, left_end);
+            span32(p, y, right_start, rt);
+        }
+    }
+    return 1;
+}
+
 static int circle(struct vm *vm, struct value *a, int argc, int outline,
                   const char *fn)
 {
@@ -405,7 +548,8 @@ static int circle(struct vm *vm, struct value *a, int argc, int outline,
     s.y0 = s.b - s.c;
     s.y1 = s.b + s.c;
     begin(vm, &p, c, 1);
-    draw_shape(&p, &s, outline);
+    if (!circle_near(&p, s.a, s.b, s.c, outline))
+        draw_shape(&p, &s, outline);
     finish(vm, &p);
     return 1;
 }
@@ -468,18 +612,24 @@ struct run
 
 typedef void (*run_fn)(struct pen *p, void *ctx, const struct run *run);
 
-#define RUN_STEP(run, x, y, r) do { \
-    x += (run)->dmx; \
-    y += (run)->dmy; \
-    r += (run)->inc; \
-    if (r >= (run)->den) { \
-        r -= (run)->den; \
-        x += (run)->dnx; \
-        y += (run)->dny; \
+/* The step of a run, with its fields in locals (RUN_LOCALS): read through
+ * the pointer, they are reloaded after every pixel store. */
+#define RUN_LOCALS(run) \
+    const int32_t dmx = (run)->dmx, dmy = (run)->dmy, dnx = (run)->dnx, \
+                  dny = (run)->dny, inc = (run)->inc, den = (run)->den
+
+#define RUN_STEP(x, y, r) do { \
+    x += dmx; \
+    y += dmy; \
+    r += inc; \
+    if (r >= den) { \
+        r -= den; \
+        x += dnx; \
+        y += dny; \
     } else if (r < 0) { \
-        r += (run)->den; \
-        x -= (run)->dnx; \
-        y -= (run)->dny; \
+        r += den; \
+        x -= dnx; \
+        y -= dny; \
     } \
 } while (0)
 
@@ -501,24 +651,61 @@ static void plot_dot(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
     row_touched(p, yi);
 }
 
-/* plot_dot along a run, unpatterned */
+/* plot_dot along a run, unpatterned. visible() put every pixel's major
+ * coordinate inside the clip, so only the minor one is tested, and the
+ * pixel is reached by stepping its offset in the surface. */
 static void run_dots(struct pen *p, void *ctx, const struct run *run)
 {
     (void)ctx;
     uint8_t *px = p->s.px, c = p->c;
-    int32_t w = p->s.w, x = run->x, y = run->y, r = run->r;
+    const int32_t w = p->s.w, inc = run->inc, den = run->den;
+    int32_t x = run->x, y = run->y, r = run->r, o = y * w + x;
     int32_t lo = p->lo, hi = p->hi;
-    uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
-    uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
     uint32_t n = 0;
-    for (int32_t k = run->k; k > 0; k--) {
-        if ((uint32_t)(x - p->cx0) < cw && (uint32_t)(y - p->cy0) < ch) {
-            px[y * w + x] = c;
-            n++;
-            if (y < lo) lo = y;
-            if (y > hi) hi = y;
+    if (run->dny) {
+        /* x major: y moves on a carry */
+        const int32_t sx = run->dmx, c0 = p->cy0;
+        const uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
+        for (int32_t k = run->k; k > 0; k--, o += sx) {
+            if ((uint32_t)(y - c0) < ch) {
+                px[o] = c;
+                n++;
+                if (y < lo) lo = y;
+                if (y > hi) hi = y;
+            }
+            r += inc;
+            if (r >= den) {
+                r -= den;
+                y++;
+                o += w;
+            } else if (r < 0) {
+                r += den;
+                y--;
+                o -= w;
+            }
         }
-        RUN_STEP(run, x, y, r);
+    } else {
+        /* y major: x moves on a carry */
+        const int32_t sy = run->dmy, sw = sy * w, c0 = p->cx0;
+        const uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
+        for (int32_t k = run->k; k > 0; k--, y += sy, o += sw) {
+            if ((uint32_t)(x - c0) < cw) {
+                px[o] = c;
+                n++;
+                if (y < lo) lo = y;
+                if (y > hi) hi = y;
+            }
+            r += inc;
+            if (r >= den) {
+                r -= den;
+                x++;
+                o++;
+            } else if (r < 0) {
+                r += den;
+                x--;
+                o--;
+            }
+        }
     }
     p->count += n;
     p->lo = lo;
@@ -594,6 +781,53 @@ static int make_run(struct run *run, int64_t major, int64_t minor,
 
 /* plot for each pixel; fast, when given, takes the stretch whole instead
  * whenever it fits in 32 bits. */
+/* walk_line's fast way, for a line within NEAR32 of the surface's corner:
+ * every product of the stepper's setup fits in 32 bits there. */
+static int near32(int64_t v)
+{
+    return v >= -NEAR32 && v <= NEAR32;
+}
+
+static void walk_near(struct pen *p, int32_t x0, int32_t y0, int32_t x1,
+                      int32_t y1, plot_fn plot, run_fn fast, void *ctx)
+{
+    struct run run;
+    int32_t dx = x1 - x0, dy = y1 - y0;
+    int32_t adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy;
+    int x_major = adx >= ady;
+    int32_t s0 = x_major ? x0 : y0, m0 = x_major ? y0 : x0;
+    int32_t n = x_major ? adx : ady, d = x_major ? dy : dx;
+    int step = (x_major ? dx : dy) < 0 ? -1 : 1;
+    int32_t lo = x_major ? p->cx0 : p->cy0, hi = x_major ? p->cx1 : p->cy1;
+    /* visible(), in 32 bits */
+    int32_t a = step > 0 ? lo - s0 : s0 - (hi - 1);
+    int32_t b = step > 0 ? hi - 1 - s0 : s0 - lo;
+    int32_t i0 = a < 0 ? 0 : a, i1 = b > n ? n : b;
+    if (i0 > i1)
+        return;
+    if (!n) {
+        plot(p, ctx, x0, y0, 0);
+        return;
+    }
+    /* step_init(), in 32 bits */
+    int32_t num = 2 * i0 * d + n, den = 2 * n;
+    int32_t q = num / den;
+    if (num % den != 0 && num < 0)
+        q--;
+    run.k = i1 - i0 + 1;
+    run.i = i0;
+    run.r = num - q * den;
+    run.den = den;
+    run.inc = 2 * d;
+    run.x = x_major ? s0 + i0 * step : m0 + q;
+    run.y = x_major ? m0 + q : s0 + i0 * step;
+    run.dmx = x_major ? step : 0;
+    run.dmy = x_major ? 0 : step;
+    run.dnx = !x_major;
+    run.dny = x_major;
+    fast(p, ctx, &run);
+}
+
 static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
                       int64_t y1, plot_fn plot, run_fn fast, void *ctx)
 {
@@ -602,6 +836,11 @@ static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
     y0 = clampc(y0) + p->oy;
     x1 = clampc(x1) + p->ox;
     y1 = clampc(y1) + p->oy;
+    if (fast && near32(x0) && near32(y0) && near32(x1) && near32(y1)) {
+        walk_near(p, (int32_t)x0, (int32_t)y0, (int32_t)x1, (int32_t)y1,
+                  plot, fast, ctx);
+        return;
+    }
     int64_t dx = x1 - x0, dy = y1 - y0;
     int64_t adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy, i, i0, i1;
     if (adx >= ady) {
@@ -655,6 +894,8 @@ NATIVE(line)
     COLOUR(4, c, "line");
     struct pen p;
     begin(vm, &p, c, 1);
+    p.cost += 8;
+    p.per16 = PER16_DOT;
     walk_line(&p, x0, y0, x1, y1, plot_dot, p.pat ? NULL : run_dots, NULL);
     finish(vm, &p);
     return 1;
@@ -669,6 +910,7 @@ struct tline_ctx
 /* A pixel of the map at mx + i * mdx, my + i * mdy. */
 static void plot_map(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
 {
+    p->cost += PER16_TLINE / 16;
     struct tline_ctx *t = ctx;
     int64_t mx = t->mx + i * t->mdx, my = t->my + i * t->mdy;
     int64_t cx = mx >> 16, cy = my >> 16;
@@ -691,35 +933,39 @@ static void plot_map(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
 /* plot_map along a run, with the map position in 32 bits */
 static void run_map(struct pen *p, void *ctx, const struct run *run)
 {
+    p->cost += (uint32_t)run->k * PER16_TLINE / 16;
     struct tline_ctx *t = ctx;
     const uint8_t *map = MEM(t->vm, t->vm->map);
     const uint8_t *sheet = MEM(t->vm, t->vm->sheet);
-    const uint8_t *transparent = p->d->transparent, *dpal = p->d->dpal;
+    const uint16_t *xl = p->xl;
     uint8_t *px = p->s.px;
-    int32_t w = p->s.w, x = run->x, y = run->y, r = run->r;
+    RUN_LOCALS(run);
+    const int32_t w = p->s.w, cx0 = p->cx0, cy0 = p->cy0;
+    int32_t x = run->x, y = run->y, r = run->r;
     int32_t lo = p->lo, hi = p->hi;
-    uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
-    uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
+    const uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
+    const uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
     uint32_t mx = (uint32_t)(int32_t)(t->mx + run->i * t->mdx);
     uint32_t my = (uint32_t)(int32_t)(t->my + run->i * t->mdy);
-    uint32_t mdx = (uint32_t)(int32_t)t->mdx, mdy = (uint32_t)(int32_t)t->mdy;
+    const uint32_t mdx = (uint32_t)(int32_t)t->mdx;
+    const uint32_t mdy = (uint32_t)(int32_t)t->mdy;
     uint32_t n = 0;
     for (int32_t k = run->k; k > 0; k--, mx += mdx, my += mdy) {
         int32_t cx = (int32_t)mx >> 16, cy = (int32_t)my >> 16;
         if ((uint32_t)cx < MAP_W && (uint32_t)cy < MAP_H &&
-            (uint32_t)(x - p->cx0) < cw && (uint32_t)(y - p->cy0) < ch) {
+            (uint32_t)(x - cx0) < cw && (uint32_t)(y - cy0) < ch) {
             uint32_t m = map[cy * MAP_W + cx];
             uint32_t sx = (m & 15) * 8 + ((mx & 0xffff) >> 13);
             uint32_t sy = (m >> 4) * 8 + ((my & 0xffff) >> 13);
-            uint8_t c = sheet[sy * SHEET_W + sx];
-            if (!(transparent[c >> 3] & (1 << (c & 7)))) {
-                px[y * w + x] = dpal[c];
+            uint32_t v = xl[sheet[sy * SHEET_W + sx]];
+            if (!(v & XLAT_CLEAR)) {
+                px[y * w + x] = (uint8_t)v;
                 n++;
                 if (y < lo) lo = y;
                 if (y > hi) hi = y;
             }
         }
-        RUN_STEP(run, x, y, r);
+        RUN_STEP(x, y, r);
     }
     p->count += n;
     p->lo = lo;
@@ -734,10 +980,9 @@ static int fits32(int64_t v)
 static int real(struct vm *vm, struct value *a, int argc, int i, int64_t def,
                 const char *fn, int64_t *out)
 {
-    if (i >= argc || a[i].tag == T_NULL) {
-        *out = def;
+    *out = def;
+    if (i >= argc || a[i].tag == T_NULL)
         return 1;
-    }
     if (!is_num(a[i]))
         return bad(vm, fn, "() needs a number, not a ", a[i]);
     *out = scaled(a[i]);
@@ -759,6 +1004,7 @@ NATIVE(tline)
         return 0;
     struct pen p;
     begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* each pixel walked is charged */
     /* run_map is exact while the map position fits in 32 bits at every
      * pixel, which holds if it does at both ends of the line. */
     int64_t len = clampc(x1) - clampc(x0), ylen = clampc(y1) - clampc(y0);
@@ -788,6 +1034,103 @@ static int64_t edge_x(int64_t px, int64_t py, int64_t qx, int64_t qy, int64_t y)
     return px + floor_div(2 * (y - py) * (qx - px) + n, 2 * n);
 }
 
+static int32_t floor32(int32_t n, int32_t d)
+{
+    int32_t q = n / d;
+    return n % d != 0 && n < 0 ? q - 1 : q;
+}
+
+/* One edge of a filled triangle, top to bottom: its x at row y is edge_x(),
+ * kept by stepping -- a whole and a remainder each row -- from one
+ * division at the first row drawn. */
+struct edge
+{
+    int32_t lo, hi, y, x, qx, r, whole, part, den;
+    int flat;
+};
+
+/* The filled triangle at corners v (camera space), unpatterned and near
+ * the surface, in 32 bits: the rows the loop below draws. 0 when it does
+ * not apply. */
+static int triangle_near(struct pen *p, const int64_t v[6])
+{
+    int32_t X[3], Y[3];
+    if (p->pat)
+        return 0;
+    for (int i = 0; i < 3; i++) {
+        int64_t x = v[i * 2] + p->ox, y = v[i * 2 + 1] + p->oy;
+        if (x < -NEAR32 || x > NEAR32 || y < -NEAR32 || y > NEAR32)
+            return 0;
+        X[i] = (int32_t)x;
+        Y[i] = (int32_t)y;
+    }
+    int32_t ymin = Y[0], ymax = Y[0];
+    for (int i = 1; i < 3; i++) {
+        if (Y[i] < ymin) ymin = Y[i];
+        if (Y[i] > ymax) ymax = Y[i];
+    }
+    if (ymin < p->cy0)
+        ymin = p->cy0;
+    if (ymax >= p->cy1)
+        ymax = p->cy1 - 1;
+    struct edge e[3];
+    for (int k = 0; k < 3; k++) {
+        struct edge *g = &e[k];
+        int32_t px = X[k], py = Y[k], qx = X[(k + 1) % 3], qy = Y[(k + 1) % 3];
+        if (py > qy) {
+            int32_t t = px; px = qx; qx = t;
+            t = py; py = qy; qy = t;
+        }
+        g->lo = py;
+        g->hi = qy;
+        g->flat = py == qy;
+        g->x = px;
+        g->qx = qx;
+        if (g->flat)
+            continue;
+        int32_t n = qy - py, dx = qx - px, ys = ymin > py ? ymin : py;
+        int32_t num = 2 * (ys - py) * dx + n;
+        g->den = 2 * n;
+        int32_t q = floor32(num, g->den);
+        g->r = num - q * g->den;
+        g->whole = floor32(2 * dx, g->den);
+        g->part = 2 * dx - g->whole * g->den;
+        g->x = px + q;
+        g->y = ys;
+    }
+    for (int32_t y = ymin; y <= ymax; y++) {
+        int32_t l = 0, r = -1;
+        int any = 0;
+        for (int k = 0; k < 3; k++) {
+            struct edge *g = &e[k];
+            if (y < g->lo || y > g->hi)
+                continue;
+            int32_t xa = g->x, xb = g->qx;
+            if (!g->flat) {
+                if (g->y < y) {
+                    g->x += g->whole;
+                    g->r += g->part;
+                    if (g->r >= g->den) {
+                        g->r -= g->den;
+                        g->x++;
+                    }
+                    g->y = y;
+                }
+                xa = xb = g->x;
+            }
+            if (!any || xa < l) l = xa;
+            if (!any || xa > r) r = xa;
+            if (xb < l) l = xb;
+            if (xb > r) r = xb;
+            any = 1;
+        }
+        p->cost += 3 * COST_ROW;
+        if (any)
+            span32(p, y, l, r);
+    }
+    return 1;
+}
+
 static int triangle(struct vm *vm, struct value *a, int argc, int outline,
                     const char *fn)
 {
@@ -803,9 +1146,14 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
     begin(vm, &p, c, 1);
     if (outline) {
         run_fn run = p.pat ? NULL : run_dots;
+        p.per16 = PER16_DOT;
         walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, run, NULL);
         walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, run, NULL);
         walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, run, NULL);
+        finish(vm, &p);
+        return 1;
+    }
+    if (triangle_near(&p, v)) {
         finish(vm, &p);
         return 1;
     }
@@ -849,6 +1197,41 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
 NATIVE(tri) { (void)out; return triangle(vm, a, argc, 1, "tri"); }
 NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 
+/* Rows from..to (inside the clip) of an unpatterned rectangle x0..x1:
+ * filled, each row whole; hollow, its two edge columns. */
+static void rows(struct pen *p, int32_t from, int32_t to, int64_t x0,
+                 int64_t x1, int hollow)
+{
+    int32_t w = p->s.w, h = to - from + 1;
+    uint8_t *row = p->s.px + from * w, c = p->c;
+    uint32_t dots;
+    if (!hollow) {
+        int64_t l = x0 < p->cx0 ? p->cx0 : x0;
+        int64_t r = x1 >= p->cx1 ? p->cx1 - 1 : x1;
+        if (l > r)
+            return;
+        for (int32_t k = h; k > 0; k--, row += w)
+            memset(row + l, c, (size_t)(r - l + 1));
+        dots = (uint32_t)(r - l + 1);
+    } else {
+        int left = x0 >= p->cx0 && x0 < p->cx1;
+        int right = x1 >= p->cx0 && x1 < p->cx1;
+        if (!left && !right)
+            return;
+        for (int32_t k = h; k > 0; k--, row += w) {
+            if (left)
+                row[x0] = c;
+            if (right)
+                row[x1] = c;
+        }
+        dots = (uint32_t)(left + right);
+    }
+    p->count += dots * (uint32_t)h;
+    p->cost += (uint32_t)h;
+    row_touched(p, from);
+    row_touched(p, to);
+}
+
 static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
                      const char *fn)
 {
@@ -871,6 +1254,14 @@ static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
         span(&p, y0, x0, x1);
         span(&p, y1, x0, x1);
     }
+    if (!p.pat) {
+        /* Unpatterned, the rows are clipped once and written in 32 bits:
+         * span()'s and dot()'s pixels, without a clipped call for each. */
+        if (from <= to)
+            rows(&p, (int32_t)from, (int32_t)to, x0, x1, hollow);
+        finish(vm, &p);
+        return 1;
+    }
     for (int64_t y = from; y <= to; y++) {
         if (hollow) {
             dot(&p, x0, y);
@@ -891,8 +1282,22 @@ NATIVE(pset)
     WHOLE(0, 0, x, "pset");
     WHOLE(1, 0, y, "pset");
     COLOUR(2, c, "pset");
+    /* The screen without a fill pattern, the usual case, without a pen */
+    struct draw *d = &vm->d;
+    if (d->target.tag != T_IMG && !d->fill) {
+        int64_t px = (int64_t)x - d->cam_x, py = (int64_t)y - d->cam_y;
+        if (px >= d->clip_x0 && px >= 0 && px < d->clip_x1 && px < SCREEN_W &&
+            py >= d->clip_y0 && py >= 0 && py < d->clip_y1 && py < SCREEN_H) {
+            ((uint8_t *)MEM(vm, vm->screen))[py * SCREEN_W + px] =
+                d->dpal[c & 0xff];
+            screen_written(vm, (int32_t)py, (int32_t)py);
+        }
+        vm_charge(vm, 6);
+        return 1;
+    }
     struct pen p;
     begin(vm, &p, c, 1);
+    p.cost = 6;
     dot(&p, (int64_t)x + p.ox, (int64_t)y + p.oy);
     finish(vm, &p);
     return 1;
@@ -907,6 +1312,7 @@ NATIVE(pget)
     int64_t px = (int64_t)x - vm->d.cam_x, py = (int64_t)y - vm->d.cam_y;
     *out = mk(T_INT, px < 0 || py < 0 || px >= s.w || py >= s.h ? 0
               : s.px[py * s.w + px]);
+    vm_charge(vm, 5);
     return 1;
 }
 
@@ -923,7 +1329,7 @@ NATIVE(cls)
         vm->d.dirty_lo = 0;
         vm->d.dirty_hi = (int16_t)(s.h - 1);
     }
-    vm_charge(vm, (uint32_t)(s.w * s.h) / PIXELS_PER_UNIT);
+    vm_charge(vm, COST_CALL + (uint32_t)(s.w * s.h) / BYTES_PER_UNIT);
     return 1;
 }
 
@@ -965,10 +1371,13 @@ static void glyph(struct pen *p, uint16_t g, int32_t x, int32_t y, int k)
             if (bits & 1) row[2] = ink;
             continue;
         }
-        for (int dy = 0; dy < k; dy++)
-            for (int c = 0; c < 3; c++)
+        for (int dy = 0; dy < k; dy++) {
+            uint8_t *d = row + dy * w;
+            for (int c = 0; c < 3; c++, d += k)
                 if ((bits >> (2 - c)) & 1)
-                    memset(row + dy * w + c * k, ink, (size_t)k);
+                    for (int dx = 0; dx < k; dx++)
+                        d[dx] = ink;
+        }
     }
     if (top >= 0) {
         p->count += dots * (uint32_t)(k * k);
@@ -1000,6 +1409,8 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
         if (ch < 32 || ch > 126)
             ch = ch >= 0x80 ? '?' : ' ';
         uint16_t g = font_small[ch - 32];
+        if (draw && g)
+            p->cost += k == 1 ? COST_GLYPH : COST_BIG_GLYPH;
         if (draw && g && !p->pat && cx + p->ox >= p->cx0 &&
             y + p->oy >= p->cy0 && cx + p->ox + 3 * k <= p->cx1 &&
             y + p->oy + 5 * k <= p->cy1) {
@@ -1092,6 +1503,7 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
 {
     if (w <= 0 || h <= 0 || dw <= 0 || dh <= 0)
         return;
+    p->cost += COST_COPY;
     if (w > FAR) w = FAR;
     if (h > FAR) h = FAR;
     if (dw > FAR) dw = FAR;
@@ -1119,6 +1531,8 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         }
         if (u0 >= u1)
             return;
+        if (v1 > v0)
+            p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_COPY / 16;
         int32_t ua = (int32_t)u0, ub = (int32_t)u1;
         for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
             int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - v : v);
@@ -1154,12 +1568,24 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         return;
     }
 
+    if (u1 > u0 && v1 > v0)
+        p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_SCALED / 16;
     int32_t whole = (int32_t)(w / dw), part = (int32_t)(w % dw);
     int32_t tx0 = (int32_t)(u0 * w / dw), rem0 = (int32_t)(u0 * w % dw);
     int32_t W = (int32_t)w, DW = (int32_t)dw, SX = (int32_t)sx;
-    for (int64_t v = v0; v < v1; v++) {
-        int32_t ty = (int32_t)(v * h / dh);
+    /* The source row steps as the column does: v * h / dh, divided once */
+    int32_t hwhole = (int32_t)(h / dh), hpart = (int32_t)(h % dh);
+    int32_t ty = (int32_t)(v0 * h / dh), trem = (int32_t)(v0 * h % dh);
+    int32_t DH = (int32_t)dh;
+    int inside = SX >= 0 && W <= sw_img - SX;
+    for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
         int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - ty : ty);
+        ty += hwhole;
+        trem += hpart;
+        if (trem >= DH) {
+            trem -= DH;
+            ty++;
+        }
         if (yy < 0 || yy >= sh_img)
             continue;
         const uint8_t *srow = src + yy * sw_img;
@@ -1167,6 +1593,29 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
                         + (int32_t)dx;
         int32_t tx = tx0, rem = rem0;
         uint32_t n = 0;
+        if (inside) {
+            /* Every source column is in the image: no test per pixel */
+            const uint8_t *sp = srow + SX + (fx ? W - 1 : 0);
+            int32_t dir = fx ? -1 : 1;
+            for (int32_t u = (int32_t)u0; u < (int32_t)u1; u++) {
+                uint32_t c = xl[sp[dir * tx]];
+                tx += whole;
+                rem += part;
+                if (rem >= DW) {
+                    rem -= DW;
+                    tx++;
+                }
+                if (!(c & XLAT_CLEAR)) {
+                    drow[u] = (uint8_t)c;
+                    n++;
+                }
+            }
+            if (n) {
+                p->count += n;
+                row_touched(p, (int32_t)(dy + v));
+            }
+            continue;
+        }
         for (int32_t u = (int32_t)u0; u < (int32_t)u1; u++) {
             int32_t xx = SX + (fx ? W - 1 - tx : tx);
             tx += whole;
@@ -1194,6 +1643,7 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
  * (x, y) in surface coordinates: copy_rect's pixels, without its setup. */
 static void tile8(struct pen *p, const uint8_t *src, int32_t x, int32_t y)
 {
+    p->cost += 64 * PER16_TILE / 16;
     const uint16_t *xl = p->xl;
     int32_t w = p->s.w;
     uint8_t *d = p->s.px + y * w + x;
@@ -1261,12 +1711,14 @@ NATIVE(spr)
     struct pen p;
     int32_t tx, ty;
     begin(vm, &p, 0, 0);
-    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty))
+    p.per16 = 0;                    /* tile8 and copy_rect charge */
+    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty)) {
         tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W + (n & 15) * 8,
               tx, ty);
-    else
+    } else {
         copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (n & 15) * 8,
                   (n >> 4) * 8, w, h, x, y, w, h, fx, fy);
+    }
     finish(vm, &p);
     return 1;
 }
@@ -1284,6 +1736,7 @@ NATIVE(sspr)
     WHOLE(7, sh, dh, "sspr");
     struct pen p;
     begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, sx, sy, sw, sh,
               dx, dy, dw, dh, flag(vm, a, argc, 8), flag(vm, a, argc, 9));
     finish(vm, &p);
@@ -1366,7 +1819,7 @@ NATIVE(img)
     im->width = (uint16_t)w;
     im->height = (uint16_t)h;
     *out = mk(T_IMG, (int32_t)off);
-    vm_charge(vm, (uint32_t)(w * h) / PIXELS_PER_UNIT);
+    vm_charge(vm, COST_CALL + (uint32_t)(w * h) / BYTES_PER_UNIT);
     return 1;
 }
 
@@ -1382,6 +1835,7 @@ NATIVE(blit)
     WHOLE(2, 0, y, "blit");
     struct pen p;
     begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, 0, 0, s.w, s.h, x, y, s.w, s.h,
               flag(vm, a, argc, 3), flag(vm, a, argc, 4));
     finish(vm, &p);
@@ -1403,6 +1857,7 @@ NATIVE(blitpart)
     WHOLE(6, 0, y, "blitpart");
     struct pen p;
     begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, sx, sy, w, h, x, y, w, h,
               flag(vm, a, argc, 7), flag(vm, a, argc, 8));
     finish(vm, &p);
@@ -1426,9 +1881,46 @@ NATIVE(map)
     uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
     struct pen p;
     begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* tile8 and copy_rect charge */
     int64_t j0 = cy < 0 ? -(int64_t)cy : 0, i0 = cx < 0 ? -(int64_t)cx : 0;
     int64_t j1 = (int64_t)MAP_H - cy < ch ? (int64_t)MAP_H - cy : ch;
     int64_t i1 = (int64_t)MAP_W - cx < cw ? (int64_t)MAP_W - cx : cw;
+    if (j0 >= j1 || i0 >= i1) {
+        finish(vm, &p);
+        return 1;
+    }
+    const uint8_t *sheet = MEM(vm, vm->sheet);
+    /* Near the screen, in 32 bits: then a tile's place needs no clamp */
+    if (sx >= -(FAR - 1024) && sx <= FAR - 1024 && sy >= -(FAR - 1024) &&
+        sy <= FAR - 1024 && p.ox >= -(1 << 29) && p.ox <= (1 << 29) &&
+        p.oy >= -(1 << 29) && p.oy <= (1 << 29)) {
+        int32_t ox = (int32_t)p.ox, oy = (int32_t)p.oy;
+        for (int32_t j = (int32_t)j0; j < (int32_t)j1; j++) {
+            int32_t py = sy + j * 8 + oy;
+            if (py + 8 <= p.cy0 || py >= p.cy1)
+                continue;
+            int whole_rows = py >= p.cy0 && py + 8 <= p.cy1;
+            const uint8_t *cells = map + (cy + j) * MAP_W + cx;
+            for (int32_t i = (int32_t)i0; i < (int32_t)i1; i++) {
+                int32_t px = sx + i * 8 + ox;
+                if (px + 8 <= p.cx0 || px >= p.cx1)
+                    continue;
+                uint8_t n = cells[i];
+                if (!n || (layers && (flags[n] & layers) != layers))
+                    continue;
+                p.cost += COST_TILE;
+                if (whole_rows && px >= p.cx0 && px + 8 <= p.cx1)
+                    tile8(&p, sheet + (n >> 4) * 8 * SHEET_W + (n & 15) * 8,
+                          px, py);
+                else
+                    copy_rect(&p, sheet, SHEET_W, SHEET_H, (n & 15) * 8,
+                              (n >> 4) * 8, 8, 8, px - ox, py - oy, 8, 8, 0,
+                              0);
+            }
+        }
+        finish(vm, &p);
+        return 1;
+    }
     for (int64_t j = j0; j < j1; j++) {
         int64_t py = (int64_t)sy + j * 8 + p.oy;
         if (py + 8 <= p.cy0 || py >= p.cy1)
@@ -1440,6 +1932,7 @@ NATIVE(map)
             uint8_t n = map[(cy + j) * MAP_W + cx + i];
             if (!n || (layers && (flags[n] & layers) != layers))
                 continue;
+            p.cost += COST_TILE;
             int32_t tx, ty;
             if (tile_inside(&p, px - p.ox, py - p.oy, &tx, &ty)) {
                 tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W +
@@ -1628,6 +2121,106 @@ NATIVE(target)
         return 0;
     vm->d.target = is_num(a[0]) ? mk(T_INT, floor_int(a[0])) : a[0];
     full_clip(vm);
+    return 1;
+}
+
+/* ---- memory ------------------------------------------------------------- */
+
+NATIVE(mem)
+{
+    WHOLE(0, 0, r, "mem");
+    uint32_t at = r == 0 ? vm->screen : r == 1 ? vm->sheet
+                : r == 2 ? vm->map : r == 3 ? vm->flags : 0;
+    if (!at)
+        return vm_fail(vm, "mem() needs MEM.SCREEN, MEM.SHEET, MEM.MAP or "
+                       "MEM.FLAGS", "", "");
+    *out = mk(T_U8, (int32_t)(at - sizeof(struct u8a)));
+    return 1;
+}
+
+/* The length and element size of an array copy() and fill() work on */
+static int span_of(struct vm *vm, struct value v, const char *fn,
+                   uint32_t *len, uint32_t *size)
+{
+    *len = *size = 0;
+    switch (v.tag) {
+    case T_U8:  *len = U8A(vm, v)->len; *size = 1; return 1;
+    case T_I32: *len = I32(vm, v)->len; *size = 4; return 1;
+    case T_ARR: *len = ARR(vm, v)->len; *size = sizeof(struct value);
+                return 1;
+    }
+    return bad(vm, fn, "() needs an array or a typed array, not a ", v);
+}
+
+static void *elems(struct vm *vm, struct value v)
+{
+    return v.tag == T_U8 ? (void *)U8A(vm, v)->d
+         : v.tag == T_I32 ? (void *)I32(vm, v)->d
+         : (void *)BUF(vm, ARR(vm, v)->buf)->v;
+}
+
+/* Bytes moved go at the speed of memory. */
+static void moved(struct vm *vm, struct value dst, uint32_t at, uint32_t n,
+                  uint32_t size)
+{
+    if (n && dst.tag == T_U8 && IS_SCREEN(vm, dst))
+        screen_written(vm, (int32_t)(at / SCREEN_W),
+                       (int32_t)((at + n - 1) / SCREEN_W));
+    vm_charge(vm, n * size / BYTES_PER_UNIT);
+}
+
+/* copy(dst, di, src, si, n): n elements from src at si to dst at di, as
+ * memmove, between two arrays of one kind. */
+NATIVE(copy)
+{
+    (void)out;
+    uint32_t dl, ds, sl, ss;
+    if (!span_of(vm, a[0], "copy", &dl, &ds) ||
+        !span_of(vm, a[2], "copy", &sl, &ss))
+        return 0;
+    if (a[0].tag != a[2].tag)
+        return vm_fail(vm, "copy() needs two arrays of one kind", "", "");
+    WHOLE(1, 0, di, "copy");
+    WHOLE(3, 0, si, "copy");
+    WHOLE(4, 0, n, "copy");
+    if (di < 0 || si < 0 || n < 0 || (uint32_t)di > dl ||
+        (uint32_t)n > dl - (uint32_t)di || (uint32_t)si > sl ||
+        (uint32_t)n > sl - (uint32_t)si)
+        return vm_fail(vm, "copy() runs past the end of an array", "", "");
+    memmove((char *)elems(vm, a[0]) + (uint32_t)di * ds,
+            (char *)elems(vm, a[2]) + (uint32_t)si * ss, (uint32_t)n * ds);
+    moved(vm, a[0], (uint32_t)di, (uint32_t)n, ds);
+    return 1;
+}
+
+/* fill(a, v, [i], [n]): n elements from i set to v; to the end by default */
+NATIVE(fill)
+{
+    (void)out;
+    uint32_t len, size;
+    if (!span_of(vm, a[0], "fill", &len, &size))
+        return 0;
+    WHOLE(2, 0, i, "fill");
+    if (i < 0 || (uint32_t)i > len)
+        return vm_fail(vm, "fill() starts past the end of an array", "", "");
+    WHOLE(3, (int32_t)(len - (uint32_t)i), n, "fill");
+    if (n < 0 || (uint32_t)n > len - (uint32_t)i)
+        return vm_fail(vm, "fill() runs past the end of an array", "", "");
+    struct value v = a[1];
+    if (a[0].tag != T_ARR && !is_num(v))
+        return bad(vm, "fill", "() puts numbers in a typed array, not a ", v);
+    if (a[0].tag == T_U8)
+        memset(U8A(vm, a[0])->d + i, (uint8_t)to_int(v), (uint32_t)n);
+    else if (a[0].tag == T_I32) {
+        int32_t *d = I32(vm, a[0])->d + i, x = to_int(v);
+        for (int32_t k = 0; k < n; k++)
+            d[k] = x;
+    } else {
+        struct value *d = BUF(vm, ARR(vm, a[0])->buf)->v + i;
+        for (int32_t k = 0; k < n; k++)
+            d[k] = v;
+    }
+    moved(vm, a[0], (uint32_t)i, (uint32_t)n, size);
     return 1;
 }
 

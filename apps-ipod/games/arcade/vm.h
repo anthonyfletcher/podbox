@@ -138,7 +138,9 @@ extern const uint32_t arcade_api_count;
 #define SHEET_H      128
 #define MAP_W        128
 #define MAP_H        64
-#define PIXELS_PER_UNIT 8   /* drawing's charge, until phase 1 measures it */
+/* A unit is about 40 of the 5G's cycles, a bytecode's worth. Filling and
+ * moving memory goes at the speed of its SDRAM: a unit for every 16 bytes. */
+#define BYTES_PER_UNIT 16
 
 /* What drawing reads and changes; PICO-8's draw state, plus the targets. */
 struct draw
@@ -299,6 +301,18 @@ static inline int32_t floor_int(struct value v)
 {
     return v.tag == T_FIX ? v.v >> 16 : v.v;
 }
+
+/* A cart wrote screen rows y0..y1 through mem(MEM.SCREEN), not by drawing */
+static inline void screen_written(struct vm *vm, int32_t y0, int32_t y1)
+{
+    if (y0 < vm->d.dirty_lo)
+        vm->d.dirty_lo = (int16_t)y0;
+    if (y1 > vm->d.dirty_hi)
+        vm->d.dirty_hi = (int16_t)y1;
+}
+
+/* Whether a Uint8Array is the screen */
+#define IS_SCREEN(vm, c) ((uint32_t)(c).v + sizeof(struct u8a) == (vm)->screen)
 
 /* vm.c */
 int vm_fail(struct vm *vm, const char *a, const char *b, const char *c);

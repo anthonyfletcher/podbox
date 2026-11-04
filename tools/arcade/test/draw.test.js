@@ -235,3 +235,48 @@ test('unscaled sprites clip and flip exactly at every edge', () => {
         assert.equal(got, want.join('\n'), 'spr at ' + x + ',' + y);
     }
 });
+
+test('mem() hands out the engine arrays; writes to the screen mark its rows', () => {
+    const run = (draw, extra) => {
+        const res = compileFiles({ 'cart.json': CART, 'main.js':
+            'var scr;\nfunction init() { scr = mem(MEM.SCREEN); }\n' +
+            'function update() {}\nfunction draw() { ' + draw + ' }' });
+        assert.deepEqual(res.errors, []);
+        const file = path.join(tmp, 'm' + n++ + '.pbg');
+        fs.writeFileSync(file, res.cart);
+        const r = spawnSync(exe, [file, '--ticks', '2', '--dirty'].concat(extra || []),
+                            { encoding: 'utf8', timeout: 20000 });
+        return { out: r.stdout.replace(/\r/g, ''), err: r.stderr, status: r.status };
+    };
+    // One pixel through the view: row 3 only, and the pixel lands.
+    let r = run('scr[3 * 160 + 5] = 8;', ['--dump', '4,3,3,1']);
+    assert.equal(r.status, 0, r.err);
+    assert.match(r.out, /^080\ndirty 3 3\n/);
+    // pset and the view address the same pixel.
+    r = run('pset(7, 2, 9); printh(scr[2 * 160 + 7] + " " + scr.length);');
+    assert.match(r.out, /^9 19200\n/);
+    // fill and copy mark exactly the rows they wrote.
+    r = run('fill(scr, 12, 160 * 10, 320);');
+    assert.match(r.out, /dirty 10 11/);
+    r = run('var a = new Uint8Array(4); fill(a, 7); copy(scr, 160 * 50 - 2, a, 0, 4); printh(scr[160 * 50 + 1]);');
+    assert.match(r.out, /^7\n7\ndirty 49 50/);
+    // A drawing call and a view write together: the union.
+    r = run('pset(0, 100); scr[160 * 20] = 1;');
+    assert.match(r.out, /dirty 20 100/);
+    // The sheet, map and flags are the arrays sget, mget and fget read.
+    r = run('mem(MEM.SHEET)[3 * 128 + 2] = 11; mem(MEM.MAP)[128 + 4] = 33; ' +
+            'mem(MEM.FLAGS)[33] = 5; printh(sget(2, 3) + " " + mget(4, 1) + " " + fget(33));');
+    assert.match(r.out, /^11 33 5\n/);
+    // copy between kinds, past an end, and a bad region are errors.
+    r = run('copy(scr, 0, new Int32Array(4), 0, 4);');
+    assert.match(r.err, /copy\(\) needs two arrays of one kind/);
+    r = run('copy(scr, 19198, scr, 0, 4);');
+    assert.match(r.err, /copy\(\) runs past the end of an array/);
+    r = run('fill(scr, 1, 19000, 300);');
+    assert.match(r.err, /fill\(\) runs past the end of an array/);
+    r = run('mem(9);');
+    assert.match(r.err, /mem\(\) needs MEM.SCREEN/);
+    // Arrays of values copy and fill too, overlapping as memmove does.
+    r = run('var v = [1, 2, 3, 4, 5]; copy(v, 1, v, 0, 4); fill(v, "x", 4); printh(v.join(","));');
+    assert.match(r.out, /^1,1,2,3,x\n/);
+});

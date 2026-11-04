@@ -2,14 +2,16 @@
  * VM, built for this machine, for the SDK's tests.
  *
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
- *                  [--shot file.png] [--dump x,y,w,h] [--menu i]...
+ *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
+ *                  [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
  * --units, the units of each call follow on stderr. After the last tick,
  * --shot saves the panel as the player shows it, the 160x120 screen
  * doubled to 320x240, and --dump prints a rectangle of the screen as one
- * hex digit a pixel (the colour's low four bits), a row a line. Each
+ * hex digit a pixel (the colour's low four bits), a row a line, and
+ * --dirty prints "dirty lo hi", the rows the last tick drew. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -218,7 +220,7 @@ int main(int argc, char **argv)
     const char *path = NULL;
     long ticks = 0;
     unsigned long long seed = 1;
-    int units = 0;
+    int units = 0, dirty = 0;
     unsigned long ceiling = 0;
     const char *shot_path = NULL, *dump_spec = NULL;
     int menu_picks[16], npicks = 0;
@@ -237,6 +239,8 @@ int main(int argc, char **argv)
             menu_picks[npicks++] = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--units"))
             units = 1;
+        else if (!strcmp(argv[i], "--dirty"))
+            dirty = 1;
         else
             path = argv[i];
     }
@@ -273,6 +277,7 @@ int main(int argc, char **argv)
     if (units)
         fprintf(stderr, "start %u\n", (unsigned)arcade_units(vm));
     for (long t = 0; t < ticks; t++) {
+        arcade_presented(vm);
         if (!arcade_tick(vm, 1))
             return report(vm);
         if (units)
@@ -281,6 +286,10 @@ int main(int argc, char **argv)
     }
     if (dump_spec)
         dump(vm, dump_spec);
+    if (dirty) {
+        const struct arcade_screen *s = arcade_screen(vm);
+        printf("dirty %d %d\n", s->dirty_lo, s->dirty_hi);
+    }
     for (int k = 0; k < npicks; k++) {
         char label[64];
         printf("menu:");

@@ -251,6 +251,8 @@ static int concat(struct vm *vm, struct value *dst, struct value a,
     o.p = s->b + la;
     tw_value(vm, &o, b, 0);
     *dst = mk(T_STR, (int32_t)off);
+    /* Formatting and allocating, measured on the 5G */
+    vm_charge(vm, 20 + m.n / BYTES_PER_UNIT);
     return 1;
 }
 
@@ -512,8 +514,11 @@ static int set_index(struct vm *vm, struct value c, struct value i,
                                vm_typename(v.tag), "");
             if (c.tag == T_I32 && k < I32(vm, c)->len)
                 I32(vm, c)->d[k] = to_int(v);
-            else if (c.tag == T_U8 && k < U8A(vm, c)->len)
+            else if (c.tag == T_U8 && k < U8A(vm, c)->len) {
                 U8A(vm, c)->d[k] = (uint8_t)to_int(v);
+                if (IS_SCREEN(vm, c))
+                    screen_written(vm, k / SCREEN_W, k / SCREEN_W);
+            }
             return 1;
         case T_OBJ:
             return vm_fail(vm, "a record's keys are strings, not numbers",
@@ -744,6 +749,8 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             for (i = 0; i < n / 2; i++) {
                 t = d[i]; d[i] = d[n - 1 - i]; d[n - 1 - i] = t;
             }
+            if (IS_SCREEN(vm, self))
+                screen_written(vm, 0, SCREEN_H - 1);
         } else
             return vm_fail(vm, ".reverse() needs an array, not a ",
                            vm_typename(self.tag), "");
@@ -1139,6 +1146,10 @@ static inline int truthy(struct vm *vm, struct value v)
     return vm_truthy(vm, v);
 }
 
+/* Each handler jumps to the next itself: at -Os GCC merges the computed
+ * gotos into one shared dispatch, three branches longer. No handler takes
+ * the address of a or b, so they stay in registers. */
+__attribute__((optimize("O2", "no-gcse")))
 static int run(struct vm *vm, uint32_t stop)
 {
     static const void *const labels[OP_COUNT] = {
@@ -1238,6 +1249,7 @@ op_INCL: {
     SYNC();
     if (!concat(vm, l, sp[-2], sp[-1]))
         goto fail;
+    RELOAD();
     sp -= 2;
     NEXT();
 }
@@ -1246,13 +1258,12 @@ op_PUSHF:
     NEXT();
 
 op_ADD:
-    a = sp[-2];
-    b = sp[-1];
-    if (a.tag == T_INT && b.tag == T_INT) {
-        sp[-2].v = (int32_t)((uint32_t)a.v + (uint32_t)b.v);
+    if (sp[-2].tag == T_INT && sp[-1].tag == T_INT) {
+        sp[-2].v = (int32_t)((uint32_t)sp[-2].v + (uint32_t)sp[-1].v);
         sp--;
         NEXT();
     }
+    a = sp[-2]; b = sp[-1];
     if (is_num(a) && is_num(b)) {
         vm_fix_op(vm, OP_ADD, a, b, &sp[-2]);
         sp--;
@@ -1264,6 +1275,7 @@ op_ADD:
     SYNC();
     if (!concat(vm, &sp[-2], a, b))
         goto fail;
+    RELOAD();
     sp--;
     NEXT();
 
@@ -1271,12 +1283,13 @@ op_ADD:
  * vm_fix_op, anything else an error. */
 #define ARITH(name, what, expr) \
 op_##name: \
-    a = sp[-2]; b = sp[-1]; \
-    if (a.tag == T_INT && b.tag == T_INT) { \
+    if (sp[-2].tag == T_INT && sp[-1].tag == T_INT) { \
+        const int32_t av = sp[-2].v, bv = sp[-1].v; \
         expr; \
         sp--; \
         NEXT(); \
     } \
+    a = sp[-2]; b = sp[-1]; \
     if (!is_num(a) || !is_num(b)) \
         FAIL(what " needs numbers, not a ", \
              vm_typename(is_num(a) ? b.tag : a.tag)); \
@@ -1285,14 +1298,14 @@ op_##name: \
     sp--; \
     NEXT();
 
-ARITH(SUB, "-", sp[-2].v = (int32_t)((uint32_t)a.v - (uint32_t)b.v))
-ARITH(MUL, "*", sp[-2].v = (int32_t)((uint32_t)a.v * (uint32_t)b.v))
+ARITH(SUB, "-", sp[-2].v = (int32_t)((uint32_t)av - (uint32_t)bv))
+ARITH(MUL, "*", sp[-2].v = (int32_t)((uint32_t)av * (uint32_t)bv))
 ARITH(DIV, "/",
-      if (b.v == 0) FAIL("division by zero", "");
-      sp[-2].v = b.v == -1 ? (int32_t)(0u - (uint32_t)a.v) : a.v / b.v)
+      if (bv == 0) FAIL("division by zero", "");
+      sp[-2].v = bv == -1 ? (int32_t)(0u - (uint32_t)av) : av / bv)
 ARITH(MOD, "%",
-      if (b.v == 0) FAIL("division by zero", "");
-      sp[-2].v = b.v == -1 ? 0 : a.v % b.v)
+      if (bv == 0) FAIL("division by zero", "");
+      sp[-2].v = bv == -1 ? 0 : av % bv)
 
 op_NEG:
     if (sp[-1].tag == T_INT)
@@ -1339,10 +1352,13 @@ op_NE:
 
 #define COMPARE(name, op, text) \
 op_##name: \
+    if (sp[-2].tag == T_INT && sp[-1].tag == T_INT) { \
+        sp[-2].v = sp[-2].v op sp[-1].v; \
+        sp--; \
+        NEXT(); \
+    } \
     a = sp[-2]; b = sp[-1]; \
-    if (a.tag == T_INT && b.tag == T_INT) \
-        sp[-2] = mk(T_INT, a.v op b.v); \
-    else if (is_num(a) && is_num(b)) \
+    if (is_num(a) && is_num(b)) \
         sp[-2] = mk(T_INT, scaled(a) op scaled(b)); \
     else if (a.tag == T_STR && b.tag == T_STR) \
         sp[-2] = mk(T_INT, str_cmp(vm, a, b) op 0); \
@@ -1360,12 +1376,15 @@ COMPARE(GE, >=, ">=")
 #define JCOMPARE(name, op) \
 op_##name: { \
     int32_t off = S16(); \
-    a = sp[-2]; b = sp[-1]; \
     sp -= 2; \
+    if (sp[0].tag == T_INT && sp[1].tag == T_INT) { \
+        if (sp[0].v op sp[1].v) \
+            pc += off; \
+        NEXT(); \
+    } \
+    a = sp[0]; b = sp[1]; \
     int hold; \
-    if (a.tag == T_INT && b.tag == T_INT) \
-        hold = a.v op b.v; \
-    else if (is_num(a) && is_num(b)) \
+    if (is_num(a) && is_num(b)) \
         hold = scaled(a) op scaled(b); \
     else if (a.tag == T_STR && b.tag == T_STR) \
         hold = str_cmp(vm, a, b) op 0; \
@@ -1530,13 +1549,15 @@ op_NEWOBJ: {
     *sp++ = out;
     NEXT();
 }
-op_GETIDX:
+op_GETIDX: {
+    struct value got;
     SYNC();
-    if (!get_index(vm, sp[-2], sp[-1], &a))
+    if (!get_index(vm, sp[-2], sp[-1], &got))
         goto fail;
-    sp[-2] = a;
+    sp[-2] = got;
     sp--;
     NEXT();
+}
 op_SETIDX:
     SYNC();
     if (!set_index(vm, sp[-3], sp[-2], sp[-1]))
@@ -1587,11 +1608,12 @@ op_METHOD: {
 op_INTR: {
     uint32_t id = U8(), argc = U8();
     SYNC();
-    if (!intrinsic(vm, (int)id, sp - argc, (int)argc, &a))
+    struct value got;
+    if (!intrinsic(vm, (int)id, sp - argc, (int)argc, &got))
         goto fail;
     RELOAD();
     sp -= argc;
-    *sp++ = a;
+    *sp++ = got;
     NEXT();
 }
 

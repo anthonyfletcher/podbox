@@ -85,15 +85,21 @@ sh host/build.sh                      # needs gcc, or CLion's MinGW on Windows
 host/pbgvm mygame.pbg --ticks 100 --units
 ```
 
-`--units` reports the cost of `init()` and of each tick. A runtime error
-names the file, the line and the function.
+`--units` reports the cost of `init()` and of each tick. A unit is about
+0.55 µs on an iPod Video with no music playing, and about twice that with
+music playing; the iPod Classic is three to four times faster. A cart
+that redraws the whole screen at 30 ticks a second has about 45,000 units
+a tick on the iPod Video with no music, and about half that with music.
+A runtime error names the file, the line and the function.
 
-Two options show what a cart drew, after the last tick:
+These options show what a cart drew, after the last tick:
 
-- `--shot file.png` saves the panel as the player shows it: 320x240, the
-  screen doubled, with the borders either side.
+- `--shot file.png` saves the panel as the player shows it: the 160x120
+  screen doubled to 320x240.
 - `--dump x,y,w,h` prints that part of the screen, one hex digit a pixel
   and a row a line.
+- `--dirty` prints `dirty lo hi`: the rows the last tick drew, which are
+  the rows the player sends to the screen.
 - `--menu i` chooses the cart's pause-menu item `i` (from `menuitem()`), as
   SELECT would, printing the items first and what the item's function
   returned. Give it more than once to choose several in turn.

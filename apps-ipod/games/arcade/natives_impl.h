@@ -67,6 +67,9 @@ IMPL(mget)
 IMPL(mset)
 IMPL(mapw)
 IMPL(maph)
+IMPL(mem)
+IMPL(copy)
+IMPL(fill)
 
 /* core_input.c */
 IMPL(btn)
