@@ -156,6 +156,8 @@ struct jpeg
     int buf_left;
     int buf_index;
     int read_size; /* most bytes a refill reads */
+    int read_cap; /* and the most it may ever read: see clip_jpeg_fd() */
+    bool read_failed; /* a refill came back empty before the image's end */
 
     int (*read_buf)(struct jpeg* p_jpeg, size_t count);
     bool (*skip_bytes_seek)(struct jpeg* p_jpeg);
@@ -926,10 +928,13 @@ static int read_buf(struct jpeg* p_jpeg, size_t count)
 INLINE void fill_buf(struct jpeg* p_jpeg)
 {
     p_jpeg->buf_left = p_jpeg->read_buf(p_jpeg,
-        MIN((unsigned long)p_jpeg->read_size, p_jpeg->len));
+        MIN((unsigned long)MIN(p_jpeg->read_size, p_jpeg->read_cap),
+            p_jpeg->len));
     p_jpeg->buf_index = 0;
     if (p_jpeg->buf_left > 0)
         p_jpeg->len -= p_jpeg->buf_left;
+    else if (p_jpeg->len > 0)
+        p_jpeg->read_failed = true;
 }
 
 static int read_buf_id3_unsync(struct jpeg* p_jpeg, size_t count)
@@ -2987,12 +2992,22 @@ static int decode_buf_bytes(struct jpeg *p_jpeg)
            * JPEG_PIX_SZ;
 }
 
-int clip_jpeg_fd(int fd, int flags,
-                 unsigned long len,
-                 struct bitmap *bm,
-                 int maxsize,
-                 int format,
-                 const struct custom_format *cformat)
+/* The refill cap of a retry: under a sector, so no read is ever a whole
+ * one, and each goes through the file system's sector cache */
+#define JPEG_RETRY_READ 256
+
+int jpeg_read_retries;
+int jpeg_read_retry_failures;
+
+/* The decode. '*state' is left at its struct jpeg, which outlives it in the
+ * caller's buffer, so the caller can ask whether a read failed. */
+static int decode_jpeg_fd(int fd, int flags,
+                          unsigned long len,
+                          struct bitmap *bm,
+                          int maxsize,
+                          int format,
+                          const struct custom_format *cformat,
+                          int read_cap, struct jpeg **state)
 {
     bool resize = false, dither = false;
     struct rowset rset;
@@ -3006,7 +3021,9 @@ int clip_jpeg_fd(int fd, int flags,
     if ((size_t)tmp_size < sizeof(struct jpeg))
         return -1;
     memset(p_jpeg, 0, sizeof(struct jpeg));
+    *state = p_jpeg;
     p_jpeg->read_size = JPEG_READ_BUF_SIZE;
+    p_jpeg->read_cap = read_cap;
     p_jpeg->len = len;
     p_jpeg->fd = fd;
     if (p_jpeg->len == 0)
@@ -3149,6 +3166,7 @@ int clip_jpeg_fd(int fd, int flags,
             return -1;
         memmove(buf_start, p_jpeg, sizeof(struct jpeg));
         p_jpeg = (struct jpeg *)buf_start;
+        *state = p_jpeg;
     }
     buf_start += sizeof(struct jpeg);
     maxsize = buf_end - buf_start;
@@ -3247,6 +3265,49 @@ int clip_jpeg_fd(int fd, int flags,
         return bm_size;
     }
     return 0;
+}
+
+/* Whether the decode that left 'state' had a read fail before the image's
+ * end. Such a decode carries on to the end on zero bits and looks finished,
+ * so it is never a result: a cache would keep it. A file that is merely
+ * truncated ends with nothing left to read, and decodes as far as it goes. */
+static bool decode_read_failed(const struct jpeg *state)
+{
+    return state && state->read_failed;
+}
+
+/* Reads after the first are whole sectors where they can be, straight from
+ * the disk into the buffer. A decode one of those fails is made again from
+ * the image's start with reads under a sector, through the file system's
+ * cache. */
+int clip_jpeg_fd(int fd, int flags,
+                 unsigned long len,
+                 struct bitmap *bm,
+                 int maxsize,
+                 int format,
+                 const struct custom_format *cformat)
+{
+    off_t start = lseek(fd, 0, SEEK_CUR);
+    int width = bm->width, height = bm->height;
+    struct jpeg *state = NULL;
+    int rc = decode_jpeg_fd(fd, flags, len, bm, maxsize, format, cformat,
+                            JPEG_READ_BUF_SIZE, &state);
+
+    if (!decode_read_failed(state))
+        return rc;
+    jpeg_read_retries++;
+    bm->width = width;
+    bm->height = height;
+    state = NULL;
+    if (start >= 0 && lseek(fd, start, SEEK_SET) == start)
+    {
+        rc = decode_jpeg_fd(fd, flags, len, bm, maxsize, format, cformat,
+                            JPEG_RETRY_READ, &state);
+        if (!decode_read_failed(state))
+            return rc;
+    }
+    jpeg_read_retry_failures++;
+    return -1;
 }
 
 int read_jpeg_fd(int fd,

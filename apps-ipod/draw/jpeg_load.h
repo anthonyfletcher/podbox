@@ -27,6 +27,12 @@
  * be freed. */
 extern const size_t JPEG_DECODE_OVERHEAD;
 
+/* Decodes a failed read made again with reads under a sector, and how many
+ * of those failed as well, since boot. A difference across a call says what
+ * happened to it. */
+extern int jpeg_read_retries;
+extern int jpeg_read_retry_failures;
+
 int read_jpeg_file(const char* filename,
                    struct bitmap *bm,
                    int maxsize,
