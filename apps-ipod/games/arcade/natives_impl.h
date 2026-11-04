@@ -81,6 +81,10 @@ IMPL(sfxp)
 IMPL(tone)
 IMPL(click)
 
+/* core_draw.c, turned */
+IMPL(rspr)
+IMPL(rblit)
+
 /* core_draw.c, for the systems */
 IMPL(sprites_draw)
 
@@ -106,6 +110,21 @@ IMPL(grid_slide)
 IMPL(grid_fits)
 IMPL(grid_place)
 IMPL(grid_rotate)
+
+/* sys_path.c */
+IMPL(path_field)
+IMPL(path_next)
+IMPL(path_find)
+IMPL(path_sight)
+
+/* sys_noise.c */
+IMPL(noise_at)
+IMPL(noise_fill)
+
+/* sys_cells.c */
+IMPL(cells_rules)
+IMPL(cells_step)
+IMPL(cells_life)
 
 /* sys_plane.c */
 IMPL(plane_view)

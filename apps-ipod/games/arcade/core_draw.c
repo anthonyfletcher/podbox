@@ -20,6 +20,7 @@
  *   lines          line, and tline, which steps the same way
  *   triangles, rectangles, text
  *   sprites        spr, sspr, sget/sset, fget/fset, images
+ *   turned         rspr and rblit, rotated and scaled about their centres
  *   the map
  *   state          camera, clip, colour, cursor, palettes, target
  *   memory         the engine's arrays as Uint8Arrays; copy and fill
@@ -2089,6 +2090,160 @@ NATIVE(blitpart)
     p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, sx, sy, w, h, x, y, w, h,
               flag(vm, a, argc, 7), flag(vm, a, argc, 8));
+    finish(vm, &p);
+    return 1;
+}
+
+/* ---- turned ------------------------------------------------------------- */
+
+/* A source rectangle, sw by sh from sx0, sy0 in rows stride apart, and how
+ * a destination row steps through it */
+struct turn
+{
+    const uint8_t *src;
+    int32_t stride;
+    uint32_t sw, sh;
+    int32_t du, dv;
+    int flip;
+    const uint16_t *xl;
+};
+
+/* One destination row, n pixels from d, its first source point u, v in
+ * 16.16 from the rectangle's corner; a pixel only where that is inside */
+__attribute__((optimize("O2")))
+static void turned_row(uint8_t *d, int32_t n, int32_t u, int32_t v,
+                       const struct turn *t)
+{
+    const uint8_t *src = t->src;
+    const int32_t du = t->du, dv = t->dv, stride = t->stride;
+    const uint32_t sw = t->sw, sh = t->sh, last = t->sw - 1;
+    const uint16_t *xl = t->xl;
+    for (int32_t i = 0; i < n; i++, u += du, v += dv) {
+        uint32_t x = (uint32_t)(u >> 16), y = (uint32_t)(v >> 16);
+        if (x >= sw || y >= sh)
+            continue;
+        uint32_t c = xl[src[y * stride + (t->flip ? last - x : x)]];
+        if (!(c & XLAT_CLEAR))
+            d[i] = (uint8_t)c;
+    }
+}
+
+/* The rectangle drawn about centre cx, cy (16.16, the camera's space),
+ * turned by angle (turns, anticlockwise on the screen as sin goes) and
+ * scaled. Each destination pixel's centre is mapped back to the source:
+ * along a row the source point steps by the inverse rotation over the
+ * scale, so a row is a start and a step. */
+static void turned(struct pen *p, struct turn *t, int64_t cx, int64_t cy,
+                   int32_t angle, int32_t scale)
+{
+    int32_t c = core_sine((uint32_t)angle + 0x4000);
+    int32_t s = core_sine((uint32_t)angle);
+    int32_t inv = (int32_t)(((int64_t)1 << 32) / scale);   /* 1 / scale */
+    t->du = (int32_t)(((int64_t)c * inv) >> 16);
+    t->dv = (int32_t)(((int64_t)s * inv) >> 16);
+    /* half the turned rectangle's extent, in screen pixels */
+    int64_t ac = c < 0 ? -c : c, as = s < 0 ? -s : s;
+    int64_t ex = ((ac * t->sw + as * t->sh) * scale >> 33) + 2;
+    int64_t ey = ((as * t->sw + ac * t->sh) * scale >> 33) + 2;
+    cx += p->ox << 16;
+    cy += p->oy << 16;
+    int64_t x0 = (cx >> 16) - ex, x1 = (cx >> 16) + ex;
+    int64_t y0 = (cy >> 16) - ey, y1 = (cy >> 16) + ey;
+    if (x0 < p->cx0) x0 = p->cx0;
+    if (x1 > p->cx1 - 1) x1 = p->cx1 - 1;
+    if (y0 < p->cy0) y0 = p->cy0;
+    if (y1 > p->cy1 - 1) y1 = p->cy1 - 1;
+    if (x0 > x1 || y0 > y1)
+        return;
+    int32_t n = (int32_t)(x1 - x0 + 1);
+    for (int64_t y = y0; y <= y1; y++) {
+        /* the first pixel's centre from the drawing's centre */
+        int64_t dx = (x0 << 16) + 0x8000 - cx, dy = (y << 16) + 0x8000 - cy;
+        int64_t u = (dx * c - dy * s) >> 16, v = (dx * s + dy * c) >> 16;
+        u = ((u * inv) >> 16) + ((int64_t)t->sw << 15);
+        v = ((v * inv) >> 16) + ((int64_t)t->sh << 15);
+        turned_row(p->s.px + y * p->s.w + x0, n, (int32_t)u, (int32_t)v, t);
+    }
+    row_touched(p, (int32_t)y0);
+    row_touched(p, (int32_t)y1);
+    p->cost += (uint32_t)((y1 - y0 + 1) * n) * PER16_FLOOR / 16 +
+               (uint32_t)(y1 - y0 + 1) * COST_ROW * 4;
+}
+
+/* The scale argument at i, 1 by default, at least 1/64 */
+static int scale_arg(struct vm *vm, struct value *a, int argc, int i,
+                     const char *fn, int32_t *out)
+{
+    int64_t k;
+    *out = 0x10000;
+    if (!real(vm, a, argc, i, 0x10000, fn, &k))
+        return 0;
+    if (k < 0x400 || k > (64 << 16))
+        return vm_fail(vm, fn, "() takes a scale from 1/64 to 64", "");
+    *out = (int32_t)k;
+    return 1;
+}
+
+/* rspr(n, x, y, angle, [scale], [w], [h], [flip]): sprite n, w by h
+ * sprites as spr takes them, turned about its centre at x, y */
+NATIVE(rspr)
+{
+    (void)out;
+    WHOLE(0, 0, n, "rspr");
+    WHOLE(5, 1, w, "rspr");
+    WHOLE(6, 1, h, "rspr");
+    int64_t x, y, angle;
+    int32_t scale;
+    if (!real(vm, a, argc, 1, 0, "rspr", &x) ||
+        !real(vm, a, argc, 2, 0, "rspr", &y) ||
+        !real(vm, a, argc, 3, 0, "rspr", &angle) ||
+        !scale_arg(vm, a, argc, 4, "rspr", &scale))
+        return 0;
+    if (n < 0 || n > 255 || w < 1 || h < 1)
+        return 1;
+    int32_t sx = (n & 15) * 8, sy = (n >> 4) * 8;
+    if (w > (SHEET_W - sx) / 8) w = (SHEET_W - sx) / 8;
+    if (h > (SHEET_H - sy) / 8) h = (SHEET_H - sy) / 8;
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;
+    struct turn t;
+    t.src = (const uint8_t *)MEM(vm, vm->sheet) + sy * SHEET_W + sx;
+    t.stride = SHEET_W;
+    t.sw = (uint32_t)w * 8;
+    t.sh = (uint32_t)h * 8;
+    t.flip = flag(vm, a, argc, 7);
+    t.xl = p.xl;
+    turned(&p, &t, x, y, wrap32(angle), scale);
+    finish(vm, &p);
+    return 1;
+}
+
+/* rblit(img, x, y, angle, [scale]): an image turned about its centre */
+NATIVE(rblit)
+{
+    (void)out;
+    struct surf s;
+    if (!surf_of(vm, a[0], &s, "rblit"))
+        return 0;
+    int64_t x, y, angle;
+    int32_t scale;
+    if (!real(vm, a, argc, 1, 0, "rblit", &x) ||
+        !real(vm, a, argc, 2, 0, "rblit", &y) ||
+        !real(vm, a, argc, 3, 0, "rblit", &angle) ||
+        !scale_arg(vm, a, argc, 4, "rblit", &scale))
+        return 0;
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;
+    struct turn t;
+    t.src = s.px;
+    t.stride = s.w;
+    t.sw = (uint32_t)s.w;
+    t.sh = (uint32_t)s.h;
+    t.flip = 0;
+    t.xl = p.xl;
+    turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
     return 1;
 }

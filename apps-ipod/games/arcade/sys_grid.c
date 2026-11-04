@@ -24,14 +24,8 @@
 
 /* ---- boards ------------------------------------------------------------ */
 
-struct board
-{
-    uint8_t *c;
-    int32_t w, h;
-};
-
 /* A Uint8Array w wide, a whole number of rows */
-static int board_of(struct vm *vm, struct value b, struct value w,
+int board_of(struct vm *vm, struct value b, struct value w,
                     const char *fn, struct board *o)
 {
     int32_t n = is_num(w) ? floor_int(w) : 0;
@@ -46,7 +40,7 @@ static int board_of(struct vm *vm, struct value b, struct value w,
 }
 
 /* bytes of zeroed scratch for this call, or NULL with the error set */
-static void *scratch(struct vm *vm, uint32_t bytes)
+void *scratch(struct vm *vm, uint32_t bytes)
 {
     uint32_t off = gc_alloc(vm, T_U8, sizeof(uint32_t) + bytes);
     return off ? ((struct u8a *)MEM(vm, off))->d : NULL;

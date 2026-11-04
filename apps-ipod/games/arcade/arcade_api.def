@@ -118,6 +118,10 @@ API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)
 API(fill,      76, 2, 4, VOID, 0,     CELLS,  LISTEN, 1)
 
+/* Sprites and images turned and scaled about their centres */
+API(rspr,     112, 4, 8, VOID, 0,     PIXELS, LISTEN, 1)
+API(rblit,    113, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+
 /* The click wheel's own sounds */
 API(click,     77, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
 
@@ -151,6 +155,24 @@ API(grid_fits,     103, 6, 6, VAL, 0, CELLS, LISTEN, 1)
 API(grid_place,    104, 6, 6, VAL, 0, CELLS, LISTEN, 1)
 API(grid_rotate,   105, 4, 4, VAL, 0, CELLS, LISTEN, 1)
 
+/* Systems: paths over a board of cells */
+API_NS(path)
+API(path_field,    106, 6, 6, VAL, 0, CELLS, LISTEN, 1)
+API(path_next,     107, 4, 4, VAL, 0, CELLS, LISTEN, 1)
+API(path_find,     108, 8, 8, VAL, 0, CELLS, LISTEN, 1)
+API(path_sight,    109, 7, 7, VAL, 0, CELLS, LISTEN, 1)
+
+/* Systems: noise, smooth random values */
+API_NS(noise)
+API(noise_at,      110, 3, 4, VAL, 0, CELLS, LISTEN, 1)
+API(noise_fill,    111, 8, 8, VAL, 0, CELLS, LISTEN, 1)
+
+/* Systems: cells, a field of materials stepped by rules */
+API_NS(cells)
+API(cells_rules,   114, 0, 0, VAL, 0, CELLS, LISTEN, 1)
+API(cells_step,    115, 3, 3, VAL, 0, CELLS, LISTEN, 1)
+API(cells_life,    116, 4, 5, VAL, 0, CELLS, LISTEN, 1)
+
 /* Systems: the plane, the map as a floor seen from a camera */
 API_NS(plane)
 API(plane_view,       87, 6, 6, VOID, 0, CELLS,  LISTEN, 1)
@@ -182,6 +204,12 @@ API_CONSTG(DIR, LEFT,  0, 1)
 API_CONSTG(DIR, RIGHT, 1, 1)
 API_CONSTG(DIR, UP,    2, 1)
 API_CONSTG(DIR, DOWN,  3, 1)
+
+/* How a material moves, in cells.rules().move */
+API_CONSTG(MOVE, STATIC, 0, 1)
+API_CONSTG(MOVE, POWDER, 1, 1)
+API_CONSTG(MOVE, LIQUID, 2, 1)
+API_CONSTG(MOVE, GAS,    3, 1)
 
 /* tone()'s waves */
 API_CONSTG(WAVE, SQUARE,   0, 1)

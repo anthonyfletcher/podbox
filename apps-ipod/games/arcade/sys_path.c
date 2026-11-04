@@ -1,0 +1,330 @@
+/***************************************************************************
+ * GNU General Public License (version 2+)
+ *
+ * Arcade systems: paths -- getting about a board of cells, the map's own
+ * bytes or a grid's, in cells and four directions. A wall is a cell whose
+ * sprite flags share a bit with solid, or, when solid is 0, any non-zero
+ * cell. Outside the board is a wall.
+ *
+ * A distance field serves many chasers heading for one place; find is
+ * one shortest path, A* by Manhattan distance; sight is whether a line
+ * between two cells' centres crosses only open cells.
+ *
+ * Parts, in order:
+ *   walls      what blocks
+ *   fields     field, next
+ *   paths      find
+ *   sight      sight
+ ***************************************************************************/
+#include <string.h>
+#include "games/arcade/vm.h"
+
+#define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
+                                  struct value *out)
+
+/* ---- walls ------------------------------------------------------------- */
+
+struct walls
+{
+    struct board b;
+    const uint8_t *flags;
+    uint8_t mask;
+};
+
+/* The board and solid from a[0..2] */
+static int walls_of(struct vm *vm, struct value *a, const char *fn,
+                    struct walls *w)
+{
+    if (!board_of(vm, a[0], a[1], fn, &w->b))
+        return 0;
+    if (!is_num(a[2]))
+        return vm_fail(vm, fn, "() needs the solid flags, or 0 for any "
+                       "non-zero cell", "");
+    w->mask = (uint8_t)floor_int(a[2]);
+    w->flags = MEM(vm, vm->flags);
+    return 1;
+}
+
+static int wall(const struct walls *w, int32_t x, int32_t y)
+{
+    if (x < 0 || y < 0 || x >= w->b.w || y >= w->b.h)
+        return 1;
+    uint8_t v = w->b.c[y * w->b.w + x];
+    return w->mask ? (w->flags[v] & w->mask) != 0 : v != 0;
+}
+
+static int32_t whole(struct value v, int32_t dflt)
+{
+    return is_num(v) ? floor_int(v) : dflt;
+}
+
+/* the four steps, in DIR's order: left, right, up, down */
+static const int8_t step_x[4] = { -1, 1, 0, 0 };
+static const int8_t step_y[4] = { 0, 0, -1, 1 };
+
+/* ---- fields -------------------------------------------------------------- */
+
+/* path.field(b, w, solid, x, y, out): every open cell's distance in steps
+ * from cell x, y into out, an Int32Array as long as the board, -1 where
+ * it cannot be reached; returns the cells reached */
+NATIVE(path_field)
+{
+    (void)argc;
+    struct walls w;
+    if (!walls_of(vm, a, "path.field", &w))
+        return 0;
+    uint32_t cells = (uint32_t)(w.b.w * w.b.h);
+    if (a[5].tag != T_I32 || I32(vm, a[5])->len < cells)
+        return vm_fail(vm, "path.field() writes to an Int32Array as long as "
+                       "the board", "", "");
+    int32_t x = whole(a[3], -1), y = whole(a[4], -1);
+    uint32_t *queue = scratch(vm, cells * 4);
+    if (!queue)
+        return 0;
+    int32_t *d = I32(vm, a[5])->d;
+    for (uint32_t i = 0; i < cells; i++)
+        d[i] = -1;
+    uint32_t head = 0, tail = 0;
+    if (!wall(&w, x, y)) {
+        d[y * w.b.w + x] = 0;
+        queue[tail++] = (uint32_t)(y * w.b.w + x);
+    }
+    while (head < tail) {
+        int32_t i = (int32_t)queue[head++];
+        int32_t cx = i % w.b.w, cy = i / w.b.w;
+        for (int k = 0; k < 4; k++) {
+            int32_t nx = cx + step_x[k], ny = cy + step_y[k];
+            int32_t j = ny * w.b.w + nx;
+            if (wall(&w, nx, ny) || d[j] >= 0)
+                continue;
+            d[j] = d[i] + 1;
+            queue[tail++] = (uint32_t)j;
+        }
+    }
+    vm_charge(vm, 10 + cells / 4 + tail * 2);
+    *out = mk(T_INT, (int32_t)tail);
+    return 1;
+}
+
+/* path.next(field, w, x, y): the way from x, y one step nearer the
+ * field's start (DIR.LEFT, RIGHT, UP or DOWN, the first in that order
+ * when several are), or -1 at the start or where it cannot be reached */
+NATIVE(path_next)
+{
+    (void)argc;
+    int32_t w = whole(a[1], 0), x = whole(a[2], -1), y = whole(a[3], -1);
+    if (a[0].tag != T_I32 || w < 1 || I32(vm, a[0])->len % (uint32_t)w)
+        return vm_fail(vm, "path.next() needs a field from path.field() and "
+                       "its width", "", "");
+    const int32_t *d = I32(vm, a[0])->d;
+    int32_t h = (int32_t)(I32(vm, a[0])->len / (uint32_t)w);
+    *out = mk(T_INT, -1);
+    vm_charge(vm, 4);
+    if (x < 0 || y < 0 || x >= w || y >= h || d[y * w + x] <= 0)
+        return 1;
+    int32_t here = d[y * w + x];
+    for (int k = 0; k < 4; k++) {
+        int32_t nx = x + step_x[k], ny = y + step_y[k];
+        if (nx >= 0 && ny >= 0 && nx < w && ny < h &&
+            d[ny * w + nx] == here - 1) {
+            *out = mk(T_INT, k);
+            break;
+        }
+    }
+    return 1;
+}
+
+/* ---- paths --------------------------------------------------------------- */
+
+/* A* keeps per cell: the steps from the start, the way it was reached,
+ * whether it is open or closed, and where it sits in the heap, an array
+ * of cells ordered by steps plus the distance still to go. */
+struct astar
+{
+    uint16_t *g, *heap, *pos;
+    uint8_t *came, *state;
+    uint32_t n;
+    int32_t w, gx, gy;
+};
+
+enum { UNSEEN, OPEN, CLOSED };
+
+static int32_t to_go(const struct astar *s, uint32_t i)
+{
+    int32_t x = (int32_t)i % s->w, y = (int32_t)i / s->w;
+    int32_t dx = x - s->gx, dy = y - s->gy;
+    return (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
+}
+
+/* Whether cell i comes before cell j: the lower estimate, and on a tie
+ * the one nearer the goal */
+static int before(const struct astar *s, uint32_t i, uint32_t j)
+{
+    int32_t hi = to_go(s, i), hj = to_go(s, j);
+    int32_t fi = s->g[i] + hi, fj = s->g[j] + hj;
+    return fi < fj || (fi == fj && hi < hj);
+}
+
+static void put(struct astar *s, uint32_t k, uint16_t cell)
+{
+    s->heap[k] = cell;
+    s->pos[cell] = (uint16_t)k;
+}
+
+static void up(struct astar *s, uint32_t k)
+{
+    uint16_t c = s->heap[k];
+    while (k > 0 && before(s, c, s->heap[(k - 1) / 2])) {
+        put(s, k, s->heap[(k - 1) / 2]);
+        k = (k - 1) / 2;
+    }
+    put(s, k, c);
+}
+
+static uint16_t pop(struct astar *s)
+{
+    uint16_t top = s->heap[0], c = s->heap[--s->n];
+    uint32_t k = 0;
+    for (;;) {
+        uint32_t l = 2 * k + 1, best = k;
+        uint16_t bc = c;
+        if (l < s->n && before(s, s->heap[l], bc))
+            best = l, bc = s->heap[l];
+        if (l + 1 < s->n && before(s, s->heap[l + 1], bc))
+            best = l + 1, bc = s->heap[l + 1];
+        if (best == k)
+            break;
+        put(s, k, bc);
+        k = best;
+    }
+    if (s->n)
+        put(s, k, c);
+    return top;
+}
+
+/* path.find(b, w, solid, x0, y0, x1, y1, out): a shortest way from cell
+ * x0, y0 to x1, y1, its cells after the first into out as far as it
+ * reaches, start to goal; returns its length in steps, or -1 when there
+ * is none */
+NATIVE(path_find)
+{
+    (void)argc;
+    struct walls w;
+    if (!walls_of(vm, a, "path.find", &w))
+        return 0;
+    if (a[7].tag != T_I32)
+        return vm_fail(vm, "path.find() writes to an Int32Array", "", "");
+    uint32_t cells = (uint32_t)(w.b.w * w.b.h);
+    if (cells > 65535)
+        return vm_fail(vm, "path.find() works on boards of up to 65535 cells",
+                       "", "");
+    int32_t x0 = whole(a[3], -1), y0 = whole(a[4], -1);
+    int32_t x1 = whole(a[5], -1), y1 = whole(a[6], -1);
+    *out = mk(T_INT, -1);
+    if (wall(&w, x0, y0) || wall(&w, x1, y1)) {
+        vm_charge(vm, 10);
+        return 1;
+    }
+    uint8_t *mem = scratch(vm, cells * 8);
+    if (!mem)
+        return 0;
+    struct astar s;
+    s.g = (uint16_t *)mem;
+    s.heap = s.g + cells;
+    s.pos = s.heap + cells;
+    s.came = (uint8_t *)(s.pos + cells);
+    s.state = s.came + cells;
+    s.n = 0;
+    s.w = w.b.w;
+    s.gx = x1;
+    s.gy = y1;
+    uint32_t start = (uint32_t)(y0 * w.b.w + x0);
+    uint32_t goal = (uint32_t)(y1 * w.b.w + x1);
+    s.state[start] = OPEN;
+    put(&s, s.n++, (uint16_t)start);
+    uint32_t expanded = 0;
+    int found = 0;
+    while (s.n) {
+        uint32_t i = pop(&s);
+        s.state[i] = CLOSED;
+        expanded++;
+        if (i == goal) {
+            found = 1;
+            break;
+        }
+        int32_t cx = (int32_t)i % w.b.w, cy = (int32_t)i / w.b.w;
+        for (int k = 0; k < 4; k++) {
+            int32_t nx = cx + step_x[k], ny = cy + step_y[k];
+            if (wall(&w, nx, ny))
+                continue;
+            uint32_t j = (uint32_t)(ny * w.b.w + nx);
+            uint16_t g = (uint16_t)(s.g[i] + 1);
+            if (s.state[j] == CLOSED || (s.state[j] == OPEN && s.g[j] <= g))
+                continue;
+            s.g[j] = g;
+            s.came[j] = (uint8_t)k;
+            if (s.state[j] == UNSEEN) {
+                s.state[j] = OPEN;
+                put(&s, s.n++, (uint16_t)j);
+            }
+            up(&s, s.pos[j]);
+        }
+    }
+    vm_charge(vm, 10 + cells / 8 + expanded * 6);
+    if (!found)
+        return 1;
+    /* back from the goal by the ways each cell was reached, into the heap's
+     * room, then out start first */
+    uint32_t len = s.g[goal], k = len;
+    uint16_t *route = s.heap;
+    for (uint32_t i = goal; i != start;) {
+        route[--k] = (uint16_t)i;
+        int d = s.came[i];
+        i = (uint32_t)((int32_t)i - step_x[d] - step_y[d] * w.b.w);
+    }
+    int32_t *o = I32(vm, a[7])->d;
+    uint32_t room = I32(vm, a[7])->len;
+    for (uint32_t i = 0; i < len && i < room; i++)
+        o[i] = route[i];
+    *out = mk(T_INT, (int32_t)len);
+    return 1;
+}
+
+/* ---- sight --------------------------------------------------------------- */
+
+/* path.sight(b, w, solid, x0, y0, x1, y1): whether the line between the
+ * centres of cells x0, y0 and x1, y1 crosses only open cells, the two
+ * ends aside. Through a corner exactly, both cells beside it must be
+ * open: no seeing through a diagonal gap. */
+NATIVE(path_sight)
+{
+    (void)argc;
+    struct walls w;
+    if (!walls_of(vm, a, "path.sight", &w))
+        return 0;
+    int32_t x = whole(a[3], 0), y = whole(a[4], 0);
+    int32_t x1 = whole(a[5], 0), y1 = whole(a[6], 0);
+    int32_t nx = x1 - x, ny = y1 - y;
+    int32_t sx = nx < 0 ? -1 : 1, sy = ny < 0 ? -1 : 1;
+    nx = nx < 0 ? -nx : nx;
+    ny = ny < 0 ? -ny : ny;
+    int clear = 1;
+    for (int32_t i = 0, j = 0; clear && (i < nx || j < ny);) {
+        /* which edge the line meets first: the next column's or row's */
+        int64_t cmp = (int64_t)(1 + 2 * i) * ny - (int64_t)(1 + 2 * j) * nx;
+        if (cmp == 0) {
+            if (wall(&w, x + sx, y) || wall(&w, x, y + sy))
+                clear = 0;
+            x += sx; y += sy; i++; j++;
+        } else if (cmp < 0) {
+            x += sx; i++;
+        } else {
+            y += sy; j++;
+        }
+        if ((x != x1 || y != y1) && wall(&w, x, y))
+            clear = 0;
+    }
+    vm_charge(vm, 8 + (uint32_t)(nx + ny));
+    *out = mk(T_INT, clear);
+    return 1;
+}

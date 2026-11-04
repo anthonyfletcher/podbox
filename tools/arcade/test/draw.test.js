@@ -280,3 +280,45 @@ test('mem() hands out the engine arrays; writes to the screen mark its rows', ()
     r = run('var v = [1, 2, 3, 4, 5]; copy(v, 1, v, 0, 4); fill(v, "x", 4); printh(v.join(","));');
     assert.match(r.out, /^1,1,2,3,x\n/);
 });
+
+/* A whole cart, one tick: what it prints, then any --dump */
+function runCart(main, extra = []) {
+    const res = compileFiles({ 'cart.json': CART, 'main.js': main });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'c' + n++ + '.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '1'].concat(extra),
+                        { encoding: 'utf8', timeout: 20000 });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.replace(/\r/g, '');
+}
+
+test('rspr at angle 0 and scale 1 is spr, and a quarter turn turns it', () => {
+    const SHEET = `for (var y = 0; y < 8; y++) for (var x = 0; x < 16; x++) sset(8 + x, y, x < 8 ? 1 + (x + y * 3) % 15 : (x + y) % 2 ? 9 : 0);`;
+    const a = runCart(`function init() { ${SHEET} cls(); camera(-3, -2); spr(1, 10, 20, 2, 1); spr(1, 40, 7, 1, 1, true); }\nfunction update() {}`, ['--dump', '0,0,70,40']);
+    const b = runCart(`function init() { ${SHEET} cls(); camera(-3, -2); rspr(1, 18, 24, 0, 1, 2, 1); rspr(1, 44, 11, 0, 1, 1, 1, true); }\nfunction update() {}`, ['--dump', '0,0,70,40']);
+    assert.equal(b, a);
+    /* a quarter turn anticlockwise: the sprite's top row becomes its left
+     * column read bottom to top, its right column its top row */
+    const q = runCart(`function init() { ${SHEET} cls(); rspr(1, 20, 20, 0.25); var s = "";
+        for (var x = 0; x < 8; x++) s += pget(16, 23 - x) == sget(8 + x, 0) ? "" : x;
+        for (var y = 0; y < 8; y++) s += pget(16 + y, 16) == sget(8 + 7, y) ? "" : "r" + y;
+        printh(s == "" ? "turned" : s); }\nfunction update() {}`);
+    assert.equal(q, 'turned\n');
+});
+
+test('rspr scales about its centre, rblit turns an image', () => {
+    const r = runCart(`function init() {
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, 12);
+    cls(); rspr(1, 40, 40, 0, 2);
+    var w = 0; for (var x = 0; x < 80; x++) if (pget(x, 40) == 12) w++;
+    var first = pget(32, 40), before = pget(31, 40);
+    var im = img(10, 4); target(im); cls(7); target(SCREEN);
+    cls(); rblit(im, 40, 40, 0.25);
+    var tall = 0; for (var y = 0; y < 80; y++) if (pget(40, y) == 7) tall++;
+    printh(w + " " + first + " " + before + " " + tall);
+}
+function update() {}`);
+    /* 16 wide from 32 to 47; the 10x4 image stands 10 tall */
+    assert.equal(r, '16 12 0 10\n');
+});

@@ -174,6 +174,16 @@ struct planeview
     int set;
 };
 
+/* A cells field's 16x16 chunks: which are awake, and each sleeping one's
+ * sum, to see it drawn on. Kept for the two fields stepped last. */
+struct cellsleep
+{
+    uint32_t id, used;
+    int32_t w, h;
+    uint8_t awake[256];
+    uint32_t sum[256];
+};
+
 /* A row of the floor: its left end and one screen pixel's step, 16.16
  * world pixels */
 struct floor_row { int32_t u, v, du, dv; };
@@ -289,6 +299,9 @@ struct vm
     struct voice voices[4];
     uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
     struct planeview plane;
+    uint32_t rules_shape;                   /* what makes a record rules */
+    struct cellsleep sleep[2];
+    uint32_t sleep_clock;
     uint32_t frame;
     int64_t t_base;             /* t() at frame_base, 16.16, for setrate() */
     uint32_t frame_base;
@@ -445,6 +458,17 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
                          int flip);
 int sound_load(struct vm *vm);
+
+/* sys_grid.c, for the systems on boards: a Uint8Array w wide, and a
+ * call's scratch from the heap, garbage after it */
+struct board
+{
+    uint8_t *c;
+    int32_t w, h;
+};
+int board_of(struct vm *vm, struct value b, struct value w, const char *fn,
+             struct board *o);
+void *scratch(struct vm *vm, uint32_t bytes);
 
 /* verify.c */
 int verify_cart(struct vm *vm);
