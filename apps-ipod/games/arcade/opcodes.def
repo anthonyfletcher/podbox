@@ -1,0 +1,123 @@
+/* GNU General Public License (version 2+)
+ *
+ * Arcade bytecode: the one list of instructions, read by the VM and the
+ * verifier as an X-macro and by the compiler (tools/arcade) as text.
+ *
+ *   OP(name, operands, pops, pushes)
+ *
+ * An opcode's number is its position in this list. Operands follow the
+ * opcode byte, little-endian and unaligned: b s8, B u8, h s16, H u16,
+ * i s32. A jump's s16 is relative to the end of its instruction. A pop or
+ * push of -1 depends on an operand; the verifier and the compiler both
+ * work it out the same way:
+ *
+ *   CALL    pops the callee's arity, pushes 1
+ *   CALLV   pops argc + 1 (the function value under its arguments), pushes 1
+ *   NCALL   pops argc, pushes 1 if the native returns a value, else 0
+ *   NEWARR  pops n, pushes 1
+ *   NEWOBJ  pops the shape's key count, pushes 1
+ *   METHOD  pops argc + 1 (the receiver under its arguments), pushes 1
+ *   INTR    pops argc, pushes 1
+ *
+ * A conditional jump's pops and pushes are its fall-through; ANDJ and ORJ
+ * arrive at their target with the operand still on the stack.
+ *
+ * Opcodes are only ever appended: a cart's bytes name them by number. */
+
+OP(NOP,      "",     0, 0)
+OP(POP,      "",     1, 0)
+OP(DUP,      "",     1, 2)
+OP(DUP2,     "",     2, 4)   /* a b -> a b a b */
+OP(PUSHNULL, "",     0, 1)
+OP(PUSHI8,   "b",    0, 1)
+OP(PUSHI16,  "h",    0, 1)
+OP(PUSHI32,  "i",    0, 1)
+OP(PUSHS,    "H",    0, 1)   /* string constant */
+OP(PUSHFN,   "H",    0, 1)   /* function reference */
+OP(LDL,      "B",    0, 1)
+OP(STL,      "B",    1, 0)
+OP(LDG,      "H",    0, 1)
+OP(STG,      "H",    1, 0)
+OP(INCL,     "Bb",   0, 0)   /* local = local + imm, as ADD */
+
+OP(ADD,      "",     2, 1)   /* integers add; a string either side joins */
+OP(SUB,      "",     2, 1)
+OP(MUL,      "",     2, 1)
+OP(DIV,      "",     2, 1)   /* truncates; by zero is a runtime error */
+OP(MOD,      "",     2, 1)
+OP(NEG,      "",     1, 1)
+OP(BAND,     "",     2, 1)
+OP(BOR,      "",     2, 1)
+OP(BXOR,     "",     2, 1)
+OP(BNOT,     "",     1, 1)
+OP(SHL,      "",     2, 1)   /* counts are taken & 31, as JS */
+OP(SHR,      "",     2, 1)
+OP(USHR,     "",     2, 1)
+OP(EQ,       "",     2, 1)   /* strict: an integer never equals a string */
+OP(NE,       "",     2, 1)
+OP(LT,       "",     2, 1)   /* integers, or two strings by byte order */
+OP(LE,       "",     2, 1)
+OP(GT,       "",     2, 1)
+OP(GE,       "",     2, 1)
+OP(NOT,      "",     1, 1)
+OP(TYPEOF,   "",     1, 1)
+
+OP(JMP,      "h",    0, 0)
+OP(JF,       "h",    1, 0)   /* pop; jump if falsy */
+OP(JT,       "h",    1, 0)   /* pop; jump if truthy */
+OP(ANDJ,     "h",    1, 0)   /* falsy: keep it and jump; else pop it */
+OP(ORJ,      "h",    1, 0)   /* truthy: keep it and jump; else pop it */
+
+OP(CALL,     "H",   -1, 1)   /* function index */
+OP(CALLV,    "B",   -1, 1)   /* argc */
+OP(NCALL,    "HB",  -1, -1)  /* native slot, argc */
+OP(RET,      "",     1, 0)
+OP(RETNULL,  "",     0, 0)
+
+OP(NEWARR,   "H",   -1, 1)   /* element count */
+OP(NEWI32,   "",     1, 1)   /* length -> Int32Array */
+OP(NEWU8,    "",     1, 1)   /* length -> Uint8Array */
+OP(NEWOBJ,   "H",   -1, 1)   /* shape */
+OP(GETIDX,   "",     2, 1)   /* container index -> value */
+OP(SETIDX,   "",     3, 0)   /* container index value -> */
+OP(GETPROP,  "HH",   1, 1)   /* key string, inline-cache site */
+OP(SETPROP,  "HH",   2, 0)   /* object value -> */
+OP(LEN,      "",     1, 1)
+OP(METHOD,   "BB",  -1, 1)   /* method, argc */
+OP(INTR,     "BB",  -1, 1)   /* intrinsic, argc */
+OP(PUSHF,    "i",    0, 1)   /* a fraction: 16.16 */
+/* Compare and jump in one: pop two, jump if the comparison holds. A loop's
+ * test or an if's is one dispatch instead of two. */
+OP(JLT,      "h",    2, 0)
+OP(JLE,      "h",    2, 0)
+OP(JGT,      "h",    2, 0)
+OP(JGE,      "h",    2, 0)
+OP(JEQ,      "h",    2, 0)
+OP(JNE,      "h",    2, 0)
+
+/* Methods, numbered by position: MTH(name, min args, max args). The
+ * receiver's type at run time picks the implementation; one a type does
+ * not have is a runtime error. */
+MTH(push,        1, 1)
+MTH(pop,         0, 0)
+MTH(shift,       0, 0)
+MTH(unshift,     1, 1)
+MTH(splice,      1, 2)
+MTH(slice,       0, 2)
+MTH(indexOf,     1, 1)
+MTH(join,        0, 1)
+MTH(reverse,     0, 0)
+MTH(sort,        1, 1)
+MTH(charCodeAt,  1, 1)
+MTH(substring,   1, 2)
+MTH(toUpperCase, 0, 0)
+MTH(toLowerCase, 0, 0)
+
+/* Intrinsics, numbered by position: INTRINSIC(name, min args, max args).
+ * The language's own globals, as distinct from the API's natives. */
+INTRINSIC(fromCharCode, 1, 1)
+INTRINSIC(parseInt,     1, 2)
+INTRINSIC(pow,          2, 2)
+INTRINSIC(sign,         1, 1)   /* Math.sign: 0 for 0, unlike sgn() */
+INTRINSIC(round,        1, 1)   /* Math.round: halves round up */
+INTRINSIC(trunc,        1, 1)   /* Math.trunc: toward zero */

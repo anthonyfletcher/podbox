@@ -1,0 +1,10 @@
+{
+  "name": "podbox-arcade-sdk",
+  "private": true,
+  "type": "module",
+  "description": "Compiler and tools for PodBox Arcade carts",
+  "license": "GPL-2.0-only",
+  "bin": { "pbgc": "pbgc.js" },
+  "scripts": { "test": "node --test test/" },
+  "dependencies": { "acorn": "8.19.0" }
+}

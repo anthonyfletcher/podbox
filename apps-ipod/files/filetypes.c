@@ -26,6 +26,7 @@
 #include "filetypes.h"
 #include "viewers/text_viewer/text_viewer.h"
 #include "viewers/image_viewer/image_viewer_pub.h"
+#include "games/arcade/shell.h"
 #include "dir.h"
 #include "file.h"
 #include "draw/icon_bitmaps.h"
@@ -102,6 +103,7 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "ppm",  FILE_ATTR_IMG },
     { "gif",  FILE_ATTR_IMG },
     { "webp", FILE_ATTR_IMG },
+    { "pbg",  FILE_ATTR_GAME },
 };
 
 struct fileattr_icon_voice {
@@ -135,6 +137,7 @@ static const struct fileattr_icon_voice inbuilt_attr_icons_voices[] = {
     { FILE_ATTR_IMG,   Icon_Last_Themeable + 2, -1 },
     { FILE_ATTR_BOOK,  Icon_Last_Themeable + 3, -1 },
     { FILE_ATTR_LYRICS, Icon_Last_Themeable + 4, -1 },
+    { FILE_ATTR_GAME,  Icon_Plugin,    -1 },
 };
 
 static int filetype_inbuilt_index(int tree_attr)
@@ -426,6 +429,9 @@ bool filetype_open_core_viewer(int attr, const char *file, int *rc)
             return true;
         case FILE_ATTR_IMG:
             *rc = image_viewer(file);
+            return true;
+        case FILE_ATTR_GAME:
+            *rc = arcade_play(file);
             return true;
     }
     return false;

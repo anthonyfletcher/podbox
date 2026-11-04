@@ -1,0 +1,121 @@
+/* GNU General Public License (version 2+)
+ *
+ * Arcade native API: the one list of functions a cart can call, read by the
+ * engine as an X-macro and by the compiler (tools/arcade) as text.
+ *
+ *   API(name, slot, min, max, ret, flags, cost, level, version)
+ *
+ * slot     the number a cart's bytes call it by; permanent
+ * min/max  how many arguments the compiler accepts
+ * ret      VAL pushes a result, VOID pushes nothing
+ * flags    PARTS: the first argument arrives as its concatenated pieces --
+ *          a count, then each piece -- so printing "score " + s never
+ *          builds the string
+ * cost     how the unit charge grows with the work done
+ * level    the music level a cart must declare to call it
+ * version  the API version that added it
+ *
+ *   API_ALIAS(name, target)       a second name for an existing function
+ *   API_CONST(name, value, ver)   a named integer, folded by the compiler
+ *   API_CONSTG(group, name, value, ver)  the same, written group.name
+ *
+ * Every line is permanent once released: functions and constants are
+ * appended, never changed or removed. */
+
+/* Drawing */
+API(cls,        0, 0, 1, VOID, 0,     PIXELS, LISTEN, 1)
+API(pset,       1, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(pget,       2, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(line,       3, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(rect,       4, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(rectfill,   5, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(circ,       6, 3, 4, VOID, 0,     PIXELS, LISTEN, 1)
+API(circfill,   7, 3, 4, VOID, 0,     PIXELS, LISTEN, 1)
+API(oval,       8, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(ovalfill,   9, 4, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(tri,       10, 6, 7, VOID, 0,     PIXELS, LISTEN, 1)
+API(trifill,   11, 6, 7, VOID, 0,     PIXELS, LISTEN, 1)
+API(fillp,     12, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(color,     13, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(cursor,    14, 0, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(pal,       15, 0, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(palt,      16, 0, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(setpal,    17, 2, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(getpal,    18, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(loadpal,   19, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(camera,    20, 0, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(clip,      21, 0, 4, VOID, 0,     FLAT,   LISTEN, 1)
+API(print,     22, 1, 4, VAL,  PARTS, PIXELS, LISTEN, 1)
+API(textw,     23, 1, 1, VAL,  PARTS, FLAT,   LISTEN, 1)
+API(font,      24, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(target,    25, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+
+/* Sprites and images */
+API(spr,       26, 3, 7, VOID, 0,     PIXELS, LISTEN, 1)
+API(sspr,      27, 6, 10, VOID, 0,    PIXELS, LISTEN, 1)
+API(sget,      28, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(sset,      29, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(fget,      30, 1, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(fset,      31, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(tline,     32, 6, 8, VOID, 0,     PIXELS, LISTEN, 1)
+API(img,       33, 2, 2, VAL,  0,     PIXELS, LISTEN, 1)
+API(blit,      34, 3, 5, VOID, 0,     PIXELS, LISTEN, 1)
+API(blitpart,  35, 7, 9, VOID, 0,     PIXELS, LISTEN, 1)
+
+/* The map */
+API(map,       36, 0, 7, VOID, 0,     PIXELS, LISTEN, 1)
+API(mget,      37, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(mset,      38, 3, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(loadmap,   39, 1, 1, VOID, 0,     CELLS,  LISTEN, 1)
+API(mapw,      40, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(maph,      41, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(mapobj,    42, 2, 2, VAL,  0,     CELLS,  LISTEN, 1)
+API(mapprop,   43, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+
+/* Input */
+API(btn,       44, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(btnp,      45, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(wheel,     46, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(wheelpos,  47, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+
+/* Sound */
+API(sfx,       48, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(sfxp,      49, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(tone,      50, 5, 5, VOID, 0,     FLAT,   LISTEN, 1)
+
+/* Maths */
+API(rnd,       51, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(srand,     52, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(flr,       53, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(ceil,      54, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(abs,       55, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(min,       56, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(max,       57, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+API(mid,       58, 3, 3, VAL,  0,     FLAT,   LISTEN, 1)
+API(sgn,       59, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(sqrt,      60, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(sin,       61, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(cos,       62, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(atan2,     63, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
+
+/* Save, time and system */
+API(dget,      64, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(dset,      65, 2, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(t,         66, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(frame,     67, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(date,      68, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(menuitem,  69, 1, 3, VOID, 0,     FLAT,   LISTEN, 1)
+API(quit,      70, 0, 0, VOID, 0,     FLAT,   LISTEN, 1)
+API(printh,    71, 1, 1, VOID, PARTS, FLAT,   LISTEN, 1)
+API(watch,     72, 2, 2, VOID, 0,     FLAT,   LISTEN, 1)
+API(prof,      73, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
+
+API_ALIAS(time, t)
+
+/* The drawing target that is the screen; img() makes the others */
+API_CONST(SCREEN,   0, 1)
+
+/* Built-in fonts; a cart's own follow from 16 */
+API_CONSTG(FONT, SMALL, 0, 1)
+API_CONSTG(FONT, BIG,   1, 1)
+API_CONSTG(FONT, SYS,   2, 1)

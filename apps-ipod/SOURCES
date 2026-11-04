@@ -205,6 +205,16 @@ games/spike/spike_text.c
 games/spike/spike_world.c
 games/quiz/quiz.c
 games/quiz/quiz_pick.c
+games/arcade/shell.c
+games/arcade/vm.c
+games/arcade/gc.c
+games/arcade/loader.c
+games/arcade/verify.c
+games/arcade/natives.c
+games/arcade/core_math.c
+games/arcade/core_draw.c
+games/arcade/core_input.c
+games/arcade/present.c
 
 screens/settings/display_settings.c
 screens/settings/eq_settings.c
