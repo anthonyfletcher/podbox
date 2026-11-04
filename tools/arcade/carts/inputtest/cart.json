@@ -1,9 +1,0 @@
-{
-  "id": "a3c1e0f27b59d684",
-  "name": "Input Test",
-  "author": "PodBox",
-  "version": "1",
-  "help": "Turn the wheel, touch it, press each button. MENU is the game's: a press counts when let go, and holding it for a second pauses.",
-  "rate": 33,
-  "menu_button": "game"
-}

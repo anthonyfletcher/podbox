@@ -1,8 +1,0 @@
-{
-  "id": "5be7c2d90a41f3e6",
-  "name": "Bench",
-  "author": "PodBox",
-  "version": "1",
-  "help": "Measures the engine: script, natives, drawing and present. Runs about a minute, then quits.",
-  "rate": 25
-}

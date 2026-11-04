@@ -1,8 +1,0 @@
-{
-  "id": "81228d8fb50b7756",
-  "name": "Systems Test",
-  "author": "PodBox",
-  "version": "1",
-  "help": "Actors bouncing off walls and each other, and particles. SELECT runs the fountain.",
-  "rate": 33
-}

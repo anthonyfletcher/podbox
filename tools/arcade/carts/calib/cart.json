@@ -1,8 +1,0 @@
-{
-  "id": "ec6fdf7fd6e8d58e",
-  "name": "Calib",
-  "author": "PodBox",
-  "version": "1",
-  "help": "Prices each native and operation for the unit charges. Runs about a minute, then quits.",
-  "rate": 25
-}
