@@ -36,6 +36,25 @@ A cart is a folder:
 
 Errors name the file, line and column, and say what to write instead.
 
+A cart's art goes in the same folder:
+
+| File | Holds |
+|---|---|
+| `sheet.png` | the 128x128 sprite sheet |
+| `flags.json` | the 256 sprite flags: an array, or `{ "12": 3 }` for just some |
+| `palettes/<name>.gpl` | a palette in GIMP's format; the first, by name, is loaded when the cart starts |
+| `maps/<name>.json` | a map: `width` and `height` (up to 256), `rows` of two hex digits a cell, and `objects`, each with a `kind`, `x`, `y`, `w`, `h` in pixels and `props` of whole numbers or strings |
+| `images/<name>.png` | any other picture, up to 1024 pixels a side |
+
+Save every PNG as an **indexed** (palette) PNG: each pixel's palette number
+is the colour number the cart draws with, whatever colours the PNG shows.
+
+In code, `MAP.<name>` and `PAL.<name>` are for `loadmap()` and `loadpal()`,
+`OBJ.<kind>` is the number `mapobj()` gives an object of that kind, and
+`IMG.<name>` is the picture itself, for `blit()`, `target()` and the rest.
+The first map is the active one when the cart starts; without any, the map
+is an empty 128x64.
+
 ## How the language differs from JavaScript
 
 - **A number is an integer or a fraction.**

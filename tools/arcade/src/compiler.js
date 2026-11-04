@@ -15,6 +15,7 @@
 
 import * as acorn from 'acorn';
 import { Writer, utf8, writeCart } from './cart.js';
+import { buildAssets } from './assets.js';
 import * as num from './numbers.js';
 
 const FORMAT = 1;
@@ -1480,6 +1481,7 @@ class Program {
                 if (sym.kind === 'const')
                     this.guard(file, () => this.constValue(sym));
         for (const g of this.globals) {
+            if (!g.node) continue;          /* an image the loader makes */
             const init = g.node.init;
             if (!init) continue;
             this.guard(g.file, () => {
@@ -1588,6 +1590,7 @@ function globals(prog) {
         else if (typeof v === 'number') { w.u8(1); w.u32(v); }
         else if (typeof v === 'string') { w.u8(2); w.u16(prog.string(v)); }
         else if (num.isFix(v)) { w.u8(4); w.u32(v.raw); }
+        else if (v.img !== undefined) { w.u8(5); w.u16(v.img); }
         else { w.u8(3); w.u16(v.fn.index); }
     }
     return w.done();
@@ -1695,6 +1698,25 @@ export function compile(input) {
         else prog.byNs.set(ns, file);
         prog.files.push(file);
     }
+    /* The cart's assets: MAP, PAL and OBJ as constant groups, and IMG as a
+     * namespace of globals that the loader sets to the images. */
+    const built = buildAssets(input.assets, input.inflate,
+                              (str) => prog.string(str), errors);
+    prog.api = Object.assign({}, prog.api, {
+        groups: Object.assign({}, prog.api.groups, built.groups)
+    });
+    if (prog.byNs.has('IMG'))
+        errors.push({ file: 'IMG.js', line: 1, column: 1, message:
+                      'IMG names the cart\'s images; call the file something else' });
+    const images = { name: 'images', ns: 'IMG', scope: new Map(), ast: null };
+    built.images.forEach((name, i) => {
+        const g = { kind: 'global', slot: prog.globals.length, name: 'IMG.' + name,
+                    node: null, file: images, value: { img: i } };
+        prog.globals.push(g);
+        images.scope.set(name, g);
+    });
+    prog.byNs.set('IMG', images);
+
     /* Namespaces first, main last: the order $start initialises them in. */
     prog.files.sort((a, b) => (a.ns === null) - (b.ns === null) ||
                     (a.name < b.name ? -1 : 1));
@@ -1744,6 +1766,7 @@ export function compile(input) {
         { tag: 'CNST', data: constants(prog) },
         { tag: 'GLOB', data: globals(prog) },
         { tag: 'LINE', data: lines(prog, fns) },
+        ...built.chunks,
         { tag: 'SRC_', data: sources(srcFiles, input.deflate) }
     ]);
     let codeBytes = 0;

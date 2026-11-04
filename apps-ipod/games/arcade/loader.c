@@ -14,6 +14,49 @@
 #include <string.h>
 #include "games/arcade/vm.h"
 
+/* The LZ4 block format: n bytes from src make exactly size bytes in dst,
+ * or 0 for data that is malformed or makes any other number. */
+int lz4_decode(const uint8_t *src, uint32_t n, uint8_t *dst, uint32_t size)
+{
+    const uint8_t *s = src, *end = src + n;
+    uint32_t o = 0;
+    while (s < end) {
+        uint32_t t = *s++, lit = t >> 4, b;
+        if (lit == 15)
+            do {
+                if (s >= end)
+                    return 0;
+                b = *s++;
+                lit += b;
+            } while (b == 255);
+        if (lit > (uint32_t)(end - s) || lit > size - o)
+            return 0;
+        memcpy(dst + o, s, lit);
+        s += lit;
+        o += lit;
+        if (s >= end)
+            break;                  /* the last sequence has no match */
+        if (end - s < 2)
+            return 0;
+        uint32_t off = s[0] | (uint32_t)s[1] << 8, m = (t & 15) + 4;
+        s += 2;
+        if (!off || off > o)
+            return 0;
+        if ((t & 15) == 15)
+            do {
+                if (s >= end)
+                    return 0;
+                b = *s++;
+                m += b;
+            } while (b == 255);
+        if (m > size - o)
+            return 0;
+        for (; m; m--, o++)
+            dst[o] = dst[o - off];
+    }
+    return o == size;
+}
+
 uint32_t perm_alloc(struct vm *vm, uint32_t bytes)
 {
     uint32_t off = (vm->perm + 7) & ~7u;
@@ -327,6 +370,22 @@ static int load_globals(struct vm *vm, const uint8_t *p, uint32_t n)
             break;
         }
         case 4: *g = mk(T_FIX, (int32_t)c32(&c)); break;
+        case 5: {
+            /* an image: core_draw.c sets it once the images are made */
+            uint32_t img = c16(&c);
+            if (!vm->img_globals) {
+                uint32_t at = perm_alloc(vm, vm->nglobals * 4 + 8);
+                if (!at)
+                    return vm_fail(vm, "not enough memory for this game", "",
+                                   "");
+                vm->img_globals = MEM(vm, at);
+            }
+            vm->img_globals[vm->nimg_globals * 2] = (uint16_t)i;
+            vm->img_globals[vm->nimg_globals * 2 + 1] = (uint16_t)img;
+            vm->nimg_globals++;
+            *g = mk(T_NULL, 0);
+            break;
+        }
         case 3: {
             uint32_t f = c16(&c);
             if (f >= vm->nfns)
@@ -386,9 +445,10 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[5] = { 0 };
-    uint32_t clen[5] = { 0 };
-    static const char tags[5][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE" };
+    const uint8_t *chunk[9] = { 0 };
+    uint32_t clen[9] = { 0 };
+    static const char tags[9][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+                                     "PALS", "SHET", "MAPS", "IMGS" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -402,7 +462,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 9; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -432,6 +492,14 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return bad(vm, "a chunk is missing");
     vm->lines = chunk[4];
     vm->lines_len = clen[4];
+    vm->pals = chunk[5];
+    vm->pals_len = clen[5];
+    vm->shet = chunk[6];
+    vm->shet_len = clen[6];
+    vm->maps = chunk[7];
+    vm->maps_len = clen[7];
+    vm->imgs = chunk[8];
+    vm->imgs_len = clen[8];
     return load_header(vm, chunk[0], clen[0]) &&
         load_code(vm, chunk[1], clen[1]) &&
         load_constants(vm, chunk[2], clen[2]) &&

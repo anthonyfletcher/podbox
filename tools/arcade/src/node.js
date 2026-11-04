@@ -31,13 +31,15 @@ export function inflate(bytes) {
     return new Uint8Array(zlib.inflateRawSync(bytes));
 }
 
-/* files: { name: text }. */
-export function compileFiles(files) {
+/* files: { name: text }; assets as readAssets() returns them. */
+export function compileFiles(files, assets) {
     const d = loadDefs();
-    return compile({ files: files, isa: d.isa, api: d.api, deflate: deflate });
+    return compile({ files: files, assets: assets, isa: d.isa, api: d.api,
+                     deflate: deflate,
+                     inflate: (z) => new Uint8Array(zlib.inflateSync(z)) });
 }
 
-/* A cart folder: cart.json and its .js files, no subfolders. */
+/* A cart folder: cart.json and its .js files. */
 export function readFolder(dir) {
     const files = {};
     for (const name of fs.readdirSync(dir)) {
@@ -45,4 +47,29 @@ export function readFolder(dir) {
             files[name] = fs.readFileSync(path.join(dir, name), 'utf8');
     }
     return files;
+}
+
+/* Its assets, as assets.js describes them: PNGs as bytes, the rest as
+ * text, each kind keyed by name. */
+export function readAssets(dir) {
+    const at = (...p) => path.join(dir, ...p);
+    const some = (sub, ext, binary) => {
+        const out = {};
+        if (!fs.existsSync(at(sub))) return out;
+        for (const name of fs.readdirSync(at(sub)))
+            if (name.endsWith(ext))
+                out[name.slice(0, -ext.length)] = binary
+                    ? new Uint8Array(fs.readFileSync(at(sub, name)))
+                    : fs.readFileSync(at(sub, name), 'utf8');
+        return out;
+    };
+    return {
+        sheet: fs.existsSync(at('sheet.png'))
+            ? new Uint8Array(fs.readFileSync(at('sheet.png'))) : undefined,
+        flags: fs.existsSync(at('flags.json'))
+            ? fs.readFileSync(at('flags.json'), 'utf8') : undefined,
+        palettes: some('palettes', '.gpl', false),
+        maps: some('maps', '.json', false),
+        images: some('images', '.png', true)
+    };
 }

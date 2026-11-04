@@ -136,8 +136,10 @@ extern const uint32_t arcade_api_count;
 #define SCREEN_H     120
 #define SHEET_W      128
 #define SHEET_H      128
-#define MAP_W        128
+#define MAP_W        128   /* the map of a cart with none of its own */
 #define MAP_H        64
+#define MAP_MAX      256   /* a cart map's widest and tallest */
+#define IMAGE_MAX    1024
 /* A unit is about 40 of the 5G's cycles, a bytecode's worth. Filling and
  * moving memory goes at the speed of its SDRAM: a unit for every 16 bytes. */
 #define BYTES_PER_UNIT 16
@@ -234,6 +236,17 @@ struct vm
     struct draw d;
     uint32_t screen;            /* its pixels */
     uint32_t sheet, flags, map;
+    int32_t map_w, map_h;       /* the active map's size */
+
+    /* The cart's assets: its chunks as loaded, and what core_draw.c makes
+     * of them */
+    const uint8_t *pals, *shet, *maps, *imgs;
+    uint32_t pals_len, shet_len, maps_len, imgs_len;
+    struct mapinfo *mapdir;
+    uint32_t nmaps;
+    int32_t active_map;         /* -1 while the map is the empty default */
+    uint16_t *img_globals;      /* pairs: a global's slot, an image's number */
+    uint32_t nimg_globals;
     uint32_t frame;
     uint8_t held, pressed;      /* btn() and btnp() bits */
     uint16_t held_ticks[5];
@@ -250,6 +263,15 @@ struct vm
     uint32_t err_fn, err_pc;
     int err_where;              /* err_fn and err_pc are meaningful */
     char msg[112];
+};
+
+/* A cart map: its cells, LZ4, and where each object's record starts */
+struct mapinfo
+{
+    uint16_t w, h, nobj;
+    uint32_t zlen;
+    const uint8_t *z;
+    const uint8_t **obj;
 };
 
 #define NONE 0xffffu
@@ -335,6 +357,7 @@ void gc_collect(struct vm *vm);
 
 /* loader.c */
 uint32_t perm_alloc(struct vm *vm, uint32_t bytes);
+int lz4_decode(const uint8_t *src, uint32_t n, uint8_t *dst, uint32_t size);
 uint32_t key_id(struct vm *vm, struct value s, int add);
 uint32_t vm_shape_add(struct vm *vm, uint32_t parent, uint32_t key);
 

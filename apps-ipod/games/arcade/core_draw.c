@@ -13,6 +13,7 @@
  *
  * Parts, in order:
  *   setup          the surfaces and the default palette
+ *   assets         the cart's palettes, sheet, maps and images
  *   arguments      coordinates, colours, flags
  *   pens           one call's clip, colours and pattern; spans; the charge
  *   shapes         circles and ovals as spans, filled or outlined
@@ -94,20 +95,224 @@ static uint32_t region(struct vm *vm, uint32_t bytes)
     return off + sizeof(struct u8a);
 }
 
+/* ---- assets -------------------------------------------------------------- *
+ * The chunks' layouts are tools/arcade/src/assets.js's. Each is checked
+ * whole when the cart loads, so the natives below can trust them. */
+
+static uint32_t le16(const uint8_t *p)
+{
+    return p[0] | (uint32_t)p[1] << 8;
+}
+
+static uint32_t le32(const uint8_t *p)
+{
+    return le16(p) | le16(p + 2) << 16;
+}
+
+static int damaged(struct vm *vm, const char *what)
+{
+    return vm_fail(vm, "this game file is damaged: ", what, "");
+}
+
+/* Palette n's colours and how many, or NULL */
+static const uint8_t *palette_at(const struct vm *vm, uint32_t n,
+                                 uint32_t *count)
+{
+    const uint8_t *p = vm->pals, *end = p + vm->pals_len;
+    *count = 0;
+    if (!p || vm->pals_len < 1 || n >= p[0])
+        return NULL;
+    p++;
+    for (uint32_t i = 0;; i++) {
+        if (end - p < 2)
+            return NULL;
+        uint32_t k = le16(p);
+        if (!k || k > 256 || (uint32_t)(end - p - 2) < k * 3)
+            return NULL;
+        if (i == n) {
+            *count = k;
+            return p + 2;
+        }
+        p += 2 + k * 3;
+    }
+}
+
+static void use_palette(struct vm *vm, const uint8_t *rgb, uint32_t k)
+{
+    for (uint32_t i = 0; i < k; i++, rgb += 3)
+        vm->d.rgb[i] = (uint32_t)rgb[0] << 16 | (uint32_t)rgb[1] << 8 | rgb[2];
+    reshow(&vm->d);
+}
+
+/* The map directory; *cap is the most cells any map needs */
+static int read_maps(struct vm *vm, uint32_t *cap)
+{
+    *cap = MAP_W * MAP_H;
+    if (!vm->maps)
+        return 1;
+    const uint8_t *p = vm->maps, *end = p + vm->maps_len;
+    if (end - p < 2)
+        return damaged(vm, "maps");
+    uint32_t n = le16(p);
+    p += 2;
+    uint32_t at = perm_alloc(vm, n * sizeof(struct mapinfo) + 8);
+    if (!at)
+        return 0;
+    vm->mapdir = MEM(vm, at);
+    for (uint32_t i = 0; i < n; i++) {
+        struct mapinfo *m = &vm->mapdir[i];
+        if (end - p < 8)
+            return damaged(vm, "maps");
+        m->w = (uint16_t)le16(p);
+        m->h = (uint16_t)le16(p + 2);
+        m->zlen = le32(p + 4);
+        p += 8;
+        if (!m->w || !m->h || m->w > MAP_MAX || m->h > MAP_MAX ||
+            m->zlen > (uint32_t)(end - p))
+            return damaged(vm, "maps");
+        m->z = p;
+        p += m->zlen;
+        if (end - p < 2)
+            return damaged(vm, "maps");
+        m->nobj = (uint16_t)le16(p);
+        p += 2;
+        at = perm_alloc(vm, m->nobj * sizeof(uint8_t *) + 8);
+        if (!at)
+            return 0;
+        m->obj = MEM(vm, at);
+        for (uint32_t o = 0; o < m->nobj; o++) {
+            m->obj[o] = p;
+            if (end - p < 10)
+                return damaged(vm, "map objects");
+            uint32_t props = p[9];
+            p += 10;
+            for (uint32_t k = 0; k < props; k++) {
+                if (end - p < 3 || le16(p) >= vm->nstrings || p[2] > 1)
+                    return damaged(vm, "map objects");
+                uint32_t type = p[2];
+                p += 3;
+                if (end - p < (type ? 2 : 4) ||
+                    (type && le16(p) >= vm->nstrings))
+                    return damaged(vm, "map objects");
+                p += type ? 2 : 4;
+            }
+        }
+        if ((uint32_t)m->w * m->h > *cap)
+            *cap = (uint32_t)m->w * m->h;
+    }
+    vm->nmaps = n;
+    return 1;
+}
+
+/* Map n becomes the active one, as stored */
+static int use_map(struct vm *vm, uint32_t n)
+{
+    const struct mapinfo *m = &vm->mapdir[n];
+    uint32_t cells = (uint32_t)m->w * m->h;
+    if (!lz4_decode(m->z, m->zlen, MEM(vm, vm->map), cells))
+        return damaged(vm, "a map");
+    vm->map_w = m->w;
+    vm->map_h = m->h;
+    vm->active_map = (int32_t)n;
+    ((struct u8a *)MEM(vm, vm->map - sizeof(struct u8a)))->len = cells;
+    return 1;
+}
+
+static int read_sheet(struct vm *vm)
+{
+    const uint8_t *p = vm->shet;
+    if (!p)
+        return 1;
+    if (vm->shet_len < 8 || le16(p) != SHEET_W || le16(p + 2) != SHEET_H ||
+        le32(p + 4) > vm->shet_len - 8 ||
+        vm->shet_len - 8 - le32(p + 4) != 256 ||
+        !lz4_decode(p + 8, le32(p + 4), MEM(vm, vm->sheet), SHEET_W * SHEET_H))
+        return damaged(vm, "the sheet");
+    memcpy(MEM(vm, vm->flags), p + 8 + le32(p + 4), 256);
+    return 1;
+}
+
+/* Each image as an img outside the heap, and the globals IMG.* name */
+static int read_images(struct vm *vm)
+{
+    const uint8_t *p = vm->imgs, *end = p + vm->imgs_len;
+    uint32_t n = 0, *offs = NULL;
+    if (p) {
+        if (end - p < 2)
+            return damaged(vm, "images");
+        n = le16(p);
+        p += 2;
+        uint32_t at = perm_alloc(vm, n * 4 + 8);
+        if (!at)
+            return 0;
+        offs = MEM(vm, at);
+        for (uint32_t i = 0; i < n; i++) {
+            if (end - p < 8)
+                return damaged(vm, "images");
+            uint32_t w = le16(p), h = le16(p + 2), zlen = le32(p + 4);
+            p += 8;
+            if (!w || !h || w > IMAGE_MAX || h > IMAGE_MAX ||
+                zlen > (uint32_t)(end - p))
+                return damaged(vm, "images");
+            uint32_t bytes = (uint32_t)sizeof(struct img) + w * h;
+            uint32_t off = perm_alloc(vm, bytes);
+            if (!off)
+                return 0;
+            struct img *im = MEM(vm, off);
+            im->h.info = T_IMG;
+            im->h.size = (bytes + 7) & ~7u;
+            im->width = (uint16_t)w;
+            im->height = (uint16_t)h;
+            if (!lz4_decode(p, zlen, im->px, w * h))
+                return damaged(vm, "an image");
+            p += zlen;
+            offs[i] = off;
+        }
+    }
+    for (uint32_t i = 0; i < vm->nimg_globals; i++) {
+        uint32_t slot = vm->img_globals[i * 2], img = vm->img_globals[i * 2 + 1];
+        if (slot >= vm->nglobals || img >= n)
+            return damaged(vm, "images");
+        vm->globals[slot] = mk(T_IMG, (int32_t)offs[img]);
+    }
+    return 1;
+}
+
+/* 0 for too little memory, or with the error set */
 int core_draw_init(struct vm *vm)
 {
     struct draw *d = &vm->d;
+    uint32_t cap;
     if (!(vm->screen = region(vm, SCREEN_W * SCREEN_H)) ||
         !(vm->sheet = region(vm, SHEET_W * SHEET_H)) ||
         !(vm->flags = region(vm, 256)) ||
-        !(vm->map = region(vm, MAP_W * MAP_H)))
+        !read_maps(vm, &cap) ||
+        !(vm->map = region(vm, cap)))
         return 0;
+    vm->map_w = MAP_W;
+    vm->map_h = MAP_H;
+    vm->active_map = -1;
+    ((struct u8a *)MEM(vm, vm->map - sizeof(struct u8a)))->len = MAP_W * MAP_H;
     memset(d, 0, sizeof(*d));
     d->target = mk(T_INT, 0);
     d->pen = 6;
     memcpy(d->rgb, default_rgb, sizeof(default_rgb));
     reset_palettes(d);
     reshow(d);
+    if (vm->pals) {
+        uint32_t k;
+        for (uint32_t i = 0; i < vm->pals[0]; i++)
+            if (!palette_at(vm, i, &k))
+                return damaged(vm, "palettes");
+        const uint8_t *first = palette_at(vm, 0, &k);
+        use_palette(vm, first, k);
+    }
+    /* Every map is checked by unpacking it; the first is then active */
+    for (uint32_t i = vm->nmaps; i-- > 0;)
+        if (!use_map(vm, i))
+            return 0;
+    if (!read_sheet(vm) || !read_images(vm))
+        return 0;
     full_clip(vm);
     d->dirty_lo = 0;
     d->dirty_hi = SCREEN_H - 1;
@@ -199,6 +404,9 @@ struct surf
 static int surf_of(struct vm *vm, struct value t, struct surf *s,
                    const char *fn)
 {
+    s->px = NULL;
+    s->w = s->h = 0;
+    s->is_screen = 0;
     if (is_num(t)) {
         if (floor_int(t) != 0)
             return vm_fail(vm, fn, "() needs SCREEN or an image", "");
@@ -914,10 +1122,10 @@ static void plot_map(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
     struct tline_ctx *t = ctx;
     int64_t mx = t->mx + i * t->mdx, my = t->my + i * t->mdy;
     int64_t cx = mx >> 16, cy = my >> 16;
-    if (cx < 0 || cy < 0 || cx >= MAP_W || cy >= MAP_H)
+    if (cx < 0 || cy < 0 || cx >= t->vm->map_w || cy >= t->vm->map_h)
         return;
     uint8_t *map = MEM(t->vm, t->vm->map), *sheet = MEM(t->vm, t->vm->sheet);
-    uint32_t n = map[cy * MAP_W + cx];
+    uint32_t n = map[cy * t->vm->map_w + cx];
     uint32_t sx = (n & 15) * 8 + (uint32_t)((mx & 0xffff) >> 13);
     uint32_t sy = (n >> 4) * 8 + (uint32_t)((my & 0xffff) >> 13);
     uint8_t c = sheet[sy * SHEET_W + sx];
@@ -939,6 +1147,7 @@ static void run_map(struct pen *p, void *ctx, const struct run *run)
     const uint8_t *sheet = MEM(t->vm, t->vm->sheet);
     const uint16_t *xl = p->xl;
     uint8_t *px = p->s.px;
+    const uint32_t mw = (uint32_t)t->vm->map_w, mh = (uint32_t)t->vm->map_h;
     RUN_LOCALS(run);
     const int32_t w = p->s.w, cx0 = p->cx0, cy0 = p->cy0;
     int32_t x = run->x, y = run->y, r = run->r;
@@ -952,9 +1161,9 @@ static void run_map(struct pen *p, void *ctx, const struct run *run)
     uint32_t n = 0;
     for (int32_t k = run->k; k > 0; k--, mx += mdx, my += mdy) {
         int32_t cx = (int32_t)mx >> 16, cy = (int32_t)my >> 16;
-        if ((uint32_t)cx < MAP_W && (uint32_t)cy < MAP_H &&
+        if ((uint32_t)cx < mw && (uint32_t)cy < mh &&
             (uint32_t)(x - cx0) < cw && (uint32_t)(y - cy0) < ch) {
-            uint32_t m = map[cy * MAP_W + cx];
+            uint32_t m = map[cy * mw + cx];
             uint32_t sx = (m & 15) * 8 + ((mx & 0xffff) >> 13);
             uint32_t sy = (m >> 4) * 8 + ((my & 0xffff) >> 13);
             uint32_t v = xl[sheet[sy * SHEET_W + sx]];
@@ -1875,16 +2084,17 @@ NATIVE(map)
     WHOLE(1, 0, cy, "map");
     WHOLE(2, 0, sx, "map");
     WHOLE(3, 0, sy, "map");
-    WHOLE(4, MAP_W, cw, "map");
-    WHOLE(5, MAP_H, ch, "map");
+    WHOLE(4, vm->map_w, cw, "map");
+    WHOLE(5, vm->map_h, ch, "map");
     WHOLE(6, 0, layers, "map");
     uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
     int64_t j0 = cy < 0 ? -(int64_t)cy : 0, i0 = cx < 0 ? -(int64_t)cx : 0;
-    int64_t j1 = (int64_t)MAP_H - cy < ch ? (int64_t)MAP_H - cy : ch;
-    int64_t i1 = (int64_t)MAP_W - cx < cw ? (int64_t)MAP_W - cx : cw;
+    const int32_t mw = vm->map_w, mh = vm->map_h;
+    int64_t j1 = (int64_t)mh - cy < ch ? (int64_t)mh - cy : ch;
+    int64_t i1 = (int64_t)mw - cx < cw ? (int64_t)mw - cx : cw;
     if (j0 >= j1 || i0 >= i1) {
         finish(vm, &p);
         return 1;
@@ -1900,7 +2110,7 @@ NATIVE(map)
             if (py + 8 <= p.cy0 || py >= p.cy1)
                 continue;
             int whole_rows = py >= p.cy0 && py + 8 <= p.cy1;
-            const uint8_t *cells = map + (cy + j) * MAP_W + cx;
+            const uint8_t *cells = map + (cy + j) * mw + cx;
             for (int32_t i = (int32_t)i0; i < (int32_t)i1; i++) {
                 int32_t px = sx + i * 8 + ox;
                 if (px + 8 <= p.cx0 || px >= p.cx1)
@@ -1929,7 +2139,7 @@ NATIVE(map)
             int64_t px = (int64_t)sx + i * 8 + p.ox;
             if (px + 8 <= p.cx0 || px >= p.cx1)
                 continue;
-            uint8_t n = map[(cy + j) * MAP_W + cx + i];
+            uint8_t n = map[(cy + j) * mw + cx + i];
             if (!n || (layers && (flags[n] & layers) != layers))
                 continue;
             p.cost += COST_TILE;
@@ -1953,8 +2163,8 @@ NATIVE(mget)
     WHOLE(0, 0, x, "mget");
     WHOLE(1, 0, y, "mget");
     uint8_t *map = MEM(vm, vm->map);
-    *out = mk(T_INT, (uint32_t)x < MAP_W && (uint32_t)y < MAP_H
-              ? map[y * MAP_W + x] : 0);
+    *out = mk(T_INT, x >= 0 && y >= 0 && x < vm->map_w && y < vm->map_h
+              ? map[y * vm->map_w + x] : 0);
     return 1;
 }
 
@@ -1965,22 +2175,105 @@ NATIVE(mset)
     WHOLE(1, 0, y, "mset");
     WHOLE(2, 0, v, "mset");
     uint8_t *map = MEM(vm, vm->map);
-    if ((uint32_t)x < MAP_W && (uint32_t)y < MAP_H)
-        map[y * MAP_W + x] = (uint8_t)v;
+    if (x >= 0 && y >= 0 && x < vm->map_w && y < vm->map_h)
+        map[y * vm->map_w + x] = (uint8_t)v;
     return 1;
 }
 
 NATIVE(mapw)
 {
     (void)vm; (void)a; (void)argc;
-    *out = mk(T_INT, MAP_W);
+    *out = mk(T_INT, vm->map_w);
+    return 1;
+}
+
+NATIVE(loadmap)
+{
+    (void)out;
+    WHOLE(0, 0, n, "loadmap");
+    if (n < 0 || (uint32_t)n >= vm->nmaps)
+        return vm_fail(vm, "loadmap() needs one of the cart's maps, MAP.name",
+                       "", "");
+    if (!use_map(vm, (uint32_t)n))
+        return 0;
+    vm_charge(vm, COST_CALL + (uint32_t)vm->map_w * vm->map_h / BYTES_PER_UNIT);
+    return 1;
+}
+
+static const uint8_t *map_object(struct vm *vm, struct value *a, int argc,
+                                 const char *fn)
+{
+    int32_t i;
+    if (!whole(vm, a, argc, 0, 0, fn, &i))
+        return NULL;
+    if (vm->active_map < 0 || i < 0 ||
+        (uint32_t)i >= vm->mapdir[vm->active_map].nobj) {
+        vm_fail(vm, fn, "() needs an object of the active map, 0 to "
+                "mapobj()'s count less one", "");
+        return NULL;
+    }
+    return vm->mapdir[vm->active_map].obj[i];
+}
+
+/* mapobj(out, max): kind, x, y, w, h of up to max objects into out, an
+ * Int32Array or array of five a time; returns how many the map has. */
+NATIVE(mapobj)
+{
+    WHOLE(1, 0, max, "mapobj");
+    if (a[0].tag != T_I32 && a[0].tag != T_ARR)
+        return bad(vm, "mapobj", "() writes to an Int32Array or an array, "
+                   "not a ", a[0]);
+    uint32_t len = a[0].tag == T_I32 ? I32(vm, a[0])->len : ARR(vm, a[0])->len;
+    uint32_t n = vm->active_map < 0 ? 0 : vm->mapdir[vm->active_map].nobj;
+    uint32_t k = max < 0 ? 0 : (uint32_t)max < n ? (uint32_t)max : n;
+    if (k * 5 > len)
+        return vm_fail(vm, "mapobj() needs room for five numbers an object",
+                       "", "");
+    for (uint32_t i = 0; i < k; i++) {
+        const uint8_t *o = vm->mapdir[vm->active_map].obj[i];
+        int32_t v[5] = { o[0], (int16_t)le16(o + 1), (int16_t)le16(o + 3),
+                         (int16_t)le16(o + 5), (int16_t)le16(o + 7) };
+        for (int j = 0; j < 5; j++) {
+            if (a[0].tag == T_I32)
+                I32(vm, a[0])->d[i * 5 + j] = v[j];
+            else
+                BUF(vm, ARR(vm, a[0])->buf)->v[i * 5 + j] = mk(T_INT, v[j]);
+        }
+    }
+    vm_charge(vm, k * 2);
+    *out = mk(T_INT, (int32_t)n);
+    return 1;
+}
+
+/* mapprop(i, name): object i's property, an integer or a string, or null */
+NATIVE(mapprop)
+{
+    const uint8_t *o = map_object(vm, a, argc, "mapprop");
+    if (!o)
+        return 0;
+    if (a[1].tag != T_STR)
+        return bad(vm, "mapprop", "() needs a property name, not a ", a[1]);
+    const struct str *want = STR(vm, a[1]);
+    uint32_t props = o[9];
+    *out = mk(T_NULL, 0);
+    for (const uint8_t *p = o + 10; props; props--) {
+        const struct str *key = MEM(vm, vm->strings[le16(p)]);
+        uint32_t type = p[2];
+        if (key->len == want->len && !memcmp(key->b, want->b, key->len)) {
+            *out = type ? mk(T_STR, (int32_t)vm->strings[le16(p + 3)])
+                        : mk(T_INT, (int32_t)le32(p + 3));
+            break;
+        }
+        p += 3 + (type ? 2 : 4);
+    }
+    vm_charge(vm, 4 + o[9]);
     return 1;
 }
 
 NATIVE(maph)
 {
     (void)vm; (void)a; (void)argc;
-    *out = mk(T_INT, MAP_H);
+    *out = mk(T_INT, vm->map_h);
     return 1;
 }
 
@@ -2074,6 +2367,20 @@ NATIVE(pal)
         vm->d.dpal[c0 & 0xff] = (uint8_t)c1;
         vm->d.xlat_stale = 1;
     }
+    return 1;
+}
+
+NATIVE(loadpal)
+{
+    (void)out;
+    WHOLE(0, 0, n, "loadpal");
+    uint32_t k;
+    const uint8_t *rgb = n < 0 ? NULL : palette_at(vm, (uint32_t)n, &k);
+    if (!rgb)
+        return vm_fail(vm, "loadpal() needs one of the cart's palettes, "
+                       "PAL.name", "", "");
+    use_palette(vm, rgb, k);
+    vm_charge(vm, COST_CALL + k / 4);
     return 1;
 }
 

@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { compileFiles, readFolder, loadDefs } from './src/node.js';
+import { compileFiles, readFolder, readAssets, loadDefs } from './src/node.js';
 import { load, verify, disassemble } from './src/bytecode.js';
 
 function usage() {
@@ -47,7 +47,7 @@ function cmdNew(dir, name) {
 
 function cmdBuild(dir, out) {
     if (!dir) usage();
-    const res = compileFiles(readFolder(dir));
+    const res = compileFiles(readFolder(dir), readAssets(dir));
     if (res.errors.length) {
         for (const e of res.errors)
             console.error(path.join(dir, e.file) + ':' + e.line + ':' + e.column +

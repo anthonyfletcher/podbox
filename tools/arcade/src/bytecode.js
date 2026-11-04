@@ -70,6 +70,7 @@ export function load(bytes) {
         else if (tag === 2) globals.push({ tag: 'str', value: r.u16() });
         else if (tag === 3) globals.push({ tag: 'fn', value: r.u16() });
         else if (tag === 4) globals.push({ tag: 'fix', value: r.s32() });
+        else if (tag === 5) globals.push({ tag: 'img', value: r.u16() });
         else throw new Error('global with unknown tag ' + tag);
     }
 
