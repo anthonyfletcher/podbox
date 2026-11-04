@@ -38,8 +38,12 @@
 #define CHUNK_SHIFT 4
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
+#define REACH     32            /* how far a liquid looks for a drop */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
+
+/* What a material can do, one byte each for the scan to read at once */
+enum { K_MOVES = 1, K_FLOWS = 2, K_GAS = 4, K_REACTS = 8, K_DECAYS = 16 };
 
 /* ---- rules ------------------------------------------------------------- */
 
@@ -145,6 +149,15 @@ static uint32_t chunk_sum(const struct field *f, int32_t cx, int32_t cy)
     uint32_t s1 = 1, s2 = 0;
     for (int32_t y = y0; y < y1; y++) {
         const uint8_t *p = f->c + y * f->w + x0;
+        /* a whole aligned row of the chunk a word at a time */
+        if (x1 - x0 == CHUNK && !((uintptr_t)p & 3)) {
+            const uint32_t *q = (const uint32_t *)(const void *)p;
+            for (int k = 0; k < CHUNK / 4; k++) {
+                s1 += q[k];
+                s2 += s1;
+            }
+            continue;
+        }
         for (int32_t x = x0; x < x1; x++) {
             s1 += *p++;
             s2 += s1;
@@ -183,6 +196,8 @@ struct stepper
     int32_t cw;                 /* chunks across */
     uint8_t first[MATERIALS];   /* the first reaction for each a, or 255 */
     uint8_t next[REACTIONS];    /* the next with the same a, or 255 */
+    uint8_t kind[MATERIALS];    /* K_*: what each material can do */
+    uint8_t slept[(FIELD_MAX / CHUNK) * (FIELD_MAX / CHUNK)];
     struct vm *vm;
     uint32_t bits;              /* random bits left over */
     int nbits;
@@ -257,6 +272,78 @@ static inline int32_t at(const struct stepper *s, int32_t x, int32_t y)
     return s->f.c[y * s->f.w + x];
 }
 
+/* Whether a cell away from the field's edge can do nothing this tick:
+ * nothing lighter where it would move, no partner it reacts with beside
+ * it, no life span -- most of a pool or a pile, every tick it is awake.
+ * Cells already moved are not looked at, which only errs toward trying. */
+__attribute__((always_inline))
+static inline int stuck(const struct stepper *s, const uint8_t *p, uint8_t m,
+                        uint32_t k, int32_t w)
+{
+    const uint8_t *dens = s->r.f[R_DENSITY];
+    const uint8_t dm = dens[m];
+    if (k & K_MOVES) {
+        int32_t d = k & K_GAS ? -w : w;
+        if (dens[p[d]] < dm || dens[p[d - 1]] < dm || dens[p[d + 1]] < dm)
+            return 0;
+        if ((k & K_FLOWS) && (dens[p[-1]] < dm || dens[p[1]] < dm))
+            return 0;
+    }
+    if (k & K_REACTS)
+        for (uint32_t q = s->first[m]; q != 255; q = s->next[q]) {
+            uint8_t b = s->r.f[R_B][q];
+            if (p[-1] == b || p[1] == b || p[-w] == b || p[w] == b)
+                return 0;
+        }
+    return 1;
+}
+
+/* How far along row y from x, in direction side, the nearest open cell
+ * that m could fall (dy 1) or rise (dy -1) from is, through cells it
+ * could move into, up to REACH; 0 when there is none */
+static int32_t drop_along(const struct stepper *s, int32_t x, int32_t y,
+                          int32_t dy, int32_t side, uint8_t m)
+{
+    int32_t ny = y + dy;
+    if (ny < 0 || ny >= s->f.h)
+        return 0;
+    int32_t room = side > 0 ? s->f.w - 1 - x : x;
+    if (room > REACH)
+        room = REACH;
+    const int32_t w = s->f.w;
+    const uint8_t *dens = s->r.f[R_DENSITY], *moved = s->moved;
+    const uint8_t dm = dens[m];
+    int32_t i = y * w + x, j = ny * w + x;
+    for (int32_t k = 1; k <= room; k++) {
+        i += side;
+        j += side;
+        if (dens[s->f.c[i]] >= dm || (moved[i >> 3] & (1 << (i & 7))))
+            return 0;
+        if (dens[s->f.c[j]] < dm && !(moved[j >> 3] & (1 << (j & 7))))
+            return k;
+    }
+    return 0;
+}
+
+/* Whether cell x, y has nothing to do this tick: stone, which does not
+ * move, end or react, or a cell stuck() inside a pool or a pile. A leaf
+ * of its own: inlined in the scan it spills the scan's registers, and the
+ * whole step's call costs four times as much. */
+__attribute__((noinline, optimize("O2")))
+static int idle(const struct stepper *s, int32_t x, int32_t y)
+{
+    const int32_t w = s->f.w;
+    const uint8_t *p = s->f.c + y * w + x;
+    uint8_t m = *p;
+    uint32_t k = s->kind[m];
+    if (!(k & (K_MOVES | K_REACTS | K_DECAYS)))
+        return 1;
+    if (k & K_DECAYS)
+        return 0;
+    return x > 0 && y > 0 && x < w - 1 && y < s->f.h - 1 &&
+           stuck(s, p, m, k, w);
+}
+
 /* One cell's tick: one reaction with a random neighbour, then its life
  * span, then a move -- so fire spreads on the tick it dies. A material
  * with a life span, or with a partner it reacts with beside it, keeps its
@@ -305,18 +392,19 @@ static void step_cell(struct stepper *s, int32_t x, int32_t y)
         }
     if (mv == MOVE_POWDER)
         return;
-    /* liquids and gases flow sideways, as far as spread, one way then
-     * the other */
+    /* Liquids and gases flow sideways toward the nearest place along the
+     * open row, up to REACH away, they could fall (or rise) from, one way
+     * then the other, moving up to spread a tick. With none in reach they
+     * stay: a level pool goes quiet and its chunks sleep, and a lone cell
+     * more than a level holds stays as a bump. */
     int32_t far = r[R_SPREAD][m] ? r[R_SPREAD][m] : 1;
-    for (int t = 0; t < 2; t++, side = -side) {
-        int32_t to = 0;
-        for (int32_t k = 1; k <= far && lighter(s, x + side * k, y, m); k++)
-            to = k;
-        if (to) {
-            swap(s, x, y, x + side * to, y);
-            return;
-        }
+    int32_t k = drop_along(s, x, y, dy, side, m);
+    if (!k) {
+        side = -side;
+        k = drop_along(s, x, y, dy, side, m);
     }
+    if (k)
+        swap(s, x, y, x + side * (k < far ? k : far), y);
 }
 
 /* Every awake chunk's cells, bottom up, a row left to right or right to
@@ -335,12 +423,30 @@ static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
                 continue;
             int32_t x0 = cx << CHUNK_SHIFT;
             int32_t x1 = x0 + CHUNK < w ? x0 + CHUNK : w;
+            /* a whole aligned chunk row: four cells of air at a time */
+            if (x1 - x0 == CHUNK && !((uintptr_t)(row + x0) & 3)) {
+                for (int32_t q = 0; q < CHUNK; q += 4) {
+                    int32_t b = forward ? x0 + q : x1 - 4 - q;
+                    if (!*(const uint32_t *)(const void *)(row + b))
+                        continue;
+                    for (int32_t e = 0; e < 4; e++) {
+                        int32_t x = forward ? b + e : b + 3 - e;
+                        if (!row[x] || is_moved(s, y * w + x))
+                            continue;
+                        visited++;
+                        if (!idle(s, x, y))
+                            step_cell(s, x, y);
+                    }
+                }
+                continue;
+            }
             for (int32_t n = x0; n < x1; n++) {
                 int32_t x = forward ? n : x1 - 1 - (n - x0);
                 if (!row[x] || is_moved(s, y * w + x))
                     continue;
                 visited++;
-                step_cell(s, x, y);
+                if (!idle(s, x, y))
+                    step_cell(s, x, y);
             }
         }
     }
@@ -375,15 +481,33 @@ NATIVE(cells_step)
             s.next[q] = s.first[s.r.f[R_A][q]];
             s.first[s.r.f[R_A][q]] = (uint8_t)q;
         }
+    for (int32_t m = 0; m < MATERIALS; m++) {
+        uint8_t mv = s.r.f[R_MOVE][m], k = 0;
+        if (mv != MOVE_STATIC && mv <= MOVE_GAS)
+            k |= K_MOVES;
+        if (mv == MOVE_LIQUID || mv == MOVE_GAS)
+            k |= K_FLOWS;
+        if (mv == MOVE_GAS)
+            k |= K_GAS;
+        if (s.first[m] != 255)
+            k |= K_REACTS;
+        if (s.r.f[R_DECAY][m])
+            k |= K_DECAYS;
+        s.kind[m] = k;
+    }
     struct cellsleep *sl = sleep_for(vm, &s.f);
     /* a sleeping chunk drawn on since wakes */
     uint32_t summed = 0, awake = 0;
-    for (int32_t k = 0; k < s.cw * chh; k++)
+    for (int32_t k = 0; k < s.cw * chh; k++) {
+        s.slept[k] = 0;
         if (!sl->awake[k]) {
             summed++;
             if (chunk_sum(&s.f, k % s.cw, k / s.cw) != sl->sum[k])
                 sl->awake[k] = 1;
+            else
+                s.slept[k] = 1;
         }
+    }
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
     /* next tick: the chunks that changed and their neighbours; the rest
      * sleep with their sums */
@@ -397,9 +521,10 @@ NATIVE(cells_step)
                     wake = 1;
             }
         sl->awake[k] = (uint8_t)wake;
+        /* a chunk that slept and nothing moved into keeps its sum */
         if (wake)
             awake++;
-        else {
+        else if (!s.slept[k] || s.changed[k]) {
             sl->sum[k] = chunk_sum(&s.f, cx, cy);
             summed++;
         }

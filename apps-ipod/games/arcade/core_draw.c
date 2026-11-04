@@ -1707,6 +1707,23 @@ NATIVE(font)
  * arithmetic slowly. Unscaled -- every sprite, tile and blit -- is a
  * straight copy; scaled steps the source column by the whole and the
  * remainder of w / dw, which gives the same columns as dividing. */
+/* An unscaled row: n pixels from s, stepping dir (1, or -1 flipped), to
+ * d. Returns the pixels drawn. */
+__attribute__((optimize("O2")))
+static uint32_t copy_row(uint8_t *d, const uint8_t *s, int32_t n, int32_t dir,
+                         const uint16_t *xl)
+{
+    uint32_t k = 0;
+    for (int32_t i = 0; i < n; i++, s += dir) {
+        uint32_t c = xl[*s];
+        if (!(c & XLAT_CLEAR)) {
+            d[i] = (uint8_t)c;
+            k++;
+        }
+    }
+    return k;
+}
+
 /* A scaled row whose source columns are all in the image: col[i] is the
  * column under destination pixel i. Returns the pixels drawn. */
 __attribute__((optimize("O2")))
@@ -1768,26 +1785,10 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
                 continue;
             const uint8_t *srow = src + yy * sw_img;
             uint8_t *drow = p->s.px + ((int32_t)dy + v) * stride + (int32_t)dx;
-            uint32_t n = 0;
-            if (!fx) {
-                const uint8_t *sp = srow + (int32_t)sx;
-                for (int32_t u = ua; u < ub; u++) {
-                    uint32_t c = xl[sp[u]];
-                    if (c & XLAT_CLEAR)
-                        continue;
-                    drow[u] = (uint8_t)c;
-                    n++;
-                }
-            } else {
-                const uint8_t *sp = srow + (int32_t)sx + (int32_t)w - 1;
-                for (int32_t u = ua; u < ub; u++) {
-                    uint32_t c = xl[sp[-u]];
-                    if (c & XLAT_CLEAR)
-                        continue;
-                    drow[u] = (uint8_t)c;
-                    n++;
-                }
-            }
+            uint32_t n = fx ? copy_row(drow + ua, srow + (int32_t)sx +
+                                       (int32_t)w - 1 - ua, ub - ua, -1, xl)
+                            : copy_row(drow + ua, srow + (int32_t)sx + ua,
+                                       ub - ua, 1, xl);
             if (n) {
                 p->count += n;
                 row_touched(p, (int32_t)dy + v);
