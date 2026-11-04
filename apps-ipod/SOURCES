@@ -146,6 +146,7 @@ screens/browse/browser_flat.c
 screens/context_menu.c
 screens/system/about.c
 screens/system/art_health.c
+screens/system/art_check.c
 screens/system/bg_task_info.c
 screens/system/db_search.c
 screens/system/file_search.c

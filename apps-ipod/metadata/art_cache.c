@@ -20,6 +20,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
 #include "config.h"
@@ -54,6 +55,8 @@
 #include "draw/img_filter.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
 #include "draw/image_load.h"
+#include "draw/jpeg_load.h"         /* a check reports a read made again */
+#include "database/path_key.h"      /* a book's path, with or without volume */
 #include "events.h"
 #include "system/appevents.h"
 #include "audio.h"
@@ -248,6 +251,79 @@ static struct
  * aa_offer holds when it is handled. The thread drops what is queued across a
  * USB session, so a pass starting and the check after USB clear it too. */
 static volatile bool aa_offer_posted;
+
+/* Queue event id: Check a File's Art, for the file in aa_chk.path */
+#define AA_EVENT_CHECK 2
+
+enum { AA_CHECK_IDLE, AA_CHECK_POSTED, AA_CHECK_RUNNING, AA_CHECK_DONE };
+
+/* One check: the file asked about and the report it writes, posted from the
+ * UI thread, run on the aa thread, and read back once 'state' is DONE. */
+static struct
+{
+    char path[MAX_PATH];
+    char *report;
+    size_t size, len;
+    volatile int state;
+    volatile int walked, total;     /* tracks, for the screen's meter */
+} aa_chk;
+
+/* A check settles only the person and the book whose art it makes again, and
+ * writes down each step. Outside one a walk settles everyone, silently. */
+static bool aa_checking;
+static unsigned int aa_only_person, aa_only_book;
+/* Folders above a person's works a check's fallback found no image in */
+static int aa_chk_missed;
+static bool aa_chk_quiet;           /* those are counted, not each written */
+/* The file as the walk names it, the first track of its book, and the first
+ * of its folder, which a pass settles the folder's cover from */
+static char aa_chk_track[MAX_PATH], aa_chk_first[MAX_PATH];
+static char aa_chk_probe[MAX_PATH];
+/* That first track's album artist and album, and the file's own person */
+static char aa_chk_name[TAGCACHE_BUFSZ], aa_chk_title[TAGCACHE_BUFSZ];
+static char aa_chk_person[TAGCACHE_BUFSZ];
+
+/* A line of the check's report; nothing outside a check */
+static void aa_note(const char *fmt, ...) ATTRIBUTE_PRINTF(1, 2);
+static void aa_note(const char *fmt, ...)
+{
+    va_list ap;
+    size_t room;
+    int n;
+
+    if (!aa_checking || aa_chk_quiet || aa_chk.len + 2 > aa_chk.size)
+        return;
+    room = aa_chk.size - aa_chk.len - 1;
+    va_start(ap, fmt);
+    n = vsnprintf(aa_chk.report + aa_chk.len, room, fmt, ap);
+    va_end(ap);
+    if (n < 0)
+        return;
+    aa_chk.len += MIN((size_t)n, room - 1);
+    aa_chk.report[aa_chk.len++] = '\n';
+    aa_chk.report[aa_chk.len] = '\0';
+}
+
+/* The name at the end of 'path', for a report line whose folder is known */
+static const char *aa_leaf(const char *path)
+{
+    const char *s = strrchr(path, '/');
+
+    return s ? s + 1 : path;
+}
+
+/* A check's thumbnail sizes share one line: each adds to it, and aa_fill()
+ * writes it once they are all made */
+static char aa_chk_sizes[128];
+
+static void aa_note_size(int size_index, const char *what)
+{
+    size_t n = strlen(aa_chk_sizes);
+
+    if (aa_checking)
+        snprintf(aa_chk_sizes + n, sizeof(aa_chk_sizes) - n, "%s%dpx: %s",
+                 n ? "   " : "", art_sizes[size_index].dim, what);
+}
 
 bool art_cache_is_busy(void)
 {
@@ -1170,6 +1246,20 @@ static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index
  * back to CONTAIN rather than overrun the work buffer.
  *
  * Returns true on success. */
+/* For a check: what became of one size, decoded from its source, and whether
+ * a JPEG read failed on the way, counted since 'retries' and 'refails' */
+static void aa_note_decode(int size_index, const char *what, int retries,
+                           int refails)
+{
+    char buf[48];
+
+    snprintf(buf, sizeof(buf), "%s%s", what,
+             jpeg_read_retries == retries ? ""
+             : jpeg_read_retry_failures != refails ? " (read failed twice)"
+             : " (read retried: ok)");
+    aa_note_size(size_index, buf);
+}
+
 static bool aa_generate_one(const struct aa_src *src, int size_index,
                             const char *out_path, void *workbuf,
                             size_t workbuf_sz)
@@ -1180,6 +1270,8 @@ static bool aa_generate_one(const struct aa_src *src, int size_index,
     int fmt = FORMAT_NATIVE | FORMAT_RESIZE | FORMAT_DITHER;
     int tw = dim, th = dim;
     int ret;
+    int retries = jpeg_read_retries, refails = jpeg_read_retry_failures;
+    bool ok;
 
     if (cover)
     {
@@ -1204,7 +1296,10 @@ static bool aa_generate_one(const struct aa_src *src, int size_index,
     ret = aa_read_source(src, &bm, fmt, tw, th, workbuf, workbuf_sz);
 
     if (ret <= 0 || bm.width <= 0 || bm.height <= 0)
+    {
+        aa_note_decode(size_index, "failed", retries, refails);
         return false;
+    }
 
     /* the decode should have landed on exactly tw x th, but never crop from an
      * image smaller than the crop window -- write what we got instead */
@@ -1215,7 +1310,9 @@ static bool aa_generate_one(const struct aa_src *src, int size_index,
         bm.height = dim;
     }
 
-    return aa_write_aat(out_path, &bm, size_index);
+    ok = aa_write_aat(out_path, &bm, size_index);
+    aa_note_decode(size_index, ok ? "ok" : "not saved", retries, refails);
+    return ok;
 }
 
 /* art_sizes[] indices, largest dim first. Fast-build derives each thumbnail
@@ -1303,8 +1400,16 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
         ret = art_cache_load_aat(fd, &bm, (int)workbuf_sz, NULL);
         close(fd);
 
+        if (ret > 0 && aa_write_aat(out_path, &bm, size_index))
+        {
+            char from[16];
+
+            snprintf(from, sizeof(from), "from %dpx", art_sizes[s].dim);
+            aa_note_size(size_index, from);
+            return true;
+        }
         if (ret > 0)
-            return aa_write_aat(out_path, &bm, size_index);
+            return false;
     }
 
     return false;
@@ -1424,7 +1529,13 @@ static bool aa_reread_tags;
  * aa_artpath: art_folder_file()'s */
 static bool aa_find_file(const char *probe_path)
 {
-    return art_folder_file(probe_path, aa_artpath, sizeof(aa_artpath));
+    if (art_folder_file(probe_path, aa_artpath, sizeof(aa_artpath)))
+    {
+        aa_note("Folder image: %s", aa_leaf(aa_artpath));
+        return true;
+    }
+    aa_note("Folder image: none");
+    return false;
 }
 
 /* What a work's cover may come from beyond its embedded art */
@@ -1444,7 +1555,12 @@ static bool aa_find_embedded(const char *path, struct aa_src *src)
     if (!get_metadata_ex(&aa_id3, -1, path, METADATA_EXCLUDE_ID3_PATH)
         || !aa_id3.has_embedded_albumart
         || !image_embedded_usable(aa_id3.albumart.type))
+    {
+        aa_note("Tags: no image");
         return false;
+    }
+    aa_note("Tags: image, %lu KB",
+            (unsigned long)(aa_id3.albumart.size + 1023) / 1024);
     src->path = path;
     src->emb_pos = aa_id3.albumart.pos;
     src->emb_size = aa_id3.albumart.size;
@@ -1505,12 +1621,18 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
         aa_generate_size(src, s, dh, aa_out_path, workbuf, worksz);
         yield();
     }
+    if (aa_chk_sizes[0])
+    {
+        aa_note("%s", aa_chk_sizes);
+        aa_chk_sizes[0] = '\0';
+    }
     /* An image that would not decode leaves the folder bare, and is counted
      * and listed as one with no art. */
     if (aa_thumbs_exist(dh))
         return true;
     aa_miss = "would not decode";
     aa_miss_src = src->path;
+    aa_note("No thumbnail: %s would not decode", aa_leaf(src->path));
     return false;
 }
 
@@ -1533,6 +1655,11 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
         return true;
 
+    aa_note("Source: %s",
+            source == ART_SOURCE_FILES       ? "files only" :
+            source == ART_SOURCE_FILES_FIRST ? "files, then tags" :
+            source == ART_SOURCE_EMBEDDED    ? "tags only" :
+                                               "tags, then files");
     if (aa_covers_central(w->artist, w->title)
         || (w->named && aa_book_file(probe_path)))
         goto from_file;
@@ -1583,6 +1710,7 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
               : aa_reread_tags ? "no image file or embedded image"
               : "no image file; tags not read again until an Update";
     aa_miss_src = NULL;
+    aa_note("No cover found");
     slot->stamp = embedded ? AA_STAMP_NO_EMBED : AA_STAMP_NONE;
     return false;
 
@@ -1822,12 +1950,20 @@ static bool aa_book_folder(const char *path, unsigned int salt,
     const char *end = strrchr(path, '/'), *start;
 
     if (!end || aa_dir_shared(&aa_bookdirs, aa_hash_n(path, end - path) ^ salt))
+    {
+        aa_note("Book folder: holds other books, not used");
         return false;
+    }
     for (start = end; start > path && start[-1] != '/'; start--)
         ;
-    return !aa_keys_match(art_name_hash_n(start, end - start),
-                          art_name_alt_hash_n(start, end - start),
-                          art_name_hash(name), art_name_alt_hash(name));
+    if (aa_keys_match(art_name_hash_n(start, end - start),
+                      art_name_alt_hash_n(start, end - start),
+                      art_name_hash(name), art_name_alt_hash(name)))
+    {
+        aa_note("Book folder: the author's, not used");
+        return false;
+    }
+    return true;
 }
 
 static void aa_book_noted(const char *path, unsigned int salt,
@@ -1995,8 +2131,12 @@ static bool aa_central_find(const struct aa_person *p)
         snprintf(aa_artpath, sizeof(aa_artpath), AA_PEOPLE_DIR "/%s",
                  aa_central_names + c->name);
         if (art_file_usable(aa_artpath))
+        {
+            aa_note("Artwork/People: %s", aa_leaf(aa_artpath));
             return true;
+        }
     }
+    aa_note("Artwork/People: none");
     return false;
 }
 
@@ -2009,7 +2149,10 @@ static bool aa_covers_central(const char *artist, const char *title)
     int i, pass;
 
     if (!kt)
+    {
+        aa_note("Artwork/Covers: no title to match");
         return false;
+    }
     for (pass = 0; pass < 2; pass++)
     {
         for (i = 0; i < aa_central_count; i++)
@@ -2021,9 +2164,13 @@ static bool aa_covers_central(const char *artist, const char *title)
             snprintf(aa_artpath, sizeof(aa_artpath), ART_COVERS_DIR "/%s",
                      aa_central_names + c->name);
             if (art_file_usable(aa_artpath))
+            {
+                aa_note("Artwork/Covers: %s", aa_leaf(aa_artpath));
                 return true;
+            }
         }
     }
+    aa_note("Artwork/Covers: none");
     return false;
 }
 
@@ -2109,7 +2256,8 @@ static void aa_person_fill(struct aa_person *p, struct aa_stamp *slot,
     unsigned int stamp = aa_art_stamp(aa_artpath);
     struct aa_src src = { .path = aa_artpath, .emb_pos = -1 };
 
-    for (; old <= 1 && slot->stamp == AA_STAMP_NONE
+    /* A check makes the picture again rather than taking one over */
+    for (; !aa_checking && old <= 1 && slot->stamp == AA_STAMP_NONE
            && !aa_thumbs_exist(p->key); old++)
     {
         const char *end = aa_level_end(path, old);
@@ -2147,6 +2295,7 @@ static void aa_people_settle(const char *path, unsigned int key, int up,
         return;
     if (aa_was_visited(key) || !(slot = aa_slot(key)))
     {
+        aa_note("No picture: the name clashes with a work's");
         p->flags |= AA_PERSON_DONE;       /* a work's key, or no room */
         return;
     }
@@ -2164,6 +2313,8 @@ static void aa_people_settle(const char *path, unsigned int key, int up,
             aa_person_fill(p, slot, path, up, c);
             return;
         }
+        if (!p->match)
+            aa_note("Named folder: none");
     }
 
     if (p->match && !(p->flags & AA_PERSON_TRIED))
@@ -2172,6 +2323,7 @@ static void aa_people_settle(const char *path, unsigned int key, int up,
         if (!end || aa_hash_n(path, end - path) != p->match)
             return;                     /* for an item under it */
         p->flags |= AA_PERSON_TRIED;
+        aa_note("Named folder: %.*s", (int)(end - path), path);
         if (aa_folder_image(path, end))
         {
             aa_person_fill(p, slot, path, up, c);
@@ -2193,11 +2345,18 @@ static void aa_people_settle(const char *path, unsigned int key, int up,
     {
         if (aa_is_library(aa_hash_n(path, end - path)))
             continue;
+        /* A check counts the folders without an image, of which a
+         * prolific person has many, rather than writing each down */
+        aa_chk_quiet = true;
         if (aa_folder_image(path, end))
         {
+            aa_chk_quiet = false;
+            aa_note("Folder above: %s", aa_artpath);
             aa_person_fill(p, slot, path, up, c);
             return;
         }
+        aa_chk_quiet = false;
+        aa_chk_missed++;
     }
 }
 
@@ -2308,9 +2467,11 @@ static bool aa_people_walk(const struct aa_people_ctx *c)
         else
         {
             aa_track_row(tcs.idx_id);
-            if (c->stage == AA_PEOPLE_RESOLVE && aa_track_is_book(tcs.idx_id))
+            if (c->stage == AA_PEOPLE_RESOLVE && aa_track_is_book(tcs.idx_id)
+                && (!aa_checking || aa_hash(tcs.result) == aa_only_book))
                 aa_book_track_cover(tcs.result, c);
-            if (aa_row.key && !*c->aborted)
+            if (aa_row.key && !*c->aborted
+                && (!aa_checking || aa_row.key == aa_only_person))
                 aa_people_settle(tcs.result, aa_row.key, 1, c);
         }
         if (*c->aborted)
@@ -2338,7 +2499,7 @@ static bool aa_book_person(const struct book_entry *e, void *data)
         *c->aborted = true;
         return false;
     }
-    if (key)
+    if (key && (!aa_checking || key == aa_only_person))
         aa_people_settle(e->path, key, 0, c);
     return !*c->aborted;
 }
@@ -2422,8 +2583,12 @@ static bool aa_book_file(const char *path)
         memcpy(aa_artpath, path, stem);
         strcpy(aa_artpath + stem, exts[i]);
         if (art_file_usable(aa_artpath))
+        {
+            aa_note("Named after the file: %s", aa_leaf(aa_artpath));
             return true;
+        }
     }
+    aa_note("Named after the file: none");
     return false;
 }
 
@@ -2482,6 +2647,8 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
     }
     else if (inside && e->cover_method == 0)
     {
+        aa_note("Inside the book: %lu KB",
+                (unsigned long)(e->cover_csize + 1023) / 1024);
         src.path = e->path;
         src.emb_pos = e->cover_at;
         src.emb_size = e->cover_csize;
@@ -2490,19 +2657,27 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
     else if (inside)
     {
         stamp = aa_art_stamp(e->path);
+        aa_note("Inside the book: %lu KB",
+                (unsigned long)(e->cover_usize + 1023) / 1024);
         if (slot->stamp != stamp || !aa_thumbs_exist(bh))
         {
             /* Before the decode needs the work buffer */
             if (!zip_member_to_file(e->path, e->cover_at, e->cover_csize,
                                     e->cover_usize, e->cover_method,
                                     AA_COVER_TMP, c->workbuf, c->worksz))
+            {
+                aa_note("No cover: it would not unpack");
                 return true;
+            }
             tmp = true;
         }
         src.path = AA_COVER_TMP;
     }
     else
     {
+        aa_note(source == ART_SOURCE_FILES
+                ? "No cover found (Source does not look inside books)"
+                : "No cover found");
         if (slot->stamp > AA_STAMP_NO_EMBED)
             aa_remove_thumbs(bh);
         slot->stamp = AA_STAMP_NONE;
@@ -2515,6 +2690,19 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
     if (tmp)
         remove(AA_COVER_TMP);
     return !*c->aborted;
+}
+
+/* Lay the tables a pass keeps out in 'mem', AA_TABLE_BYTES of it, empty */
+static void aa_tables_init(void *mem)
+{
+    aa_stamps = mem;
+    aa_visited = (unsigned char *)(aa_stamps + AA_SEEN_SLOTS);
+    aa_people = (struct aa_person *)(aa_visited + AA_SEEN_SLOTS / 8);
+    aa_libdirs.t = (struct aa_libdir *)(aa_people + AA_PEOPLE_SLOTS);
+    aa_bookdirs.t = aa_libdirs.t + AA_LIBDIR_SLOTS;
+    aa_central = (struct aa_central *)(aa_bookdirs.t + AA_BOOKDIR_SLOTS);
+    aa_central_names = (char *)(aa_central + AA_CENTRAL_MAX);
+    memset(aa_stamps, 0, AA_TABLE_BYTES);
 }
 
 static enum bg_result aa_run_pass(void)
@@ -2547,14 +2735,7 @@ static enum bg_result aa_run_pass(void)
     }
 
     workbuf = core_get_data_pinned(wh);
-    aa_stamps = core_get_data_pinned(sh);
-    aa_visited = (unsigned char *)(aa_stamps + AA_SEEN_SLOTS);
-    aa_people = (struct aa_person *)(aa_visited + AA_SEEN_SLOTS / 8);
-    aa_libdirs.t = (struct aa_libdir *)(aa_people + AA_PEOPLE_SLOTS);
-    aa_bookdirs.t = aa_libdirs.t + AA_LIBDIR_SLOTS;
-    aa_central = (struct aa_central *)(aa_bookdirs.t + AA_BOOKDIR_SLOTS);
-    aa_central_names = (char *)(aa_central + AA_CENTRAL_MAX);
-    memset(aa_stamps, 0, AA_TABLE_BYTES);
+    aa_tables_init(core_get_data_pinned(sh));
 
     aa_ensure_dirs();
     /* A purge cut short leaves no stamp file, which saving one would hide */
@@ -2846,6 +3027,322 @@ static void aa_handle_offer(void)
     core_free(wh);
 }
 
+/* ---- checking one file ----
+ *
+ * Check a File's Art: one file's art made again as a pass makes it, each step
+ * written into a report for the screen. Its walk is a pass's -- every track,
+ * for what each says about its person and its book's folder -- so a person is
+ * found exactly as a pass finds them; then only the file's own album, book
+ * and person are settled. A book's cover and its person are settled on walks
+ * of their own, so that the report keeps them apart. */
+
+static bool aa_chk_ebook;
+
+/* The ebook asked about, if 'e' is it: its cover made again, its author kept
+ * for the person step. An entry lasts only for its call, so the work is done
+ * here. */
+static bool aa_check_ebook(const struct book_entry *e, void *data)
+{
+    struct aa_books_ctx *c = data;
+    unsigned int bh = aa_hash(e->path);
+    struct aa_stamp *slot;
+
+    if (strcasecmp(path_key_strip(e->path), path_key_strip(aa_chk.path)))
+        return true;
+    aa_chk_ebook = true;
+    strlcpy(aa_chk_person, e->author ? e->author : "", sizeof(aa_chk_person));
+    aa_note("Ebook: %s, %s", e->title ? e->title : "", aa_chk_person);
+    aa_note("\nBOOK COVER");
+    if ((slot = aa_slot(bh)))
+    {
+        aa_remove_thumbs(bh);
+        slot->stamp = AA_STAMP_NONE;
+        aa_book_visit(e, c);
+        aa_stamp_append(bh, slot->stamp);
+    }
+    return false;
+}
+
+/* The person aa_only_person, settled again as a pass's people step settles
+ * them */
+static void aa_check_person(void *workbuf, size_t worksz, bool *aborted)
+{
+    struct aa_people_ctx c = { AA_PEOPLE_RESOLVE, workbuf, worksz, aborted };
+    struct aa_stamp *slot = aa_slot(aa_only_person);
+    struct aa_person *p;
+
+    if (!slot)
+        return;
+    aa_remove_thumbs(aa_only_person);
+    slot->stamp = AA_STAMP_NONE;
+    aa_chk_missed = 0;
+    aa_people_waiting = 0;
+    if (aa_people_walk(&c))
+    {
+        aa_people_last_dir = aa_people_last_key = 0;
+        book_index_each(aa_book_person, &c, &aa_book_text);
+    }
+    if (!*aborted && aa_people_waiting)
+    {
+        c.stage = AA_PEOPLE_FALLBACK;
+        if (aa_people_walk(&c))
+        {
+            aa_people_last_dir = aa_people_last_key = 0;
+            book_index_each(aa_book_person, &c, &aa_book_text);
+        }
+    }
+    if (*aborted)
+        return;
+    if (aa_chk_missed)
+        aa_note("Folders above: %d, no image", aa_chk_missed);
+    p = aa_person_get(aa_only_person, false);
+    if (!p || !(p->flags & AA_PERSON_ART))
+        aa_note("No picture found");
+    aa_stamp_append(aa_only_person, slot->stamp);
+}
+
+/* The book of the audiobook track asked about, by its first track */
+static void aa_check_audiobook(void *workbuf, size_t worksz, bool *aborted)
+{
+    struct aa_people_ctx c = { AA_PEOPLE_RESOLVE, workbuf, worksz, aborted };
+    unsigned int bh = aa_hash(aa_chk_first);
+    struct aa_stamp *slot = aa_slot(bh);
+
+    aa_note("\nBOOK COVER");
+    aa_note("From first track: %s", aa_leaf(aa_chk_first));
+    if (!slot)
+        return;
+    aa_remove_thumbs(bh);
+    slot->stamp = AA_STAMP_NONE;
+    aa_only_book = bh;
+    aa_people_walk(&c);
+    aa_only_book = 0;
+    aa_stamp_append(bh, slot->stamp);
+}
+
+/* aa thread: the check posted by art_cache_check() */
+static void aa_run_check(void)
+{
+    struct tagcache_search tcs;
+    struct aa_books_ctx books;
+    size_t worksz = aa_work_bytes();
+    void *workbuf;
+    int wh, sh, idx = -1, first = -1, kind = 0;
+    unsigned int person = 0;
+    bool aborted = false, ram = tagcache_is_in_ram();
+    /* The file's folder, without the volume, to know its tracks by */
+    const char *dir = path_key_strip(aa_chk.path);
+    const char *dir_end = strrchr(dir, '/');
+
+    aa_chk.state = AA_CHECK_RUNNING;
+    aa_chk.walked = 0;
+    aa_chk.total = tagcache_get_stat()->total_entries;
+    aa_checking = true;
+    aa_chk_quiet = aa_chk_ebook = false;
+    aa_only_person = aa_only_book = 0;
+    aa_chk_track[0] = aa_chk_first[0] = aa_chk_probe[0] = '\0';
+    aa_chk_name[0] = aa_chk_title[0] = aa_chk_person[0] = '\0';
+    aa_chk_sizes[0] = '\0';
+    aa_note("%s", aa_leaf(aa_chk.path));
+
+    wh = core_alloc(worksz);
+    sh = wh > 0 ? core_alloc(AA_TABLE_BYTES) : -1;
+    if (sh <= 0)
+    {
+        if (wh > 0)
+            core_free(wh);
+        aa_note("Not enough free memory right now");
+        goto done;
+    }
+    workbuf = core_get_data_pinned(wh);
+    aa_tables_init(core_get_data_pinned(sh));
+    books.workbuf = workbuf;
+    books.worksz = worksz;
+    books.aborted = &aborted;
+    cache_busy = true;
+    cpu_boost(true);
+
+    aa_ensure_dirs();
+    if (!aa_check_format_version())
+    {
+        aa_note("The art cache is being rebuilt: try again after");
+        goto out;
+    }
+    aa_check_all = aa_reread_tags = true;
+    aa_added_only = aa_people_move = false;
+    aa_unreached = aa_libdirs.full = aa_bookdirs.full = false;
+    aa_stamps_load();
+    aa_central_count = 0;
+    aa_central_used = 0;
+    aa_central_load(false);
+    aa_central_load(true);
+
+    if (tagcache_find_index(&tcs, aa_chk.path))
+    {
+        idx = tcs.idx_id;
+        aa_row.row = -2;
+        aa_track_row(idx);
+        if (aa_row.ok)
+        {
+            kind = db_spoken_album_kind(&aa_row.al);
+            first = aa_row.al.first;
+            person = aa_row.key;
+            strlcpy(aa_chk_person, aa_name, sizeof(aa_chk_person));
+            strlcpy(aa_chk_title, aa_title, sizeof(aa_chk_title));
+        }
+        else
+            tagcache_retrieve_two(&tcs, idx, tag_albumartist, aa_chk_person,
+                                  sizeof(aa_chk_person), tag_album,
+                                  aa_chk_title, sizeof(aa_chk_title));
+        tagcache_search_finish(&tcs);
+        aa_note("%s: %s, %s", kind == 1 ? "Audiobook"
+                : kind == 2 ? "Podcast" : "Music", aa_chk_title,
+                aa_chk_person);
+    }
+
+    /* Every track, as a pass reads them, for who is in which folder */
+    if (!tagcache_search(&tcs, tag_filename))
+    {
+        aa_note("The database could not be read");
+        goto out;
+    }
+    aa_row.row = -2;
+    while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
+    {
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            aborted = true;
+            break;
+        }
+        aa_track_note(tcs.result, tcs.idx_id);
+        if (tcs.idx_id == idx)
+            strlcpy(aa_chk_track, tcs.result, sizeof(aa_chk_track));
+        if (tcs.idx_id == first)
+            strlcpy(aa_chk_first, tcs.result, sizeof(aa_chk_first));
+        if (idx >= 0 && !aa_chk_probe[0] && dir_end)
+        {
+            const char *p = path_key_strip(tcs.result);
+            const char *end = strrchr(p, '/');
+
+            if (end && end - p == dir_end - dir
+                && !strncasecmp(p, dir, end - p))
+            {
+                strlcpy(aa_chk_probe, tcs.result, sizeof(aa_chk_probe));
+                if (aa_row.ok)
+                {
+                    strlcpy(aa_chk_name, aa_name, sizeof(aa_chk_name));
+                    strlcpy(aa_chk_title, aa_title, sizeof(aa_chk_title));
+                }
+                else
+                    tagcache_retrieve_two(&tcs, tcs.idx_id, tag_albumartist,
+                                          aa_chk_name, sizeof(aa_chk_name),
+                                          tag_album, aa_chk_title,
+                                          sizeof(aa_chk_title));
+            }
+        }
+        if ((++aa_chk.walked & 15) == 0)
+            yield();
+    }
+    tagcache_search_finish(&tcs);
+    if (aborted)
+        goto out;
+    book_index_each(aa_book_note, &books, &aa_book_text);
+
+    if (aa_chk_track[0] && aa_chk_probe[0])
+    {
+        struct aa_work w = { aa_chk_name, aa_chk_title, false, true };
+        struct aa_stamp *slot;
+        unsigned int dh;
+
+        aa_dirname(aa_chk_probe, aa_dir, sizeof(aa_dir));
+        dh = aa_hash(aa_dir);
+        aa_note("\nALBUM COVER");
+        aa_note("Folder: %s", aa_dir);
+        if (strcmp(aa_chk_probe, aa_chk_track))
+            aa_note("From first track: %s", aa_leaf(aa_chk_probe));
+        if ((slot = aa_visit(dh)))
+        {
+            aa_remove_thumbs(dh);
+            slot->stamp = AA_STAMP_NONE;
+            aa_cache_dir(aa_chk_probe, dh, slot, &w, workbuf, worksz,
+                         &aborted);
+            aa_stamp_append(dh, slot->stamp);
+        }
+        if (!aborted && kind == 1 && ram && aa_chk_first[0])
+            aa_check_audiobook(workbuf, worksz, &aborted);
+    }
+    else
+    {
+        book_index_each(aa_check_ebook, &books, &aa_book_text);
+        if (!aa_chk_ebook)
+        {
+            aa_note("Not in the library. If it is new, update the library "
+                    "first");
+            goto out;
+        }
+        person = art_name_hash(aa_chk_person);
+    }
+    if (aborted)
+        goto out;
+
+    if (!ram)
+        aa_note("\nDatabase not in RAM: pictures%s not checked",
+                kind == 1 ? " and book covers" : "");
+    else if (!person)
+        aa_note("\nNo %s tag, so no picture", kind == 1 || aa_chk_ebook
+                ? "author" : "album artist");
+    else
+    {
+        aa_note("\n%s: %s", kind == 1 || aa_chk_ebook ? "AUTHOR"
+                : "ARTIST", aa_chk_person);
+        aa_only_person = person;
+        aa_check_person(workbuf, worksz, &aborted);
+    }
+
+out:
+    cpu_boost(false);
+    cache_busy = false;
+    if (aborted)
+        aa_note("\nStopped: the disk was needed elsewhere");
+    else if (aa_chk_track[0] || aa_chk_ebook)
+        aa_note("\nNow Playing updates on the next track.");
+    aa_stamps = NULL;
+    aa_visited = NULL;
+    core_unpin(wh);
+    core_unpin(sh);
+    core_free(sh);
+    core_free(wh);
+done:
+    aa_checking = false;
+    aa_only_person = aa_only_book = 0;
+    aa_chk.state = AA_CHECK_DONE;
+}
+
+bool art_cache_check(const char *path, char *report, size_t size)
+{
+    if (aa_chk.state == AA_CHECK_RUNNING
+        || (aa_chk.state == AA_CHECK_POSTED
+            && bg_task_queued(&art_cache_task, AA_EVENT_CHECK))
+        || size < 2)
+        return false;
+    strlcpy(aa_chk.path, path, sizeof(aa_chk.path));
+    aa_chk.report = report;
+    aa_chk.size = size;
+    aa_chk.len = 0;
+    report[0] = '\0';
+    aa_chk.walked = aa_chk.total = 0;
+    aa_chk.state = AA_CHECK_POSTED;
+    bg_task_post(&art_cache_task, AA_EVENT_CHECK);
+    return true;
+}
+
+bool art_cache_check_finished(int *walked, int *total)
+{
+    *walked = aa_chk.walked;
+    *total = aa_chk.total;
+    return aa_chk.state == AA_CHECK_DONE;
+}
+
 /* Playback thread: a track became current. If it carries embedded art, hand
  * its location to the aa thread (reusing the metadata playback already parsed) --
  * no decoding here. */
@@ -2909,11 +3406,13 @@ static enum bg_result aa_task_run(void)
 }
 
 /* bg_task.handle_event: everything on the queue that is ours rather than the
- * tick's -- which is just the offer posted by the track-change hook. */
+ * tick's -- the offer posted by the track-change hook, and a check. */
 static void aa_task_event(const struct queue_event *ev)
 {
     if (ev->id == AA_EVENT_OFFER)
         aa_handle_offer();
+    else if (ev->id == AA_EVENT_CHECK)
+        aa_run_check();
 }
 
 /* Whether the stamp file's first record is this scheme's: see AA_SCHEME */

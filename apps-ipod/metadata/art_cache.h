@@ -102,6 +102,17 @@ const char *art_cache_activity(void);
  * reader holding something made from one to tell whether it is still good. */
 unsigned int art_cache_generation(void);
 
+/* Check a File's Art: has the art cache's thread make the art of the file at
+ * 'path' again -- its album's cover, its book's, and its artist's or
+ * author's picture -- as a pass would, writing each step into 'report' as
+ * lines. It runs after any pass under way. False, starting nothing, while an
+ * earlier check is still to finish; 'report' must last until this one does. */
+bool art_cache_check(const char *path, char *report, size_t size);
+
+/* Whether the check has finished, with the tracks its walk has read of
+ * 'total' so far */
+bool art_cache_check_finished(int *walked, int *total);
+
 /* The caching pass, for the standard triggers.
  *
  * bg_task_rebuild() purges every cached thumbnail and regenerates from

@@ -313,6 +313,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 |---|---|---|---|
 | Album Art Source | Where covers of albums, books and podcasts come from: the image in the folder, the art embedded in the files, or both, the first named taking precedence. An image in /Artwork/Covers, or one named after a book, is used whichever is chosen. Pictures of artists and authors only ever come from image files. Changing it reads every cover again, which takes a while on a large library. | Image Files, Then Embedded |  |
 | Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. Much faster, slightly softer. Applies only to thumbnails made from now on. | No | **Adv** |
+| Check a File's Art | Pick a track or a book to make its art again and see how it was found: where the cache looked for its cover and its artist's or author's picture, what it found, and how each thumbnail was made. Use it on a cover that looks wrong or is missing. It reads the whole library first, so it takes a few seconds on a large one. | — |  |
 
 ### Library — Playlist Engine
 

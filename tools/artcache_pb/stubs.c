@@ -331,6 +331,13 @@ void bg_task_post(struct bg_task *task, long id)
     (void)task; (void)id;
 }
 
+/* art_cache_check(), which the tool never calls: nothing is ever queued */
+bool bg_task_queued(const struct bg_task *task, long id)
+{
+    (void)task; (void)id;
+    return false;
+}
+
 void bg_task_update(struct bg_task *task)
 {
     (void)task;

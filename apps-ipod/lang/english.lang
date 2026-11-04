@@ -18917,6 +18917,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_ART_CHECK
+  desc: in Art cache settings, pick a file to make its art again and see how it was found
+  user: core
+  <source>
+    *: "Check a File's Art"
+  </source>
+  <dest>
+    *: "Check a File's Art"
+  </dest>
+  <voice>
+    *: "Check a File's Art"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_ART_HEALTH_NONE
   desc: no missing-artwork list to show yet
   user: core

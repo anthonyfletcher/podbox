@@ -17,6 +17,7 @@
 #include "screens/covers/album_covers.h"
 #include "metadata/art_cache.h"
 #include "screens/system/art_health.h"
+#include "screens/system/art_check.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "widgets/color_picker.h"
 
@@ -188,11 +189,19 @@ MENUITEM_FUNCTION(art_health_artists_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_ART_HEALTH_ARTISTS),
                   art_health_artists, NULL, Icon_NOICON);
 
+static int art_check(void)
+{
+    return art_check_screen() ? MENU_ATTACHED_USB : 0;
+}
+MENUITEM_FUNCTION(art_check_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_ART_CHECK), art_check, NULL, Icon_NOICON);
+
 MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,
             &art_cache_album_source,
             &art_cache_fast_build,
             &art_health_albums_item,
-            &art_health_artists_item);
+            &art_health_artists_item,
+            &art_check_item);
 
 /* The chain the slides are drawn through, one slot at a time in the order
  * listed. Cover Flow's own rather than shared with the browser rows: it is not

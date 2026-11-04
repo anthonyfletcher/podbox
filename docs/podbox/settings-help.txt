@@ -1994,6 +1994,14 @@ Lists the artists that have no photograph.
 
 Artist images are looked for in /Artwork/People and beside the music.
 
+[action: Check a File's Art]
+Pick a track or a book to make its art again and see how it was found: where
+the cache looked for its cover and its artist's or author's picture, what it
+found, and how each thumbnail was made.
+
+Use it on a cover that looks wrong or is missing. It reads the whole library
+first, so it takes a few seconds on a large one.
+
 [action: Create Playlist]
 Builds a playlist from the folder you are in, including everything below it, and
 saves it in the playlist catalogue.
