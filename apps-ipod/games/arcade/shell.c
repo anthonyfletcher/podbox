@@ -632,6 +632,7 @@ static int run(const char *path, void *mem, size_t size)
          * the clock gives up the time rather than racing to catch it. */
         long late = current_tick - (start + (long)((frame * HZ) / rate));
         if (late >= HZ / rate) {
+            arcade_skipped(vm, (unsigned)(late * rate / HZ));
             arcade_input(vm, held, wheel_clicks(pos), pos);
             if (!arcade_tick(vm, 0)) {
                 status = FAILED;
@@ -645,6 +646,10 @@ static int run(const char *path, void *mem, size_t size)
         if (!arcade_tick(vm, 1)) {
             status = FAILED;
             break;
+        }
+        if (arcade_rate(vm) != rate) {
+            rate = arcade_rate(vm);
+            start = current_tick - (long)((frame * HZ) / rate);
         }
         present(vm, false);
         sound_fill();

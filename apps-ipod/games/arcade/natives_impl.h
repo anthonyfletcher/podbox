@@ -81,6 +81,9 @@ IMPL(sfxp)
 IMPL(tone)
 IMPL(click)
 
+/* core_draw.c, for the systems */
+IMPL(sprites_draw)
+
 /* sys_actors.c */
 IMPL(actors_pool)
 IMPL(actors_spawn)
@@ -92,10 +95,32 @@ IMPL(particles_emit)
 IMPL(particles_step)
 IMPL(particles_draw)
 
+/* sys_grid.c */
+IMPL(grid_fill)
+IMPL(grid_region)
+IMPL(grid_runs)
+IMPL(grid_full)
+IMPL(grid_collapse)
+IMPL(grid_fall)
+IMPL(grid_slide)
+IMPL(grid_fits)
+IMPL(grid_place)
+IMPL(grid_rotate)
+
+/* sys_plane.c */
+IMPL(plane_view)
+IMPL(plane_draw)
+IMPL(plane_project)
+IMPL(plane_pick)
+IMPL(plane_billboards)
+
 /* core_input.c */
 IMPL(btn)
 IMPL(btnp)
 IMPL(wheel)
 IMPL(wheelpos)
 IMPL(quit)
+IMPL(rate)
+IMPL(setrate)
+IMPL(skipped)
 IMPL(menuitem)

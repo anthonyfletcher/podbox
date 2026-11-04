@@ -161,3 +161,191 @@ test('pools are checked when handed back', () => {
     const r4 = run('function init() { particles.step(actors.pool(2)); }\nfunction update() {}');
     assert.match(r4.err, /needs a pool from particles\.pool\(\)/);
 });
+
+/* The plane. Sprites 1 and 2 have a different colour at every pixel, none
+ * transparent, chequered over the map, so a pixel of the floor names the
+ * world point it shows. */
+const FLOOR = `
+function floor() {
+    for (var y = 0; y < 8; y++)
+        for (var x = 0; x < 8; x++) {
+            sset(8 + x, y, 1 + (x + y * 3) % 15);
+            sset(16 + x, y, 1 + (x * 5 + y) % 15);
+        }
+    for (var r = 0; r < mapH(); r++)
+        for (var c = 0; c < mapw(); c++) mset(c, r, 1 + (c + r) % 2);
+}
+`.replace('mapH()', '64');
+
+test('plane: every floor pixel is the map under plane.pick, to within the steps', () => {
+    const r = run(FLOOR + `
+function init() {
+    floor();
+    plane.view(300.5, 200.25, 24, 0.13, 40, 0.25);
+    cls(0);
+    plane.draw();
+    var at = [0, 0], bad = 0, n = 0;
+    for (var y = 40; y < 120; y++)
+        for (var x = 0; x < 160; x++) {
+            if (!plane.pick(x, y, at)) { bad++; continue; }
+            var wx = flr(at[0]), wy = flr(at[1]), want = 0;
+            if (wx >= 0 && wy >= 0 && wx < 1024 && wy < 512) {
+                var s = mget(flr(wx / 8), flr(wy / 8));
+                want = sget((s % 16) * 8 + wx % 8, flr(s / 16) * 8 + wy % 8);
+            }
+            n++;
+            if (pget(x, y) != want) bad++;
+        }
+    var sky = 0;
+    for (y = 0; y < 40; y++) for (x = 0; x < 160; x++) if (pget(x, y) != 0) sky++;
+    printh(n + " " + bad + " " + sky);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    const [n, bad, sky] = r.out.trim().split(' ').map(Number);
+    assert.equal(n, 80 * 160);
+    assert.equal(sky, 0, 'nothing above the horizon');
+    /* draw steps along a row and pick divides afresh: they part only
+     * where a pixel's centre sits on a texel's edge */
+    assert.ok(bad < 32, bad + ' of ' + n + ' differ');
+});
+
+test('plane: project and pick are each other\'s inverse on the floor', () => {
+    const r = run(`function init() {
+    plane.view(100, 100, 16, 0.3, 50, 0.2);
+    var at = [0, 0], sc = [0, 0, 0, 0], worst = 0;
+    for (var y = 52; y < 120; y += 7)
+        for (var x = 3; x < 160; x += 13) {
+            plane.pick(x, y, at);
+            plane.project(at[0], at[1], 0, sc);
+            worst = max(worst, max(abs(sc[0] - x), abs(sc[1] - (y + 0.0))));
+        }
+    printh(worst < 0.6 ? "ok" : "worst " + worst);
+    printh(plane.project(100 - cos(0.3) * 10, 100 - sin(0.3) * 10, 0, sc) + " " + plane.pick(10, 49, at));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    /* behind the camera, and above the horizon, are 0 */
+    assert.equal(r.out, 'ok\n0 0\n');
+});
+
+test('plane: billboards stand on their point, far to near', () => {
+    const r = run(`var xs = [0, 0, 0], ys = [0, 0, 0], zs = [0, 0, 0], sp = [3, 4, 5], size = [8, 8, 8], fl = [false, false, false];
+function init() {
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(24 + x, y, 8); sset(32 + x, y, 11); sset(40 + x, y, 12); }
+    plane.view(0, 0, 8, 0, 60, 0.25);
+    // ahead along x: 3 far, 4 near and in front of it, 5 behind the camera
+    xs[0] = 40; xs[1] = 20; xs[2] = -10;
+    cls(0);
+    var k = plane.billboards(xs, ys, zs, sp, size, fl, 3), sc = [0, 0, 0, 0];
+    plane.project(20, 0, 0, sc);
+    printh(k + " " + flr(sc[0]) + " " + flr(sc[1]) + " " + pget(80, flr(sc[1]) - 1) + " " + pget(80, flr(sc[1]) + 1));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    /* two drawn; the near one (11) covers the far one's centre and ends on
+     * the ground line, which is the horizon less one plus z * scale */
+    const [k, sx, sy, on, below] = r.out.trim().split(' ').map(Number);
+    assert.equal(k, 2);
+    assert.equal(sx, 80);
+    assert.equal(on, 11);
+    assert.equal(below, 0);
+    assert.ok(sy > 60 && sy < 120, 'ground row ' + sy);
+});
+
+test('plane: the camera comes first, and off the map is left or filled', () => {
+    const r = run('function init() { plane.draw(); }\nfunction update() {}');
+    assert.match(r.err, /plane\.draw\(\) needs a camera first/);
+    const r2 = run(FLOOR + `function init() {
+    floor();
+    plane.view(-200, -200, 20, 0.625, 30, 0.25);
+    cls(7); plane.draw(); var a = pget(80, 119);
+    cls(7); plane.draw(30, 119, 1); var b = pget(80, 119);
+    printh(a + " " + (b != 7 ? "filled" : "left"));
+}
+function update() {}`);
+    assert.equal(r2.status, 0, r2.err);
+    /* looking away from the map: nothing drawn, then sprite 1 everywhere */
+    assert.equal(r2.out, '7 filled\n');
+});
+
+/* The clock: rate(), setrate() and skipped(), beside the systems that
+ * lean on it */
+test('setrate changes the rate from the next tick and t() carries on', () => {
+    const r = run(`var n = 0;
+function init() { printh(rate()); }
+function update() {
+    n++;
+    if (n == 4) { printh(t()); setrate(25); printh(t() + " " + rate()); }
+    if (n == 5 || n == 29) printh(t());
+}`, 29);
+    assert.equal(r.status, 0, r.err);
+    const [r0, before, after, at5, at29] = r.out.trim().split('\n');
+    assert.equal(r0, '33');
+    assert.equal(after, before + ' 25');
+    /* one tick at 25 is 0.04 s, and 24 more make 1 s */
+    assert.ok(Math.abs(Number(at5) - Number(before) - 0.04) < 0.001, at5);
+    assert.ok(Math.abs(Number(at29) - Number(at5) - 0.96) < 0.001, at29);
+    const bad = run('function init() { setrate(30); }\nfunction update() {}');
+    assert.match(bad.err, /setrate\(\) takes 20, 25, 33 or 50/);
+});
+
+test('skipped counts the frames the host did not draw, once', () => {
+    const r = run(`var n = 0;
+function init() {}
+function update() { n++; if (n == 3 || n == 8 || n == 9) printh(n + " " + skipped()); }`,
+        9, ['--skip', '1:2,4:1,6:3']);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, '3 2\n8 4\n9 0\n');
+});
+
+test('sprites.draw draws from arrays of any kind, as spr would', () => {
+    const SHEET = `for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 1 + x); sset(16 + x, y, 9); }`;
+    const batch = run(`function init() {
+    ${SHEET}
+    var sp = new Uint8Array(3), xs = new Int32Array(3), ys = [0, 10.5, 20], fl = [false, true, 0];
+    sp[0] = 1; sp[1] = 1; sp[2] = 2; xs[0] = 0; xs[1] = 30; xs[2] = 156;
+    cls(); camera(-2, 0);
+    sprites.draw(sp, xs, ys, 3, fl);
+    sprites.draw(2, [70], [40], 1);
+}
+function update() {}`, 1, ['--dump', '0,0,160,50']);
+    const one = run(`function init() {
+    ${SHEET}
+    cls(); camera(-2, 0);
+    spr(1, 0, 0); spr(1, 30, 10.5, 1, 1, true); spr(2, 156, 20); spr(2, 70, 40);
+}
+function update() {}`, 1, ['--dump', '0,0,160,50']);
+    assert.equal(batch.status, 0, batch.err);
+    assert.equal(one.status, 0, one.err);
+    assert.equal(batch.out, one.out);
+    const bad = run('function init() { sprites.draw([1], [0], [0], 2); }\nfunction update() {}');
+    assert.match(bad.err, /n no longer than its arrays/);
+});
+
+test('plane: a billboard can be several sprites, and z lifts it', () => {
+    const r = run(`function init() {
+    // a 1x2 figure: sprite 1 on top (8), sprite 17 below it (11)
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 8); sset(8 + x, 8 + y, 11); }
+    plane.view(0, 0, 8, 0, 60, 0.25);
+    var sc = [0, 0, 0, 0];
+    plane.project(20, 0, 0, sc);
+    var foot = flr(sc[1]);
+    cls(0);
+    plane.billboards([20], [0], 0, 1, 16, 0, 1, 1, 2);
+    printh(foot + " " + pget(80, foot - 1) + " " + pget(80, foot - 40) + " " + pget(80, foot) + " " + pget(80 - 15, foot - 2) + " " + pget(80 - 17, foot - 2));
+    cls(0);
+    plane.billboards([20], [0], [4], [1], [16], [false], 1, [1], [2]);
+    printh(pget(80, foot - 1) + " " + pget(80, foot - 17));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    const [first, second] = r.out.trim().split('\n');
+    /* 16 world pixels tall at scale 4 is 64 rows on the floor, 32 wide:
+     * the lower sprite at the feet, the upper one 40 rows up */
+    const [foot, low, high, below, inside, outside] = first.split(' ').map(Number);
+    assert.ok(foot > 60 && foot < 120, 'foot ' + foot);
+    assert.deepEqual([low, high, below, inside, outside], [11, 8, 0, 11, 0]);
+    /* z 4 is 16 rows up: the feet are clear, the figure starts above */
+    assert.equal(second, '0 11');
+});

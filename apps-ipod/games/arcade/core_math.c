@@ -209,8 +209,8 @@ static int32_t quarter(uint32_t j)
     return sine_q[i] + (((sine_q[i + 1] - sine_q[i]) * (int32_t)f) >> 4);
 }
 
-/* sin(2 pi t) in 16.16, for t in 1/65536 turns. */
-static int32_t sine(uint32_t t)
+/* sin(2 pi t) in 16.16, for t in 1/65536 turns: the plane's too. */
+int32_t core_sine(uint32_t t)
 {
     t &= 0xffff;
     uint32_t i = t & 0x3fff;
@@ -226,14 +226,14 @@ NATIVE(sin)
 {
     (void)argc;
     REAL(0, t, "sin");
-    return RET_FIX(-sine((uint32_t)t));
+    return RET_FIX(-core_sine((uint32_t)t));
 }
 
 NATIVE(cos)
 {
     (void)argc;
     REAL(0, t, "cos");
-    return RET_FIX(sine((uint32_t)t + 0x4000));
+    return RET_FIX(core_sine((uint32_t)t + 0x4000));
 }
 
 /* The angle of (dx, -dy) in turns, 0 to just under 1, so that y down the
@@ -273,7 +273,8 @@ NATIVE(atan2)
 NATIVE(t)
 {
     (void)a; (void)argc;
-    return RET_FIX((int64_t)((uint64_t)vm->frame * 65536 / vm->rate));
+    return RET_FIX(vm->t_base + (int64_t)((uint64_t)(vm->frame - vm->frame_base)
+                                          * 65536 / vm->rate));
 }
 
 NATIVE(frame)

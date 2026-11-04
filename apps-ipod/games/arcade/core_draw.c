@@ -23,7 +23,8 @@
  *   the map
  *   state          camera, clip, colour, cursor, palettes, target
  *   memory         the engine's arrays as Uint8Arrays; copy and fill
- *   for the systems  actors' sprites and particles' pixels
+ *   for the systems  actors' sprites and particles' pixels; the plane's
+ *                    floor and billboards
  *   the host's view of the screen
  ***************************************************************************/
 #include <string.h>
@@ -394,6 +395,8 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
 #define PER16_SCALED   16
 #define PER16_DOT      18
 #define PER16_TLINE    48
+#define PER16_FLOOR    12   /* a row of the floor on the map */
+#define PER16_EDGE     18   /* one that leaves it */
 
 struct surf
 {
@@ -1703,6 +1706,23 @@ NATIVE(font)
  * arithmetic slowly. Unscaled -- every sprite, tile and blit -- is a
  * straight copy; scaled steps the source column by the whole and the
  * remainder of w / dw, which gives the same columns as dividing. */
+/* A scaled row whose source columns are all in the image: col[i] is the
+ * column under destination pixel i. Returns the pixels drawn. */
+__attribute__((optimize("O2")))
+static uint32_t scaled_row(uint8_t *d, const uint8_t *s, const uint16_t *col,
+                           int32_t n, const uint16_t *xl)
+{
+    uint32_t k = 0;
+    for (int32_t i = 0; i < n; i++) {
+        uint32_t c = xl[s[col[i]]];
+        if (!(c & XLAT_CLEAR)) {
+            d[i] = (uint8_t)c;
+            k++;
+        }
+    }
+    return k;
+}
+
 static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
                       int32_t sh_img, int64_t sx, int64_t sy, int64_t w,
                       int64_t h, int64_t dx, int64_t dy, int64_t dw,
@@ -1775,8 +1795,9 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         return;
     }
 
-    if (u1 > u0 && v1 > v0)
-        p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_SCALED / 16;
+    if (u1 <= u0 || v1 <= v0)
+        return;
+    p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_SCALED / 16;
     int32_t whole = (int32_t)(w / dw), part = (int32_t)(w % dw);
     int32_t tx0 = (int32_t)(u0 * w / dw), rem0 = (int32_t)(u0 * w % dw);
     int32_t W = (int32_t)w, DW = (int32_t)dw, SX = (int32_t)sx;
@@ -1784,7 +1805,7 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
     int32_t hwhole = (int32_t)(h / dh), hpart = (int32_t)(h % dh);
     int32_t ty = (int32_t)(v0 * h / dh), trem = (int32_t)(v0 * h % dh);
     int32_t DH = (int32_t)dh;
-    int inside = SX >= 0 && W <= sw_img - SX;
+    int inside = SX >= 0 && W <= sw_img - SX, stepped = 0;
     for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
         int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - ty : ty);
         ty += hwhole;
@@ -1801,22 +1822,23 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         int32_t tx = tx0, rem = rem0;
         uint32_t n = 0;
         if (inside) {
-            /* Every source column is in the image: no test per pixel */
-            const uint8_t *sp = srow + SX + (fx ? W - 1 : 0);
-            int32_t dir = fx ? -1 : 1;
-            for (int32_t u = (int32_t)u0; u < (int32_t)u1; u++) {
-                uint32_t c = xl[sp[dir * tx]];
-                tx += whole;
-                rem += part;
-                if (rem >= DW) {
-                    rem -= DW;
-                    tx++;
+            /* Every source column is in the image: the columns, stepped
+             * once for the first row drawn, serve every row */
+            static uint16_t col[IMAGE_MAX];
+            int32_t cols = (int32_t)(u1 - u0);
+            if (!stepped) {
+                for (int32_t i = 0; i < cols; i++) {
+                    col[i] = (uint16_t)(SX + (fx ? W - 1 - tx : tx));
+                    tx += whole;
+                    rem += part;
+                    if (rem >= DW) {
+                        rem -= DW;
+                        tx++;
+                    }
                 }
-                if (!(c & XLAT_CLEAR)) {
-                    drow[u] = (uint8_t)c;
-                    n++;
-                }
+                stepped = 1;
             }
+            n = scaled_row(drow + u0, srow, col, cols, xl);
             if (n) {
                 p->count += n;
                 row_touched(p, (int32_t)(dy + v));
@@ -2536,11 +2558,79 @@ static int32_t num_or_0(struct value v)
     return is_num(v) ? floor_int(v) : 0;
 }
 
-/* actors.draw(): each actor on with a sprite 0-255, as spr(sp, x, y, 1, 1,
- * flip) draws it */
-void core_draw_sprites(struct vm *vm, const struct value *on,
-                       const struct value *x, const struct value *y,
-                       const struct value *sp, const struct value *flip,
+/* 0 when v is not an array of numbers this can read */
+int column_of(struct vm *vm, struct value v, struct column *c)
+{
+    c->tag = v.tag;
+    c->k = 0;
+    switch (v.tag) {
+    case T_ARR:
+        c->p = BUF(vm, ARR(vm, v)->buf)->v;
+        c->len = ARR(vm, v)->len;
+        return 1;
+    case T_I32:
+        c->p = I32(vm, v)->d;
+        c->len = I32(vm, v)->len;
+        return 1;
+    case T_U8:
+        c->p = U8A(vm, v)->d;
+        c->len = U8A(vm, v)->len;
+        return 1;
+    case T_INT:
+    case T_FIX:
+        c->tag = T_INT;
+        c->k = floor_int(v);
+        c->p = NULL;
+        c->len = 0xffffffffu;
+        return 1;
+    }
+    return 0;
+}
+
+/* Element i rounded down; none when it is not a number */
+int32_t column_at(const struct column *c, uint32_t i, int32_t none)
+{
+    switch (c->tag) {
+    case T_ARR: {
+        struct value v = ((const struct value *)c->p)[i];
+        return is_num(v) ? floor_int(v) : none;
+    }
+    case T_I32:
+        return ((const int32_t *)c->p)[i];
+    case T_U8:
+        return ((const uint8_t *)c->p)[i];
+    case T_INT:
+        return c->k;
+    }
+    return none;
+}
+
+/* Element i in 16.16, 0 when it is not a number */
+int32_t column_fix(const struct column *c, uint32_t i)
+{
+    if (c->tag == T_ARR) {
+        struct value v = ((const struct value *)c->p)[i];
+        return is_num(v) ? wrap32(scaled(v)) : 0;
+    }
+    return (int32_t)((uint32_t)column_at(c, i, 0) << 16);
+}
+
+/* Element i as a condition; dflt when the column is absent */
+int column_true(struct vm *vm, const struct column *c, uint32_t i,
+                       int dflt)
+{
+    if (c->tag == T_NULL)
+        return dflt;
+    if (c->tag == T_ARR)
+        return vm_truthy(vm, ((const struct value *)c->p)[i]);
+    return column_at(c, i, 0) != 0;
+}
+
+/* actors.draw() and sprites.draw(): each sprite on with a number 0-255, as
+ * spr(sp, x, y, 1, 1, flip) draws it */
+void core_draw_sprites(struct vm *vm, const struct column *on,
+                       const struct column *sp, const struct column *x,
+                       const struct column *y, const struct column *flip,
                        uint32_t n)
 {
     struct pen p;
@@ -2548,11 +2638,11 @@ void core_draw_sprites(struct vm *vm, const struct value *on,
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
     for (uint32_t i = 0; i < n; i++) {
-        int32_t s = num_or_0(sp[i]);
-        if (!vm_truthy(vm, on[i]) || !is_num(sp[i]) || s < 0 || s > 255)
+        int32_t s = column_at(sp, i, -1);
+        if (s < 0 || s > 255 || !column_true(vm, on, i, 1))
             continue;
-        int64_t xx = num_or_0(x[i]), yy = num_or_0(y[i]);
-        int fl = vm_truthy(vm, flip[i]);
+        int64_t xx = column_at(x, i, 0), yy = column_at(y, i, 0);
+        int fl = column_true(vm, flip, i, 0);
         int32_t tx, ty;
         p.cost += COST_CALL / 2;
         if (!fl && tile_inside(&p, xx, yy, &tx, &ty))
@@ -2562,6 +2652,30 @@ void core_draw_sprites(struct vm *vm, const struct value *on,
                       8, 8, xx, yy, 8, 8, fl, 0);
     }
     finish(vm, &p);
+}
+
+/* sprites.draw(sp, xs, ys, n, [flips]): n sprites from the cart's arrays,
+ * each a plain array, Int32Array or Uint8Array; sp may be one number for
+ * all */
+NATIVE(sprites_draw)
+{
+    (void)out;
+    struct column sp, x, y, flip = { T_NULL, NULL, 0, 0 }, on = flip;
+    int32_t n = is_num(a[3]) ? floor_int(a[3]) : -1;
+    if (!column_of(vm, a[0], &sp) ||
+        !column_of(vm, a[1], &x) || x.tag == T_INT ||
+        !column_of(vm, a[2], &y) || y.tag == T_INT ||
+        (argc > 4 && a[4].tag != T_NULL &&
+         (!column_of(vm, a[4], &flip) || flip.tag == T_INT)))
+        return vm_fail(vm, "sprites.draw() takes arrays of sprites (or one "
+                       "sprite), x and y, a count, and arrays of flips",
+                       "", "");
+    if (n < 0 || (uint32_t)n > sp.len || (uint32_t)n > x.len ||
+        (uint32_t)n > y.len || (flip.tag != T_NULL && (uint32_t)n > flip.len))
+        return vm_fail(vm, "sprites.draw() needs n no longer than its arrays",
+                       "", "");
+    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, (uint32_t)n);
+    return 1;
 }
 
 /* particles.draw(): each live particle a pixel of its colour */
@@ -2585,6 +2699,137 @@ void core_draw_dots(struct vm *vm, const struct value *life,
         p.count++;
         row_touched(&p, (int32_t)py);
     }
+    finish(vm, &p);
+}
+
+/* What a row of the floor reads: u and v are 16.16 world pixels, and
+ * tile[m] is sprite m's top left in the sheet */
+struct floor_env
+{
+    const uint8_t *map;
+    uint32_t mw, umax, vmax;
+    const uint8_t *const *tile;
+    const uint8_t *outside;
+    const uint16_t *xl;
+};
+
+/* One row, px to end. The bounds are one unsigned compare an axis, as a
+ * negative u or v is past umax or vmax. */
+__attribute__((optimize("O2")))
+static void floor_pixels(uint8_t *px, const uint8_t *end, uint32_t u,
+                         uint32_t v, uint32_t du, uint32_t dv,
+                         const struct floor_env *e)
+{
+    const uint8_t *map = e->map, *const *tile = e->tile;
+    const uint32_t mw = e->mw, umax = e->umax, vmax = e->vmax;
+    const uint16_t *xl = e->xl;
+    do {
+        const uint8_t *t;
+        if (u < umax && v < vmax)
+            t = tile[map[(v >> 19) * mw + (u >> 19)]];
+        else
+            t = e->outside;
+        if (t) {
+            uint32_t c = xl[t[((v >> 9) & 0x380) | ((u >> 16) & 7)]];
+            if (!(c & XLAT_CLEAR))
+                *px = (uint8_t)c;
+        }
+        px++;
+        u += du;
+        v += dv;
+    } while (px < end);
+}
+
+/* A row wholly on the map, as most are: with no bounds to test, the loop
+ * keeps all it needs in registers */
+__attribute__((optimize("O2")))
+static void floor_inside(uint8_t *px, const uint8_t *end, uint32_t u,
+                         uint32_t v, uint32_t du, uint32_t dv,
+                         const struct floor_env *e)
+{
+    const uint8_t *map = e->map, *const *tile = e->tile;
+    const uint32_t mw = e->mw;
+    const uint16_t *xl = e->xl;
+    do {
+        const uint8_t *t = tile[map[(v >> 19) * mw + (u >> 19)]];
+        uint32_t c = xl[t[((v >> 9) & 0x380) | ((u >> 16) & 7)]];
+        if (!(c & XLAT_CLEAR))
+            *px = (uint8_t)c;
+        px++;
+        u += du;
+        v += dv;
+    } while (px < end);
+}
+
+/* Whether a row's ends, and so all of it, are on the map */
+static int row_inside(int64_t u, int64_t v, int64_t du, int64_t dv,
+                      int32_t n, const struct floor_env *e)
+{
+    int64_t u1 = u + du * (n - 1), v1 = v + dv * (n - 1);
+    return u >= 0 && u1 >= 0 && v >= 0 && v1 >= 0 && u < e->umax &&
+           u1 < e->umax && v < e->vmax && v1 < e->vmax;
+}
+
+/* plane.draw(): rows top..bottom of the floor, each from its start and
+ * step in 16.16 world pixels; a cell off the map is sprite outside, or
+ * left alone when outside is negative */
+void core_draw_floor(struct vm *vm, const struct floor_row *rows,
+                     int32_t top, int32_t bottom, int32_t outside)
+{
+    static const uint8_t *tile[256];
+    struct pen p;
+    struct floor_env e;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* each pixel read is charged */
+    const uint8_t *sheet = MEM(vm, vm->sheet);
+    for (uint32_t m = 0; m < 256; m++)
+        tile[m] = sheet + (m >> 4) * 8 * SHEET_W + (m & 15) * 8;
+    e.map = MEM(vm, vm->map);
+    e.mw = (uint32_t)vm->map_w;
+    e.umax = (uint32_t)vm->map_w << 19;
+    e.vmax = (uint32_t)vm->map_h << 19;
+    e.tile = tile;
+    e.outside = outside >= 0 ? tile[outside] : NULL;
+    e.xl = p.xl;
+    const int32_t x0 = p.cx0, x1 = p.cx1;
+    if (top < p.cy0) top = p.cy0;
+    if (bottom > p.cy1 - 1) bottom = p.cy1 - 1;
+    if (x0 < x1 && top <= bottom) {
+        uint32_t read = 0;          /* pixels times their units per 16 */
+        for (int32_t y = top; y <= bottom; y++) {
+            const struct floor_row *r = &rows[y];
+            uint8_t *px = p.s.px + y * p.s.w;
+            int32_t u = r->u + r->du * x0, v = r->v + r->dv * x0;
+            if (row_inside(u, v, r->du, r->dv, x1 - x0, &e)) {
+                floor_inside(px + x0, px + x1, (uint32_t)u, (uint32_t)v,
+                             (uint32_t)r->du, (uint32_t)r->dv, &e);
+                read += (uint32_t)(x1 - x0) * PER16_FLOOR;
+            } else {
+                floor_pixels(px + x0, px + x1, (uint32_t)u, (uint32_t)v,
+                             (uint32_t)r->du, (uint32_t)r->dv, &e);
+                read += (uint32_t)(x1 - x0) * PER16_EDGE;
+            }
+        }
+        row_touched(&p, top);
+        row_touched(&p, bottom);
+        p.cost += read / 16 + 64;
+    }
+    finish(vm, &p);
+}
+
+/* plane.billboards(): cw by ch sprites from s, scaled to w by h, their top
+ * left at x, y on the screen, the camera aside */
+void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
+                         int32_t w, int32_t h, int32_t cw, int32_t ch,
+                         int flip)
+{
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.ox = p.oy = 0;
+    p.cost = COST_CALL / 2;
+    p.per16 = 0;                    /* copy_rect charges the area */
+    copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
+              (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
     finish(vm, &p);
 }
 

@@ -31,7 +31,7 @@ case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) out="$out.exe" ;; esac
 srcs="$here/pbgvm.c $engine/vm.c $engine/gc.c $engine/loader.c
       $engine/verify.c $engine/natives.c $engine/core_math.c
       $engine/core_draw.c $engine/core_input.c $engine/present.c
-      $engine/core_sound.c $engine/sys_actors.c"
+      $engine/core_sound.c $engine/sys_actors.c $engine/sys_plane.c $engine/sys_grid.c"
 
 # Nothing to do when the binary is newer than every source and header, so
 # test files running side by side never replace a binary another is using.

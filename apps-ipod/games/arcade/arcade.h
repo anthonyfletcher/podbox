@@ -47,6 +47,11 @@ struct vm *arcade_load(void *mem, uint32_t size, arcade_read_fn read,
  * options and scores are filed under. */
 int arcade_rate(const struct vm *vm);
 int arcade_menu_is_game(const struct vm *vm);
+
+/* The host fell behind by this many frames and did not draw them: what
+ * skipped() reports. The rate can change at any tick (setrate()), so the
+ * host reads arcade_rate() after each. */
+void arcade_skipped(struct vm *vm, unsigned frames);
 const uint8_t *arcade_id(const struct vm *vm);
 
 /* The buttons for btn(): one bit each, in btn()'s numbering. */

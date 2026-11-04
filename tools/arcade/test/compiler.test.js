@@ -113,7 +113,8 @@ test('rejects a const cycle', () => {
 });
 
 test('rejects a global named like a native', () => {
-    rejects('var t = 0;' + ENTRY, 't is a built-in name', 1);
+    rejects('var t = 0;' + ENTRY, 't is a built-in function; choose another name for a global', 1);
+    rejects('var grid = 0;' + ENTRY, 'grid is the grid system (grid.collapse, grid.fall, grid.fill, ...)', 1);
 });
 
 test('rejects a capture, and says what to do', () => {

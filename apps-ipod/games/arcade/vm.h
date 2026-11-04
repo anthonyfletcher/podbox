@@ -165,6 +165,19 @@ struct draw
     int16_t dirty_lo, dirty_hi;  /* the screen's rows drawn */
 };
 
+/* The plane's camera, from plane.view(): 16.16 world pixels, the heading
+ * as the unit vector (dx, dy), and the focal length in screen pixels */
+struct planeview
+{
+    int32_t x, y, z, dx, dy, focal;
+    int32_t horizon;
+    int set;
+};
+
+/* A row of the floor: its left end and one screen pixel's step, 16.16
+ * world pixels */
+struct floor_row { int32_t u, v, du, dv; };
+
 /* An effect: signed bytes, each times scale a 16-bit sample */
 struct sfxinfo
 {
@@ -275,7 +288,11 @@ struct vm
     struct sfxinfo *sfxdir;
     struct voice voices[4];
     uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
+    struct planeview plane;
     uint32_t frame;
+    int64_t t_base;             /* t() at frame_base, 16.16, for setrate() */
+    uint32_t frame_base;
+    uint32_t skipped;           /* frames not drawn since skipped() */
     uint8_t held, pressed;      /* btn() and btnp() bits */
     uint16_t held_ticks[5];
     int32_t wheel, wheelpos;
@@ -394,18 +411,39 @@ uint32_t vm_shape_add(struct vm *vm, uint32_t parent, uint32_t key);
 /* core_math.c */
 void core_seed(struct vm *vm, uint64_t seed);
 uint32_t core_random(struct vm *vm);
+int32_t core_sine(uint32_t turns);
 
 /* core_draw.c */
 int core_draw_init(struct vm *vm);
-/* For the systems: actors' sprites and particles' pixels, from a pool's
- * arrays of values */
-void core_draw_sprites(struct vm *vm, const struct value *on,
-                       const struct value *x, const struct value *y,
-                       const struct value *sp, const struct value *flip,
+/* A cart's array read as numbers whatever its kind -- values, an
+ * Int32Array or a Uint8Array -- or one number for every element (tag
+ * T_INT, in k), or absent (tag T_NULL) */
+struct column
+{
+    uint32_t tag;
+    const void *p;
+    uint32_t len;
+    int32_t k;
+};
+int column_of(struct vm *vm, struct value v, struct column *c);
+int32_t column_at(const struct column *c, uint32_t i, int32_t none);
+int32_t column_fix(const struct column *c, uint32_t i);
+int column_true(struct vm *vm, const struct column *c, uint32_t i, int dflt);
+
+/* For the systems: sprites from columns (on and flip may be absent), and
+ * particles' pixels from a pool's arrays of values */
+void core_draw_sprites(struct vm *vm, const struct column *on,
+                       const struct column *sp, const struct column *x,
+                       const struct column *y, const struct column *flip,
                        uint32_t n);
 void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *x, const struct value *y,
                     const struct value *c, uint32_t n);
+void core_draw_floor(struct vm *vm, const struct floor_row *rows,
+                     int32_t top, int32_t bottom, int32_t outside);
+void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
+                         int32_t w, int32_t h, int32_t cw, int32_t ch,
+                         int flip);
 int sound_load(struct vm *vm);
 
 /* verify.c */

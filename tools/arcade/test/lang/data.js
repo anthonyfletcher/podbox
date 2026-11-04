@@ -1,5 +1,5 @@
 // Strings, arrays, typed arrays and records.
-var grid = new Uint8Array(16);
+var bytes = new Uint8Array(16);
 var wide = new Int32Array(4);
 var people = [{ name: "b", age: 30 }, { name: "a", age: 30 }, { name: "c", age: 20 }];
 
@@ -36,9 +36,9 @@ function init() {
     people.sort(function (p, q) { return p.age - q.age; });
     printh("stable " + people[0].name + people[1].name + people[2].name);
 
-    for (i = 0; i < grid.length; i++) grid[i] = i * 40;
-    printh("u8 " + grid + " " + grid[99] + " " + grid.indexOf(160));
-    grid[99] = 5;
+    for (i = 0; i < bytes.length; i++) bytes[i] = i * 40;
+    printh("u8 " + bytes + " " + bytes[99] + " " + bytes.indexOf(160));
+    bytes[99] = 5;
     wide[0] = 0x7fffffff; wide[1] = -1; wide[3] += 7; wide[2]--;
     printh("i32 " + wide + " " + wide.length + " " + wide.reverse());
 
@@ -56,7 +56,7 @@ function init() {
         counts[w] = (counts[w] || 0) + 1;
     }
     printh("dict " + counts.a + counts.b + counts.c);
-    printh(typeof o + typeof s + typeof 1 + typeof null + typeof init + typeof grid);
+    printh(typeof o + typeof s + typeof 1 + typeof null + typeof init + typeof bytes);
 }
 
 function update() {}

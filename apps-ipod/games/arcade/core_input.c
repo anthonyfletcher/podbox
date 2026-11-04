@@ -122,6 +122,44 @@ int arcade_rate(const struct vm *vm)
     return vm->rate;
 }
 
+void arcade_skipped(struct vm *vm, unsigned frames)
+{
+    vm->skipped += frames;
+}
+
+/* rate(): the ticks a second now */
+NATIVE(rate)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, vm->rate);
+    return 1;
+}
+
+/* setrate(n): 20, 25, 33 or 50 ticks a second from the next tick. t()
+ * carries on from where it is. */
+NATIVE(setrate)
+{
+    (void)argc; (void)out;
+    int32_t r = is_num(a[0]) ? floor_int(a[0]) : 0;
+    if (r != 20 && r != 25 && r != 33 && r != 50)
+        return vm_fail(vm, "setrate() takes 20, 25, 33 or 50", "", "");
+    vm->t_base += (int64_t)((uint64_t)(vm->frame - vm->frame_base) * 65536 /
+                            vm->rate);
+    vm->frame_base = vm->frame;
+    vm->rate = (uint8_t)r;
+    return 1;
+}
+
+/* skipped(): frames the engine ran late and did not draw since the last
+ * call */
+NATIVE(skipped)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, (int32_t)vm->skipped);
+    vm->skipped = 0;
+    return 1;
+}
+
 int arcade_menu_is_game(const struct vm *vm)
 {
     return vm->menu_button == 1;

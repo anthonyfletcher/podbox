@@ -1288,6 +1288,21 @@ class Program {
         return null;
     }
 
+    /* What a reserved name already is, for the error that refuses it */
+    whatIs(name) {
+        const api = this.api;
+        if (this.byNs.has(name)) return 'the name of the file ' + name + '.js';
+        if (api.namespaces && api.namespaces[name]) {
+            const fns = Object.keys(api.namespaces[name]).sort().slice(0, 3);
+            return 'the ' + name + ' system (' + fns.map((n) => name + '.' + n)
+                .join(', ') + ', ...)';
+        }
+        if (api.natives[name]) return 'a built-in function';
+        if (api.consts[name]) return 'a built-in constant';
+        if (api.groups[name]) return 'a built-in group of constants';
+        return 'a built-in name';
+    }
+
     reserved(name) {
         const api = this.api;
         return api.natives[name] || api.consts[name] || api.groups[name] ||
@@ -1440,9 +1455,8 @@ class Program {
             if (scope.has(name))
                 fail(id, name + ' is declared twice in ' + file.name);
             if (self.reserved(name))
-                fail(id, name + ' is ' + (self.byNs.has(name)
-                    ? 'the name of the file ' + name + '.js'
-                    : 'a built-in name') + '; choose another');
+                fail(id, name + ' is ' + self.whatIs(name) + '; choose another ' +
+                     'name for a global (a local or parameter may reuse it)');
         }
         for (const s of file.ast.body) {
             this.guard(file, () => {

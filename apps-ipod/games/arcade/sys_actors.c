@@ -341,9 +341,13 @@ NATIVE(actors_draw)
     uint32_t n;
     if (!actors(vm, a[0], f, &n, "actors.draw"))
         return 0;
-    core_draw_sprites(vm, ELEMS(vm, f[A_ON]), ELEMS(vm, f[A_X]),
-                      ELEMS(vm, f[A_Y]), ELEMS(vm, f[A_SP]),
-                      ELEMS(vm, f[A_FLIP]), n);
+    struct column on, x, y, sp, flip;
+    column_of(vm, f[A_ON], &on);
+    column_of(vm, f[A_X], &x);
+    column_of(vm, f[A_Y], &y);
+    column_of(vm, f[A_SP], &sp);
+    column_of(vm, f[A_FLIP], &flip);
+    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, n);
     return 1;
 }
 
