@@ -70,6 +70,7 @@ export function readAssets(dir) {
             ? fs.readFileSync(at('flags.json'), 'utf8') : undefined,
         palettes: some('palettes', '.gpl', false),
         maps: some('maps', '.json', false),
-        images: some('images', '.png', true)
+        images: some('images', '.png', true),
+        sounds: some('sounds', '.json', false)
     };
 }

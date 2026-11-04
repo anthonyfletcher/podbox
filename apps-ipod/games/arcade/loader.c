@@ -445,10 +445,10 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[9] = { 0 };
-    uint32_t clen[9] = { 0 };
-    static const char tags[9][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
-                                     "PALS", "SHET", "MAPS", "IMGS" };
+    const uint8_t *chunk[10] = { 0 };
+    uint32_t clen[10] = { 0 };
+    static const char tags[10][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+                                      "PALS", "SHET", "MAPS", "IMGS", "SFX_" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -462,7 +462,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 9; i++)
+        for (int i = 0; i < 10; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -500,6 +500,8 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     vm->maps_len = clen[7];
     vm->imgs = chunk[8];
     vm->imgs_len = clen[8];
+    vm->sfx = chunk[9];
+    vm->sfx_len = clen[9];
     return load_header(vm, chunk[0], clen[0]) &&
         load_code(vm, chunk[1], clen[1]) &&
         load_constants(vm, chunk[2], clen[2]) &&
@@ -529,7 +531,7 @@ struct vm *arcade_load(void *mem, uint32_t size, arcade_read_fn read,
     }
     if (!verify_cart(vm))
         return vm;
-    if (!core_draw_init(vm)) {
+    if (!core_draw_init(vm) || !sound_load(vm)) {
         vm_fail(vm, "not enough memory for this game", "", "");
         return vm;
     }

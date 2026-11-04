@@ -7,10 +7,13 @@
  *   maps/<name>.json     { width, height, rows: ["0a0b..", ...], objects:
  *                        [{ kind, x, y, w, h, props: { name: value } }] }
  *   images/<name>.png    other images, indexed PNGs
+ *   sounds/<name>.json   sound effects: sfxr parameters in jsfxr's JSON,
+ *                        rendered here and stored as 8-bit PCM at 22,050 Hz
  *
  * Each palette, map and image is named after its file; maps and palettes
  * become MAP.<name> and PAL.<name> (numbered in name order), object kinds
- * OBJ.<kind>, and images IMG.<name>, an image value the loader makes.
+ * OBJ.<kind>, sounds SFX.<name>, and images IMG.<name>, an image value
+ * the loader makes.
  *
  * Chunks, little-endian (lengths and counts u16, sizes u32):
  *   PALS  count; each: entries, then r, g and b, a byte each
@@ -19,11 +22,15 @@
  *         each object: kind u8, x y w h i16, prop count u8; each prop:
  *         key (a string number), type u8 (0 an integer, 1 a string), then
  *         an i32 or a string number
- *   IMGS  count; each: width, height, LZ4 size, LZ4 pixels */
+ *   IMGS  count; each: width, height, LZ4 size, LZ4 pixels
+ *   SFX_  count; each: samples (u32), scale (u16), then a signed byte a
+ *         sample: the 16-bit sample is the byte times the scale, which is
+ *         as small as lets the loudest sample fit */
 
 import { Writer } from './cart.js';
 import { lz4Compress } from './lz4.js';
 import { decodeIndexedPng } from './png.js';
+import { sfxrParams, sfxrRender, halve } from './sfxr.js';
 
 const NAME = /^[A-Za-z_][\w]*$/;
 const MAX_MAP = 256;
@@ -31,6 +38,18 @@ const MAX_IMAGE = 1024;
 
 function sortedNames(obj) {
     return Object.keys(obj || {}).sort();
+}
+
+/* 16-bit samples as signed bytes and a scale: the smallest whole scale
+ * that fits the loudest, so a quiet effect keeps its detail */
+export function quantise(pcm) {
+    let peak = 1;
+    for (const v of pcm) peak = Math.max(peak, Math.abs(v));
+    const scale = Math.ceil(peak / 127);
+    const bytes = new Uint8Array(pcm.length);
+    for (let i = 0; i < pcm.length; i++)
+        bytes[i] = Math.max(-128, Math.min(127, Math.round(pcm[i] / scale))) & 0xff;
+    return { scale: scale, bytes: bytes };
 }
 
 export function parseGpl(text) {
@@ -56,7 +75,8 @@ export function parseGpl(text) {
  * them (PNGs as bytes, the rest as text); string(s) numbers a constant
  * string. Errors go to errors; returns { groups, images, chunks }. */
 export function buildAssets(assets, inflate, string, errors) {
-    const out = { groups: { MAP: {}, PAL: {}, OBJ: {} }, images: [], chunks: [] };
+    const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {} }, images: [],
+                  chunks: [] };
     if (!assets) return out;
     function err(file, message) {
         errors.push({ file: file, line: 1, column: 1, message: message });
@@ -217,6 +237,30 @@ export function buildAssets(assets, inflate, string, errors) {
             w.u16(img.width); w.u16(img.height); w.u32(z.length); w.bytes(z);
         }
         out.chunks.push({ tag: 'IMGS', data: w.done() });
+    }
+
+    /* sounds: rendered now, each with noise seeded from its name */
+    const sounds = [];
+    for (const name of sortedNames(assets.sounds)) {
+        const file = 'sounds/' + name + '.json';
+        if (!named(file, name)) continue;
+        try {
+            const params = sfxrParams(JSON.parse(assets.sounds[name]));
+            let seed = 2166136261;
+            for (const ch of name) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+            sounds.push(quantise(halve(sfxrRender(params, seed >>> 0))));
+            out.groups.SFX[name] = { value: sounds.length - 1, version: 1 };
+        } catch (e) { err(file, e.message); }
+    }
+    if (sounds.length) {
+        const w = new Writer();
+        w.u16(sounds.length);
+        for (const s of sounds) {
+            w.u32(s.bytes.length);
+            w.u16(s.scale);
+            w.bytes(s.bytes);
+        }
+        out.chunks.push({ tag: 'SFX_', data: w.done() });
     }
     return out;
 }

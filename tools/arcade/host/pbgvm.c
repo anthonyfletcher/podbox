@@ -3,7 +3,7 @@
  *
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
- *                  [--menu i]...
+ *                  [--wav file.wav] [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -11,7 +11,9 @@
  * --shot saves the panel as the player shows it, the 160x120 screen
  * doubled to 320x240, and --dump prints a rectangle of the screen as one
  * hex digit a pixel (the colour's low four bits), a row a line, and
- * --dirty prints "dirty lo hi", the rows the last tick drew. Each
+ * --dirty prints "dirty lo hi", the rows the last tick drew. --wav saves
+ * the sound, 44.1 kHz stereo, a tick's worth after each tick, and click()
+ * prints "click 0" or "click 1". Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -43,6 +45,57 @@ static void print(void *ctx, const char *s, int len)
     (void)ctx;
     fwrite(s, 1, (size_t)len, stdout);
     fputc('\n', stdout);
+}
+
+static void click(void *ctx, int beep)
+{
+    (void)ctx;
+    printf("click %d\n", beep);
+}
+
+/* --wav: the sound, gathered tick by tick */
+#define WAV_RATE 44100
+static int16_t *wav;
+static size_t wav_frames, wav_cap;
+
+static void wav_tick(struct vm *vm, long tick)
+{
+    long rate = arcade_rate(vm);
+    size_t want = (size_t)((tick + 1) * WAV_RATE / rate) - wav_frames;
+    if (wav_frames + want > wav_cap) {
+        wav_cap = (wav_frames + want) * 2;
+        wav = realloc(wav, wav_cap * 4);
+        if (!wav)
+            exit(2);
+    }
+    arcade_audio(vm, wav + wav_frames * 2, (int)want, WAV_RATE);
+    wav_frames += want;
+}
+
+static void put32(FILE *f, uint32_t v)
+{
+    fputc((int)(v & 0xff), f); fputc((int)(v >> 8 & 0xff), f);
+    fputc((int)(v >> 16 & 0xff), f); fputc((int)(v >> 24), f);
+}
+
+static void wav_save(const char *path)
+{
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        perror(path);
+        return;
+    }
+    uint32_t bytes = (uint32_t)(wav_frames * 4);
+    fwrite("RIFF", 1, 4, f); put32(f, 36 + bytes); fwrite("WAVEfmt ", 1, 8, f);
+    put32(f, 16); put32(f, 1 | 2 << 16); put32(f, WAV_RATE);
+    put32(f, WAV_RATE * 4); put32(f, 4 | 16 << 16);
+    fwrite("data", 1, 4, f); put32(f, bytes);
+    for (size_t i = 0; i < wav_frames * 2; i++) {
+        uint16_t v = (uint16_t)wav[i];
+        fputc(v & 0xff, f);
+        fputc(v >> 8, f);
+    }
+    fclose(f);
 }
 
 static void date(void *ctx, int32_t out[7])
@@ -222,7 +275,7 @@ int main(int argc, char **argv)
     unsigned long long seed = 1;
     int units = 0, dirty = 0;
     unsigned long ceiling = 0;
-    const char *shot_path = NULL, *dump_spec = NULL;
+    const char *shot_path = NULL, *dump_spec = NULL, *wav_path = NULL;
     int menu_picks[16], npicks = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
@@ -241,6 +294,8 @@ int main(int argc, char **argv)
             units = 1;
         else if (!strcmp(argv[i], "--dirty"))
             dirty = 1;
+        else if (!strcmp(argv[i], "--wav") && i + 1 < argc)
+            wav_path = argv[++i];
         else
             path = argv[i];
     }
@@ -261,7 +316,7 @@ int main(int argc, char **argv)
 
     /* The player's limit: the 5G's whole app buffer. */
     static uint64_t arena[512 * 1024 / 8];
-    struct arcade_host host = { NULL, print, NULL, date };
+    struct arcade_host host = { NULL, print, NULL, date, click };
     struct vm *vm = arcade_load(arena, sizeof(arena), mem_read, &in, &host,
                                 seed);
     if (!vm) {
@@ -282,8 +337,12 @@ int main(int argc, char **argv)
             return report(vm);
         if (units)
             fprintf(stderr, "tick %ld %u\n", t + 1, (unsigned)arcade_units(vm));
+        if (wav_path)
+            wav_tick(vm, t);
         arcade_idle(vm);
     }
+    if (wav_path)
+        wav_save(wav_path);
     if (dump_spec)
         dump(vm, dump_spec);
     if (dirty) {

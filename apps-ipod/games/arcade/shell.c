@@ -42,6 +42,8 @@
 #include "root_menu.h"        /* GO_TO_* */
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell.h"
+#include "pcm_mixer.h"
+#include "piezo.h"
 
 /* The engine's memory: the app buffer, no more than the smaller player's. */
 #define ARENA_MAX (512 * 1024)
@@ -138,13 +140,25 @@ static void host_print(void *ctx, const char *s, int len)
     (void)ctx; (void)s; (void)len;    /* printh is for the IDE's console */
 }
 
+static void sound_fill(void);
+
 static void host_yield(void *ctx)
 {
     (void)ctx;
+    sound_fill();
 #ifdef HAVE_LCD_UPDATE_ASYNC
     lcd_update_poll();
 #endif
     yield();
+}
+
+/* Not forced: on the 5G a forced click never sounds, as piezo_clear()
+ * leaves a stop queued, and on the 6G it waits out the last beep inside
+ * the tick. Unforced, a click sounds unless the last is still sounding. */
+static void host_click(void *ctx, int beep)
+{
+    (void)ctx;
+    piezo_button_beep(beep, false);
 }
 
 static void host_date(void *ctx, int32_t out[7])
@@ -161,8 +175,68 @@ static void host_date(void *ctx, int32_t out[7])
 }
 
 static const struct arcade_host host = {
-    NULL, host_print, host_yield, host_date
+    NULL, host_print, host_yield, host_date, host_click
 };
+
+/* ---- sound -----------------------------------------------------------------
+ * The cart's voices go out on the mixer's beep channel. The game thread
+ * renders them into a ring of slots after each tick and at each yield; the
+ * mixer's callback, in its interrupt, takes the next filled slot, or
+ * silence when the game has fallen behind. The slot it took plays until it
+ * asks again, so the game fills at most all but one. */
+
+#define SOUND_FRAMES 512
+#define SOUND_SLOTS  4
+
+static int16_t sound_slot[SOUND_SLOTS][SOUND_FRAMES * 2] MEM_ALIGN_ATTR;
+static int16_t sound_quiet[SOUND_FRAMES * 2] MEM_ALIGN_ATTR;
+static volatile unsigned sound_head, sound_tail;
+static struct vm *sound_vm;     /* while a cart runs and may sound */
+static bool sound_on;
+
+static void sound_more(const void **start, size_t *size)
+{
+    if (sound_head != sound_tail)
+        *start = sound_slot[sound_tail++ % SOUND_SLOTS];
+    else
+        *start = sound_quiet;
+    *size = sizeof(sound_quiet);
+}
+
+static const struct mixer_play_cbs sound_cbs = { sound_more, NULL };
+
+static void sound_stop(void)
+{
+    if (sound_on)
+        mixer_channel_stop(PCM_MIXER_CHAN_BEEP);
+    sound_on = false;
+    sound_head = sound_tail = 0;
+}
+
+static void sound_fill(void)
+{
+    if (!sound_vm)
+        return;
+    int rate = (int)mixer_get_frequency();
+    bool sounding = false;
+    while (sound_head - sound_tail < SOUND_SLOTS - 1) {
+        if (!arcade_audio(sound_vm, sound_slot[sound_head % SOUND_SLOTS],
+                          SOUND_FRAMES, rate))
+            break;
+        sound_head++;
+        sounding = true;
+    }
+    /* Started for something to play, and again if a firmware beep, which
+     * shares the channel, stopped it; stopped once all is played out */
+    if (sounding && (!sound_on || mixer_channel_status(PCM_MIXER_CHAN_BEEP)
+                                  == CHANNEL_STOPPED)) {
+        mixer_channel_set_amplitude(PCM_MIXER_CHAN_BEEP, MIX_AMP_UNITY);
+        mixer_channel_play_data(PCM_MIXER_CHAN_BEEP, &sound_cbs, sound_quiet,
+                                sizeof(sound_quiet));
+        sound_on = true;
+    } else if (!sounding && sound_on && sound_head == sound_tail)
+        sound_stop();
+}
 
 /* ---- present ---------------------------------------------------------------
  * The 160x120 screen fills the panel, each pixel two wide and two high;
@@ -347,6 +421,7 @@ static void give_screen(void)
 {
     if (!screen_held)
         return;
+    sound_stop();
     present_wait();
     screen_held = false;
     cpu_boost(false);
@@ -358,6 +433,7 @@ static void give_screen(void)
 /* A system event: saved first, since USB or a shutdown may follow. */
 static int event(struct vm *vm, long button)
 {
+    sound_stop();
     present_wait();
     save_write(vm);
     if (default_event_handler(button) == SYS_USB_CONNECTED)
@@ -388,6 +464,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
 {
     struct simplelist_info info;
     int selection = 0;
+    sound_stop();
     present_wait();
     save_write(vm);
     give_screen();
@@ -429,6 +506,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
 /* The hold switch: the game waits, the screen shows it, until released. */
 static int hold_pause(struct vm *vm)
 {
+    sound_stop();
     present_wait();
     save_write(vm);
     while (button_hold()) {
@@ -494,6 +572,7 @@ static int run(const char *path, void *mem, size_t size)
     arcade_set_ceiling(vm, CEILING);
 
     take_screen(&vp);
+    sound_vm = vm;
     last_wheel = -1;
     menu_down = menu_paused = false;
     int status = PLAYING;
@@ -512,6 +591,7 @@ static int run(const char *path, void *mem, size_t size)
 
         /* Waiting for the next tick: the last frame lands meanwhile */
         if (TIME_BEFORE(now, due)) {
+            sound_fill();
             present_wait();
             now = current_tick;
         }
@@ -567,6 +647,7 @@ static int run(const char *path, void *mem, size_t size)
             break;
         }
         present(vm, false);
+        sound_fill();
         arcade_idle(vm);
         reset_poweroff_timer();
         /* Once a frame whatever the cart does: a cart always behind its
@@ -580,6 +661,7 @@ static int run(const char *path, void *mem, size_t size)
     if (status == FAILED)
         present(vm, false);
     give_screen();
+    sound_vm = NULL;
     if (status == FAILED) {
         show_error(vm);
         status = QUIT;

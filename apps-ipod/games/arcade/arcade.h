@@ -25,6 +25,8 @@ struct arcade_host
     void (*yield)(void *ctx);
     /* year, month, day, hour, minute, second, weekday (0 = Sunday) */
     void (*date)(void *ctx, int32_t out[7]);
+    /* click(): the wheel's tick, or with beep its beep; NULL for none */
+    void (*click)(void *ctx, int beep);
 };
 
 /* Reads n bytes into buf, or skips n bytes when buf is NULL; returns the
@@ -104,6 +106,11 @@ struct arcade_screen
 
 const struct arcade_screen *arcade_screen(struct vm *vm);
 void arcade_presented(struct vm *vm);
+
+/* core_sound.c: the cart's next frames of sound at rate Hz, each a stereo pair
+ * of 16-bit samples, the two the same. Returns 0, the frames silent, when
+ * no voice is sounding. */
+int arcade_audio(struct vm *vm, int16_t *out, int frames, int rate);
 
 /* present.c: the conversion for a 16-bit panel at twice the size. The
  * table holds each colour's pixel twice in one word, packed by the host's

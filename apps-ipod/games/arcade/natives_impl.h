@@ -75,6 +75,12 @@ IMPL(mem)
 IMPL(copy)
 IMPL(fill)
 
+/* core_sound.c */
+IMPL(sfx)
+IMPL(sfxp)
+IMPL(tone)
+IMPL(click)
+
 /* core_input.c */
 IMPL(btn)
 IMPL(btnp)

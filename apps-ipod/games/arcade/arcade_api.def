@@ -115,6 +115,9 @@ API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)
 API(fill,      76, 2, 4, VOID, 0,     CELLS,  LISTEN, 1)
 
+/* The click wheel's own sounds */
+API(click,     77, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */
@@ -124,6 +127,13 @@ API_CONST(SCREEN,   0, 1)
 API_CONSTG(FONT, SMALL, 0, 1)
 API_CONSTG(FONT, BIG,   1, 1)
 API_CONSTG(FONT, SYS,   2, 1)
+
+/* tone()'s waves */
+API_CONSTG(WAVE, SQUARE,   0, 1)
+API_CONSTG(WAVE, SAW,      1, 1)
+API_CONSTG(WAVE, TRIANGLE, 2, 1)
+API_CONSTG(WAVE, SINE,     3, 1)
+API_CONSTG(WAVE, NOISE,    4, 1)
 
 /* What mem() hands out, each a Uint8Array */
 API_CONSTG(MEM, SCREEN, 0, 1)

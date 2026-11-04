@@ -165,6 +165,29 @@ struct draw
     int16_t dirty_lo, dirty_hi;  /* the screen's rows drawn */
 };
 
+/* An effect: signed bytes, each times scale a 16-bit sample */
+struct sfxinfo
+{
+    const int8_t *data;
+    uint32_t n;
+    int32_t scale;
+};
+
+/* A voice: an effect stepped through in 16.16 at its pitch, or a tone */
+enum { VOICE_OFF, VOICE_SFX, VOICE_TONE };
+struct voice
+{
+    uint8_t kind, wave, done;
+    int32_t s0, s1;             /* an effect's samples either side of frac */
+    int32_t scale;
+    const int8_t *data;
+    uint32_t n, next;           /* samples, and the next to decode */
+    uint32_t frac, step, pitch; /* 16.16 */
+    uint32_t hz, phase, dphase, noise;
+    int32_t vol;
+    uint32_t left;              /* a tone's length left, 16.16 source samples */
+};
+
 #define MAX_SHAPES   2048
 #define MAX_RTKEYS   1024   /* string keys made at run time */
 #define MAX_FRAMES   200
@@ -247,6 +270,10 @@ struct vm
     int32_t active_map;         /* -1 while the map is the empty default */
     uint16_t *img_globals;      /* pairs: a global's slot, an image's number */
     uint32_t nimg_globals;
+    const uint8_t *sfx;
+    uint32_t sfx_len, nsfx;
+    struct sfxinfo *sfxdir;
+    struct voice voices[4];
     uint32_t frame;
     uint8_t held, pressed;      /* btn() and btnp() bits */
     uint16_t held_ticks[5];
@@ -366,6 +393,7 @@ void core_seed(struct vm *vm, uint64_t seed);
 
 /* core_draw.c */
 int core_draw_init(struct vm *vm);
+int sound_load(struct vm *vm);
 
 /* verify.c */
 int verify_cart(struct vm *vm);
