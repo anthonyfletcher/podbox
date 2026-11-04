@@ -182,6 +182,12 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->cy0 = d->clip_y0 < 0 ? 0 : d->clip_y0;
     p->cx1 = d->clip_x1 > p->s.w ? p->s.w : d->clip_x1;
     p->cy1 = d->clip_y1 > p->s.h ? p->s.h : d->clip_y1;
+    /* A clip off the surface is empty, never inverted: the runs test
+     * x - cx0 < cx1 - cx0 unsigned. */
+    if (p->cx1 < p->cx0)
+        p->cx1 = p->cx0;
+    if (p->cy1 < p->cy0)
+        p->cy1 = p->cy0;
     p->ox = -(int64_t)d->cam_x;
     p->oy = -(int64_t)d->cam_y;
     p->c = d->dpal[c & 0xff];
@@ -259,6 +265,20 @@ struct figure
 
 static uint64_t isqrt64(uint64_t v)
 {
+    if (v <= 0xffffffffu) {
+        uint32_t v32 = (uint32_t)v, r32 = 0, b32 = 1u << 30;
+        while (b32 > v32)
+            b32 >>= 2;
+        while (b32) {
+            if (v32 >= r32 + b32) {
+                v32 -= r32 + b32;
+                r32 = (r32 >> 1) + b32;
+            } else
+                r32 >>= 1;
+            b32 >>= 2;
+        }
+        return r32;
+    }
     uint64_t r = 0, bit = 1ull << 62;
     while (bit > v)
         bit >>= 2;
@@ -419,6 +439,33 @@ NATIVE(ovalfill) { (void)out; return oval(vm, a, argc, 0, "ovalfill"); }
 typedef void (*plot_fn)(struct pen *p, void *ctx, int64_t x, int64_t y,
                         int64_t i);
 
+/* A line's visible stretch in 32 bits: k pixels from (x, y), pixel i of
+ * the line first. Each pixel moves one step along the major axis, and the
+ * stepper's remainder r carries the minor step when it leaves [0, den). */
+struct run
+{
+    int32_t x, y, k, i;
+    int32_t dmx, dmy, dnx, dny;
+    int32_t r, den, inc;
+};
+
+typedef void (*run_fn)(struct pen *p, void *ctx, const struct run *run);
+
+#define RUN_STEP(run, x, y, r) do { \
+    x += (run)->dmx; \
+    y += (run)->dmy; \
+    r += (run)->inc; \
+    if (r >= (run)->den) { \
+        r -= (run)->den; \
+        x += (run)->dnx; \
+        y += (run)->dny; \
+    } else if (r < 0) { \
+        r += (run)->den; \
+        x -= (run)->dnx; \
+        y -= (run)->dny; \
+    } \
+} while (0)
+
 /* One pixel of a line, written directly: span() is for runs. */
 static void plot_dot(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
 {
@@ -435,6 +482,30 @@ static void plot_dot(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
         *px = p->c;
     p->count++;
     row_touched(p, yi);
+}
+
+/* plot_dot along a run, unpatterned */
+static void run_dots(struct pen *p, void *ctx, const struct run *run)
+{
+    (void)ctx;
+    uint8_t *px = p->s.px, c = p->c;
+    int32_t w = p->s.w, x = run->x, y = run->y, r = run->r;
+    int32_t lo = p->lo, hi = p->hi;
+    uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
+    uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
+    uint32_t n = 0;
+    for (int32_t k = run->k; k > 0; k--) {
+        if ((uint32_t)(x - p->cx0) < cw && (uint32_t)(y - p->cy0) < ch) {
+            px[y * w + x] = c;
+            n++;
+            if (y < lo) lo = y;
+            if (y > hi) hi = y;
+        }
+        RUN_STEP(run, x, y, r);
+    }
+    p->count += n;
+    p->lo = lo;
+    p->hi = hi;
 }
 
 /* The first and last i whose major coordinate s0 + i * step lands in
@@ -478,9 +549,38 @@ static void step_next(struct stepper *st)
     }
 }
 
-static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
-                      int64_t y1, plot_fn plot, void *ctx)
+/* The stretch from i0 to i1 as a run, if it fits in 32 bits: 1 if it does,
+ * 0 if no pixel of it can be in the clip, -1 to step it in 64 bits. */
+static int make_run(struct run *run, int64_t major, int64_t minor,
+                    int smaj, int x_major, int64_t i0, int64_t i1,
+                    const struct stepper *st)
 {
+    if (st->den >= (1 << 30) || i1 - i0 >= (1 << 30))
+        return -1;
+    /* A minor coordinate this far out stays off any surface for the
+     * whole stretch, which is no longer than one. */
+    if (minor < -(1 << 30) || minor > (1 << 30))
+        return 0;
+    run->k = (int32_t)(i1 - i0 + 1);
+    run->i = (int32_t)i0;
+    run->r = (int32_t)st->r;
+    run->den = (int32_t)st->den;
+    run->inc = (int32_t)st->inc;
+    run->x = (int32_t)(x_major ? major : minor);
+    run->y = (int32_t)(x_major ? minor : major);
+    run->dmx = x_major ? smaj : 0;
+    run->dmy = x_major ? 0 : smaj;
+    run->dnx = !x_major;
+    run->dny = x_major;
+    return 1;
+}
+
+/* plot for each pixel; fast, when given, takes the stretch whole instead
+ * whenever it fits in 32 bits. */
+static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
+                      int64_t y1, plot_fn plot, run_fn fast, void *ctx)
+{
+    struct run run;
     x0 = clampc(x0) + p->ox;
     y0 = clampc(y0) + p->oy;
     x1 = clampc(x1) + p->ox;
@@ -497,6 +597,15 @@ static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
         }
         struct stepper st;
         step_init(&st, i0, dy, adx);
+        if (fast) {
+            int f = make_run(&run, x0 + i0 * sx, y0 + st.q, sx, 1, i0, i1,
+                             &st);
+            if (f >= 0) {
+                if (f)
+                    fast(p, ctx, &run);
+                return;
+            }
+        }
         for (i = i0; i <= i1; i++, step_next(&st))
             plot(p, ctx, x0 + i * sx, y0 + st.q, i);
     } else {
@@ -505,6 +614,15 @@ static void walk_line(struct pen *p, int64_t x0, int64_t y0, int64_t x1,
             return;
         struct stepper st;
         step_init(&st, i0, dx, ady);
+        if (fast) {
+            int f = make_run(&run, y0 + i0 * sy, x0 + st.q, sy, 0, i0, i1,
+                             &st);
+            if (f >= 0) {
+                if (f)
+                    fast(p, ctx, &run);
+                return;
+            }
+        }
         for (i = i0; i <= i1; i++, step_next(&st))
             plot(p, ctx, x0 + st.q, y0 + i * sy, i);
     }
@@ -520,7 +638,7 @@ NATIVE(line)
     COLOUR(4, c, "line");
     struct pen p;
     begin(vm, &p, c, 1);
-    walk_line(&p, x0, y0, x1, y1, plot_dot, NULL);
+    walk_line(&p, x0, y0, x1, y1, plot_dot, p.pat ? NULL : run_dots, NULL);
     finish(vm, &p);
     return 1;
 }
@@ -553,6 +671,49 @@ static void plot_map(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
     row_touched(p, (int32_t)y);
 }
 
+/* plot_map along a run, with the map position in 32 bits */
+static void run_map(struct pen *p, void *ctx, const struct run *run)
+{
+    struct tline_ctx *t = ctx;
+    const uint8_t *map = MEM(t->vm, t->vm->map);
+    const uint8_t *sheet = MEM(t->vm, t->vm->sheet);
+    const uint8_t *transparent = p->d->transparent, *dpal = p->d->dpal;
+    uint8_t *px = p->s.px;
+    int32_t w = p->s.w, x = run->x, y = run->y, r = run->r;
+    int32_t lo = p->lo, hi = p->hi;
+    uint32_t cw = (uint32_t)(p->cx1 - p->cx0);
+    uint32_t ch = (uint32_t)(p->cy1 - p->cy0);
+    uint32_t mx = (uint32_t)(int32_t)(t->mx + run->i * t->mdx);
+    uint32_t my = (uint32_t)(int32_t)(t->my + run->i * t->mdy);
+    uint32_t mdx = (uint32_t)(int32_t)t->mdx, mdy = (uint32_t)(int32_t)t->mdy;
+    uint32_t n = 0;
+    for (int32_t k = run->k; k > 0; k--, mx += mdx, my += mdy) {
+        int32_t cx = (int32_t)mx >> 16, cy = (int32_t)my >> 16;
+        if ((uint32_t)cx < MAP_W && (uint32_t)cy < MAP_H &&
+            (uint32_t)(x - p->cx0) < cw && (uint32_t)(y - p->cy0) < ch) {
+            uint32_t m = map[cy * MAP_W + cx];
+            uint32_t sx = (m & 15) * 8 + ((mx & 0xffff) >> 13);
+            uint32_t sy = (m >> 4) * 8 + ((my & 0xffff) >> 13);
+            uint8_t c = sheet[sy * SHEET_W + sx];
+            if (!(transparent[c >> 3] & (1 << (c & 7)))) {
+                px[y * w + x] = dpal[c];
+                n++;
+                if (y < lo) lo = y;
+                if (y > hi) hi = y;
+            }
+        }
+        RUN_STEP(run, x, y, r);
+    }
+    p->count += n;
+    p->lo = lo;
+    p->hi = hi;
+}
+
+static int fits32(int64_t v)
+{
+    return v >= INT32_MIN && v <= INT32_MAX;
+}
+
 static int real(struct vm *vm, struct value *a, int argc, int i, int64_t def,
                 const char *fn, int64_t *out)
 {
@@ -581,7 +742,16 @@ NATIVE(tline)
         return 0;
     struct pen p;
     begin(vm, &p, 0, 0);
-    walk_line(&p, x0, y0, x1, y1, plot_map, &t);
+    /* run_map is exact while the map position fits in 32 bits at every
+     * pixel, which holds if it does at both ends of the line. */
+    int64_t len = clampc(x1) - clampc(x0), ylen = clampc(y1) - clampc(y0);
+    if (len < 0) len = -len;
+    if (ylen < 0) ylen = -ylen;
+    if (ylen > len) len = ylen;
+    int fast = fits32(t.mx) && fits32(t.mdx) && fits32(t.my) &&
+               fits32(t.mdy) && fits32(t.mx + len * t.mdx) &&
+               fits32(t.my + len * t.mdy);
+    walk_line(&p, x0, y0, x1, y1, plot_map, fast ? run_map : NULL, &t);
     finish(vm, &p);
     return 1;
 }
@@ -615,9 +785,10 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
     struct pen p;
     begin(vm, &p, c, 1);
     if (outline) {
-        walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, NULL);
-        walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, NULL);
-        walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, NULL);
+        run_fn run = p.pat ? NULL : run_dots;
+        walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, run, NULL);
+        walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, run, NULL);
+        walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, run, NULL);
         finish(vm, &p);
         return 1;
     }
@@ -755,6 +926,28 @@ static int scale_of(struct vm *vm)
     return vm->d.font == 1 ? 2 : 1;
 }
 
+/* A glyph wholly inside the clip, unpatterned, k pixels to a dot: the
+ * pixels span() would draw, without a clipped call for each. */
+static void glyph(struct pen *p, uint16_t g, int32_t x, int32_t y, int k)
+{
+    int32_t w = p->s.w;
+    for (int r = 0; r < 5; r++) {
+        uint32_t bits = (g >> (12 - r * 3)) & 7;
+        if (!bits)
+            continue;
+        for (int dy = 0; dy < k; dy++) {
+            uint8_t *row = p->s.px + (y + r * k + dy) * w + x;
+            for (int c = 0; c < 3; c++)
+                if ((bits >> (2 - c)) & 1) {
+                    for (int dx = 0; dx < k; dx++)
+                        row[c * k + dx] = p->c;
+                    p->count += (uint32_t)k;
+                }
+            row_touched(p, y + r * k + dy);
+        }
+    }
+}
+
 /* Draws text at (x, y) in camera space, or with draw 0 only measures it.
  * Returns the x after the last glyph; *widest is the longest line. */
 static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
@@ -778,7 +971,11 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
         if (ch < 32 || ch > 126)
             ch = ch >= 0x80 ? '?' : ' ';
         uint16_t g = font_small[ch - 32];
-        if (draw && g) {
+        if (draw && g && !p->pat && cx + p->ox >= p->cx0 &&
+            y + p->oy >= p->cy0 && cx + p->ox + 3 * k <= p->cx1 &&
+            y + p->oy + 5 * k <= p->cy1) {
+            glyph(p, g, (int32_t)(cx + p->ox), (int32_t)(y + p->oy), k);
+        } else if (draw && g) {
             for (int r = 0; r < 5; r++)
                 for (int c = 0; c < 3; c++)
                     if ((g >> (14 - r * 3 - c)) & 1)
