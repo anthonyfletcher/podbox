@@ -30,7 +30,14 @@ enum {
     ONPLAY_GO_TO_LIBRARY, /* the database browser, armed to open on an entry */
     ONPLAY_FUNC_RETURN, /* for use in hotkey_assignment only */
     ONPLAY_SELECT,      /* Select...: the list turns into a selecting one */
+    ONPLAY_LEAVE,       /* Now Playing leaves for context_menu_leave_for() */
 };
+
+/* Runs Now Playing's button action 'act' on the playing 'file': the
+   context_menu_show() result */
+int context_menu_wps_hotkey(char *file, int act);
+/* The screen an ONPLAY_LEAVE result is for, a GO_TO_ value */
+long context_menu_leave_for(void);
 
 /* Where Cut and Copy of several items keep their names, one per line; the
  * folder they are in is the clipboard's path */
@@ -56,9 +63,14 @@ enum hotkey_action {
     HOTKEY_ALBUMART,
     HOTKEY_SHOW_IN_FILES,
     HOTKEY_LYRICS,
+    HOTKEY_PREVIOUS_SCREEN,
+    HOTKEY_MUSIC,
+    HOTKEY_ALBUM_COVERS,
+    HOTKEY_FILES,
+    HOTKEY_THEME_OPTIONS,
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
-       time into the saved context_wps/hotkey_tree integers, so renumbering
-       one repoints every hotkey the user has already configured. */
+       time into the saved hotkey integers, so renumbering one repoints every
+       hotkey the user has already configured. */
     HOTKEY_CONTEXT_MENU = 0x3E, /* shows the actions above as a menu */
     /* Note no more than 62 items -- see HK_CTX_BITS */
 };
@@ -78,7 +90,8 @@ struct hotkey_assignment {
     uint8_t icon;           /* themable_icons value shown beside the entry */
 };                          /* (Pick ONPLAY_FUNC_RETURN to use function's return value) */
 
-/* The two hotkey settings hold their action as item 0 of an int. */
+/* The hotkey settings -- Now Playing's Select and Select + Play, and the
+   file browser's hotkey -- hold their action as item 0 of an int. */
 #define HK_CTX_MASK  (0x3F)
 #define HK_CTX_BITS  (6) /* 6 bits, enough for 62 hotkey actions */
 #define HK_CTX_SET(item, hotkey) ((hotkey & HK_CTX_MASK) << (item * HK_CTX_BITS))
@@ -120,10 +133,11 @@ bool context_hidden_is_changed(void *setting, void *defaultval);
 void context_hidden_set_default(void *setting, void *defaultval);
 
 /* Assign a hotkey's action, driven from the settings menu. */
+int wps_select_do_setting(void *param);
 int wps_context_menu_do_setting(void *param);
 int tree_context_menu_do_setting(void *param);
 
-/* config.cfg handlers -- both hotkey settings share these */
+/* config.cfg handlers -- every hotkey setting shares these */
 void wps_context_menu_set_default(void *setting, void *defaultval);
 char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len);
 void wps_context_menu_load_from_cfg(void *setting, char *value);

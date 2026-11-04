@@ -58,6 +58,7 @@
 #include "screens/playback/track_info.h"
 #include "widgets/text_box.h"
 #include "screens/browse/browser.h"
+#include "screens/covers/album_covers.h"
 #include "powermgmt.h"
 #include "settings/settings.h"
 #include "settings/settings_list.h"
@@ -2545,6 +2546,56 @@ static int hotkey_properties(void *param)
     return ONPLAY_RELOAD_DIR;
 }
 
+/* Now Playing's ways out to another screen. Each answers ONPLAY_LEAVE, and
+   the WPS reads the screen back with context_menu_leave_for(). */
+static long leave_for;
+
+static int leave(long go_to)
+{
+    leave_for = go_to;
+    return ONPLAY_LEAVE;
+}
+
+long context_menu_leave_for(void)
+{
+    return leave_for;
+}
+
+static int hotkey_previous_screen(void)
+{
+    return leave(GO_TO_PREVIOUS_BROWSER);
+}
+
+static int hotkey_music(void)
+{
+    return leave(GO_TO_DBBROWSER);
+}
+
+static int hotkey_files(void)
+{
+    return leave(GO_TO_FILEBROWSER);
+}
+
+/* Playback stopped in Album Covers goes back to Now Playing, which resumes
+   the playlist */
+static int hotkey_album_covers(void)
+{
+    int ret = album_covers(NULL);
+
+    if (ret == GO_TO_ALBUM_COVERS_TRACKS || ret == GO_TO_ROOT)
+        return leave(ret);
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
+        return leave(GO_TO_WPS);
+    return ONPLAY_OK;
+}
+
+static int hotkey_theme_options(void)
+{
+    if (theme_options_from_wps() == MENU_ATTACHED_USB)
+        return ONPLAY_MAINMENU;
+    return ONPLAY_OK;
+}
+
 #define HOTKEY_FUNC(func, param) {{(void *)func}, param}
 
 /* HOTKEY_CONTEXT_MENU: rather than run one action, offer all of the ones
@@ -2633,6 +2684,36 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
       .icon = Icon_NOICON },
+    { .action = HOTKEY_PREVIOUS_SCREEN,
+      .lang_id = LANG_PREVIOUS_SCREEN,
+      .func = HOTKEY_FUNC(hotkey_previous_screen, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_MUSIC,
+      .lang_id = LANG_MUSIC_BROWSER,
+      .func = HOTKEY_FUNC(hotkey_music, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_ALBUM_COVERS,
+      .lang_id = LANG_ALBUM_COVERS,
+      .func = HOTKEY_FUNC(hotkey_album_covers, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_FILES,
+      .lang_id = LANG_DIR_BROWSER,
+      .func = HOTKEY_FUNC(hotkey_files, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_file_view_menu },
+    { .action = HOTKEY_THEME_OPTIONS,
+      .lang_id = LANG_THEME_OPTIONS,
+      .func = HOTKEY_FUNC(hotkey_theme_options, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
       .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),
@@ -2706,24 +2787,20 @@ static enum list_row_kind hotkey_option_kind(int selected_item, void *data)
     return LIST_ROW_OPTION;
 }
 
-int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
+/* hotkey_run_menu(), with the title and whether Off is offered set apart */
+static int hotkey_list(intptr_t flag, bool execute, int current_action,
+                       int title_id, bool offer_off)
 {
     const struct hotkey_assignment *hk_menu[ARRAYLEN(hotkey_items)];
-
-    char *title = str(LANG_ONPLAY_MENU_TITLE);
-    if (flag & HOTKEY_FLAG_TREE)
-        title = str(LANG_HOTKEY_FILE_BROWSER);
-    else if (!execute)
-        title = str(LANG_HOTKEY_WPS);
-
+    char *title = str(title_id);
     struct simplelist_info info;
     int selected = 0;
     int count = 0;
     for (size_t i = 0; i < ARRAYLEN(hotkey_items); i++)
     {
         hk_menu[i] = NULL; /*clear all the hk_menu entries prior to setting them */
-        if (hotkey_items[i].action == HOTKEY_OFF && execute)
-            continue; /* Don't display HOTKEY_OFF item */
+        if (hotkey_items[i].action == HOTKEY_OFF && !offer_off)
+            continue;
         if ((hotkey_items[i].flags & flag) == flag)
         {
             /* the menu cannot offer itself as one of its own entries */
@@ -2769,27 +2846,51 @@ int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
     }
 }
 
-/* Assign a hotkey's action from the settings screens */
-static int hotkey_menu_do_setting(void *param, int *setting, int flag)
+int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
 {
-    int sel = hotkey_run_menu(flag, false, HK_CTX_GET(0, *setting));
+    int title_id = LANG_ONPLAY_MENU_TITLE;
 
-    (void)param;
+    if (flag & HOTKEY_FLAG_TREE)
+        title_id = LANG_HOTKEY_FILE_BROWSER;
+    else if (!execute)
+        title_id = LANG_HOTKEY_WPS;
+    return hotkey_list(flag, execute, current_action, title_id, !execute);
+}
+
+/* Assign a hotkey's action from the settings screens */
+static int hotkey_menu_do_setting(int *setting, int flag, int title_id,
+                                  bool offer_off)
+{
+    int sel = hotkey_list(flag, false, HK_CTX_GET(0, *setting), title_id,
+                          offer_off);
+
     if (sel >= 0)
         *setting = HK_CTX_SET(0, sel);
     return sel;
 }
 
+/* Select is not offered Off, so the button always does something */
+int wps_select_do_setting(void *param)
+{
+    (void)param;
+    return hotkey_menu_do_setting(&global_settings.wps_select_action,
+                                  HOTKEY_FLAG_WPS, LANG_WPS_SELECT_ACTION,
+                                  false);
+}
+
 int wps_context_menu_do_setting(void *param)
 {
-    return hotkey_menu_do_setting(param, &global_settings.context_wps,
-                                  HOTKEY_FLAG_WPS);
+    (void)param;
+    return hotkey_menu_do_setting(&global_settings.context_wps,
+                                  HOTKEY_FLAG_WPS, LANG_HOTKEY_WPS, true);
 }
 
 int tree_context_menu_do_setting(void *param)
 {
-    return hotkey_menu_do_setting(param, &global_settings.hotkey_tree,
-                                  HOTKEY_FLAG_TREE);
+    (void)param;
+    return hotkey_menu_do_setting(&global_settings.hotkey_tree,
+                                  HOTKEY_FLAG_TREE, LANG_HOTKEY_FILE_BROWSER,
+                                  true);
 }
 
 /* config.cfg stores each item by its english name -- see lang_id_to_english().
@@ -2797,7 +2898,9 @@ int tree_context_menu_do_setting(void *param)
    and storing the translated name breaks on a language change. */
 
 /* Names actions were saved under before they were renamed, so a config.cfg
-   written then keeps its assignment */
+   written then keeps its assignment. The last four are wps select action's
+   choice words, found in older config.cfg files; its "files" and "lyrics"
+   match the actions' own names. */
 static const struct
 {
     const char *name;
@@ -2805,6 +2908,10 @@ static const struct
 } hotkey_old_names[] = {
     { "Add to Queue",       HOTKEY_INSERT },
     { "Shuffle into Queue", HOTKEY_INSERT_SHUFFLED },
+    { "default",            HOTKEY_PREVIOUS_SCREEN },
+    { "database",           HOTKEY_MUSIC },
+    { "coverflow",          HOTKEY_ALBUM_COVERS },
+    { "queue",              HOTKEY_VIEW_PLAYLIST },
 };
 
 /* Whole names only: "Play Later" is also the start of "Play Later Shuffled" */
@@ -3292,9 +3399,9 @@ int context_menu_show_item(const char *path, int attr, bool in_order,
     return context_menu_result;
 }
 
-int context_menu_show(char* file, int attr, int from_context, bool hotkey, int customaction)
+/* The item a context menu or hotkey acts on */
+static void context_menu_select(char *file, int attr, int from_context)
 {
-    const struct menu_item_ex *menu;
     context_menu_result = ONPLAY_OK;
     ctx_current_playlist_insert = NULL;
     ctx_go_to = true;
@@ -3322,20 +3429,23 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
         }
 
     }
+}
+
+int context_menu_wps_hotkey(char *file, int act)
+{
+    context_menu_select(file, FILE_ATTR_AUDIO, CONTEXT_WPS);
+    return execute_hotkey(act);
+}
+
+int context_menu_show(char* file, int attr, int from_context, bool hotkey, int customaction)
+{
+    const struct menu_item_ex *menu;
     int menu_selection;
 
+    context_menu_select(file, attr, from_context);
+    /* Now Playing's buttons run through context_menu_wps_hotkey() */
     if (hotkey)
-    {
-        if (from_context == CONTEXT_WPS)
-        {
-            int act = HK_CTX_GET(0, global_settings.context_wps);
-
-            if (act == HOTKEY_CONTEXT_MENU)
-                return hotkey_run_menu(HOTKEY_FLAG_WPS, true, 0);
-            return execute_hotkey(act);
-        }
         return execute_hotkey(global_settings.hotkey_tree & HK_CTX_MASK);
-    }
     if (customaction == ONPLAY_CUSTOMACTION_SHUFFLE_SONGS)
     {
         int returnCode = add_to_playlist(&addtopl_replace_shuffled);

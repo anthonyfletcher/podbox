@@ -593,7 +593,7 @@ struct user_settings
     bool car_adapter_mode; /* 0=off 1=on */
     int car_adapter_mode_delay; /* delay before resume,  in seconds*/
     int start_in_screen;
-    int wps_select_action;
+    int wps_select_action; /* a hotkey action, as item 0 -- see HK_CTX_SET */
     int ff_rewind_min_step; /* FF/Rewind minimum step size */
     int ff_rewind_accel; /* FF/Rewind acceleration (in seconds per doubling) */
 

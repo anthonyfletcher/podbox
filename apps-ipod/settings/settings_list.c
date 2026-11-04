@@ -570,6 +570,7 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
 /* Item 0 is the hotkey button; 1..4 are the configurable rows at the bottom
    of the WPS context menu. */
 static const int wps_context_menu_default = HK_CTX_SET(0, HOTKEY_LYRICS);
+static const int wps_select_default = HK_CTX_SET(0, HOTKEY_PREVIOUS_SCREEN);
 
 static const int tree_hotkey_default = HOTKEY_OFF;
 static const uint32_t context_hidden_default = 0;
@@ -1952,16 +1953,10 @@ const struct settings_list settings[] = {
                    ID2P(LANG_MUSIC_BROWSER),
                    ID2P(LANG_RESUME_PLAYBACK), ID2P(LANG_SETTINGS)
                   ),
-    CHOICE_SETTING(0, wps_select_action, LANG_WPS_SELECT_ACTION, 0,
-                   "wps select action",
-                   "default,database,coverflow,files,lyrics,queue",
-                   NULL, 6,
-                   ID2P(LANG_PREVIOUS_SCREEN),
-                   ID2P(LANG_MUSIC_BROWSER),
-                   ID2P(LANG_ALBUM_COVERS),
-                   ID2P(LANG_DIR_BROWSER),
-                   ID2P(LANG_LYRICS),
-                   ID2P(LANG_VIEW_DYNAMIC_PLAYLIST)),
+    CUSTOM_SETTING(0, wps_select_action, LANG_WPS_SELECT_ACTION,
+                   &wps_select_default, "wps select action",
+                   wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
+                   wps_context_menu_is_changed, wps_context_menu_set_default),
 
     /* Customizable icons */
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, icon_file, "iconset", DEFAULT_ICONSET,

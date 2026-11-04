@@ -66,6 +66,10 @@ struct browse_folder_info {
 };
 int browse_folder(void *param); /* in theme_menu.c as it is mostly used there */
 int main_menu_config(void); /* in main_menu_config.c */
+/* Theme Options from a Now Playing button: says Unavailable, rather than
+ * opening, while the theme has no options or one that reloads the theme.
+ * Returns MENU_ATTACHED_USB to leave for the root. In theme_options_menu.c */
+int theme_options_from_wps(void);
 /* The main menu's own long press on 'item': whether it can be hidden (all
  * but Settings, the way back to this), hiding it, and the editor opened
  * carrying it for Move. The last returns as main_menu_config() does. */

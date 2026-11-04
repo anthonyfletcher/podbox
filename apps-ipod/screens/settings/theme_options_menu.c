@@ -8,7 +8,7 @@
  * a row per file. Each change is written when it is made, and the skins
  * read it at their next draw. Only a file some %ft reads at load alone (see
  * theme_options_live()) has the theme reload once, on leaving, and Now
- * Playing's menu leaves the row out while the theme has such a file.
+ * Playing's menu and buttons do not offer it while the theme has such a file.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -401,6 +401,23 @@ static int theme_options_callback(int action,
                 && !all_live())))
         return ACTION_EXIT_MENUITEM;
     return action;
+}
+
+/* Pushes the activity Appearance opens it under: a skin styles a list by
+ * activity, and Now Playing's would leave these lists unstyled */
+int theme_options_from_wps(void)
+{
+    int ret;
+
+    if (theme_options_count() == 0 || !all_live())
+    {
+        splash(HZ, ID2P(LANG_UNAVAILABLE));
+        return 0;
+    }
+    push_current_activity(ACTIVITY_SETTINGS);
+    ret = theme_options_menu();
+    pop_current_activity();
+    return ret;
 }
 
 MENUITEM_FUNCTION(theme_options_item, MENU_FUNC_CHECK_RETVAL,

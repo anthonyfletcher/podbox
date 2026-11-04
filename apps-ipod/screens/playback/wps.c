@@ -69,7 +69,6 @@
 #include "root_menu.h"
 #include "screens/covers/album_covers.h"
 #include "speech/announce.h"
-#include "viewers/lyric_viewer/lyric_viewer.h"
 #include "skin/backdrop.h"
 #include "quick_screen.h"
 #include "screens/shortcuts.h"
@@ -671,6 +670,26 @@ static bool show_album_covers(long *go_to)
     return true;
 }
 
+/* Where the context menu or a button's action leaves Now Playing for, from
+ * its context_menu_show() result. False to stay. Music stopped in the menu
+ * leaves for the root. */
+static bool context_go_to(int retval, long *go_to)
+{
+    if (retval == ONPLAY_LEAVE)
+        *go_to = context_menu_leave_for();
+    else if (retval == ONPLAY_MAINMENU || !audio_status())
+        *go_to = GO_TO_ROOT;
+    else if (retval == ONPLAY_REVEAL_FILE)
+        *go_to = GO_TO_FILEBROWSER;
+    else if (retval == ONPLAY_GO_TO_LIBRARY)
+        *go_to = GO_TO_ALBUM_COVERS_TRACKS;
+    else if (retval == ONPLAY_PLAYLIST)
+        *go_to = GO_TO_PLAYLIST_VIEWER;
+    else
+        return false;
+    return true;
+}
+
 static inline int action_wpsab_single(long button)
 {
 /* The iPods/X5/M5 use a single button for the A-B mode markers,
@@ -721,7 +740,6 @@ long gui_wps_show(void)
     wps_state_init();
     while ( 1 )
     {
-        bool hotkey = false;
         bool audio_paused = (audio_status() & AUDIO_STATUS_PAUSE)?true:false;
         /* did someone else (i.e power thread) change audio pause mode? */
         if (state->paused != audio_paused) {
@@ -789,97 +807,43 @@ long gui_wps_show(void)
 
         switch(button)
         {
+            case ACTION_WPS_BROWSE:
             case ACTION_WPS_HOTKEY:
             {
-                hotkey = true;
-                int act = HK_CTX_GET(0, global_settings.context_wps);
+                int act = HK_CTX_GET(0, button == ACTION_WPS_BROWSE
+                                        ? global_settings.wps_select_action
+                                        : global_settings.context_wps);
+                long go_to;
+
                 if (act == HOTKEY_OFF)
                     break;
-                if (get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS)
+                /* A NOSBS action's screen owns the display and turns the
+                 * theme off itself, so leave without re-enabling it */
+                theme_enabled = !(get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS);
+                gwps_leave_wps(theme_enabled);
+                if (context_go_to(context_menu_wps_hotkey(state->id3->path,
+                                                          act), &go_to))
                 {
-                    /* leave WPS without re-enabling theme */
-                    theme_enabled = false;
-                    gwps_leave_wps(theme_enabled);
-                    context_menu_show(state->id3->path,
-                           FILE_ATTR_AUDIO, CONTEXT_WPS, hotkey, ONPLAY_NO_CUSTOMACTION);
-                    if (!audio_status())
-                    {
-                        /* re-enable theme since we're returning to SBS */
-                        gwps_leave_wps(true);
-                        return GO_TO_ROOT;
-                    }
-                    restore = true;
-                    break;
+                    if (!theme_enabled)
+                        gwps_leave_wps(true);   /* returning to the SBS */
+                    return go_to;
                 }
-            }
-            /* fall through */
-            case ACTION_WPS_CONTEXT:
-            {
-                gwps_leave_wps(true);
-                int retval = context_menu_show(state->id3->path,
-                       FILE_ATTR_AUDIO, CONTEXT_WPS, hotkey, ONPLAY_NO_CUSTOMACTION);
-                /* if music is stopped in the context menu we want to exit the wps */
-                if (retval == ONPLAY_MAINMENU
-                    || !audio_status())
-                    return GO_TO_ROOT;
-                else if (retval == ONPLAY_REVEAL_FILE)
-                    return GO_TO_FILEBROWSER;
-                else if (retval == ONPLAY_GO_TO_LIBRARY)
-                    return GO_TO_ALBUM_COVERS_TRACKS;
-                else if (retval == ONPLAY_PLAYLIST)
-                    return GO_TO_PLAYLIST_VIEWER;
-
                 restore = true;
             }
             break;
 
-            case ACTION_WPS_BROWSE:
+            case ACTION_WPS_CONTEXT:
             {
-                int sel_action = global_settings.wps_select_action;
-                if (sel_action == 1) /* database */
-                {
-                    gwps_leave_wps(true);
-                    return GO_TO_DBBROWSER;
-                }
-                else if (sel_action == 2) /* coverflow */
-                {
-                    long go_to;
-                    theme_enabled = false;
-                    if (show_album_covers(&go_to))
-                        return go_to;
-                    restore = true;
-                }
-                else if (sel_action == 3) /* files */
-                {
-                    gwps_leave_wps(true);
-                    return GO_TO_FILEBROWSER;
-                }
-                else if (sel_action == 4) /* lyrics */
-                {
-                    /* Leave without re-enabling the theme: the lyrics screen
-                     * owns the display and turns it off again itself. Same
-                     * shape as a HOTKEY_FLAG_NOSBS hotkey. */
-                    theme_enabled = false;
-                    gwps_leave_wps(theme_enabled);
-                    if (lyric_viewer() == GO_TO_ROOT)
-                    {
-                        gwps_leave_wps(true);   /* returning to the SBS */
-                        return GO_TO_ROOT;
-                    }
-                    restore = true;
-                }
-                else if (sel_action == 5) /* queue */
-                {
-                    gwps_leave_wps(true);
-                    return GO_TO_PLAYLIST_VIEWER;
-                }
-                else /* default — previous browser */
-                {
-                    gwps_leave_wps(true);
-                    return GO_TO_PREVIOUS_BROWSER;
-                }
-                break;
+                long go_to;
+
+                gwps_leave_wps(true);
+                if (context_go_to(context_menu_show(state->id3->path,
+                                      FILE_ATTR_AUDIO, CONTEXT_WPS, false,
+                                      ONPLAY_NO_CUSTOMACTION), &go_to))
+                    return go_to;
+                restore = true;
             }
+            break;
 
                 /* play/pause */
             case ACTION_WPS_PLAY:

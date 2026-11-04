@@ -988,34 +988,37 @@ MAKE_MENU(voice_settings_menu, ID2P(LANG_VOICE), 0, Icon_Voice,
 MENUITEM_SETTING(browser_default,
                  &global_settings.browser_default, NULL);
 
-/* Where Select from the now-playing screen goes. */
-MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
-
-/* What Select and Play pressed together do; selecting it opens the list of
-   available actions. Named without its value, as the setting rows are. */
-static char *wps_context_menu_get_name(int selected_item, void *data,
-                                       char *buffer, size_t buffer_len)
+/* What Select, and Select and Play pressed together, do from the now-playing
+   screen; selecting a row opens the list of actions. Named without its value,
+   as the setting rows are: data is the row's lang id. */
+static char *wps_button_get_name(int selected_item, void *data,
+                                 char *buffer, size_t buffer_len)
 {
     (void)selected_item;
-    (void)data;
     (void)buffer;
     (void)buffer_len;
-    return str(LANG_HOTKEY_WPS);
+    return str((intptr_t)data);
 }
 
-static int wps_context_menu_speak_item(int selected_item, void *data)
+static int wps_button_speak_item(int selected_item, void *data)
 {
     (void)selected_item;
-    (void)data;
-    talk_id(LANG_HOTKEY_WPS, false);
+    talk_id((intptr_t)data, false);
     return 0;
 }
 
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_select_action, 0,
+                                  wps_select_do_setting, (void*)0,
+                                  wps_button_get_name,
+                                  wps_button_speak_item,
+                                  (void*)LANG_WPS_SELECT_ACTION, NULL,
+                                  Icon_NOICON);
+
 MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_wps_item, 0,
                                   wps_context_menu_do_setting, (void*)0,
-                                  wps_context_menu_get_name,
-                                  wps_context_menu_speak_item,
-                                  (void*)0, NULL, Icon_NOICON);
+                                  wps_button_get_name,
+                                  wps_button_speak_item,
+                                  (void*)LANG_HOTKEY_WPS, NULL, Icon_NOICON);
 
 
 /* Which picture the screen shows, and where its album cover is looked for
