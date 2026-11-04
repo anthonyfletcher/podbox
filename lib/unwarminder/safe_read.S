@@ -22,6 +22,9 @@
 .syntax unified
 
 .data
+/* Aligned: a word store to an unaligned address aborts on PP502x, and the
+ * handler below recovers only the reads, not the store that clears this. */
+.balign 4
 was_aborted:
     .word   0
 

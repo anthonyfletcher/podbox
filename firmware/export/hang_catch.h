@@ -18,6 +18,7 @@
 #ifndef HANG_CATCH_H
 #define HANG_CATCH_H
 
+#include <stdbool.h>
 #include "config.h"
 
 #if !defined(BOOTLOADER) && (defined(CPU_PP502x) || CONFIG_CPU == S5L8702)
@@ -29,8 +30,12 @@ void hang_catch_init(void);
 /* Before powering off or rebooting, whose last step spins until the
  * hardware acts */
 void hang_catch_stop(void);
+/* Around work that may run long without yielding, such as loading a theme:
+ * true holds the catcher off, false lets it watch again. Calls nest. */
+void hang_catch_hold(bool hold);
 #else
 static inline void hang_catch_stop(void) { }
+static inline void hang_catch_hold(bool hold) { (void)hold; }
 #endif
 
 #endif

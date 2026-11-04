@@ -31,6 +31,7 @@
 #include "metadata/book_resume.h"
 #include "audio/playback.h"           /* audio_release_buffer */
 #include "theme_options.h"
+#include "hang_catch.h"
 
 #define FAILSAFENAME "rockbox_failsafe"
 
@@ -130,6 +131,9 @@ void settings_apply_skins(void)
 {
     int i;
 
+    /* Parsing, bitmaps and fonts can hold the core for seconds on the 5G */
+    hang_catch_hold(true);
+
     /* Save theme colors before re-parsing skins */
     dynamic_colors_save_theme();
 
@@ -190,6 +194,7 @@ void settings_apply_skins(void)
 
     FOR_NB_SCREENS(i)
         skin_backdrop_show(sb_get_backdrop(i));
+    hang_catch_hold(false);
 }
 
 static void skin_load(enum skinnable_screens skin, enum screen_type screen,
@@ -197,6 +202,8 @@ static void skin_load(enum skinnable_screens skin, enum screen_type screen,
 {
     bool loaded = false;
 
+    /* A skin not loaded at boot loads the first time it shows */
+    hang_catch_hold(true);
     skin_helpers[skin]->process(screen, &skins[skin][screen].data, true);
 
     if (filename && *filename)
@@ -216,6 +223,7 @@ static void skin_load(enum skinnable_screens skin, enum screen_type screen,
     skin_helpers[skin]->process(screen, &skins[skin][screen].data, false);
     if (loaded)
         skin_backdrops_preload();
+    hang_catch_hold(false);
 }
 
 static char* get_skin_filename(char *buf, size_t buf_size,

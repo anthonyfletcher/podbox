@@ -46,7 +46,7 @@
 #include "button.h"
 #include "hang_catch.h"
 
-#define HANG_SECS   5
+#define HANG_SECS   10
 /* Longer than the core check: the UI thread can wait this long on the
  * audio thread through slow disk work, where a thread that never yields
  * has no excuse at all. Long work done on the UI thread itself, such as a
@@ -93,6 +93,11 @@ static uint32_t hang_pc, hang_sp, hang_lr;
 static const struct thread_entry *ui_thread;
 static long stuck_since;
 static bool hang_stuck;
+
+/* How many holds are open, and when the last one closed: the core check
+ * counts from then, as the scheduler may not have run since */
+static volatile int holds;
+static long hold_end;
 
 static char state_letter(unsigned char state)
 {
@@ -249,9 +254,17 @@ static void hang_tick(void)
 {
     struct core_entry *corep = __core_id_entry(CURRENT_CORE);
     uint32_t *ret = (uint32_t *)irq_stack_top - 1;
+    long since = corep->next_tmo_check;
 
     if (hang_thread)
         return;
+    if (holds)
+    {
+        stuck_since = 0;
+        return;
+    }
+    if (TIME_BEFORE(since, hold_end))
+        since = hold_end;
     if (ui_thread && ui_thread->state == STATE_BLOCKED
         && button_queue_count() > 0)
     {
@@ -263,7 +276,7 @@ static void hang_tick(void)
     else
         stuck_since = 0;
     if (!hang_stuck &&
-        !TIME_AFTER(current_tick, corep->next_tmo_check + HANG_SECS * HZ))
+        !TIME_AFTER(current_tick, since + HANG_SECS * HZ))
         return;
     /* The IRQ handler's prologue pushes lr, already the interrupted pc,
      * highest of its registers, so at the top of the IRQ stack; its return
@@ -298,4 +311,12 @@ void hang_catch_init(void)
 void hang_catch_stop(void)
 {
     tick_remove_task(hang_tick);
+}
+
+void hang_catch_hold(bool hold)
+{
+    if (hold)
+        holds++;
+    else if (--holds == 0)
+        hold_end = current_tick;
 }
