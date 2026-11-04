@@ -153,6 +153,8 @@ struct draw
     uint8_t dpal[256];          /* drawing: colour -> colour */
     uint8_t spal[256];          /* the screen: index -> entry shown */
     uint8_t transparent[32];
+    uint16_t xlat[256];         /* dpal[c], or 0x100 if c is transparent */
+    uint8_t xlat_stale;         /* set when either changes */
     uint32_t rgb[256];          /* each entry as 0xRRGGBB */
     uint32_t shown[256];        /* rgb[spal[i]], what present uses */
     int palette_changed;

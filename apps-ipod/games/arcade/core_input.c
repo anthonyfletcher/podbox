@@ -47,7 +47,9 @@ static int button_arg(struct vm *vm, struct value *a, int argc, uint8_t bits,
         return vm_fail(vm, fn, "() needs a button number, not a ",
                        vm_typename(a[0].tag));
     int32_t i = floor_int(a[0]);
-    *out = mk(T_INT, i >= 0 && i < 8 ? (bits >> i) & 1 : 0);
+    if (i < 0 || i > 4)
+        return vm_fail(vm, fn, "() takes a button from 0 to 4", "");
+    *out = mk(T_INT, (bits >> i) & 1);
     return 1;
 }
 

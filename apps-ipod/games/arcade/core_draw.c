@@ -49,6 +49,21 @@ static void reset_palettes(struct draw *d)
     }
     memset(d->transparent, 0, sizeof(d->transparent));
     d->transparent[0] = 1;
+    d->xlat_stale = 1;
+}
+
+#define XLAT_CLEAR 0x100
+
+/* dpal and transparent as one table: a copy's pixel is one lookup */
+static const uint16_t *xlat_of(struct draw *d)
+{
+    if (d->xlat_stale) {
+        for (int c = 0; c < 256; c++)
+            d->xlat[c] = d->transparent[c >> 3] & (1 << (c & 7))
+                         ? XLAT_CLEAR : d->dpal[c];
+        d->xlat_stale = 0;
+    }
+    return d->xlat;
 }
 
 static void reshow(struct draw *d)
@@ -172,6 +187,7 @@ struct pen
     uint32_t count;
     int32_t lo, hi;
     const struct draw *d;
+    const uint16_t *xl;
 };
 
 static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
@@ -198,6 +214,7 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->lo = 0x7fffffff;
     p->hi = -1;
     p->d = d;
+    p->xl = xlat_of(d);
 }
 
 static void row_touched(struct pen *p, int32_t y)
@@ -931,20 +948,32 @@ static int scale_of(struct vm *vm)
 static void glyph(struct pen *p, uint16_t g, int32_t x, int32_t y, int k)
 {
     int32_t w = p->s.w;
-    for (int r = 0; r < 5; r++) {
+    uint8_t ink = p->c, *row = p->s.px + y * w + x;
+    int top = -1, bot = 0;
+    uint32_t dots = 0;
+    for (int r = 0; r < 5; r++, row += w * k) {
         uint32_t bits = (g >> (12 - r * 3)) & 7;
         if (!bits)
             continue;
-        for (int dy = 0; dy < k; dy++) {
-            uint8_t *row = p->s.px + (y + r * k + dy) * w + x;
-            for (int c = 0; c < 3; c++)
-                if ((bits >> (2 - c)) & 1) {
-                    for (int dx = 0; dx < k; dx++)
-                        row[c * k + dx] = p->c;
-                    p->count += (uint32_t)k;
-                }
-            row_touched(p, y + r * k + dy);
+        dots += (bits & 1) + ((bits >> 1) & 1) + (bits >> 2);
+        if (top < 0)
+            top = r;
+        bot = r;
+        if (k == 1) {
+            if (bits & 4) row[0] = ink;
+            if (bits & 2) row[1] = ink;
+            if (bits & 1) row[2] = ink;
+            continue;
         }
+        for (int dy = 0; dy < k; dy++)
+            for (int c = 0; c < 3; c++)
+                if ((bits >> (2 - c)) & 1)
+                    memset(row + dy * w + c * k, ink, (size_t)k);
+    }
+    if (top >= 0) {
+        p->count += dots * (uint32_t)(k * k);
+        row_touched(p, y + top * k);
+        row_touched(p, y + bot * k + k - 1);
     }
 }
 
@@ -1075,7 +1104,7 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
     int64_t v1 = p->cy1 - dy < dh ? p->cy1 - dy : dh;
     int64_t u0 = p->cx0 - dx > 0 ? p->cx0 - dx : 0;
     int64_t u1 = p->cx1 - dx < dw ? p->cx1 - dx : dw;
-    const uint8_t *transparent = p->d->transparent, *dpal = p->d->dpal;
+    const uint16_t *xl = p->xl;
     int32_t stride = p->s.w;
 
     if (w == dw && h == dh) {
@@ -1101,19 +1130,19 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             if (!fx) {
                 const uint8_t *sp = srow + (int32_t)sx;
                 for (int32_t u = ua; u < ub; u++) {
-                    uint8_t c = sp[u];
-                    if (transparent[c >> 3] & (1 << (c & 7)))
+                    uint32_t c = xl[sp[u]];
+                    if (c & XLAT_CLEAR)
                         continue;
-                    drow[u] = dpal[c];
+                    drow[u] = (uint8_t)c;
                     n++;
                 }
             } else {
                 const uint8_t *sp = srow + (int32_t)sx + (int32_t)w - 1;
                 for (int32_t u = ua; u < ub; u++) {
-                    uint8_t c = sp[-u];
-                    if (transparent[c >> 3] & (1 << (c & 7)))
+                    uint32_t c = xl[sp[-u]];
+                    if (c & XLAT_CLEAR)
                         continue;
-                    drow[u] = dpal[c];
+                    drow[u] = (uint8_t)c;
                     n++;
                 }
             }
@@ -1148,10 +1177,10 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             }
             if (xx < 0 || xx >= sw_img)
                 continue;
-            uint8_t c = srow[xx];
-            if (transparent[c >> 3] & (1 << (c & 7)))
+            uint32_t c = xl[srow[xx]];
+            if (c & XLAT_CLEAR)
                 continue;
-            drow[u] = dpal[c];
+            drow[u] = (uint8_t)c;
             n++;
         }
         if (n) {
@@ -1159,6 +1188,49 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             row_touched(p, (int32_t)(dy + v));
         }
     }
+}
+
+/* An unflipped 8x8 tile of the sheet, landing wholly inside the clip at
+ * (x, y) in surface coordinates: copy_rect's pixels, without its setup. */
+static void tile8(struct pen *p, const uint8_t *src, int32_t x, int32_t y)
+{
+    const uint16_t *xl = p->xl;
+    int32_t w = p->s.w;
+    uint8_t *d = p->s.px + y * w + x;
+    int top = -1, bot = 0;
+    uint32_t total = 0;
+    for (int r = 0; r < 8; r++, src += SHEET_W, d += w) {
+        uint32_t n = 0, c;
+#define TILE_PX(i) c = xl[src[i]]; \
+        if (!(c & XLAT_CLEAR)) { d[i] = (uint8_t)c; n++; }
+        TILE_PX(0) TILE_PX(1) TILE_PX(2) TILE_PX(3)
+        TILE_PX(4) TILE_PX(5) TILE_PX(6) TILE_PX(7)
+#undef TILE_PX
+        if (n) {
+            total += n;
+            if (top < 0)
+                top = r;
+            bot = r;
+        }
+    }
+    if (top >= 0) {
+        p->count += total;
+        row_touched(p, y + top);
+        row_touched(p, y + bot);
+    }
+}
+
+/* Whether an 8x8 tile at (x, y), in camera space and clamped as copy_rect
+ * clamps it, lands wholly inside the clip; if so, where on the surface. */
+static int tile_inside(const struct pen *p, int64_t x, int64_t y,
+                       int32_t *sx, int32_t *sy)
+{
+    int64_t dx = clampc(x) + p->ox, dy = clampc(y) + p->oy;
+    if (dx < p->cx0 || dy < p->cy0 || dx + 8 > p->cx1 || dy + 8 > p->cy1)
+        return 0;
+    *sx = (int32_t)dx;
+    *sy = (int32_t)dy;
+    return 1;
 }
 
 /* A sprite count in sprites, which may be a fraction: pixels, rounded
@@ -1185,11 +1257,16 @@ NATIVE(spr)
         return 0;
     if (n < 0 || n > 255)
         return 1;
+    int fx = flag(vm, a, argc, 5), fy = flag(vm, a, argc, 6);
     struct pen p;
+    int32_t tx, ty;
     begin(vm, &p, 0, 0);
-    copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (n & 15) * 8,
-              (n >> 4) * 8, w, h, x, y, w, h, flag(vm, a, argc, 5),
-              flag(vm, a, argc, 6));
+    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty))
+        tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W + (n & 15) * 8,
+              tx, ty);
+    else
+        copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (n & 15) * 8,
+                  (n >> 4) * 8, w, h, x, y, w, h, fx, fy);
     finish(vm, &p);
     return 1;
 }
@@ -1363,6 +1440,12 @@ NATIVE(map)
             uint8_t n = map[(cy + j) * MAP_W + cx + i];
             if (!n || (layers && (flags[n] & layers) != layers))
                 continue;
+            int32_t tx, ty;
+            if (tile_inside(&p, px - p.ox, py - p.oy, &tx, &ty)) {
+                tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W +
+                      (n & 15) * 8, tx, ty);
+                continue;
+            }
             copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H,
                       (n & 15) * 8, (n >> 4) * 8, 8, 8, px - p.ox, py - p.oy,
                       8, 8, 0, 0);
@@ -1494,14 +1577,17 @@ NATIVE(pal)
     if (which == 1) {
         vm->d.spal[c0 & 0xff] = (uint8_t)c1;
         reshow(&vm->d);
-    } else
+    } else {
         vm->d.dpal[c0 & 0xff] = (uint8_t)c1;
+        vm->d.xlat_stale = 1;
+    }
     return 1;
 }
 
 NATIVE(palt)
 {
     (void)out;
+    vm->d.xlat_stale = 1;
     if (argc == 0) {
         memset(vm->d.transparent, 0, sizeof(vm->d.transparent));
         vm->d.transparent[0] = 1;
