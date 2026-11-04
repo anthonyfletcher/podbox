@@ -186,6 +186,28 @@ static void present_wait(void)
 #endif
 }
 
+#ifdef CPU_ARM
+void present_row_arm(const uint8_t *src, uint32_t *d0, uint32_t *d1,
+                     const uint32_t lut2[256], int n);
+
+/* arcade_present_rows(), each row in assembly (present_arm.S) */
+static void present_rows(const struct arcade_screen *s, void *fb, int stride,
+                         int r0, int r1)
+{
+    for (int y = r0; y <= r1; y++) {
+        uint16_t *row = (uint16_t *)fb + y * 2 * stride;
+        present_row_arm(s->px + y * s->width, (uint32_t *)row,
+                        (uint32_t *)(row + stride), lut2, s->width / 8);
+    }
+}
+#else
+static void present_rows(const struct arcade_screen *s, void *fb, int stride,
+                         int r0, int r1)
+{
+    arcade_present_rows(s, lut2, fb, stride, r0, r1);
+}
+#endif
+
 static void present(struct vm *vm, bool all)
 {
     const struct arcade_screen *s = arcade_screen(vm);
@@ -198,7 +220,7 @@ static void present(struct vm *vm, bool all)
     if (r0 <= r1) {
         int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
         present_wait();
-        arcade_present_rows(s, lut2, FBADDR(0, 0), stride, r0, r1);
+        present_rows(s, FBADDR(0, 0), stride, r0, r1);
 #ifdef HAVE_LCD_UPDATE_ASYNC
         lcd_update_start(r0 * 2, (r1 - r0 + 1) * 2);
 #else

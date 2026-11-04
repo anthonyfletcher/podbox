@@ -215,6 +215,9 @@ games/arcade/core_math.c
 games/arcade/core_draw.c
 games/arcade/core_input.c
 games/arcade/present.c
+#ifdef CPU_ARM
+games/arcade/present_arm.S
+#endif
 
 screens/settings/display_settings.c
 screens/settings/eq_settings.c
