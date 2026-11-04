@@ -694,6 +694,9 @@ class Fn extends Scope {
         case 'group':
             return fail(node, node.name + ' is a group of constants; ' +
                         'use ' + node.name + '.NAME');
+        case 'apins':
+            return fail(node, node.name + ' is a set of built-in functions; ' +
+                        'call one, as ' + node.name + '.name()');
         case 'builtin':
             if (node.name === 'undefined') return this.emit('PUSHNULL', []);
             return fail(node, node.name + ' cannot be used as a value');
@@ -974,6 +977,13 @@ class Fn extends Scope {
                 if (base && base.kind === 'group')
                     fail(callee, callee.object.name + '.' + callee.property.name +
                          ' is a constant, not a function');
+                if (base && base.kind === 'apins') {
+                    const def = this.prog.api.namespaces[base.name][callee.property.name];
+                    if (!def)
+                        fail(callee, callee.object.name + ' has no function ' +
+                             callee.property.name);
+                    return this.nativeCall(def, args, node, want);
+                }
             }
             const key = this.propertyKey(callee);
             const m = key === null ? null :
@@ -1022,7 +1032,7 @@ class Fn extends Scope {
     }
 
     nativeCall(def, args, node, want) {
-        const name = node.callee.name || def.name;
+        const name = node.callee.name || def.label || def.name;
         if (args.length < def.min || args.length > def.max)
             fail(node, name + '() takes ' + range(def.min, def.max) + ' argument' +
                  (def.max === 1 ? '' : 's'));
@@ -1271,6 +1281,8 @@ class Program {
         if (api.consts[name])
             return { kind: 'const', api: api.consts[name] };
         if (api.groups[name]) return { kind: 'group', name: name };
+        if (api.namespaces && api.namespaces[name])
+            return { kind: 'apins', name: name };
         if (api.natives[name]) return { kind: 'native', def: api.natives[name] };
         if (BUILTINS.indexOf(name) >= 0) return { kind: 'builtin', name: name };
         return null;
@@ -1279,6 +1291,7 @@ class Program {
     reserved(name) {
         const api = this.api;
         return api.natives[name] || api.consts[name] || api.groups[name] ||
+            (api.namespaces && api.namespaces[name]) ||
             BUILTINS.indexOf(name) >= 0 || this.byNs.has(name) ||
             name in MISSING_GLOBALS;
     }

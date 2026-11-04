@@ -18,6 +18,7 @@
 #define OWN 2
 
 #define API_ALIAS(name, target)
+#define API_NS(name)
 #define API_CONST(name, value, version)
 #define API_CONSTG(group, name, value, version)
 

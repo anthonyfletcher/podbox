@@ -217,6 +217,7 @@ games/arcade/core_draw.c
 games/arcade/core_input.c
 games/arcade/present.c
 games/arcade/core_sound.c
+games/arcade/sys_actors.c
 #ifdef CPU_ARM
 games/arcade/present_arm.S
 #endif

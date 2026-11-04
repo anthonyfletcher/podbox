@@ -309,6 +309,33 @@ int vm_new_array(struct vm *vm, uint32_t len, struct value *out)
     return 1;
 }
 
+/* A record with the keys named, every value null, for a system to fill;
+ * its shape is the same for every record made from the same keys. */
+static int new_obj(struct vm *vm, uint32_t shape, struct value *vals,
+                   struct value *out);
+
+int vm_new_record(struct vm *vm, const char *const *keys, uint32_t n,
+                  struct value *out)
+{
+    static struct value nulls[16];
+    uint32_t shape = 0;
+    if (n > 16)
+        return vm_fail(vm, "a record of more than 16 keys", "", "");
+    for (uint32_t i = 0; i < n; i++) {
+        struct value s;
+        if (!vm_new_string(vm, (const uint8_t *)keys[i],
+                           (uint32_t)strlen(keys[i]), &s))
+            return 0;
+        uint32_t k = key_id(vm, s, 1);
+        if (k == NONE)
+            return 0;
+        shape = vm_shape_add(vm, shape, k);
+        if (shape == NONE)
+            return 0;
+    }
+    return new_obj(vm, shape, nulls, out);
+}
+
 /* Room for at least need elements; the array must be rooted. */
 static int arr_reserve(struct vm *vm, struct value a, uint32_t need)
 {

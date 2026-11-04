@@ -57,6 +57,19 @@ export function parseApi(text) {
     each(text, 'API_ALIAS', function (a) {
         natives[a[0]] = natives[a[1]];
     });
+    /* API_NS(ns): a native ns_name is ns.name in a cart, and only that */
+    const namespaces = Object.create(null);
+    each(text, 'API_NS', function (a) {
+        const ns = Object.create(null);
+        for (const name of Object.keys(natives)) {
+            if (!name.startsWith(a[0] + '_')) continue;
+            const def = natives[name];
+            def.label = a[0] + '.' + name.slice(a[0].length + 1);
+            ns[name.slice(a[0].length + 1)] = def;
+            delete natives[name];
+        }
+        namespaces[a[0]] = ns;
+    });
     const consts = Object.create(null);
     each(text, 'API_CONST', function (a) {
         consts[a[0]] = { value: +a[1], version: +a[2] };
@@ -66,5 +79,6 @@ export function parseApi(text) {
         if (!groups[a[0]]) groups[a[0]] = Object.create(null);
         groups[a[0]][a[1]] = { value: +a[2], version: +a[3] };
     });
-    return { natives: natives, bySlot: bySlot, consts: consts, groups: groups };
+    return { natives: natives, bySlot: bySlot, consts: consts, groups: groups,
+             namespaces: namespaces };
 }

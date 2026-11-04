@@ -3,7 +3,7 @@
  *
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
- *                  [--wav file.wav] [--menu i]...
+ *                  [--wav file.wav] [--buttons t:mask,...] [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -13,7 +13,9 @@
  * hex digit a pixel (the colour's low four bits), a row a line, and
  * --dirty prints "dirty lo hi", the rows the last tick drew. --wav saves
  * the sound, 44.1 kHz stereo, a tick's worth after each tick, and click()
- * prints "click 0" or "click 1". Each
+ * prints "click 0" or "click 1". --buttons holds button masks (1 PREV,
+ * 2 NEXT, 4 MENU, 8 PLAY, 16 SELECT) from the ticks given, each until the
+ * next: "30:16,31:0" presses SELECT for tick 30. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -276,6 +278,7 @@ int main(int argc, char **argv)
     int units = 0, dirty = 0;
     unsigned long ceiling = 0;
     const char *shot_path = NULL, *dump_spec = NULL, *wav_path = NULL;
+    const char *buttons = NULL;
     int menu_picks[16], npicks = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
@@ -296,6 +299,8 @@ int main(int argc, char **argv)
             dirty = 1;
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc)
             wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
+            buttons = argv[++i];
         else
             path = argv[i];
     }
@@ -331,7 +336,22 @@ int main(int argc, char **argv)
         return report(vm);
     if (units)
         fprintf(stderr, "start %u\n", (unsigned)arcade_units(vm));
+    unsigned held = 0;
     for (long t = 0; t < ticks; t++) {
+        /* the mask of the latest --buttons entry at or before this tick */
+        for (const char *b = buttons; b && *b;) {
+            long at = strtol(b, (char **)&b, 10);
+            unsigned mask = 0;
+            if (*b == ':')
+                mask = (unsigned)strtoul(b + 1, (char **)&b, 10);
+            if (at == t)
+                held = mask;
+            if (*b == ',')
+                b++;
+            else
+                break;
+        }
+        arcade_input(vm, held, 0, -1);
         arcade_presented(vm);
         if (!arcade_tick(vm, 1))
             return report(vm);

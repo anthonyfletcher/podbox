@@ -23,6 +23,7 @@
  *   the map
  *   state          camera, clip, colour, cursor, palettes, target
  *   memory         the engine's arrays as Uint8Arrays; copy and fill
+ *   for the systems  actors' sprites and particles' pixels
  *   the host's view of the screen
  ***************************************************************************/
 #include <string.h>
@@ -1688,12 +1689,9 @@ NATIVE(font)
 {
     (void)out;
     WHOLE(0, 0, f, "font");
-    if (f < 0 || f > 2)
-        return vm_fail(vm, "font() needs FONT.SMALL, FONT.BIG or FONT.SYS",
-                       "", "");
-    /* FONT.SYS is the player's own font, drawn by the shell; until it is
-     * wired, it falls back to the small font. */
-    vm->d.font = (uint8_t)(f == 2 ? 0 : f);
+    if (f < 0 || f > 1)
+        return vm_fail(vm, "font() needs FONT.SMALL or FONT.BIG", "", "");
+    vm->d.font = (uint8_t)f;
     return 1;
 }
 
@@ -2529,6 +2527,65 @@ NATIVE(fill)
     }
     moved(vm, a[0], (uint32_t)i, (uint32_t)n, size);
     return 1;
+}
+
+/* ---- for the systems ---------------------------------------------------- */
+
+static int32_t num_or_0(struct value v)
+{
+    return is_num(v) ? floor_int(v) : 0;
+}
+
+/* actors.draw(): each actor on with a sprite 0-255, as spr(sp, x, y, 1, 1,
+ * flip) draws it */
+void core_draw_sprites(struct vm *vm, const struct value *on,
+                       const struct value *x, const struct value *y,
+                       const struct value *sp, const struct value *flip,
+                       uint32_t n)
+{
+    struct pen p;
+    const uint8_t *sheet = MEM(vm, vm->sheet);
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;                    /* tile8 and copy_rect charge */
+    for (uint32_t i = 0; i < n; i++) {
+        int32_t s = num_or_0(sp[i]);
+        if (!vm_truthy(vm, on[i]) || !is_num(sp[i]) || s < 0 || s > 255)
+            continue;
+        int64_t xx = num_or_0(x[i]), yy = num_or_0(y[i]);
+        int fl = vm_truthy(vm, flip[i]);
+        int32_t tx, ty;
+        p.cost += COST_CALL / 2;
+        if (!fl && tile_inside(&p, xx, yy, &tx, &ty))
+            tile8(&p, sheet + (s >> 4) * 8 * SHEET_W + (s & 15) * 8, tx, ty);
+        else
+            copy_rect(&p, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+                      8, 8, xx, yy, 8, 8, fl, 0);
+    }
+    finish(vm, &p);
+}
+
+/* particles.draw(): each live particle a pixel of its colour */
+void core_draw_dots(struct vm *vm, const struct value *life,
+                    const struct value *x, const struct value *y,
+                    const struct value *c, uint32_t n)
+{
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = PER16_DOT;
+    p.cost += n / 8;
+    for (uint32_t i = 0; i < n; i++) {
+        if (num_or_0(life[i]) <= 0)
+            continue;
+        int64_t px = (int64_t)num_or_0(x[i]) + p.ox;
+        int64_t py = (int64_t)num_or_0(y[i]) + p.oy;
+        if (px < p.cx0 || px >= p.cx1 || py < p.cy0 || py >= p.cy1)
+            continue;
+        p.s.px[(int32_t)py * p.s.w + (int32_t)px] =
+            p.d->dpal[num_or_0(c[i]) & 0xff];
+        p.count++;
+        row_touched(&p, (int32_t)py);
+    }
+    finish(vm, &p);
 }
 
 /* ---- the host's view of the screen ----------------------------------- */

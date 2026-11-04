@@ -45,7 +45,7 @@ static int real(struct vm *vm, struct value *a, int i, const char *fn,
 
 /* ---- random: PCG32, seeded the same way everywhere ------------------- */
 
-static uint32_t pcg(struct vm *vm)
+uint32_t core_random(struct vm *vm)
 {
     uint64_t old = vm->rng_state;
     vm->rng_state = old * 6364136223846793005ull + vm->rng_inc;
@@ -58,9 +58,9 @@ void core_seed(struct vm *vm, uint64_t seed)
 {
     vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
     vm->rng_state = 0;
-    pcg(vm);
+    core_random(vm);
     vm->rng_state += seed;
-    pcg(vm);
+    core_random(vm);
 }
 
 /* 0 .. n-1, without modulo bias. */
@@ -68,7 +68,7 @@ static uint32_t below(struct vm *vm, uint32_t n)
 {
     uint32_t floor = (0u - n) % n, r;
     do
-        r = pcg(vm);
+        r = core_random(vm);
     while (r < floor);
     return r % n;
 }
@@ -78,7 +78,7 @@ static uint32_t below(struct vm *vm, uint32_t n)
 NATIVE(rnd)
 {
     if (argc == 0)
-        return RET_FIX(pcg(vm) & 0xffff);
+        return RET_FIX(core_random(vm) & 0xffff);
     if (a[0].tag == T_ARR) {
         struct arr *p = ARR(vm, a[0]);
         *out = p->len ? BUF(vm, p->buf)->v[below(vm, p->len)] : mk(T_NULL, 0);

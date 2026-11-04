@@ -274,6 +274,7 @@ struct vm
     uint32_t sfx_len, nsfx;
     struct sfxinfo *sfxdir;
     struct voice voices[4];
+    uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
     uint32_t frame;
     uint8_t held, pressed;      /* btn() and btnp() bits */
     uint16_t held_ticks[5];
@@ -376,6 +377,8 @@ const char *vm_typename(uint32_t tag);
 int vm_new_string(struct vm *vm, const uint8_t *b, uint32_t len,
                   struct value *out);
 int vm_new_array(struct vm *vm, uint32_t len, struct value *out);
+int vm_new_record(struct vm *vm, const char *const *keys, uint32_t n,
+                  struct value *out);
 
 /* gc.c */
 void gc_init(struct vm *vm);
@@ -390,9 +393,19 @@ uint32_t vm_shape_add(struct vm *vm, uint32_t parent, uint32_t key);
 
 /* core_math.c */
 void core_seed(struct vm *vm, uint64_t seed);
+uint32_t core_random(struct vm *vm);
 
 /* core_draw.c */
 int core_draw_init(struct vm *vm);
+/* For the systems: actors' sprites and particles' pixels, from a pool's
+ * arrays of values */
+void core_draw_sprites(struct vm *vm, const struct value *on,
+                       const struct value *x, const struct value *y,
+                       const struct value *sp, const struct value *flip,
+                       uint32_t n);
+void core_draw_dots(struct vm *vm, const struct value *life,
+                    const struct value *x, const struct value *y,
+                    const struct value *c, uint32_t n);
 int sound_load(struct vm *vm);
 
 /* verify.c */

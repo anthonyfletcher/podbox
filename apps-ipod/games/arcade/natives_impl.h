@@ -81,6 +81,17 @@ IMPL(sfxp)
 IMPL(tone)
 IMPL(click)
 
+/* sys_actors.c */
+IMPL(actors_pool)
+IMPL(actors_spawn)
+IMPL(actors_move)
+IMPL(actors_overlaps)
+IMPL(actors_draw)
+IMPL(particles_pool)
+IMPL(particles_emit)
+IMPL(particles_step)
+IMPL(particles_draw)
+
 /* core_input.c */
 IMPL(btn)
 IMPL(btnp)
