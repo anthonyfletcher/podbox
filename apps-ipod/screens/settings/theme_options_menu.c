@@ -25,7 +25,7 @@
 #include "widgets/menu.h"
 #include "widgets/keyboard.h"
 #include "widgets/splash.h"
-#include "widgets/text_box.h"
+#include "widgets/dialog_prose.h"
 #include "widgets/yesno.h"
 #include "draw/viewport.h"
 #include "skin/skin_engine.h"
@@ -100,14 +100,7 @@ static void restore_title(struct gui_synclist *lists, const char *title)
 /* Explain's screen, for text the options file gave */
 static bool show_help(const char *title, const char *help)
 {
-    int leave;
-
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_enable(i, false, NULL);
-    leave = view_text(title, help);
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_undo(i, false);
-    return leave != 0;
+    return dialog_prose_show(title, help);
 }
 
 /* --- a choice ------------------------------------------------------------ */

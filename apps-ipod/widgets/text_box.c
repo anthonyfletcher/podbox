@@ -32,9 +32,19 @@
 #include "draw/text_wrap.h"
 #include "speech/talk.h"
 
+/* The text keeps this far from either side of the screen, and from the
+ * scroll bar, which sits TB_EDGE in from its own side */
+#define TB_MARGIN  6
+#define TB_BAR_GAP 4
+#define TB_EDGE    2
+/* Above and below the title, and below the rule under it */
+#define TB_TITLE_PAD 4
+
 struct view_info {
     struct font* pf;
     int font;
+    int title_font;     /* the theme's bold UI font */
+    int title_h;        /* the title's band, rule included; 0 for none */
     struct viewport scrollbar_vp; /* viewport for scrollbar */
     struct viewport vp;
     const char *title;
@@ -72,13 +82,25 @@ static void calc_line_count(struct view_info *info)
         {
             ptr = info->text;
             i = 0;
+            int bar_w = global_settings.scrollbar_width;
+            int text_l = info->vp.x, text_r = info->vp.x + info->vp.width;
+
             info->scrollbar_vp = info->vp;
-            info->scrollbar_vp.width = global_settings.scrollbar_width;
-            info->vp.width -= info->scrollbar_vp.width;
-            if (global_settings.scrollbar != SCROLLBAR_RIGHT)
-                info->vp.x = info->scrollbar_vp.width;
+            info->scrollbar_vp.width = bar_w;
+            /* Off still has one, on the right: a page longer than the
+             * screen has no other sign of what is below */
+            if (global_settings.scrollbar == SCROLLBAR_LEFT)
+            {
+                info->scrollbar_vp.x = TB_EDGE;
+                text_l = MAX(text_l, TB_EDGE + bar_w + TB_BAR_GAP);
+            }
             else
-                info->scrollbar_vp.x = info->vp.width;
+            {
+                info->scrollbar_vp.x = text_r + TB_MARGIN - TB_EDGE - bar_w;
+                text_r = MIN(text_r, info->scrollbar_vp.x - TB_BAR_GAP);
+            }
+            info->vp.x = text_l;
+            info->vp.width = text_r - text_l;
             scrollbar = true;
         }
     }
@@ -115,7 +137,11 @@ static int init_view(struct view_info *info,
     viewport_set_defaults(&info->vp, SCREEN_MAIN);
     info->font = screens[SCREEN_MAIN].getuifont();
     info->pf = font_get(info->font);
-    info->display_lines = info->vp.height / info->pf->height;
+    info->title_font = font_get_ui_bold();
+    /* padding, title, padding, rule, padding */
+    info->title_h = font_get(info->title_font)->height + 3 * TB_TITLE_PAD + 1;
+    info->vp.x += TB_MARGIN;
+    info->vp.width -= 2 * TB_MARGIN;
 
     info->title = title;
     info->text = text;
@@ -124,16 +150,14 @@ static int init_view(struct view_info *info,
     info->start = 0;
 
     /* no title for small screens. */
-    if (info->display_lines < 4)
+    if (!title || (info->vp.height - info->title_h) / info->pf->height < 4)
     {
         info->title = NULL;
+        info->title_h = 0;
     }
-    else
-    {
-        info->display_lines--;
-        info->vp.y += info->pf->height;
-        info->vp.height -= info->pf->height;
-    }
+    info->vp.y += info->title_h;
+    info->vp.height -= info->title_h;
+    info->display_lines = info->vp.height / info->pf->height;
 
     calc_line_count(info);
     return 0;
@@ -179,8 +203,17 @@ static void draw_text(struct view_info *info)
     display->set_viewport(&all);
     display->clear_viewport();
 
-    if(info->title)
-        display->puts(0, 0, info->title);
+    if (info->title)
+    {
+        int w, h, x;
+        int rule_y = info->title_h - TB_TITLE_PAD - 1;
+
+        all.font = info->title_font;
+        display->getstringsize(info->title, &w, &h);
+        x = MAX((all.width - w) / 2, TB_MARGIN);
+        display->putsxy(x, TB_TITLE_PAD, info->title);
+        display->hline(TB_MARGIN, all.width - 1 - TB_MARGIN, rule_y);
+    }
 
     info->vp.fg_pattern = fg;
     info->vp.bg_pattern = bg;

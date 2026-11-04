@@ -42,11 +42,13 @@
 
 #define PROSE_BAR_W      4      /* Scrollbar */
 #define PROSE_BAR_GAP    4
+#define PROSE_TITLE_GAP  4      /* Either side of the rule under the title */
 
 enum prose_focus { PROSE_TEXT = 0, PROSE_BUTTONS };
 
 struct prose
 {
+    const char *title;          /* NULL: none */
     const char *body;
     const char *accept;
     const char *cancel;         /* NULL: one button, and nothing to decide */
@@ -61,24 +63,40 @@ struct prose
 
 static int prose_wrap(const char *body, int w, int font);
 
-/* As tall as the text and the button row need, up to PROSE_H_PCT of the
- * screen; past that the text scrolls */
+/* The title's band at the top of the box: the title in the theme's bold UI
+ * font, then a rule. A theme's status bar need not show a title, so the box
+ * carries its own. */
+static int prose_title_h(const struct prose *p)
+{
+    if (!p->title)
+        return 0;
+    return font_get(font_get_ui_bold())->height + 2 * PROSE_TITLE_GAP + 1;
+}
+
+/* As tall as the title, the text and the button row need, up to PROSE_H_PCT
+ * of the screen; past that the text scrolls */
 static void prose_measure(struct dialog *d, struct screen *s,
                           struct viewport *box, void *data)
 {
     struct prose *p = data;
     struct dialog_insets in;
-    int fh = font_get(box->font)->height, need, max;
+    int fh = font_get(box->font)->height, lines, fixed, max;
     int sw = d->fb ? d->fb_w : s->lcdwidth;
     int sh = d->fb ? d->fb_h : s->lcdheight;
 
     dialog_get_insets(&d->style, &in);
     box->width  = sw * PROSE_W_PCT / 100;
     max = sh * PROSE_H_PCT / 100;
-    need = prose_wrap(p->body, box->width - in.left - in.right
-                               - PROSE_BAR_W - PROSE_BAR_GAP, box->font) * fh
-           + fh / 2 + fh + 8 + in.top + in.bottom;
-    box->height = MIN(need, max);
+    /* Everything but the text: the gap above the button, the button, the
+     * frame and the title */
+    fixed = fh / 2 + fh + 8 + in.top + in.bottom + prose_title_h(p);
+    lines = prose_wrap(p->body, box->width - in.left - in.right
+                                - PROSE_BAR_W - PROSE_BAR_GAP, box->font);
+    /* Text that scrolls gets the whole lines that fit and no more, so the
+     * box ends at its last line rather than a line's height below it */
+    if (fixed + lines * fh > max)
+        lines = MAX((max - fixed) / fh, 1);
+    box->height = fixed + lines * fh;
     box->x = (sw - box->width) / 2;
     box->y = (sh - box->height) / 2;
 }
@@ -115,6 +133,7 @@ static void prose_draw(struct dialog *d, struct screen *s,
     struct prose *p = data;
     int fh = font_get(content->font)->height;
     int bh = fh + 8;
+    int top = prose_title_h(p);
     /* Room for the scrollbar whether or not one is drawn. Measuring against
      * the full width and re-measuring narrower once a bar turns out to be
      * needed costs two wraps a frame, and reflows the text under the reader
@@ -125,7 +144,7 @@ static void prose_draw(struct dialog *d, struct screen *s,
 
     /* The button row is fixed to the foot; the body gets what is left, less a
      * gap so the last line of text never sits against a button. */
-    body_h = content->height - bh - fh / 2;
+    body_h = content->height - bh - fh / 2 - top;
     if (body_h < fh)
         body_h = fh;
 
@@ -142,7 +161,18 @@ static void prose_draw(struct dialog *d, struct screen *s,
 
     s->set_drawmode(DRMODE_FG);
 
-    for (i = 0, y = 0; i < p->visible; i++)
+    if (p->title)
+    {
+        int body_font = content->font, w, h;
+
+        content->font = font_get_ui_bold();
+        s->getstringsize(p->title, &w, &h);
+        s->putsxy(MAX((content->width - w) / 2, 0), 0, p->title);
+        content->font = body_font;
+        s->hline(0, content->width - 1, top - PROSE_TITLE_GAP - 1);
+    }
+
+    for (i = 0, y = top; i < p->visible; i++)
     {
         int n = p->scroll + i;
 
@@ -161,7 +191,7 @@ static void prose_draw(struct dialog *d, struct screen *s,
     {
         /* Into a buffer, filled with the box's colour: clearing in inverse
          * video copies the screen's backdrop, laid out for the screen */
-        gui_scrollbar_draw(s, content->width - PROSE_BAR_W, 0,
+        gui_scrollbar_draw(s, content->width - PROSE_BAR_W, top,
                            PROSE_BAR_W, body_h, p->lines,
                            p->scroll, p->scroll + p->visible,
                            d->fb ? VERTICAL | FOREGROUND | INNER_BGFILL
@@ -315,6 +345,7 @@ static int prose_run(const char *title, const char *body,
 
     memset(&p, 0, sizeof (p));
     prose_body = NULL;          /* a caller may reuse its buffer */
+    p.title  = title;
     p.body   = body;
     p.accept = accept_label;
     p.cancel = cancel_label;

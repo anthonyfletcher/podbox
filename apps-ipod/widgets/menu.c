@@ -60,7 +60,7 @@
 #include "root_menu.h"
 #include "audio.h"
 #include "draw/viewport.h"
-#include "text_box.h"                     /* view_text */
+#include "dialog_prose.h"                  /* Explain */
 #include "splash.h"
 #include "screens/settings/settings_help.h"
 #include "screens/settings/sound_settings.h"
@@ -385,7 +385,7 @@ static bool item_hidden(const struct menu_item_ex *item, int depth)
  * only when someone actually asks. */
 static bool explain(const char *key, const char *title)
 {
-    /* Static rather than automatic: view_text() below runs a whole screen of
+    /* Static rather than automatic: the dialog below runs a whole screen of
      * its own from this frame, so a kilobyte here sits under all of it.
      * One explanation is on screen at a time, so one buffer is enough. A
      * stanza longer than this is cut short without a sign, so
@@ -398,13 +398,7 @@ static bool explain(const char *key, const char *title)
         return false;
     }
 
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_enable(i, false, NULL);
-    int leave = view_text(title, text);
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_undo(i, false);
-
-    return leave != 0;
+    return dialog_prose_show(title, text);
 }
 
 static bool explain_setting(const struct settings_list *setting)
