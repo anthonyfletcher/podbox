@@ -59,8 +59,9 @@ static uint32_t rule_len(int f)
 }
 
 /* cells.rules(): a record of Uint8Arrays for the cart to fill -- per
- * material move (MOVE.*), spread (how far along a liquid or gas looks
- * for somewhere lower to flow into), density, decay (a chance a tick out of
+ * material move (MOVE.*), spread (how far along its row a liquid or gas
+ * looks for somewhere lower to flow into; 0, the whole row, levels), density,
+ * decay (a chance a tick out of
  * 256) and becomes; per reaction a, b, c, d and chance */
 NATIVE(cells_rules)
 {
@@ -392,15 +393,15 @@ static void step_cell(struct stepper *s, int32_t x, int32_t y)
         }
     if (mv == MOVE_POWDER)
         return;
-    /* Liquids and gases look along their open row, as far as spread, for
-     * the nearest place they could fall (or rise) into -- the nearer
-     * side's, a random one's on a tie -- and go straight into it, along
-     * and down in one move. Moving partway toward it instead makes a
+    /* Liquids and gases look along their open row for the nearest place
+     * they could fall (or rise) into -- the nearer side's, a random one's
+     * on a tie -- and go straight into it, along and down in one move. A
+     * spread of 0 looks along the whole row, so water levels; a spread of
+     * n looks n cells, so the surface keeps a slope of one cell in n, as
+     * a thick liquid does. Moving partway toward the drop instead makes a
      * draining pool's edge flick between ragged and solid every other
-     * tick, every step of it sliding and then dropping together. With
-     * none in reach they stay: a level pool goes quiet, and a lone extra
-     * cell stays a bump. */
-    int32_t reach = r[R_SPREAD][m] ? r[R_SPREAD][m] : 1;
+     * tick. With none in reach they stay, and a level pool goes quiet. */
+    int32_t reach = r[R_SPREAD][m] ? r[R_SPREAD][m] : s->f.w;
     int32_t k = drop_along(s, x, y, dy, side, m, reach);
     int32_t other = drop_along(s, x, y, dy, -side, m, reach);
     if (other && (!k || other < k)) {
@@ -513,17 +514,39 @@ NATIVE(cells_step)
         }
     }
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
-    /* next tick: the chunks that changed and their neighbours; the rest
-     * sleep with their sums */
+    /* Next tick: the chunks that changed and those near them; the rest
+     * sleep with their sums. Near is a chunk up or down, and sideways as
+     * far as a liquid looks along its row: a change there can open the
+     * drop a sleeping liquid is waiting for, and with only the chunks
+     * beside woken, water freezes in steps a chunk wide. */
+    uint16_t band[FIELD_MAX / CHUNK + 1];
+    band[0] = 0;
+    int32_t across = 1;
+    for (int32_t m = 0; m < MATERIALS; m++)
+        if (s.kind[m] & K_FLOWS) {
+            int32_t spread = s.r.f[R_SPREAD][m];
+            int32_t n = spread ? spread / CHUNK + 1 : s.cw;
+            if (n > across)
+                across = n;
+        }
     for (int32_t k = 0; k < s.cw * chh; k++) {
-        int32_t cx = k % s.cw, cy = k / s.cw, wake = 0;
-        for (int32_t j = -1; j <= 1 && !wake; j++)
-            for (int32_t i = -1; i <= 1 && !wake; i++) {
-                int32_t nx = cx + i, ny = cy + j;
-                if (nx >= 0 && ny >= 0 && nx < s.cw && ny < chh &&
-                    s.changed[ny * s.cw + nx])
-                    wake = 1;
+        int32_t cx = k % s.cw, cy = k / s.cw, wake;
+        /* each chunk row's band (the row and those above and below) as a
+         * running count of changed chunks along it, once a row */
+        if (cx == 0) {
+            int32_t n = 0;
+            for (int32_t i = 0; i < s.cw; i++) {
+                for (int32_t j = cy - 1; j <= cy + 1; j++)
+                    if (j >= 0 && j < chh && s.changed[j * s.cw + i]) {
+                        n++;
+                        break;
+                    }
+                band[i + 1] = (uint16_t)n;
             }
+        }
+        int32_t lo = cx - across < 0 ? 0 : cx - across;
+        int32_t hi = cx + across >= s.cw ? s.cw - 1 : cx + across;
+        wake = band[hi + 1] != band[lo];
         sl->awake[k] = (uint8_t)wake;
         /* a chunk that slept and nothing moved into keeps its sum */
         if (wake)

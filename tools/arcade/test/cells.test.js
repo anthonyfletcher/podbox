@@ -156,3 +156,35 @@ test('rules are checked', () => {
     const r2 = run(BOARD + 'function init() { var R = cells.rules(); R.move = 1; cells.step(new Uint8Array(4), 2, R); }\nfunction update() {}');
     assert.match(r2.err, /the rules' move is no longer its Uint8Array/);
 });
+
+test('water levels across chunks, and a thick liquid keeps its slope', () => {
+    /* a column of water on a floor four chunks wide: with spread 0 it ends
+     * level; with spread 4, one cell higher every four along */
+    const run2 = (spread) => cellrun(`var b, W = 64, H = 40, tk = 0;
+function init() {
+    R = cells.rules();
+    R.move[2] = MOVE.LIQUID; R.density[2] = 100; R.spread[2] = ${spread};
+    R.density[3] = 255;
+    b = new Uint8Array(W * H);
+    for (var x = 0; x < W; x++) b[(H - 1) * W + x] = 3;
+    for (var y = 0; y < 32; y++) for (x = 0; x < 3; x++) b[y * W + x] = 2;
+}
+function update() {
+    tk++;
+    var n = cells.step(b, W, R);
+    if (tk == 400) {
+        var lo = H, hi = 0;
+        for (var x = 0; x < W; x++) {
+            var top = H - 1;
+            for (var y = 0; y < H - 1; y++) if (b[y * W + x] == 2) { top = y; break; }
+            lo = min(lo, top); hi = max(hi, top);
+        }
+        printh(n + " " + (hi - lo));
+    }
+}`, 400);
+    /* 96 cells over 64 columns: one row and a half, so at most a step of 1 */
+    assert.deepEqual(run2(0), ['0 1']);
+    const thick = run2(4)[0].split(' ').map(Number);
+    assert.equal(thick[0], 0, 'settled');
+    assert.ok(thick[1] > 3, 'a slope remains: ' + thick[1]);
+});
