@@ -59,6 +59,7 @@ NATIVE(plane_view)
     int32_t s = core_sine(half), c = core_sine(half + 0x4000);
     v->focal = (int32_t)(((int64_t)(SCREEN_W / 2) << 32) / s * c >> 16);
     v->set = 1;
+    v->depth_set = 0;
     vm_charge(vm, 10);
     return 1;
 }
@@ -262,7 +263,7 @@ NATIVE(plane_billboards)
         core_draw_billboard(vm, column_at(&c[3], i, 0), px[i], py[i], pw[i],
                             ph[i], column_at(&c[6], i, 1),
                             column_at(&c[7], i, 1),
-                            column_true(vm, &c[5], i, 0));
+                            column_true(vm, &c[5], i, 0), dep[i]);
     }
     vm_charge(vm, 10 + (uint32_t)n * 4);
     *out = mk(T_INT, k);

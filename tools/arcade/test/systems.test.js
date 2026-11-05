@@ -434,3 +434,36 @@ function update() {}`);
     const odd = run('function init() { plane.view(0, 0, 9, 0, 50, 0.25); land.draw(img(60, 64), img(60, 64)); }\nfunction update() {}');
     assert.match(odd.err, /a power of two/);
 });
+
+test('walls: a wall ahead at its height, billboards hidden behind it', () => {
+    const r = run(`function init() {
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 8); sset(16 + x, y, 11); }
+    fset(1, 1);
+    // a wall of sprite 1 across column 5 (x 40-47), the camera at x 4
+    // looking along x, eye 4 up a wall 8 tall: the wall is 36 away
+    for (var r = 0; r < 16; r++) mset(5, r, 1);
+    plane.view(4, 64, 4, 0, 60, 0.25);
+    cls(0);
+    printh(walls.draw(1));
+    var top = -1, bottom = -1;
+    for (var y = 0; y < 120; y++) if (pget(80, y) == 8) { if (top < 0) top = y; bottom = y; }
+    printh(top + " " + bottom);
+    // a ghost (sprite 2) behind the wall, then one in front of it
+    plane.billboards([60], [64], [0], [2], [8], [false], 1);
+    printh(pget(80, 64));
+    plane.billboards([20], [64], [0], [2], [8], [false], 1);
+    printh(pget(80, 62));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    const out = r.out.trim().split('\n');
+    /* every column meets the wall; a wall 8 tall seen from 4 up, 36 away
+     * at focal 80: 4 * 80 / 36 = 8.9 rows above and below the horizon */
+    assert.equal(out[0], '160');
+    const [top, bottom] = out[1].split(' ').map(Number);
+    assert.ok(Math.abs(top - 50) <= 1 && Math.abs(bottom - 67) <= 1, out[1]);
+    /* behind: the wall shows; in front: the ghost does */
+    assert.deepEqual(out.slice(2), ['8', '11']);
+    const bad = run('function init() { walls.draw(1); }\nfunction update() {}');
+    assert.match(bad.err, /needs a camera first/);
+});

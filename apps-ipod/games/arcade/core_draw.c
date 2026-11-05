@@ -3160,16 +3160,158 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
  * left at x, y on the screen, the camera aside */
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
-                         int flip)
+                         int flip, int32_t depth)
 {
     struct pen p;
     begin(vm, &p, 0, 0);
     p.ox = p.oy = 0;
     p.cost = COST_CALL / 2;
     p.per16 = 0;                    /* copy_rect charges the area */
-    copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
-              (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
+    const struct planeview *v = &vm->plane;
+    if (!v->depth_set) {
+        copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
+                  (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
+        finish(vm, &p);
+        return;
+    }
+    /* behind walls: drawn only in the runs of columns where it is nearer
+     * than the wall there, each run as a clip */
+    int32_t c0 = p.cx0, c1 = p.cx1;
+    int32_t a = x < c0 ? c0 : x, b = x + w > c1 ? c1 : x + w;
+    for (int32_t i = a; i < b;) {
+        while (i < b && v->depth[i] <= depth)
+            i++;
+        int32_t j = i;
+        while (j < b && v->depth[j] > depth)
+            j++;
+        if (j > i) {
+            p.cx0 = i;
+            p.cx1 = j;
+            copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
+                      (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
+        }
+        i = j;
+    }
     finish(vm, &p);
+}
+
+/* walls.draw(): for each screen column a ray through the map's cells from
+ * the plane's camera, cell edge to cell edge, to the first whose flags
+ * share a bit with mask, within far world pixels. Its distance along the
+ * view (not along the ray, which would bow the walls) sets the wall's
+ * height on the screen: from the floor to height world pixels up, the
+ * cell's sprite stretched over it, the column of the sprite where the ray
+ * met the face. Each column's distance is kept for the billboards.
+ * Returns the columns that met a wall. */
+uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
+                         int32_t far)
+{
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;
+    struct planeview *v = &vm->plane;
+    const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
+    const uint8_t *sheet = MEM(vm, vm->sheet);
+    const uint16_t *xl = p.xl;
+    const int32_t mw = vm->map_w, mh = vm->map_h, w = p.s.w;
+    const int64_t never = (int64_t)1 << 50, farz = (int64_t)far << 16;
+    uint32_t hit = 0, steps = 0, drawn = 0;
+    for (int32_t x = 0; x < SCREEN_W; x++)
+        v->depth[x] = 0x7fffffff;
+    /* half a column's width over focal, 0.32: a column's offset is then a
+     * multiply */
+    int64_t half_inv = ((int64_t)1 << 47) / v->focal;
+    for (int32_t x = p.cx0; x < p.cx1; x++) {
+        /* the ray: the view's direction plus the column's way along the
+         * screen, right being (-dy, dx); its length along the view is 1,
+         * so distances along it are distances along the view */
+        int64_t off = ((int64_t)(2 * x + 1 - SCREEN_W) * half_inv) >> 16;
+        int64_t rx = v->dx + ((-(int64_t)v->dy * off) >> 16);
+        int64_t ry = v->dy + (((int64_t)v->dx * off) >> 16);
+        int32_t mx = v->x >> 19, my = v->y >> 19;
+        int32_t sx = rx < 0 ? -1 : 1, sy = ry < 0 ? -1 : 1;
+        int64_t ax = rx < 0 ? -rx : rx, ay = ry < 0 ? -ry : ry;
+        /* the distance between column edges and row edges, and to the
+         * first of each, from 1 / the ray's slope on each axis (16.16, by a
+         * 32-bit division) */
+        int64_t ix = ax > 1 ? (int64_t)(0xffffffffu / (uint32_t)ax) : 0;
+        int64_t iy = ay > 1 ? (int64_t)(0xffffffffu / (uint32_t)ay) : 0;
+        int64_t ex = rx < 0 ? v->x - ((int64_t)mx << 19)
+                            : ((int64_t)(mx + 1) << 19) - v->x;
+        int64_t ey = ry < 0 ? v->y - ((int64_t)my << 19)
+                            : ((int64_t)(my + 1) << 19) - v->y;
+        int64_t ddx = ix ? ix * 8 : never, ddy = iy ? iy * 8 : never;
+        int64_t tdx = ix ? (ex * ix) >> 16 : never;
+        int64_t tdy = iy ? (ey * iy) >> 16 : never;
+        int64_t d = 0;
+        int side = 0, found = 0;
+        uint8_t m = 0;
+        for (;;) {
+            if (tdx < tdy) {
+                d = tdx;
+                tdx += ddx;
+                mx += sx;
+                side = 0;
+            } else {
+                d = tdy;
+                tdy += ddy;
+                my += sy;
+                side = 1;
+            }
+            steps++;
+            if (d > farz)
+                break;
+            if (mx < 0 || my < 0 || mx >= mw || my >= mh)
+                continue;
+            m = map[my * mw + mx];
+            if (flags[m] & mask) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found)
+            continue;
+        if (d < (1 << 12))
+            d = 1 << 12;
+        v->depth[x] = (int32_t)d;
+        hit++;
+        /* where along the face it met, as the sprite's column, the same
+         * way round from either side */
+        int64_t along = side == 0 ? v->y + ((ry * d) >> 16)
+                                  : v->x + ((rx * d) >> 16);
+        int32_t tx = (int32_t)((along >> 16) & 7);
+        if ((side == 0 && rx < 0) || (side == 1 && ry > 0))
+            tx = 7 - tx;
+        /* the wall's top and bottom rows at this distance */
+        int64_t per = ((int64_t)v->focal << 16) / d;
+        int32_t bottom = v->horizon - 1 +
+                         (int32_t)(((int64_t)v->z * per) >> 32);
+        int32_t top = v->horizon - 1 +
+                      (int32_t)((((int64_t)v->z - height) * per) >> 32);
+        if (top >= bottom)
+            continue;
+        int32_t y0 = top < p.cy0 ? p.cy0 : top;
+        int32_t y1 = bottom > p.cy1 ? p.cy1 : bottom;
+        if (y0 >= y1)
+            continue;
+        /* eight rows of the sprite over the wall's height */
+        uint32_t ts = (8u << 16) / (uint32_t)(bottom - top);
+        uint32_t ty = (uint32_t)(y0 - top) * ts;
+        const uint8_t *col = sheet + (m >> 4) * 8 * SHEET_W + (m & 15) * 8 + tx;
+        uint8_t *px = p.s.px + y0 * w + x;
+        for (int32_t y = y0; y < y1; y++, ty += ts, px += w) {
+            uint32_t c = xl[col[((ty >> 16) & 7) * SHEET_W]];
+            if (!(c & XLAT_CLEAR))
+                *px = (uint8_t)c;
+        }
+        drawn += (uint32_t)(y1 - y0);
+        row_touched(&p, y0);
+        row_touched(&p, y1 - 1);
+    }
+    v->depth_set = 1;
+    p.cost += steps * 2 + hit * 40 + drawn * PER16_FLOOR / 16;
+    finish(vm, &p);
+    return hit;
 }
 
 /* ---- the host's view of the screen ----------------------------------- */

@@ -140,6 +140,9 @@ IMPL(links_draw)
 IMPL(land_draw)
 IMPL(land_height)
 
+/* sys_walls.c */
+IMPL(walls_draw)
+
 /* sys_plane.c */
 IMPL(plane_view)
 IMPL(plane_draw)

@@ -225,6 +225,7 @@ games/arcade/sys_noise.c
 games/arcade/sys_cells.c
 games/arcade/sys_links.c
 games/arcade/sys_land.c
+games/arcade/sys_walls.c
 #ifdef CPU_ARM
 games/arcade/present_arm.S
 #endif

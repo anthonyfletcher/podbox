@@ -172,6 +172,10 @@ struct planeview
     int32_t x, y, z, dx, dy, focal;
     int32_t horizon;
     int set;
+    /* walls.draw()'s distance at each screen column, 16.16 world pixels,
+     * for billboards behind walls; kept until the next plane.view() */
+    int depth_set;
+    int32_t depth[SCREEN_W];
 };
 
 /* A cells field's 16x16 chunks: which are awake, and each sleeping one's
@@ -473,7 +477,9 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
-                         int flip);
+                         int flip, int32_t depth);
+uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
+                         int32_t far);
 int sound_load(struct vm *vm);
 
 /* sys_grid.c, for the systems on boards: a Uint8Array w wide, and a
