@@ -182,6 +182,7 @@ struct cellsleep
     int32_t w, h;
     uint8_t awake[256];
     uint32_t sum[256];
+    uint8_t dir[256 * 256 / 8];     /* a bit a cell: a liquid's way */
 };
 
 /* A row of the floor: its left end and one screen pixel's step, 16.16

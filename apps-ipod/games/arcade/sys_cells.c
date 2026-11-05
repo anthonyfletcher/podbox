@@ -38,6 +38,7 @@
 #define CHUNK_SHIFT 4
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
+#define RIDE      64            /* out of 256: on its own liquid, a move */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
 
@@ -59,8 +60,8 @@ static uint32_t rule_len(int f)
 }
 
 /* cells.rules(): a record of Uint8Arrays for the cart to fill -- per
- * material move (MOVE.*), spread (how far along its row a liquid or gas
- * looks for somewhere lower to flow into; 0, the whole row, levels), density,
+ * material move (MOVE.*), spread (how many cells a tick a liquid or gas
+ * runs along when it cannot fall; 0 is 2), density,
  * decay (a chance a tick out of
  * 256) and becomes; per reaction a, b, c, d and chance */
 NATIVE(cells_rules)
@@ -183,6 +184,7 @@ static struct cellsleep *sleep_for(struct vm *vm, const struct field *f)
     old->h = f->h;
     old->used = ++vm->sleep_clock;
     memset(old->awake, 1, sizeof(old->awake));
+    memset(old->dir, 0, sizeof(old->dir));
     return old;
 }
 
@@ -193,6 +195,7 @@ struct stepper
     struct field f;
     struct rules r;
     uint8_t *moved;             /* a bit a cell: changed this tick */
+    uint8_t *dir;               /* a bit a cell: a liquid's way, 1 right */
     uint8_t changed[(FIELD_MAX / CHUNK) * (FIELD_MAX / CHUNK)];
     int32_t cw;                 /* chunks across */
     uint8_t first[MATERIALS];   /* the first reaction for each a, or 255 */
@@ -249,15 +252,32 @@ static inline int lighter(const struct stepper *s, int32_t x, int32_t y,
            s->r.f[R_DENSITY][s->f.c[j]] < s->r.f[R_DENSITY][m];
 }
 
-/* The mover at x, y into tx, ty, and what was there back. Only the mover
- * is done for the tick: the cell it left can still be moved into, or the
- * water a grain sank through would wall the next grain in. */
+static inline int way(const struct stepper *s, int32_t i)
+{
+    return (s->dir[i >> 3] >> (i & 7)) & 1;
+}
+
+static inline void set_way(struct stepper *s, int32_t i, int right)
+{
+    if (right)
+        s->dir[i >> 3] |= (uint8_t)(1 << (i & 7));
+    else
+        s->dir[i >> 3] &= (uint8_t)~(1 << (i & 7));
+}
+
+/* The mover at x, y into tx, ty, and what was there back, each with its
+ * way. Only the mover is done for the tick: the cell it left can still
+ * be moved into, or the water a grain sank through would wall the next
+ * grain in. */
 static void swap(struct stepper *s, int32_t x, int32_t y, int32_t tx,
                  int32_t ty)
 {
     int32_t i = y * s->f.w + x, j = ty * s->f.w + tx;
     uint8_t m = s->f.c[i];
+    int wi = way(s, i), wj = way(s, j);
     s->f.c[i] = s->f.c[j];
+    set_way(s, i, wj);
+    set_way(s, j, wi);
     busy(s, x, y);
     set(s, tx, ty, m);
     s->moves++;
@@ -297,33 +317,6 @@ static inline int stuck(const struct stepper *s, const uint8_t *p, uint8_t m,
                 return 0;
         }
     return 1;
-}
-
-/* How far along row y from x, in direction side, the nearest open cell
- * that m could fall (dy 1) or rise (dy -1) from is, through cells it
- * could move into, up to reach; 0 when there is none */
-static int32_t drop_along(const struct stepper *s, int32_t x, int32_t y,
-                          int32_t dy, int32_t side, uint8_t m, int32_t reach)
-{
-    int32_t ny = y + dy;
-    if (ny < 0 || ny >= s->f.h)
-        return 0;
-    int32_t room = side > 0 ? s->f.w - 1 - x : x;
-    if (room > reach)
-        room = reach;
-    const int32_t w = s->f.w;
-    const uint8_t *dens = s->r.f[R_DENSITY], *moved = s->moved;
-    const uint8_t dm = dens[m];
-    int32_t i = y * w + x, j = ny * w + x;
-    for (int32_t k = 1; k <= room; k++) {
-        i += side;
-        j += side;
-        if (dens[s->f.c[i]] >= dm || (moved[i >> 3] & (1 << (i & 7))))
-            return 0;
-        if (dens[s->f.c[j]] < dm && !(moved[j >> 3] & (1 << (j & 7))))
-            return k;
-    }
-    return 0;
 }
 
 /* Whether cell x, y has nothing to do this tick: stone, which does not
@@ -380,36 +373,52 @@ static void step_cell(struct stepper *s, int32_t x, int32_t y)
     uint8_t mv = r[R_MOVE][m];
     if (mv == MOVE_STATIC)
         return;
-    int32_t dy = mv == MOVE_GAS ? -1 : 1;
+    int32_t dy = mv == MOVE_GAS ? -1 : 1, w = s->f.w;
     if (lighter(s, x, y + dy, m)) {
         swap(s, x, y, x, y + dy);
+        /* falling straight, it takes a new way: a stream spreads both
+         * ways from where it lands */
+        set_way(s, (y + dy) * w + x, rand8(s) & 1);
         return;
     }
     int32_t side = rand8(s) & 1 ? 1 : -1;
     for (int t = 0; t < 2; t++, side = -side)
         if (lighter(s, x + side, y + dy, m)) {
             swap(s, x, y, x + side, y + dy);
+            set_way(s, (y + dy) * w + x + side, side > 0);
             return;
         }
     if (mv == MOVE_POWDER)
         return;
-    /* Liquids and gases look along their open row for the nearest place
-     * they could fall (or rise) into -- the nearer side's, a random one's
-     * on a tie -- and go straight into it, along and down in one move. A
-     * spread of 0 looks along the whole row, so water levels; a spread of
-     * n looks n cells, so the surface keeps a slope of one cell in n, as
-     * a thick liquid does. Moving partway toward the drop instead makes a
-     * draining pool's edge flick between ragged and solid every other
-     * tick. With none in reach they stay, and a level pool goes quiet. */
-    int32_t reach = r[R_SPREAD][m] ? r[R_SPREAD][m] : s->f.w;
-    int32_t k = drop_along(s, x, y, dy, side, m, reach);
-    int32_t other = drop_along(s, x, y, dy, -side, m, reach);
-    if (other && (!k || other < k)) {
-        side = -side;
-        k = other;
+    /* Liquids and gases keep a way they are heading, and blocked below
+     * they run along it up to spread cells a tick (2 when 0), into the
+     * first place on the way they could fall (or rise) into. Blocked
+     * along, they turn round; blocked both ways, they stay. So a splash
+     * mounds up and runs out, a part-full top layer keeps moving between
+     * the walls, and a full layer has nowhere to go and sleeps. Riding on
+     * its own liquid it moves one tick in RIDE: at full speed a thin top
+     * layer breaks into single cells hopping every tick, which strobes,
+     * and a stream spreads before it can mound. */
+    int32_t i = y * w + x, d = way(s, i) ? 1 : -1;
+    if (y + dy >= 0 && y + dy < s->f.h && s->f.c[i + dy * w] == m &&
+        rand8(s) >= RIDE) {
+        busy(s, x, y);
+        return;
     }
-    if (k)
-        swap(s, x, y, x + side * k, y + dy);
+    int32_t speed = r[R_SPREAD][m] ? r[R_SPREAD][m] : 2, to = 0;
+    for (int32_t k = 1; k <= speed && lighter(s, x + d * k, y, m); k++) {
+        to = k;
+        if (lighter(s, x + d * k, y + dy, m)) {
+            swap(s, x, y, x + d * k, y + dy);
+            return;
+        }
+    }
+    if (to) {
+        swap(s, x, y, x + d * to, y);
+    } else if (lighter(s, x - d, y, m)) {
+        set_way(s, i, d < 0);
+        busy(s, x, y);
+    }
 }
 
 /* Every awake chunk's cells, bottom up, a row left to right or right to
@@ -501,6 +510,7 @@ NATIVE(cells_step)
         s.kind[m] = k;
     }
     struct cellsleep *sl = sleep_for(vm, &s.f);
+    s.dir = sl->dir;
     /* a sleeping chunk drawn on since wakes */
     uint32_t summed = 0, awake = 0;
     for (int32_t k = 0; k < s.cw * chh; k++) {
@@ -516,16 +526,14 @@ NATIVE(cells_step)
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
     /* Next tick: the chunks that changed and those near them; the rest
      * sleep with their sums. Near is a chunk up or down, and sideways as
-     * far as a liquid looks along its row: a change there can open the
-     * drop a sleeping liquid is waiting for, and with only the chunks
-     * beside woken, water freezes in steps a chunk wide. */
+     * far as a liquid runs in a tick. */
     uint16_t band[FIELD_MAX / CHUNK + 1];
     band[0] = 0;
     int32_t across = 1;
     for (int32_t m = 0; m < MATERIALS; m++)
         if (s.kind[m] & K_FLOWS) {
             int32_t spread = s.r.f[R_SPREAD][m];
-            int32_t n = spread ? spread / CHUNK + 1 : s.cw;
+            int32_t n = (spread ? spread : 2) / CHUNK + 1;
             if (n > across)
                 across = n;
         }
