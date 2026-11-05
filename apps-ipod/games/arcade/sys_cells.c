@@ -41,7 +41,6 @@
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
 #define MAX_BOXES 256           /* actors woken round in a step */
-#define RIDE      64            /* out of 256: on its own liquid, a move */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
 
@@ -248,6 +247,7 @@ _Static_assert(offsetof(struct stepper, r) == 16 &&
                offsetof(struct stepper, cw) == 324 &&
                offsetof(struct stepper, first) == 328 &&
                offsetof(struct stepper, next) == 584 &&
+               offsetof(struct stepper, kind) == 648 &&
                offsetof(struct stepper, dir) == 64 &&
                offsetof(struct stepper, vm) == 1416 &&
                offsetof(struct stepper, bits) == 1420 &&
@@ -297,6 +297,15 @@ static inline int lighter(const struct stepper *s, int32_t x, int32_t y,
     int32_t j = y * s->f.w + x;
     return !is_moved(s, j) &&
            s->r.f[R_DENSITY][s->f.c[j]] < s->r.f[R_DENSITY][m];
+}
+
+/* Whether x, y is air or a material that moves */
+static inline int open(const struct stepper *s, int32_t x, int32_t y)
+{
+    if (x < 0 || x >= s->f.w)
+        return 0;
+    uint8_t c = s->f.c[y * s->f.w + x];
+    return !c || (s->kind[c] & K_MOVES);
 }
 
 static inline int way(const struct stepper *s, int32_t i)
@@ -422,15 +431,26 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
         return;
     int32_t dy = mv == MOVE_GAS ? -1 : 1, w = s->f.w;
     if (lighter(s, x, y + dy, m)) {
+        /* falling, it takes a new way: a stream spreads both ways from
+         * where it lands. A liquid or gas drifts a cell that way one tick
+         * in four, so a layer left in the air breaks up as it falls. */
+        uint32_t k = rand8(s), right = k & 1;
+        int32_t tx = right ? x + 1 : x - 1;
+        if (mv != MOVE_POWDER && !(k & 6) && open(s, tx, y) &&
+            lighter(s, tx, y + dy, m)) {
+            swap(s, x, y, tx, y + dy);
+            set_way(s, (y + dy) * w + tx, right);
+            return;
+        }
         swap(s, x, y, x, y + dy);
-        /* falling straight, it takes a new way: a stream spreads both
-         * ways from where it lands */
-        set_way(s, (y + dy) * w + x, rand8(s) & 1);
+        set_way(s, (y + dy) * w + x, right);
         return;
     }
+    /* not through a corner: the cell beside it must be air or a mover, so
+     * a wall drawn on the diagonal holds */
     int32_t side = rand8(s) & 1 ? 1 : -1;
     for (int t = 0; t < 2; t++, side = -side)
-        if (lighter(s, x + side, y + dy, m)) {
+        if (open(s, x + side, y) && lighter(s, x + side, y + dy, m)) {
             swap(s, x, y, x + side, y + dy);
             set_way(s, (y + dy) * w + x + side, side > 0);
             return;
@@ -442,16 +462,8 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
      * first place on the way they could fall (or rise) into. Blocked
      * along, they turn round; blocked both ways, they stay. So a splash
      * mounds up and runs out, a part-full top layer keeps moving between
-     * the walls, and a full layer has nowhere to go and sleeps. Riding on
-     * its own liquid it moves one tick in RIDE: at full speed a thin top
-     * layer breaks into single cells hopping every tick, which strobes,
-     * and a stream spreads before it can mound. */
+     * the walls, and a full layer has nowhere to go and sleeps. */
     int32_t i = y * w + x, d = way(s, i) ? 1 : -1;
-    if (y + dy >= 0 && y + dy < s->f.h && s->f.c[i + dy * w] == m &&
-        rand8(s) >= RIDE) {
-        busy(s, x, y);
-        return;
-    }
     int32_t speed = r[R_SPREAD][m] ? r[R_SPREAD][m] : 2, to = 0;
     for (int32_t k = 1; k <= speed && lighter(s, x + d * k, y, m); k++) {
         to = k;

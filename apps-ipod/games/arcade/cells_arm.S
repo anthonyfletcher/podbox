@@ -240,6 +240,7 @@ cells_run_arm:
     .equ    S_CW, 324
     .equ    S_FIRST, 328
     .equ    S_NEXT, 584
+    .equ    S_KIND, 648
     .equ    S_DENS, 904
     .equ    S_VM, 1416
     .equ    S_BITS, 1420
@@ -248,7 +249,6 @@ cells_run_arm:
 
     .equ    MOVE_POWDER, 1
     .equ    MOVE_GAS, 3
-    .equ    RIDE, 64
 
 /* In cells_step_cell: r4 the stepper, r5 x, r6 y, r7 the width, r8 the
  * cell's index, r9 its material, r10 the random bits left and r11 their
@@ -298,6 +298,23 @@ cells_run_arm:
     bne     \no
 .endm
 
+/* To no unless cell tx, y is air or a mover: nothing moves diagonally
+ * through a corner. r0 and r3 are lost. */
+.macro  open tx, no
+    cmp     \tx, r7
+    bhs     \no
+    ldr     r0, [r4, #S_C]
+    add     r0, r0, r8
+    sub     r3, \tx, r5
+    ldrb    r0, [r0, r3]
+    add     r3, r0, r4
+    ldrb    r3, [r3, #S_KIND]
+    cmp     r0, #0
+    orreq   r3, r3, #K_MOVES
+    tst     r3, #K_MOVES
+    beq     \no
+.endm
+
 /* Cell ir's way is vr (0 or 1); r1, r2, r12 and lr are lost */
 .macro  setway ir, vr
     ldr     r12, [r4, #S_DIR]
@@ -315,7 +332,7 @@ cells_run_arm:
 cells_step_cell:
     stmfd   sp!, {r4-r11, lr}
     /* 0-12 the four neighbours, 16 and 20 a reaction's partner's place,
-     * 24 its reaction; moving, 16 its way, 20 a side's way, 24 the move */
+     * 24 its reaction; moving, 20 a side's way, 24 the move */
     sub     sp, sp, #28
     mov     r4, r0
     mov     r5, r1
@@ -467,9 +484,25 @@ cells_step_cell:
     addne   r2, r6, #1
     /* straight down, taking a new way */
     lighter r5, r2, 1f
-    mov     r1, r5
-    bl      .Lswap
+    /* a liquid or gas drifts a cell its new way one tick in four */
     rand8
+    str     r0, [sp, #20]
+    ldr     r1, [sp, #24]
+    cmp     r1, #MOVE_POWDER
+    beq     9f
+    tst     r0, #6
+    bne     9f
+    tst     r0, #1
+    addne   r1, r5, #1
+    subeq   r1, r5, #1
+    open    r1, 9f
+    lighter r1, r2, 9f
+    b       .Lside
+9:
+    mov     r1, r5
+    mla     r3, r2, r7, r5
+    bl      .Lswap
+    ldr     r0, [sp, #20]
     and     r0, r0, #1
     setway  r3, r0
     b       .Lstepped
@@ -479,45 +512,28 @@ cells_step_cell:
     tst     r0, #1
     addne   r1, r5, #1
     subeq   r1, r5, #1
+    open    r1, 2f
     lighter r1, r2, 2f
     b       .Lside
 2:
     rsb     r1, r1, r5, lsl #1
+    open    r1, 3f
     lighter r1, r2, 3f
     b       .Lside
 3:
     ldr     r0, [sp, #24]
     cmp     r0, #MOVE_POWDER
     beq     .Lstepped
-    /* liquids and gases: its way, 1 or -1 */
+    /* liquids and gases, with no more random bytes: r10 the way, 1 or -1,
+     * r11 the cells it may run */
+    str     r10, [r4, #S_BITS]
+    str     r11, [r4, #S_NBITS]
     ldr     r0, [r4, #S_DIR]
     ldrb    r0, [r0, r8, lsr #3]
     and     r1, r8, #7
     mov     r0, r0, lsr r1
-    ands    r0, r0, #1
-    mvneq   r0, #0
-    str     r0, [sp, #16]
-    /* on its own liquid it moves one tick in RIDE */
-    ldr     r1, [r4, #S_H]
-    cmp     r2, r1
-    bhs     4f
-    ldr     r1, [r4, #S_C]
-    add     r1, r1, r8
-    cmp     r2, r6
-    ldrblo  r1, [r1, -r7]
-    ldrbhi  r1, [r1, r7]
-    cmp     r1, r9
-    bne     4f
-    rand8
-    cmp     r0, #RIDE
-    blo     4f
-    busy    r5, r6, r0, r1
-    b       .Lstepped
-4:
-    /* no more random bytes: r10 the way, r11 the cells it may run */
-    str     r10, [r4, #S_BITS]
-    str     r11, [r4, #S_NBITS]
-    ldr     r10, [sp, #16]
+    ands    r10, r0, #1
+    mvneq   r10, #0
     ldr     r0, [r4, #S_SPREAD]
     ldrb    r11, [r0, r9]
     cmp     r11, #0
