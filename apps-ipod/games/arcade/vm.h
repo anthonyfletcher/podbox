@@ -15,6 +15,12 @@
 #include <stdint.h>
 #include "games/arcade/arcade.h"
 
+/* The player builds the assembly routines (the *_arm.S files); the C
+ * beside each is the reference, and is what the simulator and pbgvm run */
+#if defined(ROCKBOX) && !defined(SIMULATOR) && defined(__arm__)
+#define ARCADE_ASM 1
+#endif
+
 /* Value tags. T_BUF is internal: the element store behind arrays and
  * records, never a value a cart sees. T_FIX is a fraction, 16.16. T_IMG
  * is an image made by img(). */

@@ -1724,6 +1724,14 @@ static uint32_t copy_row(uint8_t *d, const uint8_t *s, int32_t n, int32_t dir,
     return k;
 }
 
+#ifdef ARCADE_ASM
+uint32_t copy_row_arm(uint8_t *d, const uint8_t *s, int32_t n,
+                      const uint16_t *xl);
+#define copy_row_forward(d, s, n, xl) copy_row_arm(d, s, n, xl)
+#else
+#define copy_row_forward(d, s, n, xl) copy_row(d, s, n, 1, xl)
+#endif
+
 /* A scaled row whose source columns are all in the image: col[i] is the
  * column under destination pixel i. Returns the pixels drawn. */
 __attribute__((optimize("O2")))
@@ -1787,8 +1795,9 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             uint8_t *drow = p->s.px + ((int32_t)dy + v) * stride + (int32_t)dx;
             uint32_t n = fx ? copy_row(drow + ua, srow + (int32_t)sx +
                                        (int32_t)w - 1 - ua, ub - ua, -1, xl)
-                            : copy_row(drow + ua, srow + (int32_t)sx + ua,
-                                       ub - ua, 1, xl);
+                            : copy_row_forward(drow + ua,
+                                               srow + (int32_t)sx + ua,
+                                               ub - ua, xl);
             if (n) {
                 p->count += n;
                 row_touched(p, (int32_t)dy + v);

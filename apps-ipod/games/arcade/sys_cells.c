@@ -28,6 +28,7 @@
  *   lift       cells.lift
  *   life       cells.life
  ***************************************************************************/
+#include <stddef.h>
 #include <string.h>
 #include "games/arcade/vm.h"
 
@@ -44,8 +45,11 @@
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
 
-/* What a material can do, one byte each for the scan to read at once */
-enum { K_MOVES = 1, K_FLOWS = 2, K_GAS = 4, K_REACTS = 8, K_DECAYS = 16 };
+/* What a material can do, one byte each for the scan to read at once.
+ * K_SAME: with nothing but itself round it, it is stuck -- it has no life
+ * span and does not react with itself. */
+enum { K_MOVES = 1, K_FLOWS = 2, K_GAS = 4, K_REACTS = 8, K_DECAYS = 16,
+       K_SAME = 32 };
 
 /* ---- rules ------------------------------------------------------------- */
 
@@ -226,6 +230,7 @@ struct stepper
     uint8_t first[MATERIALS];   /* the first reaction for each a, or 255 */
     uint8_t next[REACTIONS];    /* the next with the same a, or 255 */
     uint8_t kind[MATERIALS];    /* K_*: what each material can do */
+    uint8_t dens[MATERIALS];    /* the rules' density, right after kind */
     uint8_t slept[(FIELD_MAX / CHUNK) * (FIELD_MAX / CHUNK)];
     struct vm *vm;
     uint32_t bits;              /* random bits left over */
@@ -348,6 +353,7 @@ static inline int stuck(const struct stepper *s, const uint8_t *p, uint8_t m,
  * move, end or react, or a cell stuck() inside a pool or a pile. A leaf
  * of its own: inlined in the scan it spills the scan's registers, and the
  * whole step's call costs four times as much. */
+#ifndef ARCADE_ASM
 __attribute__((noinline, optimize("O2")))
 static int idle(const struct stepper *s, int32_t x, int32_t y)
 {
@@ -362,13 +368,15 @@ static int idle(const struct stepper *s, int32_t x, int32_t y)
     return x > 0 && y > 0 && x < w - 1 && y < s->f.h - 1 &&
            stuck(s, p, m, k, w);
 }
+#endif
 
 /* One cell's tick: one reaction with a random neighbour, then its life
  * span, then a move -- so fire spreads on the tick it dies. A material
  * with a life span, or with a partner it reacts with beside it, keeps its
  * chunk awake whether or not it changed: its chances come round again. */
+void cells_step_cell(struct stepper *s, int32_t x, int32_t y);
 __attribute__((optimize("O2")))
-static void step_cell(struct stepper *s, int32_t x, int32_t y)
+void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
 {
     uint8_t m = s->f.c[y * s->f.w + x];
     const uint8_t *const *r = s->r.f;
@@ -446,47 +454,95 @@ static void step_cell(struct stepper *s, int32_t x, int32_t y)
     }
 }
 
-/* Every awake chunk's cells, bottom up, a row left to right or right to
- * left as forward says; air is passed over. Returns the cells stepped. */
+/* Cells x0 to x1 - 1 of row y, left to right or right to left as forward
+ * says, each stepped unless idle; air is passed over, four cells a word
+ * when the run is in whole aligned words. Returns the cells looked at. */
+#ifdef ARCADE_ASM
+/* cells_arm.S reads this; the offsets are checked below */
+struct run
+{
+    const uint8_t *c, *moved, *dens;
+    int32_t w;
+    int32_t i;                  /* the first cell's index */
+    int32_t dx;                 /* 1 or -1 */
+    int32_t groups, size;       /* groups of size cells */
+    int32_t words;              /* whether a group is a word, tested whole */
+    int32_t lo;                 /* cell index x = 1 */
+    uint32_t span;              /* cells after lo that idle may test */
+    const uint8_t *first, *next, *b;
+    struct stepper *s;
+    int32_t rowbase, y;
+};
+_Static_assert(offsetof(struct run, span) == 40 &&
+               offsetof(struct run, y) == 64, "cells_arm.S's offsets");
+_Static_assert(offsetof(struct stepper, dens) ==
+               offsetof(struct stepper, kind) + MATERIALS,
+               "cells_arm.S finds kind 256 bytes before the density");
+uint32_t cells_run_arm(struct run *r);
+
+static uint32_t run(struct stepper *s, int32_t y, int32_t x0, int32_t x1,
+                    int forward)
+{
+    const int32_t w = s->f.w, n = x1 - x0;
+    int words = !((uintptr_t)(s->f.c + y * w + x0) & 3) && !(n & 3);
+    struct run r = {
+        s->f.c, s->moved, s->dens, w,
+        y * w + (forward ? x0 : x1 - 1), forward ? 1 : -1,
+        words ? n / 4 : 1, words ? 4 : n, words,
+        y * w + 1,
+        y > 0 && y < s->f.h - 1 && w > 2 ? (uint32_t)(w - 2) : 0,
+        s->first, s->next, s->r.f[R_B], s, y * w, y
+    };
+    return cells_run_arm(&r);
+}
+#else
 __attribute__((optimize("O2")))
+static uint32_t run(struct stepper *s, int32_t y, int32_t x0, int32_t x1,
+                    int forward)
+{
+    const int32_t w = s->f.w, n = x1 - x0;
+    const uint8_t *row = s->f.c + y * w;
+    int words = !((uintptr_t)(row + x0) & 3) && !(n & 3);
+    int32_t g = words ? 4 : n;
+    uint32_t visited = 0;
+    for (int32_t q = 0; q < n; q += g) {
+        int32_t b = forward ? x0 + q : x1 - g - q;
+        if (words && !*(const uint32_t *)(const void *)(row + b))
+            continue;
+        for (int32_t e = 0; e < g; e++) {
+            int32_t x = forward ? b + e : b + g - 1 - e;
+            if (!row[x] || is_moved(s, y * w + x))
+                continue;
+            visited++;
+            if (!idle(s, x, y))
+                cells_step_cell(s, x, y);
+        }
+    }
+    return visited;
+}
+#endif
+
+/* Every awake chunk's cells, bottom up, a row left to right or right to
+ * left as forward says, side by side awake chunks as one run. Returns the
+ * cells looked at. */
 static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
 {
     uint32_t visited = 0;
     const int32_t w = s->f.w, cw = s->cw;
     for (int32_t y = s->f.h - 1; y >= 0; y--) {
         const uint8_t *chunks = awake + (y >> CHUNK_SHIFT) * cw;
-        const uint8_t *row = s->f.c + y * w;
         for (int32_t k = 0; k < cw; k++) {
-            int32_t cx = forward ? k : cw - 1 - k;
-            if (!chunks[cx])
+            if (!chunks[forward ? k : cw - 1 - k])
                 continue;
-            int32_t x0 = cx << CHUNK_SHIFT;
-            int32_t x1 = x0 + CHUNK < w ? x0 + CHUNK : w;
-            /* a whole aligned chunk row: four cells of air at a time */
-            if (x1 - x0 == CHUNK && !((uintptr_t)(row + x0) & 3)) {
-                for (int32_t q = 0; q < CHUNK; q += 4) {
-                    int32_t b = forward ? x0 + q : x1 - 4 - q;
-                    if (!*(const uint32_t *)(const void *)(row + b))
-                        continue;
-                    for (int32_t e = 0; e < 4; e++) {
-                        int32_t x = forward ? b + e : b + 3 - e;
-                        if (!row[x] || is_moved(s, y * w + x))
-                            continue;
-                        visited++;
-                        if (!idle(s, x, y))
-                            step_cell(s, x, y);
-                    }
-                }
-                continue;
-            }
-            for (int32_t n = x0; n < x1; n++) {
-                int32_t x = forward ? n : x1 - 1 - (n - x0);
-                if (!row[x] || is_moved(s, y * w + x))
-                    continue;
-                visited++;
-                if (!idle(s, x, y))
-                    step_cell(s, x, y);
-            }
+            int32_t e = k;
+            while (e + 1 < cw && chunks[forward ? e + 1 : cw - 2 - e])
+                e++;
+            int32_t lo = forward ? k : cw - 1 - e;
+            int32_t hi = forward ? e : cw - 1 - k;
+            int32_t x1 = (hi + 1) << CHUNK_SHIFT;
+            visited += run(s, y, lo << CHUNK_SHIFT, x1 < w ? x1 : w,
+                           forward);
+            k = e;
         }
     }
     return visited;
@@ -512,6 +568,7 @@ NATIVE(cells_step)
     /* scratch may have collected: read the field and rules again */
     field_of(vm, a[0], a[1], "cells.step", &s.f);
     rules_of(vm, a[2], &s.r);
+    memcpy(s.dens, s.r.f[R_DENSITY], MATERIALS);
     static int32_t boxes[MAX_BOXES * 4];
     int32_t nbox = 0;
     if (argc > 3 && a[3].tag != T_NULL &&
@@ -542,8 +599,13 @@ NATIVE(cells_step)
             k |= K_REACTS;
         if (s.r.f[R_DECAY][m])
             k |= K_DECAYS;
+        else
+            k |= K_SAME;
         s.kind[m] = k;
     }
+    for (uint32_t q = 0; q < REACTIONS; q++)
+        if (s.r.f[R_CHANCE][q] && s.r.f[R_A][q] == s.r.f[R_B][q])
+            s.kind[s.r.f[R_A][q]] &= (uint8_t)~K_SAME;
     struct cellsleep *sl = sleep_for(vm, &s.f);
     s.dir = sl->dir;
     /* a sleeping chunk drawn on since wakes */
