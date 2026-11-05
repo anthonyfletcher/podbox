@@ -4,7 +4,7 @@
 //   menu.open(items)        items, an array of strings, with the first
 //                           chosen
 //   menu.update()           once a tick while open: the wheel moves the
-//                           choice a line a detent (eight to a turn),
+//                           choice a line a detent (sixteen to a turn),
 //                           PREV and NEXT a line a press; returns the line
 //                           chosen when SELECT is pressed, else -1
 //   menu.draw(x, y, c, bar) the lines from x, y, six pixels apart, the
@@ -24,7 +24,7 @@ function open(items) {
 function update() {
     if (lines.length == 0) return -1;
     var n = lines.length;
-    at = (at + dial.steps(8) + n * 8) % n;
+    at = (at + dial.steps(16) + n * 16) % n;
     if (btnp(0)) at = (at + n - 1) % n;
     if (btnp(1)) at = (at + 1) % n;
     if (btnp(4)) return at;

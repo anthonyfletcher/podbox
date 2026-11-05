@@ -127,7 +127,7 @@ function update() {
     if (chose >= 0) printh(tk + " chose " + chose);
     if (tk == 3) printh("at " + menu.choice());
 }
-function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:24', '--buttons', '4:2,5:0,7:16']);
-    /* 24 clicks is two detents: QUIT; NEXT wraps to PLAY; SELECT takes it */
+function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:12', '--buttons', '4:2,5:0,7:16']);
+    /* 12 clicks is two detents: QUIT; NEXT wraps to PLAY; SELECT takes it */
     assert.deepEqual(out, ['at 2', '8 chose 0']);
 });
