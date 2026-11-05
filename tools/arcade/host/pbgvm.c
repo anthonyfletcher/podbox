@@ -4,7 +4,7 @@
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
- *                  [--playing] [--menu i]...
+ *                  [--wheel t:clicks[:pos],...] [--playing] [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -19,6 +19,8 @@
  * next: "30:16,31:0" presses SELECT for tick 30. --skip reports frames
  * the host fell behind by before the ticks given, as the player does when
  * a tick runs late: "10:1" is one skipped frame before tick 10.
+ * --wheel turns the wheel: "5:12:30" is 12 clicks at tick 5 with the
+ * finger at 30 from then on (-1 lifts it).
  * --playing has playback.playing() report music playing. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
@@ -289,7 +291,8 @@ int main(int argc, char **argv)
     int units = 0, dirty = 0;
     unsigned long ceiling = 0;
     const char *shot_path = NULL, *dump_spec = NULL, *wav_path = NULL;
-    const char *buttons = NULL, *skips = NULL;
+    const char *buttons = NULL, *skips = NULL, *turns = NULL;
+    int pos = -1;
     int playing_flag = 0;
     int menu_picks[16], npicks = 0;
     for (int i = 1; i < argc; i++) {
@@ -311,6 +314,8 @@ int main(int argc, char **argv)
             dirty = 1;
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc)
             wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--wheel") && i + 1 < argc)
+            turns = argv[++i];
         else if (!strcmp(argv[i], "--playing"))
             playing_flag = 1;
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
@@ -380,7 +385,24 @@ int main(int argc, char **argv)
             else
                 break;
         }
-        arcade_input(vm, held, 0, -1);
+        int clicks = 0;
+        for (const char *b = turns; b && *b;) {
+            long at = strtol(b, (char **)&b, 10);
+            long n = 0, p = pos;
+            if (*b == ':')
+                n = strtol(b + 1, (char **)&b, 10);
+            if (*b == ':')
+                p = strtol(b + 1, (char **)&b, 10);
+            if (at == t) {
+                clicks = (int)n;
+                pos = (int)p;
+            }
+            if (*b == ',')
+                b++;
+            else
+                break;
+        }
+        arcade_input(vm, held, clicks, pos);
         arcade_presented(vm);
         if (!arcade_tick(vm, 1))
             return report(vm);

@@ -55,6 +55,21 @@ In code, `MAP.<name>` and `PAL.<name>` are for `loadmap()` and `loadpal()`,
 The first map is the active one when the cart starts; without any, the map
 is an empty 128x64.
 
+### Script libraries
+
+`lib/` holds libraries written in the cart language. Copy one into the
+cart's folder and it is a namespace there, read and changed as the cart's
+own code; a function the cart never calls is dropped from the build. Each
+file's opening comment lists what it gives.
+
+| File | Gives |
+|---|---|
+| `dial.js` | the wheel as a control: detents with the rest carried, the angle turned, a smoothed speed, the finger's place on an arc |
+| `tween.js` | easing curves, and any array slot moved along one over a number of ticks |
+| `text.js` | padded numbers, a clock, centred and right-aligned text, outlined text, words wrapped in a box |
+| `palfx.js` | fades and flashes of the whole palette, and colour cycling |
+| `menu.js` | an in-game menu on the wheel and SELECT; needs `dial.js` |
+
 ## How the language differs from JavaScript
 
 - **A number is an integer or a fraction.**
