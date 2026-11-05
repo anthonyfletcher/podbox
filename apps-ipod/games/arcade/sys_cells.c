@@ -238,6 +238,23 @@ struct stepper
     uint32_t moves;
 };
 
+/* One cell's tick; in cells_arm.S on the players, which reads the stepper
+ * at these offsets */
+void cells_step_cell(struct stepper *s, int32_t x, int32_t y);
+#ifdef ARCADE_ASM
+_Static_assert(offsetof(struct stepper, r) == 16 &&
+               offsetof(struct stepper, moved) == 60 &&
+               offsetof(struct stepper, changed) == 68 &&
+               offsetof(struct stepper, cw) == 324 &&
+               offsetof(struct stepper, first) == 328 &&
+               offsetof(struct stepper, next) == 584 &&
+               offsetof(struct stepper, dir) == 64 &&
+               offsetof(struct stepper, vm) == 1416 &&
+               offsetof(struct stepper, bits) == 1420 &&
+               offsetof(struct stepper, nbits) == 1424 &&
+               offsetof(struct stepper, moves) == 1428,
+               "cells_arm.S's stepper offsets");
+#else
 static uint32_t rand8(struct stepper *s)
 {
     if (s->nbits < 8) {
@@ -353,7 +370,6 @@ static inline int stuck(const struct stepper *s, const uint8_t *p, uint8_t m,
  * move, end or react, or a cell stuck() inside a pool or a pile. A leaf
  * of its own: inlined in the scan it spills the scan's registers, and the
  * whole step's call costs four times as much. */
-#ifndef ARCADE_ASM
 __attribute__((noinline, optimize("O2")))
 static int idle(const struct stepper *s, int32_t x, int32_t y)
 {
@@ -368,13 +384,11 @@ static int idle(const struct stepper *s, int32_t x, int32_t y)
     return x > 0 && y > 0 && x < w - 1 && y < s->f.h - 1 &&
            stuck(s, p, m, k, w);
 }
-#endif
 
 /* One cell's tick: one reaction with a random neighbour, then its life
  * span, then a move -- so fire spreads on the tick it dies. A material
  * with a life span, or with a partner it reacts with beside it, keeps its
  * chunk awake whether or not it changed: its chances come round again. */
-void cells_step_cell(struct stepper *s, int32_t x, int32_t y);
 __attribute__((optimize("O2")))
 void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
 {
@@ -453,6 +467,7 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
         busy(s, x, y);
     }
 }
+#endif
 
 /* Cells x0 to x1 - 1 of row y, left to right or right to left as forward
  * says, each stepped unless idle; air is passed over, four cells a word
