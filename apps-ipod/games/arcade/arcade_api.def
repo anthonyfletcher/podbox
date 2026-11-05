@@ -183,6 +183,11 @@ API(links_link,    121, 3, 4, VAL,  0, CELLS,  LISTEN, 1)
 API(links_step,    122, 2, 2, VAL,  0, CELLS,  LISTEN, 1)
 API(links_draw,    123, 2, 2, VOID, 0, PIXELS, LISTEN, 1)
 
+/* Systems: a voxel landscape, from the plane's camera */
+API_NS(land)
+API(land_draw,     124, 2, 5, VAL, 0, PIXELS, LISTEN, 1)
+API(land_height,   125, 3, 4, VAL, 0, CELLS,  LISTEN, 1)
+
 /* Systems: the plane, the map as a floor seen from a camera */
 API_NS(plane)
 API(plane_view,       87, 6, 6, VOID, 0, CELLS,  LISTEN, 1)

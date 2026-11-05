@@ -2954,6 +2954,161 @@ static int row_inside(int64_t u, int64_t v, int64_t du, int64_t dv,
            u1 < e->umax && v < e->vmax && v1 < e->vmax;
 }
 
+/* The landscape, as Comanche drew it: front to back, at each depth z the
+ * slice of ground across the view from a left end to a right end, stepped
+ * across the screen two adds a column. Each column keeps the highest row
+ * drawn so far and a hill only shows above it, so nearer ground hides
+ * farther; the depth's step grows with it, near ground sampled finely and
+ * far ground coarsely. A slice's height-to-row is a line, worked out once
+ * a slice, so a sample is a multiply.
+ *
+ * One slice of ground: columns x0..x1 from u, t stepping su, sv (16.16
+ * world pixels); a height byte h is screen row (base - h * rise) >> 16 */
+struct slice
+{
+    const uint8_t *height, *colour, *dpal;
+    uint32_t wmask, hmask, wshift;
+    uint8_t *px;                /* the column x0's pixel in row 0 */
+    int32_t w, x0, x1, cy0;
+    int32_t step;               /* columns a sample: 1, or 2 coarse */
+    int16_t *top;
+};
+
+/* A column of the slice whose sample shows: from row y down to the top
+ * drawn so far, in its colour */
+static void land_fill(const struct slice *s, int16_t *top, int32_t y,
+                      uint32_t at, uint32_t *filled, int32_t *lo)
+{
+    int32_t x = (int32_t)(top - s->top), y1 = *top;
+    if (y < s->cy0)
+        y = s->cy0;
+    uint8_t c = s->dpal[s->colour[at]];
+    uint8_t *p = s->px + y * s->w + (x - s->x0);
+    if (s->step == 2 && x + 1 < s->x1) {
+        for (int32_t r = y; r < y1; r++, p += s->w)
+            p[0] = p[1] = c;
+        *filled += 2 * (uint32_t)(y1 - y);
+    } else {
+        for (int32_t r = y; r < y1; r++, p += s->w)
+            *p = c;
+        *filled += (uint32_t)(y1 - y);
+    }
+    *top = (int16_t)y;
+    if (y < *lo)
+        *lo = y;
+}
+
+/* The slice's loop, the image's index worked out by INDEX(u, t): with the
+ * size a constant the masks and shift are in the instructions, not in
+ * registers, and the loop keeps everything else in registers. Returns
+ * the columns still open, each a sample taken. */
+#define LAND_SLICE(name, INDEX)                                              \
+__attribute__((optimize("O2")))                                             \
+static int32_t name(const struct slice *s, uint32_t u, uint32_t t,          \
+                    uint32_t su, uint32_t sv, int32_t base, int32_t rise,   \
+                    uint32_t *filled, int32_t *lo)                          \
+{                                                                           \
+    const uint8_t *height = s->height;                                      \
+    const uint32_t wmask = s->wmask, hmask = s->hmask, wshift = s->wshift;  \
+    const int32_t cy0 = s->cy0;                                             \
+    int16_t *top = s->top + s->x0, *end = s->top + s->x1;                   \
+    const int32_t step = s->step;                                           \
+    int32_t open = 0;                                                       \
+    (void)wmask; (void)hmask; (void)wshift;                                 \
+    for (; top < end; top += step, u += su, t += sv) {                      \
+        int32_t y1 = *top;                                                  \
+        if (y1 <= cy0)                                                      \
+            continue;                                                       \
+        open++;                                                             \
+        uint32_t at = INDEX(u, t);                                          \
+        int32_t y = (base - (int32_t)height[at] * rise) >> 16;              \
+        if (y < y1)                                                         \
+            land_fill(s, top, y, at, filled, lo);                           \
+    }                                                                       \
+    return open;                                                            \
+}
+
+#define AT_ANY(u, t) ((((t) >> 16) & hmask) << wshift | (((u) >> 16) & wmask))
+#define AT_64(u, t)  ((((t) >> 10) & 0xfc0) | (((u) >> 16) & 0x3f))
+#define AT_128(u, t) ((((t) >> 9) & 0x3f80) | (((u) >> 16) & 0x7f))
+#define AT_256(u, t) ((((t) >> 8) & 0xff00) | (((u) >> 16) & 0xff))
+LAND_SLICE(land_slice, AT_ANY)
+LAND_SLICE(land_slice_64, AT_64)
+LAND_SLICE(land_slice_128, AT_128)
+LAND_SLICE(land_slice_256, AT_256)
+
+/* land.draw(): the landscape front to back, as Comanche drew it, a slice
+ * of ground at a time (land_slice()). Returns the samples taken. */
+uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
+{
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;
+    const struct planeview *v = &vm->plane;
+    static int16_t top[SCREEN_W];
+    struct slice sl;
+    sl.x0 = p.cx0;
+    sl.x1 = p.cx1;
+    if (sl.x0 >= sl.x1 || p.cy0 >= p.cy1)
+        return 0;
+    for (int32_t x = sl.x0; x < sl.x1; x++)
+        top[x] = (int16_t)p.cy1;
+    sl.height = l->height;
+    sl.colour = l->colour;
+    sl.dpal = p.d->dpal;
+    sl.wmask = l->wmask;
+    sl.hmask = l->hmask;
+    sl.wshift = l->wshift;
+    sl.px = p.s.px + sl.x0;
+    sl.w = p.s.w;
+    sl.cy0 = p.cy0;
+    sl.step = l->coarse == 2 ? 2 : 1;
+    sl.top = top;
+    uint32_t samples = 0, filled = 0;
+    int32_t open = sl.x1 - sl.x0, lo = p.cy1;
+    int64_t far = (int64_t)l->far << 16;
+    int32_t (*slice)(const struct slice *, uint32_t, uint32_t, uint32_t,
+                     uint32_t, int32_t, int32_t, uint32_t *, int32_t *) =
+        land_slice;
+    if (l->wmask == l->hmask)
+        slice = l->wmask == 63 ? land_slice_64 : l->wmask == 127 ?
+                land_slice_128 : l->wmask == 255 ? land_slice_256 : land_slice;
+    /* 1 / focal, 0.32: a slice's half-width is a multiply */
+    int64_t inv_focal = ((int64_t)1 << 48) / v->focal;
+    for (int64_t z = 2 << 16, dz = 1 << 16; z < far && open > 0;
+         z += dz, dz = (1 << 16) + z / 48) {
+        /* screen pixels a world pixel at this depth, 16.16, from 1 / z in
+         * 0.32 by a 32-bit division; the screen row of height 0, and the
+         * rows a height byte lifts, both 16.16 */
+        uint32_t inv_z = 0xffffffffu / (uint32_t)z;
+        int64_t per = ((int64_t)v->focal * inv_z) >> 16;
+        int64_t base = ((int64_t)v->horizon << 16) +
+                       (((int64_t)v->z * per) >> 16);
+        int64_t rise = ((int64_t)l->scale * per) >> 16;
+        if (base > 0x3fffffff || rise > 0x7fffff)
+            continue;
+        /* the slice's left end and its step across, 16.16 world pixels */
+        int64_t across = (z * inv_focal) >> 32;     /* a column's width */
+        int64_t cx = v->x + (((int64_t)v->dx * z) >> 16);
+        int64_t cy = v->y + (((int64_t)v->dy * z) >> 16);
+        int64_t su = ((int64_t)-v->dy * across) >> 16;
+        int64_t sv = ((int64_t)v->dx * across) >> 16;
+        int64_t ssu = su * sl.step, ssv = sv * sl.step;
+        open = slice(&sl, (uint32_t)(cx - su * (SCREEN_W / 2) + su * sl.x0),
+                     (uint32_t)(cy - sv * (SCREEN_W / 2) + sv * sl.x0),
+                     (uint32_t)ssu, (uint32_t)ssv, (int32_t)base,
+                     (int32_t)rise, &filled, &lo);
+        samples += (uint32_t)open;
+    }
+    if (lo < p.cy1) {
+        row_touched(&p, lo);
+        row_touched(&p, p.cy1 - 1);
+    }
+    p.cost += samples * 5 / 4 + filled / 4;
+    finish(vm, &p);
+    return samples;
+}
+
 /* plane.draw(): rows top..bottom of the floor, each from its start and
  * step in 16.16 world pixels; a cell off the map is sprite outside, or
  * left alone when outside is negative */

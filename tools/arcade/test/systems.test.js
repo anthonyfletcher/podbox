@@ -407,3 +407,30 @@ function draw() { cls(); links.draw(rope, 7); }`, 200, ['--dump', '40,40,40,10']
     const bad = run('function init() { links.step({ x: [] }, 0); }\nfunction update() {}');
     assert.match(bad.err, /links\.step\(\) needs a pool from links\.pool\(\)/);
 });
+
+test('land: ground from the camera, near hills hiding far ones, heights read back', () => {
+    const r = run(`var hm, cm;
+function init() {
+    hm = img(64, 64); cm = img(64, 64);
+    target(hm); cls(0); target(cm); cls(11);
+    // a tall red pillar at 40..43, 30..33, straight ahead of the camera,
+    // beyond the nearest ground the screen shows (about 23 out)
+    target(hm); rectfill(40, 30, 43, 33, 200);
+    target(cm); rectfill(40, 30, 43, 33, 8);
+    target(SCREEN);
+    plane.view(0, 32, 20, 0, 50, 0.25);
+    cls(1);
+    printh(land.draw(hm, cm, 200) > 0);
+    // above the horizon untouched, the ground below it green, the pillar
+    // standing above the horizon in red in the middle
+    printh(pget(10, 30) + " " + pget(10, 100) + " " + pget(80, 40) + " " + pget(80, 110));
+    printh(land.height(hm, 41, 31) + " " + land.height(hm, 41, 31, 0.5) + " " + land.height(hm, 105, 95, 0.5));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['1', '1 11 8 11', '200 100 100']);
+    const bad = run('function init() { land.draw(img(64, 64), img(64, 64)); }\nfunction update() {}');
+    assert.match(bad.err, /needs a camera first/);
+    const odd = run('function init() { plane.view(0, 0, 9, 0, 50, 0.25); land.draw(img(60, 64), img(60, 64)); }\nfunction update() {}');
+    assert.match(odd.err, /a power of two/);
+});

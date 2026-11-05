@@ -185,6 +185,17 @@ struct cellsleep
     uint8_t dir[256 * 256 / 8];     /* a bit a cell: a liquid's way */
 };
 
+/* A voxel landscape to draw: a height and a colour image of one size,
+ * powers of two so the world wraps, seen from the plane's camera */
+struct landspec
+{
+    const uint8_t *height, *colour;
+    uint32_t wmask, hmask, wshift;
+    int32_t far;                /* world pixels */
+    int32_t scale;              /* 16.16 world pixels a height step */
+    int32_t coarse;             /* 2: every other column, drawn twice */
+};
+
 /* A row of the floor: its left end and one screen pixel's step, 16.16
  * world pixels */
 struct floor_row { int32_t u, v, du, dv; };
@@ -457,6 +468,7 @@ void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *c, uint32_t n);
 void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
                      uint32_t c);
+uint32_t core_draw_land(struct vm *vm, const struct landspec *l);
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,

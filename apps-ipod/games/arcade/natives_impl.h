@@ -135,6 +135,10 @@ IMPL(links_link)
 IMPL(links_step)
 IMPL(links_draw)
 
+/* sys_land.c */
+IMPL(land_draw)
+IMPL(land_height)
+
 /* sys_plane.c */
 IMPL(plane_view)
 IMPL(plane_draw)
