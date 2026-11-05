@@ -127,6 +127,7 @@ IMPL(noise_fill)
 IMPL(cells_rules)
 IMPL(cells_step)
 IMPL(cells_life)
+IMPL(cells_lift)
 
 /* sys_links.c */
 IMPL(links_pool)

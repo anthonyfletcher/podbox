@@ -37,9 +37,10 @@ static const char *const actor_keys[A_FIELDS] = {
 };
 
 enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_ARRAYS,
-       P_GRAVITY = P_ARRAYS, P_DRAG, P_FIELDS };
+       P_GRAVITY = P_ARRAYS, P_DRAG, P_FIELD, P_FIELD_X, P_FIELD_Y, P_FIELDS };
 static const char *const particle_keys[P_FIELDS] = {
-    "life", "x", "y", "dx", "dy", "c", "gravity", "drag"
+    "life", "x", "y", "dx", "dy", "c", "gravity", "drag",
+    "field", "field_x", "field_y"
 };
 
 static int32_t fx(struct value v)
@@ -722,6 +723,98 @@ NATIVE(particles_emit)
     return 1;
 }
 
+/* A cells field particles fall into: its pixels, size and place */
+struct dropfield
+{
+    uint8_t *c;
+    int32_t w, h, x0, y0;
+};
+
+/* A particle moved from ox, oy to nx, ny (16.16 world pixels) into
+ * something in the field settles there as a cell of its colour -- the
+ * colour is the material -- where it was, if that is air; either way it
+ * is gone. Air is material 0. */
+static void settle(const struct dropfield *f, struct value *life, uint32_t i,
+                   int32_t ox, int32_t oy, int32_t nx, int32_t ny,
+                   struct value c)
+{
+    int32_t px = (nx >> 16) - f->x0, py = (ny >> 16) - f->y0;
+    int32_t qx = (ox >> 16) - f->x0, qy = (oy >> 16) - f->y0;
+    int in = px >= 0 && py >= 0 && px < f->w && py < f->h;
+    if (in && !f->c[py * f->w + px])
+        return;
+    /* landed: on something, or at the field's floor */
+    if (!in && !(py >= f->h && px >= 0 && px < f->w))
+        return;
+    if (qx >= 0 && qy >= 0 && qx < f->w && qy < f->h &&
+        !f->c[qy * f->w + qx])
+        f->c[qy * f->w + qx] = (uint8_t)(is_num(c) ? floor_int(c) : 0);
+    life[i] = mk(T_INT, 0);
+}
+
+/* For cells.lift(): a particle pool's arrays, checked, its length, and
+ * where it places its field (field_x, field_y) */
+int particles_arrays(struct vm *vm, struct value p, struct value **arr,
+                     uint32_t *n, int32_t *ox, int32_t *oy)
+{
+    struct value f[P_FIELDS];
+    if (!particles(vm, p, f, n, "cells.lift"))
+        return 0;
+    for (int i = 0; i < P_ARRAYS; i++)
+        arr[i] = ELEMS(vm, f[i]);
+    *ox = is_num(f[P_FIELD_X]) ? floor_int(f[P_FIELD_X]) : 0;
+    *oy = is_num(f[P_FIELD_Y]) ? floor_int(f[P_FIELD_Y]) : 0;
+    return 1;
+}
+
+/* For cells.step(): the cells of a field under each actor of a pool (or
+ * an array of pools) set in bits, a bit a cell, as the pools' field_x
+ * and field_y place them; each actor's box, in field cells, into boxes
+ * (four numbers, up to cap of them). Returns how many, or -1 with the
+ * error set. */
+int32_t actors_boxes(struct vm *vm, struct value pools, uint8_t *bits,
+                     int32_t w, int32_t h, int32_t *boxes, int32_t cap)
+{
+    int32_t k = 0;
+    uint32_t np = pools.tag == T_ARR ? ARR(vm, pools)->len : 1;
+    for (uint32_t q = 0; q < np; q++) {
+        struct value p = pools.tag == T_ARR ? ELEMS(vm, pools)[q] : pools;
+        struct value f[A_FIELDS];
+        uint32_t n;
+        if (!actors(vm, p, f, &n, "cells.step"))
+            return -1;
+        int32_t ox = is_num(f[A_FIELD_X]) ? floor_int(f[A_FIELD_X]) : 0;
+        int32_t oy = is_num(f[A_FIELD_Y]) ? floor_int(f[A_FIELD_Y]) : 0;
+        for (uint32_t i = 0; i < n; i++) {
+            if (!vm_truthy(vm, ELEMS(vm, f[A_ON])[i]))
+                continue;
+            int32_t X = fx(ELEMS(vm, f[A_X])[i]), Y = fx(ELEMS(vm, f[A_Y])[i]);
+            int32_t x0 = (X >> 16) - ox, y0 = (Y >> 16) - oy;
+            int32_t x1 = ((X + fx(ELEMS(vm, f[A_W])[i]) - 1) >> 16) - ox;
+            int32_t y1 = ((Y + fx(ELEMS(vm, f[A_H])[i]) - 1) >> 16) - oy;
+            if (x0 < 0) x0 = 0;
+            if (y0 < 0) y0 = 0;
+            if (x1 >= w) x1 = w - 1;
+            if (y1 >= h) y1 = h - 1;
+            if (x0 > x1 || y0 > y1)
+                continue;
+            for (int32_t y = y0; y <= y1; y++)
+                for (int32_t x = x0; x <= x1; x++) {
+                    int32_t c = y * w + x;
+                    bits[c >> 3] |= (uint8_t)(1 << (c & 7));
+                }
+            if (k < cap) {
+                boxes[k * 4] = x0;
+                boxes[k * 4 + 1] = y0;
+                boxes[k * 4 + 2] = x1;
+                boxes[k * 4 + 3] = y1;
+                k++;
+            }
+        }
+    }
+    return k;
+}
+
 NATIVE(particles_step)
 {
     (void)out; (void)argc;
@@ -732,7 +825,16 @@ NATIVE(particles_step)
     int32_t g = fx(f[P_GRAVITY]), drag = fx(f[P_DRAG]);
     struct value *lf = ELEMS(vm, f[P_LIFE]), *x = ELEMS(vm, f[P_X]);
     struct value *y = ELEMS(vm, f[P_Y]), *dx = ELEMS(vm, f[P_DX]);
-    struct value *dy = ELEMS(vm, f[P_DY]);
+    struct value *dy = ELEMS(vm, f[P_DY]), *c = ELEMS(vm, f[P_C]);
+    struct dropfield fd = { NULL, 0, 0, 0, 0 };
+    if (f[P_FIELD].tag == T_IMG) {
+        struct img *im = MEM(vm, (uint32_t)f[P_FIELD].v);
+        fd.c = im->px;
+        fd.w = im->width;
+        fd.h = im->height;
+        fd.x0 = is_num(f[P_FIELD_X]) ? floor_int(f[P_FIELD_X]) : 0;
+        fd.y0 = is_num(f[P_FIELD_Y]) ? floor_int(f[P_FIELD_Y]) : 0;
+    }
     uint32_t live = 0;
     for (uint32_t i = 0; i < n; i++) {
         int32_t l = floor_int(lf[i]);
@@ -743,10 +845,13 @@ NATIVE(particles_step)
         int32_t DX = dragged(fx(dx[i]), drag), DY = dragged(fx(dy[i]) + g, drag);
         dx[i] = mk(T_FIX, DX);
         dy[i] = mk(T_FIX, DY);
-        x[i] = mk(T_FIX, fx(x[i]) + DX);
-        y[i] = mk(T_FIX, fx(y[i]) + DY);
+        int32_t ox = fx(x[i]), oy = fx(y[i]);
+        x[i] = mk(T_FIX, ox + DX);
+        y[i] = mk(T_FIX, oy + DY);
+        if (fd.c)
+            settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i]);
     }
-    vm_charge(vm, 10 + n / 8 + live * 2);
+    vm_charge(vm, 10 + n / 8 + live * (fd.c ? 4 : 2));
     return 1;
 }
 

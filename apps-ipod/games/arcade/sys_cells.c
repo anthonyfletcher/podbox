@@ -25,6 +25,7 @@
  *   rules      cells.rules, and checking a rules record handed back
  *   fields     reading one, its sleep state
  *   the step   cells.step
+ *   lift       cells.lift
  *   life       cells.life
  ***************************************************************************/
 #include <string.h>
@@ -38,6 +39,7 @@
 #define CHUNK_SHIFT 4
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
+#define MAX_BOXES 256           /* actors woken round in a step */
 #define RIDE      64            /* out of 256: on its own liquid, a move */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
@@ -490,8 +492,12 @@ static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
     return visited;
 }
 
-/* cells.step(field, w, rules): one tick of the field -- an image, or a
- * Uint8Array board w wide -- by the rules. Returns the cells that moved. */
+/* cells.step(field, w, rules, [actors]): one tick of the field -- an
+ * image, or a Uint8Array board w wide -- by the rules. actors, a pool or
+ * an array of pools, are obstacles while it steps: their boxes are marked
+ * as cells already moved, which nothing moves into, so water flows round
+ * a character and sand piles on a moving platform; the chunks under them
+ * are woken. Returns the cells that moved. */
 NATIVE(cells_step)
 {
     (void)argc;
@@ -506,6 +512,12 @@ NATIVE(cells_step)
     /* scratch may have collected: read the field and rules again */
     field_of(vm, a[0], a[1], "cells.step", &s.f);
     rules_of(vm, a[2], &s.r);
+    static int32_t boxes[MAX_BOXES * 4];
+    int32_t nbox = 0;
+    if (argc > 3 && a[3].tag != T_NULL &&
+        (nbox = actors_boxes(vm, a[3], s.moved, s.f.w, s.f.h, boxes,
+                             MAX_BOXES)) < 0)
+        return 0;
     s.vm = vm;
     s.nbits = 0;
     s.moves = 0;
@@ -546,6 +558,16 @@ NATIVE(cells_step)
                 s.slept[k] = 1;
         }
     }
+    /* the chunks round each actor are awake: something may rest on it */
+    for (int32_t b = 0; b < nbox; b++)
+        for (int32_t cy = (boxes[b * 4 + 1] >> CHUNK_SHIFT) - 1;
+             cy <= (boxes[b * 4 + 3] >> CHUNK_SHIFT) + 1; cy++)
+            for (int32_t cx = (boxes[b * 4] >> CHUNK_SHIFT) - 1;
+                 cx <= (boxes[b * 4 + 2] >> CHUNK_SHIFT) + 1; cx++)
+                if (cx >= 0 && cy >= 0 && cx < s.cw && cy < chh) {
+                    sl->awake[cy * s.cw + cx] = 1;
+                    s.changed[cy * s.cw + cx] = 1;
+                }
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
     /* Next tick: the chunks that changed and those near them; the rest
      * sleep with their sums. Near is a chunk up or down, and sideways as
@@ -589,6 +611,67 @@ NATIVE(cells_step)
     }
     vm_charge(vm, 20 + visited + s.moves + summed * 16);
     *out = mk(T_INT, (int32_t)s.moves);
+    return 1;
+}
+
+/* ---- lift ---------------------------------------------------------------- */
+
+/* cells.lift(field, rules, x, y, r, pool, [speed]): the loose cells within
+ * r of field cell x, y -- any that move, powder, liquid or gas; stone
+ * stays -- thrown out as particles of their colour, outward from x, y at
+ * up to speed (2) pixels a tick, the cells left as air. With the pool's
+ * field set to this one they fall back in as cells: a blast that throws
+ * sand and water. Returns the cells lifted. */
+NATIVE(cells_lift)
+{
+    struct field f;
+    struct rules r;
+    struct value *p[6];
+    uint32_t n;
+    int32_t ox, oy;
+    if (!field_of(vm, a[0], mk(T_INT, 0), "cells.lift", &f) ||
+        !rules_of(vm, a[1], &r) ||
+        !particles_arrays(vm, a[5], p, &n, &ox, &oy))
+        return 0;
+    if (!is_num(a[2]) || !is_num(a[3]) || !is_num(a[4]))
+        return vm_fail(vm, "cells.lift() needs x, y and a radius", "", "");
+    int32_t x = floor_int(a[2]), y = floor_int(a[3]), rad = floor_int(a[4]);
+    int32_t speed = argc > 6 && is_num(a[6]) ? (int32_t)scaled(a[6]) : 2 << 16;
+    if (rad < 0) rad = 0;
+    if (rad > 32) rad = 32;
+    uint32_t slot = 0, lifted = 0;
+    for (int32_t dy = -rad; dy <= rad; dy++)
+        for (int32_t dx = -rad; dx <= rad; dx++) {
+            int32_t cx = x + dx, cy = y + dy;
+            if (dx * dx + dy * dy > rad * rad || cx < 0 || cy < 0 ||
+                cx >= f.w || cy >= f.h)
+                continue;
+            uint8_t m = f.c[cy * f.w + cx];
+            if (!m || r.f[R_MOVE][m] == MOVE_STATIC)
+                continue;
+            while (slot < n && is_num(p[0][slot]) && floor_int(p[0][slot]) > 0)
+                slot++;
+            if (slot >= n)
+                goto full;
+            /* outward from the centre, faster nearer it, and up a little */
+            int32_t d = dx * dx + dy * dy, near = rad * rad - d + 1;
+            int32_t k = (int32_t)(((int64_t)speed * near) / (rad * rad + 1));
+            int32_t len = 1;
+            while (len * len < d)
+                len++;
+            p[0][slot] = mk(T_INT, 40 + (int32_t)(core_random(vm) & 31));
+            p[1][slot] = mk(T_INT, cx + ox);
+            p[2][slot] = mk(T_INT, cy + oy);
+            p[3][slot] = mk(T_FIX, d ? k * dx / len : 0);
+            p[4][slot] = mk(T_FIX, (d ? k * dy / len : 0) - speed / 2);
+            p[5][slot] = mk(T_INT, m);
+            f.c[cy * f.w + cx] = 0;
+            lifted++;
+        }
+full:
+    vm_charge(vm, 10 + (uint32_t)((2 * rad + 1) * (2 * rad + 1)) / 2 +
+              lifted * 4);
+    *out = mk(T_INT, (int32_t)lifted);
     return 1;
 }
 

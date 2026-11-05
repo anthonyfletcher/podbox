@@ -498,6 +498,13 @@ int cells_world(struct vm *vm, struct value field, struct value rules,
                 struct cellworld *w);
 enum { CELL_SOLID = 1, CELL_LIQUID = 2, CELL_HARM = 4 };
 
+/* sys_actors.c, for cells: actors' boxes as obstacles, and a particle
+ * pool's arrays (life, x, y, dx, dy, c) for cells.lift */
+int32_t actors_boxes(struct vm *vm, struct value pools, uint8_t *bits,
+                     int32_t w, int32_t h, int32_t *boxes, int32_t cap);
+int particles_arrays(struct vm *vm, struct value p, struct value **arr,
+                     uint32_t *n, int32_t *ox, int32_t *oy);
+
 /* verify.c */
 int verify_cart(struct vm *vm);
 

@@ -190,3 +190,72 @@ function update() {
     /* 128 cells: two rows, nowhere to go */
     assert.deepEqual(run2(32, 2000), ['0 0']);
 });
+
+/* Materials for the layers: 0 air, 5 stone, 12 water, 15 sand */
+const LAYERS = `
+function rules2() {
+    R = cells.rules();
+    R.move[15] = MOVE.POWDER; R.density[15] = 200;
+    R.move[12] = MOVE.LIQUID; R.density[12] = 100;
+    R.density[5] = 255;
+}
+`;
+
+test('actors are obstacles to the field: sand rests on one and falls when it goes', () => {
+    const out = cellrun(LAYERS + `var f, p, tk = 0;
+function init() {
+    rules2();
+    f = img(32, 32);
+    target(f); cls(0); rectfill(0, 31, 31, 31, 5); rectfill(14, 0, 17, 3, 15); target(SCREEN);
+    p = actors.pool(1);
+    var a = actors.spawn(p); p.x[a] = 12; p.y[a] = 16; p.w[a] = 8; p.h[a] = 8;
+}
+function at(x, y) { target(f); var v = pget(x, y); target(SCREEN); return v; }
+function update() {
+    tk++;
+    if (tk == 60) p.x[0] = 24;
+    cells.step(f, 0, R, p);
+    if (tk == 59) printh(at(15, 15) + " " + at(15, 16) + " " + at(15, 30));
+    if (tk == 120) printh(at(15, 15) + " " + at(15, 30));
+}`, 120);
+    /* resting on the actor's top (y 16), none inside or under it; once it
+     * has gone the sand is on the floor */
+    assert.deepEqual(out, ['15 0 0', '0 15']);
+});
+
+test('particles settle into their field, and a lift throws loose cells out', () => {
+    const out = cellrun(LAYERS + `var f, sp, tk = 0;
+function init() {
+    rules2();
+    f = img(96, 32);
+    target(f); cls(0); rectfill(0, 28, 95, 31, 5); rectfill(40, 20, 47, 27, 15); rectfill(48, 24, 55, 27, 12); target(SCREEN);
+    sp = particles.pool(200);
+    sp.gravity = 0.2; sp.field = f;
+    printh(cells.lift(f, R, 44, 26, 6, sp, 2));
+    var stone = 0, live = 0;
+    target(f); for (var x = 0; x < 96; x++) for (var y = 28; y < 32; y++) if (pget(x, y) == 5) stone++; target(SCREEN);
+    for (var i = 0; i < 200; i++) if (sp.life[i] > 0) live++;
+    printh(stone + " " + live);
+}
+function update() {
+    tk++;
+    particles.step(sp);
+    cells.step(f, 0, R);
+    if (tk == 150) {
+        var live = 0, cells_ = 0;
+        for (var i = 0; i < 200; i++) if (sp.life[i] > 0) live++;
+        target(f); for (var x = 0; x < 96; x++) for (var y = 0; y < 28; y++) if (pget(x, y) != 0) cells_++; target(SCREEN);
+        printh(live + " " + cells_);
+    }
+}`, 150);
+    const lifted = Number(out[0]);
+    assert.ok(lifted > 50, 'lifted ' + lifted);
+    /* the stone floor untouched, every lifted cell a live particle */
+    assert.equal(out[1], '384 ' + lifted);
+    /* all landed again: no particle left in flight, and nearly every cell
+     * back -- a particle landing where another just has is lost, as
+     * debris thrown out of the field is */
+    const [live, back] = out[2].split(' ').map(Number);
+    assert.equal(live, 0);
+    assert.ok(back >= (64 + 32) * 0.9, 'cells back: ' + back);
+});

@@ -172,8 +172,9 @@ API(noise_fill,    111, 8, 8, VAL, 0, CELLS, LISTEN, 1)
 /* Systems: cells, a field of materials stepped by rules */
 API_NS(cells)
 API(cells_rules,   114, 0, 0, VAL, 0, CELLS, LISTEN, 1)
-API(cells_step,    115, 3, 3, VAL, 0, CELLS, LISTEN, 1)
+API(cells_step,    115, 3, 4, VAL, 0, CELLS, LISTEN, 1)
 API(cells_life,    116, 4, 5, VAL, 0, CELLS, LISTEN, 1)
+API(cells_lift,    126, 6, 7, VAL, 0, CELLS, LISTEN, 1)
 
 /* Systems: points and links -- ropes, chains, bridges, cloth */
 API_NS(links)
