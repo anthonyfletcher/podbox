@@ -317,10 +317,10 @@ static int new_obj(struct vm *vm, uint32_t shape, struct value *vals,
 int vm_new_record(struct vm *vm, const char *const *keys, uint32_t n,
                   struct value *out)
 {
-    static struct value nulls[16];
+    static struct value nulls[32];
     uint32_t shape = 0;
-    if (n > 16)
-        return vm_fail(vm, "a record of more than 16 keys", "", "");
+    if (n > 32)
+        return vm_fail(vm, "a record of more than 32 keys", "", "");
     for (uint32_t i = 0; i < n; i++) {
         struct value s;
         if (!vm_new_string(vm, (const uint8_t *)keys[i],

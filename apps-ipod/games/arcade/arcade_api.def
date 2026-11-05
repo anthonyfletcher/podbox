@@ -137,6 +137,7 @@ API(particles_pool,  83, 1, 1, VAL,  0, CELLS, LISTEN, 1)
 API(particles_emit,  84, 9, 9, VAL,  0, CELLS, LISTEN, 1)
 API(particles_step,  85, 1, 1, VOID, 0, CELLS, LISTEN, 1)
 API(particles_draw,  86, 1, 1, VOID, 0, PIXELS, LISTEN, 1)
+API(actors_zones,   117, 4, 4, VAL,  0, CELLS, LISTEN, 1)
 
 /* Systems: sprite batches, many sprites from the cart's arrays at once */
 API_NS(sprites)
@@ -197,6 +198,9 @@ API_CONSTG(HIT, RIGHT, 1, 1)
 API_CONSTG(HIT, UP,    2, 1)
 API_CONSTG(HIT, DOWN,  3, 1)
 API_CONSTG(HIT, ENTER, 4, 1)
+API_CONSTG(HIT, LEAVE, 5, 1)
+API_CONSTG(HIT, TOUCH, 6, 1)
+API_CONSTG(HIT, REACT, 7, 1)
 
 /* Directions, for grid.slide() and anything else that goes one way: the
  * same numbers as HIT's sides */
@@ -204,6 +208,11 @@ API_CONSTG(DIR, LEFT,  0, 1)
 API_CONSTG(DIR, RIGHT, 1, 1)
 API_CONSTG(DIR, UP,    2, 1)
 API_CONSTG(DIR, DOWN,  3, 1)
+
+/* What an actor makes of a material, in cells.rules().flags */
+API_CONSTG(CELL, SOLID,  1, 1)
+API_CONSTG(CELL, LIQUID, 2, 1)
+API_CONSTG(CELL, HARM,   4, 1)
 
 /* How a material moves, in cells.rules().move */
 API_CONSTG(MOVE, STATIC, 0, 1)

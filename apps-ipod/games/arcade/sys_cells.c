@@ -47,10 +47,10 @@ enum { K_MOVES = 1, K_FLOWS = 2, K_GAS = 4, K_REACTS = 8, K_DECAYS = 16 };
 
 /* ---- rules ------------------------------------------------------------- */
 
-enum { R_MOVE, R_SPREAD, R_DENSITY, R_DECAY, R_BECOMES,
+enum { R_MOVE, R_SPREAD, R_DENSITY, R_DECAY, R_BECOMES, R_FLAGS,
        R_A, R_B, R_C, R_D, R_CHANCE, R_FIELDS };
 static const char *const rule_keys[R_FIELDS] = {
-    "move", "spread", "density", "decay", "becomes",
+    "move", "spread", "density", "decay", "becomes", "flags",
     "a", "b", "c", "d", "chance"
 };
 
@@ -62,7 +62,7 @@ static uint32_t rule_len(int f)
 /* cells.rules(): a record of Uint8Arrays for the cart to fill -- per
  * material move (MOVE.*), spread (how many cells a tick a liquid or gas
  * runs along when it cannot fall; 0 is 2), density,
- * decay (a chance a tick out of
+ * flags (CELL.*, what an actor makes of it), decay (a chance a tick out of
  * 256) and becomes; per reaction a, b, c, d and chance */
 NATIVE(cells_rules)
 {
@@ -186,6 +186,29 @@ static struct cellsleep *sleep_for(struct vm *vm, const struct field *f)
     memset(old->awake, 1, sizeof(old->awake));
     memset(old->dir, 0, sizeof(old->dir));
     return old;
+}
+
+/* A field and its rules, for actors to move in: 0, with the error set,
+ * when either is not what it should be */
+int cells_world(struct vm *vm, struct value field, struct value rules,
+                struct cellworld *w)
+{
+    struct field f;
+    struct rules r;
+    if (!field_of(vm, field, mk(T_INT, 0), "actors.move", &f) ||
+        !rules_of(vm, rules, &r))
+        return 0;
+    w->c = f.c;
+    w->w = f.w;
+    w->h = f.h;
+    w->density = r.f[R_DENSITY];
+    w->flags = r.f[R_FLAGS];
+    w->a = r.f[R_A];
+    w->b = r.f[R_B];
+    w->c2 = r.f[R_C];
+    w->d = r.f[R_D];
+    w->chance = r.f[R_CHANCE];
+    return 1;
 }
 
 /* ---- the step ------------------------------------------------------------ */

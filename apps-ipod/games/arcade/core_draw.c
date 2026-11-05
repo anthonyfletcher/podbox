@@ -2783,11 +2783,13 @@ int column_true(struct vm *vm, const struct column *c, uint32_t i,
 }
 
 /* actors.draw() and sprites.draw(): each sprite on with a number 0-255, as
- * spr(sp, x, y, 1, 1, flip) draws it */
+ * spr(sp, x, y, 1, 1, flip) draws it. With frames above 1 it is animated:
+ * the sprites after sp in turn, each for speed ticks. */
 void core_draw_sprites(struct vm *vm, const struct column *on,
                        const struct column *sp, const struct column *x,
                        const struct column *y, const struct column *flip,
-                       uint32_t n)
+                       const struct column *frames,
+                       const struct column *speed, uint32_t n)
 {
     struct pen p;
     const uint8_t *sheet = MEM(vm, vm->sheet);
@@ -2797,6 +2799,14 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
         int32_t s = column_at(sp, i, -1);
         if (s < 0 || s > 255 || !column_true(vm, on, i, 1))
             continue;
+        int32_t k = column_at(frames, i, 1);
+        if (k > 1) {
+            int32_t t = column_at(speed, i, 8);
+            s += (int32_t)(vm->frame / (uint32_t)(t > 0 ? t : 1) %
+                           (uint32_t)k);
+            if (s > 255)
+                continue;
+        }
         int64_t xx = column_at(x, i, 0), yy = column_at(y, i, 0);
         int fl = column_true(vm, flip, i, 0);
         int32_t tx, ty;
@@ -2817,6 +2827,7 @@ NATIVE(sprites_draw)
 {
     (void)out;
     struct column sp, x, y, flip = { T_NULL, NULL, 0, 0 }, on = flip;
+    struct column none = flip;      /* no animation */
     int32_t n = is_num(a[3]) ? floor_int(a[3]) : -1;
     if (!column_of(vm, a[0], &sp) ||
         !column_of(vm, a[1], &x) || x.tag == T_INT ||
@@ -2830,7 +2841,8 @@ NATIVE(sprites_draw)
         (uint32_t)n > y.len || (flip.tag != T_NULL && (uint32_t)n > flip.len))
         return vm_fail(vm, "sprites.draw() needs n no longer than its arrays",
                        "", "");
-    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, (uint32_t)n);
+    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, &none, &none,
+                      (uint32_t)n);
     return 1;
 }
 

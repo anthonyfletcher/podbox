@@ -449,7 +449,8 @@ int column_true(struct vm *vm, const struct column *c, uint32_t i, int dflt);
 void core_draw_sprites(struct vm *vm, const struct column *on,
                        const struct column *sp, const struct column *x,
                        const struct column *y, const struct column *flip,
-                       uint32_t n);
+                       const struct column *frames,
+                       const struct column *speed, uint32_t n);
 void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *x, const struct value *y,
                     const struct value *c, uint32_t n);
@@ -470,6 +471,17 @@ struct board
 int board_of(struct vm *vm, struct value b, struct value w, const char *fn,
              struct board *o);
 void *scratch(struct vm *vm, uint32_t bytes);
+
+/* sys_cells.c, for actors: a cells field and its rules' tables */
+struct cellworld
+{
+    uint8_t *c;
+    int32_t w, h;
+    const uint8_t *density, *flags, *a, *b, *c2, *d, *chance;
+};
+int cells_world(struct vm *vm, struct value field, struct value rules,
+                struct cellworld *w);
+enum { CELL_SOLID = 1, CELL_LIQUID = 2, CELL_HARM = 4 };
 
 /* verify.c */
 int verify_cart(struct vm *vm);

@@ -26,10 +26,14 @@
 /* ---- pools ------------------------------------------------------------ */
 
 enum { A_ON, A_X, A_Y, A_DX, A_DY, A_W, A_H, A_SP, A_FLIP, A_CELL,
-       A_ARRAYS, A_GRAVITY = A_ARRAYS, A_DRAG, A_FIELDS };
+       A_FRAMES, A_SPEED, A_MAT, A_ZONE,
+       A_ARRAYS, A_GRAVITY = A_ARRAYS, A_DRAG, A_PLATFORMS, A_FIELD,
+       A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_FIELDS };
 static const char *const actor_keys[A_FIELDS] = {
     "on", "x", "y", "dx", "dy", "w", "h", "sp", "flip", "cell",
-    "gravity", "drag"
+    "frames", "speed", "mat", "zone",
+    "gravity", "drag", "platforms", "field", "rules", "field_x", "field_y",
+    "density"
 };
 
 enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_ARRAYS,
@@ -125,8 +129,9 @@ NATIVE(actors_pool)
     int32_t n;
     if (!whole_arg(vm, a, argc, 0, "actors.pool", &n))
         return 0;
-    /* on, x, y, dx, dy, w, h, sp, flip, cell */
-    static const int32_t fill[A_ARRAYS] = { 0, 0, 0, 0, 0, 8, 8, -1, 0, -1 };
+    /* on, x, y, dx, dy, w, h, sp, flip, cell, frames, speed, mat, zone */
+    static const int32_t fill[A_ARRAYS] = { 0, 0, 0, 0, 0, 8, 8, -1, 0, -1,
+                                            1, 8, -1, -1 };
     return make_pool(vm, actor_keys, A_FIELDS, A_ARRAYS, fill, n,
                      &vm->actor_shape, "actors.pool", out);
 }
@@ -152,6 +157,7 @@ NATIVE(actors_spawn)
             ELEMS(vm, f[A_DX])[i] = mk(T_INT, 0);
             ELEMS(vm, f[A_DY])[i] = mk(T_INT, 0);
             ELEMS(vm, f[A_CELL])[i] = mk(T_INT, -1);
+            ELEMS(vm, f[A_ZONE])[i] = mk(T_INT, -1);
             *out = mk(T_INT, (int32_t)i);
             break;
         }
@@ -242,39 +248,282 @@ static int sweep(const struct vm *vm, int32_t *pos, int32_t v, int32_t size,
     return -1;
 }
 
-/* actors.move(p, solid, trigger, out) */
+/* What an actor moves among besides the map: another pool's actors as
+ * solid boxes (platforms), and a cells image whose top left is at fx0, fy0
+ * world pixels, its materials' flags saying solid, liquid or harmful */
+struct world
+{
+    struct vm *vm;
+    uint32_t np;
+    const struct value *pon, *px, *py, *pdx, *pdy, *pw, *ph;
+    int field;
+    struct cellworld cw;
+    int32_t fx0, fy0;
+};
+
+/* The world a pool names in its fields; 0 with the error set when one of
+ * them is not what it should be */
+static int world_of(struct vm *vm, const struct value *f, struct world *w)
+{
+    w->vm = vm;
+    w->np = 0;
+    w->field = 0;
+    if (f[A_PLATFORMS].tag == T_OBJ) {
+        struct value pf[A_FIELDS];
+        if (!actors(vm, f[A_PLATFORMS], pf, &w->np, "actors.move"))
+            return 0;
+        w->pon = ELEMS(vm, pf[A_ON]);
+        w->px = ELEMS(vm, pf[A_X]);
+        w->py = ELEMS(vm, pf[A_Y]);
+        w->pdx = ELEMS(vm, pf[A_DX]);
+        w->pdy = ELEMS(vm, pf[A_DY]);
+        w->pw = ELEMS(vm, pf[A_W]);
+        w->ph = ELEMS(vm, pf[A_H]);
+    }
+    if (f[A_FIELD].tag == T_IMG) {
+        if (!cells_world(vm, f[A_FIELD], f[A_RULES], &w->cw))
+            return 0;
+        w->field = 1;
+        w->fx0 = is_num(f[A_FIELD_X]) ? floor_int(f[A_FIELD_X]) : 0;
+        w->fy0 = is_num(f[A_FIELD_Y]) ? floor_int(f[A_FIELD_Y]) : 0;
+    }
+    return 1;
+}
+
+/* The field's material at world pixel x, y, or -1 off it */
+static int32_t field_at(const struct world *w, int32_t x, int32_t y)
+{
+    x -= w->fx0;
+    y -= w->fy0;
+    if (x < 0 || y < 0 || x >= w->cw.w || y >= w->cw.h)
+        return -1;
+    return w->cw.c[y * w->cw.w + x];
+}
+
+/* The first solid field material along the pixel line at `at` on one axis,
+ * over the other axis's pixels p0..p1, or -1 */
+static int32_t field_line(const struct world *w, int x_axis, int32_t at,
+                          int32_t p0, int32_t p1)
+{
+    for (int32_t p = p0; p <= p1; p++) {
+        int32_t m = x_axis ? field_at(w, at, p) : field_at(w, p, at);
+        if (m >= 0 && (w->cw.flags[m] & CELL_SOLID))
+            return m;
+    }
+    return -1;
+}
+
+/* After the map's sweep of one axis from p0 to *p (16.16), the actor's
+ * size along it and its other extent lo, len: stopped flush by the first
+ * solid field cell or platform on the way. Returns the side that hit or
+ * -1, with -2 and the material, or -1 and the platform, in hx, hy. */
+static int obstacles(const struct world *w, int32_t p0, int32_t *p,
+                     int32_t size, int32_t lo, int32_t len, int x_axis,
+                     int32_t *hx, int32_t *hy, uint32_t *checked)
+{
+    int side = -1;
+    int32_t o0 = lo >> 16, o1 = (lo + len - 1) >> 16;
+    if (w->field && *p > p0) {
+        int32_t last = (*p + size - 1) >> 16;
+        for (int32_t e = ((p0 + size - 1) >> 16) + 1; e <= last; e++) {
+            int32_t m = field_line(w, x_axis, e, o0, o1);
+            *checked += (uint32_t)(o1 - o0 + 1);
+            if (m >= 0) {
+                *p = (e << 16) - size;
+                side = x_axis ? 1 : 3;
+                *hx = -2;
+                *hy = m;
+                break;
+            }
+        }
+    } else if (w->field && *p < p0) {
+        int32_t last = *p >> 16;
+        for (int32_t e = (p0 >> 16) - 1; e >= last; e--) {
+            int32_t m = field_line(w, x_axis, e, o0, o1);
+            *checked += (uint32_t)(o1 - o0 + 1);
+            if (m >= 0) {
+                *p = (e + 1) << 16;
+                side = x_axis ? 0 : 2;
+                *hx = -2;
+                *hy = m;
+                break;
+            }
+        }
+    }
+    for (uint32_t j = 0; j < w->np; j++) {
+        if (!vm_truthy(w->vm, w->pon[j]))
+            continue;
+        int32_t bx = fx(w->px[j]), by = fx(w->py[j]);
+        int32_t bw = fx(w->pw[j]), bh = fx(w->ph[j]);
+        int32_t b0 = x_axis ? bx : by, bs = x_axis ? bw : bh;
+        int32_t c0 = x_axis ? by : bx, cs = x_axis ? bh : bw;
+        if (!(lo < c0 + cs && c0 < lo + len))
+            continue;
+        if (*p > p0 && p0 + size <= b0 && *p + size > b0) {
+            *p = b0 - size;
+            side = x_axis ? 1 : 3;
+            *hx = -1;
+            *hy = (int32_t)j;
+        } else if (*p < p0 && p0 >= b0 + bs && *p < b0 + bs) {
+            *p = b0 + bs;
+            side = x_axis ? 0 : 2;
+            *hx = -1;
+            *hy = (int32_t)j;
+        }
+    }
+    return side;
+}
+
+/* Carried: an actor standing on a platform's top, where the platform was
+ * before this tick's move, moves with it. Platforms move first. */
+static void carry(const struct world *w, int32_t *x, int32_t *y, int32_t W,
+                  int32_t H)
+{
+    for (uint32_t j = 0; j < w->np; j++) {
+        if (!vm_truthy(w->vm, w->pon[j]))
+            continue;
+        int32_t ddx = fx(w->pdx[j]), ddy = fx(w->pdy[j]);
+        int32_t bx = fx(w->px[j]) - ddx, by = fx(w->py[j]) - ddy;
+        int32_t foot = *y + H - by;
+        if (foot >= -(1 << 16) && foot <= (1 << 16) &&
+            *x < bx + fx(w->pw[j]) && bx < *x + W) {
+            *x += ddx;
+            *y = by + ddy - H;
+            return;
+        }
+    }
+}
+
+/* In the field after its move: drag and lift from the liquid it is in, the
+ * first harmful material it touches (HIT.TOUCH), and, if it is made of a
+ * material, the rules' reactions with the cells just outside it -- the
+ * actor as a, the cell becoming d -- reported once (HIT.REACT, with c,
+ * what the actor would become, for the cart to decide) */
+static void in_field(const struct world *w, struct contacts *c, uint32_t i,
+                     int32_t X, int32_t Y, int32_t W, int32_t H, int32_t *DX,
+                     int32_t *DY, int32_t g, int32_t density, int32_t mat,
+                     uint32_t *checked)
+{
+    int32_t x0 = X >> 16, y0 = Y >> 16;
+    int32_t x1 = (X + W - 1) >> 16, y1 = (Y + H - 1) >> 16;
+    uint32_t cells = 0, wet = 0, heavy = 0;
+    int32_t harm = -1;
+    for (int32_t py = y0; py <= y1; py++)
+        for (int32_t px = x0; px <= x1; px++) {
+            int32_t m = field_at(w, px, py);
+            cells++;
+            if (m < 0)
+                continue;
+            uint8_t fl = w->cw.flags[m];
+            if (fl & CELL_LIQUID) {
+                wet++;
+                if (w->cw.density[m] > heavy)
+                    heavy = w->cw.density[m];
+            }
+            if ((fl & CELL_HARM) && harm < 0)
+                harm = m;
+        }
+    *checked += cells;
+    if (wet) {
+        /* as much as it is in: half its speed lost when wholly in, and
+         * lifted by the liquid's density over its own */
+        int32_t in = (int32_t)(((int64_t)wet << 16) / cells);
+        *DX -= (int32_t)(((int64_t)*DX * in) >> 17);
+        *DY -= (int32_t)(((int64_t)*DY * in) >> 17);
+        if (density > 0)
+            *DY -= (int32_t)((((int64_t)g * in) >> 16) * (int32_t)heavy /
+                             density);
+    }
+    if (harm >= 0)
+        contact(c, i, 6, -2, harm);
+    if (mat < 0 || mat > 255)
+        return;
+    /* the ring just outside it, clockwise from its top left */
+    int32_t across = x1 - x0 + 1, down = y1 - y0 + 1;
+    for (int32_t k = 0; k < 2 * (across + down); k++) {
+        int32_t px, py;
+        if (k < across) {
+            px = x0 + k;
+            py = y0 - 1;
+        } else if (k < across + down) {
+            px = x1 + 1;
+            py = y0 + k - across;
+        } else if (k < 2 * across + down) {
+            px = x1 - (k - across - down);
+            py = y1 + 1;
+        } else {
+            px = x0 - 1;
+            py = y1 - (k - 2 * across - down);
+        }
+        int32_t m = field_at(w, px, py);
+        (*checked)++;
+        if (m < 0)
+            continue;
+        for (int q = 0; q < 64; q++) {
+            if (!w->cw.chance[q] || w->cw.a[q] != mat || w->cw.b[q] != m)
+                continue;
+            if ((core_random(w->vm) & 0xff) < w->cw.chance[q]) {
+                w->cw.c[(py - w->fy0) * w->cw.w + (px - w->fx0)] = w->cw.d[q];
+                contact(c, i, 7, -2, w->cw.c2[q]);
+                return;
+            }
+            break;
+        }
+    }
+}
+
+/* actors.move(p, solid, trigger, out): as well as the map, the pool's
+ * platforms (another pool, which moves first) and its cells field, both
+ * named in its fields */
 NATIVE(actors_move)
 {
     struct value f[A_FIELDS];
     uint32_t n;
     int32_t smask, tmask;
+    struct world wd;
     if (!actors(vm, a[0], f, &n, "actors.move") ||
         !whole_arg(vm, a, argc, 1, "actors.move", &smask) ||
-        !whole_arg(vm, a, argc, 2, "actors.move", &tmask))
+        !whole_arg(vm, a, argc, 2, "actors.move", &tmask) ||
+        !world_of(vm, f, &wd))
         return 0;
     if (a[3].tag != T_I32)
         return vm_fail(vm, "actors.move() writes its contacts to an "
                        "Int32Array", "", "");
     struct contacts c = { I32(vm, a[3])->d, I32(vm, a[3])->len / 4, 0 };
     int32_t g = fx(f[A_GRAVITY]), drag = fx(f[A_DRAG]);
+    int32_t density = is_num(f[A_DENSITY]) ? floor_int(f[A_DENSITY]) : 0;
     struct value *on = ELEMS(vm, f[A_ON]), *x = ELEMS(vm, f[A_X]);
     struct value *y = ELEMS(vm, f[A_Y]), *dx = ELEMS(vm, f[A_DX]);
     struct value *dy = ELEMS(vm, f[A_DY]), *w = ELEMS(vm, f[A_W]);
     struct value *h = ELEMS(vm, f[A_H]), *cell = ELEMS(vm, f[A_CELL]);
-    uint32_t moved = 0;
+    struct value *mat = ELEMS(vm, f[A_MAT]);
+    uint32_t moved = 0, checked = 0;
     for (uint32_t i = 0; i < n; i++) {
         if (!vm_truthy(vm, on[i]))
             continue;
         moved++;
         int32_t X = fx(x[i]), Y = fx(y[i]), W = fx(w[i]), H = fx(h[i]);
         int32_t DX = dragged(fx(dx[i]), drag), DY = dragged(fx(dy[i]) + g, drag);
-        int32_t hx, hy, side;
+        int32_t hx, hy, side, s2, p0;
         if (W < 1) W = 1;
         if (H < 1) H = 1;
-        if ((side = sweep(vm, &X, DX, W, Y, H, smask, 1, &hx, &hy)) >= 0)
+        if (wd.np)
+            carry(&wd, &X, &Y, W, H);
+        p0 = X;
+        side = sweep(vm, &X, DX, W, Y, H, smask, 1, &hx, &hy);
+        if ((s2 = obstacles(&wd, p0, &X, W, Y, H, 1, &hx, &hy, &checked)) >= 0)
+            side = s2;
+        if (side >= 0)
             contact(&c, i, side, hx, hy);
-        if ((side = sweep(vm, &Y, DY, H, X, W, smask, 0, &hx, &hy)) >= 0)
+        p0 = Y;
+        side = sweep(vm, &Y, DY, H, X, W, smask, 0, &hx, &hy);
+        if ((s2 = obstacles(&wd, p0, &Y, H, X, W, 0, &hx, &hy, &checked)) >= 0)
+            side = s2;
+        if (side >= 0)
             contact(&c, i, side, hx, hy);
+        if (wd.field)
+            in_field(&wd, &c, i, X, Y, W, H, &DX, &DY, g, density,
+                     is_num(mat[i]) ? floor_int(mat[i]) : -1, &checked);
         x[i] = mk(T_FIX, X);
         y[i] = mk(T_FIX, Y);
         dx[i] = mk(T_FIX, DX);
@@ -290,7 +539,8 @@ NATIVE(actors_move)
         } else
             cell[i] = mk(T_INT, -1);
     }
-    vm_charge(vm, 10 + n / 4 + moved * 6 + c.n * 2);
+    vm_charge(vm, 10 + n / 4 + moved * 6 + c.n * 2 + moved * wd.np / 2 +
+              checked / 8);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }
@@ -334,6 +584,59 @@ NATIVE(actors_overlaps)
     return 1;
 }
 
+/* actors.zones(p, objs, n, out): which of n map objects (from mapobj(),
+ * five numbers each: kind, x, y, w, h) each actor's centre is in. Going
+ * into one is reported HIT.ENTER and leaving it HIT.LEAVE, with the
+ * object's index and kind; the pool's zone array keeps where each actor
+ * is. Returns the contacts written. */
+NATIVE(actors_zones)
+{
+    (void)argc;
+    struct value f[A_FIELDS];
+    uint32_t n;
+    if (!actors(vm, a[0], f, &n, "actors.zones"))
+        return 0;
+    struct column objs;
+    int32_t k = is_num(a[2]) ? floor_int(a[2]) : -1;
+    if (!column_of(vm, a[1], &objs) || objs.tag == T_INT || k < 0 ||
+        (uint32_t)k * 5 > objs.len)
+        return vm_fail(vm, "actors.zones() needs the objects from mapobj() "
+                       "and how many", "", "");
+    if (a[3].tag != T_I32)
+        return vm_fail(vm, "actors.zones() writes its contacts to an "
+                       "Int32Array", "", "");
+    struct contacts c = { I32(vm, a[3])->d, I32(vm, a[3])->len / 4, 0 };
+    struct value *on = ELEMS(vm, f[A_ON]), *zone = ELEMS(vm, f[A_ZONE]);
+    struct value *x = ELEMS(vm, f[A_X]), *y = ELEMS(vm, f[A_Y]);
+    struct value *w = ELEMS(vm, f[A_W]), *h = ELEMS(vm, f[A_H]);
+    for (uint32_t i = 0; i < n; i++) {
+        if (!vm_truthy(vm, on[i]))
+            continue;
+        int32_t cx = (fx(x[i]) + fx(w[i]) / 2) >> 16;
+        int32_t cy = (fx(y[i]) + fx(h[i]) / 2) >> 16;
+        int32_t in = -1;
+        for (int32_t j = 0; j < k && in < 0; j++) {
+            uint32_t o = (uint32_t)j * 5;
+            int32_t ox = column_at(&objs, o + 1, 0);
+            int32_t oy = column_at(&objs, o + 2, 0);
+            if (cx >= ox && cx < ox + column_at(&objs, o + 3, 0) &&
+                cy >= oy && cy < oy + column_at(&objs, o + 4, 0))
+                in = j;
+        }
+        int32_t was = is_num(zone[i]) ? floor_int(zone[i]) : -1;
+        if (in == was)
+            continue;
+        if (was >= 0 && was < k)
+            contact(&c, i, 5, was, column_at(&objs, (uint32_t)was * 5, 0));
+        if (in >= 0)
+            contact(&c, i, 4, in, column_at(&objs, (uint32_t)in * 5, 0));
+        zone[i] = mk(T_INT, in);
+    }
+    vm_charge(vm, 10 + n * (uint32_t)k / 4 + c.n * 2);
+    *out = mk(T_INT, (int32_t)c.n);
+    return 1;
+}
+
 NATIVE(actors_draw)
 {
     (void)out; (void)argc;
@@ -341,13 +644,15 @@ NATIVE(actors_draw)
     uint32_t n;
     if (!actors(vm, a[0], f, &n, "actors.draw"))
         return 0;
-    struct column on, x, y, sp, flip;
+    struct column on, x, y, sp, flip, frames, speed;
     column_of(vm, f[A_ON], &on);
     column_of(vm, f[A_X], &x);
     column_of(vm, f[A_Y], &y);
     column_of(vm, f[A_SP], &sp);
     column_of(vm, f[A_FLIP], &flip);
-    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, n);
+    column_of(vm, f[A_FRAMES], &frames);
+    column_of(vm, f[A_SPEED], &speed);
+    core_draw_sprites(vm, &on, &sp, &x, &y, &flip, &frames, &speed, n);
     return 1;
 }
 
