@@ -301,6 +301,7 @@ struct vm
     uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
     struct planeview plane;
     uint32_t rules_shape;                   /* what makes a record rules */
+    uint32_t links_shape;                   /* ... and links */
     struct cellsleep sleep[2];
     uint32_t sleep_clock;
     uint32_t frame;
@@ -454,6 +455,8 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
 void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *x, const struct value *y,
                     const struct value *c, uint32_t n);
+void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
+                     uint32_t c);
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,

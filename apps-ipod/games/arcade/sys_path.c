@@ -8,13 +8,16 @@
  *
  * A distance field serves many chasers heading for one place; find is
  * one shortest path, A* by Manhattan distance; sight is whether a line
- * between two cells' centres crosses only open cells.
+ * between two cells' centres crosses only open cells. A ray is in world
+ * pixels against the active map: where a line from a point first meets a
+ * solid cell, and which face, for shots, lasers and bounces.
  *
  * Parts, in order:
  *   walls      what blocks
  *   fields     field, next
  *   paths      find
  *   sight      sight
+ *   rays       ray
  ***************************************************************************/
 #include <string.h>
 #include "games/arcade/vm.h"
@@ -326,5 +329,100 @@ NATIVE(path_sight)
     }
     vm_charge(vm, 8 + (uint32_t)(nx + ny));
     *out = mk(T_INT, clear);
+    return 1;
+}
+
+/* ---- rays ---------------------------------------------------------------- */
+
+static int map_solid(const struct vm *vm, int32_t cx, int32_t cy, int32_t mask)
+{
+    if (cx < 0 || cy < 0 || cx >= vm->map_w || cy >= vm->map_h)
+        return 0;
+    const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
+    return (flags[map[cy * vm->map_w + cx]] & mask) != 0;
+}
+
+/* path.ray(x, y, dx, dy, solid, out, [len]): from world pixel x, y along
+ * dx, dy, the first map cell whose flags share a bit with solid, within
+ * len pixels (1024 by default). Into out, an array of at least five: the
+ * point hit, the cell's column and row, and the face of the cell it met
+ * (DIR.LEFT for its left face; -1 when it starts inside one). Returns 1
+ * on a hit, 0 when the ray goes clear. Off the map is open. */
+NATIVE(path_ray)
+{
+    if (a[5].tag != T_ARR || ARR(vm, a[5])->len < 5)
+        return vm_fail(vm, "path.ray() writes to an array of at least five",
+                       "", "");
+    int32_t mask = whole(a[4], 0);
+    int64_t x = scaled(a[0]), y = scaled(a[1]);
+    int64_t dx = scaled(a[2]), dy = scaled(a[3]);
+    int64_t far = argc > 6 && is_num(a[6]) ? scaled(a[6]) : (int64_t)1024 << 16;
+    *out = mk(T_INT, 0);
+    /* the direction as a unit vector, 16.16 */
+    int64_t l2 = dx * dx + dy * dy;
+    if (!l2 || !mask) {
+        vm_charge(vm, 6);
+        return 1;
+    }
+    uint64_t l = 1;
+    while (l * l < (uint64_t)l2)
+        l <<= 1;
+    for (uint64_t step = l >> 1; step; step >>= 1)
+        if ((l - step) * (l - step) >= (uint64_t)l2)
+            l -= step;
+    int64_t ux = (dx << 16) / (int64_t)l, uy = (dy << 16) / (int64_t)l;
+    int32_t cx = (int32_t)(x >> 19), cy = (int32_t)(y >> 19);
+    int32_t sx = ux > 0 ? 1 : -1, sy = uy > 0 ? 1 : -1, face = -1;
+    /* the distance along the ray to the next column's and row's edge, and
+     * between them, 16.16 pixels */
+    const int64_t never = (int64_t)1 << 48;
+    int64_t tx = never, ty = never, stepx = never, stepy = never;
+    if (ux) {
+        int64_t edge = ux > 0 ? ((int64_t)(cx + 1) << 19) - x
+                              : x - ((int64_t)cx << 19);
+        tx = (edge << 16) / (ux > 0 ? ux : -ux);
+        stepx = ((int64_t)8 << 32) / (ux > 0 ? ux : -ux);
+    }
+    if (uy) {
+        int64_t edge = uy > 0 ? ((int64_t)(cy + 1) << 19) - y
+                              : y - ((int64_t)cy << 19);
+        ty = (edge << 16) / (uy > 0 ? uy : -uy);
+        stepy = ((int64_t)8 << 32) / (uy > 0 ? uy : -uy);
+    }
+    int64_t t = 0;
+    uint32_t cells = 0;
+    while (!map_solid(vm, cx, cy, mask)) {
+        if (tx < ty) {
+            t = tx;
+            tx += stepx;
+            cx += sx;
+            face = sx > 0 ? 0 : 1;          /* DIR.LEFT, DIR.RIGHT */
+        } else {
+            t = ty;
+            ty += stepy;
+            cy += sy;
+            face = sy > 0 ? 2 : 3;          /* DIR.UP, DIR.DOWN */
+        }
+        cells++;
+        if (t > far) {
+            vm_charge(vm, 10 + cells * 2);
+            return 1;
+        }
+    }
+    /* the point hit, on the face exactly: the unit vector's rounding
+     * would put it a hair short */
+    int64_t hx = x + ((ux * t) >> 16), hy = y + ((uy * t) >> 16);
+    if (face == 0 || face == 1)
+        hx = (int64_t)(face == 0 ? cx : cx + 1) << 19;
+    else if (face == 2 || face == 3)
+        hy = (int64_t)(face == 2 ? cy : cy + 1) << 19;
+    struct value *o = BUF(vm, ARR(vm, a[5])->buf)->v;
+    o[0] = mk(T_FIX, wrap32(hx));
+    o[1] = mk(T_FIX, wrap32(hy));
+    o[2] = mk(T_INT, cx);
+    o[3] = mk(T_INT, cy);
+    o[4] = mk(T_INT, face);
+    *out = mk(T_INT, 1);
+    vm_charge(vm, 10 + cells * 2);
     return 1;
 }

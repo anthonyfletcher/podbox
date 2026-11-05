@@ -349,3 +349,61 @@ function update() {}`);
     /* z 4 is 16 rows up: the feet are clear, the figure starts above */
     assert.equal(second, '0 11');
 });
+
+test('links: a pinned rope hangs to its length and stays out of walls', () => {
+    const r = run(`var rope, tk = 0;
+function init() {
+    rope = links.pool(11, 10);
+    rope.gravity = 0.2; rope.drag = 0.02;
+    links.point(rope, 40, 10, true);
+    for (var i = 1; i <= 10; i++) { links.point(rope, 40 + i * 4, 10); links.link(rope, i - 1, i); }
+}
+function update() {
+    tk++;
+    links.step(rope, 0);
+    if (tk == 300) {
+        var worst = 0;
+        for (var k = 0; k < 10; k++) {
+            var a = rope.a[k], b = rope.b[k];
+            var dx = rope.x[b] - rope.x[a], dy = rope.y[b] - rope.y[a];
+            worst = max(worst, abs(sqrt(dx * dx + dy * dy) - rope.len[k]));
+        }
+        printh(rope.x[0] + " " + rope.y[0] + " " + flr(rope.x[10] + 0.5) + " " + flr(rope.y[10] + 0.5) + " " + (worst < 0.5));
+    }
+}`, 300);
+    assert.equal(r.status, 0, r.err);
+    /* pinned at 40,10; ten links of 4 hang straight down to about 50 */
+    const [px, py, ex, ey, tight] = r.out.trim().split(' ');
+    assert.deepEqual([px, py], ['40', '10']);
+    assert.ok(Math.abs(Number(ex) - 40) <= 1, 'below the pin: ' + ex);
+    assert.ok(Number(ey) >= 48 && Number(ey) <= 52, 'its length down: ' + ey);
+    assert.equal(tight, '1');
+    const wall = run(`var rope, tk = 0;
+function init() {
+    fset(1, 1);
+    // a block of map cells 5-9 across, row 6 (y 48-55)
+    for (var c = 5; c < 10; c++) mset(c, 6, 1);
+    rope = links.pool(12, 11);
+    rope.gravity = 0.2;
+    for (var i = 0; i < 12; i++) { links.point(rope, 44 + i * 3, 20); if (i) links.link(rope, i - 1, i); }
+}
+function update() {
+    tk++;
+    links.step(rope, 1);
+    if (tk == 200) {
+        var inside = 0;
+        for (var i = 0; i < 12; i++) if (fget(mget(flr(rope.x[i] / 8), flr(rope.y[i] / 8))) & 1) inside++;
+        printh(inside + " " + flr(rope.y[6]));
+    }
+}
+function draw() { cls(); links.draw(rope, 7); }`, 200, ['--dump', '40,40,40,10']);
+    assert.equal(wall.status, 0, wall.err);
+    /* draped over the block: nothing inside it, the middle resting on top */
+    const lines = wall.out.trim().split('\n');
+    const [inside, mid] = lines[0].split(' ').map(Number);
+    assert.equal(inside, 0);
+    assert.ok(mid >= 44 && mid < 48, 'resting on the block: ' + mid);
+    assert.ok(lines.slice(1).join('').includes('7'), 'drawn');
+    const bad = run('function init() { links.step({ x: [] }, 0); }\nfunction update() {}');
+    assert.match(bad.err, /links\.step\(\) needs a pool from links\.pool\(\)/);
+});

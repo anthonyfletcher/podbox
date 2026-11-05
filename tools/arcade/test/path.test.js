@@ -145,3 +145,27 @@ test('on random mazes find is as long as the field says, and walks open cells', 
         assert.deepEqual([x, y], [gx, gy]);
     }
 });
+
+test('a ray meets the first solid map cell, with the face it met', () => {
+    const out = paths(`fset(3, 1);
+    // a wall of sprite 3 down column 10 (x 80-87), and a block at 4,1
+    for (var r = 0; r < 12; r++) mset(10, r, 3);
+    mset(4, 1, 3);
+    var o = [0, 0, 0, 0, 0];
+    var h = path.ray(20, 30, 1, 0, 1, o); printh(h + " " + o.join(" "));
+    h = path.ray(20, 30.5, 1, 0.5, 1, o); printh(h + " " + flr(o[0]) + " " + flr(o[1]) + " " + o[2] + " " + o[3] + " " + o[4]);
+    h = path.ray(20, 30, -1, 0, 1, o); printh(h);
+    h = path.ray(20, 30, 1, 0, 1, o, 40); printh(h);
+    h = path.ray(84, 30, 1, 0, 1, o); printh(h + " " + o[4]);
+    h = path.ray(36, 30, 0, -1, 1, o); printh(h + " " + o.slice(1).join(" "));`);
+    /* straight right from x 20: the wall's left face at x 80, cell 10,3 */
+    assert.equal(out[0], '1 80 30 10 3 0');
+    /* down and right at a half: meets the wall's left face (x 80) at y 60.5 */
+    assert.equal(out[1], '1 80 60 10 7 0');
+    /* left, and too short: clear */
+    assert.deepEqual(out.slice(2, 4), ['0', '0']);
+    /* starting inside the wall */
+    assert.equal(out[4], '1 -1');
+    /* straight up from x 36: the block at 4,1's bottom face (y 16) */
+    assert.equal(out[5], '1 16 4 1 3');
+});

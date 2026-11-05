@@ -2846,6 +2846,22 @@ NATIVE(sprites_draw)
     return 1;
 }
 
+/* links.draw(): n segments, four whole pixels each (x0, y0, x1, y1), in
+ * colour c, as line() draws them */
+void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
+                     uint32_t c)
+{
+    struct pen p;
+    begin(vm, &p, c, 1);
+    p.per16 = PER16_DOT;
+    for (uint32_t i = 0; i < n; i++, seg += 4) {
+        p.cost += 8;
+        walk_line(&p, seg[0], seg[1], seg[2], seg[3], plot_dot,
+                  p.pat ? NULL : run_dots, NULL);
+    }
+    finish(vm, &p);
+}
+
 /* particles.draw(): each live particle a pixel of its colour */
 void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *x, const struct value *y,

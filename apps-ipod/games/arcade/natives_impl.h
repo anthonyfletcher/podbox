@@ -117,6 +117,7 @@ IMPL(path_field)
 IMPL(path_next)
 IMPL(path_find)
 IMPL(path_sight)
+IMPL(path_ray)
 
 /* sys_noise.c */
 IMPL(noise_at)
@@ -126,6 +127,13 @@ IMPL(noise_fill)
 IMPL(cells_rules)
 IMPL(cells_step)
 IMPL(cells_life)
+
+/* sys_links.c */
+IMPL(links_pool)
+IMPL(links_point)
+IMPL(links_link)
+IMPL(links_step)
+IMPL(links_draw)
 
 /* sys_plane.c */
 IMPL(plane_view)
