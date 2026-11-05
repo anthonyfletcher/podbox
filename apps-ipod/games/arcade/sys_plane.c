@@ -90,7 +90,29 @@ static int32_t distance(const struct planeview *v, int32_t dy)
     return d > FAR_FLOOR ? (int32_t)FAR_FLOOR : (int32_t)d;
 }
 
-/* plane.draw([top], [bottom], [outside]) */
+/* plane.fog(near, far, colour): the ground from near to far world pixels
+ * away goes to colour, dithered, as distance does -- it hides the shimmer
+ * of texels skipped near the horizon; a colour of -1 turns it off. Kept
+ * until changed; plane.draw and land.draw use it. */
+NATIVE(plane_fog)
+{
+    (void)argc; (void)out;
+    for (int i = 0; i < 3; i++)
+        if (!is_num(a[i]))
+            return vm_fail(vm, "plane.fog() needs near, far and a colour", "",
+                           "");
+    struct planeview *v = &vm->plane;
+    int32_t c = floor_int(a[2]);
+    v->fog_on = c >= 0 && c <= 255;
+    v->fog_near = fx(a[0]);
+    v->fog_far = fx(a[1]);
+    v->fog_colour = (uint8_t)(c & 0xff);
+    vm_charge(vm, 4);
+    return 1;
+}
+
+/* plane.draw([top], [bottom], [outside], [coarse]): coarse 2 reads every
+ * other pixel and draws each twice, for about half the time */
 NATIVE(plane_draw)
 {
     (void)out;
@@ -101,6 +123,7 @@ NATIVE(plane_draw)
     if (argc > 0 && is_num(a[0])) top = floor_int(a[0]);
     if (argc > 1 && is_num(a[1])) bottom = floor_int(a[1]);
     if (argc > 2 && is_num(a[2])) outside = floor_int(a[2]);
+    int coarse = argc > 3 && is_num(a[3]) ? floor_int(a[3]) : 1;
     if (top < v->horizon) top = v->horizon;
     if (top < 0) top = 0;
     if (bottom > SCREEN_H - 1) bottom = SCREEN_H - 1;
@@ -120,10 +143,11 @@ NATIVE(plane_draw)
         r->dv = mul(ry, step);
         r->u = cx - r->du * (SCREEN_W / 2);
         r->v = cy - r->dv * (SCREEN_W / 2);
+        r->fog = core_fog_level(v, d);
     }
     if (bottom >= top)
         vm_charge(vm, (uint32_t)(bottom - top + 1) * 4);
-    core_draw_floor(vm, rows, top, bottom, outside);
+    core_draw_floor(vm, rows, top, bottom, outside, coarse);
     return 1;
 }
 

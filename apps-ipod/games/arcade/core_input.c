@@ -150,6 +150,16 @@ NATIVE(setrate)
     return 1;
 }
 
+/* playback.playing(): whether the owner's music is playing -- for a cart
+ * to step its rate back up when the music stops */
+NATIVE(playback_playing)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, vm->host && vm->host->playing &&
+                     vm->host->playing(vm->host->ctx) ? 1 : 0);
+    return 1;
+}
+
 /* skipped(): frames the engine ran late and did not draw since the last
  * call */
 NATIVE(skipped)

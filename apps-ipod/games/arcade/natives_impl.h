@@ -149,6 +149,7 @@ IMPL(plane_draw)
 IMPL(plane_project)
 IMPL(plane_pick)
 IMPL(plane_billboards)
+IMPL(plane_fog)
 
 /* core_input.c */
 IMPL(btn)
@@ -159,4 +160,5 @@ IMPL(quit)
 IMPL(rate)
 IMPL(setrate)
 IMPL(skipped)
+IMPL(playback_playing)
 IMPL(menuitem)

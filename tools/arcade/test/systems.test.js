@@ -467,3 +467,29 @@ function update() {}`);
     const bad = run('function init() { walls.draw(1); }\nfunction update() {}');
     assert.match(bad.err, /needs a camera first/);
 });
+
+test('playback.playing reports the owner music', () => {
+    const quiet = run('function init() { printh(playback.playing()); }\nfunction update() {}');
+    const loud = run('function init() { printh(playback.playing()); }\nfunction update() {}', 1, ['--playing']);
+    assert.deepEqual([quiet.out, loud.out], ['0\n', '1\n']);
+});
+
+test('plane: fog covers the far ground, and coarse draws pixel pairs', () => {
+    const r = run(FLOOR + `function init() {
+    floor();
+    plane.view(300.5, 200.25, 24, 0.13, 40, 0.25);
+    plane.fog(0, 1, 9);
+    cls(0); plane.draw();
+    var fogged = 0;
+    for (var y = 40; y < 120; y++) for (var x = 0; x < 160; x++) if (pget(x, y) == 9) fogged++;
+    plane.fog(0, 0, -1);
+    cls(0); plane.draw(40, 119, -1, 2);
+    var pairs = 0;
+    for (y = 40; y < 120; y++) for (x = 0; x < 160; x += 2) if (pget(x, y) == pget(x + 1, y)) pairs++;
+    printh(fogged + " " + pairs);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    /* every floor pixel fogged; every pair the same with coarse */
+    assert.equal(r.out, '12800 6400\n');
+});

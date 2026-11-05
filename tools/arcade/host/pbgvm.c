@@ -4,7 +4,7 @@
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
- *                  [--menu i]...
+ *                  [--playing] [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -18,7 +18,8 @@
  * 2 NEXT, 4 MENU, 8 PLAY, 16 SELECT) from the ticks given, each until the
  * next: "30:16,31:0" presses SELECT for tick 30. --skip reports frames
  * the host fell behind by before the ticks given, as the player does when
- * a tick runs late: "10:1" is one skipped frame before tick 10. Each
+ * a tick runs late: "10:1" is one skipped frame before tick 10.
+ * --playing has playback.playing() report music playing. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -50,6 +51,13 @@ static void print(void *ctx, const char *s, int len)
     (void)ctx;
     fwrite(s, 1, (size_t)len, stdout);
     fputc('\n', stdout);
+}
+
+/* --playing: the owner's music plays, as playback.playing() reports */
+static int playing(void *ctx)
+{
+    (void)ctx;
+    return 1;
 }
 
 static void click(void *ctx, int beep)
@@ -282,6 +290,7 @@ int main(int argc, char **argv)
     unsigned long ceiling = 0;
     const char *shot_path = NULL, *dump_spec = NULL, *wav_path = NULL;
     const char *buttons = NULL, *skips = NULL;
+    int playing_flag = 0;
     int menu_picks[16], npicks = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
@@ -302,6 +311,8 @@ int main(int argc, char **argv)
             dirty = 1;
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc)
             wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--playing"))
+            playing_flag = 1;
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -326,7 +337,8 @@ int main(int argc, char **argv)
 
     /* The player's limit: the 5G's whole app buffer. */
     static uint64_t arena[512 * 1024 / 8];
-    struct arcade_host host = { NULL, print, NULL, date, click };
+    struct arcade_host host = { NULL, print, NULL, date, click,
+                                playing_flag ? playing : NULL };
     struct vm *vm = arcade_load(arena, sizeof(arena), mem_read, &in, &host,
                                 seed);
     if (!vm) {

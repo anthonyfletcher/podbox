@@ -2954,6 +2954,22 @@ static int row_inside(int64_t u, int64_t v, int64_t du, int64_t dv,
            u1 < e->umax && v < e->vmax && v1 < e->vmax;
 }
 
+/* 4x4 ordered dither: a pixel is fogged where its entry is below the
+ * fog's level, 0 (none) to 16 (all) */
+static const uint8_t bayer[4][4] = {
+    { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 }
+};
+
+/* plane.fog()'s level at distance d (16.16 world pixels): 0 to 16 */
+int32_t core_fog_level(const struct planeview *v, int64_t d)
+{
+    if (!v->fog_on || d <= v->fog_near)
+        return 0;
+    if (d >= v->fog_far || v->fog_far <= v->fog_near)
+        return 16;
+    return (int32_t)(((d - v->fog_near) * 16) / (v->fog_far - v->fog_near));
+}
+
 /* The landscape, as Comanche drew it: front to back, at each depth z the
  * slice of ground across the view from a left end to a right end, stepped
  * across the screen two adds a column. Each column keeps the highest row
@@ -2972,6 +2988,8 @@ struct slice
     int32_t w, x0, x1, cy0;
     int32_t step;               /* columns a sample: 1, or 2 coarse */
     int16_t *top;
+    int32_t fog, phase;         /* this slice's fog level, its count */
+    uint8_t fogc;
 };
 
 /* A column of the slice whose sample shows: from row y down to the top
@@ -2983,6 +3001,8 @@ static void land_fill(const struct slice *s, int16_t *top, int32_t y,
     if (y < s->cy0)
         y = s->cy0;
     uint8_t c = s->dpal[s->colour[at]];
+    if (s->fog && bayer[s->phase & 3][x & 3] < s->fog)
+        c = s->fogc;
     uint8_t *p = s->px + y * s->w + (x - s->x0);
     if (s->step == 2 && x + 1 < s->x1) {
         for (int32_t r = y; r < y1; r++, p += s->w)
@@ -3063,6 +3083,8 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     sl.w = p.s.w;
     sl.cy0 = p.cy0;
     sl.step = l->coarse == 2 ? 2 : 1;
+    sl.fogc = p.d->dpal[v->fog_colour];
+    sl.phase = 0;
     sl.top = top;
     uint32_t samples = 0, filled = 0;
     int32_t open = sl.x1 - sl.x0, lo = p.cy1;
@@ -3094,6 +3116,8 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
         int64_t su = ((int64_t)-v->dy * across) >> 16;
         int64_t sv = ((int64_t)v->dx * across) >> 16;
         int64_t ssu = su * sl.step, ssv = sv * sl.step;
+        sl.fog = core_fog_level(v, z);
+        sl.phase++;
         open = slice(&sl, (uint32_t)(cx - su * (SCREEN_W / 2) + su * sl.x0),
                      (uint32_t)(cy - sv * (SCREEN_W / 2) + sv * sl.x0),
                      (uint32_t)ssu, (uint32_t)ssv, (int32_t)base,
@@ -3112,8 +3136,24 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
 /* plane.draw(): rows top..bottom of the floor, each from its start and
  * step in 16.16 world pixels; a cell off the map is sprite outside, or
  * left alone when outside is negative */
+/* A row's fog over pixels x0..x1 of row y: its dithered share in colour c */
+static void fog_row(uint8_t *px, int32_t y, int32_t x0, int32_t x1,
+                    int32_t level, uint8_t c)
+{
+    if (level >= 16) {
+        memset(px + x0, c, (size_t)(x1 - x0));
+        return;
+    }
+    const uint8_t *b = bayer[y & 3];
+    for (int32_t k = 0; k < 4; k++)
+        if (b[k] < level)
+            for (int32_t x = x0 + ((k - x0) & 3); x < x1; x += 4)
+                px[x] = c;
+}
+
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
-                     int32_t top, int32_t bottom, int32_t outside)
+                     int32_t top, int32_t bottom, int32_t outside,
+                     int coarse)
 {
     static const uint8_t *tile[256];
     struct pen p;
@@ -3133,21 +3173,43 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
     const int32_t x0 = p.cx0, x1 = p.cx1;
     if (top < p.cy0) top = p.cy0;
     if (bottom > p.cy1 - 1) bottom = p.cy1 - 1;
+    const uint8_t fogc = p.d->dpal[vm->plane.fog_colour];
     if (x0 < x1 && top <= bottom) {
         uint32_t read = 0;          /* pixels times their units per 16 */
+        /* coarse: every other pixel read, into here, then doubled */
+        static uint8_t half[SCREEN_W / 2 + 1];
+        int32_t step = coarse == 2 ? 2 : 1;
         for (int32_t y = top; y <= bottom; y++) {
             const struct floor_row *r = &rows[y];
             uint8_t *px = p.s.px + y * p.s.w;
-            int32_t u = r->u + r->du * x0, v = r->v + r->dv * x0;
-            if (row_inside(u, v, r->du, r->dv, x1 - x0, &e)) {
-                floor_inside(px + x0, px + x1, (uint32_t)u, (uint32_t)v,
-                             (uint32_t)r->du, (uint32_t)r->dv, &e);
-                read += (uint32_t)(x1 - x0) * PER16_FLOOR;
-            } else {
-                floor_pixels(px + x0, px + x1, (uint32_t)u, (uint32_t)v,
-                             (uint32_t)r->du, (uint32_t)r->dv, &e);
-                read += (uint32_t)(x1 - x0) * PER16_EDGE;
+            if (r->fog >= 16) {
+                fog_row(px, y, x0, x1, 16, fogc);
+                read += (uint32_t)(x1 - x0);
+                continue;
             }
+            int32_t u = r->u + r->du * x0, v = r->v + r->dv * x0;
+            int32_t du = r->du * step, dv = r->dv * step;
+            int32_t n = (x1 - x0 + step - 1) / step;
+            uint8_t *to = step == 2 ? half : px + x0;
+            if (step == 2)
+                memcpy(half, px + x0, (size_t)n);
+            if (row_inside(u, v, du, dv, n, &e)) {
+                floor_inside(to, to + n, (uint32_t)u, (uint32_t)v,
+                             (uint32_t)du, (uint32_t)dv, &e);
+                read += (uint32_t)n * PER16_FLOOR;
+            } else {
+                floor_pixels(to, to + n, (uint32_t)u, (uint32_t)v,
+                             (uint32_t)du, (uint32_t)dv, &e);
+                read += (uint32_t)n * PER16_EDGE;
+            }
+            if (step == 2)
+                for (int32_t i = 0, x = x0; x < x1; i++, x += 2) {
+                    px[x] = half[i];
+                    if (x + 1 < x1)
+                        px[x + 1] = half[i];
+                }
+            if (r->fog)
+                fog_row(px, y, x0, x1, r->fog, fogc);
         }
         row_touched(&p, top);
         row_touched(&p, bottom);

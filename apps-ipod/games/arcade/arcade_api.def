@@ -113,6 +113,10 @@ API(rate,      92, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(setrate,   93, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(skipped,   94, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 
+/* The owner's music, read-only: the first of the playback service (6.4) */
+API_NS(playback)
+API(playback_playing, 128, 0, 0, VAL, 0, FLAT, LISTEN, 1)
+
 /* Memory: the engine's own arrays, and bulk moves */
 API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)
@@ -196,7 +200,8 @@ API(walls_draw,    127, 1, 3, VAL, 0, PIXELS, LISTEN, 1)
 /* Systems: the plane, the map as a floor seen from a camera */
 API_NS(plane)
 API(plane_view,       87, 6, 6, VOID, 0, CELLS,  LISTEN, 1)
-API(plane_draw,       88, 0, 3, VOID, 0, PIXELS, LISTEN, 1)
+API(plane_draw,       88, 0, 4, VOID, 0, PIXELS, LISTEN, 1)
+API(plane_fog,       129, 3, 3, VOID, 0, CELLS,  LISTEN, 1)
 API(plane_project,    89, 4, 4, VAL,  0, CELLS,  LISTEN, 1)
 API(plane_pick,       90, 3, 3, VAL,  0, CELLS,  LISTEN, 1)
 API(plane_billboards, 91, 7, 9, VAL,  0, PIXELS, LISTEN, 1)

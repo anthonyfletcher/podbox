@@ -44,6 +44,7 @@
 #include "games/arcade/shell.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
+#include "audio.h"            /* audio_status */
 
 /* The engine's memory: the app buffer, no more than the smaller player's. */
 #define ARENA_MAX (512 * 1024)
@@ -174,8 +175,15 @@ static void host_date(void *ctx, int32_t out[7])
     out[6] = tm->tm_wday;
 }
 
+static int host_playing(void *ctx)
+{
+    (void)ctx;
+    int st = audio_status();
+    return (st & AUDIO_STATUS_PLAY) && !(st & AUDIO_STATUS_PAUSE);
+}
+
 static const struct arcade_host host = {
-    NULL, host_print, host_yield, host_date, host_click
+    NULL, host_print, host_yield, host_date, host_click, host_playing
 };
 
 /* ---- sound -----------------------------------------------------------------

@@ -176,6 +176,11 @@ struct planeview
      * for billboards behind walls; kept until the next plane.view() */
     int depth_set;
     int32_t depth[SCREEN_W];
+    /* plane.fog(): from near to far (16.16 world pixels) the ground goes
+     * to colour, dithered; kept until changed */
+    int fog_on;
+    int32_t fog_near, fog_far;
+    uint8_t fog_colour;
 };
 
 /* A cells field's 16x16 chunks: which are awake, and each sleeping one's
@@ -202,7 +207,7 @@ struct landspec
 
 /* A row of the floor: its left end and one screen pixel's step, 16.16
  * world pixels */
-struct floor_row { int32_t u, v, du, dv; };
+struct floor_row { int32_t u, v, du, dv, fog; };
 
 /* An effect: signed bytes, each times scale a 16-bit sample */
 struct sfxinfo
@@ -474,7 +479,9 @@ void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
                      uint32_t c);
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l);
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
-                     int32_t top, int32_t bottom, int32_t outside);
+                     int32_t top, int32_t bottom, int32_t outside,
+                     int coarse);
+int32_t core_fog_level(const struct planeview *v, int64_t d);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
                          int flip, int32_t depth);

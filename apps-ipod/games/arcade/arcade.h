@@ -27,6 +27,9 @@ struct arcade_host
     void (*date)(void *ctx, int32_t out[7]);
     /* click(): the wheel's tick, or with beep its beep; NULL for none */
     void (*click)(void *ctx, int beep);
+    /* playback.playing(): whether the owner's music is playing (not
+     * paused or stopped); NULL for never */
+    int (*playing)(void *ctx);
 };
 
 /* Reads n bytes into buf, or skips n bytes when buf is NULL; returns the
