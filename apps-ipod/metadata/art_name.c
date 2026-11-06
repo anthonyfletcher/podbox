@@ -1,7 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The name key a person's picture is found and cached by. A tag and a folder
+ * The name keys a person's picture is found and cached by, and an album's
+ * cover is cached by. A tag and a folder
  * or file name are written differently for the same person -- "N*E*R*D" and
  * "N.E.R.D", "AC/DC" and "AC_DC", "Björk" and "Bjork", "The Beatles" and
  * "Beatles, The" -- so neither is compared as written: each is reduced to its
@@ -156,6 +157,25 @@ unsigned int art_name_work_hash(const char *artist, const char *title)
     if (artist)
         add_part(&nh, artist, artist + strlen(artist), true);
     add_part(&nh, title, title + strlen(title), !nh.kept);
+    return finish(&nh);
+}
+
+#define ALBUM_SEED (0x811C9DC5u ^ 0xA5A5A5A5u)
+
+unsigned int art_name_album_hash(const char *artist, const char *title)
+{
+    struct name_hash nh = { ALBUM_SEED, false };
+
+    if (!title)
+        return 0;
+    add_part(&nh, title, title + strlen(title), true);
+    if (!nh.kept)
+        return 0;
+    if (artist)
+    {
+        nh.h = (nh.h ^ '/') * 16777619u;    /* no name's letter or digit */
+        add_part(&nh, artist, artist + strlen(artist), true);
+    }
     return finish(&nh);
 }
 

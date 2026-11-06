@@ -152,13 +152,13 @@ void art_cache_settings_applied(void);
 bool art_cache_lookup(const char *dir, int size_index,
                            char *out, int out_len, bool *is_fallback);
 
-/* The same lookup keyed by the folder's hash rather than its path.
+/* The same lookup keyed by the folder's hash rather than its path, or by any
+ * other key a thumbnail is cached by: an album's (tagcache_album.art_hash),
+ * a person's or a book's.
  *
  * The hash is all the lookup ever uses, so a caller that resolves the same
- * folder repeatedly can keep the hash instead of the path and skip both the
- * path and the work of producing it. The carousel does exactly that: finding an
- * album's folder means a database search, so it is done once when the album
- * index is built and only the hash is carried per slide.
+ * album repeatedly can keep the key and skip the work of producing it. The
+ * carousel does exactly that: the album index carries each album's key.
  *
  * art_cache_dir_hash() produces the key, and returns 0 for a NULL path. Callers
  * use 0 as their "folder not resolved" marker; a real path can hash to 0 too,
@@ -166,9 +166,10 @@ bool art_cache_lookup(const char *dir, int size_index,
 unsigned int art_cache_dir_hash(const char *dir);
 
 /* The key of the cover a track at 'path' is shown with: its album's, as the
- * database's album rows have it -- a book's first file's, an album's first
- * track's folder -- or, for a track the RAM database does not hold, its own
- * folder's. 0 for a path with no folder. */
+ * database's album rows have it -- a book's first file's, an album's names',
+ * or for an album with no name its first track's folder -- or, for a track
+ * the RAM database does not hold, its own folder's. 0 for a path with no
+ * folder. */
 unsigned int art_cache_track_key(const char *path);
 bool art_cache_lookup_hash(unsigned int dir_hash, int size_index,
                            char *out, int out_len, bool *is_fallback);

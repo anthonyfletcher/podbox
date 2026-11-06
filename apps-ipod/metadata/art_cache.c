@@ -4,14 +4,17 @@
  * Disk cache for cover art -- album art, artist art and ebook covers. Pre-scales each
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder's image or a
- * track's embedded art, as the album art source setting orders them. A
- * person's picture -- an artist's or an author's -- is keyed by their name
- * (art_name.h), not by a folder: from /Artwork/People, else a folder above
- * their works named for them, else the folder above a work unless that is a
- * library folder holding several people's. Each has its own placeholder for
- * when nothing is found. A book's cover, keyed by the book's own path, is an
- * image named after the book or the one inside it, and keeps its shape rather
- * than being cropped square: a cover is taller than wide.
+ * track's embedded art, as the album art source setting orders them, and is
+ * keyed by the album's names, so albums sharing a folder -- as an iTunes copy
+ * of a library's do -- each keep their own; without the database in RAM it
+ * is keyed by the folder. A person's picture -- an artist's or an author's --
+ * is keyed by their name (art_name.h), not by a folder: from /Artwork/People,
+ * else a folder above their works named for them, else the folder above a
+ * work unless that is a library folder holding several people's. Each has
+ * its own placeholder for when nothing is found. A book's cover, keyed by
+ * the book's own path, is an image named after the book or the one inside
+ * it, and keeps its shape rather than being cropped square: a cover is
+ * taller than wide.
  *
  * A pass after a library update that only added tracks visits the folders of
  * those tracks alone. One after a deletion, an Update, a Rebuild or a change
@@ -151,18 +154,22 @@ struct aa_central
  * lost. EMBEDDED is art from a track's tags. NO_EMBED is a folder whose track
  * was read and held no art, so a pass does not read it again. 2 is NO_EMBED
  * as recorded when only JPEG was looked for: a pass takes it for neither, and
- * reads the folder again for PNG. */
+ * reads the folder again for PNG. CLAIMED, the same value, is a folder whose
+ * thumbnails the move to album keys has dealt with (see aa_album_adopt()). */
 #define AA_STAMP_NONE     0u
 #define AA_STAMP_EMBEDDED 1u
+#define AA_STAMP_CLAIMED  2u
 #define AA_STAMP_NO_EMBED 3u
 
 /* The stamp file's first record says how its keys are made: key AA_SCHEME_KEY,
- * stamp AA_SCHEME, people by name. A file without it keys people by folder,
- * so its marks are read as none and the next pass is a whole one, which moves
- * their thumbnails to their names. A folder hashing to AA_SCHEME_KEY is
- * tabled as the one below it, as one hashing to 0 is as 1. */
+ * stamp AA_SCHEME. Scheme 1 keys people by name and albums by their first
+ * track's folder, scheme 2 albums by name as well (tagcache_album.art_hash),
+ * and a file without the record keys people by folder too. An older scheme's
+ * marks are read as none, so the next pass is a whole one, which moves the
+ * thumbnails to their new keys; a pass cut short leaves the scheme it found.
+ * A key equal to AA_SCHEME_KEY is tabled as the one below it, as 0 is as 1. */
 #define AA_SCHEME_KEY 0xFFFFFFFFu
-#define AA_SCHEME     1u
+#define AA_SCHEME     2u
 
 /* tagcache_entry_key() of the last entry the marks cover, folded to 32 bits;
  * 0 for none. Read with the table. */
@@ -862,16 +869,41 @@ static bool aa_was_visited(unsigned int h)
     return false;
 }
 
+/* The table slot for 'h' if it has one, without claiming or visiting it */
+static struct aa_stamp *aa_find(unsigned int h)
+{
+    unsigned int i, idx;
+
+    if (h == 0)
+        h = 1;
+    else if (h == AA_SCHEME_KEY)
+        h--;
+    idx = h & (AA_SEEN_SLOTS - 1);
+    for (i = 0; i < AA_SEEN_SLOTS; i++)
+    {
+        struct aa_stamp *s = &aa_stamps[(idx + i) & (AA_SEEN_SLOTS - 1)];
+
+        if (s->key == 0)
+            return NULL;
+        if (s->key == h)
+            return s;
+    }
+    return NULL;
+}
+
 /* Thumbnails this pass could not reach: a folder or person skipped for want
  * of a slot, or people of the old scheme without the database in RAM. They
  * are not orphans, so the pass then removes none and keeps every stamp. */
 static bool aa_unreached;
 
-/* The stamp file this pass began from keys people by folder (see
- * AA_SCHEME). Its pass is a whole one, which reads no tags again, and keeps
- * every thumbnail when it cannot reach the people. */
-static bool aa_old_scheme;
-static bool aa_scheme_current(void);
+/* The scheme of the stamp file this pass began from (see AA_SCHEME). Below
+ * AA_SCHEME its pass is a whole one, which reads no tags again. Below 1 it
+ * keeps every thumbnail when it cannot reach the people; below 2 it moves
+ * albums to their names. */
+static unsigned int aa_scheme_began;
+static bool aa_old_scheme;          /* people keyed by folder */
+static bool aa_album_move;          /* albums keyed by folder */
+static unsigned int aa_scheme_read(void);
 
 /* Keeps the thumbnail of 'h' if it is tabled, without tabling it: the
  * slot, or NULL */
@@ -963,8 +995,8 @@ static void aa_stamps_load(void)
  * stamp, since the folders it never reached still have their thumbnails.
  * The header keeps the last completed pass's marks, which are what the file
  * still covers: an interrupted pass that cleared them would have the next one
- * visit every folder. */
-static void aa_stamps_save(bool completed)
+ * visit every folder. 'scheme' is the one the file is left in. */
+static void aa_stamps_save(bool completed, unsigned int scheme)
 {
     const struct bg_marks *done = &art_cache_task.done_marks;
     struct libfile_marks lm;
@@ -981,7 +1013,7 @@ static void aa_stamps_save(bool completed)
         return;
     ok = true;
     aa_stamp_io[n].key = AA_SCHEME_KEY;
-    aa_stamp_io[n++].stamp = AA_SCHEME;
+    aa_stamp_io[n++].stamp = scheme;
     if (aa_marks_key)
     {
         aa_stamp_io[n].key = 0;
@@ -2692,6 +2724,29 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
     return !*c->aborted;
 }
 
+/* On the pass that moves albums from their folders' keys to their names'
+ * (see AA_SCHEME), for each track whose album key 'dh' is not its folder's
+ * 'fh'. A folder's thumbnails and stamp were made from its first track, so
+ * the album of that track takes them over, if it has none of its own yet;
+ * 'slot' is that album's slot when this track is the album's first, else
+ * NULL. A folder is claimed once, by its first track, and any other album
+ * in it makes its own. */
+static void aa_album_adopt(unsigned int fh, unsigned int dh,
+                           struct aa_stamp *slot, void *buf, size_t size)
+{
+    struct aa_stamp *os = aa_find(fh);
+
+    if (!os || os->stamp == AA_STAMP_CLAIMED || aa_was_visited(fh))
+        return;
+    if (slot && slot->stamp == AA_STAMP_NONE && !aa_thumbs_exist(dh)
+        && (!aa_thumbs_exist(fh) || aa_adopt(fh, dh, true, buf, size)))
+    {
+        slot->stamp = os->stamp;
+        debug_log(DEBUG_LOG_ARTCACHE, "album kept: %s", aa_dir);
+    }
+    os->stamp = AA_STAMP_CLAIMED;
+}
+
 /* Lay the tables a pass keeps out in 'mem', AA_TABLE_BYTES of it, empty */
 static void aa_tables_init(void *mem)
 {
@@ -2719,10 +2774,13 @@ static enum bg_result aa_run_pass(void)
     worksz = aa_work_bytes();
     /* No marks to have covered: a trigger, a first pass, a format bump or the
      * old scheme. An upgrade only renames, so its pass reads no tags again. */
-    aa_old_scheme = aa_format_current() && !aa_scheme_current();
+    aa_scheme_began = aa_format_current() ? aa_scheme_read() : AA_SCHEME;
+    aa_old_scheme = aa_scheme_began < 1;
+    aa_album_move = aa_scheme_began < 2;
     aa_check_all = dircache_is_ready()
                 || art_cache_task.done_marks.entries < 0;
-    aa_reread_tags = art_cache_task.done_marks.entries < 0 && !aa_old_scheme;
+    aa_reread_tags = art_cache_task.done_marks.entries < 0
+                     && aa_scheme_began >= AA_SCHEME;
     wh = core_alloc(worksz);
     if (wh <= 0)
         return BG_INTERRUPTED; /* not enough free memory right now */
@@ -2804,7 +2862,7 @@ static enum bg_result aa_run_pass(void)
     aa_row.row = -2;
     while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
     {
-        unsigned int dh;
+        unsigned int dh, fh;
         struct aa_stamp *slot;
 
         /* Abort promptly on USB/shutdown (the thread loop then acknowledges)
@@ -2816,14 +2874,21 @@ static enum bg_result aa_run_pass(void)
             break;
         }
 
-        /* The track's own folder (the album), keyed by its path hash. Skip the
-         * per-folder work entirely once this folder has been visited this pass
-         * (aa_visit records it), so later tracks of the same album are
-         * cheap. */
+        /* The track's album, by the key its row has -- a book's by its
+         * folder, its own cover being made on the books' walk -- or without
+         * the RAM copy by its folder. Skip the per-album work entirely once
+         * the album has been visited this pass (aa_visit records it), so its
+         * later tracks are cheap. */
         aa_dirname(tcs.result, aa_dir, sizeof(aa_dir));
-        dh = aa_hash(aa_dir);
+        fh = dh = aa_hash(aa_dir);
         aa_track_row(tcs.idx_id);
-        if ((slot = aa_visit(dh)))
+        if (aa_row.ok && aa_row.al.art_hash
+            && db_spoken_album_kind(&aa_row.al) != 1)
+            dh = aa_row.al.art_hash;
+        slot = aa_visit(dh);
+        if (aa_album_move && dh != fh)
+            aa_album_adopt(fh, dh, slot, workbuf, worksz);
+        if (slot)
         {
             struct aa_work w = { aa_name, aa_title, false, true };
 
@@ -2840,8 +2905,15 @@ static enum bg_result aa_run_pass(void)
                 aa_counts.album_art++;
             else if (!aborted)
             {
-                path_list_write_record(&noart_albums, aa_dir);
-                aa_log_miss("album", aa_dir);
+                /* Its folder and its name: the folder may hold others */
+                static char line[MAX_PATH];
+
+                if (dh != fh && aa_title[0] && strcmp(aa_title, UNTAGGED))
+                    snprintf(line, sizeof(line), "%s/%s", aa_dir, aa_title);
+                else
+                    strlcpy(line, aa_dir, sizeof(line));
+                path_list_write_record(&noart_albums, line);
+                aa_log_miss("album", line);
             }
         }
         if (aborted)
@@ -2897,7 +2969,10 @@ out:
     noart_close(completed);
     if (completed)
         aa_remove_orphans();
-    aa_stamps_save(completed);
+    /* An interrupted move to new keys is taken up again by the next pass.
+     * Without the RAM copy nothing moves, and the folders' keys are the ones
+     * in use, so that pass records the scheme all the same. */
+    aa_stamps_save(completed, aborted || failed ? aa_scheme_began : AA_SCHEME);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);
@@ -2940,15 +3015,14 @@ static int aa_offer_poll(struct timeout *tmo)
     return 0;
 }
 
-/* Cache the offered track's embedded art into any of its folder's thumbnails
+/* Cache the offered track's embedded art into any of its album's thumbnails
  * that don't exist yet. Fill-only: never overwrites art already cached (folder
- * images are the preferred on-disk source) -- this just gives a coverless folder
+ * images are the preferred on-disk source) -- this just gives a coverless album
  * the art playback already had parsed for the WPS, at no decode cost to it.
  * Stamped EMBEDDED, so a pass that later finds folder art replaces it. */
 static void aa_handle_offer(void)
 {
     char path[MAX_PATH];
-    char dir[MAX_PATH];
     unsigned int dh;
     size_t worksz;
     int s, wh;
@@ -2971,10 +3045,9 @@ static void aa_handle_offer(void)
     src.emb_size = aa_offer.size;
     src.emb_flags = aa_offer.flags;
 
-    aa_dirname(path, dir, sizeof(dir));
-    dh = aa_hash(dir);
+    dh = art_cache_track_key(path);
 
-    if (aa_thumbs_exist(dh))
+    if (!dh || aa_thumbs_exist(dh))
         return;   /* already cached (folder art wins) */
     /* A pass removes the thumbnails of a folder outside the database, and a
      * stamp file written now would record a format the purge has not reached */
@@ -3127,8 +3200,8 @@ static void aa_run_check(void)
     struct aa_books_ctx books;
     size_t worksz = aa_work_bytes();
     void *workbuf;
-    int wh, sh, idx = -1, first = -1, kind = 0;
-    unsigned int person = 0;
+    int wh, sh, idx = -1, first = -1, kind = 0, row = -1;
+    unsigned int person = 0, key = 0;
     bool aborted = false, ram = tagcache_is_in_ram();
     /* The file's folder, without the volume, to know its tracks by */
     const char *dir = path_key_strip(aa_chk.path);
@@ -3189,6 +3262,12 @@ static void aa_run_check(void)
             person = aa_row.key;
             strlcpy(aa_chk_person, aa_name, sizeof(aa_chk_person));
             strlcpy(aa_chk_title, aa_title, sizeof(aa_chk_title));
+            /* Its album by its row, as a pass keys it */
+            if (kind != 1 && aa_row.al.art_hash)
+            {
+                row = aa_row.row;
+                key = aa_row.al.art_hash;
+            }
         }
         else
             tagcache_retrieve_two(&tcs, idx, tag_albumartist, aa_chk_person,
@@ -3224,8 +3303,9 @@ static void aa_run_check(void)
             const char *p = path_key_strip(tcs.result);
             const char *end = strrchr(p, '/');
 
-            if (end && end - p == dir_end - dir
-                && !strncasecmp(p, dir, end - p))
+            if (row >= 0 ? aa_row.row == row
+                : end && end - p == dir_end - dir
+                  && !strncasecmp(p, dir, end - p))
             {
                 strlcpy(aa_chk_probe, tcs.result, sizeof(aa_chk_probe));
                 if (aa_row.ok)
@@ -3255,7 +3335,7 @@ static void aa_run_check(void)
         unsigned int dh;
 
         aa_dirname(aa_chk_probe, aa_dir, sizeof(aa_dir));
-        dh = aa_hash(aa_dir);
+        dh = key ? key : aa_hash(aa_dir);
         aa_note("\nALBUM COVER");
         aa_note("Folder: %s", aa_dir);
         if (strcmp(aa_chk_probe, aa_chk_track))
@@ -3415,21 +3495,21 @@ static void aa_task_event(const struct queue_event *ev)
         aa_run_check();
 }
 
-/* Whether the stamp file's first record is this scheme's: see AA_SCHEME */
-static bool aa_scheme_current(void)
+/* The scheme the stamp file's first record names, 0 for none: see AA_SCHEME */
+static unsigned int aa_scheme_read(void)
 {
     struct aa_stamp first;
     int fd = open(AA_STAMP_FILE, O_RDONLY);
     bool ok;
 
     if (fd < 0)
-        return false;
+        return 0;
     ok = lseek(fd, sizeof(struct libfile_header), SEEK_SET)
             == (off_t)sizeof(struct libfile_header)
          && read(fd, &first, sizeof(first)) == (ssize_t)sizeof(first)
-         && first.key == AA_SCHEME_KEY && first.stamp == AA_SCHEME;
+         && first.key == AA_SCHEME_KEY;
     close(fd);
-    return ok;
+    return ok ? first.stamp : 0;
 }
 
 /* bg_task.read_marks and write_marks: the stamp file's header. The marks are
@@ -3442,7 +3522,7 @@ static void aa_read_marks(struct bg_marks *m)
     struct libfile_header h;
 
     if (libfile_peek(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
-                     &h) && aa_scheme_current())
+                     &h) && aa_scheme_read() == AA_SCHEME)
     {
         m->entries = h.marks.entries;
         m->commitid = h.marks.commitid;

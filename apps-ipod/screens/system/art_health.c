@@ -1,13 +1,13 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Which folders the artwork cache found no art for.
+ * Which albums and artists the artwork cache found no art for.
  *
  * The cache has always known its own totals -- art_cache_get_counts() reports
- * how many album and artist folders it saw and how many ended up with a
- * thumbnail -- but the difference was only ever a number. This shows the
- * folders behind it, so a gap in the artwork is something that can be gone and
- * fixed rather than merely counted.
+ * how many albums and artists it saw and how many ended up with a thumbnail
+ * -- but the difference was only ever a number. This shows the albums and
+ * artists behind it, so a gap in the artwork is something that can be gone
+ * and fixed rather than merely counted.
  *
  * A report, not a settings screen, which is why it sits here beside the
  * background-task view rather than under screens/settings/. It reads the list
@@ -32,8 +32,9 @@
 static struct path_list list;
 
 /* The folder's own name, not the path it sits at: for any tidily-laid-out
- * library that is the album or artist, and it is what the row is about. The
- * path is still what was stored, and is a keypress away. */
+ * library that is the album or artist, and it is what the row is about. An
+ * album with a name is stored as its folder plus that name, so its row names
+ * it even where the folder holds several. The path is a keypress away. */
 static const char *health_get_name(int selected_item, void *data,
                                    char *buffer, size_t buffer_len)
 {

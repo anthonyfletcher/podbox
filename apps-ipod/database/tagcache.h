@@ -282,11 +282,13 @@ struct tagcache_album {
     int32_t  first, last;
     int32_t  playcount;
     int32_t  lastplayed;
-    uint32_t art_hash;           /* art_cache_dir_hash() of its first track's
-                                    folder, 0 for none */
+    uint32_t art_hash;           /* the key its cover is cached by:
+                                    art_name_album_hash() of its names, or
+                                    with no album name art_cache_dir_hash()
+                                    of its first track's folder; 0 for none */
     uint32_t artist_art_hash;    /* art_name_hash() of its artist */
-    uint32_t file_art_hash;      /* and of its first track's own path, which
-                                    a book's art_hash is: books share folders */
+    uint32_t file_art_hash;      /* art_cache_dir_hash() of its first track's
+                                    own path, which a book's art_hash is */
     int16_t  year;               /* the latest of its tracks' */
     uint16_t tracks;
     uint16_t spoken;             /* of them, in a spoken genre */

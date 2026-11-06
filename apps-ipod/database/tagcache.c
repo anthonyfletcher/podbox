@@ -1115,6 +1115,20 @@ static void albums_note_path(int idx_id, const char *filename)
     r->art_hash = art_cache_dir_hash(dir);
 }
 
+/* The name at 'seek' in the RAM copy of tag file 'tag', or NULL for none or
+ * <Untagged> */
+static const char *row_name(int tag, long seek)
+{
+    const struct ramcache_header *hdr = tcramcache.hdr;
+    const char *name;
+
+    if (seek < 0
+        || seek > hdr->tag_size[tag] - (long)sizeof(struct tagfile_entry))
+        return NULL;
+    name = ((const struct tagfile_entry *)&hdr->tags[tag][seek])->tag_data;
+    return strcmp(name, UNTAGGED) ? name : NULL;
+}
+
 /* Once every tag is in: what needs the genres, and the artists' figures */
 static void albums_finish(int entries)
 {
@@ -1148,9 +1162,20 @@ static void albums_finish(int entries)
         struct tagcache_album *al = &tcrc_albums[r];
         int a = artist_row(al->artist_seek);
 
-        /* A book's art is its first file's: one folder may hold several */
+        /* A book's art is its first file's, and an album's its names':
+         * one folder may hold several of either. An album with no name
+         * keeps its first track's folder. */
         if (db_spoken_album_kind(al) == 1 && al->file_art_hash)
             al->art_hash = al->file_art_hash;
+        else
+        {
+            const char *album = row_name(tag_album, al->album_seek);
+            const char *artist = row_name(tag_albumartist, al->artist_seek);
+            unsigned int key = album ? art_name_album_hash(artist, album) : 0;
+
+            if (key)
+                al->art_hash = key;
+        }
         struct tagcache_artist *ar;
 
         if (a < 0)
@@ -1164,16 +1189,8 @@ static void albums_finish(int entries)
         ar->playcount += al->playcount;
         if (al->lastplayed > ar->lastplayed)
             ar->lastplayed = al->lastplayed;
-        if (ar->art_hash == 0 && ar->seek >= 0
-            && ar->seek <= hdr->tag_size[tag_albumartist]
-                          - (long)sizeof(struct tagfile_entry))
-        {
-            const char *name = ((const struct tagfile_entry *)
-                &hdr->tags[tag_albumartist][ar->seek])->tag_data;
-
-            if (strcmp(name, UNTAGGED))
-                ar->art_hash = art_name_hash(name);
-        }
+        if (ar->art_hash == 0)
+            ar->art_hash = art_name_hash(row_name(tag_albumartist, ar->seek));
         al->artist_art_hash = ar->art_hash;
     }
 }

@@ -817,8 +817,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
             if (e->valid_ts && e->ts > ti->last_ts)
                 ti->last_ts = e->ts;
 #ifdef HAVE_ALBUMART
-            /* A song's picture is its album's, which is the folder the file
-             * itself sits in -- the same key the album row takes. */
+            /* A song's picture is its album's -- the same key the album row
+             * takes. */
             if (ti->art_hash == 0 && path && path[0])
                 ti->art_hash = art_cache_track_key(path);
 #endif

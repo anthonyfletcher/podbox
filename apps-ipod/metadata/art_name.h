@@ -1,7 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to art_name.c: the key a person's picture is cached by.
+ * Interface to art_name.c: the keys a person's picture and an album's cover
+ * are cached by.
  ****************************************************************************/
 
 #ifndef _ART_NAME_H_
@@ -32,5 +33,10 @@ unsigned int art_name_alt_hash_n(const char *name, size_t len);
  * would be named; the title's alone when there is no artist. 0 with no
  * title. */
 unsigned int art_name_work_hash(const char *artist, const char *title);
+
+/* The cache key of the album 'title' by 'artist', or by no one with a NULL
+ * artist: the names reduced as a person's are, hashed apart from people's
+ * and works' keys. 0 with no title. */
+unsigned int art_name_album_hash(const char *artist, const char *title);
 
 #endif /* _ART_NAME_H_ */

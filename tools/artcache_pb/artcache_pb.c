@@ -183,7 +183,7 @@ static void report(long secs, unsigned int written)
     else
         printf("Done in %ld min %ld s. ", secs / 60, secs % 60);
     printf("%u thumbnails written or removed.\n", written);
-    printf("%d album folders, %d with art; %d artists, %d with art.\n",
+    printf("%d albums, %d with art; %d artists, %d with art.\n",
            c.albums, c.album_art, c.artists, c.artist_art);
 }
 

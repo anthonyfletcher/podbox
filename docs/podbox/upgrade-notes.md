@@ -9,3 +9,10 @@
   Options. Your settings are kept. Like Select + Play, Select Action is no
   longer found by Search or listed in Changed Settings, and has no Explain
   entry.
+- **Album covers are now kept per album, not per folder,** so a library whose
+  folders hold several albums each -- one copied onto the player by iTunes,
+  under `iPod_Control/Music` -- shows each album its own cover in Music and
+  Album Covers. The first art pass after updating moves your existing covers
+  across without making them again, except where a folder held more than one
+  album; those albums' covers are made afresh. The Report rebuilds its figures
+  from the log once, which takes a few seconds the first time it opens.

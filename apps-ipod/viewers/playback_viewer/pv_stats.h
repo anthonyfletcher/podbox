@@ -48,9 +48,9 @@ struct pv_agg
     int           y_count;
     unsigned      y_seconds;
     int           y_skips;
-    /* The artwork cache's key for this row's folder -- the album's own for an
-     * album, its parent for an artist. Captured the first time the row is
-     * seen, because the logged path is the only place it can come from and
+    /* The artwork cache's key for this row: art_cache_track_key() for a song
+     * or an album, the name's for an artist. Captured the first time the row
+     * is seen, because the logged path is the only place it can come from and
      * the log is not read again. 0 means it could not be resolved, which is
      * also what the cache uses for "no folder". */
     unsigned int  art_hash;
