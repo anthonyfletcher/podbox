@@ -891,3 +891,39 @@ function update() {
     /* pressed on to the wall at 120, it is crushed (pusher 0) */
     assert.match(lines[1], /^\d+ crush 0 by 0$/);
 });
+
+test('links rest on a cells field\'s solid cells and slow in its liquid', () => {
+    const r = run(`var rope, drop, f, R, tk = 0;
+function init() {
+    R = cells.rules();
+    R.density[5] = 255; R.flags[5] = CELL.SOLID;
+    R.move[12] = MOVE.LIQUID; R.density[12] = 100; R.flags[12] = CELL.LIQUID;
+    // a stone ledge at y 60 from x 20 to 80, water below x 100 from y 40
+    f = img(160, 100);
+    target(f); cls(0); rectfill(20, 60, 80, 63, 5); rectfill(100, 40, 159, 99, 12); target(SCREEN);
+    rope = links.pool(12, 12);
+    rope.gravity = 0.3; rope.field = f; rope.rules = R;
+    for (var i = 0; i < 12; i++) { links.point(rope, 30 + i * 4, 30); if (i) links.link(rope, i - 1, i); }
+    // two lone points: one falling in air, one in the water
+    drop = links.pool(2, 0);
+    drop.gravity = 0.3; drop.field = f; drop.rules = R;
+    links.point(drop, 90, 0); links.point(drop, 120, 41);
+}
+function update() {
+    tk++;
+    links.step(rope, 0);
+    links.step(drop, 0);
+    if (tk == 12) printh(flr(drop.y[0]) + " " + flr(drop.y[1]));
+    if (tk == 80) {
+        var low = 0;
+        for (var i = 0; i < 12; i++) if (rope.y[i] > low) low = rope.y[i];
+        printh(low < 61);
+    }
+}`, 80);
+    assert.equal(r.status, 0, r.err);
+    const [air, water] = r.out.trim().split('\n')[0].split(' ').map(Number);
+    /* both fell for 12 ticks; the one in water far less far */
+    assert.ok(air - 0 > 2 * (water - 41), r.out);
+    /* the rope lies on the ledge (its top at 60), not through it */
+    assert.equal(r.out.trim().split('\n')[1], '1');
+});

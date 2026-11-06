@@ -19,7 +19,9 @@
  * than that share past its length breaks: its a becomes -1, it pulls no
  * more, and broken counts it. links.cloth lays a grid of points and links
  * -- one cloth to a pool, remembered in cols, rows, first and firstlink --
- * and links.fill draws it as cells, each shaded by the way it faces.
+ * and links.fill draws it as cells, each shaded by the way it faces. With
+ * a cells field (field, rules, field_x and field_y, as an actor pool has)
+ * points are kept out of its solid cells, and slowed in its liquids.
  *
  * Parts, in order:
  *   pools      links.pool, and checking one handed back
@@ -41,11 +43,13 @@
 enum { L_X, L_Y, L_Z, L_OX, L_OY, L_OZ, L_PIN, L_POINT_ARRAYS,
        L_A = L_POINT_ARRAYS, L_B, L_LEN, L_ARRAYS,
        L_GRAVITY = L_ARRAYS, L_DRAG, L_PASSES, L_POINTS, L_LINKS, L_TEAR,
-       L_BROKEN, L_COLS, L_ROWS, L_FIRST, L_FIRSTLINK, L_FIELDS };
+       L_BROKEN, L_COLS, L_ROWS, L_FIRST, L_FIRSTLINK, L_FIELD, L_RULES,
+       L_FIELD_X, L_FIELD_Y, L_FIELDS };
 static const char *const link_keys[L_FIELDS] = {
     "x", "y", "z", "ox", "oy", "oz", "pin", "a", "b", "len",
     "gravity", "drag", "passes", "points", "links", "tear", "broken",
-    "cols", "rows", "first", "firstlink"
+    "cols", "rows", "first", "firstlink", "field", "rules", "field_x",
+    "field_y"
 };
 
 #define ELEMS(vm, arr) (BUF(vm, ARR(vm, arr)->buf)->v)
@@ -310,8 +314,27 @@ static int solid_at(const struct vm *vm, int32_t x, int32_t y, int32_t mask)
     return flags[map[cy * vm->map_w + cx]] & mask;
 }
 
+/* The field's material at world pixel x, y (16.16), or -1 off it */
+static int32_t cell_at(const struct cellworld *w, int32_t fx0, int32_t fy0,
+                       int32_t x, int32_t y)
+{
+    x = (x >> 16) - fx0;
+    y = (y >> 16) - fy0;
+    if (x < 0 || y < 0 || x >= w->w || y >= w->h)
+        return -1;
+    return w->c[y * w->w + x];
+}
+
+static int cell_solid(const struct cellworld *w, int32_t fx0, int32_t fy0,
+                      int32_t x, int32_t y)
+{
+    int32_t m = cell_at(w, fx0, fy0, x, y);
+    return m >= 0 && (w->flags[m] & CELL_SOLID);
+}
+
 /* links.step(p, solid): a tick of every point and link, then points out
- * of map cells whose flags share a bit with solid (0, none) */
+ * of map cells whose flags share a bit with solid (0, none), and out of
+ * the pool's field's solid cells */
 NATIVE(links_step)
 {
     (void)argc;
@@ -331,7 +354,13 @@ NATIVE(links_step)
     struct value *ox = ELEMS(vm, l.f[L_OX]), *oy = ELEMS(vm, l.f[L_OY]);
     struct value *z = ELEMS(vm, l.f[L_Z]), *oz = ELEMS(vm, l.f[L_OZ]);
     struct value *pin = ELEMS(vm, l.f[L_PIN]);
-    /* on by what each moved last tick, less drag, plus gravity */
+    struct cellworld cw;
+    int field = l.f[L_FIELD].tag == T_IMG;
+    int32_t fx0 = whole(l.f[L_FIELD_X], 0), fy0 = whole(l.f[L_FIELD_Y], 0);
+    if (field && !cells_world(vm, l.f[L_FIELD], l.f[L_RULES], &cw))
+        return 0;
+    /* on by what each moved last tick, less drag, plus gravity; in the
+     * field's liquid, half again of what is left */
     for (uint32_t i = 0; i < np; i++) {
         int32_t X = fx(x[i]), Y = fx(y[i]), Z = fx(z[i]);
         if (vm_truthy(vm, pin[i])) {
@@ -345,6 +374,14 @@ NATIVE(links_step)
             vx -= (int32_t)(((int64_t)vx * drag) >> 16);
             vy -= (int32_t)(((int64_t)vy * drag) >> 16);
             vz -= (int32_t)(((int64_t)vz * drag) >> 16);
+        }
+        if (field) {
+            int32_t m = cell_at(&cw, fx0, fy0, X, Y);
+            if (m >= 0 && (cw.flags[m] & CELL_LIQUID)) {
+                vx /= 2;
+                vy /= 2;
+                vz /= 2;
+            }
         }
         ox[i] = mk(T_FIX, X);
         oy[i] = mk(T_FIX, Y);
@@ -419,10 +456,27 @@ NATIVE(links_step)
                 y[i] = mk(T_FIX, OY);
             }
         }
+    /* out of the field's solid cells the same way */
+    if (field)
+        for (uint32_t i = 0; i < np; i++) {
+            int32_t X = fx(x[i]), Y = fx(y[i]);
+            if (!cell_solid(&cw, fx0, fy0, X, Y))
+                continue;
+            int32_t OX = fx(ox[i]), OY = fx(oy[i]);
+            if (!cell_solid(&cw, fx0, fy0, OX, Y))
+                x[i] = mk(T_FIX, OX);
+            else if (!cell_solid(&cw, fx0, fy0, X, OY))
+                y[i] = mk(T_FIX, OY);
+            else {
+                x[i] = mk(T_FIX, OX);
+                y[i] = mk(T_FIX, OY);
+            }
+        }
     if (broken)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
-    vm_charge(vm, 10 + np * 4 + nl * (uint32_t)passes * 6 + (mask ? np : 0));
+    vm_charge(vm, 10 + np * 4 + nl * (uint32_t)passes * 6 + (mask ? np : 0) +
+                  (field ? np * 2 : 0));
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }
