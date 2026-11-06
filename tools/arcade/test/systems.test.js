@@ -759,3 +759,45 @@ function update() {}`);
      * quarters, its quarter mark, red; 10 rows from 50 to 59 */
     assert.equal(r.out, '11 11 0 0 8\n8 0\n');
 });
+
+test('walls: doors slide aside, faces along y take dark, and the fog hazes them', () => {
+    const r = run(`function span() {
+    var top = -1, bottom = -1;
+    for (var y = 0; y < 120; y++) if (pget(80, y) != 0) { if (top < 0) top = y; bottom = y; }
+    return top + "-" + bottom;
+}
+function init() {
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, 8);
+    fset(1, 1);
+    // a wall of sprite 1 down column 5 (x 40-47), the camera at x 4 looking
+    // along x: the wall is 36 away; cell 5,8 in front of it a door
+    for (var r = 0; r < 16; r++) mset(5, r, 1);
+    plane.view(4, 68, 4, 0, 60, 0.25);
+    cls(0); walls.draw(1); var plain = span();
+    cls(0); walls.draw(1, 8, 512, null, [5, 8, 0]); var shut = span();
+    cls(0); walls.draw(1, 8, 512, null, [5, 8, 1]); var open = span();
+    printh(plain + " " + shut + " " + open);
+    // a wall across row 5 (y 40-47), looked at along y: its face is met
+    // crossing a row, one of the faces dark is for
+    for (r = 0; r < 16; r++) mset(5, r, 0);
+    for (var c = 0; c < 16; c++) mset(c, 5, 1);
+    plane.view(68, 4, 4, 0.75, 60, 0.25);
+    var dark = [];
+    for (var k = 0; k < 16; k++) dark.push(k == 8 ? 2 : k);
+    cls(0); walls.draw(1); var lit = pget(80, 60);
+    cls(0); walls.draw(1, 8, 512, dark); var shaded = pget(80, 60);
+    plane.fog(0, 1, 12);
+    cls(0); walls.draw(1); var fogged = pget(80, 60) + pget(81, 60) + pget(80, 61) + pget(81, 61);
+    printh(lit + " " + shaded + " " + fogged);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    const [doors, faces] = r.out.trim().split('\n');
+    const [plain, shut, open] = doors.split(' ');
+    const rows = (s) => s.split('-').map(Number);
+    /* shut, the panel is 4 further than the wall's face: a shorter column */
+    assert.ok(rows(shut)[1] - rows(shut)[0] < rows(plain)[1] - rows(plain)[0], doors);
+    assert.equal(open, '-1--1', 'open, the ray passes: ' + doors);
+    /* lit red, shaded the dark colour; wholly fogged, all four blue */
+    assert.equal(faces, '8 2 48');
+});

@@ -530,8 +530,17 @@ int32_t core_fog_level(const struct planeview *v, int64_t d);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
                          int flip, int32_t depth);
-uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
-                         int32_t far);
+/* walls.draw()'s: the flags of wall cells, their height (16.16) and the
+ * farthest drawn; a palette map for faces along y, or NULL; and doors as
+ * column, row and openness (16.16) three numbers each */
+struct wallspec
+{
+    int32_t mask, height, far;
+    const uint8_t *dark;
+    const int32_t *doors;
+    int32_t ndoors;
+};
+uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws);
 void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
                    int32_t lift);
 int sound_load(struct vm *vm);

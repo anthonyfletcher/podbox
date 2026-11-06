@@ -3668,16 +3668,61 @@ void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
     finish(vm, &p);
 }
 
+/* A door the ray is in: whether it meets the panel across the middle of
+ * door cell mx, my between distances d and out, and if so where. The
+ * panel runs along x when the cells either side of it along x are walls
+ * (a door across a corridor running up and down), else along y; it slides
+ * aside by open, a fraction of the cell, and the ray passes the gap */
+static int door_hit(const struct planeview *v, const struct wallspec *ws,
+                    const uint8_t *map, const uint8_t *flags, int32_t mw,
+                    int32_t mx, int32_t my, int64_t rx,
+                    int64_t ry, int64_t d, int64_t out, int32_t open,
+                    int64_t *hit, int *side, int32_t *tx)
+{
+    int across = mx > 0 && mx + 1 < mw &&
+                 (flags[map[my * mw + mx - 1]] & ws->mask) &&
+                 (flags[map[my * mw + mx + 1]] & ws->mask);
+    int64_t r = across ? ry : rx;
+    if (!r)
+        return 0;
+    int64_t at = ((int64_t)(across ? my : mx) << 19) + (4 << 16);
+    int64_t t = ((at - (across ? v->y : v->x)) << 16) / r;
+    if (t < d || t > out)
+        return 0;
+    int64_t along = across ? v->x + ((rx * t) >> 16)
+                           : v->y + ((ry * t) >> 16);
+    int64_t inside = along - ((int64_t)(across ? mx : my) << 19);
+    int64_t gap = ((int64_t)open * 8);
+    if (inside < gap || inside >= 8 << 16)
+        return 0;
+    *hit = t;
+    *side = across;
+    *tx = (int32_t)(((inside - gap) >> 16) & 7);
+    return 1;
+}
+
+/* door i of the list's openness, 16.16 (0 shut), or -1 when cell mx, my
+ * is not a door */
+static int32_t door_open(const struct wallspec *ws, int32_t mx, int32_t my)
+{
+    for (int32_t i = 0; i < ws->ndoors; i++)
+        if (ws->doors[i * 3] == mx && ws->doors[i * 3 + 1] == my) {
+            int32_t o = ws->doors[i * 3 + 2];
+            return o < 0 ? 0 : o > 1 << 16 ? 1 << 16 : o;
+        }
+    return -1;
+}
+
 /* walls.draw(): for each screen column a ray through the map's cells from
  * the plane's camera, cell edge to cell edge, to the first whose flags
  * share a bit with mask, within far world pixels. Its distance along the
  * view (not along the ray, which would bow the walls) sets the wall's
  * height on the screen: from the floor to height world pixels up, the
  * cell's sprite stretched over it, the column of the sprite where the ray
- * met the face. Each column's distance is kept for the billboards.
- * Returns the columns that met a wall. */
-uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
-                         int32_t far)
+ * met the face. Faces along y take the dark table when there is one, and
+ * every face the plane's fog for its distance. Each column's distance is
+ * kept for the billboards. Returns the columns that met a wall. */
+uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
 {
     struct pen p;
     begin_view(vm, &p);
@@ -3687,7 +3732,8 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
     const uint8_t *sheet = MEM(vm, vm->sheet);
     const uint16_t *xl = p.xl;
     const int32_t mw = vm->map_w, mh = vm->map_h, w = p.s.w;
-    const int64_t never = (int64_t)1 << 50, farz = (int64_t)far << 16;
+    const int64_t never = (int64_t)1 << 50, farz = (int64_t)ws->far << 16;
+    const uint8_t fogc = p.d->dpal[v->fog_colour];
     uint32_t hit = 0, steps = 0, drawn = 0;
     for (int32_t x = 0; x < SCREEN_W; x++)
         v->depth[x] = 0x7fffffff;
@@ -3717,7 +3763,8 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
         int64_t tdx = ix ? (ex * ix) >> 16 : never;
         int64_t tdy = iy ? (ey * iy) >> 16 : never;
         int64_t d = 0;
-        int side = 0, found = 0;
+        int side = 0, found = 0, door = 0;
+        int32_t tx = 0;
         uint8_t m = 0;
         for (;;) {
             if (tdx < tdy) {
@@ -3737,8 +3784,19 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
             if (mx < 0 || my < 0 || mx >= mw || my >= mh)
                 continue;
             m = map[my * mw + mx];
-            if (flags[m] & mask) {
+            if (!(flags[m] & ws->mask))
+                continue;
+            int32_t open = ws->ndoors ? door_open(ws, mx, my) : -1;
+            if (open < 0) {
                 found = 1;
+                break;
+            }
+            /* a door: met at its panel, or passed through its gap */
+            int64_t hd;
+            if (door_hit(v, ws, map, flags, mw, mx, my, rx, ry, d,
+                         tdx < tdy ? tdx : tdy, open, &hd, &side, &tx)) {
+                d = hd;
+                found = door = 1;
                 break;
             }
         }
@@ -3750,17 +3808,19 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
         hit++;
         /* where along the face it met, as the sprite's column, the same
          * way round from either side */
-        int64_t along = side == 0 ? v->y + ((ry * d) >> 16)
-                                  : v->x + ((rx * d) >> 16);
-        int32_t tx = (int32_t)((along >> 16) & 7);
-        if ((side == 0 && rx < 0) || (side == 1 && ry > 0))
-            tx = 7 - tx;
+        if (!door) {
+            int64_t along = side == 0 ? v->y + ((ry * d) >> 16)
+                                      : v->x + ((rx * d) >> 16);
+            tx = (int32_t)((along >> 16) & 7);
+            if ((side == 0 && rx < 0) || (side == 1 && ry > 0))
+                tx = 7 - tx;
+        }
         /* the wall's top and bottom rows at this distance */
         int64_t per = ((int64_t)v->focal << 16) / d;
         int32_t bottom = v->horizon - 1 +
                          (int32_t)(((int64_t)v->z * per) >> 32);
         int32_t top = v->horizon - 1 +
-                      (int32_t)((((int64_t)v->z - height) * per) >> 32);
+                      (int32_t)((((int64_t)v->z - ws->height) * per) >> 32);
         if (top >= bottom)
             continue;
         int32_t y0 = top < p.cy0 ? p.cy0 : top;
@@ -3771,10 +3831,19 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
         uint32_t ts = (8u << 16) / (uint32_t)(bottom - top);
         uint32_t ty = (uint32_t)(y0 - top) * ts;
         const uint8_t *col = sheet + (m >> 4) * 8 * SHEET_W + (m & 15) * 8 + tx;
+        const uint8_t *dark = side == 1 ? ws->dark : NULL;
+        int32_t fog = core_fog_level(v, d);
         uint8_t *px = p.s.px + y0 * w + x;
         for (int32_t y = y0; y < y1; y++, ty += ts, px += w) {
-            uint32_t c = xl[col[((ty >> 16) & 7) * SHEET_W]];
-            if (!(c & XLAT_CLEAR))
+            uint8_t s = col[((ty >> 16) & 7) * SHEET_W];
+            uint32_t c = xl[s];
+            if (c & XLAT_CLEAR)
+                continue;
+            if (fog && bayer[y & 3][x & 3] < fog)
+                *px = fogc;
+            else if (dark && !(xl[dark[s]] & XLAT_CLEAR))
+                *px = (uint8_t)xl[dark[s]];
+            else
                 *px = (uint8_t)c;
         }
         drawn += (uint32_t)(y1 - y0);
