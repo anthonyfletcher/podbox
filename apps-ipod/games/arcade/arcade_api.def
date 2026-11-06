@@ -318,6 +318,10 @@ API_NS(ach)
 API(ach_earn,         200, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(ach_has,          201, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 
+/* Light: lights over a dark scene */
+API_NS(light)
+API(light_draw,       202, 5, 5, VOID, 0, PIXELS, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

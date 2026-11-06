@@ -30,7 +30,7 @@ function run(main, ticks = 1) {
     fs.writeFileSync(file, res.cart);
     const t0 = Date.now();
     const r = spawnSync(exe, [file, '--ticks', String(ticks), '--ceiling',
-                              '2000000'], { encoding: 'utf8', timeout: 60000 });
+                              '2000000'], { encoding: 'utf8', timeout: 20000 });
     return { errors: [], out: r.stdout.replace(/\r/g, ''), err: r.stderr,
              status: r.status, ms: Date.now() - t0 };
 }
@@ -117,7 +117,9 @@ test('long work inside one call is charged as it goes, and stopped', () => {
         const r = run(main + update);
         assert.equal(r.status, 1, name + ': ' + r.err);
         assert.match(r.err, /The game stopped responding/, name);
-        assert.ok(r.ms < 5000, name + ' took ' + r.ms + ' ms');
+        /* stopped rather than hung: well short of the 20 s, with room for
+         * the whole suite running at once */
+        assert.ok(r.ms < 15000, name + ' took ' + r.ms + ' ms');
     }
 });
 

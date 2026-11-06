@@ -26,6 +26,7 @@
  *   memory         the engine's arrays as Uint8Arrays; copy and fill
  *   for the systems  actors' sprites and particles' pixels; the plane's
  *                    floor and billboards
+ *   light          lights over a dark scene, a ramp of colour tables
  *   the host's view of the screen
  ***************************************************************************/
 #include <stddef.h>
@@ -3889,6 +3890,198 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
     p.cost += steps * 2 + hit * 40 + drawn * PER16_FLOOR / 16;
     finish(vm, &p);
     return hit;
+}
+
+/* ---- light --------------------------------------------------------------- *
+ * Lights over a dark scene. Each pixel within a light's reach takes a
+ * level from how near its centre it is, the nearest light's winning; the
+ * level picks a colour table from the cart's ramp, darkest first, and a
+ * pixel past every light takes the darkest. Within half its reach a light
+ * leaves the scene as drawn. The steps between levels are
+ * dithered, so a torch fades rather than banding. */
+
+#define LIGHT_LEVELS 8
+
+/* One row of a light, xa to xb: each pixel's level from its squared
+ * distance dd (stepping by step, which grows by 512 a pixel), its 256ths
+ * of the reach's square (dd * inv over 2^32) through fall, with the row's
+ * dither added; the highest of the lights kept. Its own function, so the
+ * loop's few values stay in registers. */
+static void __attribute__((noinline))
+light_row(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
+                      int32_t step, uint32_t inv, const uint8_t *bay,
+                      const uint16_t *fall, uint32_t levels)
+{
+    for (int32_t x = xa; x < xb; x++) {
+        uint32_t idx = (uint32_t)(((uint64_t)dd * inv) >> 32);
+        if (idx <= 256) {
+            uint32_t k = (uint32_t)(fall[idx] + bay[x & 3]) >> 4;
+            if (k > levels)
+                k = levels;
+            if (k > row[x])
+                row[x] = (uint8_t)k;
+        }
+        dd += (uint32_t)step;
+        step += 512;
+    }
+}
+
+/* The square root of v, rounded down */
+static uint32_t root32(uint32_t v)
+{
+    uint32_t r = 0, bit = 1u << 30;
+    while (bit > v)
+        bit >>= 2;
+    while (bit) {
+        if (v >= r + bit) {
+            v -= r + bit;
+            r = (r >> 1) + bit;
+        } else
+            r >>= 1;
+        bit >>= 2;
+    }
+    return r;
+}
+
+static const uint8_t bayer4[16] = { 0, 8, 2, 10, 12, 4, 14, 6,
+                                    3, 11, 1, 9, 15, 7, 13, 5 };
+
+/* light.draw(x, y, r, n, ramp): n lights, each centre (x, y) and reach r,
+ * as numbers or arrays; ramp a list of 1 to 8 colour tables, each an
+ * array or Uint8Array taking a colour to its darker one (colours past its
+ * end kept). Over the target, within the clip, after the scene is drawn */
+NATIVE(light_draw)
+{
+    (void)argc; (void)out;
+    struct column cx, cy, cr;
+    if (!column_of(vm, a[0], &cx) || !column_of(vm, a[1], &cy) ||
+        !column_of(vm, a[2], &cr) || !is_num(a[3]))
+        return vm_fail(vm, "light.draw() needs x, y and r (numbers or "
+                       "arrays), then how many lights", "", "");
+    if (a[4].tag != T_ARR || ARR(vm, a[4])->len < 1 ||
+        ARR(vm, a[4])->len > LIGHT_LEVELS)
+        return vm_fail(vm, "light.draw() needs a ramp: a list of 1 to 8 "
+                       "colour tables, darkest first", "", "");
+    int32_t n = floor_int(a[3]);
+    if (n < 0)
+        n = 0;
+    if ((uint32_t)n > cx.len || (uint32_t)n > cy.len || (uint32_t)n > cr.len)
+        return vm_fail(vm, "light.draw() has fewer x, y or r than lights", "",
+                       "");
+    uint32_t levels = ARR(vm, a[4])->len;
+    static uint8_t lut[LIGHT_LEVELS][256];
+    for (uint32_t k = 0; k < levels; k++) {
+        struct column t;
+        if (!column_of(vm, BUF(vm, ARR(vm, a[4])->buf)->v[k], &t) ||
+            t.tag == T_INT)
+            return vm_fail(vm, "light.draw()'s ramp holds colour tables: "
+                           "arrays or Uint8Arrays", "", "");
+        for (int c = 0; c < 256; c++)
+            lut[k][c] = (uint8_t)((uint32_t)c < t.len
+                                  ? column_at(&t, (uint32_t)c, c) : c);
+    }
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    int32_t w = p.cx1 - p.cx0, h = p.cy1 - p.cy0;
+    if (w <= 0 || h <= 0) {
+        finish(vm, &p);
+        return 1;
+    }
+    uint8_t *lit = scratch(vm, (uint32_t)(w * h));
+    if (!lit)
+        return 0;
+    /* scratch may have collected: the surface is found again */
+    begin(vm, &p, 0, 0);
+    memset(lit, 0, (size_t)(w * h));
+    /* the level, in sixteenths, at a squared distance of i/256 of the
+     * reach's square: 2 * levels * (1 - its root) -- full light within
+     * half the reach, the steps across the outer half */
+    static uint16_t fall[257];
+    static uint32_t fall_levels;
+    if (fall_levels != levels) {
+        fall_levels = levels;
+        for (int i = 0; i <= 256; i++) {
+            int32_t root = (int32_t)isqrt64((uint64_t)i * 256);
+            int32_t v = (int32_t)levels * (256 - root) / 8;
+            fall[i] = (uint16_t)(v > (int32_t)levels * 16
+                                 ? (int32_t)levels * 16 : v);
+        }
+    }
+    uint32_t measured = 0;
+    for (int32_t i = 0; i < n; i++) {
+        /* in sixteenths of a pixel, so a squared distance fits 32 bits and
+         * steps along a row by adding */
+        int32_t lx = (column_fix(&cx, (uint32_t)i) >> 12) +
+                     (int32_t)(p.ox * 16);
+        int32_t ly = (column_fix(&cy, (uint32_t)i) >> 12) +
+                     (int32_t)(p.oy * 16);
+        int32_t r = column_fix(&cr, (uint32_t)i) >> 12;
+        if (r < 17)
+            continue;                   /* under a pixel */
+        if (r > 16 * 512)
+            r = 16 * 512;
+        uint32_t r2 = (uint32_t)(r * r);
+        /* a squared distance times inv, over 2^32: its 256ths of r2 */
+        uint32_t inv = (uint32_t)(((uint64_t)256 << 32) / r2);
+        int32_t y0 = (ly - r) >> 4, y1 = ((ly + r) >> 4) + 1;
+        if (y0 < p.cy0) y0 = p.cy0;
+        if (y1 > p.cy1) y1 = p.cy1;
+        for (int32_t y = y0; y < y1; y++) {
+            int32_t dy = y * 16 + 8 - ly;
+            int32_t rem = (int32_t)r2 - dy * dy;
+            if (rem <= 0)
+                continue;
+            int32_t half = (int32_t)root32((uint32_t)rem);
+            int32_t xa = (lx - half) >> 4, xb = ((lx + half) >> 4) + 1;
+            if (xa < p.cx0) xa = p.cx0;
+            if (xb > p.cx1) xb = p.cx1;
+            if (xa >= xb)
+                continue;
+            int32_t dx = xa * 16 + 8 - lx;
+            uint32_t dd = (uint32_t)(dx * dx + dy * dy);
+            int32_t step = 32 * dx + 256;
+            light_row(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step, inv,
+                      bayer4 + (y & 3) * 4, fall, levels);
+            measured += (uint32_t)(xb - xa);
+        }
+        if (measured > 65536) {
+            if (!vm_spend(vm, measured / 16))
+                return 0;
+            measured = 0;
+        }
+    }
+    /* each pixel through its level's table; the brightest are left be.
+     * Four at a time where the levels are all dark or all bright. */
+    const uint8_t *dark = lut[0];
+    for (int32_t y = p.cy0; y < p.cy1; y++) {
+        uint8_t *px = p.s.px + y * p.s.w + p.cx0;
+        const uint8_t *row = lit + (y - p.cy0) * w;
+        int32_t x = 0;
+        for (; x + 4 <= w; x += 4) {
+            uint32_t l0 = row[x], l1 = row[x + 1], l2 = row[x + 2];
+            uint32_t l3 = row[x + 3];
+            /* all at the top level: an AND keeps every bit of levels
+             * only where each is levels */
+            if ((l0 | l1 | l2 | l3) == 0) {
+                px[x] = dark[px[x]];
+                px[x + 1] = dark[px[x + 1]];
+                px[x + 2] = dark[px[x + 2]];
+                px[x + 3] = dark[px[x + 3]];
+            } else if ((l0 & l1 & l2 & l3) != levels) {
+                for (int k = 0; k < 4; k++)
+                    if (row[x + k] < levels)
+                        px[x + k] = lut[row[x + k]][px[x + k]];
+            }
+        }
+        for (; x < w; x++)
+            if (row[x] < levels)
+                px[x] = lut[row[x]][px[x]];
+        row_touched(&p, y);
+    }
+    p.count = (uint32_t)(w * h);
+    p.cost += measured / 16;
+    finish(vm, &p);
+    return 1;
 }
 
 /* ---- the host's view of the screen ----------------------------------- */
