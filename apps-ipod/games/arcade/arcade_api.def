@@ -238,6 +238,7 @@ API(plane_fog,       129, 3, 3, VOID, 0, CELLS,  LISTEN, 1)
 API(plane_project,    89, 4, 4, VAL,  0, CELLS,  LISTEN, 1)
 API(plane_pick,       90, 3, 3, VAL,  0, CELLS,  LISTEN, 1)
 API(plane_billboards, 91, 7, 9, VAL,  0, PIXELS, LISTEN, 1)
+API(plane_sky,       153, 1, 2, VOID, 0, PIXELS, LISTEN, 1)
 
 API_ALIAS(time, t)
 

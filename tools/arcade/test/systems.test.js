@@ -736,3 +736,26 @@ function update() {}`);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out, '1 1\n0\n');
 });
+
+test('plane: a sky panorama sits on the horizon and turns with the view', () => {
+    const r = run(`function init() {
+    // a turn 64 wide, 10 tall: red for its first half, green for its second
+    var sky = img(64, 10);
+    target(sky); rectfill(0, 0, 31, 9, 8); rectfill(32, 0, 63, 9, 11); target(SCREEN);
+    plane.view(0, 0, 8, 0.25, 60, 0.125);
+    cls(0); plane.sky(sky);
+    // its bottom row on the horizon's row above, nothing below it
+    var a = pget(80, 59), above = pget(80, 49), below = pget(80, 60), top = pget(80, 50);
+    plane.view(0, 0, 8, 0.75, 60, 0.125);
+    cls(0); plane.sky(sky);
+    printh(a + " " + top + " " + above + " " + below + " " + pget(80, 59));
+    plane.view(0, 0, 8, 0.75, 70, 0.125);
+    cls(0); plane.sky(sky, 5);
+    printh(pget(80, 64) + " " + pget(80, 65));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    /* a quarter turn looks at the image's three-quarter mark, green; three
+     * quarters, its quarter mark, red; 10 rows from 50 to 59 */
+    assert.equal(r.out, '11 11 0 0 8\n8 0\n');
+});

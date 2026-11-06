@@ -3627,6 +3627,47 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     finish(vm, &p);
 }
 
+/* plane.sky(): column x of the screen looks along the view's angle and as
+ * far round as it sits from the middle, the view's fov across the screen;
+ * the image's column that far round its turn, its bottom row on the
+ * horizon, lift rows up */
+void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
+                   int32_t lift)
+{
+    struct pen p;
+    begin(vm, &p, 0, 0);
+    p.per16 = 0;
+    const struct planeview *v = &vm->plane;
+    const uint16_t *xl = p.xl;
+    int32_t bottom = v->horizon - lift, top = bottom - h;
+    int32_t y0 = top > p.cy0 ? top : p.cy0;
+    int32_t y1 = bottom < p.cy1 ? bottom : p.cy1;
+    uint32_t drawn = 0;
+    if (y0 < y1)
+        for (int32_t x = p.cx0; x < p.cx1; x++) {
+            /* turns round from the angle, 16.16: east is the image's left */
+            int64_t turn = -(int64_t)v->angle +
+                           (int64_t)(x - SCREEN_W / 2) * v->fov / SCREEN_W;
+            int32_t u = (int32_t)(((turn & 0xffff) * w) >> 16);
+            const uint8_t *src = px + (y0 - top) * w + u;
+            uint8_t *dst = p.s.px + y0 * p.s.w + x;
+            for (int32_t y = y0; y < y1; y++, src += w, dst += p.s.w) {
+                uint32_t c = xl[*src];
+                if (!(c & XLAT_CLEAR)) {
+                    *dst = (uint8_t)c;
+                    drawn++;
+                }
+            }
+        }
+    if (y0 < y1) {
+        row_touched(&p, y0);
+        row_touched(&p, y1 - 1);
+    }
+    p.count += drawn;
+    p.cost += (uint32_t)((p.cx1 - p.cx0) * (y1 > y0 ? y1 - y0 : 0)) / 4;
+    finish(vm, &p);
+}
+
 /* walls.draw(): for each screen column a ray through the map's cells from
  * the plane's camera, cell edge to cell edge, to the first whose flags
  * share a bit with mask, within far world pixels. Its distance along the

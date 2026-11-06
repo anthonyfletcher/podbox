@@ -53,6 +53,8 @@ NATIVE(plane_view)
     int32_t angle = fx(a[3]), fov = fx(a[5]);
     if (fov < 0x0400) fov = 0x0400;             /* 1/64 of a turn */
     if (fov > 0x7000) fov = 0x7000;             /* under half a turn */
+    v->angle = angle;
+    v->fov = fov;
     v->dx = core_sine((uint32_t)angle + 0x4000);
     v->dy = -core_sine((uint32_t)angle);
     uint32_t half = (uint32_t)fov / 2;
@@ -61,6 +63,25 @@ NATIVE(plane_view)
     v->set = 1;
     v->depth_set = 0;
     vm_charge(vm, 10);
+    return 1;
+}
+
+static int view_set(struct vm *vm, const char *fn);
+
+/* plane.sky(image, [lift]): a panorama behind the view, the image's width
+ * a whole turn and its bottom row on the horizon (lift rows above it), so
+ * it turns with the camera and tilts with the horizon. Its transparent
+ * colours are left, for a sky drawn under it. */
+NATIVE(plane_sky)
+{
+    (void)out;
+    if (!view_set(vm, "plane.sky"))
+        return 0;
+    if (a[0].tag != T_IMG)
+        return vm_fail(vm, "plane.sky() needs an image", "", "");
+    const struct img *im = MEM(vm, (uint32_t)a[0].v);
+    int32_t lift = argc > 1 && is_num(a[1]) ? floor_int(a[1]) : 0;
+    core_draw_sky(vm, im->px, (int32_t)im->width, (int32_t)im->height, lift);
     return 1;
 }
 

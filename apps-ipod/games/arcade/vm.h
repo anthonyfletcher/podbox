@@ -178,6 +178,7 @@ struct planeview
 {
     int32_t x, y, z, dx, dy, focal;
     int32_t horizon;
+    int32_t angle, fov;         /* turns, 16.16: plane.sky()'s */
     int set;
     /* walls.draw()'s distance at each screen column, 16.16 world pixels,
      * for billboards behind walls; kept until the next plane.view() */
@@ -531,6 +532,8 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int flip, int32_t depth);
 uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
                          int32_t far);
+void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
+                   int32_t lift);
 int sound_load(struct vm *vm);
 
 /* sys_grid.c, for the systems on boards: a Uint8Array w wide, and a
