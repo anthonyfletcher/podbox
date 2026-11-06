@@ -2118,6 +2118,8 @@ NATIVE(blitpart)
 
 /* A source rectangle, sw by sh from sx0, sy0 in rows stride apart, and how
  * a destination row steps through it */
+/* turned_row_arm() reads these by place: src, stride, sw, sh, du and dv
+ * the first six words, xl the eighth */
 struct turn
 {
     const uint8_t *src;
@@ -2127,6 +2129,11 @@ struct turn
     int flip;
     const uint16_t *xl;
 };
+
+#ifdef ARCADE_ASM
+void turned_row_arm(uint8_t *d, int32_t n, int32_t u, int32_t v,
+                    const struct turn *t);
+#endif
 
 /* One destination row, n pixels from d, its first source point u, v in
  * 16.16 from the rectangle's corner; a pixel only where that is inside */
@@ -2182,7 +2189,14 @@ static void turned(struct pen *p, struct turn *t, int64_t cx, int64_t cy,
         int64_t u = (dx * c - dy * s) >> 16, v = (dx * s + dy * c) >> 16;
         u = ((u * inv) >> 16) + ((int64_t)t->sw << 15);
         v = ((v * inv) >> 16) + ((int64_t)t->sh << 15);
-        turned_row(p->s.px + y * p->s.w + x0, n, (int32_t)u, (int32_t)v, t);
+#ifdef ARCADE_ASM
+        if (!t->flip)
+            turned_row_arm(p->s.px + y * p->s.w + x0, n, (int32_t)u,
+                           (int32_t)v, t);
+        else
+#endif
+            turned_row(p->s.px + y * p->s.w + x0, n, (int32_t)u, (int32_t)v,
+                       t);
     }
     row_touched(p, (int32_t)y0);
     row_touched(p, (int32_t)y1);

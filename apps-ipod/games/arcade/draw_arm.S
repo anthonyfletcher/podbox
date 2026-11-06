@@ -12,6 +12,8 @@
  *                    every other (_2)
  *   land_smooth_arm_* land_slice_smooth() with land_paint() inside it, the
  *                    same sizes and steps
+ *   turned_row_arm   turned_row() for a source the right way round: a row
+ *                    of rspr and rblit, banking's turn of the screen
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -480,3 +482,40 @@ copy_row_arm:
     landsmooth land_smooth_arm_128_2, 7, 2
     landsmooth land_smooth_arm_256_1, 8, 1
     landsmooth land_smooth_arm_256_2, 8, 2
+
+/* turned_row_arm(d, n, u, v, t): turned_row() for a source drawn the right
+ * way round. Each of n pixels from d takes the source pixel at u, v
+ * (16.16), stepped by du, dv, through the table; points off the source
+ * and clear colours leave it.
+ *
+ * r0 d, r1 pixels left, r2 u, r3 v; from the turn: r4 src, r5 stride,
+ * r6 width, r7 height, r8 du, r9 dv, r10 xl; r11 x, r12 the row's address
+ * and then the colour. A negative u or v is a large x or y unsigned, so
+ * one unsigned compare each finds it off the source. */
+    .global turned_row_arm
+    .type   turned_row_arm, %function
+turned_row_arm:
+    ldr     r12, [sp]
+    stmfd   sp!, {r4-r11, lr}
+    ldmia   r12, {r4-r9}
+    ldr     r10, [r12, #28]
+    cmp     r1, #0
+    ble     3f
+1:  mov     r11, r2, asr #16
+    cmp     r11, r6
+    movlo   r12, r3, asr #16
+    cmplo   r12, r7
+    bhs     2f
+    mla     r12, r5, r12, r4
+    ldrb    r12, [r12, r11]
+    add     r12, r10, r12, lsl #1
+    ldrh    r12, [r12]
+    tst     r12, #XLAT_CLEAR
+    strbeq  r12, [r0]
+2:  add     r0, r0, #1
+    add     r2, r2, r8
+    add     r3, r3, r9
+    subs    r1, r1, #1
+    bgt     1b
+3:  ldmfd   sp!, {r4-r11, pc}
+    .size   turned_row_arm, . - turned_row_arm
