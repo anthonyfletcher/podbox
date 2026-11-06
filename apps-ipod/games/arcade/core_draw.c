@@ -3060,6 +3060,7 @@ static inline uint32_t land_rows(const struct slice *s, uint32_t c,
 
 /* A column of the slice whose sample shows: from row y down to the top
  * drawn so far, in palette colour colour */
+__attribute__((optimize("O2")))
 static void land_paint(const struct slice *s, int16_t *top, int32_t y,
                        uint8_t colour, uint32_t *filled, int32_t *lo)
 {
@@ -3147,6 +3148,7 @@ typedef int32_t land_slice_fn(const struct slice *, uint32_t, uint32_t,
  * ground is slopes with smooth edges between its colours, and hills
  * smooth outlines, rather than a block a pixel. C only, and slower than
  * the plain loops: a cart asks for it */
+__attribute__((optimize("O2")))
 static int32_t land_slice_smooth(const struct slice *s, uint32_t u, uint32_t t,
                                uint32_t su, uint32_t sv, int32_t base,
                                int32_t rise, uint32_t *filled, int32_t *lo)
@@ -3191,6 +3193,15 @@ land_slice_fn land_slice_arm_8_1, land_slice_arm_8_2,
               land_slice_arm_64_1, land_slice_arm_64_2,
               land_slice_arm_128_1, land_slice_arm_128_2,
               land_slice_arm_256_1, land_slice_arm_256_2;
+/* ...and land_slice_smooth()'s, with land_paint() inside them */
+land_slice_fn land_smooth_arm_8_1, land_smooth_arm_8_2,
+              land_smooth_arm_16_1, land_smooth_arm_16_2,
+              land_smooth_arm_32_1, land_smooth_arm_32_2,
+              land_smooth_arm_64_1, land_smooth_arm_64_2,
+              land_smooth_arm_128_1, land_smooth_arm_128_2,
+              land_smooth_arm_256_1, land_smooth_arm_256_2;
+_Static_assert(offsetof(struct slice, ramp) == 76 &&
+               offsetof(struct slice, nramp) == 80, "draw_arm.S's offsets");
 _Static_assert(offsetof(struct slice, px) == 24 &&
                offsetof(struct slice, w) == 28 &&
                offsetof(struct slice, cy0) == 40 &&
@@ -3222,6 +3233,30 @@ static land_slice_fn *land_loop(uint32_t wmask, uint32_t hmask, int32_t step)
     return wmask == 63 ? land_slice_64 : wmask == 127 ? land_slice_128 :
            wmask == 255 ? land_slice_256 : land_slice;
 #endif
+}
+
+/* The smooth loop for a map wmask + 1 by hmask + 1, a sample every step
+ * columns */
+static land_slice_fn *land_smooth_loop(uint32_t wmask, uint32_t hmask,
+                                       int32_t step)
+{
+#ifdef ARCADE_ASM
+    static land_slice_fn *const arm[6][2] = {
+        { land_smooth_arm_8_1, land_smooth_arm_8_2 },
+        { land_smooth_arm_16_1, land_smooth_arm_16_2 },
+        { land_smooth_arm_32_1, land_smooth_arm_32_2 },
+        { land_smooth_arm_64_1, land_smooth_arm_64_2 },
+        { land_smooth_arm_128_1, land_smooth_arm_128_2 },
+        { land_smooth_arm_256_1, land_smooth_arm_256_2 },
+    };
+    if (wmask == hmask)
+        for (int32_t k = 0; k < 6; k++)
+            if (wmask == (8u << k) - 1)
+                return arm[k][step == 2];
+#else
+    (void)wmask; (void)hmask; (void)step;
+#endif
+    return land_slice_smooth;
 }
 
 /* The ground at half, a quarter and an eighth of its size, for far
@@ -3444,11 +3479,11 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
             sl.wmask = lv[k].wmask;
             sl.hmask = lv[k].hmask;
             sl.wshift = lv[k].wshift;
-            slice = land_loop(sl.wmask, sl.hmask, sl.step);
+            slice = sl.ramp ? land_smooth_loop(sl.wmask, sl.hmask, sl.step)
+                            : land_loop(sl.wmask, sl.hmask, sl.step);
         }
-        land_slice_fn *fn = sl.ramp ? land_slice_smooth : slice;
-        open = fn(&sl, (uint32_t)((cx - su * (SCREEN_W / 2) +
-                                  su * sl.x0) >> k),
+        open = slice(&sl, (uint32_t)((cx - su * (SCREEN_W / 2) +
+                                      su * sl.x0) >> k),
                      (uint32_t)((cy - sv * (SCREEN_W / 2) + sv * sl.x0) >> k),
                      (uint32_t)(ssu >> k), (uint32_t)(ssv >> k),
                      (int32_t)base, (int32_t)rise, &filled, &lo);

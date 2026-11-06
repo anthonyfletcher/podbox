@@ -9,6 +9,7 @@
  * plane.billboards draws a sprite only where it is nearer than the wall,
  * so enemies are hidden round corners. The drawing is core_draw_walls().
  ***************************************************************************/
+#include <stddef.h>
 #include "games/arcade/vm.h"
 
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \

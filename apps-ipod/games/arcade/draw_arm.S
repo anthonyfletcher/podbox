@@ -10,6 +10,8 @@
  *   land_slice_arm_* land_slice() with land_fill() inside it, for square
  *                    maps 8 to 256 across, a sample every column (_1) or
  *                    every other (_2)
+ *   land_smooth_arm_* land_slice_smooth() with land_paint() inside it, the
+ *                    same sizes and steps
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -265,3 +267,216 @@ copy_row_arm:
     landslice land_slice_arm_128_2, 9, 0x3f80, 9, 25, 2
     landslice land_slice_arm_256_1, 8, 0xff00, 8, 24, 1
     landslice land_slice_arm_256_2, 8, 0xff00, 8, 24, 2
+
+    .equ    SL_RAMP, 76
+    .equ    SL_NRAMP, 80
+
+/* int32_t name(const struct slice *s, uint32_t u, uint32_t t, uint32_t su,
+ *              uint32_t sv, int32_t base, int32_t rise, uint32_t *filled,
+ *              int32_t *lo): land_slice_smooth() for a map 2^n square, a
+ * sample every step columns -- the height blended from the four pixels
+ * round each sample, the colour the ramp's at that height.
+ *
+ * r0 the column's top, r1 the end, r2 u, r3 t, r6 the heights, r7 rise,
+ * r8 base, r10 the clip's top row; r4, r5, r9, r11, r12 and lr work. On
+ * the stack: s, su, sv and the columns open. */
+.macro  landsmooth name, n, step
+    .global \name
+    .type   \name, %function
+\name:
+    stmfd   sp!, {r4-r11, lr}
+    sub     sp, sp, #16
+    str     r0, [sp]
+    str     r3, [sp, #4]
+    /* sv, base, rise, filled and lo from sp + 52 */
+    ldr     r4, [sp, #52]
+    str     r4, [sp, #8]
+    mov     r4, #0
+    str     r4, [sp, #12]
+    ldr     r8, [sp, #56]
+    ldr     r7, [sp, #60]
+    mov     r3, r2
+    mov     r2, r1
+    ldr     r6, [r0, #SL_HEIGHT]
+    ldr     r10, [r0, #SL_CY0]
+    ldr     r1, [r0, #SL_TOP]
+    ldr     r11, [r0, #SL_X0]
+    ldr     r12, [r0, #SL_X1]
+    add     r0, r1, r11, lsl #1
+    add     r1, r1, r12, lsl #1
+    cmp     r0, r1
+    bhs     9f
+1:
+    ldrsh   r9, [r0]
+    cmp     r9, r10
+    ble     2f
+    ldr     r4, [sp, #12]
+    add     r4, r4, #1
+    str     r4, [sp, #12]
+    /* a pixel's height is at its centre, half a pixel in */
+    sub     r11, r2, #0x8000
+    sub     r12, r3, #0x8000
+    mov     r4, r11, lsl #(16 - \n)
+    mov     r4, r4, lsr #(32 - \n)          /* x0 */
+    mov     r5, r12, lsl #(16 - \n)
+    mov     r5, r5, lsr #(32 - \n)
+    mov     r5, r5, lsl #\n                 /* row 0 */
+    mov     r11, r11, lsr #8
+    and     r11, r11, #0xff                 /* fx */
+    mov     r12, r12, lsr #8
+    and     r12, r12, #0xff                 /* fy */
+    add     lr, r6, r5
+    ldrb    r9, [lr, r4]                    /* h00 */
+    add     r4, r4, #1
+    and     r4, r4, #((1 << \n) - 1)        /* x1 */
+    ldrb    lr, [lr, r4]                    /* h10 */
+    sub     lr, lr, r9
+    mul     lr, r11, lr
+    add     r9, lr, r9, lsl #8              /* a: row 0 at fx, 8.8 */
+    add     r5, r5, #(1 << \n)
+    mov     r5, r5, lsl #(32 - 2 * \n)
+    mov     r5, r5, lsr #(32 - 2 * \n)      /* row 1 */
+    add     r5, r6, r5
+    ldrb    lr, [r5, r4]                    /* h11 */
+    sub     r4, r4, #1
+    and     r4, r4, #((1 << \n) - 1)        /* x0 */
+    ldrb    r4, [r5, r4]                    /* h01 */
+    sub     lr, lr, r4
+    mul     lr, r11, lr
+    add     lr, lr, r4, lsl #8              /* b: row 1 at fx */
+    sub     lr, lr, r9
+    mul     lr, r12, lr
+    add     lr, lr, r9, lsl #8              /* the height, 16.16 */
+    /* its row: (base - (h * rise >> 16)) >> 16, in 64 bits */
+    smull   r4, r5, lr, r7
+    mov     r4, r4, lsr #16
+    orr     r4, r4, r5, lsl #16
+    mov     r5, r5, asr #16
+    subs    r4, r8, r4
+    mov     r9, r8, asr #31
+    sbc     r5, r9, r5
+    mov     r4, r4, lsr #16
+    orr     r4, r4, r5, lsl #16             /* y */
+    ldrsh   r12, [r0]
+    cmp     r12, r4
+    bgt     5f
+2:
+    ldr     r4, [sp, #4]
+    ldr     r5, [sp, #8]
+    add     r0, r0, #(2 * \step)
+    add     r2, r2, r4
+    add     r3, r3, r5
+    cmp     r0, r1
+    blo     1b
+9:
+    ldr     r0, [sp, #12]
+    add     sp, sp, #16
+    ldmfd   sp!, {r4-r11, pc}
+
+5:
+    /* the ramp's colour at the height */
+    ldr     r9, [sp]
+    mov     r5, lr, asr #16
+    ldr     r11, [r9, #SL_NRAMP]
+    cmp     r5, r11
+    subge   r5, r11, #1
+    ldr     r11, [r9, #SL_RAMP]
+    ldrb    r5, [r11, r5]
+    /* land_paint(): r1-r8 kept above the locals, so s is at sp + 32 and
+     * filled and lo at sp + 96 */
+    stmfd   sp!, {r1-r8}
+    mov     lr, r4
+    cmp     lr, r10
+    movlt   lr, r10
+    ldr     r1, [sp, #32]
+    ldr     r3, [r1, #SL_DPAL]
+    ldrb    r2, [r3, r5]
+    orr     r2, r2, r2, lsl #8
+    orr     r2, r2, r2, lsl #16
+    ldr     r3, [r1, #SL_TOP]
+    sub     r3, r0, r3
+    mov     r3, r3, asr #1
+    /* r6 column x's colours for four rows, row y's lowest (land_rows()) */
+    ldr     r4, [r1, #SL_FOGW]
+    and     r7, lr, #3
+    mov     r7, r7, lsl #3
+    and     r5, r3, #3
+    add     r5, r1, r5, lsl #2
+    ldr     r5, [r5, #SL_FOGM]
+    bic     r6, r2, r5
+    and     r5, r4, r5
+    orr     r6, r6, r5
+    mov     r6, r6, ror r7
+    .if \step == 2
+    /* and r8 column x + 1's, when it is inside the clip */
+    ldr     r5, [r1, #SL_X1]
+    add     r8, r3, #1
+    cmp     r8, r5
+    bge     3f
+    and     r8, r8, #3
+    add     r8, r1, r8, lsl #2
+    ldr     r8, [r8, #SL_FOGM]
+    bic     r5, r2, r8
+    and     r8, r4, r8
+    orr     r8, r5, r8
+    mov     r8, r8, ror r7
+    ldr     r4, [r1, #SL_W]
+    ldr     r5, [r1, #SL_X0]
+    sub     r3, r3, r5
+    ldr     r5, [r1, #SL_PX]
+    mla     r3, lr, r4, r3
+    add     r3, r3, r5
+    sub     r7, r12, lr
+    ldr     r5, [sp, #96]
+    ldr     r2, [r5]
+    add     r2, r2, r7, lsl #1
+    str     r2, [r5]
+6:
+    strb    r8, [r3, #1]
+    strb    r6, [r3], r4
+    mov     r8, r8, ror #8
+    mov     r6, r6, ror #8
+    subs    r7, r7, #1
+    bne     6b
+    b       4f
+3:
+    .endif
+    ldr     r4, [r1, #SL_W]
+    ldr     r5, [r1, #SL_X0]
+    sub     r3, r3, r5
+    ldr     r5, [r1, #SL_PX]
+    mla     r3, lr, r4, r3
+    add     r3, r3, r5
+    sub     r7, r12, lr
+    ldr     r5, [sp, #96]
+    ldr     r2, [r5]
+    add     r2, r2, r7
+    str     r2, [r5]
+7:
+    strb    r6, [r3], r4
+    mov     r6, r6, ror #8
+    subs    r7, r7, #1
+    bne     7b
+4:
+    strh    lr, [r0]
+    ldr     r5, [sp, #100]
+    ldr     r2, [r5]
+    cmp     lr, r2
+    strlt   lr, [r5]
+    ldmfd   sp!, {r1-r8}
+    b       2b
+    .size   \name, . - \name
+.endm
+
+    landsmooth land_smooth_arm_8_1, 3, 1
+    landsmooth land_smooth_arm_8_2, 3, 2
+    landsmooth land_smooth_arm_16_1, 4, 1
+    landsmooth land_smooth_arm_16_2, 4, 2
+    landsmooth land_smooth_arm_32_1, 5, 1
+    landsmooth land_smooth_arm_32_2, 5, 2
+    landsmooth land_smooth_arm_64_1, 6, 1
+    landsmooth land_smooth_arm_64_2, 6, 2
+    landsmooth land_smooth_arm_128_1, 7, 1
+    landsmooth land_smooth_arm_128_2, 7, 2
+    landsmooth land_smooth_arm_256_1, 8, 1
+    landsmooth land_smooth_arm_256_2, 8, 2
