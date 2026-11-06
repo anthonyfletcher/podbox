@@ -133,6 +133,70 @@ function update() {}`);
     assert.equal(r2.out, '2 1-0 2-0 \n2 0-1 1-2 \n');
 });
 
+test('overlaps finds the same pairs, in the same order, as trying every pair', () => {
+    const r = run(`function init() {
+    srand(7);
+    var a = actors.pool(300), b = actors.pool(200), out = new Int32Array(20000);
+    for (var i = 0; i < 300; i++) { actors.spawn(a); a.x[i] = rnd(300); a.y[i] = rnd(200); a.w[i] = 2 + flr(rnd(20)); a.h[i] = 2 + flr(rnd(20)); if (i % 7 == 0) a.on[i] = 0; }
+    for (i = 0; i < 200; i++) { actors.spawn(b); b.x[i] = rnd(300); b.y[i] = rnd(200); b.w[i] = 2 + flr(rnd(40)); b.h[i] = 2 + flr(rnd(8)); if (i % 5 == 0) b.on[i] = 0; }
+    printh(same(a, b, out) + " " + same(a, a, out));
+}
+// every pair, as overlaps would find them in order
+function same(p, q, out) {
+    var k = actors.overlaps(p, q, out), at = 0, ok = 1;
+    for (var i = 0; i < p.x.length; i++) {
+        if (!p.on[i]) continue;
+        for (var j = p == q ? i + 1 : 0; j < q.x.length; j++) {
+            if (!q.on[j]) continue;
+            if (p.x[i] < q.x[j] + q.w[j] && q.x[j] < p.x[i] + p.w[i] &&
+                p.y[i] < q.y[j] + q.h[j] && q.y[j] < p.y[i] + p.h[i]) {
+                if (at >= k || out[at * 2] != i || out[at * 2 + 1] != j) ok = 0;
+                at++;
+            }
+        }
+    }
+    return ok && at == k ? "same " + k : "differ " + at + " " + k;
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    const [ab, aa] = r.out.trim().split(' same ');
+    assert.match(r.out, /^same \d+ same \d+\n$/);
+    assert.ok(Number(ab.split(' ')[1]) > 50 && Number(aa) > 50, r.out);
+});
+
+test('one-way cells and platforms stop an actor coming down, not going up', () => {
+    const r = run(`var p, plat, out = new Int32Array(40), tk = 0;
+function init() {
+    // flag 4: one-way; a ledge of it along row 8 (y 64-71), and a one-way
+    // platform at y 40, 40 wide, from x 60
+    fset(3, 4);
+    for (var c = 0; c < 6; c++) mset(c, 8, 3);
+    plat = actors.pool(1); actors.spawn(plat);
+    plat.x[0] = 60; plat.y[0] = 40; plat.w[0] = 40; plat.h[0] = 4; plat.oneway = 1;
+    p = actors.pool(4);
+    p.gravity = 0.5;
+    p.platforms = plat;
+    // falling onto the ledge; jumping up through it from below; walking
+    // across it at its height; falling onto the platform
+    actors.spawn(p); p.x[0] = 8; p.y[0] = 30;
+    actors.spawn(p); p.x[1] = 24; p.y[1] = 90; p.dy[1] = -9;
+    actors.spawn(p); p.x[2] = 0; p.y[2] = 64; p.dx[2] = 2; p.dy[2] = -0.5;
+    actors.spawn(p); p.x[3] = 70; p.y[3] = 10;
+}
+function update() {
+    tk++;
+    plat.x[0] += 1;
+    plat.dx[0] = 1;
+    actors.move(p, 1, 0, out, 4);
+    if (tk == 6) printh("up " + (p.y[1] < 64));
+    if (tk == 40) printh(p.y[0] + " " + (p.x[2] > 48) + " " + p.y[3] + " " + (p.x[3] > 100));
+}`, 40);
+    assert.equal(r.status, 0, r.err);
+    /* 0 lands on the ledge (64 - 8); 1 jumped up through it; 2 walked
+     * through its side; 3 lands on the platform (40 - 8) and rides it */
+    assert.deepEqual(r.out.trim().split('\n'), ['up 1', '56 1 32 1']);
+});
+
 test('particles emit from free slots, step and draw as pixels', () => {
     const r = run(`var p;
 function init() {

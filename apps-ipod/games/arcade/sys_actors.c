@@ -28,12 +28,12 @@
 enum { A_ON, A_X, A_Y, A_DX, A_DY, A_W, A_H, A_SP, A_FLIP, A_CELL,
        A_FRAMES, A_SPEED, A_MAT, A_ZONE,
        A_ARRAYS, A_GRAVITY = A_ARRAYS, A_DRAG, A_PLATFORMS, A_FIELD,
-       A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_FIELDS };
+       A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_ONEWAY, A_FIELDS };
 static const char *const actor_keys[A_FIELDS] = {
     "on", "x", "y", "dx", "dy", "w", "h", "sp", "flip", "cell",
     "frames", "speed", "mat", "zone",
     "gravity", "drag", "platforms", "field", "rules", "field_x", "field_y",
-    "density"
+    "density", "oneway"
 };
 
 enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_ARRAYS,
@@ -217,9 +217,12 @@ static int32_t row_hit(const struct vm *vm, int32_t cy, int32_t x0, int32_t x1,
  * flush at a solid cell; returns the side that hit, or -1. Off the map is
  * open, so only the map's cells are tried, and counted in *checked. */
 static int sweep(const struct vm *vm, int32_t *pos, int32_t v, int32_t size,
-                 int32_t lo, int32_t hi, int32_t mask, int x_axis,
-                 int32_t *hx, int32_t *hy, uint32_t *checked)
+                 int32_t lo, int32_t hi, int32_t mask, int32_t oneway,
+                 int x_axis, int32_t *hx, int32_t *hy, uint32_t *checked)
 {
+    /* a one-way cell stops only what comes down into it from above */
+    if (!x_axis && v > 0)
+        mask |= oneway;
     int32_t a0 = lo >> CELL_SHIFT, a1 = (lo + hi - 1) >> CELL_SHIFT;
     int32_t across = x_axis ? vm->map_h : vm->map_w;
     int32_t along = x_axis ? vm->map_w : vm->map_h;
@@ -266,6 +269,7 @@ struct world
     struct vm *vm;
     uint32_t np;
     const struct value *pon, *px, *py, *pdx, *pdy, *pw, *ph;
+    int oneway;                 /* the platforms are solid from above only */
     int field;
     struct cellworld cw;
     int32_t fx0, fy0;
@@ -277,6 +281,7 @@ static int world_of(struct vm *vm, const struct value *f, struct world *w)
 {
     w->vm = vm;
     w->np = 0;
+    w->oneway = 0;
     w->field = 0;
     if (f[A_PLATFORMS].tag == T_OBJ) {
         struct value pf[A_FIELDS];
@@ -289,6 +294,7 @@ static int world_of(struct vm *vm, const struct value *f, struct world *w)
         w->pdy = ELEMS(vm, pf[A_DY]);
         w->pw = ELEMS(vm, pf[A_W]);
         w->ph = ELEMS(vm, pf[A_H]);
+        w->oneway = vm_truthy(vm, pf[A_ONEWAY]);
     }
     if (f[A_FIELD].tag == T_IMG) {
         if (!cells_world(vm, f[A_FIELD], f[A_RULES], &w->cw))
@@ -386,6 +392,9 @@ static int obstacles(const struct world *w, int32_t p0, int32_t *p,
         int32_t b0 = x_axis ? bx : by, bs = x_axis ? bw : bh;
         int32_t c0 = x_axis ? by : bx, cs = x_axis ? bh : bw;
         if (!(lo < c0 + cs && c0 < lo + len))
+            continue;
+        /* a one-way platform stops only what comes down onto its top */
+        if (w->oneway && (x_axis || *p < p0))
             continue;
         if (*p > p0 && p0 + size <= b0 && *p + size > b0) {
             *p = b0 - size;
@@ -504,18 +513,21 @@ static void in_field(const struct world *w, struct contacts *c, uint32_t i,
     }
 }
 
-/* actors.move(p, solid, trigger, out): as well as the map, the pool's
- * platforms (another pool, which moves first) and its cells field, both
- * named in its fields */
+/* actors.move(p, solid, trigger, out, [oneway]): as well as the map, the
+ * pool's platforms (another pool, which moves first) and its cells field,
+ * both named in its fields. Map cells whose flags share a bit with oneway
+ * stop an actor only coming down onto them, as do the platforms when
+ * their pool's oneway is set: it jumps up through them, and lands on top */
 NATIVE(actors_move)
 {
     struct value f[A_FIELDS];
     uint32_t n;
-    int32_t smask, tmask;
+    int32_t smask, tmask, omask;
     struct world wd;
     if (!actors(vm, a[0], f, &n, "actors.move") ||
         !whole_arg(vm, a, argc, 1, "actors.move", &smask) ||
         !whole_arg(vm, a, argc, 2, "actors.move", &tmask) ||
+        !whole_arg(vm, a, argc, 4, "actors.move", &omask) ||
         !world_of(vm, f, &wd))
         return 0;
     if (a[3].tag != T_I32)
@@ -542,13 +554,15 @@ NATIVE(actors_move)
         if (wd.np)
             carry(&wd, &X, &Y, W, H);
         p0 = X;
-        side = sweep(vm, &X, DX, W, Y, H, smask, 1, &hx, &hy, &checked);
+        side = sweep(vm, &X, DX, W, Y, H, smask, omask, 1, &hx, &hy,
+                     &checked);
         if ((s2 = obstacles(&wd, p0, &X, W, Y, H, 1, &hx, &hy, &checked)) >= 0)
             side = s2;
         if (side >= 0)
             contact(&c, i, side, hx, hy);
         p0 = Y;
-        side = sweep(vm, &Y, DY, H, X, W, smask, 0, &hx, &hy, &checked);
+        side = sweep(vm, &Y, DY, H, X, W, smask, omask, 0, &hx, &hy,
+                     &checked);
         if ((s2 = obstacles(&wd, p0, &Y, H, X, W, 0, &hx, &hy, &checked)) >= 0)
             side = s2;
         if (side >= 0)
@@ -584,7 +598,35 @@ NATIVE(actors_move)
     return 1;
 }
 
-/* actors.overlaps(a, b, out) */
+/* An actor's box for overlaps: its left and right, top and bottom edges,
+ * 16.16, and its index */
+struct box
+{
+    int32_t x0, x1, y0, y1;
+    uint32_t i;
+};
+
+/* Boxes in order of their left edges: Shell's sort, gaps 3k + 1 */
+static void boxes_sort(struct box *b, uint32_t n)
+{
+    uint32_t gap = 1;
+    while (gap < n / 3)
+        gap = gap * 3 + 1;
+    for (; gap > 0; gap /= 3)
+        for (uint32_t i = gap; i < n; i++) {
+            struct box t = b[i];
+            uint32_t j = i;
+            for (; j >= gap && b[j - gap].x0 > t.x0; j -= gap)
+                b[j] = b[j - gap];
+            b[j] = t;
+        }
+}
+
+/* actors.overlaps(a, b, out): the pairs of live actors, one of a and one
+ * of b (or two of a, each pair once, when b is a), whose boxes overlap,
+ * into out two numbers a pair, in order of a's actors and then b's; the
+ * pairs written. b's are sorted by their left edges, so each of a's is
+ * tried against only those near it across */
 NATIVE(actors_overlaps)
 {
     (void)argc;
@@ -597,28 +639,71 @@ NATIVE(actors_overlaps)
         return vm_fail(vm, "actors.overlaps() writes its pairs to an "
                        "Int32Array", "", "");
     int same = a[0].v == a[1].v;
+    struct box *bb = scratch(vm, nb * sizeof(struct box) + 1);
+    uint32_t *found = scratch(vm, nb * sizeof(uint32_t) + 1);
+    if (!bb || !found)
+        return 0;
+    const struct value *bon = ELEMS(vm, fb[A_ON]), *bx = ELEMS(vm, fb[A_X]);
+    const struct value *by = ELEMS(vm, fb[A_Y]), *bw = ELEMS(vm, fb[A_W]);
+    const struct value *bh = ELEMS(vm, fb[A_H]);
+    uint32_t live = 0;
+    int64_t widest = 0;
+    for (uint32_t j = 0; j < nb; j++) {
+        if (!vm_truthy(vm, bon[j]))
+            continue;
+        struct box *b = &bb[live++];
+        b->x0 = fx(bx[j]);
+        b->y0 = fx(by[j]);
+        b->x1 = b->x0 + fx(bw[j]);
+        b->y1 = b->y0 + fx(bh[j]);
+        b->i = j;
+        if ((int64_t)b->x1 - b->x0 > widest)
+            widest = (int64_t)b->x1 - b->x0;
+    }
+    boxes_sort(bb, live);
     int32_t *o = I32(vm, a[2])->d;
     uint32_t cap = I32(vm, a[2])->len / 2, k = 0, tests = 0;
-    for (uint32_t i = 0; i < na; i++) {
+    for (uint32_t i = 0; i < na && k < cap; i++) {
         if (!vm_truthy(vm, ELEMS(vm, fa[A_ON])[i]))
             continue;
         int32_t ax = fx(ELEMS(vm, fa[A_X])[i]), ay = fx(ELEMS(vm, fa[A_Y])[i]);
         int32_t aw = fx(ELEMS(vm, fa[A_W])[i]), ah = fx(ELEMS(vm, fa[A_H])[i]);
-        for (uint32_t j = same ? i + 1 : 0; j < nb; j++) {
-            if (!vm_truthy(vm, ELEMS(vm, fb[A_ON])[j]))
-                continue;
+        /* the first whose left edge could reach this one: none further
+         * left is wider than the widest */
+        int64_t from = (int64_t)ax - widest;
+        uint32_t lo = 0, hi = live, n = 0;
+        while (lo < hi) {
+            uint32_t m = (lo + hi) / 2;
+            if (bb[m].x0 <= from)
+                lo = m + 1;
+            else
+                hi = m;
+        }
+        for (uint32_t m = lo; m < live && bb[m].x0 < (int64_t)ax + aw; m++) {
+            const struct box *b = &bb[m];
             tests++;
-            int32_t bx = fx(ELEMS(vm, fb[A_X])[j]), by = fx(ELEMS(vm, fb[A_Y])[j]);
-            int32_t bw = fx(ELEMS(vm, fb[A_W])[j]), bh = fx(ELEMS(vm, fb[A_H])[j]);
-            if (ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah &&
-                k < cap) {
-                o[k * 2] = (int32_t)i;
-                o[k * 2 + 1] = (int32_t)j;
-                k++;
-            }
+            if (ax < b->x1 && ay < b->y1 && b->y0 < ay + ah &&
+                (!same || b->i > i))
+                found[n++] = b->i;
+        }
+        /* written in b's order, as a pass over all of them would */
+        for (uint32_t s = 1; s < n; s++) {
+            uint32_t t = found[s], u = s;
+            for (; u > 0 && found[u - 1] > t; u--)
+                found[u] = found[u - 1];
+            found[u] = t;
+        }
+        for (uint32_t s = 0; s < n && k < cap; s++, k++) {
+            o[k * 2] = (int32_t)i;
+            o[k * 2 + 1] = (int32_t)found[s];
+        }
+        if (tests > 8192) {
+            if (!vm_spend(vm, tests / 2))
+                return 0;
+            tests = 0;
         }
     }
-    vm_charge(vm, 10 + tests / 2);
+    vm_charge(vm, 10 + tests / 2 + live * 2);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
