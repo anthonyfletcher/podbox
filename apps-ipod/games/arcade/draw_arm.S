@@ -7,8 +7,9 @@
  *
  * Parts, in order:
  *   copy_row_arm     copy_row() forward, a word of clear colour 0 at once
- *   land_slice_arm_* land_slice_64/128/256() with land_fill() inside them,
- *                    a sample every column (_1) or every other (_2)
+ *   land_slice_arm_* land_slice() with land_fill() inside it, for square
+ *                    maps 8 to 256 across, a sample every column (_1) or
+ *                    every other (_2)
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -252,6 +253,12 @@ copy_row_arm:
     .size   \name, . - \name
 .endm
 
+    landslice land_slice_arm_8_1, 13, 0x38, 13, 29, 1
+    landslice land_slice_arm_8_2, 13, 0x38, 13, 29, 2
+    landslice land_slice_arm_16_1, 12, 0xf0, 12, 28, 1
+    landslice land_slice_arm_16_2, 12, 0xf0, 12, 28, 2
+    landslice land_slice_arm_32_1, 11, 0x3e0, 11, 27, 1
+    landslice land_slice_arm_32_2, 11, 0x3e0, 11, 27, 2
     landslice land_slice_arm_64_1, 10, 0xfc0, 10, 26, 1
     landslice land_slice_arm_64_2, 10, 0xfc0, 10, 26, 2
     landslice land_slice_arm_128_1, 9, 0x3f80, 9, 25, 1

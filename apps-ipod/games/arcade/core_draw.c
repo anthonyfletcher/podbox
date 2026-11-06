@@ -3094,17 +3094,23 @@ static int32_t name(const struct slice *s, uint32_t u, uint32_t t,          \
 #define AT_128(u, t) ((((t) >> 9) & 0x3f80) | (((u) >> 16) & 0x7f))
 #define AT_256(u, t) ((((t) >> 8) & 0xff00) | (((u) >> 16) & 0xff))
 LAND_SLICE(land_slice, AT_ANY)
+#ifndef ARCADE_ASM
 LAND_SLICE(land_slice_64, AT_64)
 LAND_SLICE(land_slice_128, AT_128)
 LAND_SLICE(land_slice_256, AT_256)
+#endif
 
-#ifdef ARCADE_ASM
-/* draw_arm.S: the three sizes' loops with land_fill() inside them, fine
- * and coarse, reading the slice at these offsets */
 typedef int32_t land_slice_fn(const struct slice *, uint32_t, uint32_t,
                               uint32_t, uint32_t, int32_t, int32_t,
                               uint32_t *, int32_t *);
-land_slice_fn land_slice_arm_64_1, land_slice_arm_64_2,
+
+#ifdef ARCADE_ASM
+/* draw_arm.S: the loops for square maps 8 to 256 across with land_fill()
+ * inside them, fine and coarse, reading the slice at these offsets */
+land_slice_fn land_slice_arm_8_1, land_slice_arm_8_2,
+              land_slice_arm_16_1, land_slice_arm_16_2,
+              land_slice_arm_32_1, land_slice_arm_32_2,
+              land_slice_arm_64_1, land_slice_arm_64_2,
               land_slice_arm_128_1, land_slice_arm_128_2,
               land_slice_arm_256_1, land_slice_arm_256_2;
 _Static_assert(offsetof(struct slice, px) == 24 &&
@@ -3114,6 +3120,143 @@ _Static_assert(offsetof(struct slice, px) == 24 &&
                offsetof(struct slice, fogm) == 56 &&
                offsetof(struct slice, fogw) == 72, "draw_arm.S's offsets");
 #endif
+
+/* The loop for a map wmask + 1 by hmask + 1, a sample every step columns */
+static land_slice_fn *land_loop(uint32_t wmask, uint32_t hmask, int32_t step)
+{
+    if (wmask != hmask)
+        return land_slice;
+#ifdef ARCADE_ASM
+    static land_slice_fn *const arm[6][2] = {
+        { land_slice_arm_8_1, land_slice_arm_8_2 },
+        { land_slice_arm_16_1, land_slice_arm_16_2 },
+        { land_slice_arm_32_1, land_slice_arm_32_2 },
+        { land_slice_arm_64_1, land_slice_arm_64_2 },
+        { land_slice_arm_128_1, land_slice_arm_128_2 },
+        { land_slice_arm_256_1, land_slice_arm_256_2 },
+    };
+    for (int32_t k = 0; k < 6; k++)
+        if (wmask == (8u << k) - 1)
+            return arm[k][step == 2];
+    return land_slice;
+#else
+    (void)step;
+    return wmask == 63 ? land_slice_64 : wmask == 127 ? land_slice_128 :
+           wmask == 255 ? land_slice_256 : land_slice;
+#endif
+}
+
+/* The ground at half, a quarter and an eighth of its size, for far
+ * slices, whose samples are that many world pixels apart or more: sampled
+ * finely there, a hill's edge and a colour's boundary jump between frames
+ * as the camera moves. Heights are the mean of each 2x2, colours the
+ * commonest of the four. Built again when the ground's sum changes. */
+#define LAND_LEVELS 4
+#define MIP_BYTES (128 * 128 + 64 * 64 + 32 * 32)
+static struct
+{
+    const uint8_t *height, *colour;
+    uint32_t w, h, sum;
+    int32_t levels;
+    uint8_t mh[MIP_BYTES], mc[MIP_BYTES];
+} mip;
+
+struct landlevel
+{
+    const uint8_t *height, *colour;
+    uint32_t wmask, hmask, wshift;
+};
+
+/* The ground's bytes summed, Fletcher's way, four words a step where they
+ * come in whole words of four */
+__attribute__((optimize("O2")))
+static uint32_t ground_sum(const uint8_t *p, uint32_t n)
+{
+    uint32_t s1 = 1, s2 = 0;
+    if (!((uintptr_t)p & 3) && !(n & 15)) {
+        const uint32_t *q = (const uint32_t *)(const void *)p;
+        for (uint32_t k = 0; k < n / 4; k += 4) {
+            uint32_t a = q[k], b = q[k + 1], c = q[k + 2], d = q[k + 3];
+            s1 += a;
+            s2 += s1;
+            s1 += b;
+            s2 += s1;
+            s1 += c;
+            s2 += s1;
+            s1 += d;
+            s2 += s1;
+        }
+    } else {
+        for (uint32_t k = 0; k < n; k++) {
+            s1 += p[k];
+            s2 += s1;
+        }
+    }
+    return s1 ^ (s2 << 12) ^ (s2 >> 20);
+}
+
+static uint8_t commonest(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+{
+    if (a == b || a == c || a == d)
+        return a;
+    if (b == c || b == d)
+        return b;
+    return c == d ? c : a;
+}
+
+/* The levels for l's ground, the first the ground itself: their count */
+static int32_t land_levels(const struct landspec *l, struct landlevel *lv)
+{
+    uint32_t w = l->wmask + 1, h = l->hmask + 1;
+    uint32_t sum = ground_sum(l->height, w * h) ^
+                   ground_sum(l->colour, w * h) * 31;
+    if (mip.height != l->height || mip.colour != l->colour || mip.w != w ||
+        mip.h != h || mip.sum != sum) {
+        mip.height = l->height;
+        mip.colour = l->colour;
+        mip.w = w;
+        mip.h = h;
+        mip.sum = sum;
+        mip.levels = 1;
+        const uint8_t *sh = l->height, *sc = l->colour;
+        uint32_t at = 0;
+        while (mip.levels < LAND_LEVELS && w >= 16 && h >= 16 &&
+               at + (w / 2) * (h / 2) <= MIP_BYTES) {
+            uint8_t *dh = mip.mh + at, *dc = mip.mc + at;
+            for (uint32_t y = 0; y < h / 2; y++)
+                for (uint32_t x = 0; x < w / 2; x++) {
+                    uint32_t i = 2 * y * w + 2 * x;
+                    dh[y * (w / 2) + x] = (uint8_t)
+                        ((sh[i] + sh[i + 1] + sh[i + w] + sh[i + w + 1] + 2)
+                         >> 2);
+                    dc[y * (w / 2) + x] = commonest(sc[i], sc[i + 1],
+                                                    sc[i + w], sc[i + w + 1]);
+                }
+            sh = dh;
+            sc = dc;
+            at += (w / 2) * (h / 2);
+            w /= 2;
+            h /= 2;
+            mip.levels++;
+        }
+    }
+    w = l->wmask + 1;
+    h = l->hmask + 1;
+    lv[0].height = l->height;
+    lv[0].colour = l->colour;
+    uint32_t at = 0;
+    for (int32_t k = 0; k < mip.levels; k++) {
+        if (k) {
+            lv[k].height = mip.mh + at;
+            lv[k].colour = mip.mc + at;
+            at += (w >> k) * (h >> k);
+        }
+        lv[k].wmask = (w >> k) - 1;
+        lv[k].hmask = (h >> k) - 1;
+        lv[k].wshift = l->wshift - (uint32_t)k;
+    }
+    return mip.levels;
+}
 
 /* land.draw(): the landscape front to back, as Comanche drew it, a slice
  * of ground at a time (land_slice()). Returns the samples taken. */
@@ -3147,20 +3290,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     uint32_t samples = 0, filled = 0;
     int32_t open = sl.x1 - sl.x0, lo = p.cy1;
     int64_t far = (int64_t)l->far << 16;
-    int32_t (*slice)(const struct slice *, uint32_t, uint32_t, uint32_t,
-                     uint32_t, int32_t, int32_t, uint32_t *, int32_t *) =
-        land_slice;
-    if (l->wmask == l->hmask)
-        slice = l->wmask == 63 ? land_slice_64 : l->wmask == 127 ?
-                land_slice_128 : l->wmask == 255 ? land_slice_256 : land_slice;
-#ifdef ARCADE_ASM
-    if (l->wmask == l->hmask && l->wmask == 63)
-        slice = sl.step == 2 ? land_slice_arm_64_2 : land_slice_arm_64_1;
-    else if (l->wmask == l->hmask && l->wmask == 127)
-        slice = sl.step == 2 ? land_slice_arm_128_2 : land_slice_arm_128_1;
-    else if (l->wmask == l->hmask && l->wmask == 255)
-        slice = sl.step == 2 ? land_slice_arm_256_2 : land_slice_arm_256_1;
-#endif
+    struct landlevel lv[LAND_LEVELS];
+    int32_t levels = land_levels(l, lv), level = -1;
+    land_slice_fn *slice = land_slice;
     /* 1 / focal, 0.32: a slice's half-width is a multiply */
     int64_t inv_focal = ((int64_t)1 << 48) / v->focal;
     for (int64_t z = 2 << 16, dz = 1 << 16; z < far && open > 0;
@@ -3185,10 +3317,27 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
         int32_t fog = core_fog_level(v, z);
         if (fog != sl.fog)
             land_fog(&sl, fog);
-        open = slice(&sl, (uint32_t)(cx - su * (SCREEN_W / 2) + su * sl.x0),
-                     (uint32_t)(cy - sv * (SCREEN_W / 2) + sv * sl.x0),
-                     (uint32_t)ssu, (uint32_t)ssv, (int32_t)base,
-                     (int32_t)rise, &filled, &lo);
+        /* the level whose cells are no smaller than the samples' spacing,
+         * along the slice or between slices */
+        int64_t spacing = across * sl.step > dz ? across * sl.step : dz;
+        int32_t k = spacing >= 8 << 16 ? 3 : spacing >= 4 << 16 ? 2 :
+                    spacing >= 2 << 16 ? 1 : 0;
+        if (k >= levels)
+            k = levels - 1;
+        if (k != level) {
+            level = k;
+            sl.height = lv[k].height;
+            sl.colour = lv[k].colour;
+            sl.wmask = lv[k].wmask;
+            sl.hmask = lv[k].hmask;
+            sl.wshift = lv[k].wshift;
+            slice = land_loop(sl.wmask, sl.hmask, sl.step);
+        }
+        open = slice(&sl, (uint32_t)((cx - su * (SCREEN_W / 2) +
+                                      su * sl.x0) >> k),
+                     (uint32_t)((cy - sv * (SCREEN_W / 2) + sv * sl.x0) >> k),
+                     (uint32_t)(ssu >> k), (uint32_t)(ssv >> k),
+                     (int32_t)base, (int32_t)rise, &filled, &lo);
         samples += (uint32_t)open;
     }
     if (lo < p.cy1) {
