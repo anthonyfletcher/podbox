@@ -88,6 +88,8 @@ A cart's art goes in the same folder:
 | `palettes/<name>.gpl` | a palette in GIMP's format; the first, by name, is loaded when the cart starts |
 | `maps/<name>.json` | a map: `width` and `height` (up to 256), `rows` of two hex digits a cell, and `objects`, each with a `kind`, `x`, `y`, `w`, `h` in pixels and `props` of whole numbers or strings |
 | `images/<name>.png` | any other picture, up to 1024 pixels a side |
+| `data/<name>.json` | data the code reads: levels, waves, dialogue |
+| `data/<name>.txt` | text the code reads as one string |
 
 Save every PNG as an **indexed** (palette) PNG: each pixel's palette number
 is the colour number the cart draws with, whatever colours the PNG shows.
@@ -95,6 +97,11 @@ is the colour number the cart draws with, whatever colours the PNG shows.
 In code, `MAP.<name>` and `PAL.<name>` are for `loadmap()` and `loadpal()`,
 `OBJ.<kind>` is the number `mapobj()` gives an object of that kind, and
 `IMG.<name>` is the picture itself, for `blit()`, `target()` and the rest.
+`data.read(DATA.<name>)` gives a data file as the cart's own values --
+arrays, records, strings, numbers, with `true` and `false` as 1 and 0 --
+or a `.txt` file as a string, made afresh at each call, so read it once
+in `init()`. A number a cart cannot hold (a whole number past 32 bits, a
+fraction past -32768 to 32767) is an error when the cart is built.
 The first map is the active one when the cart starts; without any, the map
 is an empty 128x64.
 

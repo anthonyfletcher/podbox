@@ -300,6 +300,15 @@ API(speak_busy,       190, 0, 0, VAL,  0, FLAT, LISTEN, 1)
 API(speak_stop,       191, 0, 0, VOID, 0, FLAT, LISTEN, 1)
 API(speak_on,         192, 0, 0, VAL,  0, FLAT, LISTEN, 1)
 
+/* Data: the cart's data files, as DATA.<name>, and its own stored files */
+API_NS(data)
+API(data_read,        193, 1, 1, VAL,  0, CELLS, LISTEN, 1)
+API_NS(store)
+API(store_read,       194, 1, 1, VAL,  0, CELLS, LISTEN, 1)
+API(store_write,      195, 2, 2, VAL,  0, CELLS, LISTEN, 1)
+API(store_remove,     196, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(store_list,       197, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

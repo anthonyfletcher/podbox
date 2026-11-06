@@ -71,6 +71,8 @@ export function readAssets(dir) {
         palettes: some('palettes', '.gpl', false),
         maps: some('maps', '.json', false),
         images: some('images', '.png', true),
-        sounds: some('sounds', '.json', false)
+        sounds: some('sounds', '.json', false),
+        data: some('data', '.json', false),
+        texts: some('data', '.txt', false)
     };
 }

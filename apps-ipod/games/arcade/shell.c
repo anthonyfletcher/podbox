@@ -51,6 +51,7 @@
 #include "games/arcade/shell_opts.h"
 #include "games/arcade/shell_ui.h"
 #include "games/arcade/shell_suspend.h"
+#include "games/arcade/shell_store.h"
 #include "speech/talk.h"           /* talk_text, talk_shutup */
 #include "audio/voice_thread.h"    /* voice_is_playing */
 #include "pcm_mixer.h"
@@ -554,7 +555,7 @@ static void host_control(void *ctx, int what)
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
-    &shell_ui, &speak_host
+    &shell_ui, &speak_host, &shell_store
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -1128,6 +1129,7 @@ static int run(const char *path, void *mem, size_t size)
         return RESTART;
     save_load(vm);
     save_owed = false;
+    shell_store_start(vm);
     shell_scores_load(vm);
     shell_options_load(vm);
     arcade_set_ceiling(vm, CEILING);

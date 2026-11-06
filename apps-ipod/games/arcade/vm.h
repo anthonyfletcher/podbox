@@ -275,6 +275,8 @@ struct vm
     uint8_t opt_pending, opt_changed;
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
     uint8_t listening;          /* beat.listen(true): the analyser runs */
+    const uint8_t *data;        /* DATA: the cart's data files */
+    uint32_t data_len;
     const uint8_t *code;
     struct fninfo *fns;
     uint32_t nfns;
@@ -502,6 +504,16 @@ int vm_new_string(struct vm *vm, const uint8_t *b, uint32_t len,
 int vm_new_array(struct vm *vm, uint32_t len, struct value *out);
 int vm_new_record(struct vm *vm, const char *const *keys, uint32_t n,
                   struct value *out);
+/* For values built from C (json.c). A string of len bytes for the caller
+ * to fill; v added to the end of array a; record o's field named by the
+ * string key set to v -- each with its arguments rooted, since each may
+ * allocate. A record's fields in the order they were added: the i-th's
+ * name, as a string, and value; 0 past the last. */
+int vm_new_text(struct vm *vm, uint32_t len, struct value *out);
+int vm_push(struct vm *vm, struct value a, struct value v);
+int vm_set(struct vm *vm, struct value o, struct value key, struct value v);
+int vm_field(struct vm *vm, struct value o, uint32_t i, struct value *name,
+             struct value *v);
 
 /* gc.c */
 void gc_init(struct vm *vm);

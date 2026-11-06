@@ -554,11 +554,11 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[12] = { 0 };
-    uint32_t clen[12] = { 0 };
-    static const char tags[12][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+    const uint8_t *chunk[13] = { 0 };
+    uint32_t clen[13] = { 0 };
+    static const char tags[13][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
                                       "PALS", "SHET", "MAPS", "IMGS", "SFX_",
-                                      "BORD", "OPTN" };
+                                      "BORD", "OPTN", "DATA" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -575,7 +575,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < 13; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -617,6 +617,8 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     vm->imgs_len = clen[8];
     vm->sfx = chunk[9];
     vm->sfx_len = clen[9];
+    vm->data = chunk[12];
+    vm->data_len = clen[12];
     return load_header(vm, chunk[0], clen[0]) &&
         load_boards(vm, chunk[10], clen[10]) &&
         load_options(vm, chunk[11], clen[11]) &&

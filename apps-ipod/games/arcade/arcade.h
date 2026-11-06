@@ -55,6 +55,30 @@ struct arcade_host
     const struct arcade_ui *ui;
     /* speak: the player's speech, below; NULL for none */
     const struct arcade_speak *speak;
+    /* store: the cart's own files, below; NULL for none */
+    const struct arcade_store *store;
+};
+
+/* store.*: a cart's own JSON files, each name.json, in an area of its own.
+ * Names are 1 to 32 letters, digits, - and _. The host bounds the area:
+ * ARCADE_STORE_FILES files and ARCADE_STORE_BYTES in all; the engine
+ * writes no file over ARCADE_STORE_FILE. */
+#define ARCADE_STORE_FILE  65536
+#define ARCADE_STORE_BYTES (256 * 1024)
+#define ARCADE_STORE_FILES 64
+
+struct arcade_store
+{
+    /* name.json into buf, at most cap bytes: how many it holds (cap 0
+     * asks only that), or -1 when there is none */
+    int32_t (*read)(void *ctx, const char *name, void *buf, int32_t cap);
+    /* written whole in place of any before it: 1, or 0 when the area
+     * would be over its bounds or the disk refuses */
+    int (*write)(void *ctx, const char *name, const void *buf, int32_t n);
+    /* 1 when there was one to remove */
+    int (*remove)(void *ctx, const char *name);
+    /* the names, sorted, at most max of them into names: how many */
+    int (*list)(void *ctx, char (*names)[33], int max);
 };
 
 /* speak.*: text said by the player's synthesiser, over the music and the

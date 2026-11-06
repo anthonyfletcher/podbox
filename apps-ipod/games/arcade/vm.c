@@ -459,6 +459,45 @@ static int obj_set(struct vm *vm, struct value o, uint32_t key, uint32_t site,
     return 1;
 }
 
+/* ---- building values from C (json.c) ---------------------------------- */
+
+int vm_new_text(struct vm *vm, uint32_t len, struct value *out)
+{
+    uint32_t off = new_str(vm, len);
+    if (!off)
+        return 0;
+    *out = mk(T_STR, (int32_t)off);
+    return 1;
+}
+
+int vm_push(struct vm *vm, struct value a, struct value v)
+{
+    if (!arr_reserve(vm, a, ARR(vm, a)->len + 1))
+        return 0;
+    struct arr *p = ARR(vm, a);
+    BUF(vm, p->buf)->v[p->len++] = v;
+    return 1;
+}
+
+int vm_set(struct vm *vm, struct value o, struct value key, struct value v)
+{
+    uint32_t k = key_id(vm, key, 1);
+    return k != NONE && obj_set(vm, o, k, NONE, v);
+}
+
+int vm_field(struct vm *vm, struct value o, uint32_t i, struct value *name,
+             struct value *v)
+{
+    struct obj *p = OBJ(vm, o);
+    for (uint32_t s = p->shape; s; s = vm->shapes[s].parent)
+        if (vm->shapes[s].nkeys == i + 1) {
+            *name = mk(T_STR, (int32_t)vm->keyoff[vm->shapes[s].key]);
+            *v = BUF(vm, p->buf)->v[i];
+            return 1;
+        }
+    return 0;
+}
+
 /* NEWOBJ: the record of a literal, its values the top n of the stack. */
 static int new_obj(struct vm *vm, uint32_t shape, struct value *vals,
                    struct value *out)

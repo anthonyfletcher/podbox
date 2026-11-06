@@ -233,3 +233,10 @@ IMPL(speak_queue)
 IMPL(speak_busy)
 IMPL(speak_stop)
 IMPL(speak_on)
+
+/* sys_data.c */
+IMPL(data_read)
+IMPL(store_read)
+IMPL(store_write)
+IMPL(store_remove)
+IMPL(store_list)

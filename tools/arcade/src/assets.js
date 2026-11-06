@@ -75,8 +75,8 @@ export function parseGpl(text) {
  * them (PNGs as bytes, the rest as text); string(s) numbers a constant
  * string. Errors go to errors; returns { groups, images, chunks }. */
 export function buildAssets(assets, inflate, string, errors) {
-    const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {} }, images: [],
-                  chunks: [] };
+    const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {}, DATA: {} },
+                  images: [], chunks: [] };
     if (!assets) return out;
     function err(file, message) {
         errors.push({ file: file, line: 1, column: 1, message: message });
@@ -266,5 +266,66 @@ export function buildAssets(assets, inflate, string, errors) {
         }
         out.chunks.push({ tag: 'SFX_', data: w.done() });
     }
+
+    /* data files: JSON checked and stored without its spaces, text as it
+     * is; DATA.<name> numbers each, JSON and text together by name */
+    const files = [];
+    const texts = assets.texts || {};
+    for (const name of sortedNames(Object.assign({}, assets.data, texts))) {
+        const json = assets.data && name in assets.data;
+        const file = 'data/' + name + (json ? '.json' : '.txt');
+        if (!named(file, name)) continue;
+        if (json && name in texts) {
+            err(file, 'a data file and a text file are both called ' + name);
+            continue;
+        }
+        if (!json) {
+            files.push({ name: name, kind: 1, bytes: utf8Bytes(texts[name]) });
+        } else {
+            try {
+                const value = JSON.parse(assets.data[name]);
+                const why = dataFault(value, 0);
+                if (why) { err(file, why); continue; }
+                files.push({ name: name, kind: 0,
+                             bytes: utf8Bytes(JSON.stringify(value)) });
+            } catch (e) { err(file, e.message); continue; }
+        }
+        out.groups.DATA[name] = { value: files.length - 1, version: 1 };
+    }
+    if (files.length) {
+        const w = new Writer();
+        w.u16(files.length);
+        for (const f of files) {
+            w.u8(f.kind);
+            w.str(f.name);
+            w.u32(f.bytes.length);
+            w.bytes(f.bytes);
+        }
+        out.chunks.push({ tag: 'DATA', data: w.done() });
+    }
     return out;
+}
+
+function utf8Bytes(s) {
+    return new TextEncoder().encode(s);
+}
+
+/* What in a data file's value a cart cannot hold, or null: numbers past
+ * its range, lists more than 64 deep */
+function dataFault(v, depth) {
+    if (depth > 64) return 'more than 64 lists inside one another';
+    if (typeof v === 'number') {
+        if (Number.isInteger(v))
+            return v >= -2147483648 && v <= 2147483647 ? null
+                : v + ' is beyond the whole numbers a cart has';
+        return v > -32768 && v < 32768 ? null
+            : v + ' is beyond the fractions a cart has (-32768 to 32767)';
+    }
+    if (v && typeof v === 'object') {
+        for (const k in v) {
+            const why = dataFault(v[k], depth + 1);
+            if (why) return why;
+        }
+    }
+    return null;
 }

@@ -8,6 +8,7 @@
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
  *                  [--ui answer,...] [--speech] [--suspend-at t]
+ *                  [--store dir]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -44,11 +45,14 @@
  * <text>"; speak.on() is true with --speech, and nothing is ever busy.
  * --suspend-at t suspends the cart before tick t as the player's Quit
  * does, overwrites the arena, and resumes it from the copy, printing
- * "resumed" -- the run's output is then the same as one never suspended. */
+ * "resumed" -- the run's output is then the same as one never suspended.
+ * --store keeps store.* files in dir, as name.json, within the player's
+ * bounds; without it nothing is kept. */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include "games/arcade/arcade.h"
 
 struct mem_in
@@ -706,6 +710,99 @@ static const struct arcade_speak fake_speak = {
     sp_say, sp_busy, sp_stop, sp_on
 };
 
+/* ---- the cart's stored files --------------------------------------------- */
+
+static const char *store_dir;
+
+static void store_path(const char *name, char *path, size_t cap)
+{
+    snprintf(path, cap, "%s/%s.json", store_dir, name);
+}
+
+static int32_t st_read(void *ctx, const char *name, void *buf, int32_t cap)
+{
+    (void)ctx;
+    char path[512];
+    if (!store_dir)
+        return -1;
+    store_path(name, path, sizeof(path));
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return -1;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (cap > 0)
+        n = (long)fread(buf, 1, (size_t)(n < cap ? n : cap), f);
+    fclose(f);
+    return (int32_t)n;
+}
+
+static int st_list(void *ctx, char (*names)[33], int max);
+
+static int st_write(void *ctx, const char *name, const void *buf, int32_t n)
+{
+    char path[512], names[ARCADE_STORE_FILES][33];
+    if (!store_dir)
+        return 0;
+    /* the area's bounds, this file's old bytes aside */
+    long total = n;
+    int count = st_list(ctx, names, ARCADE_STORE_FILES), there = 0;
+    for (int i = 0; i < count; i++) {
+        if (!strcmp(names[i], name))
+            there = 1;
+        else
+            total += st_read(ctx, names[i], NULL, 0);
+    }
+    if (total > ARCADE_STORE_BYTES || (!there && count >= ARCADE_STORE_FILES))
+        return 0;
+    store_path(name, path, sizeof(path));
+    FILE *f = fopen(path, "wb");
+    if (!f)
+        return 0;
+    int ok = fwrite(buf, 1, (size_t)n, f) == (size_t)n;
+    return fclose(f) == 0 && ok;
+}
+
+static int st_remove(void *ctx, const char *name)
+{
+    (void)ctx;
+    char path[512];
+    if (!store_dir)
+        return 0;
+    store_path(name, path, sizeof(path));
+    return remove(path) == 0;
+}
+
+static int by_name(const void *a, const void *b)
+{
+    return strcmp((const char *)a, (const char *)b);
+}
+
+static int st_list(void *ctx, char (*names)[33], int max)
+{
+    (void)ctx;
+    int n = 0;
+    DIR *d = store_dir ? opendir(store_dir) : NULL;
+    if (!d)
+        return 0;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL && n < max) {
+        size_t len = strlen(e->d_name);
+        if (len > 5 && len - 5 <= 32 && !strcmp(e->d_name + len - 5, ".json")) {
+            memcpy(names[n], e->d_name, len - 5);
+            names[n++][len - 5] = 0;
+        }
+    }
+    closedir(d);
+    qsort(names, (size_t)n, sizeof(names[0]), by_name);
+    return n;
+}
+
+static const struct arcade_store fake_store = {
+    st_read, st_write, st_remove, st_list
+};
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -924,6 +1021,8 @@ int main(int argc, char **argv)
             speech_flag = 1;
         else if (!strcmp(argv[i], "--suspend-at") && i + 1 < argc)
             suspend_at = atol(argv[++i]);
+        else if (!strcmp(argv[i], "--store") && i + 1 < argc)
+            store_dir = argv[++i];
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -952,7 +1051,7 @@ int main(int argc, char **argv)
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
                                 NULL, control, &fake_tracks, &fake_ui,
-                                &fake_speak };
+                                &fake_speak, &fake_store };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;
