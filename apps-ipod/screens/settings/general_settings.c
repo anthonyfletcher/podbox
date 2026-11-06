@@ -85,6 +85,7 @@ MENUITEM_SETTING(tagcache_scan_on_eject, &global_settings.tagcache_scan_on_eject
 MENUITEM_SETTING(tagcache_scan_on_startup,
                  &global_settings.tagcache_scan_on_startup, NULL);
 MENUITEM_SETTING(year_from_folder, &global_settings.year_from_folder, NULL);
+MENUITEM_SETTING(skip_ipod_games, &global_settings.skip_ipod_games, NULL);
 
 MENUITEM_FUNCTION(tc_export, MENU_ADVANCED, ID2P(LANG_TAGCACHE_EXPORT),
                   browser_db_export,
@@ -98,7 +99,7 @@ MENUITEM_FUNCTION(tc_paths, MENU_ADVANCED, ID2P(LANG_SELECT_DATABASE_DIRS),
 
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_scan_on_startup, &tagcache_scan_on_eject,
-                &tc_paths, &year_from_folder,
+                &tc_paths, &year_from_folder, &skip_ipod_games,
                 &tc_export, &tc_import
                 );
 

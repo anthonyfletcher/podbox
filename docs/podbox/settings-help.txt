@@ -692,6 +692,13 @@ release date and the folder holds the album's.
 It replaces the year in the Music lists, album sorting and the carousel; the
 now playing screen still shows the tag. Takes effect at the next rebuild.
 
+[skip ipod games]
+Leaves the sounds of the click-wheel games iTunes copies to the player, in
+iPod_Control/Games_RO, out of the music database. Without it, a player synced
+by iTunes lists hundreds of game sounds among its tracks.
+
+Takes effect at the next update, which removes or adds them.
+
 [database sort albums by]
 The order for every album list that has no row of its own under Albums By:
 by name, by release year with either end first, or by album artist and then

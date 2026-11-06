@@ -6510,6 +6510,11 @@ static bool check_dir(const char *dirname, int add_files, int depth)
         logf("tagcache: depth limit at %s", dirname);
         return false;
     }
+    /* The sounds of the click-wheel games iTunes copies to the player:
+     * walked past, so an update drops any entries already taken from it */
+    if (global_settings.skip_ipod_games
+        && !strcasecmp(path_key_strip(dirname), "/iPod_Control/Games_RO"))
+        return true;
 
     DIR *dir = opendir(dirname);
     if (!dir)

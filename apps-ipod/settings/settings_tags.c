@@ -197,6 +197,7 @@ static const struct tag_row tag_rows[] = {
 { "tagcache_scan_on_eject",    TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database scan usb eject" },
 { "database scan paths",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "directories folders" },
 { "year from folder",          TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "album release date folders" },
+{ "skip ipod games",           TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "itunes click wheel game sounds ipod_control games_ro" },
 { "database sort albums by",   TAG_LIBRARY,                      "sorting albums year artist" },
 { "database sort artists by",  TAG_LIBRARY,                      "sorting artists most played" },
 { "audiobook sort books by", TAG_ADVANCED|TAG_LIBRARY,           "sorting audiobooks books order author title" },

@@ -1675,6 +1675,9 @@ const struct settings_list settings[] = {
      * rebuild and not before. */
     OFFON_SETTING(F_BANFROMQS, year_from_folder, LANG_YEAR_FROM_FOLDER,
                   false, "year from folder", NULL),
+    /* Read at scan time too: the next update drops or adds the games' audio */
+    OFFON_SETTING(F_BANFROMQS, skip_ipod_games, LANG_SKIP_IPOD_GAMES,
+                  true, "skip ipod games", NULL),
     /* Database search. The row and letter counts are choices rather than int
      * settings so the steps are fixed and the config file holds the figure as
      * written. Both store the index; db_search.c turns it back into a count. */

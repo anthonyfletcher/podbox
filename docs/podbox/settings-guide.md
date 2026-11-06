@@ -306,6 +306,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | Yes | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. The next update removes the tracks that are now outside the chosen folders, or inside a folder holding a database.ignore file. | / | **Adv** |
 | Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | No | **Adv** |
+| Skip iPod Games | Leaves the sounds of the click-wheel games iTunes copies to the player, in iPod_Control/Games_RO, out of the music database. Without it, a player synced by iTunes lists hundreds of game sounds among its tracks. Takes effect at the next update, which removes or adds them. | Yes | **Adv** |
 
 ### Library — Art Cache
 

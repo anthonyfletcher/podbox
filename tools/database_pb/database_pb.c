@@ -117,9 +117,9 @@ static int layout(void)
  * the player's settings                                              *
  * ------------------------------------------------------------------ */
 
-/* Only the two that change what a scan stores: where it looks, and whether a
- * folder's year overrides the tag. Anything else in the file is the player's
- * business. */
+/* Only the three that change what a scan stores: where it looks, whether a
+ * folder's year overrides the tag, and whether the iPod games' sounds are
+ * left out. Anything else in the file is the player's business. */
 static void read_settings(void)
 {
     static char text[64 * 1024];
@@ -129,6 +129,7 @@ static void read_settings(void)
 
     strcpy((char *)global_settings.tagcache_scan_paths, "/");
     global_settings.year_from_folder = false;
+    global_settings.skip_ipod_games = true;
     if (fd < 0)
         return;
     /* open() is the simulator's, whose descriptors are its own: a stdio
@@ -161,6 +162,8 @@ static void read_settings(void)
                      sizeof(global_settings.tagcache_scan_paths), "%s", v);
         else if (!strcmp(line, "year from folder"))
             global_settings.year_from_folder = !strcmp(v, "on");
+        else if (!strcmp(line, "skip ipod games"))
+            global_settings.skip_ipod_games = !strcmp(v, "on");
     }
 }
 
@@ -263,8 +266,9 @@ int main(int argc, char **argv)
 
     printf("%s the database on %s\n",
            database_pb_rebuild ? "Rebuilding" : "Updating", target);
-    printf("Music in %s%s\n", global_settings.tagcache_scan_paths,
-           global_settings.year_from_folder ? ", years from folder names" : "");
+    printf("Music in %s%s%s\n", global_settings.tagcache_scan_paths,
+           global_settings.year_from_folder ? ", years from folder names" : "",
+           global_settings.skip_ipod_games ? ", iPod games left out" : "");
     t0 = time(NULL);
     ok = tagcache_tool_run(database_pb_rebuild);
     tracks = ok ? count_tracks() : 0;

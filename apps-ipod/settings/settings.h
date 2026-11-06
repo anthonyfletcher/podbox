@@ -654,6 +654,7 @@ struct user_settings
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */
     bool tagcache_scan_on_startup; /* also check for changes at boot? */
     bool year_from_folder;       /* a "YYYY - " folder name replaces the year */
+    bool skip_ipod_games;        /* the scan leaves out /iPod_Control/Games_RO */
     /* Database search. The two counts are indices into evenly spaced choice
      * lists, not the values themselves. */
     int db_search_max_rows;      /* 0..7 -> 25..200 results, in steps of 25 */

@@ -16,3 +16,7 @@
   across without making them again, except where a folder held more than one
   album; those albums' covers are made afresh. The Report rebuilds its figures
   from the log once, which takes a few seconds the first time it opens.
+- **The sounds of iPod click-wheel games are left out of the database,** under
+  the new **Skip iPod Games** setting (Settings > Library > Database, on by
+  default). On a player iTunes has synced, the next Update removes them from
+  your Music lists; turn the setting off before updating to keep them.

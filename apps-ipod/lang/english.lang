@@ -27844,3 +27844,17 @@
     *: "By Show"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SKIP_IPOD_GAMES
+  desc: in Database settings: leave the click-wheel games' sounds out of the scan
+  user: core
+  <source>
+    *: "Skip iPod Games"
+  </source>
+  <dest>
+    *: "Skip iPod Games"
+  </dest>
+  <voice>
+    *: "Skip iPod Games"
+  </voice>
+</phrase>
