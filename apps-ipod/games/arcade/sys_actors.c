@@ -60,12 +60,13 @@ static int make_pool(struct vm *vm, const char *const *keys, int fields,
     if (!vm_new_record(vm, keys, (uint32_t)fields, out))
         return 0;
     *shape = OBJ(vm, *out)->shape;
-    vm->tmp[vm->ntmp++] = *out;
+    if (!vm_root(vm, *out))
+        return 0;
     for (int f = 0; f < fields; f++) {
         struct value v = mk(T_INT, 0);
         if (f < arrays) {
             if (!vm_new_array(vm, (uint32_t)n, &v)) {
-                vm->ntmp--;
+                vm_unroot(vm);
                 return 0;
             }
             struct value *e = BUF(vm, ARR(vm, v)->buf)->v;
@@ -74,7 +75,7 @@ static int make_pool(struct vm *vm, const char *const *keys, int fields,
         }
         BUF(vm, OBJ(vm, *out)->buf)->v[f] = v;
     }
-    vm->ntmp--;
+    vm_unroot(vm);
     vm_charge(vm, 20 + (uint32_t)(n * arrays) / 4);
     return 1;
 }
@@ -213,34 +214,42 @@ static int32_t row_hit(const struct vm *vm, int32_t cy, int32_t x0, int32_t x1,
 }
 
 /* Moves *pos by v along one axis, the box's other extent fixed, stopping
- * flush at a solid cell; returns the side that hit, or -1 */
+ * flush at a solid cell; returns the side that hit, or -1. Off the map is
+ * open, so only the map's cells are tried, and counted in *checked. */
 static int sweep(const struct vm *vm, int32_t *pos, int32_t v, int32_t size,
                  int32_t lo, int32_t hi, int32_t mask, int x_axis,
-                 int32_t *hx, int32_t *hy)
+                 int32_t *hx, int32_t *hy, uint32_t *checked)
 {
     int32_t a0 = lo >> CELL_SHIFT, a1 = (lo + hi - 1) >> CELL_SHIFT;
+    int32_t across = x_axis ? vm->map_h : vm->map_w;
+    int32_t along = x_axis ? vm->map_w : vm->map_h;
+    if (a0 < 0)
+        a0 = 0;
+    if (a1 > across - 1)
+        a1 = across - 1;
+    if (a0 > a1 || !mask) {
+        *pos = (int32_t)((uint32_t)*pos + (uint32_t)v);
+        return -1;
+    }
     while (v) {
         int32_t step = v > MAX_STEP ? MAX_STEP : v < -MAX_STEP ? -MAX_STEP : v;
-        int32_t np = *pos + step, cell, at;
-        if (step > 0) {
-            cell = (np + size - 1) >> CELL_SHIFT;
-            if (cell != (*pos + size - 1) >> CELL_SHIFT &&
-                (at = x_axis ? column_hit(vm, cell, a0, a1, mask)
-                             : row_hit(vm, cell, a0, a1, mask)) >= 0) {
-                *pos = (cell << CELL_SHIFT) - size;
+        int32_t np = *pos + step;
+        /* the leading edge's cell, and whether this step entered it */
+        int32_t cell = step > 0 ? (np + size - 1) >> CELL_SHIFT
+                                : np >> CELL_SHIFT;
+        int32_t was = step > 0 ? (*pos + size - 1) >> CELL_SHIFT
+                               : *pos >> CELL_SHIFT;
+        if (cell != was && cell >= 0 && cell < along) {
+            *checked += (uint32_t)(a1 - a0 + 1);
+            int32_t at = x_axis ? column_hit(vm, cell, a0, a1, mask)
+                                : row_hit(vm, cell, a0, a1, mask);
+            if (at >= 0) {
+                *pos = step > 0 ? (cell << CELL_SHIFT) - size
+                                : (cell + 1) << CELL_SHIFT;
                 *hx = x_axis ? cell : at;
                 *hy = x_axis ? at : cell;
-                return x_axis ? 1 : 3;          /* RIGHT, DOWN */
-            }
-        } else {
-            cell = np >> CELL_SHIFT;
-            if (cell != *pos >> CELL_SHIFT &&
-                (at = x_axis ? column_hit(vm, cell, a0, a1, mask)
-                             : row_hit(vm, cell, a0, a1, mask)) >= 0) {
-                *pos = (cell + 1) << CELL_SHIFT;
-                *hx = x_axis ? cell : at;
-                *hy = x_axis ? at : cell;
-                return x_axis ? 0 : 2;          /* LEFT, UP */
+                /* RIGHT, DOWN; LEFT, UP */
+                return step > 0 ? (x_axis ? 1 : 3) : (x_axis ? 0 : 2);
             }
         }
         *pos = np;
@@ -324,9 +333,23 @@ static int obstacles(const struct world *w, int32_t p0, int32_t *p,
 {
     int side = -1;
     int32_t o0 = lo >> 16, o1 = (lo + len - 1) >> 16;
+    /* only the field's own pixels can stop it */
+    int32_t e0 = 0, e1 = -1;
+    if (w->field) {
+        int32_t f0 = x_axis ? w->fy0 : w->fx0;
+        int32_t f1 = f0 + (x_axis ? w->cw.h : w->cw.w) - 1;
+        o0 = o0 < f0 ? f0 : o0;
+        o1 = o1 > f1 ? f1 : o1;
+        e0 = x_axis ? w->fx0 : w->fy0;
+        e1 = o0 > o1 ? e0 - 1 : e0 + (x_axis ? w->cw.w : w->cw.h) - 1;
+    }
     if (w->field && *p > p0) {
-        int32_t last = (*p + size - 1) >> 16;
-        for (int32_t e = ((p0 + size - 1) >> 16) + 1; e <= last; e++) {
+        int32_t e = ((p0 + size - 1) >> 16) + 1, last = (*p + size - 1) >> 16;
+        if (e < e0)
+            e = e0;
+        if (last > e1)
+            last = e1;
+        for (; e <= last; e++) {
             int32_t m = field_line(w, x_axis, e, o0, o1);
             *checked += (uint32_t)(o1 - o0 + 1);
             if (m >= 0) {
@@ -338,8 +361,12 @@ static int obstacles(const struct world *w, int32_t p0, int32_t *p,
             }
         }
     } else if (w->field && *p < p0) {
-        int32_t last = *p >> 16;
-        for (int32_t e = (p0 >> 16) - 1; e >= last; e--) {
+        int32_t e = (p0 >> 16) - 1, last = *p >> 16;
+        if (e > e1)
+            e = e1;
+        if (last < e0)
+            last = e0;
+        for (; e >= last; e--) {
             int32_t m = field_line(w, x_axis, e, o0, o1);
             *checked += (uint32_t)(o1 - o0 + 1);
             if (m >= 0) {
@@ -407,12 +434,17 @@ static void in_field(const struct world *w, struct contacts *c, uint32_t i,
 {
     int32_t x0 = X >> 16, y0 = Y >> 16;
     int32_t x1 = (X + W - 1) >> 16, y1 = (Y + H - 1) >> 16;
-    uint32_t cells = 0, wet = 0, heavy = 0;
+    /* every pixel it covers counts, but only those on the field are read */
+    uint32_t cells = (uint32_t)(x1 - x0 + 1) * (uint32_t)(y1 - y0 + 1);
+    uint32_t wet = 0, heavy = 0;
     int32_t harm = -1;
-    for (int32_t py = y0; py <= y1; py++)
-        for (int32_t px = x0; px <= x1; px++) {
+    int32_t fx1 = w->fx0 + w->cw.w - 1, fy1 = w->fy0 + w->cw.h - 1;
+    int32_t qx0 = x0 < w->fx0 ? w->fx0 : x0, qx1 = x1 > fx1 ? fx1 : x1;
+    int32_t qy0 = y0 < w->fy0 ? w->fy0 : y0, qy1 = y1 > fy1 ? fy1 : y1;
+    for (int32_t py = qy0; py <= qy1; py++)
+        for (int32_t px = qx0; px <= qx1; px++) {
             int32_t m = field_at(w, px, py);
-            cells++;
+            (*checked)++;
             if (m < 0)
                 continue;
             uint8_t fl = w->cw.flags[m];
@@ -424,7 +456,6 @@ static void in_field(const struct world *w, struct contacts *c, uint32_t i,
             if ((fl & CELL_HARM) && harm < 0)
                 harm = m;
         }
-    *checked += cells;
     if (wet) {
         /* as much as it is in: half its speed lost when wholly in, and
          * lifted by the liquid's density over its own */
@@ -511,13 +542,13 @@ NATIVE(actors_move)
         if (wd.np)
             carry(&wd, &X, &Y, W, H);
         p0 = X;
-        side = sweep(vm, &X, DX, W, Y, H, smask, 1, &hx, &hy);
+        side = sweep(vm, &X, DX, W, Y, H, smask, 1, &hx, &hy, &checked);
         if ((s2 = obstacles(&wd, p0, &X, W, Y, H, 1, &hx, &hy, &checked)) >= 0)
             side = s2;
         if (side >= 0)
             contact(&c, i, side, hx, hy);
         p0 = Y;
-        side = sweep(vm, &Y, DY, H, X, W, smask, 0, &hx, &hy);
+        side = sweep(vm, &Y, DY, H, X, W, smask, 0, &hx, &hy, &checked);
         if ((s2 = obstacles(&wd, p0, &Y, H, X, W, 0, &hx, &hy, &checked)) >= 0)
             side = s2;
         if (side >= 0)
@@ -539,9 +570,16 @@ NATIVE(actors_move)
             }
         } else
             cell[i] = mk(T_INT, -1);
+        /* the checks, and the platforms, are paid as they come, so a
+         * runaway move is stopped */
+        checked += wd.np * 4;
+        if (checked >= 8192) {
+            if (!vm_spend(vm, checked / 8))
+                return 0;
+            checked %= 8;
+        }
     }
-    vm_charge(vm, 10 + n / 4 + moved * 6 + c.n * 2 + moved * wd.np / 2 +
-              checked / 8);
+    vm_charge(vm, 10 + n / 4 + moved * 6 + c.n * 2 + checked / 8);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }
@@ -600,7 +638,7 @@ NATIVE(actors_zones)
     struct column objs;
     int32_t k = is_num(a[2]) ? floor_int(a[2]) : -1;
     if (!column_of(vm, a[1], &objs) || objs.tag == T_INT || k < 0 ||
-        (uint32_t)k * 5 > objs.len)
+        (uint32_t)k > objs.len / 5)
         return vm_fail(vm, "actors.zones() needs the objects from mapobj() "
                        "and how many", "", "");
     if (a[3].tag != T_I32)
@@ -776,12 +814,12 @@ int32_t actors_boxes(struct vm *vm, struct value pools, uint8_t *bits,
                      int32_t w, int32_t h, int32_t *boxes, int32_t cap)
 {
     int32_t k = 0;
-    uint32_t np = pools.tag == T_ARR ? ARR(vm, pools)->len : 1;
+    uint32_t np = pools.tag == T_ARR ? ARR(vm, pools)->len : 1, set = 0;
     for (uint32_t q = 0; q < np; q++) {
         struct value p = pools.tag == T_ARR ? ELEMS(vm, pools)[q] : pools;
         struct value f[A_FIELDS];
         uint32_t n;
-        if (!actors(vm, p, f, &n, "cells.step"))
+        if (!actors(vm, p, f, &n, "cells.step") || !vm_spend(vm, n / 4))
             return -1;
         int32_t ox = is_num(f[A_FIELD_X]) ? floor_int(f[A_FIELD_X]) : 0;
         int32_t oy = is_num(f[A_FIELD_Y]) ? floor_int(f[A_FIELD_Y]) : 0;
@@ -803,6 +841,13 @@ int32_t actors_boxes(struct vm *vm, struct value pools, uint8_t *bits,
                     int32_t c = y * w + x;
                     bits[c >> 3] |= (uint8_t)(1 << (c & 7));
                 }
+            /* paid as it goes: one pool can be listed any number of times */
+            set += (uint32_t)(x1 - x0 + 1) * (uint32_t)(y1 - y0 + 1);
+            if (set >= 8192) {
+                if (!vm_spend(vm, set / 8))
+                    return -1;
+                set %= 8;
+            }
             if (k < cap) {
                 boxes[k * 4] = x0;
                 boxes[k * 4 + 1] = y0;

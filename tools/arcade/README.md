@@ -108,6 +108,8 @@ file's opening comment lists what it gives.
 - **Records can't have methods named like array or string methods.** On a
   record, `o.push()`, `o.sort()` and the rest of those names are always the
   built-in methods, never a field of the record.
+- **A sort's comparator can't sort.** Calling `.sort()` from inside a
+  comparator stops the cart with an error.
 
 ## Running a cart's script
 

@@ -63,13 +63,14 @@ NATIVE(links_pool)
     if (!vm_new_record(vm, link_keys, L_FIELDS, out))
         return 0;
     vm->links_shape = OBJ(vm, *out)->shape;
-    vm->tmp[vm->ntmp++] = *out;
+    if (!vm_root(vm, *out))
+        return 0;
     for (int f = 0; f < L_FIELDS; f++) {
         struct value v = mk(T_INT, f == L_PASSES ? 4 : 0);
         if (f < L_ARRAYS) {
             uint32_t n = (uint32_t)(f < L_POINT_ARRAYS ? np : nl);
             if (!vm_new_array(vm, n ? n : 1, &v)) {
-                vm->ntmp--;
+                vm_unroot(vm);
                 return 0;
             }
             for (uint32_t i = 0; i < (n ? n : 1); i++)
@@ -77,7 +78,7 @@ NATIVE(links_pool)
         }
         BUF(vm, OBJ(vm, *out)->buf)->v[f] = v;
     }
-    vm->ntmp--;
+    vm_unroot(vm);
     vm_charge(vm, 20 + (uint32_t)(np * 5 + nl * 3) / 4);
     return 1;
 }
@@ -100,6 +101,9 @@ static int links_of(struct vm *vm, struct value p, const char *fn,
         return vm_fail(vm, fn, "() needs a pool from links.pool()", "");
     for (int i = 0; i < L_FIELDS; i++)
         l->f[i] = BUF(vm, OBJ(vm, p)->buf)->v[i];
+    if (l->f[L_X].tag != T_ARR || l->f[L_A].tag != T_ARR)
+        return vm_fail(vm, fn, "() needs a pool whose arrays are as "
+                       "links.pool() made them", "");
     for (int i = 0; i < L_ARRAYS; i++) {
         uint32_t want = i < L_POINT_ARRAYS ? ARR(vm, l->f[L_X])->len
                                            : ARR(vm, l->f[L_A])->len;

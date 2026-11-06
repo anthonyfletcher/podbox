@@ -145,14 +145,18 @@ NATIVE(noise_fill)
     int32_t y0 = (int32_t)((scaled(a[3]) << 16) / scaled(a[4]));
     int octaves = octaves_of(a[5]);
     uint32_t seed = (uint32_t)whole(a[6], 0);
-    for (int32_t y = 0; y < h; y++)
+    /* paid a row at a time, so a fill too big for the tick is stopped */
+    for (int32_t y = 0; y < h; y++) {
+        if (!vm_spend(vm, (uint32_t)w * (uint32_t)octaves * 4))
+            return 0;
         for (int32_t x = 0; x < w; x++) {
             uint32_t n = noise(x0 + x * step, y0 + y * step, seed, octaves);
             uint32_t k = (n * (uint32_t)levels) >> 16;
             px[y * w + x] = (uint8_t)(ramp.tag == T_NULL ? (int32_t)k
                                       : column_at(&ramp, k, 0));
         }
-    vm_charge(vm, 10 + (uint32_t)(w * h) * (uint32_t)octaves * 4);
+    }
+    vm_charge(vm, 10);
     *out = mk(T_INT, w * h);
     return 1;
 }

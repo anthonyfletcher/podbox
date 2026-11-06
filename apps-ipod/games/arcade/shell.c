@@ -67,6 +67,10 @@
  * until phase 1 measures what a frame costs on each player. */
 #define CEILING 2000000
 
+/* Untouched this long, the game pauses: the pause menu hands the
+ * backlight, the CPU and idle power-off back to their settings. */
+#define IDLE_PAUSE (5 * 60 * HZ)
+
 #define SAVE_DIR "/.rockbox/games/saves"
 
 
@@ -119,15 +123,21 @@ static void save_load(struct vm *vm)
     arcade_restore(vm, values, b + 4 + 256 * 4);
 }
 
+/* A save the disk refused, tried again at the next chance */
+static bool save_owed;
+
+/* Written beside the old one and renamed over it, so a full disk or a
+ * short write leaves the old save as it was */
 static void save_write(struct vm *vm)
 {
-    char path[MAX_PATH];
+    char path[MAX_PATH], part[MAX_PATH];
     unsigned char b[4 + 256 * 4 + 32];
     const uint8_t *frac;
     int dirty;
     const int32_t *values = arcade_save(vm, &dirty, &frac);
-    if (!dirty)
+    if (!dirty && !save_owed)
         return;
+    save_owed = true;
     memcpy(b, "PBGS", 4);
     for (int i = 0; i < 256; i++) {
         uint32_t v = (uint32_t)values[i];
@@ -141,11 +151,17 @@ static void save_write(struct vm *vm)
     mkdir("/.rockbox/games");
     mkdir(SAVE_DIR);
     save_path(vm, path, sizeof(path));
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    snprintf(part, sizeof(part), "%s.new", path);
+    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd < 0)
         return;
-    write(fd, b, sizeof(b));
-    close(fd);
+    bool whole = write(fd, b, sizeof(b)) == (ssize_t)sizeof(b);
+    if (close(fd) < 0)
+        whole = false;
+    if (whole && rename(part, path) == 0)
+        save_owed = false;
+    else
+        remove(part);
 }
 
 /* ---- the engine's host --------------------------------------------------- */
@@ -202,10 +218,11 @@ static int host_playing(void *ctx)
  * Beats are shifted by Spike's audio offset, which is the delay between
  * the player and the ear and not Spike's own. The analyser runs only
  * while the cart listens. The bar is counted from the tracker's lock
- * until the cart asks for the downbeat, and from the downbeat after. */
+ * until the cart asks for the downbeat, and from the downbeat's time
+ * after. */
 
 static bool beat_listening;
-static int beat_rot;            /* the downbeat, on the tracker's count */
+static long beat_bar_ms;        /* a downbeat's time, the newest asked about */
 static long beat_due;           /* the beat the mood is sampled at next */
 static int32_t beat_press[5];   /* stamped as each button went down */
 
@@ -216,7 +233,7 @@ static void beat_start(void)
     spk_bar_reset();
     spk_music_reset();
     beat_listening = false;
-    beat_rot = -1;
+    beat_bar_ms = -1;
     beat_due = -1;
     for (int i = 0; i < 5; i++)
         beat_press[i] = -1;
@@ -228,7 +245,7 @@ static void beat_listen(void *ctx, int on)
     if (on && !beat_listening) {
         beat_analyse_start();
         spk_bar_reset();
-        beat_rot = -1;
+        beat_bar_ms = -1;
     } else if (!on && beat_listening)
         beat_analyse_stop();
     beat_listening = on;
@@ -256,7 +273,19 @@ static int32_t beat_next(void *ctx, int32_t from, int32_t n, int32_t *in_bar)
     if (from + off < 0 ||
         !beat_track_next((unsigned long)(from + off), n, &at, &bar))
         return -1;
-    *in_bar = beat_rot < 0 ? bar : (bar - beat_rot + 4) % 4;
+    if (beat_bar_ms < 0) {
+        *in_bar = bar;
+    } else {
+        /* beats since the downbeat, rounded: the tracker's own count can
+         * move when it decides again, the downbeat's time does not */
+        struct beat_track bt;
+        beat_track_get(&bt);
+        long p = (long)bt.period_ms, d = (long)at - beat_bar_ms + p / 2;
+        long k = d >= 0 ? d / p : -((p - 1 - d) / p);
+        *in_bar = (int32_t)(((k % 4) + 4) % 4);
+        if (*in_bar == 0 && (long)at > beat_bar_ms)
+            beat_bar_ms = (long)at;
+    }
     return (int32_t)((long)at - off);
 }
 
@@ -270,13 +299,16 @@ static int32_t beat_downbeat(void *ctx, int32_t *margin10)
     *margin10 = 0;
     if (!bt.locked || !beat_track_next(spk_clock_ms(), 0, &at, &bar))
         return -1;
-    /* a beat the tracker counts as the first of four */
-    long zero = (long)at - (long)bar * (long)bt.period_ms;
-    beat_rot = spk_bar_downbeat(zero, (int)bt.period_ms);
+    /* a beat the tracker counts as the first of four, twelve bars back:
+     * the bar is found from the onsets since then, which have to span 32
+     * beats */
+    long zero = (long)at - ((long)bar + 48) * (long)bt.period_ms;
+    int rot = spk_bar_downbeat(zero, (int)bt.period_ms);
+    beat_bar_ms = rot < 0 ? -1 : zero + (long)rot * (long)bt.period_ms;
     int m;
     spk_bar_working(&hits, &m);
     *margin10 = m;
-    return beat_rot;
+    return rot;
 }
 
 static int32_t beat_now(void *ctx)
@@ -431,7 +463,7 @@ static void beat_tick(struct vm *vm)
             beat_track_reset();
         spk_bar_reset();
         spk_music_reset();
-        beat_rot = -1;
+        beat_bar_ms = -1;
         beat_due = -1;
     }
     if (beat_listening) {
@@ -549,9 +581,12 @@ static void sound_fill(void)
         sounding = true;
     }
     /* Started for something to play, and again if a firmware beep, which
-     * shares the channel, stopped it; stopped once all is played out */
-    if (sounding && (!sound_on || mixer_channel_status(PCM_MIXER_CHAN_BEEP)
-                                  == CHANNEL_STOPPED)) {
+     * shares the channel, stopped it -- by then the slots may be full and
+     * nothing new rendered; stopped once all is played out */
+    bool queued = sound_head != sound_tail;
+    if ((sounding && !sound_on) ||
+        (queued && sound_on && mixer_channel_status(PCM_MIXER_CHAN_BEEP)
+                               == CHANNEL_STOPPED)) {
         mixer_channel_set_amplitude(PCM_MIXER_CHAN_BEEP, MIX_AMP_UNITY);
         mixer_channel_play_data(PCM_MIXER_CHAN_BEEP, &sound_cbs, sound_quiet,
                                 sizeof(sound_quiet));
@@ -752,7 +787,8 @@ static void give_screen(void)
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 }
 
-/* A system event: saved first, since USB or a shutdown may follow. */
+/* A system event: saved first, since USB or a shutdown may follow; the
+ * game redrawn after, over any splash the event showed. */
 static int event(struct vm *vm, long button)
 {
     sound_stop();
@@ -760,6 +796,7 @@ static int event(struct vm *vm, long button)
     save_write(vm);
     if (default_event_handler(button) == SYS_USB_CONNECTED)
         return USB;
+    present(vm, true);
     return PLAYING;
 }
 
@@ -825,22 +862,36 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
     return PLAYING;
 }
 
-/* The hold switch: the game waits, the screen shows it, until released. */
+/* A key from an earphone remote, a dock or a car: acted on as on every
+ * other screen, and the game redrawn over anything that showed. */
+static void remote_key(struct vm *vm, long b)
+{
+    default_event_handler(b);
+    present(vm, true);
+}
+
+/* The hold switch: the game waits, the screen shows it, until released;
+ * meanwhile the CPU and the backlight go back to their settings. */
 static int hold_pause(struct vm *vm)
 {
+    int r = PLAYING;
     sound_stop();
     present_wait();
     save_write(vm);
-    while (button_hold()) {
+    cpu_boost(false);
+    hold_backlight(false);
+    while (r == PLAYING && button_hold()) {
         long b = button_get_w_tmo(HZ / 10);
-        if (b & SYS_EVENT) {
-            int r = event(vm, b);
-            if (r != PLAYING)
-                return r;
-        }
+        if (b & SYS_EVENT)
+            r = event(vm, b);
+        else if (b & BUTTON_MULTIMEDIA)
+            default_event_handler(b);
     }
-    present(vm, true);
-    return PLAYING;
+    cpu_boost(true);
+    hold_backlight(true);
+    if (r == PLAYING)
+        present(vm, true);
+    return r;
 }
 
 /* Everything queued since the last frame. The buttons are read as held
@@ -853,6 +904,8 @@ static int drain(struct vm *vm, bool *menu_pressed)
             int r = event(vm, b);
             if (r != PLAYING)
                 return r;
+        } else if (b & BUTTON_MULTIMEDIA) {
+            remote_key(vm, b);
         } else {
             beat_stamp(vm, b);
             if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
@@ -894,6 +947,7 @@ static int run(const char *path, void *mem, size_t size)
         return QUIT;
     }
     save_load(vm);
+    save_owed = false;
     arcade_set_ceiling(vm, CEILING);
 
     take_screen(&vp);
@@ -908,7 +962,7 @@ static int run(const char *path, void *mem, size_t size)
     present(vm, true);
 
     int rate = arcade_rate(vm);
-    long start = current_tick;
+    long start = current_tick, touched = current_tick;
     unsigned long frame = 0;
 
     while (status == PLAYING) {
@@ -928,6 +982,10 @@ static int run(const char *path, void *mem, size_t size)
                 status = event(vm, b);
                 continue;
             }
+            if (b & BUTTON_MULTIMEDIA) {
+                remote_key(vm, b);
+                continue;
+            }
             beat_stamp(vm, b);
             if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
                 menu_pressed = true;
@@ -940,16 +998,24 @@ static int run(const char *path, void *mem, size_t size)
 
         if (arcade_menu_is_game(vm) && menu_held_long(button_status()))
             menu_pressed = true;
+        /* a finger on the wheel counts, though it sends no events */
+        if (button_status() || wheel_position() >= 0) {
+            touched = current_tick;
+            reset_poweroff_timer();
+        } else if (TIME_AFTER(current_tick, touched + IDLE_PAUSE))
+            menu_pressed = true;
         if (menu_pressed) {
             status = pause_menu(vm, &vp);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
+            touched = current_tick;
             continue;
         }
         if (button_hold()) {
             status = hold_pause(vm);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
+            touched = current_tick;
             continue;
         }
 
@@ -986,7 +1052,6 @@ static int run(const char *path, void *mem, size_t size)
         present(vm, false);
         sound_fill();
         arcade_idle(vm);
-        reset_poweroff_timer();
         /* Once a frame whatever the cart does: a cart always behind its
          * clock never waits above, and one light on script never yields
          * inside a tick, so without this nothing else would run. */

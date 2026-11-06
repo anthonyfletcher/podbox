@@ -167,7 +167,8 @@ static int verify_fn(struct vm *vm, uint32_t fi, uint8_t *scratch,
     const struct fninfo *f = &vm->fns[fi];
     const uint8_t *code = vm->code + f->off;
     uint32_t len = f->len, pc;
-    if ((uint64_t)len * 7 > room)
+    /* height, a word aligned, then work and start, as laid out below */
+    if ((((uint64_t)len * 2 + 3) & ~(uint64_t)3) + (uint64_t)len * 5 > room)
         return vm_fail(vm, "not enough memory for this game", "", "");
     if (f->arity > f->nlocals)
         return vm_fail(vm, "this game file is damaged: ", "locals", "");
@@ -240,6 +241,9 @@ static int verify_fn(struct vm *vm, uint32_t fi, uint8_t *scratch,
     }
     if (max > f->maxstack)
         return vm_fail(vm, "this game file is damaged: ", "stack size", "");
+    if ((uint32_t)f->nlocals + f->maxstack + STACK_SLACK > STACK_VALUES)
+        return vm_fail(vm, "a function needs more stack than a game has",
+                       "", "");
     return 1;
 }
 

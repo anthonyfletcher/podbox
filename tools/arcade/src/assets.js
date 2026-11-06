@@ -93,6 +93,10 @@ export function buildAssets(assets, inflate, string, errors) {
     for (const name of sortedNames(assets.palettes)) {
         const file = 'palettes/' + name + '.gpl';
         if (!named(file, name)) continue;
+        if (pals.length === 255) {
+            err(file, 'a cart holds at most 255 palettes');
+            continue;
+        }
         try {
             pals.push(parseGpl(assets.palettes[name]));
             out.groups.PAL[name] = { value: pals.length - 1, version: 1 };

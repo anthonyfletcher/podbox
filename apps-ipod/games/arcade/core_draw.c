@@ -1655,6 +1655,8 @@ static char text_buf[1024];
 NATIVE(print)
 {
     char *buf = text_buf;
+    if (!vm_parts(vm, a, argc, "print"))
+        return 0;
     uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
     int first = 1 + a[0].v, rest = argc - first, k = scale_of(vm);
     int32_t x = vm->d.cur_x, y = vm->d.cur_y;
@@ -1682,6 +1684,8 @@ NATIVE(print)
 NATIVE(textw)
 {
     char *buf = text_buf;
+    if (!vm_parts(vm, a, argc, "textw"))
+        return 0;
     uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
     int64_t widest;
     int lines;
@@ -1836,7 +1840,7 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         if (inside) {
             /* Every source column is in the image: the columns, stepped
              * once for the first row drawn, serve every row */
-            static uint16_t col[IMAGE_MAX];
+            static uint16_t col[IMG_MAX];
             int32_t cols = (int32_t)(u1 - u0);
             if (!stepped) {
                 for (int32_t i = 0; i < cols; i++) {
@@ -2048,7 +2052,7 @@ NATIVE(img)
 {
     WHOLE(0, 0, w, "img");
     WHOLE(1, 0, h, "img");
-    if (w < 1 || h < 1 || w > 4096 || h > 4096)
+    if (w < 1 || h < 1 || w > IMG_MAX || h > IMG_MAX)
         return vm_fail(vm, "img() needs a width and height from 1 to 4096",
                        "", "");
     uint32_t off = gc_alloc(vm, T_IMG, (uint32_t)(sizeof(struct img) -
@@ -3260,10 +3264,25 @@ static int32_t land_levels(const struct landspec *l, struct landlevel *lv)
 
 /* land.draw(): the landscape front to back, as Comanche drew it, a slice
  * of ground at a time (land_slice()). Returns the samples taken. */
+/* The views keep a value a screen column: drawn into a wider image, they
+ * stop at the screen's size */
+static void begin_view(struct vm *vm, struct pen *p)
+{
+    begin(vm, p, 0, 0);
+    if (p->cx1 > SCREEN_W)
+        p->cx1 = SCREEN_W;
+    if (p->cy1 > SCREEN_H)
+        p->cy1 = SCREEN_H;
+    if (p->cx0 > p->cx1)
+        p->cx0 = p->cx1;
+    if (p->cy0 > p->cy1)
+        p->cy0 = p->cy1;
+}
+
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
 {
     struct pen p;
-    begin(vm, &p, 0, 0);
+    begin_view(vm, &p);
     p.per16 = 0;
     const struct planeview *v = &vm->plane;
     static int16_t top[SCREEN_W];
@@ -3292,6 +3311,8 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     int64_t far = (int64_t)l->far << 16;
     struct landlevel lv[LAND_LEVELS];
     int32_t levels = land_levels(l, lv), level = -1;
+    /* the ground's two layers read to see whether they changed */
+    p.cost += 2 * (l->wmask + 1) * (l->hmask + 1) / BYTES_PER_UNIT;
     land_slice_fn *slice = land_slice;
     /* 1 / focal, 0.32: a slice's half-width is a multiply */
     int64_t inv_focal = ((int64_t)1 << 48) / v->focal;
@@ -3374,7 +3395,7 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
     static const uint8_t *tile[256];
     struct pen p;
     struct floor_env e;
-    begin(vm, &p, 0, 0);
+    begin_view(vm, &p);
     p.per16 = 0;                    /* each pixel read is charged */
     const uint8_t *sheet = MEM(vm, vm->sheet);
     for (uint32_t m = 0; m < 256; m++)
@@ -3441,7 +3462,7 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int flip, int32_t depth)
 {
     struct pen p;
-    begin(vm, &p, 0, 0);
+    begin_view(vm, &p);
     p.ox = p.oy = 0;
     p.cost = COST_CALL / 2;
     p.per16 = 0;                    /* copy_rect charges the area */
@@ -3485,7 +3506,7 @@ uint32_t core_draw_walls(struct vm *vm, int32_t mask, int32_t height,
                          int32_t far)
 {
     struct pen p;
-    begin(vm, &p, 0, 0);
+    begin_view(vm, &p);
     p.per16 = 0;
     struct planeview *v = &vm->plane;
     const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);

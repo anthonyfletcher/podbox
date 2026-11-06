@@ -75,19 +75,20 @@ NATIVE(cells_rules)
     if (!vm_new_record(vm, rule_keys, R_FIELDS, out))
         return 0;
     vm->rules_shape = OBJ(vm, *out)->shape;
-    vm->tmp[vm->ntmp++] = *out;
+    if (!vm_root(vm, *out))
+        return 0;
     for (int f = 0; f < R_FIELDS; f++) {
         uint32_t n = rule_len(f);
         uint32_t off = gc_alloc(vm, T_U8, (uint32_t)(sizeof(struct u8a) -
                                                      sizeof(struct hdr)) + n);
         if (!off) {
-            vm->ntmp--;
+            vm_unroot(vm);
             return 0;
         }
         ((struct u8a *)MEM(vm, off))->len = n;
         BUF(vm, OBJ(vm, *out)->buf)->v[f] = mk(T_U8, (int32_t)off);
     }
-    vm->ntmp--;
+    vm_unroot(vm);
     vm_charge(vm, 40);
     return 1;
 }

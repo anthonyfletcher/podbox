@@ -246,7 +246,8 @@ NATIVE(grid_collapse)
     int32_t n = whole(a[3], -1);
     if (!board_of(vm, a[0], a[1], "grid.collapse", &b))
         return 0;
-    if (!column_of(vm, a[2], &rows) || n < 0 || (uint32_t)n > rows.len)
+    if (!column_of(vm, a[2], &rows) || rows.tag == T_INT || n < 0 ||
+        (uint32_t)n > rows.len)
         return vm_fail(vm, "grid.collapse() takes an array of rows and how "
                        "many of them to remove", "", "");
     uint8_t *gone = scratch(vm, (uint32_t)b.h);
@@ -270,7 +271,7 @@ NATIVE(grid_collapse)
     }
     if (dst >= 0)
         memset(b.c, 0, (size_t)((dst + 1) * b.w));
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / BYTES_PER_UNIT);
+    vm_charge(vm, 10 + (uint32_t)n + (uint32_t)(b.w * b.h) / BYTES_PER_UNIT);
     *out = mk(T_INT, removed);
     return 1;
 }

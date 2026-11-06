@@ -7,7 +7,8 @@
  *
  * btn and btnp use PICO-8's numbers: 0 PREV, 1 NEXT, 2 MENU (only for a
  * cart that claims it; the host never sets it otherwise), 3 PLAY,
- * 4 SELECT, 5 nothing. btnp is true on the tick a button goes down, then
+ * 4 SELECT; any other number is an error, as the wheel has only five.
+ * btnp is true on the tick a button goes down, then
  * on the 16th tick it is held and every 4th after.
  ***************************************************************************/
 #include <string.h>
@@ -217,9 +218,11 @@ NATIVE(beat_next)
         return vm_fail(vm, "beat.next() needs a time and a count", "", "");
     const struct arcade_beat *b = beat_of(vm);
     int32_t at = -1, in_bar = -1;
-    if (b && b->next)
-        at = b->next(vm->host->ctx, floor_int(a[0]), floor_int(a[1]),
-                     &in_bar);
+    int32_t from = floor_int(a[0]), n = floor_int(a[1]);
+    /* a day of track and 4096 beats are past any music: none */
+    if (b && b->next && from > -86400000 && from < 86400000 && n >= 0 &&
+        n <= 4096)
+        at = b->next(vm->host->ctx, from, n, &in_bar);
     vm->beat_inbar = at < 0 ? -1 : in_bar;
     return RET_INT(at);
 }
@@ -231,7 +234,8 @@ NATIVE(beat_inbar)
 }
 
 /* beat.downbeat(): which of the four beats starts the bar, or -1 where
- * none wins; beat.margin() is by how much, in tenths */
+ * none wins or fewer than 32 beats have been heard; beat.margin() is by
+ * how much, in tenths */
 NATIVE(beat_downbeat)
 {
     (void)a; (void)argc;

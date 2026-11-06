@@ -1238,7 +1238,9 @@ class Program {
     string(s) {
         let i = this.stringIndex.get(s);
         if (i === undefined) {
-            if (this.strings.length >= 65535) throw new Error('too many strings');
+            /* the engine keeps 1024 more for keys made as it runs */
+            if (this.strings.length >= 65535 - 1024)
+                throw new Error('too many strings');
             i = this.strings.length;
             this.strings.push(s);
             this.stringIndex.set(s, i);
@@ -1774,6 +1776,17 @@ export function compile(input) {
     if (fns.length > 65535)
         return { cart: null, errors: [{ file: 'main.js', line: 1, column: 1,
                                         message: 'too many functions' }] };
+    /* the engine's 4096 values of stack, less the 8 it keeps above */
+    for (const f of fns)
+        if (f.nlocals + f.maxDepth + 8 > 4096) {
+            const at = f.node && f.node.loc ? f.node.loc.start
+                                            : { line: 1, column: 0 };
+            return { cart: null, errors: [{
+                file: f.file ? f.file.name : 'main.js', line: at.line,
+                column: at.column + 1,
+                message: (f.name || 'the program') + ' needs more stack ' +
+                         'than a game has; split it' }] };
+        }
     fns.forEach((f, i) => { f.index = i; });
     for (const f of fns) {
         for (const x of f.fixups) {

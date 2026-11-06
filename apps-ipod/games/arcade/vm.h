@@ -145,7 +145,8 @@ extern const uint32_t arcade_api_count;
 #define MAP_W        128   /* the map of a cart with none of its own */
 #define MAP_H        64
 #define MAP_MAX      256   /* a cart map's widest and tallest */
-#define IMAGE_MAX    1024
+#define IMAGE_MAX    1024  /* a cart image's widest and tallest */
+#define IMG_MAX      4096  /* an img()'s */
 /* A unit is about 40 of the 5G's cycles, a bytecode's worth. Filling and
  * moving memory goes at the speed of its SDRAM: a unit for every 16 bytes. */
 #define BYTES_PER_UNIT 16
@@ -235,13 +236,14 @@ struct voice
     uint32_t frac, step, pitch; /* 16.16 */
     uint32_t hz, phase, dphase, noise;
     int32_t vol;
-    uint32_t left;              /* a tone's length left, 16.16 source samples */
+    uint64_t left;              /* a tone's length left, 16.16 source samples */
 };
 
 #define MAX_SHAPES   2048
 #define MAX_RTKEYS   1024   /* string keys made at run time */
 #define MAX_FRAMES   200
 #define STACK_VALUES 4096
+#define STACK_SLACK  8      /* room above maxstack for INCL and sort */
 #define MARK_STACK   1024
 #define FREE_CLASSES 64     /* exact lists for blocks of 16..504 bytes */
 #define YIELD_UNITS  2048
@@ -286,8 +288,9 @@ struct vm
     struct value *sp;
     struct frame *frames;
     uint32_t nframes;
-    struct value tmp[4];        /* roots for natives between allocations */
+    struct value tmp[8];        /* roots for natives between allocations */
     uint32_t ntmp;
+    uint32_t sorting;           /* a .sort() is calling its comparator */
     uint32_t s_typeof[4];       /* "number", "string", "object", "function" */
 
     /* The heap */
@@ -428,12 +431,40 @@ static inline void screen_written(struct vm *vm, int32_t y0, int32_t y1)
 /* vm.c */
 int vm_fail(struct vm *vm, const char *a, const char *b, const char *c);
 int vm_call(struct vm *vm, struct value fn, int argc, struct value *out);
+
+/* v kept from the collector until vm_unroot(), for a native between
+ * allocations; 0, the cart stopped, once every root is in use */
+static inline int vm_root(struct vm *vm, struct value v)
+{
+    if (vm->ntmp >= sizeof(vm->tmp) / sizeof(vm->tmp[0]))
+        return vm_fail(vm, "too many values held at once", "", "");
+    vm->tmp[vm->ntmp++] = v;
+    return 1;
+}
+
+static inline void vm_unroot(struct vm *vm)
+{
+    vm->ntmp--;
+}
+
+/* For a PARTS native (arcade_api.def): whether a[0], the count of the
+ * pieces that follow it, is one the call holds */
+static inline int vm_parts(struct vm *vm, const struct value *a, int argc,
+                           const char *fn)
+{
+    if (a[0].tag != T_INT || a[0].v < 0 || a[0].v >= argc)
+        return vm_fail(vm, fn, "() was called with its text damaged", "");
+    return 1;
+}
 int vm_truthy(struct vm *vm, struct value v);
 int vm_tostring(struct vm *vm, struct value v, struct value *out);
 uint32_t vm_text(struct vm *vm, struct value v, char *dst, uint32_t cap);
 int vm_fix_op(struct vm *vm, int op, struct value a, struct value b,
               struct value *out);
 void vm_charge(struct vm *vm, uint32_t units);
+/* vm_charge() for a native's long work, as it goes: 0, the cart stopped,
+ * once the call is past the ceiling */
+int vm_spend(struct vm *vm, uint32_t units);
 const char *vm_typename(uint32_t tag);
 int vm_new_string(struct vm *vm, const uint8_t *b, uint32_t len,
                   struct value *out);

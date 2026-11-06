@@ -458,6 +458,9 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
         if (got != 8)
             return bad(vm, "chunk header");
         uint32_t len = rd32(hd + 4);
+        /* no chunk is bigger than the memory, and len + 4 must not wrap */
+        if (len > vm->size - 4)
+            return bad(vm, "chunk length");
         if (first && memcmp(hd, "PBG1", 4))
             return vm_fail(vm, "not a game file", "", "");
         first = 0;

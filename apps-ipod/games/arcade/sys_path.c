@@ -344,10 +344,11 @@ static int map_solid(const struct vm *vm, int32_t cx, int32_t cy, int32_t mask)
 
 /* path.ray(x, y, dx, dy, solid, out, [len]): from world pixel x, y along
  * dx, dy, the first map cell whose flags share a bit with solid, within
- * len pixels (1024 by default). Into out, an array of at least five: the
- * point hit, the cell's column and row, and the face of the cell it met
- * (DIR.LEFT for its left face; -1 when it starts inside one). Returns 1
- * on a hit, 0 when the ray goes clear. Off the map is open. */
+ * len pixels (1024 by default, 65536 at most). Into out, an array of at
+ * least five: the point hit, the cell's column and row, and the face of
+ * the cell it met (DIR.LEFT for its left face; -1 when it starts inside
+ * one). Returns 1 on a hit, 0 when the ray goes clear. Off the map is
+ * open. */
 NATIVE(path_ray)
 {
     if (a[5].tag != T_ARR || ARR(vm, a[5])->len < 5)
@@ -357,8 +358,16 @@ NATIVE(path_ray)
     int64_t x = scaled(a[0]), y = scaled(a[1]);
     int64_t dx = scaled(a[2]), dy = scaled(a[3]);
     int64_t far = argc > 6 && is_num(a[6]) ? scaled(a[6]) : (int64_t)1024 << 16;
+    if (far > (int64_t)65536 << 16)
+        far = (int64_t)65536 << 16;
     *out = mk(T_INT, 0);
-    /* the direction as a unit vector, 16.16 */
+    /* the direction as a unit vector, 16.16; only its angle matters, so it
+     * is scaled down until its square fits */
+    while (dx >= (1 << 30) || dx <= -(1 << 30) || dy >= (1 << 30) ||
+           dy <= -(1 << 30)) {
+        dx /= 2;
+        dy /= 2;
+    }
     int64_t l2 = dx * dx + dy * dy;
     if (!l2 || !mask) {
         vm_charge(vm, 6);

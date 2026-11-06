@@ -330,6 +330,8 @@ NATIVE(printh)
     static char line[256];
     uint32_t n = 0;
     (void)out;
+    if (!vm_parts(vm, a, argc, "printh"))
+        return 0;
     int parts = a[0].v;
     for (int i = 1; i <= parts && i < argc; i++)
         n += vm_text(vm, a[i], line + n, sizeof(line) - n);

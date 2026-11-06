@@ -102,7 +102,7 @@ static int channel(struct vm *vm, struct value *a, int argc, int i,
     for (int c = 0; c < 4; c++) {
         const struct voice *v = &vm->voices[c];
         uint32_t left = v->kind == VOICE_SFX ? v->n - v->next
-                      : v->kind == VOICE_TONE ? v->left >> 16 : 0;
+                      : v->kind == VOICE_TONE ? (uint32_t)(v->left >> 16) : 0;
         if (v->kind == VOICE_OFF) {
             *ch = c;
             return 1;
@@ -188,7 +188,7 @@ NATIVE(tone)
     v->vol = vol;
     v->noise = 0xace1u;
     /* its length in source samples, 16.16, so any mixer rate agrees */
-    v->left = (uint32_t)((uint64_t)ticks * SOURCE_RATE / vm->rate) << 16;
+    v->left = (uint64_t)ticks * SOURCE_RATE / (uint32_t)vm->rate << 16;
     vm_charge(vm, 8);
     return 1;
 }

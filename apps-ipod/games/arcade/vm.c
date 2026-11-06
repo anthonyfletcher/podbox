@@ -21,7 +21,6 @@
 #include <string.h>
 #include "games/arcade/vm.h"
 
-#define STACK_SLACK 8       /* room above maxstack for INCL and sort */
 
 /* ---- errors and text ---------------------------------------------------- */
 
@@ -108,12 +107,16 @@ static uint32_t fix_text(int32_t raw, char *b)
 }
 
 /* Text is written through a bounded writer that counts everything, so
- * one routine both measures and writes. */
+ * one routine both measures and writes. The length saturates, and an
+ * array nested in itself stops after TW_MOST elements. */
 struct tw
 {
     uint8_t *p, *end;
     uint32_t n;
+    uint32_t seen;                  /* elements visited */
 };
+
+#define TW_MOST (1u << 18)
 
 static void tw_put(struct tw *w, const void *b, uint32_t n)
 {
@@ -122,7 +125,15 @@ static void tw_put(struct tw *w, const void *b, uint32_t n)
         memcpy(w->p, b, k);
         w->p += k;
     }
-    w->n += n;
+    w->n = n > 0xffffffffu - w->n ? 0xffffffffu : w->n + n;
+}
+
+/* The charge for a text measured, before it is made */
+static int tw_spend(struct vm *vm, const struct tw *w)
+{
+    if (w->seen > TW_MOST)
+        return vm_fail(vm, "text of too many elements", "", "");
+    return vm_spend(vm, w->seen + w->n / BYTES_PER_UNIT);
 }
 
 static void tw_value(struct vm *vm, struct tw *w, struct value v, int depth);
@@ -136,9 +147,12 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
         tw_put(w, "...", 3);
         return;
     }
+    if (w->seen > TW_MOST)
+        return;
     if (v.tag == T_ARR) {
         struct arr *a = ARR(vm, v);
-        for (uint32_t i = 0; i < a->len; i++) {
+        w->seen += a->len;
+        for (uint32_t i = 0; i < a->len && w->seen <= TW_MOST; i++) {
             if (i)
                 tw_put(w, sep, seplen);
             struct value e = BUF(vm, a->buf)->v[i];
@@ -147,6 +161,7 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
         }
     } else if (v.tag == T_I32) {
         struct i32 *a = I32(vm, v);
+        w->seen += a->len;
         for (uint32_t i = 0; i < a->len; i++) {
             if (i)
                 tw_put(w, sep, seplen);
@@ -154,6 +169,7 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
         }
     } else {
         struct u8a *a = U8A(vm, v);
+        w->seen += a->len;
         for (uint32_t i = 0; i < a->len; i++) {
             if (i)
                 tw_put(w, sep, seplen);
@@ -186,7 +202,7 @@ static void tw_value(struct vm *vm, struct tw *w, struct value v, int depth)
 /* v as text into dst, truncated to cap; returns the length written. */
 uint32_t vm_text(struct vm *vm, struct value v, char *dst, uint32_t cap)
 {
-    struct tw w = { (uint8_t *)dst, (uint8_t *)dst + cap, 0 };
+    struct tw w = { (uint8_t *)dst, (uint8_t *)dst + cap, 0, 0 };
     tw_value(vm, &w, v, 0);
     return (uint32_t)(w.p - (uint8_t *)dst);
 }
@@ -222,13 +238,15 @@ int vm_tostring(struct vm *vm, struct value v, struct value *out)
         *out = v;
         return 1;
     }
-    struct tw w = { 0, 0, 0 };
+    struct tw w = { 0, 0, 0, 0 };
     tw_value(vm, &w, v, 0);
+    if (!tw_spend(vm, &w))
+        return 0;
     uint32_t off = new_str(vm, w.n);
     if (!off)
         return 0;
     struct str *s = MEM(vm, off);
-    struct tw o = { s->b, s->b + w.n, 0 };
+    struct tw o = { s->b, s->b + w.n, 0, 0 };
     tw_value(vm, &o, v, 0);
     *out = mk(T_STR, (int32_t)off);
     return 1;
@@ -238,21 +256,22 @@ int vm_tostring(struct vm *vm, struct value v, struct value *out)
 static int concat(struct vm *vm, struct value *dst, struct value a,
                   struct value b)
 {
-    struct tw m = { 0, 0, 0 };
+    struct tw m = { 0, 0, 0, 0 };
     tw_value(vm, &m, a, 0);
     uint32_t la = m.n;
     tw_value(vm, &m, b, 0);
+    /* Formatting and allocating, measured on the 5G */
+    if (!tw_spend(vm, &m) || !vm_spend(vm, 20))
+        return 0;
     uint32_t off = new_str(vm, m.n);
     if (!off)
         return 0;
     struct str *s = MEM(vm, off);
-    struct tw o = { s->b, s->b + m.n, 0 };
+    struct tw o = { s->b, s->b + m.n, 0, 0 };
     tw_value(vm, &o, a, 0);
     o.p = s->b + la;
     tw_value(vm, &o, b, 0);
     *dst = mk(T_STR, (int32_t)off);
-    /* Formatting and allocating, measured on the 5G */
-    vm_charge(vm, 20 + m.n / BYTES_PER_UNIT);
     return 1;
 }
 
@@ -260,6 +279,7 @@ static int str_cmp(struct vm *vm, struct value a, struct value b)
 {
     struct str *x = STR(vm, a), *y = STR(vm, b);
     uint32_t n = x->len < y->len ? x->len : y->len;
+    vm_charge(vm, n / BYTES_PER_UNIT);
     int c = memcmp(x->b, y->b, n);
     if (c)
         return c;
@@ -272,7 +292,10 @@ static int equal(struct vm *vm, struct value a, struct value b)
         return is_num(a) && is_num(b) && scaled(a) == scaled(b);
     if (a.tag == T_STR && a.v != b.v) {
         struct str *x = STR(vm, a), *y = STR(vm, b);
-        return x->len == y->len && !memcmp(x->b, y->b, x->len);
+        if (x->len != y->len)
+            return 0;
+        vm_charge(vm, x->len / BYTES_PER_UNIT);
+        return !memcmp(x->b, y->b, x->len);
     }
     return a.v == b.v;
 }
@@ -296,9 +319,10 @@ int vm_new_array(struct vm *vm, uint32_t len, struct value *out)
     struct value a = mk(T_ARR, (int32_t)off);
     if (len) {
         uint32_t b;
-        vm->tmp[vm->ntmp++] = a;
+        if (!vm_root(vm, a))
+            return 0;
         int ok = new_buf(vm, len, &b);
-        vm->ntmp--;
+        vm_unroot(vm);
         if (!ok)
             return 0;
         ARR(vm, a)->buf = b;
@@ -326,7 +350,10 @@ int vm_new_record(struct vm *vm, const char *const *keys, uint32_t n,
         if (!vm_new_string(vm, (const uint8_t *)keys[i],
                            (uint32_t)strlen(keys[i]), &s))
             return 0;
+        if (!vm_root(vm, s))
+            return 0;
         uint32_t k = key_id(vm, s, 1);
+        vm_unroot(vm);
         if (k == NONE)
             return 0;
         shape = vm_shape_add(vm, shape, k);
@@ -434,9 +461,10 @@ static int new_obj(struct vm *vm, uint32_t shape, struct value *vals,
         return 0;
     struct value o = mk(T_OBJ, (int32_t)off);
     if (n) {
-        vm->tmp[vm->ntmp++] = o;
+        if (!vm_root(vm, o))
+            return 0;
         int ok = new_buf(vm, n, &b);
-        vm->ntmp--;
+        vm_unroot(vm);
         if (!ok)
             return 0;
         memcpy(BUF(vm, b)->v, vals, n * sizeof(struct value));
@@ -589,6 +617,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                   int argc)
 {
     struct value self = *r, out = mk(T_NULL, 0);
+    uint32_t work = 0;              /* bytes moved or made, charged after */
     int is_arr = self.tag == T_ARR, is_str = self.tag == T_STR;
     if (m == M_splice || m == M_slice || m == M_charCodeAt ||
         m == M_substring)
@@ -622,6 +651,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         else {
             out = v[0];
             memmove(v, v + 1, p->len * sizeof(struct value));
+            work = p->len * sizeof(struct value);
         }
         v[p->len] = mk(T_NULL, 0);
         break;
@@ -634,6 +664,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             return 0;
         struct value *v = BUF(vm, ARR(vm, self)->buf)->v;
         memmove(v + 1, v, n * sizeof(struct value));
+        work = n * sizeof(struct value);
         v[0] = a[0];
         ARR(vm, self)->len = n + 1;
         out = mk(T_INT, (int32_t)(n + 1));
@@ -663,6 +694,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                 v[i] = mk(T_NULL, 0);
         }
         p->len = len - k;
+        work = len * sizeof(struct value);
         break;
     }
     case M_slice: {
@@ -682,6 +714,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             e = position(a[1].v, len);
         }
         uint32_t k = e > s ? e - s : 0;
+        work = is_str ? k : k * sizeof(struct value);
         if (is_str) {
             uint32_t off = new_str(vm, k);
             if (!off)
@@ -705,6 +738,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             for (uint32_t i = 0; i < p->len && found < 0; i++)
                 if (equal(vm, BUF(vm, p->buf)->v[i], a[0]))
                     found = (int32_t)i;
+            work = p->len * 4;
         } else if (self.tag == T_I32 || self.tag == T_U8) {
             if (a[0].tag == T_INT) {
                 uint32_t n = self.tag == T_I32 ? I32(vm, self)->len
@@ -715,16 +749,27 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                     if (e == a[0].v)
                         found = (int32_t)i;
                 }
+                work = n * 4;
             }
         } else if (is_str) {
             if (!need(vm, a[0], T_STR, ".indexOf() on a string needs a "
                       "string, not a "))
                 return 0;
             struct str *h = STR(vm, self), *nd = STR(vm, a[0]);
+            /* each place tried costs the needle's length at most, and is
+             * charged as it goes: a long search is stopped */
+            uint32_t cost = 1 + nd->len / BYTES_PER_UNIT, tried = 0;
             for (uint32_t i = 0; nd->len <= h->len && i <= h->len - nd->len
-                 && found < 0; i++)
+                 && found < 0; i++) {
                 if (!memcmp(h->b + i, nd->b, nd->len))
                     found = (int32_t)i;
+                if (++tried == 1024) {
+                    tried = 0;
+                    if (!vm_spend(vm, cost * 1024))
+                        return 0;
+                }
+            }
+            vm_charge(vm, cost * tried);
         } else
             return vm_fail(vm, ".indexOf() needs an array or string, not a ",
                            vm_typename(self.tag), "");
@@ -743,15 +788,17 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             sep = STR(vm, a[0])->b;
             seplen = STR(vm, a[0])->len;
         }
-        struct tw m0 = { 0, 0, 0 };
+        struct tw m0 = { 0, 0, 0, 0 };
         tw_join(vm, &m0, self, sep, seplen, 0);
+        if (!tw_spend(vm, &m0))
+            return 0;
         uint32_t off = new_str(vm, m0.n);
         if (!off)
             return 0;
         if (argc > 0)
             sep = STR(vm, a[0])->b;
         struct str *s = MEM(vm, off);
-        struct tw o = { s->b, s->b + m0.n, 0 };
+        struct tw o = { s->b, s->b + m0.n, 0, 0 };
         tw_join(vm, &o, self, sep, seplen, 0);
         out = mk(T_STR, (int32_t)off);
         break;
@@ -781,6 +828,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         } else
             return vm_fail(vm, ".reverse() needs an array, not a ",
                            vm_typename(self.tag), "");
+        work = n * 4;
         out = self;
         break;
     }
@@ -789,25 +837,29 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             !need(vm, a[0], T_FN, ".sort() needs a comparator function, "
                   "not a "))
             return 0;
+        /* A comparator runs the cart again on the C stack, so it may not
+         * sort in turn: one sort at a time keeps that stack shallow */
+        if (vm->sorting)
+            return vm_fail(vm, ".sort() inside a sort's comparator", "", "");
         /* Sort a copy, so a comparator that changes the array cannot
          * disturb the sort; the copy and its scratch are rooted in tmp. */
         uint32_t n = ARR(vm, self)->len;
         struct value copy, scratch;
-        if (!vm_new_array(vm, n, &copy))
+        if (!vm_new_array(vm, n, &copy) || !vm_root(vm, copy))
             return 0;
-        vm->tmp[vm->ntmp++] = copy;
-        int ok = vm_new_array(vm, n, &scratch);
+        int ok = vm_new_array(vm, n, &scratch) && vm_root(vm, scratch);
         if (ok) {
-            vm->tmp[vm->ntmp++] = scratch;
             if (n)
                 memcpy(BUF(vm, ARR(vm, copy)->buf)->v,
                        BUF(vm, ARR(vm, self)->buf)->v,
                        n * sizeof(struct value));
+            vm->sorting = 1;
             ok = sort_values(vm, a[0], BUF(vm, ARR(vm, copy)->buf)->v,
                              n ? BUF(vm, ARR(vm, scratch)->buf)->v : NULL, n);
-            vm->ntmp--;
+            vm->sorting = 0;
+            vm_unroot(vm);
         }
-        vm->ntmp--;
+        vm_unroot(vm);
         if (!ok)
             return 0;
         uint32_t len = ARR(vm, self)->len;
@@ -816,6 +868,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         if (n)
             memcpy(BUF(vm, ARR(vm, self)->buf)->v,
                    BUF(vm, ARR(vm, copy)->buf)->v, n * sizeof(struct value));
+        work = 3 * n * sizeof(struct value);
         out = self;
         break;
     }
@@ -846,6 +899,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         if (!off)
             return 0;
         memcpy(((struct str *)MEM(vm, off))->b, STR(vm, self)->b + s, e - s);
+        work = e - s;
         out = mk(T_STR, (int32_t)off);
         break;
     }
@@ -869,12 +923,14 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                 c = (uint8_t)(c + 32);
             d[i] = c;
         }
+        work = len * 2;
         out = mk(T_STR, (int32_t)off);
         break;
     }
     default:
         return vm_fail(vm, "unknown method", "", "");
     }
+    vm_charge(vm, work / BYTES_PER_UNIT);
     *r = out;
     return 1;
 }
@@ -1102,6 +1158,14 @@ void vm_charge(struct vm *vm, uint32_t units)
             vm->host->yield(vm->host->ctx);
     }
     vm->budget -= units;
+}
+
+int vm_spend(struct vm *vm, uint32_t units)
+{
+    vm_charge(vm, units);
+    if (vm->units > vm->ceiling)
+        return vm_fail(vm, "The game stopped responding", "", "");
+    return 1;
 }
 
 /* ---- calls -------------------------------------------------------------- */
@@ -1368,12 +1432,24 @@ op_BNOT:
         FAIL("~ needs a number, not a ", vm_typename(sp[-1].tag));
     sp[-1] = mk(T_INT, ~to_int(sp[-1]));
     NEXT();
+/* Strings are compared at a charge for their length, so the registers go
+ * over for them */
+#define EQUAL(x, y, r) do { \
+    if ((x).tag == T_STR && (y).tag == T_STR) { \
+        SYNC(); \
+        r = equal(vm, x, y); \
+        RELOAD(); \
+    } else \
+        r = equal(vm, x, y); \
+} while (0)
 op_EQ:
-    sp[-2] = mk(T_INT, equal(vm, sp[-2], sp[-1]));
+    EQUAL(sp[-2], sp[-1], n);
+    sp[-2] = mk(T_INT, (int32_t)n);
     sp--;
     NEXT();
 op_NE:
-    sp[-2] = mk(T_INT, !equal(vm, sp[-2], sp[-1]));
+    EQUAL(sp[-2], sp[-1], n);
+    sp[-2] = mk(T_INT, !n);
     sp--;
     NEXT();
 
@@ -1387,9 +1463,11 @@ op_##name: \
     a = sp[-2]; b = sp[-1]; \
     if (is_num(a) && is_num(b)) \
         sp[-2] = mk(T_INT, scaled(a) op scaled(b)); \
-    else if (a.tag == T_STR && b.tag == T_STR) \
+    else if (a.tag == T_STR && b.tag == T_STR) { \
+        SYNC(); \
         sp[-2] = mk(T_INT, str_cmp(vm, a, b) op 0); \
-    else \
+        RELOAD(); \
+    } else \
         FAIL(text " needs two numbers or two strings, not a ", \
              vm_typename(is_num(a) || a.tag == T_STR ? b.tag : a.tag)); \
     sp--; \
@@ -1413,9 +1491,11 @@ op_##name: { \
     int hold; \
     if (is_num(a) && is_num(b)) \
         hold = scaled(a) op scaled(b); \
-    else if (a.tag == T_STR && b.tag == T_STR) \
+    else if (a.tag == T_STR && b.tag == T_STR) { \
+        SYNC(); \
         hold = str_cmp(vm, a, b) op 0; \
-    else \
+        RELOAD(); \
+    } else \
         FAIL("a comparison needs two numbers or two strings, not a ", \
              vm_typename(is_num(a) || a.tag == T_STR ? b.tag : a.tag)); \
     if (hold) \
@@ -1432,7 +1512,8 @@ op_JNE: {
     int ne = pc[-1] == OP_JNE;
     int32_t off = S16();
     sp -= 2;
-    if (equal(vm, sp[0], sp[1]) != ne)
+    EQUAL(sp[0], sp[1], n);
+    if ((int)n != ne)
         pc += off;
     NEXT();
 }
@@ -1563,6 +1644,9 @@ op_NEWU8: {
         goto fail;
     ((struct i32 *)MEM(vm, off))->len = n;
     sp[-1] = mk(is32 ? T_I32 : T_U8, (int32_t)off);
+    /* cleared at the speed of memory */
+    vm_charge(vm, n * (is32 ? 4 : 1) / BYTES_PER_UNIT);
+    RELOAD();
     NEXT();
 }
 op_NEWOBJ: {

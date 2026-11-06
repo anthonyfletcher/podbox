@@ -55,8 +55,8 @@ struct arcade_beat
     /* the nth beat at or after from (0 the first) and its place in the
      * bar, 0-3, from the downbeat once one was found; -1 with no lock */
     int32_t (*next)(void *ctx, int32_t from, int32_t n, int32_t *in_bar);
-    /* which of the four beats starts the bar, or -1, and by what margin
-     * in tenths */
+    /* which of the four beats starts the bar, or -1 (none wins, or under
+     * 32 beats heard), and by what margin in tenths */
     int32_t (*downbeat)(void *ctx, int32_t *margin10);
     /* track ms this instant, past the tick */
     int32_t (*now)(void *ctx);

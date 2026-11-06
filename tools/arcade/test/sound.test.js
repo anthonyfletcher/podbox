@@ -139,6 +139,13 @@ test('four voices mix, sfx(-1) stops one, and tone plays its note for its ticks'
     const tick = 44100 / 25;
     assert.ok(stop.left.slice(0, 2 * tick).some((v) => v !== 0));
     assert.ok(stop.left.slice(3 * tick).every((v) => v === 0), 'still sounding after sfx(-1)');
+    /* 100 ticks is 4 s: past the 65536 samples a 32-bit length held */
+    const long = cart({}, 'function init() { tone(0, 441, 100, 255, WAVE.SQUARE); }\n' +
+                      'function update() {}', 110);
+    let end = 0;
+    for (let i = 0; i < long.left.length; i++)
+        if (long.left[i]) end = i;
+    assert.ok(Math.abs(end - 176400) <= 2, 'a long tone ends at ' + end);
 });
 
 test('click reaches the host, and bad sounds and calls are named', () => {
