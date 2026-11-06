@@ -123,14 +123,6 @@ static int spk_info_screen(void)
 
 /** The menu **/
 
-static int spk_offset_setting(void)
-{
-    set_int(str(LANG_SPIKE_OFFSET), " ms", UNIT_MS, state->offset_ms, NULL,
-            SPK_OFFSET_STEP, -SPK_OFFSET_MAX, SPK_OFFSET_MAX, NULL);
-
-    return 0;
-}
-
 static int spk_tempo_setting(void)
 {
     static const struct opt_items names[] = {
@@ -155,8 +147,6 @@ static int spk_tempo_setting(void)
 MENUITEM_FUNCTION(spk_scores_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_SPIKE_SCORES), spk_scores_screen, NULL,
                   Icon_NOICON);
-MENUITEM_FUNCTION(spk_offset_item, 0, ID2P(LANG_SPIKE_OFFSET),
-                  spk_offset_setting, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(spk_tempo_item, 0, ID2P(LANG_SPIKE_TEMPO),
                   spk_tempo_setting, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(spk_info_item, 0, ID2P(LANG_SPIKE_INFO),
@@ -172,7 +162,7 @@ MENUITEM_SETTING(spk_scroll_item, &global_settings.spike_caption_scroll, NULL);
 
 MAKE_MENU(spike_menu, ID2P(LANG_SPIKE), NULL, Icon_NOICON,
           &spk_scores_item, &spk_caption_item, &spk_scroll_item,
-          &spk_offset_item, &spk_tempo_item, &spk_info_item);
+          &spk_tempo_item, &spk_info_item);
 
 bool spike_menu_show(struct spk_menu *m)
 {

@@ -398,7 +398,6 @@ static const struct tag_row tag_rows[] = {
 { "spun rank by",        TAG_LIBRARY,                            "spun playback report statistics top artists songs albums ranked plays minutes time listened" },
 { "spike caption",       TAG_APPEARANCE,                         "spike game now playing track artist" },
 { "spike caption scroll",TAG_APPEARANCE,                         "spike game now playing scroll crop" },
-{ "spike audio offset",  TAG_ADVANCED|TAG_SOUND,                 "spike game latency calibration timing" },
 { "show debug menu",     TAG_ADVANCED|TAG_SYSTEM,                "debug" },
 { "settings mode",       TAG_SYSTEM,                             "basic advanced" },
 { "time format",         TAG_SYSTEM,                             "clock 12 24 hour" },

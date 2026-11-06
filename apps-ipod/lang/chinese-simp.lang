@@ -20357,16 +20357,16 @@
 </phrase>
 <phrase>
   id: LANG_SPIKE_OFFSET
-  desc: in the Spike menu, the output delay the game is judged against
+  desc: deprecated
   user: core
   <source>
-    *: "Audio Offset"
+    *: none
   </source>
   <dest>
-    *: "音频偏移"
+    *: none
   </dest>
   <voice>
-    *: "音频偏移"
+    *: none
   </voice>
 </phrase>
 <phrase>

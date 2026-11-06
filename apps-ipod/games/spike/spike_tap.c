@@ -20,9 +20,8 @@
  *           the game's pause menu has a half/double toggle for exactly it.
  *   phase   where your taps sit relative to the tracker's beats. A tight
  *           spread with the mean away from zero is a right tempo started in
- *           the wrong place, and the mean is the number to put into the
- *           audio offset. It carries your own reaction time with it, which
- *           is intended: that is what the offset is nulling.
+ *           the wrong place, by about the mean. It carries your own
+ *           reaction time with it.
  *   spread  how far the taps scatter. Wide means the tempo is wrong, however
  *           good the ratio looks -- a wrong period walks the phase around.
  *   drift   the phase error of the first tap against the last. Steady drift
@@ -313,15 +312,15 @@ static void bt_draw(bool pulse)
     lcd_putsxy(2, BT_PLOT_Y + BT_PLOT_H + 8, (const unsigned char *)
                "early                beat                 late");
 
-    /* A tight cluster off centre is a fixed offset and the phase figure is
-     * the correction; a smear is a tempo that does not fit, whatever the
+    /* A tight cluster off centre is a fixed lean, the phase figure its
+     * size; a smear is a tempo that does not fit, whatever the
      * ratio says. */
     if (spread > (int)bt.period_ms / 3)
         lcd_putsxy(2, BT_PLOT_Y + BT_PLOT_H + 20, (const unsigned char *)
                    "scattered -- tempo does not fit these taps");
     else if (taps > 3)
         lcd_putsxy(2, BT_PLOT_Y + BT_PLOT_H + 20, (const unsigned char *)
-                   "clustered -- phase above is the offset to dial in");
+                   "clustered -- phase above is how far off they lean");
 
     lcd_update();
 }

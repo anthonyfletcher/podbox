@@ -43,7 +43,6 @@
 #include "pcm.h"
 #include "iap-usb.h"
 #include "settings.h"
-#include "games/spike/spike_menu.h"  /* SPK_OFFSET_MAX/STEP */
 #include "rbpaths.h"
 #include "settings_list.h"
 #include "usb.h"
@@ -2410,9 +2409,6 @@ const struct settings_list settings[] = {
                    ID2P(LANG_SPIKE_CAPTION_BOTH)),
     OFFON_SETTING(0, spike_caption_scroll, LANG_SPIKE_CAPTION_SCROLL, false,
                   "spike caption scroll", NULL),
-    INT_SETTING(0, spike_offset, LANG_SPIKE_OFFSET, -50, "spike audio offset",
-                UNIT_MS, -SPK_OFFSET_MAX, SPK_OFFSET_MAX, SPK_OFFSET_STEP,
-                NULL, NULL, NULL),
 };
 
 const int nb_settings = sizeof(settings)/sizeof(*settings);

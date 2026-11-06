@@ -10,17 +10,11 @@
 
 #include <stdbool.h>
 
-/* The calibration slider's range and step, shared with the game so the two
- * cannot disagree about what the offset may be. */
-#define SPK_OFFSET_MAX       250
-#define SPK_OFFSET_STEP      5
-
-/* What the caller lends the menu. The offset and the octave shift are
- * written back through; the rest are read-outs, gathered by the caller so
+/* What the caller lends the menu. The octave shift is written back
+ * through; the rest are read-outs, gathered by the caller so
  * they all describe the same instant. */
 struct spk_menu
 {
-    int *offset_ms;
     int *shift;
     bool tempo_changed;         /* ...and the grid has to be re-anchored */
 

@@ -417,12 +417,6 @@ off. It steps a character at a time on the beat rather than gliding. Off is
 the calmer choice while you are playing, and shows as much of the name as
 fits. Off as well while Scrolling is off.
 
-[spike audio offset]
-How far ahead of the sound the game judges a press. Raise it if your presses
-feel late when they sounded on the beat, lower it if they feel early. It
-corrects the delay below the player's own buffer -- headphones and the codec
--- so it is worth setting once and leaving.
-
 [play log]
 Records what was played and when. On feeds the listening statistics; the
 Last.fm setting writes a scrobble log a computer can upload.

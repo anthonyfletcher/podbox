@@ -20,3 +20,6 @@
   the new **Skip iPod Games** setting (Settings > Library > Database, on by
   default). On a player iTunes has synced, the next Update removes them from
   your Music lists; turn the setting off before updating to keep them.
+- **Spike's Audio Offset setting is gone.** It never moved where a press was
+  judged, so play is unchanged; the line it leaves in `config.cfg` is
+  ignored.

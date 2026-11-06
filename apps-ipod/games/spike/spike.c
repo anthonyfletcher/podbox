@@ -188,18 +188,6 @@ enum spk_run_state
     SPK_RUN_OVER         /* playback has stopped: there is no more of it */
 };
 
-/* Kept across entries so a calibration survives leaving the screen. It is
- * not a saved setting yet: a value that only a debug-menu screen reads has
- * no business in config.cfg until the game has a menu of its own.
- *
- * The default is where tapping put it rather than zero. The tracker's beats
- * land late against what is heard -- measured at about -118ms by tapping,
- * of which some is the analyser's phase and some is a player's habit of
- * anticipating -- and -50 is where it started feeling right in play. */
-/* Calibration, and it belongs to the player rather than to the run: it is a
- * setting so that it survives the session as well as the screen. */
-#define spk_offset()  (global_settings.spike_offset)
-
 /* The caption's own state: what it last said, and the font it says it in.
  *
  * The strings are copies. mp3entry is live -- a buflib allocation can blank
@@ -238,7 +226,7 @@ static int   cap_chars;
 
 
 /* The latched grid, and the octave the player asked for on top of it. The
- * shift is kept across entries with the offset, for the same reason. */
+ * shift is kept across entries, so a choice survives leaving the screen. */
 static int  beat_ms = SPK_BEAT_TARGET;
 static int  tempo_shift;
 static int  tempo_bpm;          /* 0 where the tempo was never locked */
@@ -335,7 +323,7 @@ static void spike_set_paused(bool pause)
  * latch, and the half/double toggle. */
 static void spike_anchor(long at)
 {
-    anchor_ms = at - spk_offset() - (long)(cur_beat + 1) * beat_ms;
+    anchor_ms = at - (long)(cur_beat + 1) * beat_ms;
 }
 
 static int spike_shifted(int ms)
@@ -423,7 +411,7 @@ static bool spike_latch_tempo(void)
      * different levels. The generator takes it out of the cell before
      * deciding anything, so they are the same phrases in the same order,
      * offset by up to three cells and by nothing else. */
-    bar_rot = spk_bar_downbeat(anchor_ms + spk_offset(), beat_ms);
+    bar_rot = spk_bar_downbeat(anchor_ms, beat_ms);
     spk_gen_set_bar(bar_rot < 0 ? 0 : bar_rot);
 
     return true;
@@ -458,13 +446,12 @@ static void spike_note_track(void)
     run_stats.tracks++;
 }
 
-/* Grid time, which is clock time with the run's origin and the output delay
- * taken out. A positive offset says the sound leaves the socket that much
- * after the position reports it, so the beats the player is judged against
- * move later by the same amount. */
+/* Grid time, which is clock time with the run's origin taken out. The
+ * grid's beats are the tracker's, and a press is judged against those --
+ * the beat the animation lands on. */
 static long spike_now(void)
 {
-    return (long)spk_clock_ms() - anchor_ms - spk_offset();
+    return (long)spk_clock_ms() - anchor_ms;
 }
 
 /* Back to listening, without stopping. Everything the audio invalidates goes
@@ -496,7 +483,7 @@ static void spike_listen(int cell)
      * a track change is a scroll that jumps back part of a cell for no
      * reason the player can hear. Anchoring on the grid time the last frame
      * had keeps both. */
-    anchor_ms = (long)spk_clock_ms() - spk_offset() - last_grid;
+    anchor_ms = (long)spk_clock_ms() - last_grid;
 
     /* Flat first, then the cells: patterns are laid the moment one is asked
      * for, and starting the player is what asks. Setting the mode afterwards
@@ -526,7 +513,7 @@ static void spike_reset_run(void)
     beat_ms = spike_shifted(SPK_BEAT_TARGET);
     spk_draw_reset();
 
-    anchor_ms = (long)spk_clock_ms() - spk_offset();
+    anchor_ms = (long)spk_clock_ms();
     last_grid = 0;
     cur_beat = 0;
     death_kind = SPK_DEATH_LEDGE;
@@ -1174,7 +1161,6 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
     int old_shift = tempo_shift;
     bool root;
 
-    m.offset_ms = &global_settings.spike_offset;
     m.shift = &tempo_shift;
     m.font = cap_font;
     m.beat_ms = beat_ms;
@@ -1468,7 +1454,7 @@ bool spike_screen(void)
             /* Timestamped against the clock rather than against the frame:
              * the loop wakes on the button, so a press is judged where it
              * fell and not where the next frame happened to be. */
-            spike_press((long)spk_clock_now() - anchor_ms - spk_offset());
+            spike_press((long)spk_clock_now() - anchor_ms);
         }
 
         /* The WPS's controls, carried over: a run is the WPS with a game
