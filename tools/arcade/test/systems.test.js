@@ -523,6 +523,21 @@ function update() {
     assert.match(bad.err, /1 to 8 bands/);
 });
 
+test('sys: a setting by its config name, and a phrase translated', () => {
+    const cart = `function init() {
+    var v = sys.setting("volume"), t = sys.setting("theme");
+    printh(v + " " + (v + 1) + " " + t + " " + sys.setting("nothing"));
+    printh(sys.translate("Playlist") + "|" + sys.translate("my own words"));
+}
+function update() {}`;
+    const r = run(cart, 0, ['--setting', 'volume=-25', '--setting', 'theme=scrim']);
+    assert.equal(r.status, 0, r.err);
+    /* a number is a number; anything else text; unknown is null; with no
+     * language but English a phrase comes back as it went */
+    assert.deepEqual(r.out.trim().split('\n'),
+                     ['-25 -24 scrim null', 'Playlist|my own words']);
+});
+
 test('plane: fog covers the far ground, and coarse draws pixel pairs', () => {
     const r = run(FLOOR + `function init() {
     floor();

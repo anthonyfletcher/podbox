@@ -5,7 +5,7 @@
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
- *                  [--menu i]...
+ *                  [--setting name=value]... [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -25,7 +25,8 @@
  * --playing has playback.playing() report music playing. --beat bpm plays
  * a steady track at that tempo for beat: its clock follows the ticks, the
  * tracker locks a second after beat.listen(true), and presses are stamped
- * with the tick's time. Each
+ * with the tick's time. --setting name=value is what sys.setting(name)
+ * gives, a number where the value is one; sys.translate() is English. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -163,6 +164,31 @@ static const struct arcade_beat fake_beat = {
     fake_listen, fake_state, fake_next, fake_downbeat, fake_now, fake_mood,
     fake_bands, fake_sound
 };
+
+/* --setting name=value: what sys.setting(name) gives, a number where the
+ * value is one; none are set otherwise. sys.translate() is English. */
+static const char *settings[16];
+static int nsettings;
+
+static int fake_setting(void *ctx, const char *name, int32_t *num, char *buf,
+                        int cap)
+{
+    (void)ctx;
+    size_t len = strlen(name);
+    for (int i = 0; i < nsettings; i++)
+        if (!strncmp(settings[i], name, len) && settings[i][len] == '=') {
+            const char *v = settings[i] + len + 1;
+            char *end;
+            long n = strtol(v, &end, 10);
+            if (*v && !*end) {
+                *num = (int32_t)n;
+                return 1;
+            }
+            snprintf(buf, (size_t)cap, "%s", v);
+            return 2;
+        }
+    return 0;
+}
 
 static void click(void *ctx, int beep)
 {
@@ -419,6 +445,9 @@ int main(int argc, char **argv)
             wav_path = argv[++i];
         else if (!strcmp(argv[i], "--wheel") && i + 1 < argc)
             turns = argv[++i];
+        else if (!strcmp(argv[i], "--setting") && i + 1 < argc &&
+                 nsettings < 16)
+            settings[nsettings++] = argv[++i];
         else if (!strcmp(argv[i], "--beat") && i + 1 < argc)
             bpm = atol(argv[++i]);
         else if (!strcmp(argv[i], "--playing"))
@@ -449,7 +478,8 @@ int main(int argc, char **argv)
     static uint64_t arena[512 * 1024 / 8];
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
-                                bpm > 0 ? &fake_beat : NULL };
+                                bpm > 0 ? &fake_beat : NULL, fake_setting,
+                                NULL };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;

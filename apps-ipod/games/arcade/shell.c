@@ -21,6 +21,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>           /* atoi */
 #include <stdbool.h>
 #include <string.h>
 #include "config.h"
@@ -35,6 +36,7 @@
 #include "timefuncs.h"        /* get_time */
 #include "lang.h"
 #include "settings/settings.h"
+#include "settings/settings_list.h"  /* F_T_MASK, F_RGB */
 #include "system/app_buffer.h"
 #include "system/activity.h"
 #include "system/shutdown.h"  /* default_event_handler */
@@ -412,9 +414,49 @@ static void beat_tick(struct vm *vm)
     arcade_music(vm, &m);
 }
 
+/* ---- sys: settings and phrases ------------------------------------------ */
+
+/* A setting as config.cfg writes it; a number when it is a plain one */
+static int host_setting(void *ctx, const char *name, int32_t *num, char *buf,
+                        int cap)
+{
+    (void)ctx;
+    const struct settings_list *s = find_setting_by_cfgname(name);
+    if (!s)
+        return 0;
+    cfg_to_string(s, buf, cap);
+    int type = s->flags & F_T_MASK;
+    if ((type == F_T_INT || type == F_T_UINT) && !(s->flags & F_RGB)) {
+        const char *p = buf + (*buf == '-');
+        if (*p) {
+            while (*p >= '0' && *p <= '9')
+                p++;
+            if (!*p) {
+                *num = atoi(buf);
+                return 1;
+            }
+        }
+    }
+    return 2;
+}
+
+/* The phrase whose built-in English is english, as the loaded language
+ * has it: every phrase compared, once for each the cart asks for */
+static const char *host_translate(void *ctx, const char *english)
+{
+    (void)ctx;
+    const unsigned char *p = core_language_builtin;
+    for (int i = 0; i < LANG_LAST_INDEX_IN_ARRAY; i++) {
+        if (*p && !strcmp((const char *)p, english))
+            return (const char *)language_strings[i];
+        p += strlen((const char *)p) + 1;
+    }
+    return NULL;
+}
+
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
-    &beat_host
+    &beat_host, host_setting, host_translate
 };
 
 /* ---- sound -----------------------------------------------------------------

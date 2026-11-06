@@ -339,6 +339,54 @@ NATIVE(playback_sound)
     return RET_INT(has ? 1 : 0);
 }
 
+/* ---- sys: the owner's settings and the firmware's phrases ---------------- */
+
+/* sys.setting(name): the owner's setting by the name config.cfg gives it,
+ * read-only -- a number where it is one, else its text as config.cfg
+ * writes it ("on", a choice's name, a colour as rrggbb); null for no such
+ * setting */
+NATIVE(sys_setting)
+{
+    (void)argc;
+    char name[64], text[128];
+    if (a[0].tag != T_STR)
+        return vm_fail(vm, "sys.setting() needs a setting's name", "", "");
+    name[vm_text(vm, a[0], name, sizeof(name) - 1)] = '\0';
+    int32_t num = 0;
+    int kind = vm->host && vm->host->setting ?
+               vm->host->setting(vm->host->ctx, name, &num, text,
+                                 sizeof(text)) : 0;
+    vm_charge(vm, 50);
+    if (kind == 1)
+        return RET_INT(num);
+    if (kind != 2) {
+        *out = mk(T_NULL, 0);
+        return 1;
+    }
+    return vm_new_string(vm, (const uint8_t *)text, (uint32_t)strlen(text),
+                         out);
+}
+
+/* sys.translate(phrase): a phrase the firmware has, given in English, in
+ * the owner's language; anything else back as it came. It searches every
+ * phrase, so a cart asks once and keeps the answer */
+NATIVE(sys_translate)
+{
+    (void)argc;
+    char english[128];
+    if (a[0].tag != T_STR)
+        return vm_fail(vm, "sys.translate() needs a phrase", "", "");
+    english[vm_text(vm, a[0], english, sizeof(english) - 1)] = '\0';
+    const char *t = vm->host && vm->host->translate ?
+                    vm->host->translate(vm->host->ctx, english) : NULL;
+    vm_charge(vm, 500);
+    if (!t) {
+        *out = a[0];
+        return 1;
+    }
+    return vm_new_string(vm, (const uint8_t *)t, (uint32_t)strlen(t), out);
+}
+
 /* skipped(): frames the engine ran late and did not draw since the last
  * call */
 NATIVE(skipped)

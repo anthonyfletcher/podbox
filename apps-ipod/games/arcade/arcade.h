@@ -32,6 +32,15 @@ struct arcade_host
     int (*playing)(void *ctx);
     /* beat: the music's beat, below; NULL where there is none to follow */
     const struct arcade_beat *beat;
+    /* sys.setting(): the owner's setting by its config.cfg name -- 1 with
+     * *num for a number, 2 with its text in buf, 0 for no such setting;
+     * NULL for none */
+    int (*setting)(void *ctx, const char *name, int32_t *num, char *buf,
+                   int cap);
+    /* sys.translate(): the firmware's phrase whose English is english, in
+     * the owner's language, UTF-8; NULL where the firmware has no such
+     * phrase. NULL for English only */
+    const char *(*translate)(void *ctx, const char *english);
 };
 
 /* The beat of the owner's music, for a cart played to it. Times are track

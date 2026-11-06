@@ -135,6 +135,12 @@ API(beat_mood,     141, 1, 1, VOID, 0, FLAT, LISTEN, 1)
 API(playback_bands, 142, 2, 2, VOID, 0, FLAT, LISTEN, 1)
 API(playback_sound, 143, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 
+/* The owner's settings, read-only, and the firmware's phrases in their
+ * language */
+API_NS(sys)
+API(sys_setting,   144, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(sys_translate, 145, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+
 /* Memory: the engine's own arrays, and bulk moves */
 API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)
