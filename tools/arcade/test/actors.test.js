@@ -185,3 +185,37 @@ test('a pool names its platforms and field, checked when used', () => {
     const out = spawnSync(exe, [file, '--ticks', '1'], { encoding: 'utf8' });
     assert.match(out.stderr, /actors\.move\(\) needs a pool from actors\.pool\(\)/);
 });
+
+test('an actor with splash set pushes the water aside, and none is lost', () => {
+    const body = (splash) => FIELD + `
+function water() {
+    var n = 0;
+    target(f); for (var y = 0; y < 60; y++) for (var x = 30; x < 90; x++) if (pget(x, y) == 12) n++; target(SCREEN);
+    return n;
+}
+function inside() {
+    var n = 0, x0 = flr(p.x[0]), y0 = flr(p.y[0]);
+    target(f); for (var y = y0; y < y0 + 8; y++) for (var x = x0; x < x0 + 8; x++) if (pget(x, y) == 12) n++; target(SCREEN);
+    return n;
+}
+function init() {
+    field();
+    p = actors.pool(1);
+    p.gravity = 0.25; p.field = f; p.rules = R; p.density = 300; p.splash = ${splash};
+    var b = actors.spawn(p); p.x[b] = 56; p.y[b] = 20;
+    printh(water());
+}
+function update() {
+    tk++;
+    actors.move(p, 0, 0, hits);
+    if (tk == 40) printh(water() + " " + inside() + " " + flr(p.y[0]));
+}`;
+    const wet = run(body(1), 40);
+    /* 40 x 20 of water: all of it still there, none inside the actor, which
+     * has sunk to the floor (60 - 8) */
+    assert.deepEqual(wet, ['800', '800 0 52']);
+    /* without splash it sits in the water */
+    const still = run(body(0), 40);
+    assert.equal(still[1].split(' ')[0], '800');
+    assert.notEqual(still[1].split(' ')[1], '0');
+});

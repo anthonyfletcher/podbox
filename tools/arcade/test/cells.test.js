@@ -252,10 +252,9 @@ function update() {
     assert.ok(lifted > 50, 'lifted ' + lifted);
     /* the stone floor untouched, every lifted cell a live particle */
     assert.equal(out[1], '384 ' + lifted);
-    /* all landed again: no particle left in flight, and nearly every cell
-     * back -- a particle landing where another just has is lost, as
-     * debris thrown out of the field is */
+    /* all landed again: no particle left in flight, and every cell back --
+     * one landing where another just has settles beside or above it */
     const [live, back] = out[2].split(' ').map(Number);
     assert.equal(live, 0);
-    assert.ok(back >= (64 + 32) * 0.9, 'cells back: ' + back);
+    assert.equal(back, 64 + 32);
 });

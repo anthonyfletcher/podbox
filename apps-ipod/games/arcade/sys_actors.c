@@ -29,12 +29,13 @@
 enum { A_ON, A_X, A_Y, A_DX, A_DY, A_W, A_H, A_SP, A_FLIP, A_CELL,
        A_FRAMES, A_SPEED, A_MAT, A_ZONE,
        A_ARRAYS, A_GRAVITY = A_ARRAYS, A_DRAG, A_PLATFORMS, A_FIELD,
-       A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_ONEWAY, A_FIELDS };
+       A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_ONEWAY, A_SPLASH,
+       A_FIELDS };
 static const char *const actor_keys[A_FIELDS] = {
     "on", "x", "y", "dx", "dy", "w", "h", "sp", "flip", "cell",
     "frames", "speed", "mat", "zone",
     "gravity", "drag", "platforms", "field", "rules", "field_x", "field_y",
-    "density", "oneway"
+    "density", "oneway", "splash"
 };
 
 enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_ARRAYS,
@@ -434,6 +435,63 @@ static void carry(const struct world *w, int32_t *x, int32_t *y, int32_t W,
 
 #define HIT_CRUSH 8
 
+/* The nearest air to column px in the ring r out from the box x0..x1,
+ * y0..y1 (field pixels): its top first, then its sides from the top down,
+ * then its bottom; 1 with it in *ax, *ay */
+static int air_near(const struct world *w, int32_t px,
+                    int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t r,
+                    int32_t *ax, int32_t *ay)
+{
+    int32_t top = y0 - r, bottom = y1 + r, left = x0 - r, right = x1 + r;
+    int32_t best = -1;
+    /* the top, nearest the cell first */
+    for (int32_t x = left; x <= right; x++) {
+        int32_t d = x > px ? x - px : px - x;
+        if ((best < 0 || d < best) && field_at(w, x, top) == 0) {
+            best = d;
+            *ax = x;
+            *ay = top;
+        }
+    }
+    if (best >= 0)
+        return 1;
+    for (int32_t y = top + 1; y <= bottom; y++) {
+        int32_t first = px - left <= right - px ? left : right;
+        int32_t other = first == left ? right : left;
+        if (field_at(w, first, y) == 0) { *ax = first; *ay = y; return 1; }
+        if (field_at(w, other, y) == 0) { *ax = other; *ay = y; return 1; }
+    }
+    return 0;
+}
+
+/* Splashed: the loose cells -- liquids and powders, anything not solid --
+ * under the actor's box pushed out to the nearest air just outside it,
+ * above first, then beside it, a ring or two out when the first is full;
+ * a cell with no air near stays where it is. For a pool with splash set. */
+static void splash(const struct world *w, int32_t X, int32_t Y, int32_t W,
+                   int32_t H, uint32_t *checked)
+{
+    int32_t x0 = X >> 16, y0 = Y >> 16;
+    int32_t x1 = (X + W - 1) >> 16, y1 = (Y + H - 1) >> 16;
+    for (int32_t py = y0; py <= y1; py++)
+        for (int32_t px = x0; px <= x1; px++) {
+            int32_t m = field_at(w, px, py);
+            (*checked)++;
+            if (m <= 0 || (w->cw.flags[m] & CELL_SOLID))
+                continue;
+            for (int32_t r = 1; r <= 3; r++) {
+                int32_t ax = 0, ay = 0;
+                *checked += (uint32_t)(2 * (x1 - x0 + y1 - y0) + 8 * r);
+                if (air_near(w, px, x0, y0, x1, y1, r, &ax, &ay)) {
+                    w->cw.c[(ay - w->fy0) * w->cw.w + (ax - w->fx0)] =
+                        (uint8_t)m;
+                    w->cw.c[(py - w->fy0) * w->cw.w + (px - w->fx0)] = 0;
+                    break;
+                }
+            }
+        }
+}
+
 /* Pushed: a platform that moved into the actor this tick -- clear of it
  * where the platform was before, overlapping it now -- shoves it out
  * ahead, along the way the platform crossed into it, swept against the
@@ -584,6 +642,7 @@ NATIVE(actors_move)
     struct value *dy = ELEMS(vm, f[A_DY]), *w = ELEMS(vm, f[A_W]);
     struct value *h = ELEMS(vm, f[A_H]), *cell = ELEMS(vm, f[A_CELL]);
     struct value *mat = ELEMS(vm, f[A_MAT]);
+    int splashes = vm_truthy(vm, f[A_SPLASH]);
     uint32_t moved = 0, checked = 0;
     for (uint32_t i = 0; i < n; i++) {
         if (!vm_truthy(vm, on[i]))
@@ -612,9 +671,12 @@ NATIVE(actors_move)
             side = s2;
         if (side >= 0)
             contact(&c, i, side, hx, hy);
-        if (wd.field)
+        if (wd.field) {
             in_field(&wd, &c, i, X, Y, W, H, &DX, &DY, g, density,
                      is_num(mat[i]) ? floor_int(mat[i]) : -1, &checked);
+            if (splashes)
+                splash(&wd, X, Y, W, H, &checked);
+        }
         x[i] = mk(T_FIX, X);
         y[i] = mk(T_FIX, Y);
         dx[i] = mk(T_FIX, DX);
@@ -1198,9 +1260,10 @@ struct dropfield
 };
 
 /* A particle moved from ox, oy to nx, ny (16.16 world pixels) into
- * something in the field settles there as a cell of its colour -- the
- * colour is the material -- where it was, if that is air; either way it
- * is gone. Air is material 0. */
+ * something in the field, or out through its floor, settles as a cell of
+ * its colour -- the colour is the material -- where it was, or the
+ * nearest air above or beside that; either way it is gone as a particle.
+ * Air is material 0. */
 static void settle(const struct dropfield *f, struct value *life, uint32_t i,
                    int32_t ox, int32_t oy, int32_t nx, int32_t ny,
                    struct value c)
@@ -1213,9 +1276,27 @@ static void settle(const struct dropfield *f, struct value *life, uint32_t i,
     /* landed: on something, or at the field's floor */
     if (!in && !(py >= f->h && px >= 0 && px < f->w))
         return;
-    if (qx >= 0 && qy >= 0 && qx < f->w && qy < f->h &&
-        !f->c[qy * f->w + qx])
-        f->c[qy * f->w + qx] = (uint8_t)(is_num(c) ? floor_int(c) : 0);
+    /* where it was, brought into the field; taken, the nearest air up its
+     * column, or a column or two either side */
+    if (qx < 0) qx = 0;
+    if (qx >= f->w) qx = f->w - 1;
+    if (qy >= f->h) qy = f->h - 1;
+    if (qy >= 0) {
+        uint8_t m = (uint8_t)(is_num(c) ? floor_int(c) : 0);
+        static const int8_t side[5] = { 0, -1, 1, -2, 2 };
+        for (int s = 0; s < 5; s++) {
+            int32_t cx = qx + side[s];
+            if (cx < 0 || cx >= f->w)
+                continue;
+            int32_t cy = qy;
+            while (cy >= 0 && f->c[cy * f->w + cx])
+                cy--;
+            if (cy >= 0) {
+                f->c[cy * f->w + cx] = m;
+                break;
+            }
+        }
+    }
     life[i] = mk(T_INT, 0);
 }
 
