@@ -266,4 +266,59 @@ const int32_t *arcade_save(struct vm *vm, int *dirty,
 void arcade_restore(struct vm *vm, const int32_t save[256],
                     const uint8_t fractions[32]);
 
+/* sys_score.c: a cart's high scores. Its boards come from the cart (the
+ * BORD chunk); the host fills them from its file when the cart starts and
+ * writes them out when they change. A board's name is matched by key, a
+ * hash of the name the cart's code knows it by, and a table is kept only
+ * while its version is unchanged. */
+#define ARCADE_BOARDS 8
+#define ARCADE_RANKS  10
+#define ARCADE_SCORE_NUMBER 0   /* a plain number */
+#define ARCADE_SCORE_TIME   1   /* ms, shown as a time */
+#define ARCADE_SCORE_TICKS  2   /* ticks, shown as a time at the cart's rate */
+
+struct arcade_entry
+{
+    int32_t value;
+    int32_t date;               /* yyyymmdd, 0 unknown */
+    char name[16];              /* "" when none was given */
+};
+
+struct arcade_board
+{
+    char title[24];
+    uint32_t key;
+    uint16_t version;
+    uint8_t low, format;        /* low: the lowest value wins */
+    uint8_t count;
+    struct arcade_entry e[ARCADE_RANKS];
+};
+
+struct arcade_scores
+{
+    char cart[32];              /* the cart's name, for a list of every cart */
+    uint8_t id[8];
+    uint8_t rate;               /* ticks a second, for ARCADE_SCORE_TICKS */
+    uint32_t plays, seconds;    /* times started, and time played */
+    int count;
+    struct arcade_board b[ARCADE_BOARDS];
+};
+
+/* The running cart's boards; dirty is set when a score was recorded or
+ * cleared since the last call, and cleared. */
+struct arcade_scores *arcade_scores(struct vm *vm, int *dirty);
+/* Takes saved's tables for the boards that match by key and version */
+void arcade_scores_restore(struct vm *vm, const struct arcade_scores *saved);
+/* The file's bytes: a scores record into buf, its length (0 too small);
+ * and back, 1 when buf held a whole one */
+int arcade_scores_pack(const struct arcade_scores *s, uint8_t *buf, int cap);
+int arcade_scores_unpack(struct arcade_scores *s, const uint8_t *buf, int n);
+#define ARCADE_SCORES_MAX (64 + ARCADE_BOARDS * (40 + ARCADE_RANKS * 24))
+/* A value as its board shows it, into buf */
+void arcade_score_text(const struct arcade_scores *s, int board,
+                       int32_t value, char *buf, int cap);
+/* score.show(): the board the cart asked to show since the last call, and
+ * the rank to mark (0 none), or -1 when none was asked; cleared */
+int arcade_score_shown(struct vm *vm, int *rank);
+
 #endif

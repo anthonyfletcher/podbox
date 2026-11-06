@@ -208,6 +208,7 @@ games/quiz/quiz.c
 games/quiz/quiz_pick.c
 games/arcade/shell.c
 games/arcade/shell_tracks.c
+games/arcade/shell_score.c
 games/arcade/vm.c
 games/arcade/gc.c
 games/arcade/loader.c
@@ -227,6 +228,7 @@ games/arcade/sys_cells.c
 games/arcade/sys_links.c
 games/arcade/sys_land.c
 games/arcade/sys_walls.c
+games/arcade/sys_score.c
 #ifdef CPU_ARM
 games/arcade/present_arm.S
 games/arcade/cells_arm.S

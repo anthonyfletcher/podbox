@@ -263,6 +263,12 @@ struct vm
     uint8_t id[8];
     const uint8_t *meta;
     uint32_t meta_len;
+    /* High scores (sys_score.c): the boards, whether one changed since the
+     * host last wrote them, and what score.show() asked for */
+    struct arcade_scores scores;
+    uint8_t scores_dirty;
+    int8_t show_board, show_rank;           /* board + 1, 0 none */
+    int8_t last_rank[ARCADE_BOARDS];        /* each board latest, 0 none */
     const uint8_t *code;
     struct fninfo *fns;
     uint32_t nfns;

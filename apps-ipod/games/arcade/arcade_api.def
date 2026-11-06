@@ -270,6 +270,15 @@ API_CONSTG(TRACK, GENRE,  3, 1)
 API_CONSTG(TRACK, YEAR,   4, 1)
 API_CONSTG(TRACK, LENGTH, 5, 1)
 
+/* High scores: the boards cart.json declares, as BOARD.<name> */
+API_NS(score)
+API(score_submit,     175, 2, 3, VAL,  0, FLAT, LISTEN, 1)
+API(score_best,       176, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(score_get,        177, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(score_name,       178, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(score_count,      179, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(score_show,       180, 1, 1, VOID, 0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

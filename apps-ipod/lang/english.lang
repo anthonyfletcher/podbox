@@ -27858,3 +27858,87 @@
     *: "Skip iPod Games"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_HIGH_SCORES
+  desc: in a game cart's pause menu: its high-score tables
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "High Scores"
+  </dest>
+  <voice>
+    *: "High Scores"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES
+  desc: in a game cart's High Scores: empty every one of its tables
+  user: core
+  <source>
+    *: "Clear High Scores"
+  </source>
+  <dest>
+    *: "Clear High Scores"
+  </dest>
+  <voice>
+    *: "Clear High Scores"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES_ASK
+  desc: asked before a game cart's high scores are cleared
+  user: core
+  <source>
+    *: "Clear High Scores?"
+  </source>
+  <dest>
+    *: "Clear High Scores?"
+  </dest>
+  <voice>
+    *: "Clear High Scores?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_HIGH_SCORES
+  desc: a game cart's high-score table with nothing in it yet
+  user: core
+  <source>
+    *: "No scores yet"
+  </source>
+  <dest>
+    *: "No scores yet"
+  </dest>
+  <voice>
+    *: "No scores yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIMES_PLAYED
+  desc: in a game cart's High Scores: how many times it was started
+  user: core
+  <source>
+    *: "Times Played: %d"
+  </source>
+  <dest>
+    *: "Times Played: %d"
+  </dest>
+  <voice>
+    *: "Times Played"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIME_PLAYED
+  desc: in a game cart's High Scores: hours and minutes it was played
+  user: core
+  <source>
+    *: "Time Played: %dh %02dm"
+  </source>
+  <dest>
+    *: "Time Played: %dh %02dm"
+  </dest>
+  <voice>
+    *: "Time Played"
+  </voice>
+</phrase>

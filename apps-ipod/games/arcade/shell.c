@@ -47,6 +47,7 @@
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell.h"
 #include "games/arcade/shell_tracks.h"
+#include "games/arcade/shell_score.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status, audio_current_track */
@@ -783,29 +784,46 @@ static int event(struct vm *vm, long button)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_scores_write(vm, false);
     if (default_event_handler(button) == SYS_USB_CONNECTED)
         return USB;
     present(vm, true);
     return PLAYING;
 }
 
-/* The pause menu's rows: Resume, the cart's own (menuitem), Now Playing,
- * Restart, Quit. */
+/* The pause menu's rows: Resume, the cart's own (menuitem), High Scores
+ * when the cart has boards, Now Playing, Restart, Quit. */
+enum { ROW_RESUME, ROW_ITEM, ROW_SCORES, ROW_MUSIC, ROW_RESTART, ROW_QUIT };
 static char item_label[5][32];
-static int item_index[5], item_count;
+static int item_index[5];
+static int row_kind[10], row_item[10], row_count;
 
 static const char *menu_row(int row, void *data, char *buf, size_t len)
 {
     (void)data; (void)buf; (void)len;
-    if (row == 0)
-        return str(LANG_CHESSBOX_MENU_RESUME_GAME);
-    if (row <= item_count)
-        return item_label[row - 1];
-    if (row == item_count + 1)
-        return str(LANG_NOW_PLAYING);
-    if (row == item_count + 2)
-        return str(LANG_CHESSBOX_MENU_RESTART_GAME);
-    return str(LANG_MENU_QUIT);
+    switch (row_kind[row]) {
+    case ROW_RESUME:  return str(LANG_CHESSBOX_MENU_RESUME_GAME);
+    case ROW_ITEM:    return item_label[row_item[row]];
+    case ROW_SCORES:  return str(LANG_HIGH_SCORES);
+    case ROW_MUSIC:   return str(LANG_NOW_PLAYING);
+    case ROW_RESTART: return str(LANG_CHESSBOX_MENU_RESTART_GAME);
+    default:          return str(LANG_MENU_QUIT);
+    }
+}
+
+static void add_row(int kind, int item)
+{
+    row_kind[row_count] = kind;
+    row_item[row_count++] = item;
+}
+
+bool shell_list(struct simplelist_info *info)
+{
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    bool to_root = simplelist_show_list(info);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+    return to_root;
 }
 
 /* Now Playing: the music's controls, which a game holding PREV, NEXT and
@@ -829,7 +847,7 @@ static bool music_menu(void)
                              ARRAYLEN(music_label), NULL);
         info.get_name = music_row;
         info.selection = selection;
-        if (simplelist_show_list(&info))
+        if (shell_list(&info))
             return true;
         if (info.selection < 0)
             return false;
@@ -847,42 +865,74 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_scores_run(false);
+    shell_scores_write(vm, false);
     give_screen();
     for (;;) {
-        item_count = 0;
+        int items = 0;
+        row_count = 0;
+        add_row(ROW_RESUME, 0);
         for (int i = 1; i <= 5; i++)
-            if (arcade_menu_item(vm, i, item_label[item_count],
-                                 sizeof(item_label[0])))
-                item_index[item_count++] = i;
-        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), item_count + 4,
-                             NULL);
+            if (arcade_menu_item(vm, i, item_label[items],
+                                 sizeof(item_label[0]))) {
+                item_index[items] = i;
+                add_row(ROW_ITEM, items++);
+            }
+        if (arcade_scores(vm, NULL)->count)
+            add_row(ROW_SCORES, 0);
+        add_row(ROW_MUSIC, 0);
+        add_row(ROW_RESTART, 0);
+        add_row(ROW_QUIT, 0);
+        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), row_count, NULL);
         info.get_name = menu_row;
         info.selection = selection;
-        push_current_activity(ACTIVITY_CONTEXTMENU);
-        bool to_root = simplelist_show_list(&info);
-        if (get_current_activity() == ACTIVITY_CONTEXTMENU)
-            pop_current_activity();
+        bool to_root = shell_list(&info);
         /* MENU held or USB: out to the root, as everywhere else */
         if (to_root)
             return USB;
         selection = info.selection;
-        if (selection == item_count + 1) {
+        int kind = selection < 0 ? ROW_RESUME : row_kind[selection];
+        if (kind == ROW_SCORES) {
+            if (shell_scores_menu(vm))
+                return USB;
+            continue;
+        }
+        if (kind == ROW_MUSIC) {
             if (music_menu())
                 return USB;
             continue;
         }
-        if (selection == item_count + 2)
+        if (kind == ROW_RESTART)
             return RESTART;
-        if (selection == item_count + 3)
+        if (kind == ROW_QUIT)
             return QUIT;
-        if (selection < 1 || selection > item_count)
+        if (kind == ROW_RESUME)
             break;
-        int r = arcade_menu_choose(vm, item_index[selection - 1], 4);
+        int r = arcade_menu_choose(vm, item_index[row_item[selection]], 4);
         if (r < 0)
             return FAILED;
         if (r == 0)
             break;
     }
+    take_screen(vp);
+    present(vm, true);
+    return PLAYING;
+}
+
+/* score.show(): the board's table over the game, which resumes when it is
+ * closed; written out first, since a new score is usually why */
+static int show_scores(struct vm *vm, struct viewport *vp, int board,
+                       int rank)
+{
+    sound_stop();
+    present_wait();
+    shell_scores_run(false);
+    shell_scores_write(vm, false);
+    give_screen();
+    bool to_root = shell_score_table(vm, board, rank);
+    shell_scores_run(true);
+    if (to_root)
+        return USB;
     take_screen(vp);
     present(vm, true);
     return PLAYING;
@@ -904,6 +954,8 @@ static int hold_pause(struct vm *vm)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_scores_run(false);
+    shell_scores_write(vm, false);
     cpu_boost(false);
     hold_backlight(false);
     while (r == PLAYING && button_hold()) {
@@ -974,6 +1026,7 @@ static int run(const char *path, void *mem, size_t size)
     }
     save_load(vm);
     save_owed = false;
+    shell_scores_load(vm);
     arcade_set_ceiling(vm, CEILING);
 
     take_screen(&vp);
@@ -987,6 +1040,7 @@ static int run(const char *path, void *mem, size_t size)
     if (!arcade_start(vm))
         status = FAILED;
     present(vm, true);
+    shell_scores_run(true);
 
     int rate = arcade_rate(vm);
     long start = current_tick, touched = current_tick;
@@ -1033,6 +1087,7 @@ static int run(const char *path, void *mem, size_t size)
             menu_pressed = true;
         if (menu_pressed) {
             status = pause_menu(vm, &vp);
+            shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = current_tick;
@@ -1040,6 +1095,7 @@ static int run(const char *path, void *mem, size_t size)
         }
         if (button_hold()) {
             status = hold_pause(vm);
+            shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = current_tick;
@@ -1077,6 +1133,14 @@ static int run(const char *path, void *mem, size_t size)
             start = current_tick - (long)((frame * HZ) / rate);
         }
         present(vm, false);
+        int rank, board = arcade_score_shown(vm, &rank);
+        if (board >= 0) {
+            status = show_scores(vm, &vp, board, rank);
+            spk_clock_resume();
+            start = current_tick - (long)((frame * HZ) / rate);
+            touched = current_tick;
+            continue;
+        }
         sound_fill();
         arcade_idle(vm);
         /* Once a frame whatever the cart does: a cart always behind its
@@ -1098,6 +1162,8 @@ static int run(const char *path, void *mem, size_t size)
         status = QUIT;
     }
     save_write(vm);
+    shell_scores_run(false);
+    shell_scores_write(vm, true);
     return status;
 }
 

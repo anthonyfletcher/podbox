@@ -6,6 +6,7 @@
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
  *                  [--setting name=value]... [--menu i]...
+ *                  [--scores file]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -28,7 +29,11 @@
  * with the tick's time. --setting name=value is what sys.setting(name)
  * gives, a number where the value is one; sys.translate() is English. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
- * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
+ * before and the answer: "menu: <label>|<label>..." and "chose i: r".
+ * --scores keeps the cart's high scores in file, read before the start
+ * and written after the last tick, in the player's own record. score.show
+ * prints "show <title>", then a line for each rank, "<rank> <value>
+ * <name> <date>", the marked rank starred. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -511,6 +516,50 @@ static void date(void *ctx, int32_t out[7])
     memcpy(out, fixed, sizeof(fixed));
 }
 
+/* ---- high scores --------------------------------------------------------- */
+
+static void scores_read(struct vm *vm, const char *path)
+{
+    static struct arcade_scores saved;
+    unsigned char b[ARCADE_SCORES_MAX];
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    int n = (int)fread(b, 1, sizeof(b), f);
+    fclose(f);
+    if (arcade_scores_unpack(&saved, b, n))
+        arcade_scores_restore(vm, &saved);
+}
+
+static int scores_write(struct vm *vm, const char *path)
+{
+    unsigned char b[ARCADE_SCORES_MAX];
+    int n = arcade_scores_pack(arcade_scores(vm, NULL), b, sizeof(b));
+    FILE *f = fopen(path, "wb");
+    if (!f || fwrite(b, 1, (size_t)n, f) != (size_t)n) {
+        if (f)
+            fclose(f);
+        return 0;
+    }
+    return fclose(f) == 0;
+}
+
+static void scores_show(struct vm *vm)
+{
+    int rank, i = arcade_score_shown(vm, &rank);
+    if (i < 0)
+        return;
+    const struct arcade_scores *s = arcade_scores(vm, NULL);
+    const struct arcade_board *b = &s->b[i];
+    printf("show %s\n", b->title);
+    for (int k = 0; k < b->count; k++) {
+        char v[32];
+        arcade_score_text(s, i, b->e[k].value, v, sizeof(v));
+        printf("%s%d %s %s %ld\n", k + 1 == rank ? "*" : "", k + 1, v,
+               b->e[k].name, (long)b->e[k].date);
+    }
+}
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -687,6 +736,7 @@ int main(int argc, char **argv)
     int playing_flag = 0;
     long bpm = 0;
     int menu_picks[16], npicks = 0;
+    const char *scores_path = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
             ticks = atol(argv[++i]);
@@ -715,6 +765,8 @@ int main(int argc, char **argv)
             bpm = atol(argv[++i]);
         else if (!strcmp(argv[i], "--playing"))
             playing_flag = 1;
+        else if (!strcmp(argv[i], "--scores") && i + 1 < argc)
+            scores_path = argv[++i];
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -757,6 +809,8 @@ int main(int argc, char **argv)
         return report(vm);
     if (ceiling)
         arcade_set_ceiling(vm, (uint32_t)ceiling);
+    if (scores_path)
+        scores_read(vm, scores_path);
     if (!arcade_start(vm))
         return report(vm);
     if (units)
@@ -832,7 +886,12 @@ int main(int argc, char **argv)
             fprintf(stderr, "tick %ld %u\n", t + 1, (unsigned)arcade_units(vm));
         if (wav_path)
             wav_tick(vm, t);
+        scores_show(vm);
         arcade_idle(vm);
+    }
+    if (scores_path && !scores_write(vm, scores_path)) {
+        fprintf(stderr, "could not write %s\n", scores_path);
+        return 2;
     }
     if (wav_path)
         wav_save(wav_path);

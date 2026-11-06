@@ -207,3 +207,11 @@ IMPL(tracks_queued)
 IMPL(tracks_place)
 IMPL(tracks_queue)
 IMPL(tracks_enqueue)
+
+/* sys_score.c */
+IMPL(score_submit)
+IMPL(score_best)
+IMPL(score_get)
+IMPL(score_name)
+IMPL(score_count)
+IMPL(score_show)

@@ -1654,10 +1654,67 @@ function sources(files, deflate) {
     return deflate(w.done());
 }
 
+/* BORD: the high-score boards, each its key (a hash of its name, which the
+ * engine matches a saved table by), version, whether low wins, its format
+ * and its title */
+const FORMATS = ['number', 'time', 'ticks'];
+
+function boardKey(name) {
+    let h = 0x811c9dc5;
+    for (const b of utf8(name)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+    return h;
+}
+
+function boards(list) {
+    const w = new Writer();
+    w.u8(list.length);
+    for (const b of list) {
+        w.u32(boardKey(b.name));
+        w.u16(b.version);
+        w.u8(b.wins === 'low' ? 1 : 0);
+        w.u8(FORMATS.indexOf(b.format));
+        w.str(b.title);
+    }
+    return w.done();
+}
+
 /* ---- the cart's settings ----------------------------------------------- */
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
-                   'menu_button', 'music'];
+                   'menu_button', 'music', 'boards'];
+const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
+
+/* cart.boards checked, with each one's defaults filled in */
+function checkBoards(list, bad) {
+    if (list === undefined) return [];
+    if (!Array.isArray(list)) { bad('boards must be a list'); return []; }
+    if (list.length > 8) bad('a cart has at most 8 boards');
+    const seen = new Set();
+    return list.slice(0, 8).map((b, i) => {
+        const at = 'board ' + (i + 1) + ': ';
+        if (b === null || typeof b !== 'object' || Array.isArray(b)) {
+            bad(at + 'must be a record'); return null;
+        }
+        for (const k in b)
+            if (BOARD_KEYS.indexOf(k) < 0) bad(at + 'unknown setting ' + k);
+        if (typeof b.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(b.name))
+            bad(at + 'name must be usable in code as BOARD.<name>');
+        else if (seen.has(b.name)) bad(at + 'a second board called ' + b.name);
+        seen.add(b.name);
+        const c = Object.assign({ title: b.name, wins: 'high', format: 'number',
+                                  version: 1 }, b);
+        if (typeof c.title !== 'string' || c.title === '' ||
+            utf8(c.title).length > 23)
+            bad(at + 'title must be text of 1 to 23 bytes');
+        if (c.wins !== 'high' && c.wins !== 'low')
+            bad(at + 'wins must be "high" or "low"');
+        if (FORMATS.indexOf(c.format) < 0)
+            bad(at + 'format must be one of ' + FORMATS.join(', '));
+        if (!Number.isInteger(c.version) || c.version < 1 || c.version > 65535)
+            bad(at + 'version must be a whole number from 1 to 65535');
+        return c;
+    }).filter(Boolean);
+}
 
 function checkCart(cart, errors) {
     function bad(message) {
@@ -1676,6 +1733,7 @@ function checkCart(cart, errors) {
     if (c.menu_button !== 'pause' && c.menu_button !== 'game')
         bad('menu_button must be "pause" or "game"');
     if (MUSIC.indexOf(c.music) < 0) bad('music must be one of ' + MUSIC.join(', '));
+    c.boards = checkBoards(cart.boards, bad);
     return c;
 }
 
@@ -1731,8 +1789,10 @@ export function compile(input) {
      * namespace of globals that the loader sets to the images. */
     const built = buildAssets(input.assets, input.inflate,
                               (str) => prog.string(str), errors);
+    const board = {};
+    cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });
     prog.api = Object.assign({}, prog.api, {
-        groups: Object.assign({}, prog.api.groups, built.groups)
+        groups: Object.assign({}, prog.api.groups, built.groups, { BOARD: board })
     });
     if (prog.byNs.has('IMG'))
         errors.push({ file: 'IMG.js', line: 1, column: 1, message:
@@ -1807,6 +1867,7 @@ export function compile(input) {
         { tag: 'GLOB', data: globals(prog) },
         { tag: 'LINE', data: lines(prog, fns) },
         ...built.chunks,
+        ...(cart.boards.length ? [{ tag: 'BORD', data: boards(cart.boards) }] : []),
         { tag: 'SRC_', data: sources(srcFiles, input.deflate) }
     ]);
     let codeBytes = 0;

@@ -33,8 +33,25 @@ A cart is a folder:
 | `rate` | ticks a second: 20, 25, 33 (the default) or 50 |
 | `menu_button` | `pause` (the default) or `game`, to have MENU as button 2 |
 | `music` | `listen` (the default), `control` or `own` |
+| `boards` | the high-score tables, up to 8, below |
 
 Errors name the file, line and column, and say what to write instead.
+
+Each board is a record: `name`, which the code uses as `BOARD.<name>`;
+`title`, shown in High Scores (the name when left out, at most 23 bytes);
+`wins`, `high` (the default) or `low`; `format`, `number` (the
+default), `time` (milliseconds, shown as 1:23.45) or `ticks` (shown as a
+time at the cart's rate); and `version`, 1 by default. A board keeps its ten
+best, each with its date and any name given to `score.submit()`. Its table
+is found again by its name, so boards can be reordered; raise its version
+to start it afresh.
+
+```json
+"boards": [
+  { "name": "points", "title": "Points" },
+  { "name": "lap", "title": "Best Lap", "wins": "low", "format": "time" }
+]
+```
 
 A cart's art goes in the same folder:
 
