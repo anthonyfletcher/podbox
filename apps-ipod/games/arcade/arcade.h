@@ -253,7 +253,9 @@ int arcade_tick(struct vm *vm, int draw);
 /* Between ticks: collect garbage if enough has been allocated. */
 void arcade_idle(struct vm *vm);
 
-/* Units charged by the last arcade_start or arcade_tick. */
+/* Units charged by the last arcade_start or arcade_tick: the cart's own,
+ * and while it listens to playing music, the beat analyser's share of the
+ * tick. */
 uint32_t arcade_units(const struct vm *vm);
 /* Units at which one call is stopped as not responding. */
 void arcade_set_ceiling(struct vm *vm, uint32_t units);

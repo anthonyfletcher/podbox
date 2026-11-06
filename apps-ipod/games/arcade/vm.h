@@ -274,6 +274,7 @@ struct vm
     struct arcade_options opts;
     uint8_t opt_pending, opt_changed;
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
+    uint8_t listening;          /* beat.listen(true): the analyser runs */
     const uint8_t *code;
     struct fninfo *fns;
     uint32_t nfns;

@@ -503,8 +503,9 @@ NATIVE(beat_listen)
 {
     (void)argc; (void)out;
     const struct arcade_beat *b = beat_of(vm);
+    vm->listening = (uint8_t)vm_truthy(vm, a[0]);
     if (b && b->listen)
-        b->listen(vm->host->ctx, vm_truthy(vm, a[0]));
+        b->listen(vm->host->ctx, vm->listening);
     return 1;
 }
 
