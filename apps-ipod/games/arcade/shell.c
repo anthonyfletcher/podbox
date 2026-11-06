@@ -12,6 +12,8 @@
  *
  * Parts, in order:
  *   - the cart file and the save file
+ *   - the engine's host, and the beat: Spike's clock and the beat tracker
+ *   - sound: the cart's voices on the beep channel
  *   - present: the 8-bit screen and borders, doubled onto the panel
  *   - input: the buttons and the wheel, as btn() and wheel() see them
  *   - the pause menu, the hold switch and system events
@@ -45,6 +47,11 @@
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status */
+#include "audio/beat_analyse.h"
+#include "audio/beat_track.h"
+#include "games/spike/spike_bar.h"
+#include "games/spike/spike_clock.h"
+#include "games/spike/spike_music.h"
 
 /* The engine's memory: the app buffer, no more than the smaller player's. */
 #define ARENA_MAX (512 * 1024)
@@ -182,8 +189,161 @@ static int host_playing(void *ctx)
     return (st & AUDIO_STATUS_PLAY) && !(st & AUDIO_STATUS_PAUSE);
 }
 
+/* ---- the beat ---------------------------------------------------------------
+ * beat, from what Spike plays by: its clock (track time steered by the
+ * audio), the beat tracker and its analyser, its downbeat and its mood.
+ * Beats are shifted by Spike's audio offset, which is the delay between
+ * the player and the ear and not Spike's own. The analyser runs only
+ * while the cart listens. The bar is counted from the tracker's lock
+ * until the cart asks for the downbeat, and from the downbeat after. */
+
+static bool beat_listening;
+static int beat_rot;            /* the downbeat, on the tracker's count */
+static long beat_due;           /* the beat the mood is sampled at next */
+static int32_t beat_press[5];   /* stamped as each button went down */
+
+static void beat_start(void)
+{
+    spk_clock_reset();
+    beat_track_reset();
+    spk_bar_reset();
+    spk_music_reset();
+    beat_listening = false;
+    beat_rot = -1;
+    beat_due = -1;
+    for (int i = 0; i < 5; i++)
+        beat_press[i] = -1;
+}
+
+static void beat_listen(void *ctx, int on)
+{
+    (void)ctx;
+    if (on && !beat_listening) {
+        beat_analyse_start();
+        spk_bar_reset();
+        beat_rot = -1;
+    } else if (!on && beat_listening)
+        beat_analyse_stop();
+    beat_listening = on;
+}
+
+static void beat_state(void *ctx, int32_t out[6])
+{
+    (void)ctx;
+    struct beat_track bt;
+    beat_track_get(&bt);
+    out[0] = bt.locked;
+    out[1] = (int32_t)bt.bpm;
+    out[2] = (int32_t)bt.period_ms;
+    out[3] = (int32_t)bt.confidence;
+    out[4] = (int32_t)beat_track_fill();
+    out[5] = (int32_t)bt.count;
+}
+
+static int32_t beat_next(void *ctx, int32_t from, int32_t n, int32_t *in_bar)
+{
+    (void)ctx;
+    unsigned long at;
+    int bar;
+    long off = global_settings.spike_offset;
+    if (from + off < 0 ||
+        !beat_track_next((unsigned long)(from + off), n, &at, &bar))
+        return -1;
+    *in_bar = beat_rot < 0 ? bar : (bar - beat_rot + 4) % 4;
+    return (int32_t)((long)at - off);
+}
+
+static int32_t beat_downbeat(void *ctx, int32_t *margin10)
+{
+    (void)ctx;
+    struct beat_track bt;
+    unsigned long at;
+    int bar, hits;
+    beat_track_get(&bt);
+    *margin10 = 0;
+    if (!bt.locked || !beat_track_next(spk_clock_ms(), 0, &at, &bar))
+        return -1;
+    /* a beat the tracker counts as the first of four */
+    long zero = (long)at - (long)bar * (long)bt.period_ms;
+    beat_rot = spk_bar_downbeat(zero, (int)bt.period_ms);
+    int m;
+    spk_bar_working(&hits, &m);
+    *margin10 = m;
+    return beat_rot;
+}
+
+static int32_t beat_now(void *ctx)
+{
+    (void)ctx;
+    return (int32_t)spk_clock_now();
+}
+
+static void beat_mood(void *ctx, int32_t out[3])
+{
+    (void)ctx;
+    struct spk_mood m;
+    spk_music_get(&m);
+    out[0] = m.energy;
+    out[1] = m.flux;
+    out[2] = m.trend;
+}
+
+static const struct arcade_beat beat_host = {
+    beat_listen, beat_state, beat_next, beat_downbeat, beat_now, beat_mood
+};
+
+/* A button going down, stamped with the track time it arrived at */
+static void beat_stamp(struct vm *vm, long b)
+{
+    int i = b == BUTTON_LEFT ? 0 : b == BUTTON_RIGHT ? 1 :
+            b == BUTTON_MENU && arcade_menu_is_game(vm) ? 2 :
+            b == BUTTON_PLAY ? 3 : b == BUTTON_SELECT ? 4 : -1;
+    if (i >= 0 && beat_press[i] < 0)
+        beat_press[i] = (int32_t)spk_clock_now();
+}
+
+/* Before each tick: the clock carried to now, the analyser fed while the
+ * cart listens, the mood sampled at each beat, and the reading handed over
+ * with the presses since the last tick */
+static void beat_tick(struct vm *vm)
+{
+    struct arcade_music m;
+    m.jumped = !spk_clock_tick();
+    if (m.jumped) {
+        /* a seek, a skip, a new track: the tempo and the bar start again */
+        if (beat_listening)
+            beat_analyse_start();
+        else
+            beat_track_reset();
+        spk_bar_reset();
+        spk_music_reset();
+        beat_rot = -1;
+        beat_due = -1;
+    }
+    if (beat_listening) {
+        beat_analyse_poll();
+        spk_bar_listen();
+    }
+    unsigned long now = spk_clock_ms(), at;
+    if (beat_due >= 0 && (long)now >= beat_due) {
+        spk_music_beat();
+        beat_due = -1;
+    }
+    if (beat_due < 0 && beat_track_next(now + 1, 0, &at, NULL))
+        beat_due = (long)at;
+    unsigned long left = spk_clock_left_ms();
+    m.clock = (int32_t)now;
+    m.left = left > 0x7fffffff ? 0x7fffffff : (int32_t)left;
+    for (int i = 0; i < 5; i++) {
+        m.press[i] = beat_press[i];
+        beat_press[i] = -1;
+    }
+    arcade_music(vm, &m);
+}
+
 static const struct arcade_host host = {
-    NULL, host_print, host_yield, host_date, host_click, host_playing
+    NULL, host_print, host_yield, host_date, host_click, host_playing,
+    &beat_host
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -539,8 +699,11 @@ static int drain(struct vm *vm, bool *menu_pressed)
             int r = event(vm, b);
             if (r != PLAYING)
                 return r;
-        } else if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
-            *menu_pressed = true;
+        } else {
+            beat_stamp(vm, b);
+            if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
+                *menu_pressed = true;
+        }
     }
     return PLAYING;
 }
@@ -583,6 +746,7 @@ static int run(const char *path, void *mem, size_t size)
     sound_vm = vm;
     last_wheel = -1;
     menu_down = menu_paused = false;
+    beat_start();
     int status = PLAYING;
     if (!arcade_start(vm))
         status = FAILED;
@@ -609,6 +773,7 @@ static int run(const char *path, void *mem, size_t size)
                 status = event(vm, b);
                 continue;
             }
+            beat_stamp(vm, b);
             if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
                 menu_pressed = true;
             if (TIME_BEFORE(current_tick, due) && !menu_pressed)
@@ -622,11 +787,13 @@ static int run(const char *path, void *mem, size_t size)
             menu_pressed = true;
         if (menu_pressed) {
             status = pause_menu(vm, &vp);
+            spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             continue;
         }
         if (button_hold()) {
             status = hold_pause(vm);
+            spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             continue;
         }
@@ -642,6 +809,7 @@ static int run(const char *path, void *mem, size_t size)
         if (late >= HZ / rate) {
             arcade_skipped(vm, (unsigned)(late * rate / HZ));
             arcade_input(vm, held, wheel_clicks(pos), pos);
+            beat_tick(vm);
             if (!arcade_tick(vm, 0)) {
                 status = FAILED;
                 break;
@@ -651,6 +819,7 @@ static int run(const char *path, void *mem, size_t size)
                 start = current_tick - (long)((frame * HZ) / rate);
         }
         arcade_input(vm, held, wheel_clicks(pos), pos);
+        beat_tick(vm);
         if (!arcade_tick(vm, 1)) {
             status = FAILED;
             break;
@@ -673,6 +842,7 @@ static int run(const char *path, void *mem, size_t size)
 
     if (status == FAILED)
         present(vm, false);
+    beat_listen(NULL, 0);
     give_screen();
     sound_vm = NULL;
     if (status == FAILED) {

@@ -337,6 +337,9 @@ struct vm
     uint8_t held, pressed;      /* btn() and btnp() bits */
     uint16_t held_ticks[5];
     int32_t wheel, wheelpos;
+    struct arcade_music heard;  /* this tick's, from arcade_music() */
+    int32_t beat_inbar;         /* from the last beat.next() */
+    int32_t beat_margin;        /* from the last beat.downbeat() */
     int quit;
     struct value menu_label[5], menu_fn[5];   /* menuitem(); roots */
     uint64_t rng_state, rng_inc;

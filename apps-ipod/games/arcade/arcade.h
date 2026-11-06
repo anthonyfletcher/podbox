@@ -30,6 +30,39 @@ struct arcade_host
     /* playback.playing(): whether the owner's music is playing (not
      * paused or stopped); NULL for never */
     int (*playing)(void *ctx);
+    /* beat: the music's beat, below; NULL where there is none to follow */
+    const struct arcade_beat *beat;
+};
+
+/* The beat of the owner's music, for a cart played to it. Times are track
+ * ms. The host also hands over each tick's clock (arcade_music()). */
+struct arcade_beat
+{
+    /* beat.listen(): start or stop the analyser and the tempo search */
+    void (*listen)(void *ctx, int on);
+    /* locked (0/1), bpm, period ms, confidence 0-100, the envelope's
+     * fill 0-100, beats since the lock */
+    void (*state)(void *ctx, int32_t out[6]);
+    /* the nth beat at or after from (0 the first) and its place in the
+     * bar, 0-3, from the downbeat once one was found; -1 with no lock */
+    int32_t (*next)(void *ctx, int32_t from, int32_t n, int32_t *in_bar);
+    /* which of the four beats starts the bar, or -1, and by what margin
+     * in tenths */
+    int32_t (*downbeat)(void *ctx, int32_t *margin10);
+    /* track ms this instant, past the tick */
+    int32_t (*now)(void *ctx);
+    /* the bar just heard: energy 0-100, flux 0-100, trend (signed) */
+    void (*mood)(void *ctx, int32_t out[3]);
+};
+
+/* What the host read for a tick: the clock, steady for the tick; the ms
+ * still to play; whether playback moved underneath (a seek, a skip, a new
+ * track) since the last; and when each button went down, in btn()'s
+ * numbering, or -1. */
+struct arcade_music
+{
+    int32_t clock, left, jumped;
+    int32_t press[5];
 };
 
 /* Reads n bytes into buf, or skips n bytes when buf is NULL; returns the
@@ -68,6 +101,10 @@ const uint8_t *arcade_id(const struct vm *vm);
  * the last tick (96 a turn, clockwise positive), and where the finger is
  * on it, 0-95 clockwise from the top, or -1 when nothing touches it. */
 void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos);
+
+/* Before each tick, where the host follows the music: beat.clock() and
+ * the rest of the tick's reading. */
+void arcade_music(struct vm *vm, const struct arcade_music *m);
 
 /* The cart's own pause-menu rows, made by menuitem(): copies item i's
  * label (1-5) into buf and returns 1, or returns 0 when there is none. */

@@ -117,6 +117,21 @@ API(skipped,   94, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API_NS(playback)
 API(playback_playing, 128, 0, 0, VAL, 0, FLAT, LISTEN, 1)
 
+/* Listening: the music's clock and its beat (6.4) */
+API_NS(beat)
+API(beat_listen,   130, 1, 1, VOID, 0, FLAT, LISTEN, 1)
+API(beat_state,    131, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(beat_next,     132, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(beat_inbar,    133, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_downbeat, 134, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_margin,   135, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_clock,    136, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_now,      137, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_press,    138, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(beat_jumped,   139, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_left,     140, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_mood,     141, 1, 1, VOID, 0, FLAT, LISTEN, 1)
+
 /* Memory: the engine's own arrays, and bulk moves */
 API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)

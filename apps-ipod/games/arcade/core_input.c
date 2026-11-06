@@ -2,17 +2,20 @@
  * GNU General Public License (version 2+)
  *
  * Arcade core: input -- the buttons and the click wheel, as the host hands
- * them over before each tick (arcade_input) -- and quit().
+ * them over before each tick (arcade_input) -- quit(), and the music's
+ * clock and beat (beat, arcade_music).
  *
  * btn and btnp use PICO-8's numbers: 0 PREV, 1 NEXT, 2 MENU (only for a
  * cart that claims it; the host never sets it otherwise), 3 PLAY,
  * 4 SELECT, 5 nothing. btnp is true on the tick a button goes down, then
  * on the 16th tick it is held and every 4th after.
  ***************************************************************************/
+#include <string.h>
 #include "games/arcade/vm.h"
 
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
                                   struct value *out)
+#define RET_INT(v) (*out = mk(T_INT, (int32_t)(v)), 1)
 
 void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos)
 {
@@ -34,6 +37,15 @@ void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos)
     vm->pressed = pressed;
     vm->wheel = wheel;
     vm->wheelpos = wheelpos < 0 || wheelpos > 95 ? -1 : wheelpos;
+    /* no presses stamped unless the host follows the music this tick */
+    vm->heard.jumped = 0;
+    for (int i = 0; i < 5; i++)
+        vm->heard.press[i] = -1;
+}
+
+void arcade_music(struct vm *vm, const struct arcade_music *m)
+{
+    vm->heard = *m;
 }
 
 static int button_arg(struct vm *vm, struct value *a, int argc, uint8_t bits,
@@ -157,6 +169,136 @@ NATIVE(playback_playing)
     (void)a; (void)argc;
     *out = mk(T_INT, vm->host && vm->host->playing &&
                      vm->host->playing(vm->host->ctx) ? 1 : 0);
+    return 1;
+}
+
+/* ---- beat: the music's time and its beat --------------------------------
+ * Track ms throughout. The clock is the host's reading for this tick, so
+ * a frame drawn from it is steady; the tracker's calls go to the host.
+ * With no music to follow, the clock stands at 0 and there is no lock. */
+
+static const struct arcade_beat *beat_of(struct vm *vm)
+{
+    return vm->host ? vm->host->beat : NULL;
+}
+
+/* beat.listen(on): start or stop the analyser -- costly, so a cart
+ * listens until the tempo is held, then stops and projects from it */
+NATIVE(beat_listen)
+{
+    (void)argc; (void)out;
+    const struct arcade_beat *b = beat_of(vm);
+    if (b && b->listen)
+        b->listen(vm->host->ctx, vm_truthy(vm, a[0]));
+    return 1;
+}
+
+/* beat.state(out): into an Int32Array of 6 -- locked, bpm, period ms,
+ * confidence, the envelope's fill, beats since the lock. Returns locked */
+NATIVE(beat_state)
+{
+    (void)argc;
+    int32_t s[6] = { 0 };
+    if (a[0].tag != T_I32 || I32(vm, a[0])->len < 6)
+        return vm_fail(vm, "beat.state() needs an Int32Array of 6", "", "");
+    const struct arcade_beat *b = beat_of(vm);
+    if (b && b->state)
+        b->state(vm->host->ctx, s);
+    memcpy(I32(vm, a[0])->d, s, sizeof(s));
+    return RET_INT(s[0] ? 1 : 0);
+}
+
+/* beat.next(from, n): the nth beat at or after from, or -1 with no lock;
+ * beat.inbar() is then its place in the bar */
+NATIVE(beat_next)
+{
+    (void)argc;
+    if (!is_num(a[0]) || !is_num(a[1]))
+        return vm_fail(vm, "beat.next() needs a time and a count", "", "");
+    const struct arcade_beat *b = beat_of(vm);
+    int32_t at = -1, in_bar = -1;
+    if (b && b->next)
+        at = b->next(vm->host->ctx, floor_int(a[0]), floor_int(a[1]),
+                     &in_bar);
+    vm->beat_inbar = at < 0 ? -1 : in_bar;
+    return RET_INT(at);
+}
+
+NATIVE(beat_inbar)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->beat_inbar);
+}
+
+/* beat.downbeat(): which of the four beats starts the bar, or -1 where
+ * none wins; beat.margin() is by how much, in tenths */
+NATIVE(beat_downbeat)
+{
+    (void)a; (void)argc;
+    const struct arcade_beat *b = beat_of(vm);
+    int32_t margin = 0, d = -1;
+    if (b && b->downbeat)
+        d = b->downbeat(vm->host->ctx, &margin);
+    vm->beat_margin = margin;
+    return RET_INT(d);
+}
+
+NATIVE(beat_margin)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->beat_margin);
+}
+
+NATIVE(beat_clock)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->heard.clock);
+}
+
+/* beat.now(): this instant, for a moment within a tick */
+NATIVE(beat_now)
+{
+    (void)a; (void)argc;
+    const struct arcade_beat *b = beat_of(vm);
+    return RET_INT(b && b->now ? b->now(vm->host->ctx) : vm->heard.clock);
+}
+
+/* beat.press(i): when button i went down this tick, or -1: a press is
+ * judged by this, not by the tick it is seen in, which is up to a frame
+ * later */
+NATIVE(beat_press)
+{
+    (void)argc;
+    if (!is_num(a[0]))
+        return vm_fail(vm, "beat.press() needs a button", "", "");
+    int32_t i = floor_int(a[0]);
+    return RET_INT((uint32_t)i < 5 ? vm->heard.press[i] : -1);
+}
+
+NATIVE(beat_jumped)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->heard.jumped ? 1 : 0);
+}
+
+NATIVE(beat_left)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->heard.left);
+}
+
+/* beat.mood(out): the bar just heard, into an Int32Array of 3 -- energy,
+ * flux, trend */
+NATIVE(beat_mood)
+{
+    (void)argc; (void)out;
+    int32_t m[3] = { 0 };
+    if (a[0].tag != T_I32 || I32(vm, a[0])->len < 3)
+        return vm_fail(vm, "beat.mood() needs an Int32Array of 3", "", "");
+    const struct arcade_beat *b = beat_of(vm);
+    if (b && b->mood)
+        b->mood(vm->host->ctx, m);
+    memcpy(I32(vm, a[0])->d, m, sizeof(m));
     return 1;
 }
 

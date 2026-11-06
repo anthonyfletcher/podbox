@@ -474,6 +474,36 @@ test('playback.playing reports the owner music', () => {
     assert.deepEqual([quiet.out, loud.out], ['0\n', '1\n']);
 });
 
+test('beat: the clock, the lock, the next beat, its bar and a press', () => {
+    const cart = `var st = new Int32Array(6), md = new Int32Array(3), tk = 0;
+function init() { beat.listen(true); }
+function update() {
+    tk++;
+    var locked = beat.state(st);
+    if (tk == 10) printh(locked + " " + beat.next(beat.clock(), 0));
+    if (tk == 40) {
+        printh(beat.clock() + " " + locked + " " + st[1] + " " + st[2]);
+        printh(beat.next(beat.clock(), 0) + " " + beat.inbar() + " " +
+               beat.next(beat.clock(), 1) + " " + beat.inbar());
+        printh(beat.downbeat() + " " + beat.margin());
+        beat.listen(false);
+    }
+    if (beat.press(4) >= 0) printh("press " + beat.press(4) + " " + beat.clock());
+    if (tk == 60) { beat.mood(md); printh(md[0] + " " + beat.left() + " " + beat.jumped()); }
+}`;
+    const r = run(cart, 60, ['--beat', '120', '--buttons', '50:16,51:0']);
+    assert.equal(r.status, 0, r.err);
+    /* 33 ticks a second: no lock at first, locked a second after listening
+     * began, beats on the half-second, the press stamped with its tick */
+    assert.deepEqual(r.out.trim().split('\n'), [
+        '0 -1', '1212 1 120 500', '1500 3 2000 0', '0 30',
+        'press 1545 1545', '30 178182 0']);
+    /* with no music, the clock stands still and nothing locks */
+    const q = run(cart, 45);
+    assert.deepEqual(q.out.trim().split('\n'),
+                     ['0 -1', '0 0 0 0', '-1 -1 -1 -1', '-1 0']);
+});
+
 test('plane: fog covers the far ground, and coarse draws pixel pairs', () => {
     const r = run(FLOOR + `function init() {
     floor();

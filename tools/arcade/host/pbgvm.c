@@ -4,7 +4,8 @@
  *   pbgvm cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
  *                  [--shot file.png] [--dump x,y,w,h] [--dirty]
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
- *                  [--wheel t:clicks[:pos],...] [--playing] [--menu i]...
+ *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
+ *                  [--menu i]...
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -21,7 +22,10 @@
  * a tick runs late: "10:1" is one skipped frame before tick 10.
  * --wheel turns the wheel: "5:12:30" is 12 clicks at tick 5 with the
  * finger at 30 from then on (-1 lifts it).
- * --playing has playback.playing() report music playing. Each
+ * --playing has playback.playing() report music playing. --beat bpm plays
+ * a steady track at that tempo for beat: its clock follows the ticks, the
+ * tracker locks a second after beat.listen(true), and presses are stamped
+ * with the tick's time. Each
  * --menu i then chooses pause-menu item i with SELECT, printing the items
  * before and the answer: "menu: <label>|<label>..." and "chose i: r". */
 
@@ -61,6 +65,78 @@ static int playing(void *ctx)
     (void)ctx;
     return 1;
 }
+
+/* --beat bpm: a three-minute track at a steady tempo, its first beat at
+ * 0 and the bar starting on it. The clock follows the ticks; the tracker
+ * locks a second after beat.listen(true), as a real one takes a while. */
+static struct
+{
+    int32_t period, clock, listen_at, locked;
+} fake;
+
+static void fake_listen(void *ctx, int on)
+{
+    (void)ctx;
+    if (on && fake.listen_at < 0 && !fake.locked)
+        fake.listen_at = fake.clock;
+}
+
+static void fake_lock(void)
+{
+    if (fake.listen_at >= 0 && fake.clock >= fake.listen_at + 1000)
+        fake.locked = 1;
+}
+
+static void fake_state(void *ctx, int32_t out[6])
+{
+    (void)ctx;
+    fake_lock();
+    out[0] = fake.locked;
+    out[1] = 60000 / fake.period;
+    out[2] = fake.period;
+    out[3] = fake.locked ? 90 : 40;
+    out[4] = fake.locked ? 100 : 50;
+    out[5] = fake.locked ? (fake.clock - fake.listen_at) / fake.period : 0;
+}
+
+static int32_t fake_next(void *ctx, int32_t from, int32_t n, int32_t *in_bar)
+{
+    (void)ctx;
+    fake_lock();
+    if (!fake.locked)
+        return -1;
+    int32_t k = from <= 0 ? 0 : (from + fake.period - 1) / fake.period;
+    k += n;
+    *in_bar = k % 4;
+    return k * fake.period;
+}
+
+static int32_t fake_downbeat(void *ctx, int32_t *margin10)
+{
+    (void)ctx;
+    *margin10 = fake.locked ? 30 : 0;
+    return fake.locked ? 0 : -1;
+}
+
+static int32_t fake_now(void *ctx)
+{
+    (void)ctx;
+    return fake.clock;
+}
+
+/* the bar's energy rises and falls over eight bars */
+static void fake_mood(void *ctx, int32_t out[3])
+{
+    (void)ctx;
+    int32_t bar = fake.clock / (fake.period * 4), k = bar % 8;
+    out[0] = 30 + (k < 4 ? k : 8 - k) * 15;
+    out[1] = 20;
+    out[2] = k < 4 ? 1 : -1;
+}
+
+static const struct arcade_beat fake_beat = {
+    fake_listen, fake_state, fake_next, fake_downbeat, fake_now, fake_mood
+};
 
 static void click(void *ctx, int beep)
 {
@@ -294,6 +370,7 @@ int main(int argc, char **argv)
     const char *buttons = NULL, *skips = NULL, *turns = NULL;
     int pos = -1;
     int playing_flag = 0;
+    long bpm = 0;
     int menu_picks[16], npicks = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
@@ -316,6 +393,8 @@ int main(int argc, char **argv)
             wav_path = argv[++i];
         else if (!strcmp(argv[i], "--wheel") && i + 1 < argc)
             turns = argv[++i];
+        else if (!strcmp(argv[i], "--beat") && i + 1 < argc)
+            bpm = atol(argv[++i]);
         else if (!strcmp(argv[i], "--playing"))
             playing_flag = 1;
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
@@ -343,7 +422,12 @@ int main(int argc, char **argv)
     /* The player's limit: the 5G's whole app buffer. */
     static uint64_t arena[512 * 1024 / 8];
     struct arcade_host host = { NULL, print, NULL, date, click,
-                                playing_flag ? playing : NULL };
+                                playing_flag || bpm ? playing : NULL,
+                                bpm > 0 ? &fake_beat : NULL };
+    fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
+    fake.listen_at = -1;
+    unsigned last_held = 0;
+    double track_ms = 0;
     struct vm *vm = arcade_load(arena, sizeof(arena), mem_read, &in, &host,
                                 seed);
     if (!vm) {
@@ -403,6 +487,18 @@ int main(int argc, char **argv)
                 break;
         }
         arcade_input(vm, held, clicks, pos);
+        if (bpm > 0) {
+            /* the clock a tick on, and each new press stamped with it */
+            track_ms += 1000.0 / arcade_rate(vm);
+            fake.clock = (int32_t)track_ms;
+            struct arcade_music m = { fake.clock, 180000 - fake.clock, 0,
+                                      { -1, -1, -1, -1, -1 } };
+            for (int i = 0; i < 5; i++)
+                if ((held & ~last_held) & (1u << i))
+                    m.press[i] = fake.clock;
+            arcade_music(vm, &m);
+        }
+        last_held = held;
         arcade_presented(vm);
         if (!arcade_tick(vm, 1))
             return report(vm);
