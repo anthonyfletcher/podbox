@@ -14,6 +14,9 @@
  *                    same sizes and steps
  *   turned_row_arm   turned_row() for a source the right way round: a row
  *                    of rspr and rblit, banking's turn of the screen
+ *   light_map_arm    light.draw()'s last pass: pixels through their
+ *                    levels' tables, four a word
+ *   light_row_arm    light_row(): one row of a light's levels
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -519,3 +522,121 @@ turned_row_arm:
     bgt     1b
 3:  ldmfd   sp!, {r4-r11, pc}
     .size   turned_row_arm, . - turned_row_arm
+
+/* light_map_arm(px, lit, n, lut, levels): n pixels from px (a multiple of
+ * four, px and lit word aligned) each through the table of its level in
+ * lit, lut[level * 256 + colour]; a level of levels leaves it as drawn.
+ * Four lit together are left whole, four dark together go through the
+ * darkest table with one load and one store, and the rest each by its own
+ * level.
+ *
+ * r0 px, r1 lit, r2 pixels left, r3 lut, r4 levels, r6 levels in every
+ * byte, r7 four levels, r8 four pixels, r9 and r10 a level and a pixel */
+    .global light_map_arm
+    .type   light_map_arm, %function
+light_map_arm:
+    stmfd   sp!, {r4-r10, lr}
+    ldr     r4, [sp, #32]
+    ldr     r5, =0x01010101
+    mul     r6, r5, r4
+    cmp     r2, #0
+    ble     9f
+1:  ldr     r7, [r1], #4
+    cmp     r7, r6
+    beq     4f
+    ldr     r8, [r0]
+    cmp     r7, #0
+    bne     2f
+    and     r9, r8, #0xff
+    ldrb    r9, [r3, r9]
+    and     r10, r8, #0xff00
+    ldrb    r10, [r3, r10, lsr #8]
+    orr     r9, r9, r10, lsl #8
+    and     r10, r8, #0xff0000
+    ldrb    r10, [r3, r10, lsr #16]
+    orr     r9, r9, r10, lsl #16
+    ldrb    r10, [r3, r8, lsr #24]
+    orr     r9, r9, r10, lsl #24
+    str     r9, [r0]
+    b       4f
+2:
+    and     r9, r7, #0xff
+    cmp     r9, r4
+    bhs     50f
+    and     r10, r8, #0xff
+    add     r10, r10, r9, lsl #8
+    ldrb    r10, [r3, r10]
+    strb    r10, [r0, #0]
+50:
+    and     r9, r7, #0xff00
+    mov     r9, r9, lsr #8
+    cmp     r9, r4
+    bhs     51f
+    and     r10, r8, #0xff00
+    mov     r10, r10, lsr #8
+    add     r10, r10, r9, lsl #8
+    ldrb    r10, [r3, r10]
+    strb    r10, [r0, #1]
+51:
+    and     r9, r7, #0xff0000
+    mov     r9, r9, lsr #16
+    cmp     r9, r4
+    bhs     52f
+    and     r10, r8, #0xff0000
+    mov     r10, r10, lsr #16
+    add     r10, r10, r9, lsl #8
+    ldrb    r10, [r3, r10]
+    strb    r10, [r0, #2]
+52:
+    mov     r9, r7, lsr #24
+    cmp     r9, r4
+    bhs     53f
+    mov     r10, r8, lsr #24
+    add     r10, r10, r9, lsl #8
+    ldrb    r10, [r3, r10]
+    strb    r10, [r0, #3]
+53:
+4:  add     r0, r0, #4
+    subs    r2, r2, #4
+    bgt     1b
+9:  ldmfd   sp!, {r4-r10, pc}
+    .ltorg
+    .size   light_map_arm, . - light_map_arm
+
+/* light_row_arm(row, xa, xb, dd, step, inv, bay, fall, levels):
+ * light_row() -- each pixel xa to xb of row takes the level its squared
+ * distance dd gives, fall[(dd * inv) >> 32] plus the dither over 16, at
+ * most levels, where that is more than it has. bay holds the row's four
+ * dither steps a byte each, xa's lowest, turned a byte each pixel.
+ *
+ * r0 row, r1 x, r2 xb, r3 dd, r4 step, r5 inv, r6 bay, r7 fall, r8
+ * levels, r9 the level, r10 the product's low word, then the old level */
+    .global light_row_arm
+    .type   light_row_arm, %function
+light_row_arm:
+    stmfd   sp!, {r4-r10, lr}
+    add     r12, sp, #32
+    ldmia   r12, {r4-r8}
+    cmp     r1, r2
+    bge     9f
+1:  umull   r10, r9, r3, r5
+    cmp     r9, #256
+    bhi     2f
+    add     r9, r7, r9, lsl #1
+    ldrh    r9, [r9]
+    and     r10, r6, #0xff
+    add     r9, r9, r10
+    mov     r9, r9, lsr #4
+    cmp     r9, r8
+    movhi   r9, r8
+    ldrb    r10, [r0, r1]
+    cmp     r9, r10
+    strbhi  r9, [r0, r1]
+2:  add     r3, r3, r4
+    add     r4, r4, #512
+    mov     r6, r6, ror #8
+    add     r1, r1, #1
+    cmp     r1, r2
+    blt     1b
+9:  ldmfd   sp!, {r4-r10, pc}
+    .size   light_row_arm, . - light_row_arm

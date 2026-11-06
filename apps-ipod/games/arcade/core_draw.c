@@ -3948,6 +3948,15 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
 
 #define LIGHT_LEVELS 8
 
+#ifdef ARCADE_ASM
+void light_map_arm(uint8_t *px, const uint8_t *lit, int32_t n,
+                   const uint8_t *lut, uint32_t levels);
+void light_row_arm(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
+                   int32_t step, uint32_t inv, uint32_t bay,
+                   const uint16_t *fall, uint32_t levels);
+#endif
+
+#ifndef ARCADE_ASM
 /* One row of a light, xa to xb: each pixel's level from its squared
  * distance dd (stepping by step, which grows by 512 a pixel), its 256ths
  * of the reach's square (dd * inv over 2^32) through fall, with the row's
@@ -3971,6 +3980,7 @@ light_row(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
         step += 512;
     }
 }
+#endif
 
 /* The square root of v, rounded down */
 static uint32_t root32(uint32_t v)
@@ -4086,8 +4096,18 @@ NATIVE(light_draw)
             int32_t dx = xa * 16 + 8 - lx;
             uint32_t dd = (uint32_t)(dx * dx + dy * dy);
             int32_t step = 32 * dx + 256;
+#ifdef ARCADE_ASM
+            /* the row's dither steps a byte each, xa's lowest */
+            const uint8_t *b4 = bayer4 + (y & 3) * 4;
+            uint32_t bay = 0;
+            for (int k = 3; k >= 0; k--)
+                bay = bay << 8 | b4[(xa + k) & 3];
+            light_row_arm(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step,
+                          inv, bay, fall, levels);
+#else
             light_row(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step, inv,
                       bayer4 + (y & 3) * 4, fall, levels);
+#endif
             measured += (uint32_t)(xb - xa);
         }
         if (measured > 65536) {
@@ -4103,6 +4123,12 @@ NATIVE(light_draw)
         uint8_t *px = p.s.px + y * p.s.w + p.cx0;
         const uint8_t *row = lit + (y - p.cy0) * w;
         int32_t x = 0;
+#ifdef ARCADE_ASM
+        if (!(((uintptr_t)px | (uintptr_t)row) & 3)) {
+            x = w & ~3;
+            light_map_arm(px, row, x, lut[0], levels);
+        }
+#endif
         for (; x + 4 <= w; x += 4) {
             uint32_t l0 = row[x], l1 = row[x + 1], l2 = row[x + 2];
             uint32_t l3 = row[x + 3];
