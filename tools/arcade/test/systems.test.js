@@ -692,3 +692,17 @@ function update() {}`);
     /* every floor pixel fogged; every pair the same with coarse */
     assert.equal(r.out, '12800 6400\n');
 });
+
+test('playback.toggle, next and prev reach the host, for a cart that controls the music', () => {
+    const main = 'function init() { playback.toggle(); playback.next(); playback.prev(); }\nfunction update() {}';
+    const res = compileFiles({ 'cart.json': JSON.stringify({ id: '00000000000c0e70', name: 'Control', music: 'control' }),
+                               'main.js': main });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'control.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '1'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.replace(/\r/g, ''), 'control 0\ncontrol 1\ncontrol 2\n');
+    const listen = run(main);
+    assert.match(listen.errors[0].message, /needs the cart's music level to be control/);
+});

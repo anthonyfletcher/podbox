@@ -227,6 +227,13 @@ static void click(void *ctx, int beep)
     printf("click %d\n", beep);
 }
 
+/* playback.toggle(), next(), prev(): printed, as there is no music */
+static void control(void *ctx, int what)
+{
+    (void)ctx;
+    printf("control %d\n", what);
+}
+
 /* --wav: the sound, gathered tick by tick */
 #define WAV_RATE 44100
 static int16_t *wav;
@@ -510,7 +517,7 @@ int main(int argc, char **argv)
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
-                                NULL };
+                                NULL, control };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;

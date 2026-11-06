@@ -41,6 +41,10 @@ struct arcade_host
      * the owner's language, UTF-8; NULL where the firmware has no such
      * phrase. NULL for English only */
     const char *(*translate)(void *ctx, const char *english);
+    /* playback.toggle(), next(), prev(): the owner's music paused or
+     * played (0), on a track (1) or back one (2), as the earphone remote's
+     * keys do; NULL for none */
+    void (*control)(void *ctx, int what);
 };
 
 /* playback.sound()'s record: SOUND.SIZE in arcade_api.def */

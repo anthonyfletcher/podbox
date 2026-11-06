@@ -523,9 +523,20 @@ static const char *host_translate(void *ctx, const char *english)
     return NULL;
 }
 
+/* playback.toggle(), next() and prev(): the remote's keys */
+static void host_control(void *ctx, int what)
+{
+    static const long keys[] = { BUTTON_MULTIMEDIA_PLAYPAUSE,
+                                 BUTTON_MULTIMEDIA_NEXT,
+                                 BUTTON_MULTIMEDIA_PREV };
+    (void)ctx;
+    if (what >= 0 && what < (int)ARRAYLEN(keys))
+        default_event_handler(keys[what]);
+}
+
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
-    &beat_host, host_setting, host_translate
+    &beat_host, host_setting, host_translate, host_control
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -830,12 +841,9 @@ static enum themable_icons music_icon(int row, void *data)
 }
 
 /* Now Playing: the music's controls, which a game holding PREV, NEXT and
- * PLAY leaves no other way to reach; each as an earphone remote's key */
+ * PLAY leaves no other way to reach; in host_control()'s order */
 static const int music_label[] = { LANG_PLAYPAUSE, LANG_NEXTTRACK,
                                    LANG_PREVTRACK };
-static const long music_key[] = { BUTTON_MULTIMEDIA_PLAYPAUSE,
-                                  BUTTON_MULTIMEDIA_NEXT,
-                                  BUTTON_MULTIMEDIA_PREV };
 
 static const char *music_row(int row, void *data, char *buf, size_t len)
 {
@@ -860,7 +868,7 @@ static bool music_menu(void)
         if (info.selection < 0)
             return false;
         selection = info.selection;
-        default_event_handler(music_key[selection]);
+        host_control(NULL, selection);
     }
 }
 

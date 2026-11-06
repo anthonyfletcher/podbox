@@ -134,6 +134,9 @@ API(beat_left,     140, 0, 0, VAL,  0, FLAT, LISTEN, 1)
 API(beat_mood,     141, 1, 1, VOID, 0, FLAT, LISTEN, 1)
 API(playback_bands, 142, 2, 2, VOID, 0, FLAT, LISTEN, 1)
 API(playback_sound, 143, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(playback_toggle, 150, 0, 0, VOID, 0, FLAT, CONTROL, 1)
+API(playback_next,   151, 0, 0, VOID, 0, FLAT, CONTROL, 1)
+API(playback_prev,   152, 0, 0, VOID, 0, FLAT, CONTROL, 1)
 
 /* The owner's settings, read-only, and the firmware's phrases in their
  * language */

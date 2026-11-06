@@ -173,6 +173,22 @@ NATIVE(playback_playing)
     return 1;
 }
 
+/* playback.toggle(), playback.next(), playback.prev(): the owner's music
+ * paused or played, skipped on or back -- for a cart that holds the
+ * buttons the music would otherwise have. A cart declares music "control"
+ * for them. */
+static int control(struct vm *vm, int what)
+{
+    if (vm->host && vm->host->control)
+        vm->host->control(vm->host->ctx, what);
+    vm_charge(vm, 20);
+    return 1;
+}
+
+NATIVE(playback_toggle) { (void)a; (void)argc; (void)out; return control(vm, 0); }
+NATIVE(playback_next) { (void)a; (void)argc; (void)out; return control(vm, 1); }
+NATIVE(playback_prev) { (void)a; (void)argc; (void)out; return control(vm, 2); }
+
 /* ---- beat: the music's time and its beat --------------------------------
  * Track ms throughout. The clock is the host's reading for this tick, so
  * a frame drawn from it is steady; the tracker's calls go to the host.
