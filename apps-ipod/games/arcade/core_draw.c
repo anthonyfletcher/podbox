@@ -3396,6 +3396,13 @@ static void begin_view(struct vm *vm, struct pen *p)
         p->cy0 = p->cy1;
 }
 
+/* The depths, world pixels, at which land.draw() keeps each column's top
+ * for billboards behind hills: closer together near */
+static const int16_t land_band[LAND_BANDS] = {
+    12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536,
+    2048
+};
+
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
 {
     struct pen p;
@@ -3408,8 +3415,10 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     sl.x1 = p.cx1;
     if (sl.x0 >= sl.x1 || p.cy0 >= p.cy1)
         return 0;
-    for (int32_t x = sl.x0; x < sl.x1; x++)
+    for (int32_t x = 0; x < SCREEN_W; x++)
         top[x] = (int16_t)p.cy1;
+    struct planeview *vw = &vm->plane;
+    int32_t band = 0;
     sl.height = l->height;
     sl.colour = l->colour;
     sl.dpal = p.d->dpal;
@@ -3446,6 +3455,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
          z < far && open > 0;
          z = ((ahead + z + land_spacing(z)) & -land_spacing(z)) - ahead) {
         int64_t dz = land_spacing(z);
+        /* the ground nearer than each depth passed, as it stands */
+        while (band < LAND_BANDS && z >= (int64_t)land_band[band] << 16)
+            memcpy(vw->land_top[band++], top, sizeof(top));
         /* screen pixels a world pixel at this depth, 16.16, from 1 / z in
          * 0.32 by a 32-bit division; the screen row of height 0, and the
          * rows a height byte lifts, both 16.16 */
@@ -3490,6 +3502,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
                      (int32_t)base, (int32_t)rise, &filled, &lo);
         samples += (uint32_t)open;
     }
+    while (band < LAND_BANDS)
+        memcpy(vw->land_top[band++], top, sizeof(top));
+    vw->land_set = 1;
     if (lo < p.cy1) {
         row_touched(&p, lo);
         row_touched(&p, p.cy1 - 1);
@@ -3640,25 +3655,40 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     const uint8_t *sheet = MEM(vm, vm->sheet);
     int32_t fog = core_fog_level(v, depth);
     uint8_t fogc = p.d->dpal[v->fog_colour];
-    if (!v->depth_set) {
+    if (!v->depth_set && !v->land_set) {
         billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
         finish(vm, &p);
         return;
     }
+    /* behind hills: in each column, only the rows above the ground drawn
+     * nearer than it -- as it stood at the last kept depth short of it */
+    const int16_t *hill = NULL;
+    if (v->land_set) {
+        int32_t k = -1;
+        while (k + 1 < LAND_BANDS &&
+               ((int32_t)land_band[k + 1] << 16) <= depth)
+            k++;
+        if (k >= 0)
+            hill = v->land_top[k];
+    }
     /* behind walls: drawn only in the runs of columns where it is nearer
-     * than the wall there, each run as a clip */
-    int32_t c0 = p.cx0, c1 = p.cx1;
+     * than the wall there; each run, of one ground top, as a clip */
+    int32_t c0 = p.cx0, c1 = p.cx1, r1 = p.cy1;
     int32_t a = x < c0 ? c0 : x, b = x + w > c1 ? c1 : x + w;
     for (int32_t i = a; i < b;) {
-        while (i < b && v->depth[i] <= depth)
+        while (i < b && v->depth_set && v->depth[i] <= depth)
             i++;
         int32_t j = i;
-        while (j < b && v->depth[j] > depth)
+        while (j < b && (!v->depth_set || v->depth[j] > depth) &&
+               (!hill || hill[j] == hill[i]))
             j++;
         if (j > i) {
             p.cx0 = i;
             p.cx1 = j;
-            billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
+            p.cy1 = hill && hill[i] < r1 ? hill[i] : r1;
+            if (p.cy1 > p.cy0)
+                billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog,
+                               fogc);
         }
         i = j;
     }

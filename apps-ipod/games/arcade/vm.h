@@ -172,6 +172,8 @@ struct draw
     int16_t dirty_lo, dirty_hi;  /* the screen's rows drawn */
 };
 
+#define LAND_BANDS 16
+
 /* The plane's camera, from plane.view(): 16.16 world pixels, the heading
  * as the unit vector (dx, dy), and the focal length in screen pixels */
 struct planeview
@@ -184,6 +186,11 @@ struct planeview
      * for billboards behind walls; kept until the next plane.view() */
     int depth_set;
     int32_t depth[SCREEN_W];
+    /* land.draw()'s nearer ground at each screen column, for billboards
+     * behind hills: the highest row drawn by the time its slices passed
+     * each of LAND_BANDS depths; kept until the next plane.view() */
+    int land_set;
+    int16_t land_top[LAND_BANDS][SCREEN_W];
     /* plane.fog(): from near to far (16.16 world pixels) the ground goes
      * to colour, dithered; kept until changed */
     int fog_on;

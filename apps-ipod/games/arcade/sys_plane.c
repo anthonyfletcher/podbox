@@ -62,6 +62,7 @@ NATIVE(plane_view)
     v->focal = (int32_t)(((int64_t)(SCREEN_W / 2) << 32) / s * c >> 16);
     v->set = 1;
     v->depth_set = 0;
+    v->land_set = 0;
     vm_charge(vm, 10);
     return 1;
 }

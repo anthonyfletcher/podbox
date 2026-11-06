@@ -951,3 +951,32 @@ function draw() {
      * (colour 12); and from above it, no ceiling at all */
     assert.equal(r.out, '9 9 12 12\n0\n');
 });
+
+test('land: a billboard behind a hill shows only above the hill', () => {
+    const body = (ridge) => `var hm, cm;
+function init() {
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, 8);
+    hm = img(64, 64); cm = img(64, 64);
+    target(hm); cls(0); target(cm); cls(11);
+    // a low ridge across the view at x 30..31
+    target(hm); if (${ridge}) rectfill(30, 0, 31, 63, 12);
+    target(cm); rectfill(30, 0, 31, 63, 5);
+    target(SCREEN);
+    plane.view(0, 32, 20, 0, 50, 0.25);
+    cls(1);
+    land.draw(hm, cm, 200);
+    // a tall figure well beyond the ridge, straight ahead
+    plane.billboards([50], [32], 0, 1, 40, 0, 1);
+    var n = 0;
+    for (var y = 0; y < 120; y++) if (pget(80, y) == 8) n++;
+    printh(n);
+}
+function update() {}`;
+    const open = run(body(0)), hidden = run(body(1));
+    assert.equal(open.status, 0, open.err);
+    assert.equal(hidden.status, 0, hidden.err);
+    const seen = Number(open.out.trim()), behind = Number(hidden.out.trim());
+    /* the whole figure on open ground; behind the ridge, its top only */
+    assert.ok(seen > 10, open.out);
+    assert.ok(behind > 0 && behind < seen, seen + ' then ' + behind);
+});
