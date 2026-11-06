@@ -46,6 +46,7 @@
 #include "root_menu.h"        /* GO_TO_* */
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell.h"
+#include "games/arcade/shell_tracks.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status, audio_current_track */
@@ -365,27 +366,7 @@ static int beat_sound(void *ctx, int32_t out[ARCADE_SOUND_FIELDS])
     }
     if (!sound_have)
         return 0;
-    const struct sound_record *s = &sound_rec;
-    bool locked = !(s->flags & SOUND_F_NO_LOCK);
-    out[0] = locked ? s->period_ms : 0;
-    out[1] = locked ? s->confidence : 0;
-    out[2] = (s->flags & SOUND_F_SETTLED) ? 1 : 0;
-    out[3] = s->loudness_db10;
-    out[4] = s->crest_db;
-    out[5] = s->width;
-    for (int k = 0; k < 3; k++) {
-        out[6 + k] = s->level[k];
-        out[9 + k] = s->rate10[k];
-    }
-    out[12] = s->strength;
-    out[13] = s->peakiness;
-    for (int k = 0; k < 12; k++)
-        out[14 + k] = s->pitch[k];
-    out[26] = s->tonic;
-    out[27] = (s->flags & SOUND_F_NO_MODE) ? -1 : s->mode;
-    out[28] = s->mode_margin;
-    out[29] = s->tonal_clarity;
-    out[30] = s->harmonic_change;
+    shell_sound_out(&sound_rec, out);
     return 1;
 }
 
@@ -451,6 +432,7 @@ static void beat_tick(struct vm *vm)
     struct arcade_music m;
     ticks_heard++;
     m.jumped = !spk_clock_tick();
+    m.changed = shell_tracks_tick();
     if (m.jumped) {
         /* a seek, a skip, a new track: the tempo and the bar start again */
         if (beat_listening)
@@ -536,7 +518,7 @@ static void host_control(void *ctx, int what)
 
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
-    &beat_host, host_setting, host_translate, host_control
+    &beat_host, host_setting, host_translate, host_control, &shell_tracks
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -1017,6 +999,7 @@ static int run(const char *path, void *mem, size_t size)
     last_wheel = -1;
     menu_down = menu_paused = false;
     beat_start();
+    shell_tracks_start();
     sound_path[0] = '\0';         /* the track's record is read afresh */
     int status = PLAYING;
     if (!arcade_start(vm))
@@ -1125,6 +1108,7 @@ static int run(const char *path, void *mem, size_t size)
     if (status == FAILED)
         present(vm, false);
     beat_listen(NULL, 0);
+    shell_tracks_end();
     give_screen();
     sound_vm = NULL;
     if (status == FAILED) {

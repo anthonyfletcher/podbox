@@ -413,6 +413,14 @@ static struct value obj_get(struct vm *vm, struct value o, uint32_t key,
     return BUF(vm, p->buf)->v[slot];
 }
 
+struct value vm_get(struct vm *vm, struct value o, const char *name)
+{
+    if (o.tag != T_OBJ)
+        return mk(T_NULL, 0);
+    uint32_t key = key_find(vm, name, (uint32_t)strlen(name));
+    return key == NONE ? mk(T_NULL, 0) : obj_get(vm, o, key, NONE);
+}
+
 /* o and v must be rooted: adding a key may allocate. */
 static int obj_set(struct vm *vm, struct value o, uint32_t key, uint32_t site,
                    struct value v)

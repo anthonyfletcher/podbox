@@ -90,6 +90,19 @@ static void hash_insert(struct vm *vm, uint32_t id)
     s->h.info = (s->h.info & 0xffff) | ((id + 1) << 16);
 }
 
+/* The key id of the len bytes at b, or NONE when no record has that key */
+uint32_t key_find(struct vm *vm, const char *b, uint32_t len)
+{
+    uint32_t i = hash_bytes((const uint8_t *)b, len) & vm->hashmask, id;
+    while ((id = vm->keyhash[i]) != 0) {
+        struct str *k = MEM(vm, vm->keyoff[id - 1]);
+        if (k->len == len && !memcmp(k->b, b, len))
+            return id - 1;
+        i = (i + 1) & vm->hashmask;
+    }
+    return NONE;
+}
+
 /* The key id of string s, or NONE when it has none and add is 0. With add,
  * a new key is made; failing that the error is set and NONE returned. */
 uint32_t key_id(struct vm *vm, struct value s, int add)

@@ -16,6 +16,9 @@
 /* The newest API version this engine provides. */
 #define ARCADE_API_VERSION 1
 
+/* playback.sound()'s record: SOUND.SIZE in arcade_api.def */
+#define ARCADE_SOUND_FIELDS 31
+
 struct arcade_host
 {
     void *ctx;
@@ -45,10 +48,68 @@ struct arcade_host
      * played (0), on a track (1) or back one (2), as the earphone remote's
      * keys do; NULL for none */
     void (*control)(void *ctx, int what);
+    /* playback and tracks: the playing track, the library and the queue,
+     * below; NULL where there is no music to read */
+    const struct arcade_tracks *tracks;
 };
 
-/* playback.sound()'s record: SOUND.SIZE in arcade_api.def */
-#define ARCADE_SOUND_FIELDS 31
+/* tracks.pick() and tracks.count()'s filter; 0 or NULL in a field is any */
+struct arcade_filter
+{
+    int32_t minlen, maxlen;     /* ms */
+    const char *genre;          /* the genre's name, case aside */
+    int32_t decade;             /* 1980 for the 80s */
+    int music;                  /* spoken word left out */
+};
+
+/* The owner's music and library. A track is its id, the database's number
+ * for it; -1 is none. Strings are UTF-8, cut to cap. */
+struct arcade_tracks
+{
+    /* playback: the playing track's id, its elapsed and length (ms), and
+     * its title (0), artist (1) or album (2) into buf, cap bytes with its
+     * end: the length written */
+    int32_t (*current)(void *ctx);
+    void (*position)(void *ctx, int32_t out[2]);
+    int (*text)(void *ctx, int what, char *buf, int cap);
+    /* playback.seek(), and duck(): the music to level / 256 of its
+     * volume over ticks ticks, undone when the cart ends */
+    void (*seek)(void *ctx, int32_t ms);
+    void (*duck)(void *ctx, int32_t level, int32_t ticks);
+    /* playback.play(): track id from ms, from a playlist of the cart's own,
+     * the owner's set aside until the cart ends; 0 when it cannot.
+     * stop(), and started(): whether it is heard yet */
+    int (*play)(void *ctx, int32_t id, int32_t ms);
+    void (*stop)(void *ctx);
+    int (*started)(void *ctx);
+    /* tracks.count(), and pick(): up to n ids at random into out, the
+     * count */
+    int32_t (*count)(void *ctx, const struct arcade_filter *f);
+    int32_t (*pick)(void *ctx, int32_t n, const struct arcade_filter *f,
+                    int32_t *out);
+    /* tracks.field(): 1 with *num for a number, 2 with its text in buf,
+     * cap bytes with its end, 0 when there is none (ARCADE_TRACK_* below) */
+    int (*field)(void *ctx, int32_t id, int f, int32_t *num, char *buf,
+                 int cap);
+    /* tracks.near(): up to n tracks most like id, into out, the count */
+    int32_t (*near)(void *ctx, int32_t id, int32_t n, int32_t *out);
+    /* tracks.sound(): id's Sound Index record, as playback.sound() */
+    int (*sound)(void *ctx, int32_t id, int32_t out[ARCADE_SOUND_FIELDS]);
+    /* the queue: its length and the playing place (0 first, -1 none),
+     * the id at place i, and a track added after the playing one (next)
+     * or at the end; 0 when it cannot be */
+    int32_t (*queued)(void *ctx, int32_t *at);
+    int32_t (*queue_at)(void *ctx, int32_t i);
+    int (*enqueue)(void *ctx, int32_t id, int next);
+};
+
+/* tracks.field()'s fields: TRACK.* in arcade_api.def */
+#define ARCADE_TRACK_TITLE  0
+#define ARCADE_TRACK_ARTIST 1
+#define ARCADE_TRACK_ALBUM  2
+#define ARCADE_TRACK_GENRE  3
+#define ARCADE_TRACK_YEAR   4
+#define ARCADE_TRACK_LENGTH 5
 
 /* The beat of the owner's music, for a cart played to it. Times are track
  * ms. The host also hands over each tick's clock (arcade_music()). */
@@ -87,11 +148,11 @@ struct arcade_beat
 
 /* What the host read for a tick: the clock, steady for the tick; the ms
  * still to play; whether playback moved underneath (a seek, a skip, a new
- * track) since the last; and when each button went down, in btn()'s
- * numbering, or -1. */
+ * track) since the last, and whether the track is another; and when each
+ * button went down, in btn()'s numbering, or -1. */
 struct arcade_music
 {
-    int32_t clock, left, jumped;
+    int32_t clock, left, jumped, changed;
     int32_t press[5];
 };
 

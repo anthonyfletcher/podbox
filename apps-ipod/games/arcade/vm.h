@@ -484,6 +484,10 @@ void gc_collect(struct vm *vm);
 uint32_t perm_alloc(struct vm *vm, uint32_t bytes);
 int lz4_decode(const uint8_t *src, uint32_t n, uint8_t *dst, uint32_t size);
 uint32_t key_id(struct vm *vm, struct value s, int add);
+uint32_t key_find(struct vm *vm, const char *b, uint32_t len);
+/* A record's field by its name, from C; null when o is not a record or has
+ * no such field */
+struct value vm_get(struct vm *vm, struct value o, const char *name);
 uint32_t vm_shape_add(struct vm *vm, uint32_t parent, uint32_t key);
 
 /* core_math.c */

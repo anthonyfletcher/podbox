@@ -189,6 +189,304 @@ NATIVE(playback_toggle) { (void)a; (void)argc; (void)out; return control(vm, 0);
 NATIVE(playback_next) { (void)a; (void)argc; (void)out; return control(vm, 1); }
 NATIVE(playback_prev) { (void)a; (void)argc; (void)out; return control(vm, 2); }
 
+/* ---- playback and tracks: the playing track, the library, the queue ------
+ * Through the host's arcade_tracks; with none (no music to read), the calls
+ * answer as for nothing playing and an empty library. A track is its id. */
+
+static const struct arcade_tracks *music_of(struct vm *vm)
+{
+    return vm->host ? vm->host->tracks : NULL;
+}
+
+static int position(struct vm *vm, int i, struct value *out)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    int32_t p[2] = { 0, 0 };
+    if (t && t->position)
+        t->position(vm->host->ctx, p);
+    vm_charge(vm, 4);
+    return RET_INT(p[i]);
+}
+
+NATIVE(playback_elapsed) { (void)a; (void)argc; return position(vm, 0, out); }
+NATIVE(playback_length) { (void)a; (void)argc; return position(vm, 1, out); }
+
+NATIVE(playback_changed)
+{
+    (void)a; (void)argc;
+    return RET_INT(vm->heard.changed ? 1 : 0);
+}
+
+/* A string the host writes, up to 255 bytes, as a new string */
+static int host_text(struct vm *vm, int n, const char *buf, struct value *out)
+{
+    vm_charge(vm, 10 + (uint32_t)n / 4);
+    return vm_new_string(vm, (const uint8_t *)buf, (uint32_t)n, out);
+}
+
+static int playing_text(struct vm *vm, int what, struct value *out)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    char buf[256];
+    int n = t && t->text ? t->text(vm->host->ctx, what, buf, 255) : 0;
+    return host_text(vm, n < 0 ? 0 : n, buf, out);
+}
+
+NATIVE(playback_title) { (void)a; (void)argc; return playing_text(vm, 0, out); }
+NATIVE(playback_artist) { (void)a; (void)argc; return playing_text(vm, 1, out); }
+NATIVE(playback_album) { (void)a; (void)argc; return playing_text(vm, 2, out); }
+
+NATIVE(playback_track)
+{
+    (void)a; (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    vm_charge(vm, 10);
+    return RET_INT(t && t->current ? t->current(vm->host->ctx) : -1);
+}
+
+NATIVE(playback_seek)
+{
+    (void)argc; (void)out;
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "playback.seek() needs a time in ms", "", "");
+    int32_t ms = floor_int(a[0]);
+    if (t && t->seek)
+        t->seek(vm->host->ctx, ms < 0 ? 0 : ms);
+    vm_charge(vm, 20);
+    return 1;
+}
+
+/* playback.duck(level, [ticks]): the music to level / 256 of the owner's
+ * volume, over ticks (0, at once), never above it; undone at the end */
+NATIVE(playback_duck)
+{
+    (void)out;
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "playback.duck() needs a level, 0 to 256", "", "");
+    int32_t level = floor_int(a[0]);
+    int32_t ticks = argc > 1 && is_num(a[1]) ? floor_int(a[1]) : 0;
+    level = level < 0 ? 0 : level > 256 ? 256 : level;
+    if (t && t->duck)
+        t->duck(vm->host->ctx, level, ticks < 0 ? 0 : ticks);
+    vm_charge(vm, 10);
+    return 1;
+}
+
+NATIVE(playback_play)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "playback.play() needs a track", "", "");
+    int32_t ms = argc > 1 && is_num(a[1]) ? floor_int(a[1]) : 0;
+    vm_charge(vm, 40);
+    return RET_INT(t && t->play &&
+                   t->play(vm->host->ctx, floor_int(a[0]), ms < 0 ? 0 : ms));
+}
+
+NATIVE(playback_stop)
+{
+    (void)a; (void)argc; (void)out;
+    const struct arcade_tracks *t = music_of(vm);
+    if (t && t->stop)
+        t->stop(vm->host->ctx);
+    vm_charge(vm, 20);
+    return 1;
+}
+
+NATIVE(playback_started)
+{
+    (void)a; (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    return RET_INT(t && t->started && t->started(vm->host->ctx));
+}
+
+/* A filter record ({ minlen, maxlen, genre, decade, music }, any field
+ * left out) as the host takes it; genre's text in buf */
+static int filter_of(struct vm *vm, struct value v, struct arcade_filter *f,
+                     char *buf, uint32_t cap, const char *fn)
+{
+    memset(f, 0, sizeof(*f));
+    if (v.tag == T_NULL)
+        return 1;
+    if (v.tag != T_OBJ)
+        return vm_fail(vm, fn, "() takes a filter record: { minlen, maxlen, "
+                       "genre, decade, music }", "");
+    struct value x;
+    if (is_num(x = vm_get(vm, v, "minlen")))
+        f->minlen = floor_int(x);
+    if (is_num(x = vm_get(vm, v, "maxlen")))
+        f->maxlen = floor_int(x);
+    if (is_num(x = vm_get(vm, v, "decade")))
+        f->decade = floor_int(x) / 10 * 10;
+    f->music = vm_truthy(vm, vm_get(vm, v, "music"));
+    if ((x = vm_get(vm, v, "genre")).tag == T_STR) {
+        buf[vm_text(vm, x, buf, cap - 1)] = '\0';
+        f->genre = buf;
+    }
+    return 1;
+}
+
+/* Up to n ids from the host into the array or Int32Array out */
+static int ids_out(struct vm *vm, struct value v, int32_t n, int32_t **ids,
+                   const char *fn)
+{
+    uint32_t len = v.tag == T_I32 ? I32(vm, v)->len :
+                   v.tag == T_ARR ? ARR(vm, v)->len : 0;
+    if ((v.tag != T_I32 && v.tag != T_ARR) || n < 0 || (uint32_t)n > len)
+        return vm_fail(vm, fn, "() writes its tracks to an array of at "
+                       "least n", "");
+    *ids = scratch(vm, (uint32_t)n * sizeof(int32_t) + 1);
+    return *ids != NULL;
+}
+
+static void ids_store(struct vm *vm, struct value v, const int32_t *ids,
+                      int32_t n)
+{
+    for (int32_t i = 0; i < n; i++) {
+        if (v.tag == T_I32)
+            I32(vm, v)->d[i] = ids[i];
+        else
+            BUF(vm, ARR(vm, v)->buf)->v[i] = mk(T_INT, ids[i]);
+    }
+}
+
+NATIVE(tracks_count)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    struct arcade_filter f;
+    char genre[64];
+    if (!filter_of(vm, argc > 0 ? a[0] : mk(T_NULL, 0), &f, genre,
+                   sizeof(genre), "tracks.count"))
+        return 0;
+    int32_t n = t && t->count ? t->count(vm->host->ctx, &f) : 0;
+    vm_charge(vm, 200 + (uint32_t)n / 4);
+    return RET_INT(n);
+}
+
+/* tracks.pick(n, filter, out): n tracks at random, into out; how many */
+NATIVE(tracks_pick)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    struct arcade_filter f;
+    char genre[64];
+    int32_t n = is_num(a[0]) ? floor_int(a[0]) : -1, *ids;
+    if (!filter_of(vm, a[1], &f, genre, sizeof(genre), "tracks.pick") ||
+        !ids_out(vm, a[2], n, &ids, "tracks.pick"))
+        return 0;
+    int32_t k = t && t->pick && n ? t->pick(vm->host->ctx, n, &f, ids) : 0;
+    ids_store(vm, a[2], ids, k);
+    vm_charge(vm, 200 + (uint32_t)k * 4);
+    return RET_INT(k);
+}
+
+/* tracks.field(id, TRACK.x): a string or a number, or null */
+NATIVE(tracks_field)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    char buf[256];
+    int32_t num = 0;
+    if (!is_num(a[0]) || !is_num(a[1]))
+        return vm_fail(vm, "tracks.field() needs a track and a TRACK field",
+                       "", "");
+    int kind = t && t->field ? t->field(vm->host->ctx, floor_int(a[0]),
+                                        floor_int(a[1]), &num, buf, 255) : 0;
+    if (kind == 1) {
+        vm_charge(vm, 10);
+        return RET_INT(num);
+    }
+    if (kind == 2) {
+        buf[255] = '\0';
+        return host_text(vm, (int)strlen(buf), buf, out);
+    }
+    *out = mk(T_NULL, 0);
+    vm_charge(vm, 10);
+    return 1;
+}
+
+/* tracks.near(id, n, out): up to n tracks most like id, into out */
+NATIVE(tracks_near)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    int32_t n = is_num(a[1]) ? floor_int(a[1]) : -1, *ids;
+    if (!is_num(a[0]) || !ids_out(vm, a[2], n, &ids, "tracks.near"))
+        return 0;
+    int32_t k = t && t->near && n ? t->near(vm->host->ctx, floor_int(a[0]),
+                                            n, ids) : 0;
+    ids_store(vm, a[2], ids, k);
+    vm_charge(vm, 200 + (uint32_t)k * 4);
+    return RET_INT(k);
+}
+
+/* tracks.sound(id, out): as playback.sound(), for any track */
+NATIVE(tracks_sound)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    int32_t s[ARCADE_SOUND_FIELDS] = { 0 };
+    if (!is_num(a[0]) || a[1].tag != T_I32 ||
+        I32(vm, a[1])->len < ARCADE_SOUND_FIELDS)
+        return vm_fail(vm, "tracks.sound() needs a track and an Int32Array "
+                       "of SOUND.SIZE", "", "");
+    int has = t && t->sound ? t->sound(vm->host->ctx, floor_int(a[0]), s) : 0;
+    memcpy(I32(vm, a[1])->d, s, sizeof(s));
+    vm_charge(vm, 40);
+    return RET_INT(has ? 1 : 0);
+}
+
+static int32_t queued(struct vm *vm, int32_t *at)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    *at = -1;
+    vm_charge(vm, 10);
+    return t && t->queued ? t->queued(vm->host->ctx, at) : 0;
+}
+
+NATIVE(tracks_queued)
+{
+    (void)a; (void)argc;
+    int32_t at;
+    return RET_INT(queued(vm, &at));
+}
+
+NATIVE(tracks_place)
+{
+    (void)a; (void)argc;
+    int32_t at;
+    queued(vm, &at);
+    return RET_INT(at);
+}
+
+/* tracks.queue(i): the track at place i of the queue, or -1 */
+NATIVE(tracks_queue)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "tracks.queue() needs a place in the queue", "",
+                       "");
+    vm_charge(vm, 20);
+    return RET_INT(t && t->queue_at ? t->queue_at(vm->host->ctx,
+                                                  floor_int(a[0])) : -1);
+}
+
+/* tracks.enqueue(id, [next]): added after the playing track (next true)
+ * or at the end of the queue; whether it was */
+NATIVE(tracks_enqueue)
+{
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "tracks.enqueue() needs a track", "", "");
+    int next = argc > 1 && vm_truthy(vm, a[1]);
+    vm_charge(vm, 40);
+    return RET_INT(t && t->enqueue &&
+                   t->enqueue(vm->host->ctx, floor_int(a[0]), next));
+}
+
 /* ---- beat: the music's time and its beat --------------------------------
  * Track ms throughout. The clock is the host's reading for this tick, so
  * a frame drawn from it is steady; the tracker's calls go to the host.

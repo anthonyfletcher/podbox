@@ -227,11 +227,236 @@ static void click(void *ctx, int beep)
     printf("click %d\n", beep);
 }
 
-/* playback.toggle(), next(), prev(): printed, as there is no music */
+/* playback and tracks: a library of twenty made-up tracks -- "Track n" by
+ * Artist A, B or C on Album n / 4, Rock, Jazz or Pop in turn, from 1970 a
+ * year each, 2 to 4 minutes, track 19 spoken word -- and a queue of the
+ * first ten, playing the first. The clock is the playing track's; a skip
+ * or a play moves the queue's place and says the track changed. */
+#define LIB 20
+static struct
+{
+    int32_t queue[LIB], nqueue, at, owned, duck, changed;
+} lib = { { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }, 10, 0, 0, 256, 0 };
+
+static int lib_spoken(int32_t id) { return id == 19; }
+static int32_t lib_length(int32_t id) { return 120000 + id * 6000; }
+static int32_t lib_year(int32_t id) { return 1970 + id; }
+static const char *lib_genre(int32_t id)
+{
+    static const char *const g[] = { "Rock", "Jazz", "Pop" };
+    return g[id % 3];
+}
+
+/* s into buf, cap bytes with its end, cut short; its length */
+static int lib_copy(char *buf, int cap, const char *s)
+{
+    int n = (int)strlen(s);
+    if (n > cap - 1)
+        n = cap - 1;
+    memcpy(buf, s, (size_t)n);
+    buf[n] = '\0';
+    return n;
+}
+
+static int32_t fake_current(void *ctx)
+{
+    (void)ctx;
+    return lib.at >= 0 && lib.at < lib.nqueue ? lib.queue[lib.at] : -1;
+}
+
+static void fake_position(void *ctx, int32_t out[2])
+{
+    int32_t id = fake_current(ctx);
+    out[0] = id < 0 ? 0 : fake.clock;
+    out[1] = id < 0 ? 0 : lib_length(id);
+}
+
+static int fake_field(void *ctx, int32_t id, int f, int32_t *num, char *buf,
+                      int cap)
+{
+    char t[32];
+    (void)ctx;
+    if (id < 0 || id >= LIB)
+        return 0;
+    switch (f) {
+    case ARCADE_TRACK_TITLE:
+        snprintf(t, sizeof(t), "Track %d", (int)id);
+        lib_copy(buf, cap, t);
+        return 2;
+    case ARCADE_TRACK_ARTIST:
+        snprintf(t, sizeof(t), "Artist %c", 'A' + (int)(id % 3));
+        lib_copy(buf, cap, t);
+        return 2;
+    case ARCADE_TRACK_ALBUM:
+        snprintf(t, sizeof(t), "Album %d", (int)(id / 4));
+        lib_copy(buf, cap, t);
+        return 2;
+    case ARCADE_TRACK_GENRE:
+        lib_copy(buf, cap, lib_genre(id));
+        return 2;
+    case ARCADE_TRACK_YEAR:
+        *num = lib_year(id);
+        return 1;
+    case ARCADE_TRACK_LENGTH:
+        *num = lib_length(id);
+        return 1;
+    }
+    return 0;
+}
+
+static int fake_text(void *ctx, int what, char *buf, int cap)
+{
+    int32_t id = fake_current(ctx), n;
+    char t[32];
+    if (id < 0 || fake_field(ctx, id, what, &n, t, sizeof(t)) != 2)
+        return 0;
+    return lib_copy(buf, cap, t);
+}
+
+static void fake_seek(void *ctx, int32_t ms)
+{
+    (void)ctx;
+    printf("seek %d\n", (int)ms);
+}
+
+static void fake_duck(void *ctx, int32_t level, int32_t ticks)
+{
+    (void)ctx;
+    lib.duck = level;
+    printf("duck %d over %d\n", (int)level, (int)ticks);
+}
+
+static int fake_play(void *ctx, int32_t id, int32_t ms)
+{
+    (void)ctx;
+    if (id < 0 || id >= LIB)
+        return 0;
+    lib.owned = 1;
+    lib.queue[0] = id;
+    lib.nqueue = 1;
+    lib.at = 0;
+    lib.changed = 1;
+    printf("play %d from %d\n", (int)id, (int)ms);
+    return 1;
+}
+
+static void fake_stop(void *ctx)
+{
+    (void)ctx;
+    printf("stop\n");
+}
+
+static int fake_started(void *ctx)
+{
+    (void)ctx;
+    return lib.owned;
+}
+
+static int fake_matches(int32_t id, const struct arcade_filter *f)
+{
+    if (!f)
+        return 1;
+    if (f->music && lib_spoken(id))
+        return 0;
+    if (f->minlen && lib_length(id) < f->minlen)
+        return 0;
+    if (f->maxlen && lib_length(id) > f->maxlen)
+        return 0;
+    if (f->genre && strcmp(f->genre, lib_genre(id)))
+        return 0;
+    if (f->decade && lib_year(id) / 10 * 10 != f->decade)
+        return 0;
+    return 1;
+}
+
+static int32_t fake_count(void *ctx, const struct arcade_filter *f)
+{
+    int32_t n = 0;
+    (void)ctx;
+    for (int32_t id = 0; id < LIB; id++)
+        n += fake_matches(id, f);
+    return n;
+}
+
+/* the first n that match, in order: the test's "random" */
+static int32_t fake_pick(void *ctx, int32_t n, const struct arcade_filter *f,
+                         int32_t *out)
+{
+    int32_t k = 0;
+    (void)ctx;
+    for (int32_t id = 0; id < LIB && k < n; id++)
+        if (fake_matches(id, f))
+            out[k++] = id;
+    return k;
+}
+
+/* the same genre first, then the nearest years */
+static int32_t fake_near(void *ctx, int32_t id, int32_t n, int32_t *out)
+{
+    int32_t k = 0;
+    (void)ctx;
+    if (id < 0 || id >= LIB)
+        return 0;
+    for (int32_t d = 1; d < LIB && k < n; d++)
+        for (int s = -1; s <= 1 && k < n; s += 2) {
+            int32_t j = id + s * d;
+            if (j >= 0 && j < LIB && !strcmp(lib_genre(j), lib_genre(id)))
+                out[k++] = j;
+        }
+    return k;
+}
+
+static int fake_track_sound(void *ctx, int32_t id, int32_t out[ARCADE_SOUND_FIELDS])
+{
+    (void)ctx;
+    if (id < 0 || id >= LIB)
+        return 0;
+    memset(out, 0, ARCADE_SOUND_FIELDS * sizeof(int32_t));
+    out[0] = 400 + id * 10;
+    return 1;
+}
+
+static int32_t fake_queued(void *ctx, int32_t *at)
+{
+    (void)ctx;
+    *at = lib.at;
+    return lib.nqueue;
+}
+
+static int32_t fake_queue_at(void *ctx, int32_t i)
+{
+    (void)ctx;
+    return i >= 0 && i < lib.nqueue ? lib.queue[i] : -1;
+}
+
+static int fake_enqueue(void *ctx, int32_t id, int next)
+{
+    (void)ctx;
+    if (id < 0 || id >= LIB || lib.nqueue >= LIB)
+        return 0;
+    int32_t at = next ? lib.at + 1 : lib.nqueue;
+    memmove(lib.queue + at + 1, lib.queue + at,
+            (size_t)(lib.nqueue - at) * sizeof(int32_t));
+    lib.queue[at] = id;
+    lib.nqueue++;
+    return 1;
+}
+
+static const struct arcade_tracks fake_tracks = {
+    fake_current, fake_position, fake_text, fake_seek, fake_duck,
+    fake_play, fake_stop, fake_started, fake_count, fake_pick, fake_field,
+    fake_near, fake_track_sound, fake_queued, fake_queue_at, fake_enqueue
+};
+
+/* playback.toggle(), next(), prev(): printed; a skip moves the queue */
 static void control(void *ctx, int what)
 {
     (void)ctx;
     printf("control %d\n", what);
+    if ((what == 1 && lib.at + 1 < lib.nqueue) || (what == 2 && lib.at > 0)) {
+        lib.at += what == 1 ? 1 : -1;
+        lib.changed = 1;
+    }
 }
 
 /* --wav: the sound, gathered tick by tick */
@@ -517,7 +742,7 @@ int main(int argc, char **argv)
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
-                                NULL, control };
+                                NULL, control, &fake_tracks };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;
@@ -586,10 +811,17 @@ int main(int argc, char **argv)
             track_ms += 1000.0 / arcade_rate(vm);
             fake.clock = (int32_t)track_ms;
             struct arcade_music m = { fake.clock, 180000 - fake.clock, 0,
-                                      { -1, -1, -1, -1, -1 } };
+                                      lib.changed, { -1, -1, -1, -1, -1 } };
+            lib.changed = 0;
             for (int i = 0; i < 5; i++)
                 if ((held & ~last_held) & (1u << i))
                     m.press[i] = fake.clock;
+            arcade_music(vm, &m);
+        } else {
+            /* no clock to follow: only a track changing */
+            struct arcade_music m = { 0, 0, 0, lib.changed,
+                                      { -1, -1, -1, -1, -1 } };
+            lib.changed = 0;
             arcade_music(vm, &m);
         }
         last_held = held;

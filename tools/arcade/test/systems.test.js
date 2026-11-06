@@ -801,3 +801,59 @@ function update() {}`);
     /* lit red, shaded the dark colour; wholly fogged, all four blue */
     assert.equal(faces, '8 2 48');
 });
+
+test('playback and tracks: the playing track, the library, the queue, and owning the music', () => {
+    const main = `var ids = new Int32Array(8), near = [0, 0, 0], snd = new Int32Array(SOUND.SIZE), tk = 0;
+function init() {
+    // pbgvm's library: twenty tracks, Rock, Jazz and Pop in turn from 1970,
+    // track 19 spoken; a queue of the first ten, playing the first
+    printh(playback.track() + " " + playback.title() + "|" + playback.artist() + "|" + playback.album() + " " + playback.length());
+    printh(tracks.count() + " " + tracks.count({ music: true }) + " " + tracks.count({ genre: "Jazz" }) + " " + tracks.count({ decade: 1980, music: true }) + " " + tracks.count({ minlen: 200000 }));
+    var k = tracks.pick(3, { genre: "Pop" }, ids);
+    printh(k + " " + ids[0] + " " + ids[1] + " " + ids[2]);
+    printh(tracks.field(4, TRACK.TITLE) + "|" + tracks.field(4, TRACK.GENRE) + "|" + tracks.field(4, TRACK.YEAR) + "|" + tracks.field(4, TRACK.LENGTH) + "|" + tracks.field(99, TRACK.TITLE));
+    printh(tracks.near(6, 3, near) + " " + near.join(","));
+    printh(tracks.sound(3, snd) + " " + snd[0]);
+    printh(tracks.queued() + " " + tracks.place() + " " + tracks.queue(2) + " " + tracks.queue(40));
+    printh(tracks.enqueue(15, true) + " " + tracks.queued() + " " + tracks.queue(1));
+    playback.seek(30000);
+    playback.duck(128, 10);
+}
+function update() {
+    tk++;
+    if (tk == 2) playback.next();
+    if (tk == 3) printh("changed " + playback.changed() + " " + playback.track() + " " + tracks.place());
+    if (tk == 4) printh("still " + playback.changed());
+    if (tk == 5) { printh(playback.play(12, 5000) + " " + playback.started() + " " + playback.track()); playback.stop(); }
+}`;
+    const res = compileFiles({ 'cart.json': JSON.stringify({ id: '0000000000007ac5', name: 'Tracks', music: 'own' }),
+                               'main.js': main });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'tracks.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '5'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.stdout.replace(/\r/g, '').trim().split('\n'), [
+        '0 Track 0|Artist A|Album 0 120000',
+        /* 20 in all, 19 music; Jazz is 1, 4, 7 ... 19 (7); the 80s are
+         * 10-18 (9, none spoken); 200 s or more is 14 on (6) */
+        '20 19 7 9 6',
+        '3 2 5 8',
+        'Track 4|Jazz|1974|144000|null',
+        '3 3,9,0',
+        '1 430',
+        '10 0 2 -1',
+        '1 11 15',
+        'seek 30000',
+        'duck 128 over 10',
+        'control 1',
+        'changed 1 15 1',
+        'still 0',
+        'play 12 from 5000',
+        '1 1 12',
+        'stop'
+    ]);
+    /* a listen cart may read, not steer */
+    const listen = run('function init() { playback.seek(0); }\nfunction update() {}');
+    assert.match(listen.errors[0].message, /needs the cart's music level to be control/);
+});
