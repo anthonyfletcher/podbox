@@ -43,6 +43,9 @@ struct arcade_host
     const char *(*translate)(void *ctx, const char *english);
 };
 
+/* playback.sound()'s record: SOUND.SIZE in arcade_api.def */
+#define ARCADE_SOUND_FIELDS 31
+
 /* The beat of the owner's music, for a cart played to it. Times are track
  * ms. The host also hands over each tick's clock (arcade_music()). */
 struct arcade_beat
@@ -67,7 +70,7 @@ struct arcade_beat
     void (*bands)(void *ctx, int32_t *out, int32_t n);
     /* playback.sound(): the playing track's Sound Index record, in the
      * order of SOUND.* (arcade_api.def); 0 where it has none */
-    int (*sound)(void *ctx, int32_t out[31]);
+    int (*sound)(void *ctx, int32_t out[ARCADE_SOUND_FIELDS]);
     /* beat.ahead(): the hits the analyser has found from from to before
      * to, oldest first, as time, bands (1 low, 2 mid, 4 high) and
      * strength, at most max of them; the count. Only while listening */

@@ -146,7 +146,7 @@ static void fake_bands(void *ctx, int32_t *out, int32_t n)
 }
 
 /* the track's record: steady at the tempo, A minor, moderately loud */
-static int fake_sound(void *ctx, int32_t out[31])
+static int fake_sound(void *ctx, int32_t out[ARCADE_SOUND_FIELDS])
 {
     (void)ctx;
     static const int32_t rest[28] = {

@@ -363,8 +363,8 @@ NATIVE(playback_bands)
 NATIVE(playback_sound)
 {
     (void)argc;
-    int32_t s[31] = { 0 };
-    if (a[0].tag != T_I32 || I32(vm, a[0])->len < 31)
+    int32_t s[ARCADE_SOUND_FIELDS] = { 0 };
+    if (a[0].tag != T_I32 || I32(vm, a[0])->len < ARCADE_SOUND_FIELDS)
         return vm_fail(vm, "playback.sound() needs an Int32Array of "
                        "SOUND.SIZE", "", "");
     const struct arcade_beat *b = beat_of(vm);

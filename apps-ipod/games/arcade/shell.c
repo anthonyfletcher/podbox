@@ -348,7 +348,7 @@ static char sound_path[MAX_PATH];
 static struct sound_record sound_rec;
 static bool sound_have;
 
-static int beat_sound(void *ctx, int32_t out[31])
+static int beat_sound(void *ctx, int32_t out[ARCADE_SOUND_FIELDS])
 {
     (void)ctx;
     struct mp3entry *id3 = audio_current_track();
