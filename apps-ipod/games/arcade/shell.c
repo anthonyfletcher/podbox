@@ -800,8 +800,8 @@ static int event(struct vm *vm, long button)
     return PLAYING;
 }
 
-/* The pause menu's rows: Resume, the cart's own (menuitem), Restart,
- * Quit. */
+/* The pause menu's rows: Resume, the cart's own (menuitem), Now Playing,
+ * Restart, Quit. */
 static char item_label[5][32];
 static int item_index[5], item_count;
 
@@ -813,8 +813,43 @@ static const char *menu_row(int row, void *data, char *buf, size_t len)
     if (row <= item_count)
         return item_label[row - 1];
     if (row == item_count + 1)
+        return str(LANG_NOW_PLAYING);
+    if (row == item_count + 2)
         return str(LANG_CHESSBOX_MENU_RESTART_GAME);
     return str(LANG_MENU_QUIT);
+}
+
+/* Now Playing: the music's controls, which a game holding PREV, NEXT and
+ * PLAY leaves no other way to reach; each as an earphone remote's key */
+static const int music_label[] = { LANG_PLAYPAUSE, LANG_NEXTTRACK,
+                                   LANG_PREVTRACK };
+static const long music_key[] = { BUTTON_MULTIMEDIA_PLAYPAUSE,
+                                  BUTTON_MULTIMEDIA_NEXT,
+                                  BUTTON_MULTIMEDIA_PREV };
+
+static const char *music_row(int row, void *data, char *buf, size_t len)
+{
+    (void)data; (void)buf; (void)len;
+    return str(music_label[row]);
+}
+
+/* Open until backed out of; true for out to the root (MENU or USB) */
+static bool music_menu(void)
+{
+    struct simplelist_info info;
+    int selection = 0;
+    for (;;) {
+        simplelist_info_init(&info, str(LANG_NOW_PLAYING),
+                             ARRAYLEN(music_label), NULL);
+        info.get_name = music_row;
+        info.selection = selection;
+        if (simplelist_show_list(&info))
+            return true;
+        if (info.selection < 0)
+            return false;
+        selection = info.selection;
+        default_event_handler(music_key[selection]);
+    }
 }
 
 /* An item's function returning true keeps the menu up, relabelled, so a
@@ -833,7 +868,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
             if (arcade_menu_item(vm, i, item_label[item_count],
                                  sizeof(item_label[0])))
                 item_index[item_count++] = i;
-        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), item_count + 3,
+        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), item_count + 4,
                              NULL);
         info.get_name = menu_row;
         info.selection = selection;
@@ -845,9 +880,14 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         if (to_root)
             return USB;
         selection = info.selection;
-        if (selection == item_count + 1)
-            return RESTART;
+        if (selection == item_count + 1) {
+            if (music_menu())
+                return USB;
+            continue;
+        }
         if (selection == item_count + 2)
+            return RESTART;
+        if (selection == item_count + 3)
             return QUIT;
         if (selection < 1 || selection > item_count)
             break;
