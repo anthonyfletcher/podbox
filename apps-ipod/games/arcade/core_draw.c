@@ -3519,7 +3519,7 @@ static void fog_row(uint8_t *px, int32_t y, int32_t x0, int32_t x1,
 
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside,
-                     int coarse)
+                     int coarse, const uint8_t *remap)
 {
     static const uint8_t *tile[256];
     struct pen p;
@@ -3527,8 +3527,10 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
     begin_view(vm, &p);
     p.per16 = 0;                    /* each pixel read is charged */
     const uint8_t *sheet = MEM(vm, vm->sheet);
-    for (uint32_t m = 0; m < 256; m++)
-        tile[m] = sheet + (m >> 4) * 8 * SHEET_W + (m & 15) * 8;
+    for (uint32_t m = 0; m < 256; m++) {
+        uint32_t s = remap ? remap[m] : m;
+        tile[m] = sheet + (s >> 4) * 8 * SHEET_W + (s & 15) * 8;
+    }
     e.map = MEM(vm, vm->map);
     e.mw = (uint32_t)vm->map_w;
     e.umax = (uint32_t)vm->map_w << 19;

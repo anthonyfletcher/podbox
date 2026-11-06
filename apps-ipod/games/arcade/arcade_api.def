@@ -233,7 +233,7 @@ API(walls_draw,    127, 1, 5, VAL, 0, PIXELS, LISTEN, 1)
 /* Systems: the plane, the map as a floor seen from a camera */
 API_NS(plane)
 API(plane_view,       87, 6, 6, VOID, 0, CELLS,  LISTEN, 1)
-API(plane_draw,       88, 0, 4, VOID, 0, PIXELS, LISTEN, 1)
+API(plane_draw,       88, 0, 5, VOID, 0, PIXELS, LISTEN, 1)
 API(plane_fog,       129, 3, 3, VOID, 0, CELLS,  LISTEN, 1)
 API(plane_project,    89, 4, 4, VAL,  0, CELLS,  LISTEN, 1)
 API(plane_pick,       90, 3, 3, VAL,  0, CELLS,  LISTEN, 1)
@@ -321,6 +321,9 @@ API(ach_has,          201, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 /* Light: lights over a dark scene */
 API_NS(light)
 API(light_draw,       202, 5, 5, VOID, 0, PIXELS, LISTEN, 1)
+
+/* The plane's ceiling, a sprite table over the map like the floor's */
+API(plane_ceiling,    203, 1, 5, VOID, 0, PIXELS, LISTEN, 1)
 
 API_ALIAS(time, t)
 

@@ -927,3 +927,27 @@ function update() {
     /* the rope lies on the ledge (its top at 60), not through it */
     assert.equal(r.out.trim().split('\n')[1], '1');
 });
+
+test('plane: a floor drawn through a table of sprites, and a ceiling', () => {
+    const r = run(`function init() {
+    // sprite 1: colour 4; sprite 3: colour 9; sprite 5: colour 12
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 4); sset(24 + x, y, 9); sset(40 + x, y, 12); }
+    for (var r = 0; r < 64; r++) for (var c = 0; c < 128; c++) mset(c, r, 1);
+}
+function update() {}
+function draw() {
+    cls(0);
+    plane.view(200, 200, 4, 0, 60, 0.2);
+    plane.draw(60, 119, -1, 1, [0, 3]);
+    plane.ceiling(8, [5, 5]);
+    printh(pget(80, 119) + " " + pget(10, 100) + " " + pget(80, 0) + " " + pget(150, 10));
+    cls(0);
+    plane.view(200, 200, 12, 0, 60, 0.2);
+    plane.ceiling(8, [5, 5]);
+    printh(pget(80, 0));
+}`);
+    assert.equal(r.status, 0, r.err);
+    /* every floor cell is sprite 1, drawn as 3 (colour 9); the ceiling 5
+     * (colour 12); and from above it, no ceiling at all */
+    assert.equal(r.out, '9 9 12 12\n0\n');
+});

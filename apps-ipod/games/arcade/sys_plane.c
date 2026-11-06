@@ -101,14 +101,64 @@ static int view_set(struct vm *vm, const char *fn)
 /* How far away the floor is at dy rows below the horizon, 16.16. K, the
  * height times the focal length, fits 32 bits at any usual height, and a
  * 32-bit division is a fifth of a 64-bit one on the ARM7. */
-static int32_t distance(const struct planeview *v, int32_t dy)
+/* How far the floor is at dy rows below the horizon -- or a ceiling,
+ * with its height over the eye for z */
+static int32_t distance_at(const struct planeview *v, int32_t z, int32_t dy)
 {
-    int64_t k = (int64_t)v->z * v->focal >> 16, d;
+    int64_t k = (int64_t)z * v->focal >> 16, d;
     if (k < 0x80000000LL)
         d = (uint32_t)k / (uint32_t)dy;
     else
         d = k / dy;
     return d > FAR_FLOOR ? (int32_t)FAR_FLOOR : (int32_t)d;
+}
+
+static int32_t distance(const struct planeview *v, int32_t dy)
+{
+    return distance_at(v, v->z, dy);
+}
+
+/* Rows top..bottom of a plane z over (a ceiling) or under the eye: where
+ * each starts on the map, its step along it, and its fog */
+static void plane_rows(const struct planeview *v, struct floor_row *rows,
+                       int32_t top, int32_t bottom, int32_t z, int ceiling)
+{
+    /* 1 / focal in 0.32, so that a row's step is a multiply */
+    uint32_t inv = (uint32_t)(((uint64_t)1 << 48) / (uint32_t)v->focal);
+    for (int32_t y = top; y <= bottom; y++) {
+        /* the distance, and one screen pixel's worth of floor, 16.16 */
+        int32_t d = distance_at(v, z, ceiling ? v->horizon - y
+                                              : y - v->horizon + 1);
+        int32_t step = (int32_t)((uint64_t)(uint32_t)d * inv >> 32);
+        /* the row's centre, then its left end: right is (-dy, dx) */
+        int32_t cx = v->x + mul(v->dx, d), cy = v->y + mul(v->dy, d);
+        int32_t rx = -v->dy, ry = v->dx;
+        struct floor_row *r = &rows[y];
+        r->du = mul(rx, step);
+        r->dv = mul(ry, step);
+        r->u = cx - r->du * (SCREEN_W / 2);
+        r->v = cy - r->dv * (SCREEN_W / 2);
+        r->fog = core_fog_level(v, d);
+    }
+}
+
+/* A table of sprites for each map cell's, from an array; NULL when absent */
+static int remap_of(struct vm *vm, struct value *a, int argc, int i,
+                    const char *fn, const uint8_t **remap)
+{
+    static uint8_t table[256];
+    *remap = NULL;
+    if (i >= argc || a[i].tag == T_NULL)
+        return 1;
+    struct column c;
+    if (!column_of(vm, a[i], &c) || c.tag == T_INT)
+        return vm_fail(vm, fn, "() needs a table of sprites: an array, at "
+                       "each map sprite the sprite drawn in its place", "");
+    for (uint32_t m = 0; m < 256; m++)
+        table[m] = (uint8_t)(m < c.len
+                             ? (uint32_t)column_at(&c, m, (int32_t)m) : m);
+    *remap = table;
+    return 1;
 }
 
 /* plane.fog(near, far, colour): the ground from near to far world pixels
@@ -132,8 +182,10 @@ NATIVE(plane_fog)
     return 1;
 }
 
-/* plane.draw([top], [bottom], [outside], [coarse]): coarse 2 reads every
- * other pixel and draws each twice, for about half the time */
+/* plane.draw([top], [bottom], [outside], [coarse], [under]): coarse 2
+ * reads every other pixel and draws each twice, for about half the time;
+ * under, a table of sprites, draws the floor of each map cell with its
+ * entry's sprite -- a wall's or a door's cell with the tile under it */
 NATIVE(plane_draw)
 {
     (void)out;
@@ -149,26 +201,48 @@ NATIVE(plane_draw)
     if (top < 0) top = 0;
     if (bottom > SCREEN_H - 1) bottom = SCREEN_H - 1;
     if (outside > 255) outside = -1;
+    const uint8_t *remap;
+    if (!remap_of(vm, a, argc, 4, "plane.draw", &remap))
+        return 0;
     static struct floor_row rows[SCREEN_H];
-    /* 1 / focal in 0.32, so that a row's step is a multiply */
-    uint32_t inv = (uint32_t)(((uint64_t)1 << 48) / (uint32_t)v->focal);
-    for (int32_t y = top; y <= bottom; y++) {
-        /* the distance, and one screen pixel's worth of floor, 16.16 */
-        int32_t d = distance(v, y - v->horizon + 1);
-        int32_t step = (int32_t)((uint64_t)(uint32_t)d * inv >> 32);
-        /* the row's centre, then its left end: right is (-dy, dx) */
-        int32_t cx = v->x + mul(v->dx, d), cy = v->y + mul(v->dy, d);
-        int32_t rx = -v->dy, ry = v->dx;
-        struct floor_row *r = &rows[y];
-        r->du = mul(rx, step);
-        r->dv = mul(ry, step);
-        r->u = cx - r->du * (SCREEN_W / 2);
-        r->v = cy - r->dv * (SCREEN_W / 2);
-        r->fog = core_fog_level(v, d);
-    }
+    plane_rows(v, rows, top, bottom, v->z, 0);
     if (bottom >= top)
         vm_charge(vm, (uint32_t)(bottom - top + 1) * 4);
-    core_draw_floor(vm, rows, top, bottom, outside, coarse);
+    core_draw_floor(vm, rows, top, bottom, outside, coarse, remap);
+    return 1;
+}
+
+/* plane.ceiling(height, [table], [outside], [coarse], [top]): a ceiling
+ * height world pixels up, over the rows from top (0) to the horizon --
+ * each map cell's sprite, or its entry's in table (an array of sprites:
+ * every cell one sprite, say, or each its own), outside the map outside's
+ * sprite; fogged as the floor is. Nothing when the eye is above it. */
+NATIVE(plane_ceiling)
+{
+    (void)out;
+    if (!view_set(vm, "plane.ceiling"))
+        return 0;
+    if (!is_num(a[0]))
+        return vm_fail(vm, "plane.ceiling() needs the ceiling's height", "",
+                       "");
+    const struct planeview *v = &vm->plane;
+    int32_t z = fx(a[0]) - v->z;
+    int32_t outside = argc > 2 && is_num(a[2]) ? floor_int(a[2]) : -1;
+    int coarse = argc > 3 && is_num(a[3]) ? floor_int(a[3]) : 1;
+    int32_t top = argc > 4 && is_num(a[4]) ? floor_int(a[4]) : 0;
+    int32_t bottom = v->horizon - 1;
+    const uint8_t *remap;
+    if (!remap_of(vm, a, argc, 1, "plane.ceiling", &remap))
+        return 0;
+    if (outside > 255) outside = -1;
+    if (top < 0) top = 0;
+    if (bottom > SCREEN_H - 1) bottom = SCREEN_H - 1;
+    if (z < (1 << 12) || bottom < top)
+        return 1;
+    static struct floor_row rows[SCREEN_H];
+    plane_rows(v, rows, top, bottom, z, 1);
+    vm_charge(vm, (uint32_t)(bottom - top + 1) * 4);
+    core_draw_floor(vm, rows, top, bottom, outside, coarse, remap);
     return 1;
 }
 

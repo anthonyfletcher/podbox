@@ -569,9 +569,11 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
 void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
                      uint32_t c);
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l);
+/* The floor's rows, or the ceiling's: each map cell's sprite, through
+ * remap when it is not NULL */
 void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside,
-                     int coarse);
+                     int coarse, const uint8_t *remap);
 int32_t core_fog_level(const struct planeview *v, int64_t d);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
