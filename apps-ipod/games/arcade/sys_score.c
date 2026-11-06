@@ -298,16 +298,7 @@ NATIVE(score_submit)
     uint32_t n = 0;
     if (argc > 2 && a[2].tag != T_NULL) {
         n = vm_text(vm, a[2], name, sizeof(name) - 1);
-        /* a character the cut left without its last bytes goes too */
-        uint32_t lead = n;
-        while (lead > 0 && ((uint8_t)name[lead - 1] & 0xc0) == 0x80)
-            lead--;
-        if (lead > 0) {
-            uint8_t c = (uint8_t)name[lead - 1];
-            uint32_t need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
-            if (lead - 1 + need > n)
-                n = lead - 1;
-        }
+        n = utf8_whole(name, n);
     }
     name[n] = 0;
     int rank = insert(vm, b, floor_int(a[1]), name);

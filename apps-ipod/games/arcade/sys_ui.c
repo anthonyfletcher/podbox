@@ -28,17 +28,7 @@
 static void text_of(struct vm *vm, struct value v, char *dst, uint32_t cap)
 {
     uint32_t n = v.tag == T_NULL ? 0 : vm_text(vm, v, dst, cap - 1);
-    /* a last character missing bytes the cut took goes too */
-    uint32_t lead = n;
-    while (lead > 0 && ((uint8_t)dst[lead - 1] & 0xc0) == 0x80)
-        lead--;
-    if (lead > 0) {
-        uint8_t c = (uint8_t)dst[lead - 1];
-        uint32_t need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
-        if (lead - 1 + need > n)
-            n = lead - 1;
-    }
-    dst[n] = 0;
+    dst[utf8_whole(dst, n)] = 0;
 }
 
 static const struct arcade_ui *ui_of(struct vm *vm)

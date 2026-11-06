@@ -50,6 +50,8 @@
 #include "games/arcade/shell_score.h"
 #include "games/arcade/shell_opts.h"
 #include "games/arcade/shell_ui.h"
+#include "speech/talk.h"           /* talk_text, talk_shutup */
+#include "audio/voice_thread.h"    /* voice_is_playing */
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status, audio_current_track */
@@ -190,6 +192,35 @@ static void host_yield(void *ctx)
 /* Not forced: on the 5G a forced click never sounds, as piezo_clear()
  * leaves a stop queued, and on the 6G it waits out the last beep inside
  * the tick. Unforced, a click sounds unless the last is still sounding. */
+/* speak: the player's synthesiser, which says nothing while it is off */
+static void host_say(void *ctx, const char *text, int queue)
+{
+    (void)ctx;
+    talk_text(text, queue != 0);
+}
+
+static int host_speaking(void *ctx)
+{
+    (void)ctx;
+    return voice_is_playing();
+}
+
+static void host_hush(void *ctx)
+{
+    (void)ctx;
+    talk_shutup();
+}
+
+static int host_speech_on(void *ctx)
+{
+    (void)ctx;
+    return global_settings.talk_menu;
+}
+
+static const struct arcade_speak speak_host = {
+    host_say, host_speaking, host_hush, host_speech_on
+};
+
 static void host_click(void *ctx, int beep)
 {
     (void)ctx;
@@ -522,7 +553,7 @@ static void host_control(void *ctx, int what)
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
-    &shell_ui
+    &shell_ui, &speak_host
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -1232,6 +1263,7 @@ static int run(const char *path, void *mem, size_t size)
         present(vm, false);
     beat_listen(NULL, 0);
     shell_tracks_end();
+    talk_shutup();              /* nothing the cart said outlasts it */
     give_screen();
     sound_vm = NULL;
     if (status == FAILED) {

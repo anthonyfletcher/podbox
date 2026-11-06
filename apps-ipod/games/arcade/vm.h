@@ -441,6 +441,22 @@ static inline void screen_written(struct vm *vm, int32_t y0, int32_t y1)
 /* Whether a Uint8Array is the screen */
 #define IS_SCREEN(vm, c) ((uint32_t)(c).v + sizeof(struct u8a) == (vm)->screen)
 
+/* n bytes of UTF-8 text cut short of a last character missing bytes, as a
+ * copy cut to fit leaves one */
+static inline uint32_t utf8_whole(const char *s, uint32_t n)
+{
+    uint32_t lead = n;
+    while (lead > 0 && ((uint8_t)s[lead - 1] & 0xc0) == 0x80)
+        lead--;
+    if (lead > 0) {
+        uint8_t c = (uint8_t)s[lead - 1];
+        uint32_t need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
+        if (lead - 1 + need > n)
+            return lead - 1;
+    }
+    return n;
+}
+
 /* vm.c */
 int vm_fail(struct vm *vm, const char *a, const char *b, const char *c);
 int vm_call(struct vm *vm, struct value fn, int argc, struct value *out);

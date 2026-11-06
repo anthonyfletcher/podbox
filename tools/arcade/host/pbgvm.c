@@ -7,7 +7,7 @@
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
- *                  [--ui answer,...]
+ *                  [--ui answer,...] [--speech]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -40,7 +40,8 @@
  * what it showed and takes the next of --ui's answers: an index for
  * choose (-1 backs out), 1 or 0 for confirm, a number for number, and the
  * text for text (~ backs out). message takes none. Without an answer,
- * each backs out. */
+ * each backs out. speak.say and queue print "say <text>" and "queue
+ * <text>"; speak.on() is true with --speech, and nothing is ever busy. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -684,6 +685,24 @@ static const struct arcade_ui fake_ui = {
     ui_choose, ui_confirm, ui_message, ui_number, ui_text
 };
 
+/* ---- speech -------------------------------------------------------------- */
+
+static int speech_flag;
+
+static void sp_say(void *ctx, const char *text, int queue)
+{
+    (void)ctx;
+    printf("%s %s\n", queue ? "queue" : "say", text);
+}
+
+static int sp_busy(void *ctx) { (void)ctx; return 0; }
+static void sp_stop(void *ctx) { (void)ctx; printf("stop\n"); }
+static int sp_on(void *ctx) { (void)ctx; return speech_flag; }
+
+static const struct arcade_speak fake_speak = {
+    sp_say, sp_busy, sp_stop, sp_on
+};
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -897,6 +916,8 @@ int main(int argc, char **argv)
             opt_sets = argv[++i];
         else if (!strcmp(argv[i], "--ui") && i + 1 < argc)
             ui_answers = argv[++i];
+        else if (!strcmp(argv[i], "--speech"))
+            speech_flag = 1;
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -924,7 +945,8 @@ int main(int argc, char **argv)
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
-                                NULL, control, &fake_tracks, &fake_ui };
+                                NULL, control, &fake_tracks, &fake_ui,
+                                &fake_speak };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;

@@ -53,6 +53,21 @@ struct arcade_host
     const struct arcade_tracks *tracks;
     /* ui: the player's own dialogs over the game, below; NULL for none */
     const struct arcade_ui *ui;
+    /* speak: the player's speech, below; NULL for none */
+    const struct arcade_speak *speak;
+};
+
+/* speak.*: text said by the player's synthesiser, over the music and the
+ * cart's sounds. Nothing is said while the owner has it off. */
+struct arcade_speak
+{
+    /* text said, cutting off what is being said, or after it (queue) */
+    void (*say)(void *ctx, const char *text, int queue);
+    /* whether anything is still being said; stopping it */
+    int (*busy)(void *ctx);
+    void (*stop)(void *ctx);
+    /* whether the owner has the player's menus spoken */
+    int (*on)(void *ctx);
 };
 
 /* The dialogs ui.* opens. Each runs to its end inside the cart's call, the

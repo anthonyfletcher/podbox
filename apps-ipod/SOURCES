@@ -233,6 +233,7 @@ games/arcade/sys_walls.c
 games/arcade/sys_score.c
 games/arcade/sys_opt.c
 games/arcade/sys_ui.c
+games/arcade/sys_speak.c
 #ifdef CPU_ARM
 games/arcade/present_arm.S
 games/arcade/cells_arm.S

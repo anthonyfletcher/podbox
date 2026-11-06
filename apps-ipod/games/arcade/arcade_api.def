@@ -292,6 +292,14 @@ API(ui_message,       185, 1, 2, VOID, 0, FLAT, LISTEN, 1)
 API(ui_number,        186, 4, 5, VAL,  0, FLAT, LISTEN, 1)
 API(ui_text,          187, 2, 3, VAL,  0, FLAT, LISTEN, 1)
 
+/* Speech: the player's synthesiser */
+API_NS(speak)
+API(speak_say,        188, 1, 8, VOID, 0, FLAT, LISTEN, 1)
+API(speak_queue,      189, 1, 8, VOID, 0, FLAT, LISTEN, 1)
+API(speak_busy,       190, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(speak_stop,       191, 0, 0, VOID, 0, FLAT, LISTEN, 1)
+API(speak_on,         192, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

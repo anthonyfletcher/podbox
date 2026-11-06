@@ -226,3 +226,10 @@ IMPL(ui_confirm)
 IMPL(ui_message)
 IMPL(ui_number)
 IMPL(ui_text)
+
+/* sys_speak.c */
+IMPL(speak_say)
+IMPL(speak_queue)
+IMPL(speak_busy)
+IMPL(speak_stop)
+IMPL(speak_on)
