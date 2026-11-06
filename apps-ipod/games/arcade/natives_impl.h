@@ -135,6 +135,8 @@ IMPL(links_point)
 IMPL(links_link)
 IMPL(links_step)
 IMPL(links_draw)
+IMPL(links_cloth)
+IMPL(links_fill)
 
 /* sys_land.c */
 IMPL(land_draw)

@@ -517,6 +517,8 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
 void core_draw_dots(struct vm *vm, const struct value *life,
                     const struct value *x, const struct value *y,
                     const struct value *c, uint32_t n);
+void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
+                     uint32_t n);
 void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
                      uint32_t c);
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l);

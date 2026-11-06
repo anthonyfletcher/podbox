@@ -1346,41 +1346,20 @@ static int triangle_near(struct pen *p, const int64_t v[6])
     return 1;
 }
 
-static int triangle(struct vm *vm, struct value *a, int argc, int outline,
-                    const char *fn)
+/* A filled triangle, its corners v (x, y three times) before the camera */
+static void fill_triangle(struct pen *p, int64_t v[6])
 {
-    int64_t v[6];
-    for (int i = 0; i < 6; i++) {
-        int32_t k;
-        if (!whole(vm, a, argc, i, 0, fn, &k))
-            return 0;
-        v[i] = clampc(k);
-    }
-    COLOUR(6, c, fn);
-    struct pen p;
-    begin(vm, &p, c, 1);
-    if (outline) {
-        run_fn run = p.pat ? NULL : run_dots;
-        p.per16 = PER16_DOT;
-        walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, run, NULL);
-        walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, run, NULL);
-        walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, run, NULL);
-        finish(vm, &p);
-        return 1;
-    }
-    if (triangle_near(&p, v)) {
-        finish(vm, &p);
-        return 1;
-    }
+    if (triangle_near(p, v))
+        return;
     int64_t ymin = v[1], ymax = v[1];
     for (int i = 3; i < 6; i += 2) {
         if (v[i] < ymin) ymin = v[i];
         if (v[i] > ymax) ymax = v[i];
     }
-    if (ymin + p.oy < p.cy0)
-        ymin = p.cy0 - p.oy;
-    if (ymax + p.oy >= p.cy1)
-        ymax = p.cy1 - 1 - p.oy;
+    if (ymin + p->oy < p->cy0)
+        ymin = p->cy0 - p->oy;
+    if (ymax + p->oy >= p->cy1)
+        ymax = p->cy1 - 1 - p->oy;
     for (int64_t y = ymin; y <= ymax; y++) {
         int64_t l = 0, r = -1;
         int any = 0;
@@ -1403,8 +1382,33 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
             }
         }
         if (any)
-            span(&p, y + p.oy, l + p.ox, r + p.ox);
+            span(p, y + p->oy, l + p->ox, r + p->ox);
     }
+}
+
+static int triangle(struct vm *vm, struct value *a, int argc, int outline,
+                    const char *fn)
+{
+    int64_t v[6];
+    for (int i = 0; i < 6; i++) {
+        int32_t k;
+        if (!whole(vm, a, argc, i, 0, fn, &k))
+            return 0;
+        v[i] = clampc(k);
+    }
+    COLOUR(6, c, fn);
+    struct pen p;
+    begin(vm, &p, c, 1);
+    if (outline) {
+        run_fn run = p.pat ? NULL : run_dots;
+        p.per16 = PER16_DOT;
+        walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, run, NULL);
+        walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, run, NULL);
+        walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, run, NULL);
+        finish(vm, &p);
+        return 1;
+    }
+    fill_triangle(&p, v);
     finish(vm, &p);
     return 1;
 }
@@ -2872,6 +2876,27 @@ void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
         p.cost += 8;
         walk_line(&p, seg[0], seg[1], seg[2], seg[3], plot_dot,
                   p.pat ? NULL : run_dots, NULL);
+    }
+    finish(vm, &p);
+}
+
+/* links.fill(): n quads, eight whole pixels each (four corners in turn),
+ * each in its own colour, as two triangles */
+void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
+                     uint32_t n)
+{
+    struct pen p;
+    begin(vm, &p, 0, 1);
+    for (uint32_t i = 0; i < n; i++, q += 8) {
+        int64_t t[6];
+        p.c = p.d->dpal[c[i]];
+        p.cost += 8;
+        for (int k = 0; k < 6; k++)
+            t[k] = clampc(q[k]);
+        fill_triangle(&p, t);
+        t[2] = clampc(q[6]);
+        t[3] = clampc(q[7]);
+        fill_triangle(&p, t);
     }
     finish(vm, &p);
 }

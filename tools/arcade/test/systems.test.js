@@ -408,6 +408,36 @@ function draw() { cls(); links.draw(rope, 7); }`, 200, ['--dump', '40,40,40,10']
     assert.match(bad.err, /links\.step\(\) needs a pool from links\.pool\(\)/);
 });
 
+test('links: a cloth hangs, ripples in depth and shades, and tears', () => {
+    const r = run(`var p, tk = 0;
+function init() {
+    p = links.pool(48, 200);
+    p.gravity = 0.1;
+    // 8 by 6, 4 apart: 48 points, 7*6 + 8*5 across and down, 2*7*5 diagonals
+    printh(links.cloth(p, 20, 10, 8, 6, 4) + " " + p.points + " " + p.links + " " + p.pin[0] + p.pin[7] + p.pin[8]);
+    printh(links.cloth(p, 0, 0, 2, 2, 4));
+}
+function update() {
+    tk++;
+    for (var i = 8; i < p.points; i++) p.z[i] += sin(tk * 0.02 + i * 0.1) * 0.3;
+    links.step(p, 0);
+    if (tk == 60) {
+        cls(0);
+        var cells = links.fill(p, [1, 2, 8, 14, 15]);
+        var seen = [];
+        for (var y = 0; y < 120; y++) for (var x = 0; x < 160; x++) { var c = pget(x, y); if (c && seen.indexOf(c) < 0) seen.push(c); }
+        printh(cells + " " + (seen.length > 1) + " " + (p.y[47] > 20));
+        // torn: pull the bottom row far down, past twice its links
+        p.tear = 1;
+        for (var k = 40; k < 48; k++) { p.y[k] += 40; p.oy[k] = p.y[k]; }
+        links.step(p, 0);
+        printh((p.broken > 0) + " " + (links.fill(p, [7]) < 35));
+    }
+}`, 60);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['0 48 152 110', '-1', '35 1 1', '1 1']);
+});
+
 test('land: ground from the camera, near hills hiding far ones, heights read back', () => {
     const r = run(`var hm, cm;
 function init() {
