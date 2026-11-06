@@ -219,3 +219,10 @@ IMPL(score_show)
 /* sys_opt.c */
 IMPL(opt_get)
 IMPL(opt_changed)
+
+/* sys_ui.c */
+IMPL(ui_choose)
+IMPL(ui_confirm)
+IMPL(ui_message)
+IMPL(ui_number)
+IMPL(ui_text)

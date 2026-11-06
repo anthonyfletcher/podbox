@@ -284,6 +284,14 @@ API_NS(opt)
 API(opt_get,          181, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(opt_changed,      182, 0, 0, VAL,  0, FLAT, LISTEN, 1)
 
+/* Dialogs: the player's own, over the game */
+API_NS(ui)
+API(ui_choose,        183, 2, 3, VAL,  0, FLAT, LISTEN, 1)
+API(ui_confirm,       184, 1, 2, VAL,  0, FLAT, LISTEN, 1)
+API(ui_message,       185, 1, 2, VOID, 0, FLAT, LISTEN, 1)
+API(ui_number,        186, 4, 5, VAL,  0, FLAT, LISTEN, 1)
+API(ui_text,          187, 2, 3, VAL,  0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

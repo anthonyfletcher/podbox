@@ -49,6 +49,7 @@
 #include "games/arcade/shell_tracks.h"
 #include "games/arcade/shell_score.h"
 #include "games/arcade/shell_opts.h"
+#include "games/arcade/shell_ui.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status, audio_current_track */
@@ -520,7 +521,8 @@ static void host_control(void *ctx, int what)
 
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
-    &beat_host, host_setting, host_translate, host_control, &shell_tracks
+    &beat_host, host_setting, host_translate, host_control, &shell_tracks,
+    &shell_ui
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -776,6 +778,27 @@ static void give_screen(void)
     hold_backlight(false);
     wheel_events(true);
     viewportmanager_theme_undo(SCREEN_MAIN, true);
+}
+
+/* A dialog during a tick: the game's viewport to take the screen back
+ * with, whether one was shown (the frame clock then starts afresh), and
+ * whether the owner went out to the root from it */
+static struct viewport *game_vp;
+static bool dialog_shown, dialog_to_root;
+
+void shell_dialog_begin(void)
+{
+    shell_scores_run(false);
+    give_screen();
+}
+
+void shell_dialog_end(bool to_root)
+{
+    shell_scores_run(true);
+    dialog_shown = true;
+    dialog_to_root = dialog_to_root || to_root;
+    take_screen(game_vp);
+    present(sound_vm, true);
 }
 
 /* A system event: saved first, since USB or a shutdown may follow; the
@@ -1071,6 +1094,8 @@ static int run(const char *path, void *mem, size_t size)
     shell_options_load(vm);
     arcade_set_ceiling(vm, CEILING);
 
+    game_vp = &vp;
+    dialog_shown = dialog_to_root = false;
     take_screen(&vp);
     sound_vm = vm;
     last_wheel = -1;
@@ -1173,6 +1198,16 @@ static int run(const char *path, void *mem, size_t size)
         if (arcade_rate(vm) != rate) {
             rate = arcade_rate(vm);
             start = current_tick - (long)((frame * HZ) / rate);
+        }
+        if (dialog_shown) {
+            dialog_shown = false;
+            spk_clock_resume();
+            start = current_tick - (long)((frame * HZ) / rate);
+            touched = current_tick;
+            if (dialog_to_root) {
+                status = USB;
+                break;
+            }
         }
         present(vm, false);
         int rank, board = arcade_score_shown(vm, &rank);

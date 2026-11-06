@@ -159,6 +159,14 @@ void dialog_draw_button(struct screen *screen,
                         int x, int y, int w, int h,
                         const char *label, bool selected);
 
+/* A box's own title, at the top of its content: centred in the theme's bold
+ * UI font, a rule under it. A theme's status bar need not show a title, so
+ * a box carries its own. The height it takes (0 for a NULL title), and
+ * drawing it into the active content viewport. */
+int dialog_title_height(const char *title);
+void dialog_draw_title(struct screen *screen, struct viewport *content,
+                       const char *title);
+
 /* Where the label sits. Centred is right for a Cancel/OK pair; left is right
  * for a button that is really a row of a list. */
 enum dialog_button_align {

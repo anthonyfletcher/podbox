@@ -42,7 +42,6 @@
 
 #define PROSE_BAR_W      4      /* Scrollbar */
 #define PROSE_BAR_GAP    4
-#define PROSE_TITLE_GAP  4      /* Either side of the rule under the title */
 
 enum prose_focus { PROSE_TEXT = 0, PROSE_BUTTONS };
 
@@ -63,14 +62,10 @@ struct prose
 
 static int prose_wrap(const char *body, int w, int font);
 
-/* The title's band at the top of the box: the title in the theme's bold UI
- * font, then a rule. A theme's status bar need not show a title, so the box
- * carries its own. */
+/* The title's band at the top of the box (dialog_draw_title) */
 static int prose_title_h(const struct prose *p)
 {
-    if (!p->title)
-        return 0;
-    return font_get(font_get_ui_bold())->height + 2 * PROSE_TITLE_GAP + 1;
+    return dialog_title_height(p->title);
 }
 
 /* As tall as the title, the text and the button row need, up to PROSE_H_PCT
@@ -159,18 +154,8 @@ static void prose_draw(struct dialog *d, struct screen *s,
     if (p->scroll < 0)
         p->scroll = 0;
 
+    dialog_draw_title(s, content, p->title);
     s->set_drawmode(DRMODE_FG);
-
-    if (p->title)
-    {
-        int body_font = content->font, w, h;
-
-        content->font = font_get_ui_bold();
-        s->getstringsize(p->title, &w, &h);
-        s->putsxy(MAX((content->width - w) / 2, 0), 0, p->title);
-        content->font = body_font;
-        s->hline(0, content->width - 1, top - PROSE_TITLE_GAP - 1);
-    }
 
     for (i = 0, y = top; i < p->visible; i++)
     {

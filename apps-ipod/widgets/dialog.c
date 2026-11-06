@@ -591,6 +591,30 @@ void dialog_draw_button(struct screen *screen,
                           DIALOG_BTN_CENTRE, NULL, 0, NULL);
 }
 
+#define DIALOG_TITLE_GAP 4       /* either side of the rule under a title */
+
+int dialog_title_height(const char *title)
+{
+    if (!title)
+        return 0;
+    return font_get(font_get_ui_bold())->height + 2 * DIALOG_TITLE_GAP + 1;
+}
+
+void dialog_draw_title(struct screen *screen, struct viewport *content,
+                       const char *title)
+{
+    int body_font = content->font, w, h;
+    if (!title)
+        return;
+    screen->set_drawmode(DRMODE_FG);
+    content->font = font_get_ui_bold();
+    screen->getstringsize(title, &w, &h);
+    screen->putsxy(MAX((content->width - w) / 2, 0), 0, title);
+    content->font = body_font;
+    screen->hline(0, content->width - 1,
+                  dialog_title_height(title) - DIALOG_TITLE_GAP - 1);
+}
+
 int dialog_wrap_text(const char *text, int max_width, int font,
                      struct dialog_text_line *out, int max_lines)
 {

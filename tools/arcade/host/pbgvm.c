@@ -7,6 +7,7 @@
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
+ *                  [--ui answer,...]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -35,7 +36,11 @@
  * prints "show <title>", then a line for each rank, "<rank> <value>
  * <name> <date>", the marked rank starred. --options does the same for
  * the option values the owner set, and --opt sets option i to v before
- * tick t, as the pause menu does. */
+ * tick t, as the pause menu does. Each ui.* dialog prints a line saying
+ * what it showed and takes the next of --ui's answers: an index for
+ * choose (-1 backs out), 1 or 0 for confirm, a number for number, and the
+ * text for text (~ backs out). message takes none. Without an answer,
+ * each backs out. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -606,6 +611,79 @@ static void options_set(struct vm *vm, const char *spec, long t)
     }
 }
 
+/* ---- dialogs ------------------------------------------------------------- */
+
+static const char *ui_answers;
+
+/* The next --ui answer into buf; 0 when there are no more */
+static int ui_next(char *buf, int cap)
+{
+    if (!ui_answers || !*ui_answers)
+        return 0;
+    const char *end = strchr(ui_answers, ',');
+    int n = end ? (int)(end - ui_answers) : (int)strlen(ui_answers);
+    snprintf(buf, (size_t)cap, "%.*s", n, ui_answers);
+    ui_answers = end ? end + 1 : "";
+    return 1;
+}
+
+static int ui_choose(void *ctx, const char *title, const char *const *items,
+                     int n, int at)
+{
+    (void)ctx;
+    char a[64];
+    int r = ui_next(a, sizeof(a)) ? atoi(a) : -1;
+    printf("choose %s:", title);
+    for (int i = 0; i < n; i++)
+        printf("%s%s", i ? "|" : " ", items[i]);
+    printf(" at %d -> %d\n", at, r);
+    return r;
+}
+
+static int ui_confirm(void *ctx, const char *title, const char *text)
+{
+    (void)ctx;
+    char a[64];
+    int r = ui_next(a, sizeof(a)) ? atoi(a) : 0;
+    printf("confirm %s: %s -> %d\n", title, text, r);
+    return r;
+}
+
+static void ui_message(void *ctx, const char *title, const char *text)
+{
+    (void)ctx;
+    printf("message %s: %s\n", title, text);
+}
+
+static int32_t ui_number(void *ctx, const char *title, int32_t min,
+                         int32_t max, int32_t step, int32_t value)
+{
+    (void)ctx;
+    char a[64];
+    int32_t r = ui_next(a, sizeof(a)) ? (int32_t)atol(a) : value;
+    printf("number %s: %ld to %ld by %ld from %ld -> %ld\n", title,
+           (long)min, (long)max, (long)step, (long)value, (long)r);
+    return r;
+}
+
+static int ui_text(void *ctx, const char *title, char *buf, int cap)
+{
+    (void)ctx;
+    char a[128];
+    printf("text %s: [%s] up to %d", title, buf, cap - 1);
+    if (!ui_next(a, sizeof(a)) || !strcmp(a, "~")) {
+        printf(" -> cancelled\n");
+        return 0;
+    }
+    snprintf(buf, (size_t)cap, "%s", a);
+    printf(" -> [%s]\n", buf);
+    return 1;
+}
+
+static const struct arcade_ui fake_ui = {
+    ui_choose, ui_confirm, ui_message, ui_number, ui_text
+};
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -817,6 +895,8 @@ int main(int argc, char **argv)
             options_path = argv[++i];
         else if (!strcmp(argv[i], "--opt") && i + 1 < argc)
             opt_sets = argv[++i];
+        else if (!strcmp(argv[i], "--ui") && i + 1 < argc)
+            ui_answers = argv[++i];
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -844,7 +924,7 @@ int main(int argc, char **argv)
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
-                                NULL, control, &fake_tracks };
+                                NULL, control, &fake_tracks, &fake_ui };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;

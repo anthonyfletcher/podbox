@@ -21,9 +21,8 @@
 #include "file.h"
 #include "dir.h"                    /* mkdir */
 #include "lang.h"
-#include "settings/settings.h"     /* ID2P */
 #include "widgets/list.h"
-#include "widgets/yesno.h"
+#include "widgets/dialog_prose.h"
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell.h"
 #include "games/arcade/shell_score.h"
@@ -188,12 +187,10 @@ bool shell_scores_menu(struct vm *vm)
             if (shell_score_table(vm, selection, 0))
                 return true;
         } else if (selection == s->count) {
-            static const char *lines[] = { ID2P(LANG_CLEAR_HIGH_SCORES_ASK) };
-            static const struct text_message message = { lines, 1 };
-            enum yesno_res r = gui_syncyesno_run(&message, NULL, NULL);
-            if (r == YESNO_USB)
-                return true;
-            if (r == YESNO_YES) {
+            if (dialog_prose_confirm(str(LANG_CLEAR_HIGH_SCORES),
+                                     str(LANG_CLEAR_HIGH_SCORES_ASK),
+                                     str(LANG_SET_BOOL_YES),
+                                     str(LANG_SET_BOOL_NO), false)) {
                 for (int i = 0; i < s->count; i++)
                     s->b[i].count = 0;
                 scores_owed = true;

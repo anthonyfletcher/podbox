@@ -19,4 +19,10 @@ struct simplelist_info;
  * simplelist_show_list(): true when the owner went out to the root. */
 bool shell_list(struct simplelist_info *info);
 
+/* Around a dialog a cart opens (ui.*): the screen handed back to the
+ * player's own, and taken again after; to_root when the owner went out to
+ * the root, which ends the cart once its tick is over. */
+void shell_dialog_begin(void);
+void shell_dialog_end(bool to_root);
+
 #endif /* ARCADE_SHELL_H */

@@ -27891,13 +27891,13 @@
   desc: asked before a game cart's high scores are cleared
   user: core
   <source>
-    *: "Clear High Scores?"
+    *: "Every table of this game's scores is emptied."
   </source>
   <dest>
-    *: "Clear High Scores?"
+    *: "Every table of this game's scores is emptied."
   </dest>
   <voice>
-    *: "Clear High Scores?"
+    *: "Every table of this game's scores is emptied."
   </voice>
 </phrase>
 <phrase>

@@ -51,6 +51,28 @@ struct arcade_host
     /* playback and tracks: the playing track, the library and the queue,
      * below; NULL where there is no music to read */
     const struct arcade_tracks *tracks;
+    /* ui: the player's own dialogs over the game, below; NULL for none */
+    const struct arcade_ui *ui;
+};
+
+/* The dialogs ui.* opens. Each runs to its end inside the cart's call, the
+ * game waiting; the texts are UTF-8 and ended. */
+struct arcade_ui
+{
+    /* ui.choose(): one of n items, its index, or -1 when backed out of */
+    int (*choose)(void *ctx, const char *title, const char *const *items,
+                  int n, int at);
+    /* ui.confirm(): text under title, 1 for yes */
+    int (*confirm)(void *ctx, const char *title, const char *text);
+    /* ui.message(): text to read, under title */
+    void (*message)(void *ctx, const char *title, const char *text);
+    /* ui.number(): a number from min to max in steps, starting at value;
+     * value again when backed out of */
+    int32_t (*number)(void *ctx, const char *title, int32_t min, int32_t max,
+                      int32_t step, int32_t value);
+    /* ui.text(): buf, holding the starting text, edited in place, at most
+     * cap bytes with its end; 1 when accepted, 0 when backed out of */
+    int (*text)(void *ctx, const char *title, char *buf, int cap);
 };
 
 /* tracks.pick() and tracks.count()'s filter; 0 or NULL in a field is any */
