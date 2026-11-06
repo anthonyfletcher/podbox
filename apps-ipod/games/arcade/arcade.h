@@ -317,6 +317,46 @@ int arcade_scores_unpack(struct arcade_scores *s, const uint8_t *buf, int n);
 /* A value as its board shows it, into buf */
 void arcade_score_text(const struct arcade_scores *s, int board,
                        int32_t value, char *buf, int cap);
+/* sys_opt.c: a cart's options, the settings the pause menu shows for it.
+ * They come from the cart (the OPTN chunk), each with its default; the
+ * host puts back the owner's values when the cart starts, matched by key,
+ * a hash of the option's name, and keeps them when the owner changes one. */
+#define ARCADE_OPTIONS    8
+#define ARCADE_CHOICES    8
+#define ARCADE_OPT_CHOICE 0     /* one of its choices, by index */
+#define ARCADE_OPT_ONOFF  1     /* 0 or 1 */
+#define ARCADE_OPT_NUMBER 2     /* min to max, in steps */
+
+struct arcade_option
+{
+    char title[24];
+    char choice[ARCADE_CHOICES][24];
+    const char *help;           /* in the cart, not ended; help_len bytes */
+    int help_len;
+    uint32_t key;
+    uint8_t type, nchoices;
+    int32_t value, def, min, max, step;
+};
+
+struct arcade_options
+{
+    int count;
+    struct arcade_option o[ARCADE_OPTIONS];
+};
+
+const struct arcade_options *arcade_options(const struct vm *vm);
+/* The owner set option i: value is brought within its range, and
+ * opt.changed() is true for the next tick when it differs */
+void arcade_option_set(struct vm *vm, int i, int32_t value);
+/* The file's bytes: the values with their keys, packed; and back, each
+ * value given to the option with its key. pack returns the length, 0 when
+ * cap is too small; unpack 1 when buf held a whole record. */
+#define ARCADE_OPTIONS_MAX (8 + ARCADE_OPTIONS * 8)
+int arcade_options_pack(const struct vm *vm, uint8_t *buf, int cap);
+int arcade_options_unpack(struct vm *vm, const uint8_t *buf, int n);
+/* The cart's help text, not ended: its length, 0 for none */
+int arcade_help(const struct vm *vm, const char **text);
+
 /* score.show(): the board the cart asked to show since the last call, and
  * the rank to mark (0 none), or -1 when none was asked; cleared */
 int arcade_score_shown(struct vm *vm, int *rank);

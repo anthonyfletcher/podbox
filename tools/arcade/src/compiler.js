@@ -1678,11 +1678,104 @@ function boards(list) {
     return w.done();
 }
 
+/* OPTN: the options, each its key (a hash of its name, which the engine
+ * matches the owner's saved value by), type, default, range, step, title,
+ * choices and help */
+const OPT_TYPES = ['choice', 'onoff', 'number'];
+
+function options(list) {
+    const w = new Writer();
+    w.u8(list.length);
+    for (const o of list) {
+        w.u32(boardKey(o.name));
+        w.u8(OPT_TYPES.indexOf(o.type));
+        w.u32(o.default >>> 0);
+        w.u32(o.min >>> 0);
+        w.u32(o.max >>> 0);
+        w.u32(o.step);
+        w.str(o.title);
+        w.u8(o.choices.length);
+        for (const c of o.choices) w.str(c);
+        w.str(o.help);
+    }
+    return w.done();
+}
+
 /* ---- the cart's settings ----------------------------------------------- */
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
-                   'menu_button', 'music', 'boards'];
+                   'menu_button', 'music', 'boards', 'options'];
 const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
+
+const OPTION_KEYS = ['name', 'title', 'type', 'choices', 'min', 'max', 'step',
+                     'default', 'help'];
+
+function shortText(s) {
+    return typeof s === 'string' && s !== '' && utf8(s).length <= 23;
+}
+
+/* cart.options checked, each made whole: the defaults filled in, and an
+ * on/off or a choice given the range of its values */
+function checkOptions(list, bad) {
+    if (list === undefined) return [];
+    if (!Array.isArray(list)) { bad('options must be a list'); return []; }
+    if (list.length > 8) bad('a cart has at most 8 options');
+    const seen = new Set();
+    const whole = (v) => Number.isInteger(v) && v >= -0x80000000 && v <= 0x7fffffff;
+    return list.slice(0, 8).map((o, i) => {
+        const at = 'option ' + (i + 1) + ': ';
+        if (o === null || typeof o !== 'object' || Array.isArray(o)) {
+            bad(at + 'must be a record'); return null;
+        }
+        for (const k in o)
+            if (OPTION_KEYS.indexOf(k) < 0) bad(at + 'unknown setting ' + k);
+        if (typeof o.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(o.name))
+            bad(at + 'name must be usable in code as OPT.<name>');
+        else if (seen.has(o.name)) bad(at + 'a second option called ' + o.name);
+        seen.add(o.name);
+        const c = Object.assign({ title: o.name, help: '' }, o);
+        if (!shortText(c.title)) bad(at + 'title must be text of 1 to 23 bytes');
+        if (typeof c.help !== 'string' || utf8(c.help).length > 300)
+            bad(at + 'help must be text of at most 300 bytes');
+        if (OPT_TYPES.indexOf(c.type) < 0) {
+            bad(at + 'type must be one of ' + OPT_TYPES.join(', '));
+            return null;
+        }
+        if (c.type !== 'choice' && o.choices !== undefined)
+            bad(at + 'only a choice has choices');
+        if (c.type !== 'number')
+            for (const k of ['min', 'max', 'step'])
+                if (o[k] !== undefined) bad(at + 'only a number has ' + k);
+        if (c.type === 'choice') {
+            if (!Array.isArray(c.choices) || c.choices.length < 2 ||
+                c.choices.length > 8 || !c.choices.every(shortText)) {
+                bad(at + 'choices must be 2 to 8 texts of 1 to 23 bytes');
+                c.choices = [];
+            }
+            c.min = 0; c.max = Math.max(c.choices.length - 1, 0); c.step = 1;
+            if (c.default === undefined) c.default = 0;
+        } else if (c.type === 'onoff') {
+            c.choices = []; c.min = 0; c.max = 1; c.step = 1;
+            if (c.default === undefined || c.default === false) c.default = 0;
+            if (c.default === true) c.default = 1;
+        } else {
+            c.choices = [];
+            if (c.step === undefined) c.step = 1;
+            if (!whole(c.min) || !whole(c.max) || c.min >= c.max)
+                bad(at + 'min and max must be whole numbers, min below max');
+            if (!Number.isInteger(c.step) || c.step < 1 || c.step > 0x7fffffff)
+                bad(at + 'step must be a whole number of at least 1');
+            if (c.default === undefined) c.default = c.min;
+        }
+        if (!Number.isInteger(c.default) || c.default < c.min ||
+            c.default > c.max)
+            bad(at + 'default must be ' + (c.type === 'choice'
+                ? 'the index of one of its choices'
+                : c.type === 'onoff' ? 'true or false'
+                : 'a whole number from min to max'));
+        return c;
+    }).filter(Boolean);
+}
 
 /* cart.boards checked, with each one's defaults filled in */
 function checkBoards(list, bad) {
@@ -1734,6 +1827,7 @@ function checkCart(cart, errors) {
         bad('menu_button must be "pause" or "game"');
     if (MUSIC.indexOf(c.music) < 0) bad('music must be one of ' + MUSIC.join(', '));
     c.boards = checkBoards(cart.boards, bad);
+    c.options = checkOptions(cart.options, bad);
     return c;
 }
 
@@ -1789,10 +1883,12 @@ export function compile(input) {
      * namespace of globals that the loader sets to the images. */
     const built = buildAssets(input.assets, input.inflate,
                               (str) => prog.string(str), errors);
-    const board = {};
+    const board = {}, option = {};
     cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });
+    cart.options.forEach((o, i) => { option[o.name] = { value: i, version: 1 }; });
     prog.api = Object.assign({}, prog.api, {
-        groups: Object.assign({}, prog.api.groups, built.groups, { BOARD: board })
+        groups: Object.assign({}, prog.api.groups, built.groups,
+                              { BOARD: board, OPT: option })
     });
     if (prog.byNs.has('IMG'))
         errors.push({ file: 'IMG.js', line: 1, column: 1, message:
@@ -1868,6 +1964,7 @@ export function compile(input) {
         { tag: 'LINE', data: lines(prog, fns) },
         ...built.chunks,
         ...(cart.boards.length ? [{ tag: 'BORD', data: boards(cart.boards) }] : []),
+        ...(cart.options.length ? [{ tag: 'OPTN', data: options(cart.options) }] : []),
         { tag: 'SRC_', data: sources(srcFiles, input.deflate) }
     ]);
     let codeBytes = 0;

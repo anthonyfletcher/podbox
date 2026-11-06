@@ -6,7 +6,7 @@
  *                  [--wav file.wav] [--buttons t:mask,...] [--skip t:n,...]
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
  *                  [--setting name=value]... [--menu i]...
- *                  [--scores file]
+ *                  [--scores file] [--options file] [--opt t:i:v,...]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -33,7 +33,9 @@
  * --scores keeps the cart's high scores in file, read before the start
  * and written after the last tick, in the player's own record. score.show
  * prints "show <title>", then a line for each rank, "<rank> <value>
- * <name> <date>", the marked rank starred. */
+ * <name> <date>", the marked rank starred. --options does the same for
+ * the option values the owner set, and --opt sets option i to v before
+ * tick t, as the pause menu does. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -560,6 +562,50 @@ static void scores_show(struct vm *vm)
     }
 }
 
+/* ---- options ------------------------------------------------------------- */
+
+static void options_read(struct vm *vm, const char *path)
+{
+    unsigned char b[ARCADE_OPTIONS_MAX];
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    int n = (int)fread(b, 1, sizeof(b), f);
+    fclose(f);
+    arcade_options_unpack(vm, b, n);
+}
+
+static int options_write(struct vm *vm, const char *path)
+{
+    unsigned char b[ARCADE_OPTIONS_MAX];
+    int n = arcade_options_pack(vm, b, sizeof(b));
+    FILE *f = fopen(path, "wb");
+    if (!f || fwrite(b, 1, (size_t)n, f) != (size_t)n) {
+        if (f)
+            fclose(f);
+        return 0;
+    }
+    return fclose(f) == 0;
+}
+
+/* each --opt entry for tick t: "t:i:v" */
+static void options_set(struct vm *vm, const char *spec, long t)
+{
+    for (const char *b = spec; b && *b;) {
+        long at = strtol(b, (char **)&b, 10), i = -1, v = 0;
+        if (*b == ':')
+            i = strtol(b + 1, (char **)&b, 10);
+        if (*b == ':')
+            v = strtol(b + 1, (char **)&b, 10);
+        if (at == t)
+            arcade_option_set(vm, (int)i, (int32_t)v);
+        if (*b == ',')
+            b++;
+        else
+            break;
+    }
+}
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -736,7 +782,7 @@ int main(int argc, char **argv)
     int playing_flag = 0;
     long bpm = 0;
     int menu_picks[16], npicks = 0;
-    const char *scores_path = NULL;
+    const char *scores_path = NULL, *options_path = NULL, *opt_sets = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
             ticks = atol(argv[++i]);
@@ -767,6 +813,10 @@ int main(int argc, char **argv)
             playing_flag = 1;
         else if (!strcmp(argv[i], "--scores") && i + 1 < argc)
             scores_path = argv[++i];
+        else if (!strcmp(argv[i], "--options") && i + 1 < argc)
+            options_path = argv[++i];
+        else if (!strcmp(argv[i], "--opt") && i + 1 < argc)
+            opt_sets = argv[++i];
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -811,6 +861,8 @@ int main(int argc, char **argv)
         arcade_set_ceiling(vm, (uint32_t)ceiling);
     if (scores_path)
         scores_read(vm, scores_path);
+    if (options_path)
+        options_read(vm, options_path);
     if (!arcade_start(vm))
         return report(vm);
     if (units)
@@ -860,6 +912,7 @@ int main(int argc, char **argv)
                 break;
         }
         arcade_input(vm, held, clicks, pos);
+        options_set(vm, opt_sets, t);
         if (bpm > 0) {
             /* the clock a tick on, and each new press stamped with it */
             track_ms += 1000.0 / arcade_rate(vm);
@@ -891,6 +944,10 @@ int main(int argc, char **argv)
     }
     if (scores_path && !scores_write(vm, scores_path)) {
         fprintf(stderr, "could not write %s\n", scores_path);
+        return 2;
+    }
+    if (options_path && !options_write(vm, options_path)) {
+        fprintf(stderr, "could not write %s\n", options_path);
         return 2;
     }
     if (wav_path)

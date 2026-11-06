@@ -34,6 +34,7 @@ A cart is a folder:
 | `menu_button` | `pause` (the default) or `game`, to have MENU as button 2 |
 | `music` | `listen` (the default), `control` or `own` |
 | `boards` | the high-score tables, up to 8, below |
+| `options` | the settings the pause menu shows, up to 8, below |
 
 Errors name the file, line and column, and say what to write instead.
 
@@ -50,6 +51,31 @@ to start it afresh.
 "boards": [
   { "name": "points", "title": "Points" },
   { "name": "lap", "title": "Best Lap", "wins": "low", "format": "time" }
+]
+```
+
+Each option is a record: `name`, which the code uses as `OPT.<name>`;
+`title`, its row in the pause menu (the name when left out, at most 23
+bytes); `type`; `default`; and `help`, up to 300 bytes, shown under
+its title by the pause menu's Help, after the cart's own `help`. The
+types:
+
+| `type` | Also takes | `opt.get()` gives | `default` |
+|---|---|---|---|
+| `choice` | `choices`, 2 to 8 texts of up to 23 bytes | the index of the one chosen | an index, 0 when left out |
+| `onoff` | | 0 or 1 | `true` or `false`, `false` when left out |
+| `number` | `min`, `max`, and `step` (1 when left out) | the number | `min` when left out |
+
+The owner's values are kept, each found again by its option's name.
+`opt.changed()` is true for the one tick after the owner changes one: the
+time to rebuild anything that depends on them.
+
+```json
+"options": [
+  { "name": "level", "title": "Difficulty", "type": "choice",
+    "choices": ["Easy", "Normal", "Hard"], "default": 1 },
+  { "name": "trails", "title": "Trails", "type": "onoff", "default": true },
+  { "name": "speed", "title": "Speed", "type": "number", "min": 1, "max": 10 }
 ]
 ```
 

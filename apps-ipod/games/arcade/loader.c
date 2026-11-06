@@ -283,6 +283,56 @@ static int load_boards(struct vm *vm, const uint8_t *p, uint32_t n)
     return 1;
 }
 
+/* Text from the chunk into a fixed buffer, cut to fit and ended */
+static void copy_text(struct cur *c, char *dst, uint32_t cap)
+{
+    uint32_t len = c16(c);
+    const uint8_t *t = take(c, len);
+    if (!t)
+        len = 0;
+    if (len > cap - 1)
+        len = cap - 1;
+    if (len)
+        memcpy(dst, t, len);
+    dst[len] = 0;
+}
+
+/* OPTN, the cart's options: a count, then each one's key, type, default,
+ * range and step, title, choices and help. Each starts at its default. */
+static int load_options(struct vm *vm, const uint8_t *p, uint32_t n)
+{
+    if (!p)
+        return 1;
+    struct arcade_options *s = &vm->opts;
+    struct cur c = { p, p + n, 0 };
+    uint32_t count = c8(&c);
+    if (count > ARCADE_OPTIONS)
+        return bad(vm, "options");
+    for (uint32_t i = 0; i < count; i++) {
+        struct arcade_option *o = &s->o[i];
+        o->key = c32(&c);
+        o->type = (uint8_t)c8(&c);
+        o->def = (int32_t)c32(&c);
+        o->min = (int32_t)c32(&c);
+        o->max = (int32_t)c32(&c);
+        o->step = (int32_t)c32(&c);
+        copy_text(&c, o->title, sizeof(o->title));
+        o->nchoices = (uint8_t)c8(&c);
+        if (o->nchoices > ARCADE_CHOICES)
+            return bad(vm, "options");
+        for (int k = 0; k < o->nchoices; k++)
+            copy_text(&c, o->choice[k], sizeof(o->choice[k]));
+        o->help_len = (int)c16(&c);
+        o->help = (const char *)take(&c, (uint32_t)o->help_len);
+        if (c.bad || o->type > ARCADE_OPT_NUMBER || o->min > o->max ||
+            o->step < 1 || o->def < o->min || o->def > o->max)
+            return bad(vm, "options");
+        o->value = o->def;
+    }
+    s->count = (int)count;
+    return 1;
+}
+
 static int load_code(struct vm *vm, const uint8_t *p, uint32_t n)
 {
     struct cur c = { p, p + n, 0 };
@@ -504,11 +554,11 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[11] = { 0 };
-    uint32_t clen[11] = { 0 };
-    static const char tags[11][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+    const uint8_t *chunk[12] = { 0 };
+    uint32_t clen[12] = { 0 };
+    static const char tags[12][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
                                       "PALS", "SHET", "MAPS", "IMGS", "SFX_",
-                                      "BORD" };
+                                      "BORD", "OPTN" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -525,7 +575,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 11; i++)
+        for (int i = 0; i < 12; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -567,6 +617,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     vm->sfx_len = clen[9];
     return load_header(vm, chunk[0], clen[0]) &&
         load_boards(vm, chunk[10], clen[10]) &&
+        load_options(vm, chunk[11], clen[11]) &&
         load_code(vm, chunk[1], clen[1]) &&
         load_constants(vm, chunk[2], clen[2]) &&
         load_globals(vm, chunk[3], clen[3]);

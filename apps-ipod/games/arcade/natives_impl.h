@@ -215,3 +215,7 @@ IMPL(score_get)
 IMPL(score_name)
 IMPL(score_count)
 IMPL(score_show)
+
+/* sys_opt.c */
+IMPL(opt_get)
+IMPL(opt_changed)

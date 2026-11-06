@@ -279,6 +279,11 @@ API(score_name,       178, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 API(score_count,      179, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(score_show,       180, 1, 1, VOID, 0, FLAT, LISTEN, 1)
 
+/* Options: the settings cart.json declares, as OPT.<name> */
+API_NS(opt)
+API(opt_get,          181, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(opt_changed,      182, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

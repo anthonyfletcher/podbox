@@ -27942,3 +27942,17 @@
     *: "Time Played"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GAME_HELP
+  desc: in a game cart's pause menu: the cart's help text and its options' explanations
+  user: core
+  <source>
+    *: "Help"
+  </source>
+  <dest>
+    *: "Help"
+  </dest>
+  <voice>
+    *: "Help"
+  </voice>
+</phrase>

@@ -48,6 +48,7 @@
 #include "games/arcade/shell.h"
 #include "games/arcade/shell_tracks.h"
 #include "games/arcade/shell_score.h"
+#include "games/arcade/shell_opts.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
 #include "audio.h"            /* audio_status, audio_current_track */
@@ -791,24 +792,47 @@ static int event(struct vm *vm, long button)
     return PLAYING;
 }
 
-/* The pause menu's rows: Resume, the cart's own (menuitem), High Scores
- * when the cart has boards, Now Playing, Restart, Quit. */
-enum { ROW_RESUME, ROW_ITEM, ROW_SCORES, ROW_MUSIC, ROW_RESTART, ROW_QUIT };
+/* The pause menu's rows: Resume, the cart's own (menuitem), its options,
+ * High Scores when it has boards, Help when it has any, Now Playing,
+ * Restart, Quit. An option row is a setting, the rest plain. */
+enum { ROW_RESUME, ROW_ITEM, ROW_OPTION, ROW_SCORES, ROW_HELP, ROW_MUSIC,
+       ROW_RESTART, ROW_QUIT };
 static char item_label[5][32];
 static int item_index[5];
-static int row_kind[10], row_item[10], row_count;
+static int row_kind[1 + 5 + ARCADE_OPTIONS + 5], row_item[ARRAYLEN(row_kind)];
+static int row_count;
 
 static const char *menu_row(int row, void *data, char *buf, size_t len)
 {
-    (void)data; (void)buf; (void)len;
+    (void)buf; (void)len;
     switch (row_kind[row]) {
     case ROW_RESUME:  return str(LANG_CHESSBOX_MENU_RESUME_GAME);
     case ROW_ITEM:    return item_label[row_item[row]];
+    case ROW_OPTION:  return shell_option_title(data, row_item[row]);
     case ROW_SCORES:  return str(LANG_HIGH_SCORES);
+    case ROW_HELP:    return str(LANG_GAME_HELP);
     case ROW_MUSIC:   return str(LANG_NOW_PLAYING);
     case ROW_RESTART: return str(LANG_CHESSBOX_MENU_RESTART_GAME);
     default:          return str(LANG_MENU_QUIT);
     }
+}
+
+static enum list_row_kind menu_kind(int row, void *data)
+{
+    return row_kind[row] == ROW_OPTION
+        ? shell_option_kind(data, row_item[row]) : LIST_ROW_PLAIN;
+}
+
+static const char *menu_value(int row, void *data, char *buf, size_t len)
+{
+    return row_kind[row] == ROW_OPTION
+        ? shell_option_value(data, row_item[row], buf, len) : NULL;
+}
+
+static int menu_range(int row, void *data)
+{
+    return row_kind[row] == ROW_OPTION
+        ? shell_option_range(data, row_item[row]) : -1;
 }
 
 static void add_row(int kind, int item)
@@ -878,13 +902,20 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
                 item_index[items] = i;
                 add_row(ROW_ITEM, items++);
             }
+        for (int i = 0; i < arcade_options(vm)->count; i++)
+            add_row(ROW_OPTION, i);
         if (arcade_scores(vm, NULL)->count)
             add_row(ROW_SCORES, 0);
+        if (shell_has_help(vm))
+            add_row(ROW_HELP, 0);
         add_row(ROW_MUSIC, 0);
         add_row(ROW_RESTART, 0);
         add_row(ROW_QUIT, 0);
-        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), row_count, NULL);
+        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), row_count, vm);
         info.get_name = menu_row;
+        info.get_kind = menu_kind;
+        info.get_value = menu_value;
+        info.get_range = menu_range;
         info.selection = selection;
         bool to_root = shell_list(&info);
         /* MENU held or USB: out to the root, as everywhere else */
@@ -892,6 +923,16 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
             return USB;
         selection = info.selection;
         int kind = selection < 0 ? ROW_RESUME : row_kind[selection];
+        if (kind == ROW_OPTION) {
+            if (shell_option_edit(vm, row_item[selection]))
+                return USB;
+            continue;
+        }
+        if (kind == ROW_HELP) {
+            if (shell_help(vm))
+                return USB;
+            continue;
+        }
         if (kind == ROW_SCORES) {
             if (shell_scores_menu(vm))
                 return USB;
@@ -1027,6 +1068,7 @@ static int run(const char *path, void *mem, size_t size)
     save_load(vm);
     save_owed = false;
     shell_scores_load(vm);
+    shell_options_load(vm);
     arcade_set_ceiling(vm, CEILING);
 
     take_screen(&vp);
