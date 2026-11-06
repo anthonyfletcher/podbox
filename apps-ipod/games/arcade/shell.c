@@ -808,20 +808,6 @@ static const char *menu_row(int row, void *data, char *buf, size_t len)
     return str(LANG_MENU_QUIT);
 }
 
-/* Each row's icon, as a menu gives it: a submenu's chevron for Now
- * Playing, an action's for the rest */
-static enum themable_icons menu_icon(int row, void *data)
-{
-    (void)data;
-    return row == item_count + 1 ? Icon_Submenu : Icon_Menu_functioncall;
-}
-
-static enum themable_icons music_icon(int row, void *data)
-{
-    (void)row; (void)data;
-    return Icon_Menu_functioncall;
-}
-
 /* Now Playing: the music's controls, which a game holding PREV, NEXT and
  * PLAY leaves no other way to reach; in host_control()'s order */
 static const int music_label[] = { LANG_PLAYPAUSE, LANG_NEXTTRACK,
@@ -842,8 +828,6 @@ static bool music_menu(void)
         simplelist_info_init(&info, str(LANG_NOW_PLAYING),
                              ARRAYLEN(music_label), NULL);
         info.get_name = music_row;
-        info.get_icon = music_icon;
-        info.title_icon = Icon_Submenu_Entered;
         info.selection = selection;
         if (simplelist_show_list(&info))
             return true;
@@ -873,8 +857,6 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), item_count + 4,
                              NULL);
         info.get_name = menu_row;
-        info.get_icon = menu_icon;
-        info.title_icon = Icon_Submenu_Entered;
         info.selection = selection;
         push_current_activity(ACTIVITY_CONTEXTMENU);
         bool to_root = simplelist_show_list(&info);
