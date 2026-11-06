@@ -213,6 +213,7 @@ games/arcade/shell_opts.c
 games/arcade/shell_ui.c
 games/arcade/shell_suspend.c
 games/arcade/shell_store.c
+games/arcade/shell_font.c
 games/arcade/vm.c
 games/arcade/gc.c
 games/arcade/loader.c

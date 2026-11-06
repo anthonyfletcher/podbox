@@ -333,6 +333,7 @@ API_CONST(SCREEN,   0, 1)
 /* Built-in fonts; a cart's own follow from 16 */
 API_CONSTG(FONT, SMALL, 0, 1)
 API_CONSTG(FONT, BIG,   1, 1)
+API_CONSTG(FONT, TEXT,  2, 1)
 
 /* What actors.move() reports: the side of the actor that hit, or a
  * trigger cell entered */

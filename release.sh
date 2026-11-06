@@ -513,6 +513,7 @@ for target in $TARGETS; do
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
                     .rockbox/speech/cmudict.bin \
+                    .rockbox/games/font.bin \
                     .rockbox/langs/english.vstrings \
                     .rockbox/fonts/LICENSE-Noto.txt \
                     $TOOL_WANT \

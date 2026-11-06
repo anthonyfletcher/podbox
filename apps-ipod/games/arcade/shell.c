@@ -53,6 +53,7 @@
 #include "games/arcade/shell_ui.h"
 #include "games/arcade/shell_suspend.h"
 #include "games/arcade/shell_store.h"
+#include "games/arcade/shell_font.h"
 #include "speech/talk.h"           /* talk_text, talk_shutup */
 #include "audio/voice_thread.h"    /* voice_is_playing */
 #include "pcm_mixer.h"
@@ -556,7 +557,7 @@ static void host_control(void *ctx, int what)
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
-    &shell_ui, &speak_host, &shell_store
+    &shell_ui, &speak_host, &shell_store, shell_glyph
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -1349,6 +1350,7 @@ static int run(const char *path, void *mem, size_t size)
     beat_listen(NULL, 0);
     shell_tracks_end();
     talk_shutup();              /* nothing the cart said outlasts it */
+    shell_font_end();
     give_screen();
     sound_vm = NULL;
     if (status == FAILED) {

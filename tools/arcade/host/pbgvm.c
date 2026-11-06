@@ -8,7 +8,7 @@
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
  *                  [--ui answer,...] [--speech] [--suspend-at t]
- *                  [--store dir]
+ *                  [--store dir] [--font font.bin]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -48,7 +48,8 @@
  * does, overwrites the arena, and resumes it from the copy, printing
  * "resumed" -- the run's output is then the same as one never suspended.
  * --store keeps store.* files in dir, as name.json, within the player's
- * bounds; without it nothing is kept. */
+ * bounds; without it nothing is kept. --font gives FONT.TEXT the glyphs of
+ * a font file (gen_textfont.py --file) beyond the engine's own. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -807,6 +808,47 @@ static const struct arcade_store fake_store = {
     st_read, st_write, st_remove, st_list
 };
 
+/* ---- the font file ------------------------------------------------------- */
+
+static unsigned char *font_data;
+static long font_size;
+
+/* As the player's shell_glyph(): the page, the codepoint's bit, its rank */
+static int font_glyph(void *ctx, uint32_t cp, uint8_t out[13])
+{
+    (void)ctx;
+    if (!font_data || cp >= 0x10000)
+        return 0;
+    const unsigned char *page = font_data + 8 + (cp >> 8) * 36;
+    uint32_t base = page[0] | page[1] << 8 | page[2] << 16 |
+                    (uint32_t)page[3] << 24, low = cp & 0xff, rank = 0;
+    if (!base || !(page[4 + (low >> 3)] & (1 << (low & 7))))
+        return 0;
+    for (uint32_t b = 0; b < low; b++)
+        rank += (page[4 + (b >> 3)] >> (b & 7)) & 1;
+    if ((long)(base + rank * 13 + 13) > font_size)
+        return 0;
+    memcpy(out, font_data + base + rank * 13, 13);
+    return 1;
+}
+
+static void font_load(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    fseek(f, 0, SEEK_END);
+    font_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    font_data = malloc((size_t)font_size);
+    if (font_data && fread(font_data, 1, (size_t)font_size, f) !=
+                     (size_t)font_size) {
+        free(font_data);
+        font_data = NULL;
+    }
+    fclose(f);
+}
+
 /* ---- a PNG, uncompressed, so no zlib is needed -------------------------- */
 
 static uint32_t crc_table[256];
@@ -1027,6 +1069,8 @@ int main(int argc, char **argv)
             suspend_at = atol(argv[++i]);
         else if (!strcmp(argv[i], "--store") && i + 1 < argc)
             store_dir = argv[++i];
+        else if (!strcmp(argv[i], "--font") && i + 1 < argc)
+            font_load(argv[++i]);
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -1055,7 +1099,7 @@ int main(int argc, char **argv)
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
                                 NULL, control, &fake_tracks, &fake_ui,
-                                &fake_speak, &fake_store };
+                                &fake_speak, &fake_store, font_glyph };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
     unsigned last_held = 0;

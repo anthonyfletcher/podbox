@@ -33,6 +33,7 @@
 #include <string.h>
 #include "games/arcade/vm.h"
 #include "games/arcade/core_font.h"
+#include "games/arcade/core_textfont.h"
 
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
                                   struct value *out)
@@ -1651,6 +1652,105 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
     return cx;
 }
 
+/* ---- FONT.TEXT: beyond ASCII ---- *
+ * 12-row cells, each glyph its own advance, a 12-row line. The letters,
+ * punctuation and symbols below U+3000 are the engine's own; kana, Hangul
+ * and the ideographs come from the host, a glyph at a time. */
+
+#define TEXT_LINE 12
+
+/* The next character of UTF-8 text at *i, which moves past it; a byte
+ * that does not begin one is taken alone, as U+FFFD */
+static uint32_t utf8_next(const char *s, uint32_t n, uint32_t *i)
+{
+    uint8_t c = (uint8_t)s[(*i)++];
+    int more = c >= 0xf0 && c < 0xf8 ? 3 : c >= 0xe0 ? 2 : c >= 0xc0 ? 1 : 0;
+    if (c >= 0x80 && !more)
+        return 0xfffd;
+    uint32_t cp = more == 3 ? c & 7 : more == 2 ? c & 15 : more ? c & 31 : c;
+    for (int k = 0; k < more; k++) {
+        if (*i >= n || ((uint8_t)s[*i] & 0xc0) != 0x80)
+            return 0xfffd;
+        cp = cp << 6 | ((uint8_t)s[(*i)++] & 63);
+    }
+    return cp;
+}
+
+/* cp's glyph: the engine's, the host's (into buf), or the engine's ? */
+static const uint8_t *text_glyph(struct vm *vm, uint32_t cp, uint8_t *buf)
+{
+    if (cp < 0x10000) {
+        int32_t lo = 0, hi = TEXTFONT_CORE - 1;
+        while (lo <= hi) {
+            int32_t m = (lo + hi) / 2;
+            if (textfont_cp[m] == cp)
+                return textfont_glyph[m];
+            if (textfont_cp[m] < cp)
+                lo = m + 1;
+            else
+                hi = m - 1;
+        }
+    }
+    if (cp >= 0x3000 && vm->host && vm->host->glyph &&
+        vm->host->glyph(vm->host->ctx, cp, buf))
+        return buf;
+    return textfont_glyph['?' - 0x20];
+}
+
+/* text() for FONT.TEXT */
+static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
+                         uint32_t n, int64_t x, int64_t y, int draw,
+                         int64_t *widest, int *lines)
+{
+    uint8_t buf[13];
+    int64_t cx = x;
+    *widest = 0;
+    *lines = 1;
+    for (uint32_t i = 0; i < n;) {
+        uint32_t cp = utf8_next(s, n, &i);
+        if (cp == '\n') {
+            if (cx - x > *widest)
+                *widest = cx - x;
+            cx = x;
+            y += TEXT_LINE;
+            (*lines)++;
+            continue;
+        }
+        if (cp < 0x20)
+            cp = ' ';
+        const uint8_t *g = text_glyph(vm, cp, buf);
+        if (draw && cp != ' ') {
+            int64_t gx = cx + p->ox, gy = y + p->oy;
+            p->cost += COST_GLYPH;
+            int inside = !p->pat && gx >= p->cx0 && gy >= p->cy0 &&
+                         gx + 8 <= p->cx1 && gy + TEXT_LINE <= p->cy1;
+            for (int r = 0; r < TEXT_LINE; r++) {
+                uint8_t bits = g[1 + r];
+                if (!bits)
+                    continue;
+                if (inside) {
+                    uint8_t *d = p->s.px + (gy + r) * p->s.w + gx;
+                    for (int c = 0; c < 8; c++)
+                        if (bits & (0x80 >> c)) {
+                            d[c] = p->c;
+                            p->count++;
+                        }
+                    row_touched(p, (int32_t)(gy + r));
+                } else {
+                    for (int c = 0; c < 8; c++)
+                        if (bits & (0x80 >> c))
+                            span(p, y + r + p->oy, cx + c + p->ox,
+                                 cx + c + p->ox);
+                }
+            }
+        }
+        cx += g[0];
+    }
+    if (cx - x > *widest)
+        *widest = cx - x;
+    return cx;
+}
+
 /* print's and textw's text. Static, because the UI thread's stack is
  * small; there is only ever one engine. */
 static char text_buf[1024];
@@ -1678,10 +1778,13 @@ NATIVE(print)
     int64_t widest;
     int lines;
     begin(vm, &p, c, 0);
-    int64_t end = text(&p, buf, n, x, y, k, 1, &widest, &lines);
+    int wide = vm->d.font == 2;
+    int64_t end = wide ? text_wide(vm, &p, buf, n, x, y, 1, &widest, &lines)
+                       : text(&p, buf, n, x, y, k, 1, &widest, &lines);
     finish(vm, &p);
     vm->d.cur_x = x;
-    vm->d.cur_y = (int32_t)clampc((int64_t)y + lines * 6 * k);
+    vm->d.cur_y = (int32_t)clampc((int64_t)y +
+                                  lines * (wide ? TEXT_LINE : 6 * k));
     *out = mk(T_INT, (int32_t)clampc(end));
     return 1;
 }
@@ -1694,7 +1797,10 @@ NATIVE(textw)
     uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
     int64_t widest;
     int lines;
-    text(NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
+    if (vm->d.font == 2)
+        text_wide(vm, NULL, buf, n, 0, 0, 0, &widest, &lines);
+    else
+        text(NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     *out = mk(T_INT, (int32_t)widest);
     return 1;
 }
@@ -1703,8 +1809,9 @@ NATIVE(font)
 {
     (void)out;
     WHOLE(0, 0, f, "font");
-    if (f < 0 || f > 1)
-        return vm_fail(vm, "font() needs FONT.SMALL or FONT.BIG", "", "");
+    if (f < 0 || f > 2)
+        return vm_fail(vm, "font() needs FONT.SMALL, FONT.BIG or FONT.TEXT",
+                       "", "");
     vm->d.font = (uint8_t)f;
     return 1;
 }
