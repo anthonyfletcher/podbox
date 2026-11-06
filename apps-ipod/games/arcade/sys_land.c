@@ -55,13 +55,16 @@ static int32_t scale_of(int argc, struct value *a, int i)
 
 /* ---- natives ------------------------------------------------------------- */
 
-/* land.draw(heights, colours, [far], [scale], [coarse]): the landscape
- * from the plane's camera, as far as far world pixels (512 by default), a
- * height byte being scale world pixels (1). coarse 2 samples every other
- * column and draws each twice: about half the time, for a busy cart or
- * music on the 5G. Draws the ground only: the sky, and anything standing
- * on the ground, are the cart's, drawn before and after. Returns the
- * ground samples taken. */
+/* land.draw(heights, colours, [far], [scale], [coarse], [ramp]): the
+ * landscape from the plane's camera, as far as far world pixels (512 by
+ * default), a height byte being scale world pixels (1). coarse 2 samples
+ * every other column and draws each twice: about half the time, for a busy
+ * cart or music on the 5G. ramp, an array of colours, says the colour of
+ * the ground at each height (ramp[h], the last for any higher): given it,
+ * the ground is drawn with its heights blended between pixels and coloured
+ * by the ramp, smooth rather than a block a pixel, at more cost. Draws the
+ * ground only: the sky, and anything standing on the ground, are the
+ * cart's, drawn before and after. Returns the ground samples taken. */
 NATIVE(land_draw)
 {
     if (!vm->plane.set)
@@ -83,6 +86,19 @@ NATIVE(land_draw)
     if (l.far > 4096) l.far = 4096;
     l.scale = scale_of(argc, a, 3);
     l.coarse = argc > 4 && is_num(a[4]) ? floor_int(a[4]) : 1;
+    l.ramp = NULL;
+    l.nramp = 0;
+    if (argc > 5 && a[5].tag != T_NULL) {
+        static uint8_t ramp[256];
+        struct column c;
+        if (!column_of(vm, a[5], &c) || c.tag == T_INT || c.len < 1)
+            return vm_fail(vm, "land.draw() needs its ramp as an array of "
+                           "colours", "", "");
+        l.nramp = c.len < 256 ? (int32_t)c.len : 256;
+        for (int32_t i = 0; i < l.nramp; i++)
+            ramp[i] = (uint8_t)column_at(&c, (uint32_t)i, 0);
+        l.ramp = ramp;
+    }
     *out = mk(T_INT, (int32_t)core_draw_land(vm, &l));
     return 1;
 }

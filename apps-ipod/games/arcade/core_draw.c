@@ -3005,6 +3005,8 @@ struct slice
     int32_t fog;                /* this slice's fog level */
     uint32_t fogm[4];           /* by x & 3, byte k set: row k of 4 fogged */
     uint32_t fogw;              /* the fog's colour in each byte */
+    const uint8_t *ramp;        /* NULL, or the colour at each height */
+    int32_t nramp;
 };
 
 /* The slice's dither at fog level fog: the plane's pattern, fixed to the
@@ -3032,14 +3034,14 @@ static inline uint32_t land_rows(const struct slice *s, uint32_t c,
 }
 
 /* A column of the slice whose sample shows: from row y down to the top
- * drawn so far, in its colour */
-static void land_fill(const struct slice *s, int16_t *top, int32_t y,
-                      uint32_t at, uint32_t *filled, int32_t *lo)
+ * drawn so far, in palette colour colour */
+static void land_paint(const struct slice *s, int16_t *top, int32_t y,
+                       uint8_t colour, uint32_t *filled, int32_t *lo)
 {
     int32_t x = (int32_t)(top - s->top), y1 = *top;
     if (y < s->cy0)
         y = s->cy0;
-    uint32_t c = s->dpal[s->colour[at]] * 0x01010101u;
+    uint32_t c = s->dpal[colour] * 0x01010101u;
     uint32_t a = land_rows(s, c, x, y);
     uint8_t *p = s->px + y * s->w + (x - s->x0);
     if (s->step == 2 && x + 1 < s->x1) {
@@ -3061,6 +3063,13 @@ static void land_fill(const struct slice *s, int16_t *top, int32_t y,
     *top = (int16_t)y;
     if (y < *lo)
         *lo = y;
+}
+
+/* ...in the colour of the ground's pixel at */
+static inline void land_fill(const struct slice *s, int16_t *top, int32_t y,
+                             uint32_t at, uint32_t *filled, int32_t *lo)
+{
+    land_paint(s, top, y, s->colour[at], filled, lo);
 }
 
 /* The slice's loop, the image's index worked out by INDEX(u, t): with the
@@ -3107,6 +3116,46 @@ LAND_SLICE(land_slice_256, AT_256)
 typedef int32_t land_slice_fn(const struct slice *, uint32_t, uint32_t,
                               uint32_t, uint32_t, int32_t, int32_t,
                               uint32_t *, int32_t *);
+
+/* A slice of ground with a ramp: the height blended from the four pixels
+ * round each sample, and the colour the ramp's at that height, so the
+ * ground is slopes with smooth edges between its colours, and hills
+ * smooth outlines, rather than a block a pixel. C only, and slower than
+ * the plain loops: a cart asks for it */
+static int32_t land_slice_smooth(const struct slice *s, uint32_t u, uint32_t t,
+                               uint32_t su, uint32_t sv, int32_t base,
+                               int32_t rise, uint32_t *filled, int32_t *lo)
+{
+    const uint8_t *height = s->height;
+    const uint32_t wmask = s->wmask, hmask = s->hmask, wshift = s->wshift;
+    int16_t *top = s->top + s->x0, *end = s->top + s->x1;
+    int32_t open = 0;
+    for (; top < end; top += s->step, u += su, t += sv) {
+        int32_t y1 = *top;
+        if (y1 <= s->cy0)
+            continue;
+        open++;
+        /* a pixel's height is at its centre, half a pixel in */
+        uint32_t uu = u - 0x8000, tt = t - 0x8000;
+        uint32_t x0 = (uu >> 16) & wmask, x1 = (x0 + 1) & wmask;
+        uint32_t r0 = ((tt >> 16) & hmask) << wshift;
+        uint32_t r1 = (((tt >> 16) + 1) & hmask) << wshift;
+        int32_t fx = (int32_t)(uu >> 8) & 0xff, fy = (int32_t)(tt >> 8) & 0xff;
+        int32_t a = height[r0 + x0] * 256 +
+                    (height[r0 + x1] - height[r0 + x0]) * fx;
+        int32_t b = height[r1 + x0] * 256 +
+                    (height[r1 + x1] - height[r1 + x0]) * fx;
+        int32_t h = a * 256 + (b - a) * fy;     /* 16.16 of a height byte */
+        int32_t y = (int32_t)(((int64_t)base -
+                               (((int64_t)h * rise) >> 16)) >> 16);
+        if (y < y1) {
+            int32_t k = h >> 16;
+            land_paint(s, top, y, s->ramp[k < s->nramp ? k : s->nramp - 1],
+                       filled, lo);
+        }
+    }
+    return open;
+}
 
 #ifdef ARCADE_ASM
 /* draw_arm.S: the loops for square maps 8 to 256 across with land_fill()
@@ -3311,6 +3360,8 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     sl.cy0 = p.cy0;
     sl.step = l->coarse == 2 ? 2 : 1;
     sl.fogw = p.d->dpal[v->fog_colour] * 0x01010101u;
+    sl.ramp = l->ramp;
+    sl.nramp = l->nramp;
     land_fog(&sl, 0);
     sl.top = top;
     uint32_t samples = 0, filled = 0;
@@ -3370,8 +3421,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
             sl.wshift = lv[k].wshift;
             slice = land_loop(sl.wmask, sl.hmask, sl.step);
         }
-        open = slice(&sl, (uint32_t)((cx - su * (SCREEN_W / 2) +
-                                      su * sl.x0) >> k),
+        land_slice_fn *fn = sl.ramp ? land_slice_smooth : slice;
+        open = fn(&sl, (uint32_t)((cx - su * (SCREEN_W / 2) +
+                                  su * sl.x0) >> k),
                      (uint32_t)((cy - sv * (SCREEN_W / 2) + sv * sl.x0) >> k),
                      (uint32_t)(ssu >> k), (uint32_t)(ssv >> k),
                      (int32_t)base, (int32_t)rise, &filled, &lo);

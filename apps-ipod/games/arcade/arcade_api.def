@@ -218,7 +218,7 @@ API(links_draw,    123, 2, 2, VOID, 0, PIXELS, LISTEN, 1)
 
 /* Systems: a voxel landscape, from the plane's camera */
 API_NS(land)
-API(land_draw,     124, 2, 5, VAL, 0, PIXELS, LISTEN, 1)
+API(land_draw,     124, 2, 6, VAL, 0, PIXELS, LISTEN, 1)
 API(land_height,   125, 3, 4, VAL, 0, CELLS,  LISTEN, 1)
 
 /* Systems: first-person walls from the map, from the plane's camera */

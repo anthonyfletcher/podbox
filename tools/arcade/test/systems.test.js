@@ -435,6 +435,29 @@ function update() {}`);
     assert.match(odd.err, /a power of two/);
 });
 
+test('land: a ramp colours the ground by its height, not by its colours', () => {
+    const r = run(`var hm, cm;
+function init() {
+    // flat ground with the pillar of the test above, its colours all 1
+    hm = img(64, 64); cm = img(64, 64);
+    target(cm); cls(1);
+    target(hm); cls(0); rectfill(40, 30, 43, 33, 200);
+    target(SCREEN);
+    plane.view(0, 32, 20, 0, 50, 0.25);
+    cls(0);
+    // green below 100, red from there up
+    var ramp = [];
+    for (var h = 0; h < 256; h++) ramp.push(h < 100 ? 11 : 8);
+    printh(land.draw(hm, cm, 200, 1, 1, ramp) > 0);
+    printh(pget(10, 100) + " " + pget(80, 40) + " " + pget(80, 110));
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['1', '11 8 11']);
+    const bad = run('function init() { plane.view(0, 0, 9, 0, 50, 0.25); land.draw(img(64, 64), img(64, 64), 100, 1, 1, 5); }\nfunction update() {}');
+    assert.match(bad.err, /needs its ramp as an array of colours/);
+});
+
 test('walls: a wall ahead at its height, billboards hidden behind it', () => {
     const r = run(`function init() {
     for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 8); sset(16 + x, y, 11); }

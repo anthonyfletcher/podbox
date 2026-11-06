@@ -210,6 +210,8 @@ struct landspec
     int32_t far;                /* world pixels */
     int32_t scale;              /* 16.16 world pixels a height step */
     int32_t coarse;             /* 2: every other column, drawn twice */
+    const uint8_t *ramp;        /* NULL, or the colour at each height */
+    int32_t nramp;
 };
 
 /* A row of the floor: its left end and one screen pixel's step, 16.16
