@@ -3208,6 +3208,13 @@ static uint8_t commonest(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
     return c == d ? c : a;
 }
 
+/* The slices' spacing at depth z, 16.16 world pixels */
+static inline int64_t land_spacing(int64_t z)
+{
+    return z < 48 << 16 ? 1 << 16 : z < 96 << 16 ? 2 << 16 :
+           z < 192 << 16 ? 4 << 16 : 8 << 16;
+}
+
 /* The levels for l's ground, the first the ground itself: their count */
 static int32_t land_levels(const struct landspec *l, struct landlevel *lv)
 {
@@ -3316,8 +3323,17 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     land_slice_fn *slice = land_slice;
     /* 1 / focal, 0.32: a slice's half-width is a multiply */
     int64_t inv_focal = ((int64_t)1 << 48) / v->focal;
-    for (int64_t z = 2 << 16, dz = 1 << 16; z < far && open > 0;
-         z += dz, dz = (1 << 16) + z / 48) {
+    /* The slices stay where they are on the ground as the camera moves
+     * along the view, a whole number of their spacing from the view's
+     * origin: one kept a fixed depth from the camera slides across the
+     * ground's pixels, and its span, rows tall up close, jumps each time it
+     * crosses one. Their spacing doubles at 48, 96 and 192 world pixels,
+     * to match the levels the samples come from. */
+    int64_t ahead = ((int64_t)v->x * v->dx + (int64_t)v->y * v->dy) >> 16;
+    for (int64_t z = ((ahead + (2 << 16) + 0xffff) & -(1 << 16)) - ahead;
+         z < far && open > 0;
+         z = ((ahead + z + land_spacing(z)) & -land_spacing(z)) - ahead) {
+        int64_t dz = land_spacing(z);
         /* screen pixels a world pixel at this depth, 16.16, from 1 / z in
          * 0.32 by a 32-bit division; the screen row of height 0, and the
          * rows a height byte lifts, both 16.16 */
