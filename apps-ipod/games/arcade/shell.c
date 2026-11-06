@@ -46,12 +46,17 @@
 #include "games/arcade/shell.h"
 #include "pcm_mixer.h"
 #include "piezo.h"
-#include "audio.h"            /* audio_status */
+#include "audio.h"            /* audio_status, audio_current_track */
+#include "metadata.h"         /* struct mp3entry */
+#include "string-extra.h"     /* strmemccpy */
 #include "audio/beat_analyse.h"
 #include "audio/beat_track.h"
 #include "games/spike/spike_bar.h"
 #include "games/spike/spike_clock.h"
 #include "games/spike/spike_music.h"
+#include "audio/spectrum_meter.h"
+#include "database/path_key.h"
+#include "database/sound_index.h"
 
 /* The engine's memory: the app buffer, no more than the smaller player's. */
 #define ARENA_MAX (512 * 1024)
@@ -288,8 +293,73 @@ static void beat_mood(void *ctx, int32_t out[3])
     out[2] = m.trend;
 }
 
+/* The spectrum is worked out from the mixer's audio once a tick, however
+ * often a cart asks */
+static unsigned long bands_tick, ticks_heard;
+
+static void beat_bands(void *ctx, int32_t *out, int32_t n)
+{
+    (void)ctx;
+    if (bands_tick != ticks_heard) {
+        spectrum_meter_peek();
+        bands_tick = ticks_heard;
+    }
+    for (int32_t k = 0; k < n; k++)
+        out[k] = spectrum_meter_get_bar(k, n);
+}
+
+/* The playing track's record, read from the index once a track: the read
+ * may spin the disk up */
+static char sound_path[MAX_PATH];
+static struct sound_record sound_rec;
+static bool sound_have;
+
+static int beat_sound(void *ctx, int32_t out[31])
+{
+    (void)ctx;
+    struct mp3entry *id3 = audio_current_track();
+    if (!id3 || !id3->path[0])
+        return 0;
+    if (strcmp(id3->path, sound_path)) {
+        struct sound_index_reader r;
+        strmemccpy(sound_path, id3->path, sizeof(sound_path));
+        sound_have = false;
+        if (sound_index_reader_open(&r) == SOUND_OK) {
+            sound_have = sound_index_find(&r, path_key(sound_path),
+                                          &sound_rec) &&
+                         sound_record_usable(&sound_rec);
+            sound_index_reader_close(&r);
+        }
+    }
+    if (!sound_have)
+        return 0;
+    const struct sound_record *s = &sound_rec;
+    bool locked = !(s->flags & SOUND_F_NO_LOCK);
+    out[0] = locked ? s->period_ms : 0;
+    out[1] = locked ? s->confidence : 0;
+    out[2] = (s->flags & SOUND_F_SETTLED) ? 1 : 0;
+    out[3] = s->loudness_db10;
+    out[4] = s->crest_db;
+    out[5] = s->width;
+    for (int k = 0; k < 3; k++) {
+        out[6 + k] = s->level[k];
+        out[9 + k] = s->rate10[k];
+    }
+    out[12] = s->strength;
+    out[13] = s->peakiness;
+    for (int k = 0; k < 12; k++)
+        out[14 + k] = s->pitch[k];
+    out[26] = s->tonic;
+    out[27] = (s->flags & SOUND_F_NO_MODE) ? -1 : s->mode;
+    out[28] = s->mode_margin;
+    out[29] = s->tonal_clarity;
+    out[30] = s->harmonic_change;
+    return 1;
+}
+
 static const struct arcade_beat beat_host = {
-    beat_listen, beat_state, beat_next, beat_downbeat, beat_now, beat_mood
+    beat_listen, beat_state, beat_next, beat_downbeat, beat_now, beat_mood,
+    beat_bands, beat_sound
 };
 
 /* A button going down, stamped with the track time it arrived at */
@@ -308,6 +378,7 @@ static void beat_stamp(struct vm *vm, long b)
 static void beat_tick(struct vm *vm)
 {
     struct arcade_music m;
+    ticks_heard++;
     m.jumped = !spk_clock_tick();
     if (m.jumped) {
         /* a seek, a skip, a new track: the tempo and the bar start again */
@@ -747,6 +818,7 @@ static int run(const char *path, void *mem, size_t size)
     last_wheel = -1;
     menu_down = menu_paused = false;
     beat_start();
+    sound_path[0] = '\0';         /* the track's record is read afresh */
     int status = PLAYING;
     if (!arcade_start(vm))
         status = FAILED;

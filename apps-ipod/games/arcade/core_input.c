@@ -302,6 +302,43 @@ NATIVE(beat_mood)
     return 1;
 }
 
+/* playback.bands(out, n): n spectrum bands, 1 to 8, low to high, each
+ * 0-100, into an Int32Array -- the skins' spectrum, for this tick */
+NATIVE(playback_bands)
+{
+    (void)argc; (void)out;
+    if (a[0].tag != T_I32 || !is_num(a[1]))
+        return vm_fail(vm, "playback.bands() needs an Int32Array and a count",
+                       "", "");
+    int32_t n = floor_int(a[1]);
+    if (n < 1 || n > 8 || I32(vm, a[0])->len < (uint32_t)n)
+        return vm_fail(vm, "playback.bands() takes 1 to 8 bands, and an "
+                       "Int32Array that holds them", "", "");
+    int32_t *d = I32(vm, a[0])->d;
+    memset(d, 0, (size_t)n * sizeof(*d));
+    const struct arcade_beat *b = beat_of(vm);
+    if (b && b->bands)
+        b->bands(vm->host->ctx, d, n);
+    return 1;
+}
+
+/* playback.sound(out): the playing track's Sound Index record into an
+ * Int32Array of SOUND.SIZE, field by field as SOUND.* names them: the whole
+ * track's character, for a cart to choose by before it starts. Returns 0,
+ * the array cleared, where the track has none */
+NATIVE(playback_sound)
+{
+    (void)argc;
+    int32_t s[31] = { 0 };
+    if (a[0].tag != T_I32 || I32(vm, a[0])->len < 31)
+        return vm_fail(vm, "playback.sound() needs an Int32Array of "
+                       "SOUND.SIZE", "", "");
+    const struct arcade_beat *b = beat_of(vm);
+    int has = b && b->sound ? b->sound(vm->host->ctx, s) : 0;
+    memcpy(I32(vm, a[0])->d, s, sizeof(s));
+    return RET_INT(has ? 1 : 0);
+}
+
 /* skipped(): frames the engine ran late and did not draw since the last
  * call */
 NATIVE(skipped)

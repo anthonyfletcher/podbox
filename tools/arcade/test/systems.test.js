@@ -504,6 +504,25 @@ function update() {
                      ['0 -1', '0 0 0 0', '-1 -1 -1 -1', '-1 0']);
 });
 
+test('playback: the spectrum bands and the track\'s Sound Index record', () => {
+    const cart = `var b = new Int32Array(8), s = new Int32Array(SOUND.SIZE);
+function init() {
+    printh(playback.sound(s) + " " + s[SOUND.PERIOD] + " " + s[SOUND.TONIC] +
+           " " + s[SOUND.MODE] + " " + SOUND.SIZE);
+}
+function update() {
+    playback.bands(b, 4);
+    printh(b[0] + " " + b[1] + " " + b[2] + " " + b[3]);
+}`;
+    const r = run(cart, 1, ['--beat', '120']);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['1 500 9 1 31', '89 50 40 30']);
+    const q = run(cart, 1);
+    assert.deepEqual(q.out.trim().split('\n'), ['0 0 0 0 31', '0 0 0 0']);
+    const bad = run('var b = new Int32Array(8);\nfunction init() { playback.bands(b, 9); }\nfunction update() {}');
+    assert.match(bad.err, /1 to 8 bands/);
+});
+
 test('plane: fog covers the far ground, and coarse draws pixel pairs', () => {
     const r = run(FLOOR + `function init() {
     floor();

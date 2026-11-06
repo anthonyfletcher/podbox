@@ -134,8 +134,34 @@ static void fake_mood(void *ctx, int32_t out[3])
     out[2] = k < 4 ? 1 : -1;
 }
 
+/* a spectrum that leans to the low end and pulses on the beat */
+static void fake_bands(void *ctx, int32_t *out, int32_t n)
+{
+    (void)ctx;
+    int32_t pulse = 30 - (fake.clock % fake.period) * 30 / fake.period;
+    for (int32_t k = 0; k < n; k++)
+        out[k] = 60 - k * 40 / n + (k == 0 ? pulse : 0);
+}
+
+/* the track's record: steady at the tempo, A minor, moderately loud */
+static int fake_sound(void *ctx, int32_t out[31])
+{
+    (void)ctx;
+    static const int32_t rest[28] = {
+        -120, 12, 70, 60, 50, 40, 30, 40, 50, 70, 40,
+        10, 2, 8, 2, 6, 6, 2, 8, 2, 9, 2, 6,
+        9, 1, 25, 60, 30
+    };
+    out[0] = fake.period;
+    out[1] = 80;
+    out[2] = 1;
+    memcpy(out + 3, rest, 28 * sizeof(int32_t));
+    return 1;
+}
+
 static const struct arcade_beat fake_beat = {
-    fake_listen, fake_state, fake_next, fake_downbeat, fake_now, fake_mood
+    fake_listen, fake_state, fake_next, fake_downbeat, fake_now, fake_mood,
+    fake_bands, fake_sound
 };
 
 static void click(void *ctx, int beep)

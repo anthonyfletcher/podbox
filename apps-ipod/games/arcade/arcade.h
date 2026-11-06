@@ -53,6 +53,12 @@ struct arcade_beat
     int32_t (*now)(void *ctx);
     /* the bar just heard: energy 0-100, flux 0-100, trend (signed) */
     void (*mood)(void *ctx, int32_t out[3]);
+    /* playback.bands(): n spectrum bands (1-8), 0-100, as the skins draw
+     * them */
+    void (*bands)(void *ctx, int32_t *out, int32_t n);
+    /* playback.sound(): the playing track's Sound Index record, in the
+     * order of SOUND.* (arcade_api.def); 0 where it has none */
+    int (*sound)(void *ctx, int32_t out[31]);
 };
 
 /* What the host read for a tick: the clock, steady for the tick; the ms
