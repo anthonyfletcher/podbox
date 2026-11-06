@@ -141,6 +141,10 @@ API_NS(sys)
 API(sys_setting,   144, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(sys_translate, 145, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 
+/* Listening ahead: the hits in the audio decoded ahead of the speaker */
+API(beat_ahead,    146, 3, 3, VAL,  0, FLAT, LISTEN, 1)
+API(beat_horizon,  147, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+
 /* Memory: the engine's own arrays, and bulk moves */
 API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(copy,      75, 5, 5, VOID, 0,     CELLS,  LISTEN, 1)

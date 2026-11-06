@@ -359,9 +359,50 @@ static int beat_sound(void *ctx, int32_t out[31])
     return 1;
 }
 
+/* The hits in the analyser's history from from to before to, in the
+ * cart's time (the offset taken off), oldest first. The history runs
+ * newest first, back to some 3.7 s, and reaches the codec's write cursor,
+ * so its newest end is audio not yet heard. */
+static int32_t beat_ahead(void *ctx, int32_t from, int32_t to, int32_t *out,
+                          int32_t max)
+{
+    (void)ctx;
+    static int16_t found[BEAT_HISTORY];
+    const struct beat_window *w;
+    long off = global_settings.spike_offset;
+    int n = 0;
+    if (!beat_listening)
+        return 0;
+    for (int back = 0; back < BEAT_HISTORY &&
+                       (w = beat_analyse_window(back)) != NULL; back++) {
+        long t = (long)w->time_ms - off;
+        if (t < from)
+            break;
+        if (w->onset && t < to)
+            found[n++] = (int16_t)back;
+    }
+    int32_t k = 0;
+    for (int i = n - 1; i >= 0 && k < max; i--, k++) {
+        w = beat_analyse_window(found[i]);
+        out[k * 3] = (int32_t)((long)w->time_ms - off);
+        out[k * 3 + 1] = w->onset;
+        out[k * 3 + 2] = w->strength;
+    }
+    return k;
+}
+
+static int32_t beat_horizon(void *ctx)
+{
+    (void)ctx;
+    const struct beat_window *w = beat_listening ? beat_analyse_window(0)
+                                                 : NULL;
+    return w ? (int32_t)((long)w->time_ms - global_settings.spike_offset)
+             : -1;
+}
+
 static const struct arcade_beat beat_host = {
     beat_listen, beat_state, beat_next, beat_downbeat, beat_now, beat_mood,
-    beat_bands, beat_sound
+    beat_bands, beat_sound, beat_ahead, beat_horizon
 };
 
 /* A button going down, stamped with the track time it arrived at */

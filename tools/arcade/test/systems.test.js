@@ -523,6 +523,24 @@ function update() {
     assert.match(bad.err, /1 to 8 bands/);
 });
 
+test('beat.ahead: the hits heard ahead, only while listening', () => {
+    const cart = `var h = new Int32Array(30);
+function init() { beat.listen(true); }
+function update() {
+    if (frame() != 30) return;
+    var now = beat.clock(), n = beat.ahead(h, now, now + 1200);
+    printh(now + " " + beat.horizon() + " " + n);
+    for (var i = 0; i < n; i++) printh(h[i * 3] + " " + h[i * 3 + 1] + " " + h[i * 3 + 2]);
+    beat.listen(false);
+    printh(beat.ahead(h, now, now + 1200) + " " + beat.horizon());
+}`;
+    const r = run(cart, 31, ['--beat', '120']);
+    assert.equal(r.status, 0, r.err);
+    /* the stand-in's kick, hat, kick and snare, hat, and the bar's accent */
+    assert.deepEqual(r.out.trim().split('\n'), ['909 2709 5', '1000 1 128',
+        '1250 4 128', '1500 3 128', '1750 4 128', '2000 1 192', '0 -1']);
+});
+
 test('sys: a setting by its config name, and a phrase translated', () => {
     const cart = `function init() {
     var v = sys.setting("volume"), t = sys.setting("theme");

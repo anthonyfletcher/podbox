@@ -302,6 +302,36 @@ NATIVE(beat_mood)
     return 1;
 }
 
+/* beat.ahead(out, from, to): the hits in the music from from to before to
+ * that the analyser has already heard -- it reads the audio decoded ahead
+ * of the speaker, so up to beat.horizon(), some two seconds on. Into an
+ * Int32Array, three numbers a hit: its time, its bands (1 low, 2 mid,
+ * 4 high) and its strength (128 level with the hits round it, 192 an
+ * accent). Returns the hits; only while the cart listens */
+NATIVE(beat_ahead)
+{
+    (void)argc;
+    if (a[0].tag != T_I32 || !is_num(a[1]) || !is_num(a[2]))
+        return vm_fail(vm, "beat.ahead() needs an Int32Array, and a time "
+                       "from and to", "", "");
+    int32_t max = (int32_t)(I32(vm, a[0])->len / 3), n = 0;
+    const struct arcade_beat *b = beat_of(vm);
+    if (b && b->ahead && max > 0)
+        n = b->ahead(vm->host->ctx, floor_int(a[1]), floor_int(a[2]),
+                     I32(vm, a[0])->d, max);
+    vm_charge(vm, 20 + (uint32_t)n * 2);
+    return RET_INT(n);
+}
+
+/* beat.horizon(): how far ahead beat.ahead() can see: the time of the
+ * newest audio analysed, or -1 when not listening */
+NATIVE(beat_horizon)
+{
+    (void)a; (void)argc;
+    const struct arcade_beat *b = beat_of(vm);
+    return RET_INT(b && b->horizon ? b->horizon(vm->host->ctx) : -1);
+}
+
 /* playback.bands(out, n): n spectrum bands, 1 to 8, low to high, each
  * 0-100, into an Int32Array -- the skins' spectrum, for this tick */
 NATIVE(playback_bands)

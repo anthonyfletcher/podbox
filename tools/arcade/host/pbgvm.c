@@ -72,7 +72,7 @@ static int playing(void *ctx)
  * locks a second after beat.listen(true), as a real one takes a while. */
 static struct
 {
-    int32_t period, clock, listen_at, locked;
+    int32_t period, clock, listen_at, locked, listening;
 } fake;
 
 static void fake_listen(void *ctx, int on)
@@ -80,6 +80,7 @@ static void fake_listen(void *ctx, int on)
     (void)ctx;
     if (on && fake.listen_at < 0 && !fake.locked)
         fake.listen_at = fake.clock;
+    fake.listening = on;
 }
 
 static void fake_lock(void)
@@ -160,9 +161,39 @@ static int fake_sound(void *ctx, int32_t out[31])
     return 1;
 }
 
+/* While listening, the 1.8 s ahead are heard: a kick on every beat, a
+ * snare (mid) on the second and fourth beats, a hat (high) on the
+ * off-beats;
+ * the kick that starts the bar an accent */
+static int32_t fake_ahead(void *ctx, int32_t from, int32_t to, int32_t *out,
+                          int32_t max)
+{
+    (void)ctx;
+    int32_t half = fake.period / 2, n = 0;
+    if (!fake.listening)
+        return 0;
+    if (to > fake.clock + 1800)
+        to = fake.clock + 1800;
+    for (int32_t k = from <= 0 ? 0 : (from + half - 1) / half;
+         k * half < to && n < max; k++) {
+        int32_t beat = k / 2, bands = k % 2 ? 4 : 1 | (beat % 2 ? 2 : 0);
+        out[n * 3] = k * half;
+        out[n * 3 + 1] = bands;
+        out[n * 3 + 2] = k % 8 == 0 ? 192 : 128;
+        n++;
+    }
+    return n;
+}
+
+static int32_t fake_horizon(void *ctx)
+{
+    (void)ctx;
+    return fake.listening ? fake.clock + 1800 : -1;
+}
+
 static const struct arcade_beat fake_beat = {
     fake_listen, fake_state, fake_next, fake_downbeat, fake_now, fake_mood,
-    fake_bands, fake_sound
+    fake_bands, fake_sound, fake_ahead, fake_horizon
 };
 
 /* --setting name=value: what sys.setting(name) gives, a number where the

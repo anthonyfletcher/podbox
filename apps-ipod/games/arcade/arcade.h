@@ -68,6 +68,14 @@ struct arcade_beat
     /* playback.sound(): the playing track's Sound Index record, in the
      * order of SOUND.* (arcade_api.def); 0 where it has none */
     int (*sound)(void *ctx, int32_t out[31]);
+    /* beat.ahead(): the hits the analyser has found from from to before
+     * to, oldest first, as time, bands (1 low, 2 mid, 4 high) and
+     * strength, at most max of them; the count. Only while listening */
+    int32_t (*ahead)(void *ctx, int32_t from, int32_t to, int32_t *out,
+                     int32_t max);
+    /* beat.horizon(): track ms of the newest audio analysed, or -1 when
+     * not listening */
+    int32_t (*horizon)(void *ctx);
 };
 
 /* What the host read for a tick: the clock, steady for the tick; the ms
