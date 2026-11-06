@@ -990,6 +990,9 @@ static bool skip_bytes_seek(struct jpeg* p_jpeg)
 {
     if (UNLIKELY(lseek(p_jpeg->fd, -p_jpeg->buf_left, SEEK_CUR) < 0))
         return false;
+    /* the bytes seeked over are no longer to come: counted, a file cut
+     * short after them decodes as far as it goes */
+    p_jpeg->len -= MIN(p_jpeg->len, (unsigned long)-p_jpeg->buf_left);
     p_jpeg->buf_left = 0;
     return true;
 }

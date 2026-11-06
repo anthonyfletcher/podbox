@@ -34,6 +34,7 @@
 #include "speech/talk.h"           /* UNIT_SEC */
 #include "system/library_files.h"
 #include "database/libfile.h"
+#include "database/path_key.h"
 #include "viewers/playback_viewer/pv_stats.h"  /* the calendar */
 #include "reading_stats.h"
 
@@ -87,11 +88,17 @@ static int rs_open_file(struct libfile_header *h)
                         h, NULL);
 }
 
+/* The next record, its path terminated whatever the file holds and without
+ * a volume, as text_viewer() keeps it */
 static bool rs_read(int fd, struct rs_record *r)
 {
+    const char *path;
+
     if (read(fd, r, sizeof(*r)) != (ssize_t)sizeof(*r))
         return false;
     r->path[sizeof(r->path) - 1] = '\0';
+    path = path_key_strip(r->path);
+    memmove(r->path, path, strlen(path) + 1);
     return true;
 }
 

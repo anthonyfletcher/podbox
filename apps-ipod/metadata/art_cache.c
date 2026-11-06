@@ -259,8 +259,9 @@ static struct
  * USB session, so a pass starting and the check after USB clear it too. */
 static volatile bool aa_offer_posted;
 
-/* Queue event id: Check a File's Art, for the file in aa_chk.path */
-#define AA_EVENT_CHECK 2
+/* Queue event id: Check a File's Art, for the file in aa_chk.path; unique
+ * on the thread, for bg_task_queued() (iap-artwork.c has 2) */
+#define AA_EVENT_CHECK 3
 
 enum { AA_CHECK_IDLE, AA_CHECK_POSTED, AA_CHECK_RUNNING, AA_CHECK_DONE };
 
@@ -2730,15 +2731,20 @@ static bool aa_book_visit(const struct book_entry *e, void *data)
  * the album of that track takes them over, if it has none of its own yet;
  * 'slot' is that album's slot when this track is the album's first, else
  * NULL. A folder is claimed once, by its first track, and any other album
- * in it makes its own. */
+ * in it makes its own. Thumbnails stamped EMBEDDED can instead be a played
+ * track's, offered for a folder whose first track had none: they are taken
+ * only when 'path', that first track, holds an image itself. */
 static void aa_album_adopt(unsigned int fh, unsigned int dh,
-                           struct aa_stamp *slot, void *buf, size_t size)
+                           struct aa_stamp *slot, const char *path,
+                           void *buf, size_t size)
 {
     struct aa_stamp *os = aa_find(fh);
+    struct aa_src src;
 
     if (!os || os->stamp == AA_STAMP_CLAIMED || aa_was_visited(fh))
         return;
     if (slot && slot->stamp == AA_STAMP_NONE && !aa_thumbs_exist(dh)
+        && (os->stamp != AA_STAMP_EMBEDDED || aa_find_embedded(path, &src))
         && (!aa_thumbs_exist(fh) || aa_adopt(fh, dh, true, buf, size)))
     {
         slot->stamp = os->stamp;
@@ -2887,7 +2893,7 @@ static enum bg_result aa_run_pass(void)
             dh = aa_row.al.art_hash;
         slot = aa_visit(dh);
         if (aa_album_move && dh != fh)
-            aa_album_adopt(fh, dh, slot, workbuf, worksz);
+            aa_album_adopt(fh, dh, slot, tcs.result, workbuf, worksz);
         if (slot)
         {
             struct aa_work w = { aa_name, aa_title, false, true };
@@ -2909,7 +2915,16 @@ static enum bg_result aa_run_pass(void)
                 static char line[MAX_PATH];
 
                 if (dh != fh && aa_title[0] && strcmp(aa_title, UNTAGGED))
+                {
+                    /* the list shows what follows the last '/', so one
+                     * in the name ("Live/Dead") becomes a '-' */
+                    size_t d = strlen(aa_dir) + 1;
+
                     snprintf(line, sizeof(line), "%s/%s", aa_dir, aa_title);
+                    for (char *p = line + MIN(d, strlen(line)); *p; p++)
+                        if (*p == '/')
+                            *p = '-';
+                }
                 else
                     strlcpy(line, aa_dir, sizeof(line));
                 path_list_write_record(&noart_albums, line);
