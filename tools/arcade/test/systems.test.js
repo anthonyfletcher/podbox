@@ -857,3 +857,37 @@ function update() {
     const listen = run('function init() { playback.seek(0); }\nfunction update() {}');
     assert.match(listen.errors[0].message, /needs the cart's music level to be control/);
 });
+
+test('a platform moving into an actor pushes it, and crushes it against a wall', () => {
+    const r = run(`var p, plat, out = new Int32Array(40), tk = 0;
+function init() {
+    fset(1, 1);
+    for (var r = 0; r < 15; r++) mset(15, r, 1);      // a wall at x 120
+    plat = actors.pool(2);
+    actors.spawn(plat); actors.spawn(plat);
+    // a pusher sliding right at row 20; a lift rising under an actor at 60
+    plat.x[0] = 10; plat.y[0] = 20; plat.w[0] = 16; plat.h[0] = 16;
+    plat.x[1] = 60; plat.y[1] = 100; plat.w[1] = 16; plat.h[1] = 8;
+    p = actors.pool(2);
+    p.platforms = plat;
+    actors.spawn(p); p.x[0] = 40; p.y[0] = 24;
+    actors.spawn(p); p.x[1] = 64; p.y[1] = 85;
+}
+function update() {
+    tk++;
+    plat.x[0] += 3; plat.dx[0] = 3;
+    plat.y[1] -= 2; plat.dy[1] = -2;
+    var k = actors.move(p, 1, 0, out);
+    for (var i = 0; i < k; i++)
+        if (out[i * 4 + 1] == HIT.CRUSH && tk < 40) { printh(tk + " crush " + out[i * 4] + " by " + out[i * 4 + 3]); tk = 99; }
+    if (tk == 10) printh(p.x[0] + " " + (p.y[1] + 8 == plat.y[1]));
+}`, 40);
+    assert.equal(r.status, 0, r.err);
+    const lines = r.out.trim().split('\n');
+    /* by tick 10 the pusher's right edge is 10 + 30 + 16 = 56: the actor
+     * flush against it; the lift has come up under the other and carries
+     * it on its top */
+    assert.equal(lines[0], '56 1');
+    /* pressed on to the wall at 120, it is crushed (pusher 0) */
+    assert.match(lines[1], /^\d+ crush 0 by 0$/);
+});

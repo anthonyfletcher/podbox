@@ -341,6 +341,7 @@ API_CONSTG(HIT, ENTER, 4, 1)
 API_CONSTG(HIT, LEAVE, 5, 1)
 API_CONSTG(HIT, TOUCH, 6, 1)
 API_CONSTG(HIT, REACT, 7, 1)
+API_CONSTG(HIT, CRUSH, 8, 1)
 
 /* Directions, for grid.slide() and anything else that goes one way: the
  * same numbers as HIT's sides */

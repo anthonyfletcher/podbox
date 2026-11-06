@@ -432,6 +432,48 @@ static void carry(const struct world *w, int32_t *x, int32_t *y, int32_t W,
     }
 }
 
+#define HIT_CRUSH 8
+
+/* Pushed: a platform that moved into the actor this tick -- clear of it
+ * where the platform was before, overlapping it now -- shoves it out
+ * ahead, along the way the platform crossed into it, swept against the
+ * map as any move is. One with a wall behind it cannot be shoved out and
+ * is crushed: HIT.CRUSH, with the platform. One-way platforms push
+ * nothing. Platforms move first. */
+static void push(const struct world *w, struct contacts *c, uint32_t i,
+                 int32_t *X, int32_t *Y, int32_t W, int32_t H, int32_t smask,
+                 int32_t omask, uint32_t *checked)
+{
+    if (w->oneway)
+        return;
+    for (uint32_t j = 0; j < w->np; j++) {
+        if (!vm_truthy(w->vm, w->pon[j]))
+            continue;
+        int32_t bx = fx(w->px[j]), by = fx(w->py[j]);
+        int32_t bw = fx(w->pw[j]), bh = fx(w->ph[j]);
+        int32_t ddx = fx(w->pdx[j]), ddy = fx(w->pdy[j]);
+        int32_t ox = bx - ddx, oy = by - ddy;
+        if (!(*X < bx + bw && bx < *X + W && *Y < by + bh && by < *Y + H))
+            continue;
+        int across = ox + bw <= *X || ox >= *X + W;
+        int down = oy + bh <= *Y || oy >= *Y + H;
+        if (!across && !down)
+            continue;               /* inside it before: left as it is */
+        int32_t hx, hy, side, to;
+        if (across) {
+            to = ddx > 0 ? bx + bw : bx - W;
+            side = sweep(w->vm, X, to - *X, W, *Y, H, smask, omask, 1, &hx,
+                         &hy, checked);
+        } else {
+            to = ddy > 0 ? by + bh : by - H;
+            side = sweep(w->vm, Y, to - *Y, H, *X, W, smask, omask, 0, &hx,
+                         &hy, checked);
+        }
+        if (side >= 0)
+            contact(c, i, HIT_CRUSH, -1, (int32_t)j);
+    }
+}
+
 /* In the field after its move: drag and lift from the liquid it is in, the
  * first harmful material it touches (HIT.TOUCH), and, if it is made of a
  * material, the rules' reactions with the cells just outside it -- the
@@ -552,8 +594,10 @@ NATIVE(actors_move)
         int32_t hx, hy, side, s2, p0;
         if (W < 1) W = 1;
         if (H < 1) H = 1;
-        if (wd.np)
+        if (wd.np) {
             carry(&wd, &X, &Y, W, H);
+            push(&wd, &c, i, &X, &Y, W, H, smask, omask, &checked);
+        }
         p0 = X;
         side = sweep(vm, &X, DX, W, Y, H, smask, omask, 1, &hx, &hy,
                      &checked);
