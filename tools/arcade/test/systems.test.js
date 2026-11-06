@@ -706,3 +706,33 @@ test('playback.toggle, next and prev reach the host, for a cart that controls th
     const listen = run(main);
     assert.match(listen.errors[0].message, /needs the cart's music level to be control/);
 });
+
+test('plane: billboards fade into the fog with the ground', () => {
+    const r = run(`function init() {
+    // sprite 1 a solid red 8x8 with a transparent (0) column
+    for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, x == 3 ? 0 : 8);
+    plane.view(0, 0, 8, 0, 60, 0.25);
+    // one near, one in the fog's middle, one past its far end
+    var xs = [20, 60, 140], ys = [0, 0, 0];
+    plane.fog(40, 100, 12);
+    cls(1);
+    plane.billboards(xs, ys, 0, 1, 16, 0, 3);
+    var near = 0, red = 0, blue = 0, through = 0;
+    for (var y = 0; y < 120; y++) for (var x = 0; x < 160; x++) {
+        var c = pget(x, y);
+        if (c == 8) red++;
+        if (c == 12) blue++;
+    }
+    printh((red > 0) + " " + (blue > 0));
+    // without fog, nothing is the fog's colour
+    plane.fog(0, 0, -1);
+    cls(1);
+    plane.billboards(xs, ys, 0, 1, 16, 0, 3);
+    blue = 0;
+    for (y = 0; y < 120; y++) for (x = 0; x < 160; x++) if (pget(x, y) == 12) blue++;
+    printh(blue);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, '1 1\n0\n');
+});

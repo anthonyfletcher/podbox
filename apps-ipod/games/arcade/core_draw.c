@@ -3550,6 +3550,45 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
 
 /* plane.billboards(): cw by ch sprites from s, scaled to w by h, their top
  * left at x, y on the screen, the camera aside */
+/* A billboard's sprite through the clip p has, and plane.fog() over it at
+ * fog level fog: the sprite drawn again into a mask, its every opaque
+ * pixel 1, and the fog's colour put where the mask is set and the screen's
+ * dither says, as the ground's is, so it fades into the haze with it */
+static void billboard_copy(struct pen *p, const uint8_t *sheet, int32_t s,
+                           int32_t x, int32_t y, int32_t w, int32_t h,
+                           int32_t cw, int32_t ch, int flip, int32_t fog,
+                           uint8_t fogc)
+{
+    copy_rect(p, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+              cw * 8, ch * 8, x, y, w, h, flip, 0);
+    if (fog <= 0)
+        return;
+    static uint8_t mask[SCREEN_W * SCREEN_H];
+    static uint16_t ones[256];
+    int32_t x0 = x > p->cx0 ? x : p->cx0, x1 = x + w < p->cx1 ? x + w : p->cx1;
+    int32_t y0 = y > p->cy0 ? y : p->cy0, y1 = y + h < p->cy1 ? y + h : p->cy1;
+    if (x0 >= x1 || y0 >= y1)
+        return;
+    for (int32_t r = y0; r < y1; r++)
+        memset(mask + r * SCREEN_W + x0, 0, (size_t)(x1 - x0));
+    for (int c = 0; c < 256; c++)
+        ones[c] = p->xl[c] & XLAT_CLEAR ? XLAT_CLEAR : 1;
+    struct pen m = *p;
+    m.s.px = mask;
+    m.s.w = SCREEN_W;
+    m.xl = ones;
+    copy_rect(&m, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+              cw * 8, ch * 8, x, y, w, h, flip, 0);
+    p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16;
+    for (int32_t r = y0; r < y1; r++) {
+        const uint8_t *b = bayer[r & 3], *mr = mask + r * SCREEN_W;
+        uint8_t *dr = p->s.px + r * p->s.w;
+        for (int32_t c = x0; c < x1; c++)
+            if (mr[c] && b[c & 3] < fog)
+                dr[c] = fogc;
+    }
+}
+
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
                          int flip, int32_t depth)
@@ -3560,9 +3599,11 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     p.cost = COST_CALL / 2;
     p.per16 = 0;                    /* copy_rect charges the area */
     const struct planeview *v = &vm->plane;
+    const uint8_t *sheet = MEM(vm, vm->sheet);
+    int32_t fog = core_fog_level(v, depth);
+    uint8_t fogc = p.d->dpal[v->fog_colour];
     if (!v->depth_set) {
-        copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
-                  (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
+        billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
         finish(vm, &p);
         return;
     }
@@ -3579,8 +3620,7 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
         if (j > i) {
             p.cx0 = i;
             p.cx1 = j;
-            copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (s & 15) * 8,
-                      (s >> 4) * 8, cw * 8, ch * 8, x, y, w, h, flip, 0);
+            billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
         }
         i = j;
     }
