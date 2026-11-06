@@ -269,6 +269,8 @@ struct vm
     uint8_t scores_dirty;
     int8_t show_board, show_rank;           /* board + 1, 0 none */
     int8_t last_rank[ARCADE_BOARDS];        /* each board latest, 0 none */
+    int8_t achieved[8];                     /* earned, for the alert */
+    uint8_t nachieved;
     /* Options (sys_opt.c): an owner's change waits for the next tick, and
      * opt.changed() is true during it */
     struct arcade_options opts;

@@ -28,6 +28,7 @@
 #include "system.h"           /* TIME_BEFORE, cpu_boost */
 #include "kernel.h"
 #include "lcd.h"
+#include "font.h"
 #include "button.h"
 #include "backlight.h"
 #include "powermgmt.h"        /* reset_poweroff_timer */
@@ -665,6 +666,62 @@ static void present_rows(const struct arcade_screen *s, void *fb, int stride,
 }
 #endif
 
+/* An achievement just earned: a banner across the top of the game for a
+ * while, in the player's own fonts, drawn over each frame as it goes to
+ * the screen; the game's rows under it are put back when it ends. */
+#define BANNER_TIME (HZ * 5 / 2)
+
+static int banner_ach = -1;         /* the achievement shown, -1 none */
+static long banner_until;           /* its end, pushed back by any time */
+static long banner_away;            /* the game spent off the screen */
+static int banner_rows;             /* the game's rows it covers */
+
+/* Which of the game's rows the banner needs presented this frame: 0 none,
+ * else the count from the top; a new one is started when one is owed */
+static int banner_due(struct vm *vm)
+{
+    if (banner_ach >= 0 && TIME_AFTER(current_tick, banner_until)) {
+        banner_ach = -1;
+        return banner_rows;         /* once more, to put the game back */
+    }
+    if (banner_ach < 0) {
+        banner_ach = arcade_achieved(vm);
+        if (banner_ach < 0)
+            return 0;
+        banner_until = current_tick + BANNER_TIME;
+        int h = font_get(FONT_UI)->height +
+                font_get(font_get_ui_bold())->height + 16;
+        banner_rows = (h + 1) / 2;
+        if (global_settings.talk_menu) {
+            talk_text(str(LANG_ACH_EARNED), false);
+            talk_text(arcade_scores(vm, NULL)->ach[banner_ach].title, true);
+        }
+    }
+    return banner_rows;
+}
+
+static void banner_draw(struct vm *vm)
+{
+    const char *title = arcade_scores(vm, NULL)->ach[banner_ach].title;
+    int fh = font_get(FONT_UI)->height;
+    int h = fh + font_get(font_get_ui_bold())->height + 16;
+    lcd_set_viewport(NULL);
+    lcd_set_drawmode(DRMODE_SOLID);
+    lcd_set_foreground(LCD_RGBPACK(24, 24, 28));
+    lcd_fillrect(6, 4, LCD_WIDTH - 12, h - 6);
+    lcd_set_foreground(LCD_RGBPACK(255, 196, 40));
+    lcd_fillrect(6, 4, 4, h - 6);
+    lcd_set_drawmode(DRMODE_FG);
+    lcd_setfont(FONT_UI);
+    lcd_set_foreground(LCD_RGBPACK(255, 196, 40));
+    lcd_putsxy(18, 7, str(LANG_ACH_EARNED));
+    lcd_setfont(font_get_ui_bold());
+    lcd_set_foreground(LCD_RGBPACK(255, 255, 255));
+    lcd_putsxy(18, 7 + fh, title);
+    lcd_setfont(FONT_SYSFIXED);
+    lcd_set_drawmode(DRMODE_SOLID);
+}
+
 static void present(struct vm *vm, bool all)
 {
     const struct arcade_screen *s = arcade_screen(vm);
@@ -674,10 +731,23 @@ static void present(struct vm *vm, bool all)
         all = true;
     }
     int r0 = all ? 0 : s->dirty_lo, r1 = all ? s->height - 1 : s->dirty_hi;
+    int under = banner_due(vm);
+    if (under) {
+        if (r0 > r1) {
+            r0 = 0;
+            r1 = under - 1;
+        } else {
+            r0 = 0;
+            if (r1 < under - 1)
+                r1 = under - 1;
+        }
+    }
     if (r0 <= r1) {
         int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
         present_wait();
         present_rows(s, FBADDR(0, 0), stride, r0, r1);
+        if (banner_ach >= 0)
+            banner_draw(vm);
 #ifdef HAVE_LCD_UPDATE_ASYNC
         lcd_update_start(r0 * 2, (r1 - r0 + 1) * 2);
 #else
@@ -791,6 +861,8 @@ static void take_screen(struct viewport *vp)
     if (screen_held)
         return;
     screen_held = true;
+    if (banner_ach >= 0)
+        banner_until += current_tick - banner_away;
     viewportmanager_theme_enable(SCREEN_MAIN, false, vp);
     lcd_set_backdrop(NULL);
     lcd_clear_display();
@@ -807,6 +879,7 @@ static void give_screen(void)
     sound_stop();
     present_wait();
     screen_held = false;
+    banner_away = current_tick;
     cpu_boost(false);
     hold_backlight(false);
     wheel_events(true);
@@ -960,7 +1033,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
             }
         for (int i = 0; i < arcade_options(vm)->count; i++)
             add_row(ROW_OPTION, i);
-        if (arcade_scores(vm, NULL)->count)
+        if (arcade_scores(vm, NULL)->count || arcade_scores(vm, NULL)->nach)
             add_row(ROW_SCORES, 0);
         if (shell_has_help(vm))
             add_row(ROW_HELP, 0);
@@ -1136,6 +1209,7 @@ static int run(const char *path, void *mem, size_t size)
 
     game_vp = &vp;
     dialog_shown = dialog_to_root = false;
+    banner_ach = -1;
     take_screen(&vp);
     sound_vm = vm;
     last_wheel = -1;

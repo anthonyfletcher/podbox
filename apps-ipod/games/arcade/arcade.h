@@ -373,6 +373,17 @@ struct arcade_board
     struct arcade_entry e[ARCADE_RANKS];
 };
 
+/* An achievement, from the cart (ACHV), earned on date (yyyymmdd; 1 when
+ * the date was not known, 0 not yet) */
+#define ARCADE_ACHIEVEMENTS 32
+struct arcade_achievement
+{
+    char title[32];
+    char text[96];
+    uint32_t key;
+    int32_t date;
+};
+
 struct arcade_scores
 {
     char cart[32];              /* the cart's name, for a list of every cart */
@@ -381,6 +392,8 @@ struct arcade_scores
     uint32_t plays, seconds;    /* times started, and time played */
     int count;
     struct arcade_board b[ARCADE_BOARDS];
+    int nach;
+    struct arcade_achievement ach[ARCADE_ACHIEVEMENTS];
 };
 
 /* The running cart's boards; dirty is set when a score was recorded or
@@ -392,7 +405,8 @@ void arcade_scores_restore(struct vm *vm, const struct arcade_scores *saved);
  * and back, 1 when buf held a whole one */
 int arcade_scores_pack(const struct arcade_scores *s, uint8_t *buf, int cap);
 int arcade_scores_unpack(struct arcade_scores *s, const uint8_t *buf, int n);
-#define ARCADE_SCORES_MAX (64 + ARCADE_BOARDS * (40 + ARCADE_RANKS * 24))
+#define ARCADE_SCORES_MAX (64 + ARCADE_BOARDS * (40 + ARCADE_RANKS * 24) + \
+                           1 + ARCADE_ACHIEVEMENTS * (10 + 32 + 96))
 /* A value as its board shows it, into buf */
 void arcade_score_text(const struct arcade_scores *s, int board,
                        int32_t value, char *buf, int cap);
@@ -439,5 +453,8 @@ int arcade_help(const struct vm *vm, const char **text);
 /* score.show(): the board the cart asked to show since the last call, and
  * the rank to mark (0 none), or -1 when none was asked; cleared */
 int arcade_score_shown(struct vm *vm, int *rank);
+/* An achievement earned since the last call (ach.earn), for the host's
+ * alert: its index, or -1; up to eight are kept in turn */
+int arcade_achieved(struct vm *vm);
 
 #endif

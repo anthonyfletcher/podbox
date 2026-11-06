@@ -152,30 +152,106 @@ bool shell_score_table(struct vm *vm, int board, int rank)
     return shell_list(&info);
 }
 
-/* The boards, then Clear High Scores, then how often and how long the cart
- * was played */
+/* ---- achievements ------------------------------------------------------- */
+
+static const char *ach_row(int row, void *data, char *buf, size_t len)
+{
+    const struct arcade_scores *s = data;
+    const struct arcade_achievement *a = &s->ach[row];
+    if (a->date)
+        return a->title;
+    snprintf(buf, len, str(LANG_ACH_LOCKED), a->title);
+    return buf;
+}
+
+/* Each achievement, and chosen, its text and when it was earned in the
+ * box Help uses */
+static bool achievements_menu(const struct arcade_scores *s)
+{
+    static char body[160];
+    struct simplelist_info info;
+    int selection = 0;
+    for (;;) {
+        simplelist_info_init(&info, str(LANG_ACHIEVEMENTS), s->nach,
+                             (void *)s);
+        info.get_name = ach_row;
+        info.selection = selection;
+        if (shell_list(&info))
+            return true;
+        selection = info.selection;
+        if (selection < 0)
+            return false;
+        const struct arcade_achievement *a = &s->ach[selection];
+        char when[48];
+        if (a->date > 1)
+            snprintf(when, sizeof(when), str(LANG_ACH_EARNED_ON),
+                     (int)(a->date / 10000), (int)(a->date / 100 % 100),
+                     (int)(a->date % 100));
+        else
+            snprintf(when, sizeof(when), "%s",
+                     str(a->date ? LANG_ACH_EARNED : LANG_ACH_NOT_YET));
+        snprintf(body, sizeof(body), "%s%s%s", a->text,
+                 a->text[0] ? "\n\n" : "", when);
+        if (dialog_prose_show(a->title, body))
+            return true;
+    }
+}
+
+/* ---- the menu ------------------------------------------------------------ */
+
+/* The boards, the achievements, Clear High Scores (when there are boards),
+ * then how often and how long the cart was played */
+enum { M_BOARD, M_ACH, M_CLEAR, M_TIMES, M_TIME };
+
+static int row_is(const struct arcade_scores *s, int row, int *board)
+{
+    *board = row;
+    if (row < s->count)
+        return M_BOARD;
+    row -= s->count;
+    if (s->nach && row-- == 0)
+        return M_ACH;
+    if (s->count && row-- == 0)
+        return M_CLEAR;
+    return row == 0 ? M_TIMES : M_TIME;
+}
+
+static int rows_of(const struct arcade_scores *s)
+{
+    return s->count + (s->nach > 0) + (s->count > 0) + 2;
+}
+
 static const char *menu_row(int row, void *data, char *buf, size_t len)
 {
     const struct arcade_scores *s = data;
-    if (row < s->count)
-        return s->b[row].title;
-    if (row == s->count)
+    int earned = 0, board;
+    switch (row_is(s, row, &board)) {
+    case M_BOARD:
+        return s->b[board].title;
+    case M_ACH:
+        for (int i = 0; i < s->nach; i++)
+            earned += s->ach[i].date != 0;
+        snprintf(buf, len, str(LANG_ACH_COUNT), earned, s->nach);
+        return buf;
+    case M_CLEAR:
         return str(LANG_CLEAR_HIGH_SCORES);
-    if (row == s->count + 1)
+    case M_TIMES:
         snprintf(buf, len, str(LANG_TIMES_PLAYED), (int)s->plays);
-    else
+        return buf;
+    default:
         snprintf(buf, len, str(LANG_TIME_PLAYED), (int)(s->seconds / 3600),
                  (int)(s->seconds / 60 % 60));
-    return buf;
+        return buf;
+    }
 }
 
 bool shell_scores_menu(struct vm *vm)
 {
     struct arcade_scores *s = arcade_scores(vm, NULL);
     struct simplelist_info info;
-    int selection = 0;
+    int selection = 0, board;
     for (;;) {
-        simplelist_info_init(&info, str(LANG_HIGH_SCORES), s->count + 3, s);
+        simplelist_info_init(&info, str(LANG_HIGH_SCORES), rows_of(s), s);
         info.get_name = menu_row;
         info.selection = selection;
         if (shell_list(&info))
@@ -183,10 +259,16 @@ bool shell_scores_menu(struct vm *vm)
         selection = info.selection;
         if (selection < 0)
             return false;
-        if (selection < s->count) {
-            if (shell_score_table(vm, selection, 0))
+        switch (row_is(s, selection, &board)) {
+        case M_BOARD:
+            if (shell_score_table(vm, board, 0))
                 return true;
-        } else if (selection == s->count) {
+            break;
+        case M_ACH:
+            if (achievements_menu(s))
+                return true;
+            break;
+        case M_CLEAR:
             if (dialog_prose_confirm(str(LANG_CLEAR_HIGH_SCORES),
                                      str(LANG_CLEAR_HIGH_SCORES_ASK),
                                      str(LANG_SET_BOOL_YES),
@@ -196,6 +278,7 @@ bool shell_scores_menu(struct vm *vm)
                 scores_owed = true;
                 shell_scores_write(vm, false);
             }
+            break;
         }
     }
 }

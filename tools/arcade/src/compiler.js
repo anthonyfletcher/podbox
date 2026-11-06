@@ -1701,10 +1701,24 @@ function options(list) {
     return w.done();
 }
 
+/* ACHV: the achievements, each its key (a hash of its name, which the
+ * engine matches the owner's earned ones by), title and text */
+function achievements(list) {
+    const w = new Writer();
+    w.u8(list.length);
+    for (const a of list) {
+        w.u32(boardKey(a.name));
+        w.str(a.title);
+        w.str(a.text);
+    }
+    return w.done();
+}
+
 /* ---- the cart's settings ----------------------------------------------- */
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
-                   'menu_button', 'music', 'boards', 'options'];
+                   'menu_button', 'music', 'boards', 'options',
+                   'achievements'];
 const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
 
 const OPTION_KEYS = ['name', 'title', 'type', 'choices', 'min', 'max', 'step',
@@ -1777,6 +1791,33 @@ function checkOptions(list, bad) {
     }).filter(Boolean);
 }
 
+/* cart.achievements checked: up to 32, each a name, a title and a text */
+function checkAchievements(list, bad) {
+    if (list === undefined) return [];
+    if (!Array.isArray(list)) { bad('achievements must be a list'); return []; }
+    if (list.length > 32) bad('a cart has at most 32 achievements');
+    const seen = new Set();
+    return list.slice(0, 32).map((a, i) => {
+        const at = 'achievement ' + (i + 1) + ': ';
+        if (a === null || typeof a !== 'object' || Array.isArray(a)) {
+            bad(at + 'must be a record'); return null;
+        }
+        for (const k in a)
+            if (['name', 'title', 'text'].indexOf(k) < 0)
+                bad(at + 'unknown setting ' + k);
+        if (typeof a.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(a.name))
+            bad(at + 'name must be usable in code as ACH.<name>');
+        else if (seen.has(a.name)) bad(at + 'a second achievement called ' + a.name);
+        seen.add(a.name);
+        const c = Object.assign({ title: a.name, text: '' }, a);
+        if (typeof c.title !== 'string' || c.title === '' || utf8(c.title).length > 31)
+            bad(at + 'title must be text of 1 to 31 bytes');
+        if (typeof c.text !== 'string' || utf8(c.text).length > 95)
+            bad(at + 'text must be at most 95 bytes');
+        return c;
+    }).filter(Boolean);
+}
+
 /* cart.boards checked, with each one's defaults filled in */
 function checkBoards(list, bad) {
     if (list === undefined) return [];
@@ -1828,6 +1869,7 @@ function checkCart(cart, errors) {
     if (MUSIC.indexOf(c.music) < 0) bad('music must be one of ' + MUSIC.join(', '));
     c.boards = checkBoards(cart.boards, bad);
     c.options = checkOptions(cart.options, bad);
+    c.achievements = checkAchievements(cart.achievements, bad);
     return c;
 }
 
@@ -1883,12 +1925,13 @@ export function compile(input) {
      * namespace of globals that the loader sets to the images. */
     const built = buildAssets(input.assets, input.inflate,
                               (str) => prog.string(str), errors);
-    const board = {}, option = {};
+    const board = {}, option = {}, ach = {};
     cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });
     cart.options.forEach((o, i) => { option[o.name] = { value: i, version: 1 }; });
+    cart.achievements.forEach((a, i) => { ach[a.name] = { value: i, version: 1 }; });
     prog.api = Object.assign({}, prog.api, {
         groups: Object.assign({}, prog.api.groups, built.groups,
-                              { BOARD: board, OPT: option })
+                              { BOARD: board, OPT: option, ACH: ach })
     });
     if (prog.byNs.has('IMG'))
         errors.push({ file: 'IMG.js', line: 1, column: 1, message:
@@ -1965,6 +2008,8 @@ export function compile(input) {
         ...built.chunks,
         ...(cart.boards.length ? [{ tag: 'BORD', data: boards(cart.boards) }] : []),
         ...(cart.options.length ? [{ tag: 'OPTN', data: options(cart.options) }] : []),
+        ...(cart.achievements.length
+            ? [{ tag: 'ACHV', data: achievements(cart.achievements) }] : []),
         { tag: 'SRC_', data: sources(srcFiles, input.deflate) }
     ]);
     let codeBytes = 0;

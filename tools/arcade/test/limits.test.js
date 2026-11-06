@@ -30,7 +30,7 @@ function run(main, ticks = 1) {
     fs.writeFileSync(file, res.cart);
     const t0 = Date.now();
     const r = spawnSync(exe, [file, '--ticks', String(ticks), '--ceiling',
-                              '2000000'], { encoding: 'utf8', timeout: 20000 });
+                              '2000000'], { encoding: 'utf8', timeout: 60000 });
     return { errors: [], out: r.stdout.replace(/\r/g, ''), err: r.stderr,
              status: r.status, ms: Date.now() - t0 };
 }

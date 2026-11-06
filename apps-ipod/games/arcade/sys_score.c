@@ -1,16 +1,19 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Arcade services: high scores. A cart declares its boards in cart.json
- * (the loader reads them from BORD); each keeps its best ten, with the
- * date and an optional name. The host keeps them in a file, through the
- * record packed here, and shows them in the pause menu.
+ * Arcade services: high scores and achievements. A cart declares its
+ * boards and achievements in cart.json (the loader reads them from BORD
+ * and ACHV); each board keeps its best ten, with the date and an optional
+ * name, and each achievement the date it was earned. The host keeps them
+ * in a file, through the record packed here, shows them in the pause
+ * menu, and announces an achievement as it is earned.
  *
  * Parts, in order:
  *   the table     ranking a value, inserting it
  *   the record    packing the scores for the host's file, and back
  *   the text      a value as its board shows it
- *   natives       score.submit, best, get, name, count, show
+ *   natives       score.submit, best, get, name, count, show; ach.earn,
+ *                 ach.has
  ***************************************************************************/
 #include <string.h>
 #include "games/arcade/vm.h"
@@ -74,6 +77,10 @@ void arcade_scores_restore(struct vm *vm, const struct arcade_scores *saved)
             s->b[i].count = o->count;
             memcpy(s->b[i].e, o->e, sizeof(o->e));
         }
+    for (int i = 0; i < s->nach; i++)
+        for (int j = 0; j < saved->nach; j++)
+            if (saved->ach[j].key == s->ach[i].key)
+                s->ach[i].date = saved->ach[j].date;
 }
 
 int arcade_score_shown(struct vm *vm, int *rank)
@@ -86,8 +93,10 @@ int arcade_score_shown(struct vm *vm, int *rank)
 
 /* ---- the record ---------------------------------------------------------- *
  * "PBSC", a version byte, the cart's id, rate, plays, seconds and name,
- * then each board: key, version, low, format, title, count and entries.
- * Little-endian; text is a length byte and its bytes. */
+ * then each board: key, version, low, format, title, count and entries;
+ * then (from version 2) the achievements: a count, and each one's key,
+ * date, title and text. Little-endian; text is a length byte and its
+ * bytes. */
 
 struct out
 {
@@ -123,7 +132,7 @@ static void put_text(struct out *o, const char *s, int cap)
 int arcade_scores_pack(const struct arcade_scores *s, uint8_t *buf, int cap)
 {
     struct out o = { buf, buf + cap };
-    uint8_t v[4] = { 1, s->rate, (uint8_t)s->count, 0 };
+    uint8_t v[4] = { 2, s->rate, (uint8_t)s->count, 0 };
     put(&o, "PBSC", 4);
     put(&o, v, 4);
     put(&o, s->id, 8);
@@ -143,6 +152,14 @@ int arcade_scores_pack(const struct arcade_scores *s, uint8_t *buf, int cap)
             put32(&o, (uint32_t)b->e[k].date);
             put_text(&o, b->e[k].name, sizeof(b->e[k].name));
         }
+    }
+    uint8_t na = (uint8_t)s->nach;
+    put(&o, &na, 1);
+    for (int i = 0; i < s->nach; i++) {
+        put32(&o, s->ach[i].key);
+        put32(&o, (uint32_t)s->ach[i].date);
+        put_text(&o, s->ach[i].title, sizeof(s->ach[i].title));
+        put_text(&o, s->ach[i].text, sizeof(s->ach[i].text));
     }
     return o.p ? (int)(o.p - buf) : 0;
 }
@@ -185,7 +202,8 @@ int arcade_scores_unpack(struct arcade_scores *s, const uint8_t *buf, int n)
     struct in c = { buf, buf + n, 0 };
     memset(s, 0, sizeof(*s));
     const uint8_t *m = get(&c, 4), *v = get(&c, 4), *id = get(&c, 8);
-    if (c.bad || memcmp(m, "PBSC", 4) || v[0] != 1 || v[2] > ARCADE_BOARDS)
+    if (c.bad || memcmp(m, "PBSC", 4) || v[0] < 1 || v[0] > 2 ||
+        v[2] > ARCADE_BOARDS)
         return 0;
     s->rate = v[1];
     s->count = v[2];
@@ -211,6 +229,18 @@ int arcade_scores_unpack(struct arcade_scores *s, const uint8_t *buf, int n)
             b->e[j].value = (int32_t)get32(&c);
             b->e[j].date = (int32_t)get32(&c);
             get_text(&c, b->e[j].name, sizeof(b->e[j].name));
+        }
+    }
+    if (v[0] >= 2) {
+        const uint8_t *na = get(&c, 1);
+        if (!na || na[0] > ARCADE_ACHIEVEMENTS)
+            return 0;
+        s->nach = na[0];
+        for (int i = 0; i < s->nach && !c.bad; i++) {
+            s->ach[i].key = get32(&c);
+            s->ach[i].date = (int32_t)get32(&c);
+            get_text(&c, s->ach[i].title, sizeof(s->ach[i].title));
+            get_text(&c, s->ach[i].text, sizeof(s->ach[i].text));
         }
     }
     return !c.bad;
@@ -374,4 +404,59 @@ NATIVE(score_show)
     vm->show_rank = vm->last_rank[a[0].v];
     vm_charge(vm, 10);
     return 1;
+}
+
+/* ach.* takes one of the cart's achievements, ACH.<name> */
+static struct arcade_achievement *ach_of(struct vm *vm, struct value v,
+                                         const char *fn)
+{
+    if (v.tag != T_INT || v.v < 0 || v.v >= vm->scores.nach) {
+        vm_fail(vm, fn, "() needs one of the cart's achievements, ACH.<name>",
+                "");
+        return NULL;
+    }
+    return &vm->scores.ach[v.v];
+}
+
+int arcade_achieved(struct vm *vm)
+{
+    if (!vm->nachieved)
+        return -1;
+    int i = vm->achieved[0];
+    memmove(vm->achieved, vm->achieved + 1, --vm->nachieved);
+    return i;
+}
+
+/* ach.earn(ACH.name): true when it is earned now, for the first time --
+ * the player then announces it; false when it was already */
+NATIVE(ach_earn)
+{
+    (void)argc;
+    struct arcade_achievement *e = ach_of(vm, a[0], "ach.earn");
+    if (!e)
+        return 0;
+    vm_charge(vm, 20);
+    if (e->date)
+        return RET_INT(0);
+    e->date = 1;
+    if (vm->host->date) {
+        int32_t d[7];
+        vm->host->date(vm->host->ctx, d);
+        e->date = d[0] * 10000 + d[1] * 100 + d[2];
+    }
+    vm->scores_dirty = 1;
+    if (vm->nachieved < sizeof(vm->achieved))
+        vm->achieved[vm->nachieved++] = (int8_t)a[0].v;
+    return RET_INT(1);
+}
+
+/* ach.has(ACH.name): whether it has been earned */
+NATIVE(ach_has)
+{
+    (void)argc;
+    struct arcade_achievement *e = ach_of(vm, a[0], "ach.has");
+    if (!e)
+        return 0;
+    vm_charge(vm, 10);
+    return RET_INT(e->date != 0);
 }

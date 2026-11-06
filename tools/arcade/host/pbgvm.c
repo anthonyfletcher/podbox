@@ -35,7 +35,8 @@
  * --scores keeps the cart's high scores in file, read before the start
  * and written after the last tick, in the player's own record. score.show
  * prints "show <title>", then a line for each rank, "<rank> <value>
- * <name> <date>", the marked rank starred. --options does the same for
+ * <name> <date>", the marked rank starred, and an achievement earned
+ * prints "achieved <title>". --options does the same for
  * the option values the owner set, and --opt sets option i to v before
  * tick t, as the pause menu does. Each ui.* dialog prints a line saying
  * what it showed and takes the next of --ui's answers: an index for
@@ -561,6 +562,9 @@ static int scores_write(struct vm *vm, const char *path)
 
 static void scores_show(struct vm *vm)
 {
+    int got;
+    while ((got = arcade_achieved(vm)) >= 0)
+        printf("achieved %s\n", arcade_scores(vm, NULL)->ach[got].title);
     int rank, i = arcade_score_shown(vm, &rank);
     if (i < 0)
         return;

@@ -217,6 +217,8 @@ IMPL(score_get)
 IMPL(score_name)
 IMPL(score_count)
 IMPL(score_show)
+IMPL(ach_earn)
+IMPL(ach_has)
 
 /* sys_opt.c */
 IMPL(opt_get)

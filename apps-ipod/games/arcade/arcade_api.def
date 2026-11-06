@@ -313,6 +313,11 @@ API(store_list,       197, 0, 0, VAL,  0, FLAT, LISTEN, 1)
 API(actors_bounce,     198, 3, 4, VAL, 0, CELLS, LISTEN, 1)
 API(actors_bounce_map, 199, 3, 4, VAL, 0, CELLS, LISTEN, 1)
 
+/* Achievements: the ones cart.json declares, as ACH.<name> */
+API_NS(ach)
+API(ach_earn,         200, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(ach_has,          201, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

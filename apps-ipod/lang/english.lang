@@ -27970,3 +27970,87 @@
     *: "Carry on from where you quit?"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ACHIEVEMENTS
+  desc: a game cart's achievements, listed under its High Scores
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "Achievements"
+  </dest>
+  <voice>
+    *: "Achievements"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_COUNT
+  desc: a game cart's High Scores row: achievements earned, of all
+  user: core
+  <source>
+    *: "Achievements: %d of %d"
+  </source>
+  <dest>
+    *: "Achievements: %d of %d"
+  </dest>
+  <voice>
+    *: "Achievements"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED
+  desc: the banner over a game when an achievement is earned, and one earned on an unknown date
+  user: core
+  <source>
+    *: "Achievement Earned"
+  </source>
+  <dest>
+    *: "Achievement Earned"
+  </dest>
+  <voice>
+    *: "Achievement Earned"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED_ON
+  desc: an achievement's box: the date it was earned, year-month-day
+  user: core
+  <source>
+    *: "Earned %04d-%02d-%02d"
+  </source>
+  <dest>
+    *: "Earned %04d-%02d-%02d"
+  </dest>
+  <voice>
+    *: "Earned"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_NOT_YET
+  desc: an achievement's box: not earned yet
+  user: core
+  <source>
+    *: "Not earned yet"
+  </source>
+  <dest>
+    *: "Not earned yet"
+  </dest>
+  <voice>
+    *: "Not earned yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_LOCKED
+  desc: in the list of achievements: one not earned yet
+  user: core
+  <source>
+    *: "%s (not yet)"
+  </source>
+  <dest>
+    *: "%s (not yet)"
+  </dest>
+  <voice>
+    *: "not yet"
+  </voice>
+</phrase>

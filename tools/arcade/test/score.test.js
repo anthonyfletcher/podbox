@@ -145,3 +145,61 @@ function update() {}`;
     fs.writeFileSync(file, Buffer.from('PBSC\x01\x21\x09'));
     assert.equal(run(main, { scores: file }).out, 'null null\n');
 });
+
+const ACHS = [
+    { name: 'first', title: 'First Steps', text: 'Start a game.' },
+    { name: 'ten', title: 'Ten in a Row' }
+];
+
+function runAch(main, scores, achs = ACHS) {
+    const res = compileFiles({
+        'cart.json': JSON.stringify({ id: '00000000000ac4e5', name: 'Achieve',
+                                      achievements: achs }),
+        'main.js': main });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'ach' + n++ + '.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '1', '--scores', scores], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.replace(/\r/g, '');
+}
+
+test('achievements are checked in cart.json', () => {
+    const bad = (achs) => compileFiles({
+        'cart.json': JSON.stringify({ id: '00000000000ac4e5', name: 'A', achievements: achs }),
+        'main.js': 'function update() {}' }).errors.map((e) => e.message).join('\n');
+    assert.match(bad({}), /achievements must be a list/);
+    assert.match(bad([{ name: 'a b' }]), /usable in code as ACH/);
+    assert.match(bad([{ name: 'a' }, { name: 'a' }]), /a second achievement called a/);
+    assert.match(bad([{ name: 'a', title: 'x'.repeat(32) }]), /1 to 31 bytes/);
+    assert.match(bad([{ name: 'a', text: 'x'.repeat(96) }]), /at most 95 bytes/);
+    assert.match(bad(Array.from({ length: 33 }, (_, i) => ({ name: 'a' + i }))), /at most 32/);
+});
+
+test('earning one is announced once and kept between runs', () => {
+    const file = path.join(tmp, 'ach.sco');
+    const main = `function init() {
+    printh(ach.has(ACH.first) + " " + ach.has(ACH.ten));
+    printh(ach.earn(ACH.first) + " " + ach.earn(ACH.first));
+}
+function update() {}`;
+    assert.equal(runAch(main, file), '0 0\n1 0\nachieved First Steps\n');
+    assert.equal(runAch(main, file), '1 0\n0 0\n');
+    /* reordered, a new one added: each finds its own */
+    const more = [{ name: 'new', title: 'New' }, ACHS[1], ACHS[0]];
+    assert.equal(runAch(main, file, more), '1 0\n0 0\n');
+});
+
+test('a scores file from before achievements still reads', () => {
+    /* version 1: no achievements after the boards */
+    const file = path.join(tmp, 'v1.sco');
+    const id = Buffer.from('00000000000ac4e5', 'hex');
+    const v1 = Buffer.concat([Buffer.from('PBSC'), Buffer.from([1, 33, 0, 0]), id,
+                              Buffer.from([7, 0, 0, 0, 0, 0, 0, 0, 1, 65])]);
+    fs.writeFileSync(file, v1);
+    assert.equal(runAch(`function init() { printh(ach.has(ACH.first)); ach.earn(ACH.ten); }
+function update() {}`, file), '0\nachieved Ten in a Row\n');
+    const v2 = fs.readFileSync(file);
+    assert.equal(v2[4], 2);
+    assert.equal(v2.readUInt32LE(16), 7);   /* v1's plays, carried over */
+});

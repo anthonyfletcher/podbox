@@ -333,6 +333,30 @@ static int load_options(struct vm *vm, const uint8_t *p, uint32_t n)
     return 1;
 }
 
+/* ACHV, the cart's achievements: a count, then each one's key, title and
+ * text; none is earned until the host says */
+static int load_achievements(struct vm *vm, const uint8_t *p, uint32_t n)
+{
+    if (!p)
+        return 1;
+    struct arcade_scores *s = &vm->scores;
+    struct cur c = { p, p + n, 0 };
+    uint32_t count = c8(&c);
+    if (count > ARCADE_ACHIEVEMENTS)
+        return bad(vm, "achievements");
+    for (uint32_t i = 0; i < count; i++) {
+        struct arcade_achievement *a = &s->ach[i];
+        a->key = c32(&c);
+        copy_text(&c, a->title, sizeof(a->title));
+        copy_text(&c, a->text, sizeof(a->text));
+        a->date = 0;
+    }
+    if (c.bad)
+        return bad(vm, "achievements");
+    s->nach = (int)count;
+    return 1;
+}
+
 static int load_code(struct vm *vm, const uint8_t *p, uint32_t n)
 {
     struct cur c = { p, p + n, 0 };
@@ -554,11 +578,11 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[13] = { 0 };
-    uint32_t clen[13] = { 0 };
-    static const char tags[13][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+    const uint8_t *chunk[14] = { 0 };
+    uint32_t clen[14] = { 0 };
+    static const char tags[14][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
                                       "PALS", "SHET", "MAPS", "IMGS", "SFX_",
-                                      "BORD", "OPTN", "DATA" };
+                                      "BORD", "OPTN", "DATA", "ACHV" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -575,7 +599,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 13; i++)
+        for (int i = 0; i < 14; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -622,6 +646,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     return load_header(vm, chunk[0], clen[0]) &&
         load_boards(vm, chunk[10], clen[10]) &&
         load_options(vm, chunk[11], clen[11]) &&
+        load_achievements(vm, chunk[13], clen[13]) &&
         load_code(vm, chunk[1], clen[1]) &&
         load_constants(vm, chunk[2], clen[2]) &&
         load_globals(vm, chunk[3], clen[3]);
