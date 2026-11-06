@@ -7,7 +7,7 @@
  *                  [--wheel t:clicks[:pos],...] [--playing] [--beat bpm]
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
- *                  [--ui answer,...] [--speech]
+ *                  [--ui answer,...] [--speech] [--suspend-at t]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -41,7 +41,10 @@
  * choose (-1 backs out), 1 or 0 for confirm, a number for number, and the
  * text for text (~ backs out). message takes none. Without an answer,
  * each backs out. speak.say and queue print "say <text>" and "queue
- * <text>"; speak.on() is true with --speech, and nothing is ever busy. */
+ * <text>"; speak.on() is true with --speech, and nothing is ever busy.
+ * --suspend-at t suspends the cart before tick t as the player's Quit
+ * does, overwrites the arena, and resumes it from the copy, printing
+ * "resumed" -- the run's output is then the same as one never suspended. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -880,6 +883,7 @@ int main(int argc, char **argv)
     long bpm = 0;
     int menu_picks[16], npicks = 0;
     const char *scores_path = NULL, *options_path = NULL, *opt_sets = NULL;
+    long suspend_at = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
             ticks = atol(argv[++i]);
@@ -918,6 +922,8 @@ int main(int argc, char **argv)
             ui_answers = argv[++i];
         else if (!strcmp(argv[i], "--speech"))
             speech_flag = 1;
+        else if (!strcmp(argv[i], "--suspend-at") && i + 1 < argc)
+            suspend_at = atol(argv[++i]);
         else if (!strcmp(argv[i], "--buttons") && i + 1 < argc)
             buttons = argv[++i];
         else if (!strcmp(argv[i], "--skip") && i + 1 < argc)
@@ -1012,6 +1018,20 @@ int main(int argc, char **argv)
                 b++;
             else
                 break;
+        }
+        if (t == suspend_at) {
+            static uint64_t copy[sizeof(arena) / 8];
+            uint32_t n;
+            const void *snap = arcade_snapshot(vm, &n);
+            memcpy(copy, snap, n);
+            memset(arena, 0xa5, sizeof(arena));
+            memcpy(arena, copy, n);
+            vm = arcade_resume(arena, n, &host);
+            if (!vm) {
+                fprintf(stderr, "not resumable\n");
+                return 1;
+            }
+            printf("resumed\n");
         }
         arcade_input(vm, held, clicks, pos);
         options_set(vm, opt_sets, t);

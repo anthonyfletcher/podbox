@@ -592,6 +592,8 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return bad(vm, "truncated");
         if (crc32(b, len) != rd32(b + len))
             return bad(vm, "a checksum fails");
+        vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
+                        rd32(b + len);
         if (is_meta) {
             vm->meta = b;
             vm->meta_len = len;

@@ -303,6 +303,22 @@ const int32_t *arcade_save(struct vm *vm, int *dirty,
 void arcade_restore(struct vm *vm, const int32_t save[256],
                     const uint8_t fractions[32]);
 
+/* Suspending: the arena as it stands between ticks is the whole game, so
+ * writing its size bytes from arcade_snapshot() and reading them back to
+ * the same address carries on from that tick. Every pointer inside it is
+ * an address in this firmware build, so a snapshot holds only for the
+ * same build, the same arena address and size, and the same cart -- the
+ * host keeps those beside it (arcade_cart_hash names the cart's bytes).
+ * A cart that owns the music is not suspended: its playlist is not part
+ * of the arena. */
+const void *arcade_snapshot(const struct vm *vm, uint32_t *size);
+uint32_t arcade_cart_hash(const struct vm *vm);
+int arcade_owns_music(const struct vm *vm);
+/* mem holds a snapshot read back to where it was taken: the cart, ready
+ * for its next tick, or NULL when mem is not one */
+struct vm *arcade_resume(void *mem, uint32_t size,
+                         const struct arcade_host *host);
+
 /* sys_score.c: a cart's high scores. Its boards come from the cart (the
  * BORD chunk); the host fills them from its file when the cart starts and
  * writes them out when they change. A board's name is matched by key, a

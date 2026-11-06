@@ -27956,3 +27956,17 @@
     *: "Help"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_GAME_RESUME_ASK
+  desc: starting a game cart that was quit mid-game: carry on from there, or start again
+  user: core
+  <source>
+    *: "Carry on from where you quit?"
+  </source>
+  <dest>
+    *: "Carry on from where you quit?"
+  </dest>
+  <voice>
+    *: "Carry on from where you quit?"
+  </voice>
+</phrase>

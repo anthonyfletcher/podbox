@@ -1831,6 +1831,43 @@ void arcade_set_ceiling(struct vm *vm, uint32_t units)
     vm->ceiling = units;
 }
 
+const void *arcade_snapshot(const struct vm *vm, uint32_t *size)
+{
+    *size = vm->size;
+    return vm->mem;
+}
+
+uint32_t arcade_cart_hash(const struct vm *vm)
+{
+    return vm->cart_hash;
+}
+
+int arcade_owns_music(const struct vm *vm)
+{
+    return vm->music == 2;
+}
+
+struct vm *arcade_resume(void *mem, uint32_t size,
+                         const struct arcade_host *host)
+{
+    struct vm *vm = mem;
+    if (size < sizeof(struct vm) || vm->mem != mem || vm->size != size ||
+        vm->err)
+        return NULL;
+    /* what belongs to the tick it was taken after, and to the host */
+    vm->host = host;
+    vm->sp = vm->stack;
+    vm->nframes = 0;
+    vm->ntmp = 0;
+    vm->units = 0;
+    vm->opt_pending = vm->opt_changed = 0;
+    vm->show_board = 0;
+    vm->d.dirty_lo = 0;
+    vm->d.dirty_hi = SCREEN_H - 1;
+    vm->d.palette_changed = 1;
+    return vm;
+}
+
 const int32_t *arcade_save(struct vm *vm, int *dirty,
                            const uint8_t **fractions)
 {

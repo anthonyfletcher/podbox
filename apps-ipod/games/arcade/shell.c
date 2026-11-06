@@ -50,6 +50,7 @@
 #include "games/arcade/shell_score.h"
 #include "games/arcade/shell_opts.h"
 #include "games/arcade/shell_ui.h"
+#include "games/arcade/shell_suspend.h"
 #include "speech/talk.h"           /* talk_text, talk_shutup */
 #include "audio/voice_thread.h"    /* voice_is_playing */
 #include "pcm_mixer.h"
@@ -1119,6 +1120,12 @@ static int run(const char *path, void *mem, size_t size)
         show_error(vm);
         return QUIT;
     }
+    /* suspended last time: carry on, or start afresh; an arena a failed
+     * read left unusable is loaded again */
+    bool resumed;
+    vm = shell_suspend_offer(vm, mem, (uint32_t)size, &host, &resumed);
+    if (!vm)
+        return RESTART;
     save_load(vm);
     save_owed = false;
     shell_scores_load(vm);
@@ -1135,7 +1142,8 @@ static int run(const char *path, void *mem, size_t size)
     shell_tracks_start();
     sound_path[0] = '\0';         /* the track's record is read afresh */
     int status = PLAYING;
-    if (!arcade_start(vm))
+    bool suspend = false;           /* left by the pause menu's Quit */
+    if (!resumed && !arcade_start(vm))
         status = FAILED;
     present(vm, true);
     shell_scores_run(true);
@@ -1185,6 +1193,7 @@ static int run(const char *path, void *mem, size_t size)
             menu_pressed = true;
         if (menu_pressed) {
             status = pause_menu(vm, &vp);
+            suspend = status == QUIT;
             shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
@@ -1273,6 +1282,8 @@ static int run(const char *path, void *mem, size_t size)
     save_write(vm);
     shell_scores_run(false);
     shell_scores_write(vm, true);
+    if (suspend)
+        shell_suspend_write(vm);
     return status;
 }
 
