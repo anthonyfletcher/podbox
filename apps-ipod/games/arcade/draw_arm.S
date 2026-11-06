@@ -2,9 +2,13 @@
  * GNU General Public License (version 2+)
  *
  * Arcade: drawing's inner loops, ARMv4 so one copy serves both players.
- * Each is the C function of the same name in core_draw.c without the
- * _arm, which stays for the simulator and the host and is the reference
- * this is checked against.
+ * The C in core_draw.c stays for the simulator and the host, and is the
+ * reference these are checked against.
+ *
+ * Parts, in order:
+ *   copy_row_arm     copy_row() forward, a word of clear colour 0 at once
+ *   land_slice_arm_* land_slice_64/128/256() with land_fill() inside them,
+ *                    a sample every column (_1) or every other (_2)
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -89,3 +93,168 @@ copy_row_arm:
     ldmfd   sp!, {r4-r6}
     bx      lr
     .size   copy_row_arm, . - copy_row_arm
+
+/* struct slice, core_draw.c, which checks these */
+    .equ    SL_HEIGHT, 0
+    .equ    SL_COLOUR, 4
+    .equ    SL_DPAL, 8
+    .equ    SL_PX, 24
+    .equ    SL_W, 28
+    .equ    SL_X0, 32
+    .equ    SL_X1, 36
+    .equ    SL_CY0, 40
+    .equ    SL_TOP, 48
+    .equ    SL_FOGM, 56
+    .equ    SL_FOGW, 72
+
+/* int32_t name(const struct slice *s, uint32_t u, uint32_t t, uint32_t su,
+ *              uint32_t sv, int32_t base, int32_t rise, uint32_t *filled,
+ *              int32_t *lo): land_slice() for a map 2^n square, its index
+ * ((t >> tsh) & tmask) | (u << ul >> ur), a sample every step columns.
+ *
+ * r0 the column's top, r1 the end, r2 u, r3 t, r4 su, r5 sv, r6 the
+ * heights, r7 rise, r8 base, r9 the clip's top row, r10 the columns open;
+ * r11 the sample's index, r12 the column's top row, lr its new top. */
+.macro  landslice name, tsh, tmask, ul, ur, step
+    .global \name
+    .type   \name, %function
+\name:
+    stmfd   sp!, {r4-r11, lr}
+    sub     sp, sp, #4
+    str     r0, [sp]
+    /* s at sp; sv, base, rise, filled and lo from sp + 40 */
+    ldr     r5, [sp, #40]
+    ldr     r8, [sp, #44]
+    ldr     r7, [sp, #48]
+    mov     r4, r3
+    mov     r3, r2
+    mov     r2, r1
+    ldr     r6, [r0, #SL_HEIGHT]
+    ldr     r9, [r0, #SL_CY0]
+    ldr     r1, [r0, #SL_TOP]
+    ldr     r11, [r0, #SL_X0]
+    ldr     r12, [r0, #SL_X1]
+    add     r0, r1, r11, lsl #1
+    add     r1, r1, r12, lsl #1
+    mov     r10, #0
+    cmp     r0, r1
+    bhs     9f
+1:
+    ldrsh   r12, [r0]
+    cmp     r12, r9
+    ble     2f
+    add     r10, r10, #1
+    mov     r11, r3, lsr #\tsh
+    and     r11, r11, #\tmask
+    mov     lr, r2, lsl #\ul
+    orr     r11, r11, lr, lsr #\ur
+    ldrb    lr, [r6, r11]
+    mul     lr, r7, lr
+    sub     lr, r8, lr
+    cmp     r12, lr, asr #16
+    bgt     5f
+2:
+    add     r0, r0, #(2 * \step)
+    add     r2, r2, r4
+    add     r3, r3, r5
+    cmp     r0, r1
+    blo     1b
+9:
+    mov     r0, r10
+    add     sp, sp, #4
+    ldmfd   sp!, {r4-r11, pc}
+
+5:
+    /* land_fill(): r1-r8 kept above s, so filled and lo are at sp + 84 */
+    stmfd   sp!, {r1-r8}
+    mov     lr, lr, asr #16
+    cmp     lr, r9
+    movlt   lr, r9
+    ldr     r1, [sp, #32]
+    ldr     r2, [r1, #SL_COLOUR]
+    ldrb    r2, [r2, r11]
+    ldr     r3, [r1, #SL_DPAL]
+    ldrb    r2, [r3, r2]
+    orr     r2, r2, r2, lsl #8
+    orr     r2, r2, r2, lsl #16
+    ldr     r3, [r1, #SL_TOP]
+    sub     r3, r0, r3
+    mov     r3, r3, asr #1
+    /* r6 column x's colours for four rows, row y's lowest (land_rows()) */
+    ldr     r4, [r1, #SL_FOGW]
+    and     r7, lr, #3
+    mov     r7, r7, lsl #3
+    and     r5, r3, #3
+    add     r5, r1, r5, lsl #2
+    ldr     r5, [r5, #SL_FOGM]
+    bic     r6, r2, r5
+    and     r5, r4, r5
+    orr     r6, r6, r5
+    mov     r6, r6, ror r7
+    .if \step == 2
+    /* and r8 column x + 1's, when it is inside the clip */
+    ldr     r5, [r1, #SL_X1]
+    add     r8, r3, #1
+    cmp     r8, r5
+    bge     3f
+    and     r8, r8, #3
+    add     r8, r1, r8, lsl #2
+    ldr     r8, [r8, #SL_FOGM]
+    bic     r5, r2, r8
+    and     r8, r4, r8
+    orr     r8, r5, r8
+    mov     r8, r8, ror r7
+    ldr     r4, [r1, #SL_W]
+    ldr     r5, [r1, #SL_X0]
+    sub     r3, r3, r5
+    ldr     r5, [r1, #SL_PX]
+    mla     r3, lr, r4, r3
+    add     r3, r3, r5
+    sub     r7, r12, lr
+    ldr     r5, [sp, #84]
+    ldr     r2, [r5]
+    add     r2, r2, r7, lsl #1
+    str     r2, [r5]
+6:
+    strb    r8, [r3, #1]
+    strb    r6, [r3], r4
+    mov     r8, r8, ror #8
+    mov     r6, r6, ror #8
+    subs    r7, r7, #1
+    bne     6b
+    b       4f
+3:
+    .endif
+    ldr     r4, [r1, #SL_W]
+    ldr     r5, [r1, #SL_X0]
+    sub     r3, r3, r5
+    ldr     r5, [r1, #SL_PX]
+    mla     r3, lr, r4, r3
+    add     r3, r3, r5
+    sub     r7, r12, lr
+    ldr     r5, [sp, #84]
+    ldr     r2, [r5]
+    add     r2, r2, r7
+    str     r2, [r5]
+7:
+    strb    r6, [r3], r4
+    mov     r6, r6, ror #8
+    subs    r7, r7, #1
+    bne     7b
+4:
+    strh    lr, [r0]
+    ldr     r5, [sp, #88]
+    ldr     r2, [r5]
+    cmp     lr, r2
+    strlt   lr, [r5]
+    ldmfd   sp!, {r1-r8}
+    b       2b
+    .size   \name, . - \name
+.endm
+
+    landslice land_slice_arm_64_1, 10, 0xfc0, 10, 26, 1
+    landslice land_slice_arm_64_2, 10, 0xfc0, 10, 26, 2
+    landslice land_slice_arm_128_1, 9, 0x3f80, 9, 25, 1
+    landslice land_slice_arm_128_2, 9, 0x3f80, 9, 25, 2
+    landslice land_slice_arm_256_1, 8, 0xff00, 8, 24, 1
+    landslice land_slice_arm_256_2, 8, 0xff00, 8, 24, 2

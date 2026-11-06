@@ -28,6 +28,7 @@
  *                    floor and billboards
  *   the host's view of the screen
  ***************************************************************************/
+#include <stddef.h>
 #include <string.h>
 #include "games/arcade/vm.h"
 #include "games/arcade/core_font.h"
@@ -2997,9 +2998,34 @@ struct slice
     int32_t w, x0, x1, cy0;
     int32_t step;               /* columns a sample: 1, or 2 coarse */
     int16_t *top;
-    int32_t fog, phase;         /* this slice's fog level, its count */
-    uint8_t fogc;
+    int32_t fog;                /* this slice's fog level */
+    uint32_t fogm[4];           /* by x & 3, byte k set: row k of 4 fogged */
+    uint32_t fogw;              /* the fog's colour in each byte */
 };
+
+/* The slice's dither at fog level fog: the plane's pattern, fixed to the
+ * screen, so far hills are hatched rather than striped by slice */
+static void land_fog(struct slice *s, int32_t fog)
+{
+    s->fog = fog;
+    for (int32_t x = 0; x < 4; x++) {
+        uint32_t m = 0;
+        for (int32_t k = 0; k < 4; k++)
+            if (bayer[k][x & 3] < fog)
+                m |= 0xffu << (8 * k);
+        s->fogm[x] = m;
+    }
+}
+
+/* Column x's colours for four rows from row y, in colour c (in each
+ * byte): the lowest byte is row y's, and a turn right by 8 the next's */
+static inline uint32_t land_rows(const struct slice *s, uint32_t c,
+                                 int32_t x, int32_t y)
+{
+    uint32_t m = s->fogm[x & 3], v = (c & ~m) | (s->fogw & m);
+    uint32_t r = (uint32_t)(y & 3) * 8;
+    return r ? v >> r | v << (32 - r) : v;
+}
 
 /* A column of the slice whose sample shows: from row y down to the top
  * drawn so far, in its colour */
@@ -3009,17 +3035,23 @@ static void land_fill(const struct slice *s, int16_t *top, int32_t y,
     int32_t x = (int32_t)(top - s->top), y1 = *top;
     if (y < s->cy0)
         y = s->cy0;
-    uint8_t c = s->dpal[s->colour[at]];
-    if (s->fog && bayer[s->phase & 3][x & 3] < s->fog)
-        c = s->fogc;
+    uint32_t c = s->dpal[s->colour[at]] * 0x01010101u;
+    uint32_t a = land_rows(s, c, x, y);
     uint8_t *p = s->px + y * s->w + (x - s->x0);
     if (s->step == 2 && x + 1 < s->x1) {
-        for (int32_t r = y; r < y1; r++, p += s->w)
-            p[0] = p[1] = c;
+        uint32_t b = land_rows(s, c, x + 1, y);
+        for (int32_t r = y; r < y1; r++, p += s->w) {
+            p[0] = (uint8_t)a;
+            p[1] = (uint8_t)b;
+            a = a >> 8 | a << 24;
+            b = b >> 8 | b << 24;
+        }
         *filled += 2 * (uint32_t)(y1 - y);
     } else {
-        for (int32_t r = y; r < y1; r++, p += s->w)
-            *p = c;
+        for (int32_t r = y; r < y1; r++, p += s->w) {
+            *p = (uint8_t)a;
+            a = a >> 8 | a << 24;
+        }
         *filled += (uint32_t)(y1 - y);
     }
     *top = (int16_t)y;
@@ -3066,6 +3098,23 @@ LAND_SLICE(land_slice_64, AT_64)
 LAND_SLICE(land_slice_128, AT_128)
 LAND_SLICE(land_slice_256, AT_256)
 
+#ifdef ARCADE_ASM
+/* draw_arm.S: the three sizes' loops with land_fill() inside them, fine
+ * and coarse, reading the slice at these offsets */
+typedef int32_t land_slice_fn(const struct slice *, uint32_t, uint32_t,
+                              uint32_t, uint32_t, int32_t, int32_t,
+                              uint32_t *, int32_t *);
+land_slice_fn land_slice_arm_64_1, land_slice_arm_64_2,
+              land_slice_arm_128_1, land_slice_arm_128_2,
+              land_slice_arm_256_1, land_slice_arm_256_2;
+_Static_assert(offsetof(struct slice, px) == 24 &&
+               offsetof(struct slice, w) == 28 &&
+               offsetof(struct slice, cy0) == 40 &&
+               offsetof(struct slice, top) == 48 &&
+               offsetof(struct slice, fogm) == 56 &&
+               offsetof(struct slice, fogw) == 72, "draw_arm.S's offsets");
+#endif
+
 /* land.draw(): the landscape front to back, as Comanche drew it, a slice
  * of ground at a time (land_slice()). Returns the samples taken. */
 uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
@@ -3092,8 +3141,8 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     sl.w = p.s.w;
     sl.cy0 = p.cy0;
     sl.step = l->coarse == 2 ? 2 : 1;
-    sl.fogc = p.d->dpal[v->fog_colour];
-    sl.phase = 0;
+    sl.fogw = p.d->dpal[v->fog_colour] * 0x01010101u;
+    land_fog(&sl, 0);
     sl.top = top;
     uint32_t samples = 0, filled = 0;
     int32_t open = sl.x1 - sl.x0, lo = p.cy1;
@@ -3104,6 +3153,14 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
     if (l->wmask == l->hmask)
         slice = l->wmask == 63 ? land_slice_64 : l->wmask == 127 ?
                 land_slice_128 : l->wmask == 255 ? land_slice_256 : land_slice;
+#ifdef ARCADE_ASM
+    if (l->wmask == l->hmask && l->wmask == 63)
+        slice = sl.step == 2 ? land_slice_arm_64_2 : land_slice_arm_64_1;
+    else if (l->wmask == l->hmask && l->wmask == 127)
+        slice = sl.step == 2 ? land_slice_arm_128_2 : land_slice_arm_128_1;
+    else if (l->wmask == l->hmask && l->wmask == 255)
+        slice = sl.step == 2 ? land_slice_arm_256_2 : land_slice_arm_256_1;
+#endif
     /* 1 / focal, 0.32: a slice's half-width is a multiply */
     int64_t inv_focal = ((int64_t)1 << 48) / v->focal;
     for (int64_t z = 2 << 16, dz = 1 << 16; z < far && open > 0;
@@ -3125,8 +3182,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
         int64_t su = ((int64_t)-v->dy * across) >> 16;
         int64_t sv = ((int64_t)v->dx * across) >> 16;
         int64_t ssu = su * sl.step, ssv = sv * sl.step;
-        sl.fog = core_fog_level(v, z);
-        sl.phase++;
+        int32_t fog = core_fog_level(v, z);
+        if (fog != sl.fog)
+            land_fog(&sl, fog);
         open = slice(&sl, (uint32_t)(cx - su * (SCREEN_W / 2) + su * sl.x0),
                      (uint32_t)(cy - sv * (SCREEN_W / 2) + sv * sl.x0),
                      (uint32_t)ssu, (uint32_t)ssv, (int32_t)base,
