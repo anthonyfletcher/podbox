@@ -13,6 +13,7 @@
  * Parts, in order:
  *   pools       making one, and checking one handed back
  *   actors      spawn, move, overlaps, draw
+ *   circles     bounce off one another, bounce off the map
  *   particles   emit, step, draw
  ***************************************************************************/
 #include <string.h>
@@ -777,6 +778,305 @@ NATIVE(actors_draw)
     column_of(vm, f[A_FRAMES], &frames);
     column_of(vm, f[A_SPEED], &speed);
     core_draw_sprites(vm, &on, &sp, &x, &y, &flip, &frames, &speed, n);
+    return 1;
+}
+
+/* ---- circles ------------------------------------------------------------- *
+ * An actor as a circle: centred in its box, half its width across. They
+ * bounce off one another and off the map at the true angle -- a ball off
+ * another ball, a peg, a brick's corner. give is how much of the speed
+ * into a surface comes back out of it: 1 (the default) all of it, 0 none. */
+
+static uint64_t root(uint64_t v)
+{
+    uint64_t r = 0, bit = 1ull << 62;
+    while (bit > v)
+        bit >>= 2;
+    while (bit) {
+        if (v >= r + bit) {
+            v -= r + bit;
+            r = (r >> 1) + bit;
+        } else
+            r >>= 1;
+        bit >>= 2;
+    }
+    return r;
+}
+
+static int give_arg(struct vm *vm, struct value *a, int argc, int i,
+                    const char *fn, int32_t *give)
+{
+    *give = 65536;
+    if (i >= argc || a[i].tag == T_NULL)
+        return 1;
+    if (!is_num(a[i]))
+        return vm_fail(vm, fn, "() needs a number for give, not a ",
+                       vm_typename(a[i].tag));
+    *give = fx(a[i]);
+    if (*give < 0)
+        *give = 0;
+    if (*give > 65536)
+        *give = 65536;
+    return 1;
+}
+
+/* (*vx, *vy) going into a surface whose normal (nx, ny), 16.16 and of
+ * length one, points out of it: the part along the normal turned back,
+ * give of it kept */
+static void rebound(int32_t *vx, int32_t *vy, int32_t nx, int32_t ny,
+                    int32_t give)
+{
+    int64_t along = ((int64_t)*vx * nx + (int64_t)*vy * ny) >> 16;
+    if (along >= 0)
+        return;
+    int64_t k = (along * (65536 + give)) >> 16;
+    *vx -= (int32_t)((k * nx) >> 16);
+    *vy -= (int32_t)((k * ny) >> 16);
+}
+
+/* (dx, dy) as a normal of length one, 16.16, and its length; (1, 0) when
+ * it has none */
+static int32_t normal(int64_t dx, int64_t dy, int32_t *nx, int32_t *ny)
+{
+    int64_t d = (int64_t)root((uint64_t)(dx * dx + dy * dy));
+    if (!d) {
+        *nx = 65536;
+        *ny = 0;
+        return 0;
+    }
+    *nx = (int32_t)((dx << 16) / d);
+    *ny = (int32_t)((dy << 16) / d);
+    return (int32_t)d;
+}
+
+/* actors.bounce(a, b, out, [give]): live circles of a that touch circles
+ * of b, pushed apart and bounced. When b is a, both of a pair move, as
+ * balls of one weight do, and each pair is found once; otherwise b's
+ * stand still, as pegs and bumpers, and only a's give way. The pairs go
+ * into out, two numbers each as actors.overlaps writes them; the pairs
+ * written */
+NATIVE(actors_bounce)
+{
+    struct value fa[A_FIELDS], fb[A_FIELDS];
+    uint32_t na, nb;
+    int32_t give;
+    if (!actors(vm, a[0], fa, &na, "actors.bounce") ||
+        !actors(vm, a[1], fb, &nb, "actors.bounce") ||
+        !give_arg(vm, a, argc, 3, "actors.bounce", &give))
+        return 0;
+    if (a[2].tag != T_I32)
+        return vm_fail(vm, "actors.bounce() writes its pairs to an "
+                       "Int32Array", "", "");
+    int same = a[0].v == a[1].v;
+    struct box *bb = scratch(vm, nb * sizeof(struct box) + 1);
+    if (!bb)
+        return 0;
+    struct value *bon = ELEMS(vm, fb[A_ON]), *bx = ELEMS(vm, fb[A_X]);
+    struct value *by = ELEMS(vm, fb[A_Y]), *bw = ELEMS(vm, fb[A_W]);
+    struct value *bdx = ELEMS(vm, fb[A_DX]), *bdy = ELEMS(vm, fb[A_DY]);
+    struct value *aon = ELEMS(vm, fa[A_ON]), *ax = ELEMS(vm, fa[A_X]);
+    struct value *ay = ELEMS(vm, fa[A_Y]), *aw = ELEMS(vm, fa[A_W]);
+    struct value *adx = ELEMS(vm, fa[A_DX]), *ady = ELEMS(vm, fa[A_DY]);
+    /* b's circles by their left edges, as actors.overlaps sorts boxes */
+    uint32_t live = 0;
+    int64_t widest = 0;
+    for (uint32_t j = 0; j < nb; j++) {
+        if (!vm_truthy(vm, bon[j]))
+            continue;
+        struct box *b = &bb[live++];
+        b->x0 = fx(bx[j]);
+        b->x1 = b->x0 + fx(bw[j]);
+        b->i = j;
+        if ((int64_t)b->x1 - b->x0 > widest)
+            widest = (int64_t)b->x1 - b->x0;
+    }
+    boxes_sort(bb, live);
+    int32_t *o = I32(vm, a[2])->d;
+    uint32_t cap = I32(vm, a[2])->len / 2, k = 0, tests = 0;
+    for (uint32_t i = 0; i < na; i++) {
+        if (!vm_truthy(vm, aon[i]))
+            continue;
+        int32_t ra = fx(aw[i]) / 2;
+        int64_t from = (int64_t)fx(ax[i]) - widest;
+        uint32_t lo = 0, hi = live;
+        while (lo < hi) {
+            uint32_t m = (lo + hi) / 2;
+            if (bb[m].x0 <= from)
+                lo = m + 1;
+            else
+                hi = m;
+        }
+        for (uint32_t m = lo; m < live; m++) {
+            uint32_t j = bb[m].i;
+            /* past this circle's right edge, none further can touch */
+            if (bb[m].x0 >= (int64_t)fx(ax[i]) + 2 * ra)
+                break;
+            if (same && j <= i)
+                continue;
+            tests++;
+            int32_t rb = fx(bw[j]) / 2;
+            int64_t dx = ((int64_t)fx(ax[i]) + ra) - ((int64_t)fx(bx[j]) + rb);
+            int64_t dy = ((int64_t)fx(ay[i]) + ra) - ((int64_t)fx(by[j]) + rb);
+            int64_t reach = (int64_t)ra + rb;
+            if (dx * dx + dy * dy >= reach * reach)
+                continue;
+            int32_t nx, ny, d = normal(dx, dy, &nx, &ny);
+            int32_t over = (int32_t)(reach - d);
+            int32_t vax = fx(adx[i]), vay = fx(ady[i]);
+            if (same) {
+                /* half the overlap each; the meeting speed along the line
+                 * between them shared, give of it kept */
+                int32_t half = over / 2;
+                ax[i] = mk(T_FIX, fx(ax[i]) + (int32_t)(((int64_t)half * nx) >> 16));
+                ay[i] = mk(T_FIX, fx(ay[i]) + (int32_t)(((int64_t)half * ny) >> 16));
+                bx[j] = mk(T_FIX, fx(bx[j]) - (int32_t)(((int64_t)half * nx) >> 16));
+                by[j] = mk(T_FIX, fx(by[j]) - (int32_t)(((int64_t)half * ny) >> 16));
+                int32_t vbx = fx(bdx[j]), vby = fx(bdy[j]);
+                int64_t along = ((int64_t)(vax - vbx) * nx +
+                                 (int64_t)(vay - vby) * ny) >> 16;
+                if (along < 0) {
+                    int64_t jn = (along * (65536 + give)) >> 17;
+                    vax -= (int32_t)((jn * nx) >> 16);
+                    vay -= (int32_t)((jn * ny) >> 16);
+                    vbx += (int32_t)((jn * nx) >> 16);
+                    vby += (int32_t)((jn * ny) >> 16);
+                    bdx[j] = mk(T_FIX, vbx);
+                    bdy[j] = mk(T_FIX, vby);
+                }
+            } else {
+                ax[i] = mk(T_FIX, fx(ax[i]) + (int32_t)(((int64_t)over * nx) >> 16));
+                ay[i] = mk(T_FIX, fx(ay[i]) + (int32_t)(((int64_t)over * ny) >> 16));
+                rebound(&vax, &vay, nx, ny, give);
+            }
+            adx[i] = mk(T_FIX, vax);
+            ady[i] = mk(T_FIX, vay);
+            if (k < cap) {
+                o[k * 2] = (int32_t)i;
+                o[k * 2 + 1] = (int32_t)j;
+                k++;
+            }
+        }
+        if (tests > 8192) {
+            if (!vm_spend(vm, tests / 2))
+                return 0;
+            tests = 0;
+        }
+    }
+    vm_charge(vm, 10 + tests / 2 + live * 2 + k * 8);
+    *out = mk(T_INT, (int32_t)k);
+    return 1;
+}
+
+#define MAX_STEPS 16
+#define CELL (8 << 16)
+
+/* actors.bounce_map(p, flags, out, [give]): live circles moved by their
+ * speed, the pool's gravity and drag as actors.move takes them, bouncing
+ * off map cells whose flags meet flags -- off a face square on, off a
+ * corner aslant. Each cell struck goes into out as three numbers: the
+ * actor, the cell's column and row; the cells written */
+NATIVE(actors_bounce_map)
+{
+    struct value f[A_FIELDS];
+    uint32_t n;
+    int32_t mask, give;
+    if (!actors(vm, a[0], f, &n, "actors.bounce_map") ||
+        !whole_arg(vm, a, argc, 1, "actors.bounce_map", &mask) ||
+        !give_arg(vm, a, argc, 3, "actors.bounce_map", &give))
+        return 0;
+    if (a[2].tag != T_I32)
+        return vm_fail(vm, "actors.bounce_map() writes the cells it struck "
+                       "to an Int32Array", "", "");
+    int32_t *o = I32(vm, a[2])->d;
+    uint32_t cap = I32(vm, a[2])->len / 3, k = 0, checked = 0, moved = 0;
+    int32_t g = fx(f[A_GRAVITY]), drag = fx(f[A_DRAG]);
+    struct value *on = ELEMS(vm, f[A_ON]), *x = ELEMS(vm, f[A_X]);
+    struct value *y = ELEMS(vm, f[A_Y]), *dx = ELEMS(vm, f[A_DX]);
+    struct value *dy = ELEMS(vm, f[A_DY]), *w = ELEMS(vm, f[A_W]);
+    for (uint32_t i = 0; i < n; i++) {
+        if (!vm_truthy(vm, on[i]))
+            continue;
+        moved++;
+        int32_t W = fx(w[i]) < 2 ? 2 : fx(w[i]), r = W / 2;
+        int64_t cx = (int64_t)fx(x[i]) + r, cy = (int64_t)fx(y[i]) + r;
+        int32_t vx = dragged(fx(dx[i]), drag), vy = dragged(fx(dy[i]) + g, drag);
+        /* steps of at most half the radius, so a ball never passes
+         * through a cell's corner between two looks */
+        int32_t span = vx < 0 ? -vx : vx, sy = vy < 0 ? -vy : vy;
+        if (sy > span)
+            span = sy;
+        int32_t steps = r / 2 > 0 ? span / (r / 2) + 1 : 1;
+        if (steps > MAX_STEPS)
+            steps = MAX_STEPS;
+        int32_t hits[4][2], nh = 0;
+        for (int32_t s = 0; s < steps; s++) {
+            cx += vx / steps;
+            cy += vy / steps;
+            int32_t gx0 = (int32_t)((cx - r) >> CELL_SHIFT);
+            int32_t gx1 = (int32_t)((cx + r - 1) >> CELL_SHIFT);
+            int32_t gy0 = (int32_t)((cy - r) >> CELL_SHIFT);
+            int32_t gy1 = (int32_t)((cy + r - 1) >> CELL_SHIFT);
+            for (int32_t gy = gy0; gy <= gy1; gy++)
+                for (int32_t gx = gx0; gx <= gx1; gx++) {
+                    checked++;
+                    if (!solid(vm, gx, gy, mask))
+                        continue;
+                    /* the cell's point nearest the centre */
+                    int64_t l = (int64_t)gx * CELL, t = (int64_t)gy * CELL;
+                    int64_t qx = cx < l ? l : cx > l + CELL ? l + CELL : cx;
+                    int64_t qy = cy < t ? t : cy > t + CELL ? t + CELL : cy;
+                    int64_t ex = cx - qx, ey = cy - qy;
+                    int32_t nx, ny, d;
+                    if (ex == 0 && ey == 0) {
+                        /* the centre inside: out by the nearest face */
+                        int64_t left = cx - l, right = l + CELL - cx;
+                        int64_t up = cy - t, down = t + CELL - cy;
+                        int64_t least = left < right ? left : right;
+                        if ((up < down ? up : down) < least) {
+                            nx = 0;
+                            ny = up < down ? -65536 : 65536;
+                            cy = up < down ? t - r : t + CELL + r;
+                        } else {
+                            ny = 0;
+                            nx = left < right ? -65536 : 65536;
+                            cx = left < right ? l - r : l + CELL + r;
+                        }
+                    } else {
+                        d = normal(ex, ey, &nx, &ny);
+                        if (d >= r)
+                            continue;
+                        cx += ((int64_t)(r - d) * nx) >> 16;
+                        cy += ((int64_t)(r - d) * ny) >> 16;
+                    }
+                    rebound(&vx, &vy, nx, ny, give);
+                    /* each cell once a tick */
+                    int seen = 0;
+                    for (int32_t h = 0; h < nh; h++)
+                        seen |= hits[h][0] == gx && hits[h][1] == gy;
+                    if (!seen && nh < 4) {
+                        hits[nh][0] = gx;
+                        hits[nh++][1] = gy;
+                        if (k < cap) {
+                            o[k * 3] = (int32_t)i;
+                            o[k * 3 + 1] = gx;
+                            o[k * 3 + 2] = gy;
+                            k++;
+                        }
+                    }
+                }
+        }
+        x[i] = mk(T_FIX, (int32_t)(cx - r));
+        y[i] = mk(T_FIX, (int32_t)(cy - r));
+        dx[i] = mk(T_FIX, vx);
+        dy[i] = mk(T_FIX, vy);
+        if (checked >= 8192) {
+            if (!vm_spend(vm, checked / 8))
+                return 0;
+            checked %= 8;
+        }
+    }
+    vm_charge(vm, 10 + n / 4 + moved * 8 + k * 2 + checked / 8);
+    *out = mk(T_INT, (int32_t)k);
     return 1;
 }
 
