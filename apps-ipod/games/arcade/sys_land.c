@@ -12,6 +12,7 @@
  *   the ground   reading the two images
  *   natives      land.draw, land.height
  ***************************************************************************/
+#include <stddef.h>
 #include "games/arcade/vm.h"
 
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
