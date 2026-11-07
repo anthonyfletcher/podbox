@@ -23,7 +23,9 @@ const [out, cartDir, ms = '2000', keyScript = ''] = process.argv.slice(2);
 const EDGE = process.env.BROWSER || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 
 const folder = {};
-if (cartDir) {
+/* a .pbg is opened as the IDE's Open does */
+const pbg = cartDir && /.pbg$/i.test(cartDir) ? fs.readFileSync(cartDir).toString('base64') : null;
+if (cartDir && !pbg) {
     Object.assign(folder, readFolder(cartDir));
     const a = readAssets(cartDir);
     for (const [k, dir, ext] of [['palettes', 'palettes/', '.gpl'], ['maps', 'maps/', '.json'],
@@ -42,7 +44,9 @@ const script = `<script>
     while (!window.arcadeIde) await new Promise((r) => setTimeout(r, 20));
     await new Promise((r) => setTimeout(r, 1200));
     const enc = ${JSON.stringify(enc)};
-    if (Object.keys(enc).length) {
+    const pbg = ${JSON.stringify(pbg)};
+    if (pbg) window.arcadeIde.openBytes(Uint8Array.from(atob(pbg), (c) => c.charCodeAt(0)), null);
+    else if (Object.keys(enc).length) {
         const f = {};
         for (const [k, v] of Object.entries(enc))
             f[k] = v.t !== undefined ? v.t : Uint8Array.from(atob(v.b), (c) => c.charCodeAt(0));

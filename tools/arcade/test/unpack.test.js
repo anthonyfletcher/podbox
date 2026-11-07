@@ -83,3 +83,19 @@ test('a cart without palettes unpacks in the engine\'s sixteen; one without SRC_
     const stripped = writeCart(order.filter((t) => t !== 'SRC_').map((t) => ({ tag: t, data: chunks[t] })));
     assert.throws(() => unpackCart(stripped, inflateRaw, deflate), /holds no sources/);
 });
+
+test('a cart built before its assets were kept says to build it again', () => {
+    const cart = build(CODE, ASSETS);
+    const { chunks, order } = readCart(cart);
+    /* SRC_ as it was: the code alone */
+    const w = [], names = ['cart.json', 'enemy.js', 'main.js'];
+    const u16 = (v) => w.push(v & 255, v >> 8), u32 = (v) => { u16(v & 0xffff); u16(v >>> 16); };
+    u16(names.length);
+    for (const n of names) {
+        const b = Buffer.from(n), t = Buffer.from(CODE[n]);
+        u16(b.length); w.push(...b); u32(t.length); w.push(...t);
+    }
+    const src = new Uint8Array(zlib.deflateRawSync(Buffer.from(w)));
+    const old = writeCart(order.map((t) => ({ tag: t, data: t === 'SRC_' ? src : chunks[t] })));
+    assert.throws(() => unpackCart(old, inflateRaw, deflate), /build it again from its folder/);
+});

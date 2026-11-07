@@ -48,6 +48,14 @@ export function unpackCart(bytes, inflateRaw, deflate) {
         const name = src.str();
         files[name] = src.bytes(src.u32()).slice();
     }
+    /* a cart built before SRC_ kept its assets has them only as chunks */
+    const has = (prefix) => Object.keys(files).some((f) => f.startsWith(prefix));
+    const lost = [['PALS', 'palettes/'], ['MAPS', 'maps/'], ['IMGS', 'images/'],
+                  ['SFX_', 'sounds/'], ['DATA', 'data/'], ['FONT', 'fonts/']]
+        .filter(([tag, dir]) => chunks[tag] && !has(dir));
+    if ((chunks.SHET && !has('sheet.png') && !has('flags.json')) || lost.length)
+        throw new Error('this cart was built before carts kept their pictures, maps ' +
+                        'and sounds whole; build it again from its folder with pbgc');
     const rgb = firstPalette(chunks.PALS);
     const picture = (r) => {
         const w = r.u16(), h = r.u16(), z = r.bytes(r.u32());

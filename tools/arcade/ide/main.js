@@ -481,15 +481,27 @@ function say(kind, text, where) {
 
 const canPick = 'showOpenFilePicker' in window;
 
+/* the browser refused a picker for a reason other than being closed */
+function refused(e) {
+    if (e && e.name === 'AbortError') return false;
+    say('print', 'The browser would not open its own file picker here (' +
+        (e && e.message || e) + '), so the plain one is used instead.');
+    return true;
+}
+
 async function openCart() {
     let bytes, handle = null;
     if (canPick) {
         try {
             [handle] = await window.showOpenFilePicker({ types: [{ description: 'Arcade cart',
                 accept: { 'application/octet-stream': ['.pbg'] } }] });
-        } catch (e) { return; }
-        bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer());
-    } else {
+            bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer());
+        } catch (e) {
+            if (!refused(e)) return;
+            handle = null;
+        }
+    }
+    if (!bytes) {
         const f = await pickFile();
         if (!f) return;
         bytes = new Uint8Array(await f.arrayBuffer());
@@ -516,10 +528,17 @@ function pickFile() {
     });
 }
 
-/* a cart folder: the files a cart is made of, each in its place */
+/* a cart folder: the files a cart is made of, each in its place. With
+ * the browser's folder access Save writes them back; without it they are
+ * read from the plain picker, and Save writes a .pbg. */
 async function openFolder() {
     let dir;
-    try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) { return; }
+    if ('showDirectoryPicker' in window) {
+        try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (e) {
+            if (!refused(e)) return;
+        }
+    }
+    if (!dir) return openFolderPlain();
     const files = {};
     async function walk(d, prefix, depth) {
         for await (const [name, h] of d.entries()) {
@@ -532,10 +551,33 @@ async function openFolder() {
             }
         }
     }
-    await walk(dir, '', 0);
+    try { await walk(dir, '', 0); } catch (e) { say('error', 'Could not read that folder: ' + e.message); return; }
     if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
     load(files);
     saveTo = { dir };
+    say('print', 'Opened the folder ' + dir.name + ': Save writes its files back.');
+}
+
+const CART_FILE = /^((palettes|maps|images|sounds|data|fonts)\/)?[^/]+\.(js|json|png|gpl|txt|bdf)$/;
+
+function openFolderPlain() {
+    const i = document.createElement('input');
+    i.type = 'file';
+    i.webkitdirectory = true;
+    i.onchange = async () => {
+        const files = {};
+        for (const f of i.files) {
+            /* the path below the folder chosen */
+            const rel = f.webkitRelativePath.split('/').slice(1).join('/');
+            if (CART_FILE.test(rel))
+                files[rel] = isBinary(rel) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
+        }
+        if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
+        load(files);
+        saveTo = null;
+        say('print', 'Opened the folder. This browser cannot write it back: Save writes a .pbg.');
+    };
+    i.click();
 }
 
 async function save() {
@@ -600,7 +642,6 @@ function newFile() {
 $('new').onclick = () => { if (confirmLeave()) load(NEW_CART()); saveTo = null; };
 $('open').onclick = openCart;
 $('open-folder').onclick = openFolder;
-$('open-folder').hidden = !('showDirectoryPicker' in window);
 $('save').onclick = save;
 $('export').onclick = exportCart;
 $('add').onclick = newFile;
@@ -631,4 +672,4 @@ document.addEventListener('drop', async (e) => {
 })();
 
 /* for the tests, which drive the page */
-window.arcadeIde = { load, run, stop, folder: () => folder, show, build: () => lastBuild };
+window.arcadeIde = { load, run, stop, openBytes, folder: () => folder, show, build: () => lastBuild };

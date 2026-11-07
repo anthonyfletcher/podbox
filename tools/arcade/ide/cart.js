@@ -6,7 +6,7 @@ import { deflateSync, inflateSync, unzlibSync, zlibSync } from 'fflate';
 import { compile } from '../src/compiler.js';
 import { parseOpcodes, parseApi } from '../src/defs.js';
 import { unpackCart } from '../src/unpack.js';
-import { compileInput } from '../src/folder.js';
+import { compileInput, isBinary } from '../src/folder.js';
 import opcodesText from '../../../apps-ipod/games/arcade/opcodes.def';
 import apiText from '../../../apps-ipod/games/arcade/arcade_api.def';
 
@@ -21,9 +21,12 @@ export function build(folder) {
                      inflate: (b) => unzlibSync(b) });
 }
 
-/* the folder a .pbg was built from */
+/* the folder a .pbg was built from: text as text, pictures as bytes */
 export function open(bytes) {
-    return unpackCart(bytes, (b) => inflateSync(b), (b) => zlibSync(b, { level: 9 }));
+    const files = unpackCart(bytes, (b) => inflateSync(b), (b) => zlibSync(b, { level: 9 }));
+    for (const name of Object.keys(files))
+        if (!isBinary(name)) files[name] = new TextDecoder().decode(files[name]);
+    return files;
 }
 
 /* What the editor offers: the natives, constants and groups at the top,
