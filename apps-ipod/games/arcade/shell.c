@@ -50,7 +50,6 @@
 #include "games/arcade/shell_tracks.h"
 #include "games/arcade/shell_score.h"
 #include "games/arcade/shell_opts.h"
-#include "games/arcade/shell_ui.h"
 #include "games/arcade/shell_suspend.h"
 #include "games/arcade/shell_store.h"
 #include "games/arcade/shell_font.h"
@@ -554,10 +553,12 @@ static void host_control(void *ctx, int what)
         default_event_handler(keys[what]);
 }
 
+static int host_frame(void *ctx, unsigned *held, int *wheel);
+
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
-    &shell_ui, &speak_host, &shell_store, shell_glyph
+    host_frame, &speak_host, &shell_store, shell_glyph
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -668,59 +669,39 @@ static void present_rows(const struct arcade_screen *s, void *fb, int stride,
 #endif
 
 /* An achievement just earned: a banner across the top of the game for a
- * while, in the player's own fonts, drawn over each frame as it goes to
- * the screen; the game's rows under it are put back when it ends. */
+ * while, in the dialogs' style, laid over each frame as it is presented
+ * and taken off again, so the game's own pixels are never changed. */
 #define BANNER_TIME (HZ * 5 / 2)
 
 static int banner_ach = -1;         /* the achievement shown, -1 none */
 static long banner_until;           /* its end, pushed back by any time */
 static long banner_away;            /* the game spent off the screen */
-static int banner_rows;             /* the game's rows it covers */
+static int banner_rows;             /* the game's rows it last covered */
 
-/* Which of the game's rows the banner needs presented this frame: 0 none,
- * else the count from the top; a new one is started when one is owed */
+/* The banner laid over the game for this frame: the rows to present for
+ * it, 0 none -- once more after it ends, to put the game back. A new one
+ * is started when one is owed. */
 static int banner_due(struct vm *vm)
 {
     if (banner_ach >= 0 && TIME_AFTER(current_tick, banner_until)) {
         banner_ach = -1;
-        return banner_rows;         /* once more, to put the game back */
+        return banner_rows;
     }
     if (banner_ach < 0) {
         banner_ach = arcade_achieved(vm);
         if (banner_ach < 0)
             return 0;
         banner_until = current_tick + BANNER_TIME;
-        int h = font_get(FONT_UI)->height +
-                font_get(font_get_ui_bold())->height + 16;
-        banner_rows = (h + 1) / 2;
         if (global_settings.talk_menu) {
             talk_text(str(LANG_ACH_EARNED), false);
             talk_text(arcade_scores(vm, NULL)->ach[banner_ach].title, true);
         }
     }
+    int rows = arcade_banner(vm, str(LANG_ACH_EARNED),
+                             arcade_scores(vm, NULL)->ach[banner_ach].title);
+    if (rows > banner_rows)
+        banner_rows = rows;
     return banner_rows;
-}
-
-static void banner_draw(struct vm *vm)
-{
-    const char *title = arcade_scores(vm, NULL)->ach[banner_ach].title;
-    int fh = font_get(FONT_UI)->height;
-    int h = fh + font_get(font_get_ui_bold())->height + 16;
-    lcd_set_viewport(NULL);
-    lcd_set_drawmode(DRMODE_SOLID);
-    lcd_set_foreground(LCD_RGBPACK(24, 24, 28));
-    lcd_fillrect(6, 4, LCD_WIDTH - 12, h - 6);
-    lcd_set_foreground(LCD_RGBPACK(255, 196, 40));
-    lcd_fillrect(6, 4, 4, h - 6);
-    lcd_set_drawmode(DRMODE_FG);
-    lcd_setfont(FONT_UI);
-    lcd_set_foreground(LCD_RGBPACK(255, 196, 40));
-    lcd_putsxy(18, 7, str(LANG_ACH_EARNED));
-    lcd_setfont(font_get_ui_bold());
-    lcd_set_foreground(LCD_RGBPACK(255, 255, 255));
-    lcd_putsxy(18, 7 + fh, title);
-    lcd_setfont(FONT_SYSFIXED);
-    lcd_set_drawmode(DRMODE_SOLID);
 }
 
 static void present(struct vm *vm, bool all)
@@ -747,14 +728,14 @@ static void present(struct vm *vm, bool all)
         int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
         present_wait();
         present_rows(s, FBADDR(0, 0), stride, r0, r1);
-        if (banner_ach >= 0)
-            banner_draw(vm);
 #ifdef HAVE_LCD_UPDATE_ASYNC
         lcd_update_start(r0 * 2, (r1 - r0 + 1) * 2);
 #else
         lcd_update_rect(0, r0 * 2, LCD_WIDTH, (r1 - r0 + 1) * 2);
 #endif
     }
+    if (banner_ach >= 0)
+        arcade_banner_undo(vm);
     arcade_presented(vm);
 }
 
@@ -887,25 +868,70 @@ static void give_screen(void)
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 }
 
-/* A dialog during a tick: the game's viewport to take the screen back
- * with, whether one was shown (the frame clock then starts afresh), and
- * whether the owner went out to the root from it */
+/* A dialog during a tick: the game's viewport to take the screen with,
+ * whether one was shown (the frame clock then starts afresh), whether USB
+ * came during it (the cart then ends once its tick is over), and whether
+ * the screen was taken for it from the pause menu */
 static struct viewport *game_vp;
-static bool dialog_shown, dialog_to_root;
+static bool dialog_shown, dialog_to_root, dialog_open, dialog_took;
 
-void shell_dialog_begin(void)
-{
-    shell_scores_run(false);
-    give_screen();
-}
+static void remote_key(struct vm *vm, long b);
+static int event(struct vm *vm, long button);
 
-void shell_dialog_end(bool to_root)
+/* A frame of a dialog the engine drew on the game's screen (ui.*): shown,
+ * a tick of the game's rate waited, and the buttons and wheel read --
+ * MENU always, which backs out of it. Events are handled as in play. */
+static int host_frame(void *ctx, unsigned *held, int *wheel)
 {
-    shell_scores_run(true);
+    (void)ctx;
+    struct vm *vm = sound_vm;
     dialog_shown = true;
-    dialog_to_root = dialog_to_root || to_root;
-    take_screen(game_vp);
-    present(sound_vm, true);
+    if (!held) {
+        dialog_open = false;
+        shell_scores_run(true);
+        if (dialog_took) {
+            dialog_took = false;
+            give_screen();
+        } else
+            present(vm, true);
+        return 1;
+    }
+    if (!dialog_open) {
+        dialog_open = true;
+        shell_scores_run(false);
+    }
+    if (dialog_to_root)
+        return 0;
+    if (!screen_held) {
+        take_screen(game_vp);
+        dialog_took = true;
+    }
+    present(vm, true);
+    int rate = arcade_rate(vm) > 0 ? arcade_rate(vm) : 30;
+    long due = current_tick + HZ / rate;
+    while (TIME_BEFORE(current_tick, due)) {
+        sound_fill();
+        long b = button_get_w_tmo(due - current_tick);
+        if (b & SYS_EVENT) {
+            if (event(vm, b) == USB) {
+                dialog_to_root = true;
+                return 0;
+            }
+        } else if (b & BUTTON_MULTIMEDIA)
+            remote_key(vm, b);
+    }
+    int status = button_status(), pos = wheel_position();
+    unsigned h = 0;
+    if (status & BUTTON_LEFT)   h |= ARCADE_PREV;
+    if (status & BUTTON_RIGHT)  h |= ARCADE_NEXT;
+    if (status & BUTTON_PLAY)   h |= ARCADE_PLAY;
+    if (status & BUTTON_SELECT) h |= ARCADE_SELECT;
+    if (status & BUTTON_MENU)   h |= ARCADE_MENU;
+    *held = h;
+    *wheel = wheel_clicks(pos);
+    if (status || pos >= 0)
+        reset_poweroff_timer();
+    return 1;
 }
 
 /* A system event: saved first, since USB or a shutdown may follow; the
@@ -1213,6 +1239,14 @@ static int run(const char *path, void *mem, size_t size)
     banner_ach = -1;
     take_screen(&vp);
     sound_vm = vm;
+    /* suspended last time: asked over the game as it was left */
+    if (resumed && !arcade_confirm(vm, str(LANG_GAME_RESUME_ASK),
+                                   str(LANG_CHESSBOX_MENU_RESUME_GAME),
+                                   str(LANG_CHESSBOX_MENU_RESTART_GAME))) {
+        give_screen();
+        sound_vm = NULL;
+        return dialog_to_root ? USB : RESTART;
+    }
     last_wheel = -1;
     menu_down = menu_paused = false;
     beat_start();

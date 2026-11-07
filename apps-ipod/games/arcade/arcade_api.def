@@ -328,6 +328,9 @@ API(plane_ceiling,    203, 1, 5, VOID, 0, PIXELS, LISTEN, 1)
 /* The height print would take: its lines, in the current font and size */
 API(texth,            204, 1, 1, VAL,  PARTS, FLAT, LISTEN, 1)
 
+/* The dialogs' colours: the box, its text, the highlight */
+API(ui_style,         205, 3, 3, VOID, 0, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

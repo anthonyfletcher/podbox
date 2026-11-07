@@ -15,11 +15,11 @@
  * music */
 void shell_suspend_write(struct vm *vm);
 
-/* A cart just loaded into mem: when it was suspended in this build, the
- * owner is asked whether to carry on. Returns the cart to run -- the one
- * loaded, or the resumed one with *resumed set -- or NULL when the arena
- * was overwritten without making a game, to be loaded again. The file is
- * gone after, whatever the answer. */
+/* A cart just loaded into mem: when it was suspended in this build, it is
+ * resumed, for the owner to be asked over it whether to carry on. Returns
+ * the cart to run -- the one loaded, or the resumed one with *resumed set
+ * -- or NULL when the arena was overwritten without making a game, to be
+ * loaded again. The file is gone after either way. */
 struct vm *shell_suspend_offer(struct vm *vm, void *mem, uint32_t size,
                                const struct arcade_host *host,
                                bool *resumed);

@@ -1823,6 +1823,36 @@ NATIVE(texth)
     return 1;
 }
 
+int32_t draw_text(struct vm *vm, const char *s, uint32_t n, int32_t x,
+                  int32_t y, uint32_t c)
+{
+    struct pen p;
+    int64_t widest;
+    int lines;
+    begin(vm, &p, c, 0);
+    int64_t end = vm->d.font == 2
+        ? text_wide(vm, &p, s, n, x, y, scale_of(vm), 1, &widest, &lines)
+        : text(&p, s, n, x, y, scale_of(vm), 1, &widest, &lines);
+    finish(vm, &p);
+    return (int32_t)clampc(end);
+}
+
+int32_t text_width(struct vm *vm, const char *s, uint32_t n)
+{
+    int64_t widest;
+    int lines;
+    if (vm->d.font == 2)
+        text_wide(vm, NULL, s, n, 0, 0, scale_of(vm), 0, &widest, &lines);
+    else
+        text(NULL, s, n, 0, 0, scale_of(vm), 0, &widest, &lines);
+    return (int32_t)widest;
+}
+
+int32_t text_line(struct vm *vm)
+{
+    return (vm->d.font == 2 ? TEXT_LINE : 6) * scale_of(vm);
+}
+
 /* font(f) or font(f, size): size 1 or 2, 1 if left out */
 NATIVE(font)
 {

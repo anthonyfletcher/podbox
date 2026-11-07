@@ -39,10 +39,13 @@
  * prints "achieved <title>". --options does the same for
  * the option values the owner set, and --opt sets option i to v before
  * tick t, as the pause menu does. Each ui.* dialog prints a line saying
- * what it showed and takes the next of --ui's answers: an index for
- * choose (-1 backs out), 1 or 0 for confirm, a number for number, and the
- * text for text (~ backs out). message takes none. Without an answer,
- * each backs out. speak.say and queue print "say <text>" and "queue
+ * what it showed. With --ui it takes the next answer at once: an index
+ * for choose (-1 backs out), 1 or 0 for confirm, a number for number, the
+ * text for text (~ backs out); message takes none, and with no
+ * answer left each backs out. Without --ui it is worked as on the player:
+ * each of its frames is a tick, taking that tick's --buttons and --wheel,
+ * and when the ticks run out it is backed out of (--shot then shows it).
+ * speak.say and queue print "say <text>" and "queue
  * <text>"; speak.on() is true with --speech, and nothing is ever busy.
  * --suspend-at t suspends the cart before tick t as the player's Quit
  * does, overwrites the arena, and resumes it from the copy, printing
@@ -627,6 +630,12 @@ static void options_set(struct vm *vm, const char *spec, long t)
 /* ---- dialogs ------------------------------------------------------------- */
 
 static const char *ui_answers;
+static struct vm *the_vm;
+static long tick_now, tick_last;
+static const char *shot_at_end;
+static int shot_taken, dialog_said;
+static int shot(struct vm *vm, const char *path);
+static int input_at(long t, unsigned *held);
 
 /* The next --ui answer into buf; 0 when there are no more */
 static int ui_next(char *buf, int cap)
@@ -640,62 +649,70 @@ static int ui_next(char *buf, int cap)
     return 1;
 }
 
-static int ui_choose(void *ctx, const char *title, const char *const *items,
-                     int n, int at)
+/* s on one line: a newline as " / " */
+static void print_flat(const char *s)
 {
-    (void)ctx;
-    char a[64];
-    int r = ui_next(a, sizeof(a)) ? atoi(a) : -1;
-    printf("choose %s:", title);
-    for (int i = 0; i < n; i++)
-        printf("%s%s", i ? "|" : " ", items[i]);
-    printf(" at %d -> %d\n", at, r);
-    return r;
+    for (; *s; s++)
+        if (*s == '\n')
+            fputs(" / ", stdout);
+        else
+            putchar(*s);
 }
 
-static int ui_confirm(void *ctx, const char *title, const char *text)
+static void print_dialog(const struct arcade_dialog *d)
 {
-    (void)ctx;
-    char a[64];
-    int r = ui_next(a, sizeof(a)) ? atoi(a) : 0;
-    printf("confirm %s: %s -> %d\n", title, text, r);
-    return r;
+    static const char *const kinds[] = { "choose", "confirm", "message",
+                                         "number", "text" };
+    printf("%s ", kinds[d->kind]);
+    print_flat(d->prompt);
+    if (d->kind == ARCADE_DIALOG_CHOOSE) {
+        printf(":");
+        for (int i = 0; i < d->n; i++)
+            printf("%s%s", i ? "|" : " ", d->items[i]);
+        printf(" at %d", d->at);
+    } else if (d->kind == ARCADE_DIALOG_NUMBER)
+        printf(": %ld to %ld by %ld from %ld", (long)d->min, (long)d->max,
+               (long)d->step, (long)d->value);
+    else if (d->kind == ARCADE_DIALOG_TEXT)
+        printf(": [%s] up to %d", d->text, d->most);
 }
 
-static void ui_message(void *ctx, const char *title, const char *text)
+/* A dialog's frame: answered from --ui, or a tick of the input */
+static int dialog_frame(void *ctx, unsigned *held, int *wheel)
 {
     (void)ctx;
-    printf("message %s: %s\n", title, text);
-}
-
-static int32_t ui_number(void *ctx, const char *title, int32_t min,
-                         int32_t max, int32_t step, int32_t value)
-{
-    (void)ctx;
-    char a[64];
-    int32_t r = ui_next(a, sizeof(a)) ? (int32_t)atol(a) : value;
-    printf("number %s: %ld to %ld by %ld from %ld -> %ld\n", title,
-           (long)min, (long)max, (long)step, (long)value, (long)r);
-    return r;
-}
-
-static int ui_text(void *ctx, const char *title, char *buf, int cap)
-{
-    (void)ctx;
-    char a[128];
-    printf("text %s: [%s] up to %d", title, buf, cap - 1);
-    if (!ui_next(a, sizeof(a)) || !strcmp(a, "~")) {
-        printf(" -> cancelled\n");
+    if (!held) {
+        dialog_said = 0;
+        return 1;
+    }
+    struct arcade_dialog d;
+    if (!dialog_said && arcade_dialog(the_vm, &d)) {
+        dialog_said = 1;
+        print_dialog(&d);
+        if (ui_answers && d.kind == ARCADE_DIALOG_MESSAGE) {
+            printf("\n");
+            arcade_dialog_answer(the_vm, "");
+            return 1;
+        }
+        if (ui_answers) {
+            char a[128];
+            int any = ui_next(a, sizeof(a));
+            printf(" -> %s\n", any ? a : "none");
+            arcade_dialog_answer(the_vm, any ? a : NULL);
+            return 1;
+        }
+        printf("\n");
+    }
+    if (tick_now + 1 >= tick_last) {
+        if (shot_at_end && !shot_taken) {
+            shot(the_vm, shot_at_end);
+            shot_taken = 1;
+        }
         return 0;
     }
-    snprintf(buf, (size_t)cap, "%s", a);
-    printf(" -> [%s]\n", buf);
+    *wheel = input_at(++tick_now, held);
     return 1;
 }
-
-static const struct arcade_ui fake_ui = {
-    ui_choose, ui_confirm, ui_message, ui_number, ui_text
-};
 
 /* ---- speech -------------------------------------------------------------- */
 
@@ -1000,6 +1017,47 @@ static void dump(struct vm *vm, const char *spec)
     }
 }
 
+static const char *in_buttons, *in_turns;
+static int in_pos = -1;
+static unsigned in_held;
+
+/* Tick t's input: the mask of the latest --buttons entry at or before it
+ * into *held, and the wheel's clicks, the finger moved as --wheel says */
+static int input_at(long t, unsigned *held)
+{
+    for (const char *b = in_buttons; b && *b;) {
+        long at = strtol(b, (char **)&b, 10);
+        unsigned mask = 0;
+        if (*b == ':')
+            mask = (unsigned)strtoul(b + 1, (char **)&b, 10);
+        if (at == t)
+            in_held = mask;
+        if (*b == ',')
+            b++;
+        else
+            break;
+    }
+    int clicks = 0;
+    for (const char *b = in_turns; b && *b;) {
+        long at = strtol(b, (char **)&b, 10);
+        long n = 0, p = in_pos;
+        if (*b == ':')
+            n = strtol(b + 1, (char **)&b, 10);
+        if (*b == ':')
+            p = strtol(b + 1, (char **)&b, 10);
+        if (at == t) {
+            clicks = (int)n;
+            in_pos = (int)p;
+        }
+        if (*b == ',')
+            b++;
+        else
+            break;
+    }
+    *held = in_held;
+    return clicks;
+}
+
 static int report(struct vm *vm)
 {
     const char *file, *fn;
@@ -1098,7 +1156,7 @@ int main(int argc, char **argv)
     struct arcade_host host = { NULL, print, NULL, date, click,
                                 playing_flag || bpm ? playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
-                                NULL, control, &fake_tracks, &fake_ui,
+                                NULL, control, &fake_tracks, dialog_frame,
                                 &fake_speak, &fake_store, font_glyph };
     fake.period = bpm > 0 ? (int32_t)(60000 / bpm) : 500;
     fake.listen_at = -1;
@@ -1110,6 +1168,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "no memory\n");
         return 1;
     }
+    the_vm = vm;
+    in_buttons = buttons;
+    in_turns = turns;
+    in_pos = pos;
+    tick_last = ticks;
+    shot_at_end = shot_path;
     if (arcade_error(vm, NULL, NULL, NULL))
         return report(vm);
     if (ceiling)
@@ -1123,20 +1187,9 @@ int main(int argc, char **argv)
     if (units)
         fprintf(stderr, "start %u\n", (unsigned)arcade_units(vm));
     unsigned held = 0;
-    for (long t = 0; t < ticks; t++) {
-        /* the mask of the latest --buttons entry at or before this tick */
-        for (const char *b = buttons; b && *b;) {
-            long at = strtol(b, (char **)&b, 10);
-            unsigned mask = 0;
-            if (*b == ':')
-                mask = (unsigned)strtoul(b + 1, (char **)&b, 10);
-            if (at == t)
-                held = mask;
-            if (*b == ',')
-                b++;
-            else
-                break;
-        }
+    for (; tick_now < ticks; tick_now++) {
+        long t = tick_now;
+        int clicks = input_at(t, &held);
         for (const char *b = skips; b && *b;) {
             long at = strtol(b, (char **)&b, 10);
             unsigned n = 0;
@@ -1149,23 +1202,6 @@ int main(int argc, char **argv)
             else
                 break;
         }
-        int clicks = 0;
-        for (const char *b = turns; b && *b;) {
-            long at = strtol(b, (char **)&b, 10);
-            long n = 0, p = pos;
-            if (*b == ':')
-                n = strtol(b + 1, (char **)&b, 10);
-            if (*b == ':')
-                p = strtol(b + 1, (char **)&b, 10);
-            if (at == t) {
-                clicks = (int)n;
-                pos = (int)p;
-            }
-            if (*b == ',')
-                b++;
-            else
-                break;
-        }
         if (t == suspend_at) {
             static uint64_t copy[sizeof(arena) / 8];
             uint32_t n;
@@ -1173,14 +1209,14 @@ int main(int argc, char **argv)
             memcpy(copy, snap, n);
             memset(arena, 0xa5, sizeof(arena));
             memcpy(arena, copy, n);
-            vm = arcade_resume(arena, n, &host);
+            vm = the_vm = arcade_resume(arena, n, &host);
             if (!vm) {
                 fprintf(stderr, "not resumable\n");
                 return 1;
             }
             printf("resumed\n");
         }
-        arcade_input(vm, held, clicks, pos);
+        arcade_input(vm, held, clicks, in_pos);
         options_set(vm, opt_sets, t);
         if (bpm > 0) {
             /* the clock a tick on, and each new press stamped with it */
@@ -1239,7 +1275,7 @@ int main(int argc, char **argv)
         if (r < 0)
             return report(vm);
     }
-    if (shot_path && !shot(vm, shot_path)) {
+    if (shot_path && !shot_taken && !shot(vm, shot_path)) {
         fprintf(stderr, "could not write %s\n", shot_path);
         return 2;
     }

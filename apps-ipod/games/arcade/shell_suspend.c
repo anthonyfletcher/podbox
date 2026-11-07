@@ -3,8 +3,9 @@
  *
  * Suspending a cart on the player. Quitting from the pause menu writes the
  * whole arena beside the cart's save, as /.rockbox/games/saves/<id>.sus;
- * the next start offers to carry on from it, and either way it is gone
- * after, so a game is resumed at most once from one Quit.
+ * the next start resumes it and asks, over the game, whether to carry on
+ * from it (shell.c); either way the file is gone after, so a game is
+ * resumed at most once from one Quit.
  *
  * The arena holds addresses in this firmware build (see arcade_snapshot),
  * so the file opens with what makes them hold -- where the engine's code
@@ -18,8 +19,6 @@
 #include "system.h"
 #include "file.h"
 #include "dir.h"                    /* mkdir */
-#include "lang.h"
-#include "widgets/dialog_prose.h"
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell_suspend.h"
 
@@ -91,14 +90,6 @@ struct vm *shell_suspend_offer(struct vm *vm, void *mem, uint32_t size,
     head_of(vm, mem, size, &want);
     bool fits = read(fd, &h, sizeof(h)) == (ssize_t)sizeof(h) &&
                 !memcmp(&h, &want, sizeof(h));
-    if (fits) {
-        char cart[32];
-        snprintf(cart, sizeof(cart), "%s", arcade_scores(vm, NULL)->cart);
-        fits = dialog_prose_confirm(cart, str(LANG_GAME_RESUME_ASK),
-                                    str(LANG_CHESSBOX_MENU_RESUME_GAME),
-                                    str(LANG_CHESSBOX_MENU_RESTART_GAME),
-                                    true);
-    }
     struct vm *back = NULL;
     if (fits && read(fd, mem, size) == (ssize_t)size)
         back = arcade_resume(mem, size, host);

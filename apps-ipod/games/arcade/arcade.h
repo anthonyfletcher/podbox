@@ -51,8 +51,14 @@ struct arcade_host
     /* playback and tracks: the playing track, the library and the queue,
      * below; NULL where there is no music to read */
     const struct arcade_tracks *tracks;
-    /* ui: the player's own dialogs over the game, below; NULL for none */
-    const struct arcade_ui *ui;
+    /* ui: one frame of a dialog the engine has drawn on the game's
+     * screen -- the screen shown as it stands, the next tick waited for --
+     * and the buttons held then (ARCADE_* bits, MENU whenever it is down)
+     * and the wheel's clicks since the last. 0 when the cart must stop at
+     * once (USB, a shutdown): the dialog is then backed out of. Called
+     * with held NULL when the dialog is over and the game's pixels are
+     * back. NULL: every dialog is backed out of at once. */
+    int (*frame)(void *ctx, unsigned *held, int *wheel);
     /* speak: the player's speech, below; NULL for none */
     const struct arcade_speak *speak;
     /* store: the cart's own files, below; NULL for none */
@@ -99,24 +105,21 @@ struct arcade_speak
     int (*on)(void *ctx);
 };
 
-/* The dialogs ui.* opens. Each runs to its end inside the cart's call, the
- * game waiting; the texts are UTF-8 and ended. */
-struct arcade_ui
+/* The dialog ui.* has open, for a host that reads or answers it during
+ * its frame call: the test tool, and speech. Texts are UTF-8 and ended. */
+enum { ARCADE_DIALOG_CHOOSE, ARCADE_DIALOG_CONFIRM, ARCADE_DIALOG_MESSAGE,
+       ARCADE_DIALOG_NUMBER, ARCADE_DIALOG_TEXT };
+
+struct arcade_dialog
 {
-    /* ui.choose(): one of n items, its index, or -1 when backed out of */
-    int (*choose)(void *ctx, const char *title, const char *const *items,
-                  int n, int at);
-    /* ui.confirm(): text under title, 1 for yes */
-    int (*confirm)(void *ctx, const char *title, const char *text);
-    /* ui.message(): text to read, under title */
-    void (*message)(void *ctx, const char *title, const char *text);
-    /* ui.number(): a number from min to max in steps, starting at value;
-     * value again when backed out of */
-    int32_t (*number)(void *ctx, const char *title, int32_t min, int32_t max,
-                      int32_t step, int32_t value);
-    /* ui.text(): buf, holding the starting text, edited in place, at most
-     * cap bytes with its end; 1 when accepted, 0 when backed out of */
-    int (*text)(void *ctx, const char *title, char *buf, int cap);
+    int kind;
+    const char *prompt;
+    const char *const *items;           /* choose: n of them */
+    int n;
+    int at;                             /* choose: the row highlighted */
+    int32_t min, max, step, value;      /* number */
+    const char *text;                   /* text: the line as it stands */
+    int most;                           /* text: the bytes it may hold */
 };
 
 /* tracks.pick() and tracks.count()'s filter; 0 or NULL in a field is any */
@@ -461,5 +464,24 @@ int arcade_score_shown(struct vm *vm, int *rank);
 /* An achievement earned since the last call (ach.earn), for the host's
  * alert: its index, or -1; up to eight are kept in turn */
 int arcade_achieved(struct vm *vm);
+
+/* The dialog open, during the host's frame call: 1 with it in out, or 0
+ * when there is none */
+int arcade_dialog(struct vm *vm, struct arcade_dialog *out);
+/* The dialog open answered at once, as typed: choose's index (-1 backs
+ * out), confirm's 1 or 0, number's number, text's line (~ backs out);
+ * message takes anything. NULL backs out of any. */
+void arcade_dialog_answer(struct vm *vm, const char *answer);
+/* The host's own question over the game, drawn and worked as ui.confirm()
+ * is, with buttons labelled yes and no: 1 for yes. Translated text the
+ * cart's font cannot draw is shown in FONT.WORLD. */
+int arcade_confirm(struct vm *vm, const char *prompt, const char *yes,
+                   const char *no);
+/* A banner across the top of the game's screen, head over title, in the
+ * dialogs' style: the rows it covers, from 0, to present with it; the
+ * game's pixels under them come back with arcade_banner_undo(). Draws
+ * nothing, giving 0, while a dialog is open. */
+int arcade_banner(struct vm *vm, const char *head, const char *title);
+void arcade_banner_undo(struct vm *vm);
 
 #endif

@@ -210,7 +210,6 @@ games/arcade/shell.c
 games/arcade/shell_tracks.c
 games/arcade/shell_score.c
 games/arcade/shell_opts.c
-games/arcade/shell_ui.c
 games/arcade/shell_suspend.c
 games/arcade/shell_store.c
 games/arcade/shell_font.c

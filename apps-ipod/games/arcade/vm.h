@@ -285,6 +285,10 @@ struct vm
     uint8_t opt_pending, opt_changed;
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
     uint8_t listening;          /* beat.listen(true): the analyser runs */
+    /* Dialogs (sys_ui.c): ui.style()'s colours -- the box, its text and
+     * the highlight -- and the dialog showing, NULL none */
+    uint8_t ui_box, ui_ink, ui_hi;
+    struct dialog *dialog;
     const uint8_t *data;        /* DATA: the cart's data files */
     uint32_t data_len;
     const uint8_t *code;
@@ -508,6 +512,13 @@ void vm_charge(struct vm *vm, uint32_t units);
 /* vm_charge() for a native's long work, as it goes: 0, the cart stopped,
  * once the call is past the ceiling */
 int vm_spend(struct vm *vm, uint32_t units);
+/* core_draw.c, for the engine's own dialogs: n bytes of s drawn on the
+ * current target in the current font and size, colour c, returning the x
+ * after it; its width; one line's height */
+int32_t draw_text(struct vm *vm, const char *s, uint32_t n, int32_t x,
+                  int32_t y, uint32_t c);
+int32_t text_width(struct vm *vm, const char *s, uint32_t n);
+int32_t text_line(struct vm *vm);
 const char *vm_typename(uint32_t tag);
 int vm_new_string(struct vm *vm, const uint8_t *b, uint32_t len,
                   struct value *out);

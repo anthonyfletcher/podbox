@@ -233,6 +233,7 @@ IMPL(ui_confirm)
 IMPL(ui_message)
 IMPL(ui_number)
 IMPL(ui_text)
+IMPL(ui_style)
 
 /* sys_speak.c */
 IMPL(speak_say)
