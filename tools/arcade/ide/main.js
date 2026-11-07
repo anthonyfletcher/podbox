@@ -289,7 +289,7 @@ function showPalette(pane, file) {
     const first = paletteFiles()[0] === file;
     const name = file.slice(9, -4);
     pixels = new PaletteEditor(pane, {
-        rgb: rgb, first: first, pictures: () => pictures(),
+        rgb: rgb, name: name, first: first, pictures: () => pictures(),
         say: (text, bad) => say(bad ? 'error' : 'print', text),
         asText: () => { asText[file] = true; show(file); },
         sure: async () => await ask('Move colours?', [{

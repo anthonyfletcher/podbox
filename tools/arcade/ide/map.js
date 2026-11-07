@@ -13,7 +13,7 @@
 
 import { shown } from './pixels.js';
 import { iconButton, toolCursor } from './icons.js';
-import { sidePanel, toolbar } from './chrome.js';
+import { sidePanel, toolbar, foldSection } from './chrome.js';
 
 const MAX = 256;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -112,16 +112,14 @@ export class MapEditor {
         this.picker.width = this.picker.height = 256;
         this.info = document.createElement('div');
         this.info.className = 'sheet-info';
-        const objHead = document.createElement('div');
-        objHead.className = 'ed-sub';
-        objHead.innerHTML = '<span class="grow">Objects</span>';
         this.list = document.createElement('div');
         this.list.className = 'map-objs';
+        const objects = foldSection('Objects', this.list);
         this.insp = document.createElement('div');
         this.insp.className = 'map-insp';
         const body = document.createElement('div');
         body.className = 'sheet-body';
-        body.append(this.picker, this.info, objHead, this.list, this.insp);
+        body.append(this.picker, this.info, objects.head, this.list, this.insp);
         this.side.body.append(body);
         this.setPicker(this.o.picker !== false);
 
@@ -147,6 +145,18 @@ export class MapEditor {
         layer.append(this.layerChoice);
         this.layerChoice.onchange = () => { this.layer = +this.layerChoice.value; this.drawMap(); };
         bar.put(layer);
+        /* the kind of the chosen object, or of the next one placed */
+        this.kindBox = document.createElement('label');
+        this.kindBox.className = 'map-kindbox';
+        this.kindInput = document.createElement('input');
+        this.kindInput.type = 'text';
+        this.kindInput.setAttribute('list', 'map-kinds');
+        this.kinds = document.createElement('datalist');
+        this.kinds.id = 'map-kinds';
+        this.kindInput.onchange = () => this.setKind(this.kindInput.value.trim());
+        this.kindInput.onkeydown = (e) => { if (e.key === 'Enter') { this.kindInput.blur(); this.main.focus(); } };
+        this.kindBox.append('Kind', this.kindInput, this.kinds);
+        bar.put(this.kindBox);
         bar.sep();
         bar.add('zoomOut', 'Zoom out (-)', () => this.setZoom(this.zoom - 1));
         bar.add('zoomIn', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
@@ -202,8 +212,41 @@ export class MapEditor {
         this.tool = tool;
         for (const [id, b] of Object.entries(this.toolButtons)) b.classList.toggle('on', id === tool);
         this.cursor(this.hover, false);
+        this.showKind();
         this.refresh();
         this.main.focus();
+    }
+
+    /* the toolbar's kind box: shown with the Objects tool or an object
+     * chosen, holding the chosen one's kind or the next one's */
+    showKind() {
+        const o = this.m.objects[this.sel];
+        this.kindBox.hidden = this.tool !== 'object' && !o;
+        this.kindInput.value = o ? o.kind : this.kind;
+        this.kindInput.title = o ? 'This object\'s kind: OBJ.' + o.kind + ' in code'
+                                 : 'The kind the next object placed takes';
+        this.kinds.innerHTML = '';
+        for (const k of new Set(this.m.objects.map((q) => q.kind))) {
+            const opt = document.createElement('option');
+            opt.value = k;
+            this.kinds.append(opt);
+        }
+    }
+
+    setKind(v) {
+        if (!NAME.test(v)) {
+            this.o.say('A kind is a name: letters, digits and _, not starting with a digit.', true);
+            this.showKind();
+            return;
+        }
+        this.kind = v;
+        const o = this.m.objects[this.sel];
+        if (o && o.kind !== v) {
+            this.save();
+            o.kind = v;
+            this.commit();
+        }
+        this.drawObjects();
     }
 
     /* whole pixels a map pixel; a canvas no wider than 8192 */
@@ -519,6 +562,8 @@ export class MapEditor {
             o.w = Math.max(1, e.shiftKey ? (d.was.w || 0) + dx : Math.round(((d.was.w || 0) + dx) / 8) * 8);
             o.h = Math.max(1, e.shiftKey ? (d.was.h || 0) + dy : Math.round(((d.was.h || 0) + dy) / 8) * 8);
         }
+        /* the inspector follows the drag */
+        for (const [k, i] of Object.entries(this.placeInputs || {})) i.value = o[k] || 0;
     }
 
     objectUp(d) {
@@ -528,12 +573,13 @@ export class MapEditor {
             this.m.objects.push(Object.assign({ kind: this.kind }, d.rect));
             this.choose(this.m.objects.length - 1);
             this.commit();
-            this.insp.querySelector('input').select();
+            this.kindInput.select();
             return;
         }
         const o = this.m.objects[this.sel];
         if (['x', 'y', 'w', 'h'].every((k) => o[k] === d.was[k])) { this.undos.pop(); return; }
         this.commit();
+        this.drawObjects();
     }
 
     choose(i) {
@@ -542,9 +588,10 @@ export class MapEditor {
         this.refresh();
     }
 
-    /* the list of objects, and the chosen one's kind, place, size and
-     * properties */
+    /* the list of objects, and the chosen one's place, size and
+     * properties; its kind is on the toolbar */
     drawObjects() {
+        this.showKind();
         this.list.innerHTML = '';
         this.m.objects.forEach((o, i) => {
             const b = document.createElement('button');
@@ -564,19 +611,14 @@ export class MapEditor {
             this.list.append(p);
         }
         this.insp.innerHTML = '';
+        this.placeInputs = null;
         const o = this.m.objects[this.sel];
         if (!o) return;
         const head = document.createElement('div');
         head.className = 'ed-sub';
-        head.innerHTML = '<span class="grow">Object ' + this.sel + '</span>';
+        head.innerHTML = '<span class="grow"></span>';
+        head.firstChild.textContent = 'Object ' + this.sel;
         head.append(iconButton('trash', 'Delete it (Delete)', () => this.removeObject()));
-        const kinds = document.createElement('datalist');
-        kinds.id = 'map-kinds';
-        for (const k of new Set(this.m.objects.map((q) => q.kind))) {
-            const opt = document.createElement('option');
-            opt.value = k;
-            kinds.append(opt);
-        }
         const input = (value, set, type) => {
             const i = document.createElement('input');
             i.type = type || 'text';
@@ -589,17 +631,12 @@ export class MapEditor {
             };
             return i;
         };
-        const kind = input(o.kind, (v) => {
-            if (!NAME.test(v)) { this.o.say('A kind is a name: letters, digits and _.', true); return false; }
-            o.kind = this.kind = v;
-        });
-        kind.setAttribute('list', 'map-kinds');
-        kind.title = 'Its kind: OBJ.' + o.kind + ' in code';
         const place = document.createElement('div');
         place.className = 'map-xywh';
+        this.placeInputs = {};
         for (const k of ['x', 'y', 'w', 'h']) {
             const l = document.createElement('label');
-            const i = input(o[k] || 0, (v) => {
+            const i = this.placeInputs[k] = input(o[k] || 0, (v) => {
                 const n = Math.round(+v);
                 if (!Number.isFinite(n) || n < -32768 || n > 32767) return false;
                 o[k] = n;
@@ -642,10 +679,7 @@ export class MapEditor {
         propHead.className = 'ed-sub';
         propHead.innerHTML = '<span class="grow">Properties</span>';
         propHead.append(add);
-        const kl = document.createElement('label');
-        kl.className = 'map-kind';
-        kl.append('Kind', kind);
-        this.insp.append(head, kinds, kl, place, propHead, props);
+        this.insp.append(head, place, propHead, props);
     }
 
     removeObject() {

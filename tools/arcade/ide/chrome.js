@@ -1,7 +1,7 @@
-/* The editors' shared chrome: a side panel that folds to a rail, and a
- * toolbar of icon buttons. */
+/* The editors' shared chrome: a side panel that folds to a rail, sections
+ * in it that fold away, and a toolbar of icon buttons. */
 
-import { iconButton } from './icons.js';
+import { icon, iconButton } from './icons.js';
 
 /* a panel on an editor's left: its head, a hide button and a rail to
  * show it again; shown(open) is told when either is clicked. The panel's
@@ -23,6 +23,27 @@ export function sidePanel(title, shown) {
     body.className = 'ed-side-body';
     el.append(rail, head, body);
     return { el, head, body, setOpen: (open) => el.classList.toggle('closed', !open) };
+}
+
+/* a section's heading in a side panel that folds what is under it away:
+ * a click on it shows or hides the body; .head is the heading, for
+ * buttons of its own */
+export function foldSection(title, body, open) {
+    const head = document.createElement('div');
+    head.className = 'ed-sub fold';
+    const twist = document.createElement('span');
+    twist.className = 'twist';
+    const name = document.createElement('span');
+    name.className = 'grow';
+    name.textContent = title;
+    head.append(twist, name);
+    const set = (on) => {
+        twist.innerHTML = icon(on ? 'down' : 'right');
+        body.hidden = !on;
+    };
+    head.onclick = (e) => { if (!e.target.closest('.ib')) set(body.hidden); };
+    set(open !== false);
+    return { head, body };
 }
 
 /* a toolbar; add(name, title, onclick) appends an icon button and

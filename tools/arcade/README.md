@@ -240,8 +240,10 @@ show as `?`.
   rectangle or an area, and erase (or paint with the right button). Mark
   the cells whose sprites have a flag to check the solid ones line up.
   With the Objects tool, drag on the map to place an object, drag one to
-  move it or its corner to size it, and set its kind and properties beside
-  the picker; objects sit on whole cells unless Shift is held. The map's
+  move it or its corner to size it. Its kind is on the toolbar -- set it
+  before placing, and the objects placed take it -- and its place, size
+  and properties are beside the picker; objects sit on whole cells unless
+  Shift is held. The map's
   size is set from the toolbar.
 - **Palettes**: open one to set its colours, shown as the player shows
   them; colours no picture uses are marked, and two that look the same on

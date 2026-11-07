@@ -779,13 +779,11 @@ export class SheetEditor {
         this.picker.width = this.picker.height = 128 * 2;
         this.info = document.createElement('div');
         this.info.className = 'sheet-info';
-        this.flagRow = document.createElement('div');
-        this.flagRow.className = 'pix-flags';
         this.animBox = document.createElement('div');
         this.animBox.className = 'sheet-anim';
         const body = document.createElement('div');
         body.className = 'sheet-body';
-        body.append(this.picker, this.info, this.flagRow, this.animBox);
+        body.append(this.picker, this.info, this.animBox);
         this.side.body.append(bar.el, body);
         this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
@@ -878,6 +876,12 @@ export class SheetEditor {
             fitColours: this.o.fitColours,
             say: this.o.say
         });
+        /* the chosen sprites' flags on the end of the drawing toolbar */
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        this.flagRow = document.createElement('span');
+        this.flagRow.className = 'pix-flags';
+        this.editor.bar.append(sep, this.flagRow);
         this.drawFlags();
         this.drawAnim();
         this.refresh();
@@ -1064,8 +1068,8 @@ export class SheetEditor {
     drawFlags() {
         const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
         this.flagRow.innerHTML = '';
-        const label = document.createElement('div');
-        label.className = 'ed-sub';
+        const label = document.createElement('span');
+        label.className = 'note';
         label.textContent = 'Flags';
         this.flagRow.append(label);
         for (let b = 0; b < 8; b++) {
