@@ -202,6 +202,10 @@ static struct {
     unsigned long total_min;
 } plpct = { .amount = -1, .enabled = false };
 
+/* The scan's own scratch: playback's temporary entry is the first unbuffered
+ * track, which it reads back at the next track change. */
+static struct mp3entry plpct_id3;
+
 static uint32_t plpct_sig(void)
 {
     struct playlist_info *pl = playlist_get_current();
@@ -262,10 +266,7 @@ void wps_playlist_percent_prepare(void)
 
     struct playlist_track_info info;
 
-    struct mp3entry *tmp = get_temp_mp3entry(NULL); /* shared scratch */
-
-    if (!tmp)
-        return;
+    struct mp3entry *tmp = &plpct_id3;
 #if (CONFIG_STORAGE & STORAGE_ATA) /* Harddrive estimate length based on filesize */
     unsigned int last_afmt = AFMT_UNKNOWN;
     uint32_t last_bps = 0;
@@ -275,11 +276,11 @@ void wps_playlist_percent_prepare(void)
         unsigned long secs = 0;
         uint16_t mins = 0;
         if (playlist_get_track_info(NULL, n, &info) < 0) /* couldn't get track filename abort */
-            goto abort;
+            return;
 
         int slot = info.display_index - 1;
         if (slot < 0 || slot >= amount)
-            goto abort;
+            return;
 
         if (plpct_db_minutes(info.filename, &plpct.track_mins[slot]))
             continue;
@@ -329,8 +330,6 @@ void wps_playlist_percent_prepare(void)
     for (int t = 0; t < plpct.amount; t++)
         plpct.total_min += plpct.track_mins[t];
     plpct.nomem = false;
-abort:
-    get_temp_mp3entry(tmp); /* release scratch */
 }
 
 bool wps_get_playlist_percent(struct mp3entry *id3, unsigned long elapsed_ms,
@@ -672,8 +671,12 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
 }
 
 
-static struct mp3entry* get_mp3entry_from_offset(int offset,
-                                   struct mp3entry **freeid3, char **filename)
+/* Holds a track two or more ahead while one tag is drawn. Playback's
+ * temporary entry cannot: it is the first unbuffered track, which becomes the
+ * next track at the coming track change. */
+static struct mp3entry offset_id3;
+
+static struct mp3entry* get_mp3entry_from_offset(int offset, char **filename)
 {
     struct mp3entry* pid3 = NULL;
     struct wps_state *state = get_wps_state();
@@ -688,9 +691,8 @@ static struct mp3entry* get_mp3entry_from_offset(int offset,
         pid3 = state->nid3;
     else if (audio_status() & AUDIO_STATUS_PLAY)
     {
-        /* we had to get a temp id3 entry, fill freeid3 to free later */
-        struct mp3entry *bufid3 = get_temp_mp3entry(NULL);
-        *freeid3 = bufid3;
+        struct mp3entry *bufid3 = &offset_id3;
+        wipe_mp3entry(bufid3);
         fname = playlist_peek(offset, bufid3->path, sizeof(bufid3->path));
         *filename = (char*)fname;
 
@@ -719,10 +721,9 @@ static const char *try_id3_token(struct wps_token *token, int offset,
 {
     const char *out_text = NULL;
     char *filename = NULL;
-    struct mp3entry *id3, *freeid3 = NULL;
+    struct mp3entry *id3;
 
-    /* if freeid3 is filled on return we need to free the id3 when finished */
-    id3 = get_mp3entry_from_offset(token->next? 1: offset, &freeid3, &filename);
+    id3 = get_mp3entry_from_offset(token->next? 1: offset, &filename);
 
     if (token->type == SKIN_TOKEN_REPLAYGAIN)
     {
@@ -769,7 +770,7 @@ static const char *try_id3_token(struct wps_token *token, int offset,
             *intval = numeric_ret;
         }
         out_text = numeric_buf;
-        goto free_id3_outtext;
+        return out_text;
     }
 
     struct wps_state *state = get_wps_state();
@@ -778,21 +779,10 @@ static const char *try_id3_token(struct wps_token *token, int offset,
         out_text = get_cuesheetid3_token(token, id3,
                                          token->next?1:offset, buf, buf_size);
         if (out_text)
-            goto free_id3_outtext;
+            return out_text;
     }
 
-    out_text = get_id3_token(token, id3, filename, buf, buf_size, limit, intval);
-
-    if (out_text)
-        goto free_id3_outtext;
-
-    if (freeid3)
-        get_temp_mp3entry(freeid3);
-    return NULL;
-free_id3_outtext:
-    if (freeid3)
-        get_temp_mp3entry(freeid3);
-    return out_text;
+    return get_id3_token(token, id3, filename, buf, buf_size, limit, intval);
 }
 
 #define SELECT_MAX_DEPTH 5
