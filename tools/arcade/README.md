@@ -228,6 +228,11 @@ show as `?`.
   to the palette (as many as it has room for, chosen to stand for the
   rest). Copy puts the selection on the clipboard for other programs too,
   and File > Export picture saves the open one.
+- **Fonts**: open a `.bdf` to draw its characters: each in a cell the line
+  tall with the baseline marked, its advance set by number; add a character
+  by typing it, delete one, and change the ascent and descent. A line of
+  text shows in the font as you work. It is saved as BDF, so any BDF
+  editor still opens it.
 - **Palettes**: open one to set its colours, shown as the player shows
   them; colours no picture uses are marked, and two that look the same on
   the player are pointed out. Moving and sorting colours rewrites the

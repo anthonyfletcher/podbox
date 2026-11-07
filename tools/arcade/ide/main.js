@@ -21,6 +21,7 @@ import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { PaletteEditor } from './palette.js';
+import { FontEditor } from './font.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
@@ -158,22 +159,25 @@ function show(file) {
     if (pixels) { pixels.destroy(); pixels = null; }
     current = file;
     const pane = $('editor');
-    const gplFile = /^palettes\/\w+\.gpl$/.test(file);
-    if (isBinary(file) || (gplFile && !asText[file])) {
+    const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
+    const visual = gplFile || bdfFile;
+    if (isBinary(file) || (visual && !asText[file])) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
-        if (gplFile) showPalette(pane, file); else showPicture(pane, file);
+        if (gplFile) showPalette(pane, file);
+        else if (bdfFile) showFont(pane, file);
+        else showPicture(pane, file);
     } else {
-        /* a palette as text has a bar over it to go back to the swatches */
-        if (view && (gplFile || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
+        /* a palette or a font as text has a bar over it to go back */
+        if (view && (visual || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
         if (!view) {
             pane.innerHTML = '';
             let host = pane;
-            if (gplFile) {
+            if (visual) {
                 const bar = document.createElement('div');
                 bar.className = 'text-bar';
                 const b = document.createElement('button');
-                b.textContent = 'Edit as swatches';
+                b.textContent = gplFile ? 'Edit as swatches' : 'Edit as glyphs';
                 b.onclick = () => { delete asText[file]; check(); show(file); };
                 bar.append(b);
                 host = document.createElement('div');
@@ -193,6 +197,22 @@ let sheetAnim = null;
 
 /* palettes shown as text rather than swatches */
 const asText = {};
+
+/* a font in the font editor */
+function showFont(pane, file) {
+    try {
+        pixels = new FontEditor(pane, {
+            text: String(folder[file]), ask: ask,
+            say: (text, bad) => say(bad ? 'error' : 'print', text),
+            asText: () => { asText[file] = true; show(file); },
+            changed: (text) => { folder[file] = text; delete states[file]; changed(); }
+        });
+    } catch (e) {
+        asText[file] = true;
+        say('error', file + ': ' + e.message + '. Shown as text to put right.');
+        show(file);
+    }
+}
 
 /* every picture of the cart: its file, size and palette numbers */
 function pictures() {

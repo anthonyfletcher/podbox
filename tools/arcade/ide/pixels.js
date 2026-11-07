@@ -60,7 +60,8 @@ export function toPalette(rgba, rgb) {
 
 export class PixelEditor {
     /* opts: width, height, px (Uint8Array), rgb (the palette, 0xRRGGBB),
-     * grid (lines every so many pixels, 8 for sprites), fit (the largest
+     * grid (lines every so many pixels, 8 for sprites), baseline (a row
+     * to mark the top of, a font's baseline under it), fit (the largest
      * the picture is shown, in pixels), was (another editor whose tool,
      * colours and mirror carry on), changed(px), tooBig(picture) (a
      * pasted picture wider or taller than this one: true when handled),
@@ -279,6 +280,15 @@ export class PixelEditor {
             for (let x = grid; x < this.w; x += grid) { g.moveTo(x * z + 0.5, 0); g.lineTo(x * z + 0.5, this.h * z); }
             for (let y = grid; y < this.h; y += grid) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
             g.stroke();
+        }
+        if (this.o.baseline != null) {
+            g.strokeStyle = 'rgba(110,160,255,0.85)';
+            g.lineWidth = 2;
+            g.beginPath();
+            g.moveTo(0, this.o.baseline * z);
+            g.lineTo(this.w * z, this.o.baseline * z);
+            g.stroke();
+            g.lineWidth = 1;
         }
         const pixel = (x, y, c) => {
             const s = shown(this.rgb[c] || 0);

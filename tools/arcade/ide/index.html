@@ -193,6 +193,29 @@ body.running #run { display: none; }
 .sheet-anim-view { image-rendering: pixelated; align-self: flex-start; background: var(--screen-bg); }
 .sheet-anim-code { font: 11px ui-monospace, Consolas, monospace; color: var(--dim); word-break: break-all; }
 
+/* ---- fonts ---- */
+.font { display: flex; height: 100%; min-height: 0; }
+.font-side { width: 300px; flex: none; border-right: 1px solid var(--line); padding: 10px;
+             display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.font-head { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+.font-head label, .font-bar label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
+.font-head input, .font-bar input { width: 50px; font: inherit; padding: 2px 4px; border-radius: 4px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.font-head button { padding: 2px 8px; font-size: 12px; }
+.font-grid { flex: 1; overflow: auto; display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; }
+.font-glyph { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px;
+              min-width: 34px; font-size: 11px; }
+.font-glyph canvas { image-rendering: pixelated; }
+.font-glyph.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.font-add { justify-content: center; font-size: 18px; color: var(--dim); border-style: dashed; }
+.font-sample { font: 13px system-ui, sans-serif; padding: 4px 6px; border-radius: 4px;
+               border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.font-preview { image-rendering: pixelated; max-width: 100%; align-self: flex-start; }
+.font-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.font-bar { display: flex; align-items: center; gap: 14px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.font-bar button { padding: 2px 8px; font-size: 12px; margin-left: auto; }
+.font-host { flex: 1; min-height: 0; }
+
 /* ---- palettes ---- */
 .pal { padding: 14px; overflow: auto; height: 100%; outline: none; }
 .pal-head { color: var(--dim); font-size: 13px; margin-bottom: 10px; }
