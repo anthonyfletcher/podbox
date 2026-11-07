@@ -207,6 +207,16 @@ These options show what a cart drew, after the last tick:
   SELECT would, printing the items first and what the item's function
   returned. Give it more than once to choose several in turn.
 
+`pbgrun.js` runs a cart the same way on `wasm/arcade.wasm`, the engine
+built as WebAssembly, which the IDE runs too. It takes the same options
+but `--menu`, `--wav` and the music, scores and store options, and
+prints the same lines, units and pixels:
+
+```sh
+sh wasm/build.sh                      # needs wasi-sdk and binaryen
+node pbgrun.js mygame.pbg --ticks 100 --units
+```
+
 ## Tests
 
 ```sh
@@ -217,3 +227,6 @@ The tests build `pbgvm` first. Each program in `test/lang/` runs both in
 `pbgvm` and in Node, with Node's arithmetic changed to the cart language's,
 and the two must print the same lines. Random expressions are checked the
 same way, and mutated carts must be refused or run, never crash or hang.
+`pbgrun` must match `pbgvm` line for line, unit for unit and pixel for
+pixel, so the tests need a `wasm/arcade.wasm` built from the current
+sources.

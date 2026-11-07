@@ -1,0 +1,178 @@
+#!/usr/bin/env node
+/* pbgrun: runs a cart headless on wasm/arcade.wasm, the engine the IDE
+ * runs, with pbgvm's options and output:
+ *
+ *   pbgrun cart.pbg [--ticks n] [--seed s] [--ceiling units] [--units]
+ *                   [--shot file.png] [--dump x,y,w,h] [--dirty]
+ *                   [--buttons t:mask,...] [--wheel t:clicks[:pos],...]
+ *                   [--skip t:n,...] [--setting name=value]... [--speech]
+ *                   [--font font.bin]
+ *
+ * printh() lines go to stdout; a runtime error to stderr as file:line:
+ * message (in function), with exit status 1; --units prints each call's
+ * units to stderr. Each ui.* dialog prints what it showed, and is worked
+ * a tick at a time from --buttons and --wheel, backed out of when the
+ * ticks run out (--shot then shows it). See pbgvm.c for the rest. */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
+import { Engine } from './src/runner.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+function args(argv) {
+    const o = { ticks: 0, seed: 1n, settings: {}, pos: -1 };
+    for (let i = 0; i < argv.length; i++) {
+        const a = argv[i], v = () => argv[++i];
+        if (a === '--ticks') o.ticks = +v();
+        else if (a === '--seed') o.seed = BigInt(v());
+        else if (a === '--ceiling') o.ceiling = +v();
+        else if (a === '--units') o.units = true;
+        else if (a === '--shot') o.shot = v();
+        else if (a === '--dump') o.dump = v();
+        else if (a === '--dirty') o.dirty = true;
+        else if (a === '--buttons') o.buttons = v();
+        else if (a === '--wheel') o.wheel = v();
+        else if (a === '--skip') o.skip = v();
+        else if (a === '--speech') o.speech = true;
+        else if (a === '--font') o.font = fs.readFileSync(v());
+        else if (a === '--setting') {
+            const [k, ...rest] = v().split('=');
+            const s = rest.join('=');
+            o.settings[k] = /^-?\d+$/.test(s) ? +s : s;
+        } else o.cart = a;
+    }
+    return o;
+}
+
+/* "t:a:b,..." as [[t, a, b], ...] */
+function entries(spec) {
+    return spec ? spec.split(',').map((e) => e.split(':').map(Number)) : [];
+}
+
+/* pbgvm's input: the latest --buttons mask at or before t, and the wheel's
+ * clicks at t, the finger moved as --wheel says */
+function input(o) {
+    let held = 0, pos = o.pos;
+    const buttons = entries(o.buttons), wheel = entries(o.wheel);
+    return (t) => {
+        for (const [at, mask] of buttons) if (at === t) held = mask || 0;
+        let clicks = 0;
+        for (const [at, n, p] of wheel)
+            if (at === t) { clicks = n || 0; if (p !== undefined) pos = p; }
+        return { held, clicks, pos };
+    };
+}
+
+/* font.bin's glyph for cp, as gen_textfont.py --file lays it out */
+function fontGlyph(file) {
+    return (cp) => {
+        const page = cp >> 8, off = file.readUInt32LE(8 + page * 36);
+        if (!off || cp > 0xffff) return undefined;
+        const bits = file.subarray(8 + page * 36 + 4, 8 + page * 36 + 36);
+        const lo = cp & 0xff;
+        if (!(bits[lo >> 3] & (1 << (lo & 7)))) return undefined;
+        let k = 0;
+        for (let i = 0; i < lo; i++) if (bits[i >> 3] & (1 << (i & 7))) k++;
+        return new Uint8Array(file.subarray(off + k * 13, off + k * 13 + 13));
+    };
+}
+
+function png(rgb, w, h) {
+    const raw = Buffer.alloc((w * 3 + 1) * h);
+    for (let y = 0; y < h; y++) rgb.copy(raw, y * (w * 3 + 1) + 1, y * w * 3, (y + 1) * w * 3);
+    const chunk = (type, data) => {
+        const len = Buffer.alloc(4);
+        len.writeUInt32BE(data.length);
+        const td = Buffer.concat([Buffer.from(type), data]);
+        const crc = Buffer.alloc(4);
+        crc.writeUInt32BE(zlib.crc32(td));
+        return Buffer.concat([len, td, crc]);
+    };
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(w, 0);
+    ihdr.writeUInt32BE(h, 4);
+    ihdr.set([8, 2, 0, 0, 0], 8);
+    return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr),
+                          chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+/* the panel as the player shows it: the screen doubled */
+function shot(engine, file) {
+    const s = engine.rgba(), rgb = Buffer.alloc(320 * 240 * 3);
+    for (let y = 0; y < 240; y++)
+        for (let x = 0; x < 320; x++) {
+            const i = ((y >> 1) * 160 + (x >> 1)) * 4, o = (y * 320 + x) * 3;
+            rgb[o] = s[i]; rgb[o + 1] = s[i + 1]; rgb[o + 2] = s[i + 2];
+        }
+    fs.writeFileSync(file, png(rgb, 320, 240));
+}
+
+function main() {
+    const o = args(process.argv.slice(2));
+    if (!o.cart) {
+        console.error('usage: pbgrun cart.pbg [--ticks n] [--seed s] [--units] [--shot file.png] ...');
+        return 2;
+    }
+    const out = [];
+    const flush = () => { if (out.length) { process.stdout.write(out.join('')); out.length = 0; } };
+    const at = input(o);
+    let t = 0, said = false, shotTaken = false, engine;
+    const host = {
+        print: (s) => out.push(s + '\n'),
+        click: (beep) => out.push('click ' + beep + '\n'),
+        setting: (name) => o.settings[name],
+        control: (what) => out.push('control ' + what + '\n'),
+        say: (text, queue) => out.push((queue ? 'queue ' : 'say ') + text + '\n'),
+        speechStop: () => out.push('stop\n'),
+        speechOn: () => !!o.speech,
+        glyph: o.font ? fontGlyph(o.font) : undefined,
+        /* a dialog's frame: the next tick's input, as pbgvm works it */
+        frame: (open) => {
+            if (!open) { said = false; return null; }
+            if (!said) {
+                const d = engine.dialog();
+                if (d) { said = true; out.push(d + '\n'); }
+            }
+            if (t + 1 >= o.ticks) {
+                if (o.shot && !shotTaken) { shot(engine, o.shot); shotTaken = true; }
+                return null;
+            }
+            const i = at(++t);
+            return { held: i.held, wheel: i.clicks };
+        }
+    };
+    const wasm = new WebAssembly.Module(fs.readFileSync(path.join(here, 'wasm', 'arcade.wasm')));
+    engine = new Engine(wasm, host);
+    const report = () => { flush(); console.error(engine.error()); return 1; };
+    if (!engine.load(new Uint8Array(fs.readFileSync(o.cart)), o.seed)) return report();
+    if (o.ceiling) engine.ceiling(o.ceiling);
+    if (!engine.start()) return report();
+    if (o.units) { flush(); console.error('start ' + engine.units()); }
+    const skips = entries(o.skip);
+    for (; t < o.ticks; t++) {
+        /* the tick it began as, though a dialog may run on past it */
+        const begun = t, i = at(t);
+        for (const [when, n] of skips) if (when === t) engine.skipped(n || 0);
+        if (!engine.tick(i.held, i.clicks, i.pos)) return report();
+        if (o.units) { flush(); console.error('tick ' + (begun + 1) + ' ' + engine.units()); }
+        engine.idle();
+    }
+    if (o.dump) {
+        const [x, y, w, h] = o.dump.split(',').map(Number), px = engine.pixels();
+        for (let j = y; j < y + h; j++) {
+            let line = '';
+            for (let k = x; k < x + w; k++)
+                line += (k >= 0 && j >= 0 && k < 160 && j < 120 ? px[j * 160 + k] & 15 : 0).toString(16);
+            out.push(line + '\n');
+        }
+    }
+    if (o.dirty) { const [lo, hi] = engine.dirty(); out.push('dirty ' + lo + ' ' + hi + '\n'); }
+    if (o.shot && !shotTaken) shot(engine, o.shot);
+    flush();
+    return 0;
+}
+
+process.exitCode = main();

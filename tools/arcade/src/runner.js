@@ -1,0 +1,171 @@
+/* The engine, wasm/arcade.wasm, driven from JavaScript: pbgrun's and the
+ * IDE's. The host's calls arrive as imports and go to `host`, an object
+ * of the functions below, any left out answering as the player does with
+ * nothing there:
+ *
+ *   print(text)               a printh line
+ *   date()                    [year, month, day, hour, minute, second, weekday]
+ *   click(beep)               the wheel's tick, or its beep
+ *   setting(name)             sys.setting: a number, a string, or undefined
+ *   control(what)             playback.toggle (0), next (1), prev (2)
+ *   frame()                   a dialog's next tick: { held, wheel }, or null
+ *                             to back out of it; called with no dialog open
+ *                             (done) when it is over
+ *   say(text, queue), speechBusy(), speechStop(), speechOn()
+ *   storeRead(name)           Uint8Array or undefined
+ *   storeWrite(name, bytes)   true when kept
+ *   storeRemove(name)         true when there was one
+ *   storeList()               the names, sorted
+ *   glyph(cp)                 13 bytes of FONT.WORLD glyph, or undefined
+ *
+ * frame() may also return a Promise, in the IDE, where the next tick comes
+ * from the page: the engine then pauses inside the call (Asyncify) and
+ * tick() returns a Promise too, settled once the dialog lets the tick end.
+ */
+
+export class Engine {
+    constructor(wasmModule, host) {
+        this.host = host || {};
+        const imports = { env: this.imports() };
+        this.inst = new WebAssembly.Instance(wasmModule, imports);
+        this.x = this.inst.exports;
+        this.pending = null;
+    }
+
+    get mem() { return new Uint8Array(this.x.memory.buffer); }
+    get view() { return new DataView(this.x.memory.buffer); }
+
+    cstr(ptr, len) {
+        const m = this.mem;
+        let end = ptr;
+        if (len === undefined) while (m[end]) end++;
+        else end = ptr + len;
+        return new TextDecoder().decode(m.subarray(ptr, end));
+    }
+
+    /* text into memory at ptr, at most cap bytes with its end */
+    put(ptr, cap, s) {
+        const b = new TextEncoder().encode(s).subarray(0, Math.max(0, cap - 1));
+        this.mem.set(b, ptr);
+        this.mem[ptr + b.length] = 0;
+    }
+
+    imports() {
+        const h = () => this.host;
+        return {
+            print: (p, n) => h().print && h().print(this.cstr(p, n)),
+            date: (out) => {
+                const d = h().date ? h().date() : [2026, 11, 3, 12, 0, 0, 2];
+                for (let i = 0; i < 7; i++) this.view.setInt32(out + i * 4, d[i], true);
+            },
+            click: (beep) => h().click && h().click(beep),
+            setting: (name, num, buf, cap) => {
+                const v = h().setting ? h().setting(this.cstr(name)) : undefined;
+                if (typeof v === 'number') { this.view.setInt32(num, v, true); return 1; }
+                if (typeof v === 'string') { this.put(buf, cap, v); return 2; }
+                return 0;
+            },
+            control: (what) => h().control && h().control(what),
+            frame: (held, wheel) => this.frame(held, wheel),
+            say: (t, q) => h().say && h().say(this.cstr(t), q),
+            speech_busy: () => (h().speechBusy && h().speechBusy() ? 1 : 0),
+            speech_stop: () => h().speechStop && h().speechStop(),
+            speech_on: () => (h().speechOn && h().speechOn() ? 1 : 0),
+            store_read: (name, buf, cap) => {
+                const b = h().storeRead && h().storeRead(this.cstr(name));
+                if (!b) return -1;
+                if (cap > 0) this.mem.set(b.subarray(0, Math.min(cap, b.length)), buf);
+                return cap > 0 ? Math.min(cap, b.length) : b.length;
+            },
+            store_write: (name, buf, n) =>
+                (h().storeWrite && h().storeWrite(this.cstr(name), this.mem.slice(buf, buf + n)) ? 1 : 0),
+            store_remove: (name) => (h().storeRemove && h().storeRemove(this.cstr(name)) ? 1 : 0),
+            store_list: (names, max) => {
+                const all = h().storeList ? h().storeList() : [];
+                const n = Math.min(all.length, max);
+                for (let i = 0; i < n; i++) this.put(names + i * 33, 33, all[i]);
+                return n;
+            },
+            glyph: (cp, out) => {
+                const g = h().glyph && h().glyph(cp);
+                if (!g) return 0;
+                this.mem.set(g.subarray(0, 13), out);
+                return 1;
+            }
+        };
+    }
+
+    /* env.frame: answered at once, or, for a Promise, the engine unwound
+     * here and rewound into it with the answer */
+    frame(held, wheel) {
+        const x = this.x;
+        if (x.asyncify_get_state() === 2) {
+            /* rewinding: the answer the Promise gave */
+            x.asyncify_stop_rewind();
+            const r = this.answer;
+            this.answer = null;
+            return this.give(r, held, wheel);
+        }
+        if (!this.host.frame) return held ? 0 : 1;
+        const r = this.host.frame(held !== 0);
+        if (r && typeof r.then === 'function') {
+            this.pending = r;
+            x.asyncify_start_unwind(this.asyncData);
+            return 0;
+        }
+        return this.give(r, held, wheel);
+    }
+
+    give(r, held, wheel) {
+        if (!held) return 1;
+        if (!r) return 0;
+        this.view.setUint32(held, r.held >>> 0, true);
+        this.view.setInt32(wheel, r.wheel | 0, true);
+        return 1;
+    }
+
+    /* fn called again until no frame() is waiting: its result, or a
+     * Promise of it when one was */
+    run(fn) {
+        const r = fn();
+        if (this.x.asyncify_get_state() !== 1) return r;
+        this.x.asyncify_stop_unwind();
+        const p = this.pending;
+        this.pending = null;
+        return p.then((answer) => {
+            this.answer = answer;
+            this.x.asyncify_start_rewind(this.asyncData);
+            return this.run(fn);
+        });
+    }
+
+    load(cart, seed = 1n) {
+        const x = this.x;
+        if (cart.length > x.web_cart_size()) return false;
+        this.mem.set(cart, x.web_cart());
+        this.asyncData = x.web_async_data();
+        const s = BigInt(seed);
+        return x.web_load(cart.length, Number(s & 0xffffffffn), Number(s >> 32n)) !== 0;
+    }
+
+    start() { return this.run(() => this.x.web_start() !== 0); }
+    tick(held, clicks, pos) { return this.run(() => this.x.web_tick(held, clicks, pos) !== 0); }
+    idle() { this.x.web_idle(); }
+    rate() { return this.x.web_rate(); }
+    units() { return this.x.web_units() >>> 0; }
+    ceiling(u) { this.x.web_ceiling(u); }
+    skipped(n) { this.x.web_skipped(n); }
+    error() { return this.cstr(this.x.web_error()); }
+    dialog() { return this.cstr(this.x.web_dialog()); }
+    dirty() { const d = this.x.web_dirty(); return [d >> 16, (d << 16) >> 16]; }
+
+    /* the screen: 160x120 RGBA, and its palette numbers */
+    rgba() { const p = this.x.web_screen(); return this.mem.slice(p, p + 160 * 120 * 4); }
+    pixels() { const p = this.x.web_pixels(); return this.mem.slice(p, p + 160 * 120); }
+
+    /* frames of stereo 16-bit sound at rate Hz */
+    audio(frames, rate) {
+        const p = this.x.web_audio(frames, rate);
+        return new Int16Array(this.x.memory.buffer.slice(p, p + frames * 4));
+    }
+}
