@@ -129,3 +129,27 @@ test('a dialog paused for each frame ends as one answered at once', async () => 
     assert.deepEqual(now.lines, ['1', 'A', '0']);
     assert.deepEqual(later, now);
 });
+
+test('the made-up music, library and beat: the same through both', () => {
+    const cart = JSON.stringify({ id: '00000000000a5a51', name: 'Music', music: 'control' });
+    const res = compileFiles({ 'cart.json': cart, 'main.js': `var st = new Int32Array(6), md = new Int32Array(3), b = new Int32Array(4), n = 0;
+function init() { beat.listen(true); printh(playback.title() + " " + tracks.count({ genre: "Rock" })); }
+function update() {
+    n++;
+    beat.state(st);
+    if (n % 10 == 0) {
+        beat.mood(md); playback.bands(b, 4);
+        printh(n + " " + st[0] + " " + beat.next(beat.clock(), 0) + " " + beat.inbar() + " " +
+               playback.elapsed() + " " + md[0] + " " + b[0]);
+    }
+    if (beat.press(4) >= 0) printh("press " + beat.press(4));
+    if (n == 45) playback.next();
+    if (playback.changed()) printh("now " + playback.title() + " " + playback.artist());
+}` });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'music.pbg');
+    fs.writeFileSync(file, res.cart);
+    both(file, ['--ticks', '80', '--beat', '0', '--buttons', '30:16,31:0']);
+    both(file, ['--ticks', '80', '--beat', '90', '--buttons', '30:16,31:0']);
+    both(file, ['--ticks', '20', '--playing']);
+});

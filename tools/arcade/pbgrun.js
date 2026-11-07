@@ -6,7 +6,7 @@
  *                   [--shot file.png] [--dump x,y,w,h] [--dirty]
  *                   [--buttons t:mask,...] [--wheel t:clicks[:pos],...]
  *                   [--skip t:n,...] [--setting name=value]... [--speech]
- *                   [--font font.bin]
+ *                   [--font font.bin] [--playing] [--beat bpm]
  *
  * printh() lines go to stdout; a runtime error to stderr as file:line:
  * message (in function), with exit status 1; --units prints each call's
@@ -37,6 +37,8 @@ function args(argv) {
         else if (a === '--wheel') o.wheel = v();
         else if (a === '--skip') o.skip = v();
         else if (a === '--speech') o.speech = true;
+        else if (a === '--playing') o.playing = true;
+        else if (a === '--beat') o.bpm = +v();
         else if (a === '--font') o.font = fs.readFileSync(v());
         else if (a === '--setting') {
             const [k, ...rest] = v().split('=');
@@ -110,7 +112,7 @@ function main() {
         print: (s) => out.push(s + '\n'),
         click: (beep) => out.push('click ' + beep + '\n'),
         setting: (name) => o.settings[name],
-        control: (what) => out.push('control ' + what + '\n'),
+        musicSay: (line) => out.push(line + '\n'),
         say: (text, queue) => out.push((queue ? 'queue ' : 'say ') + text + '\n'),
         speechStop: () => out.push('stop\n'),
         speechOn: () => !!o.speech,
@@ -132,17 +134,28 @@ function main() {
     };
     const wasm = new WebAssembly.Module(fs.readFileSync(path.join(here, 'wasm', 'arcade.wasm')));
     engine = new Engine(wasm, host);
+    /* the made-up music: there to read with --playing or --beat, its clock
+     * running with the ticks only with --beat, as pbgvm's */
+    engine.music({ playingFn: o.playing || o.bpm > 0, beat: o.bpm > 0,
+                   playing: o.playing || o.bpm > 0, bpm: o.bpm || 0 });
     const report = () => { flush(); console.error(engine.error()); return 1; };
     if (!engine.load(new Uint8Array(fs.readFileSync(o.cart)), o.seed)) return report();
     if (o.ceiling) engine.ceiling(o.ceiling);
     if (!engine.start()) return report();
     if (o.units) { flush(); console.error('start ' + engine.units()); }
     const skips = entries(o.skip);
+    let trackMs = 0, trackAt = 0;
     for (; t < o.ticks; t++) {
         /* the tick it began as, though a dialog may run on past it */
         const begun = t, i = at(t);
         for (const [when, n] of skips) if (when === t) engine.skipped(n || 0);
-        if (!engine.tick(i.held, i.clicks, i.pos)) return report();
+        let ms = 0;
+        if (o.bpm > 0) {
+            trackMs += 1000 / engine.rate();
+            ms = Math.trunc(trackMs) - trackAt;
+            trackAt = Math.trunc(trackMs);
+        }
+        if (!engine.tick(i.held, i.clicks, i.pos, true, ms)) return report();
         if (o.units) { flush(); console.error('tick ' + (begun + 1) + ' ' + engine.units()); }
         engine.idle();
     }

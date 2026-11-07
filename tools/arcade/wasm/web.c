@@ -6,12 +6,17 @@
  * pauses the module there with Asyncify and resumes it on the next tick,
  * while pbgrun answers it at once, as pbgvm does.
  *
- * Parts: the imports; the host built from them; driving a cart; what the
- * page reads back (the screen, the sound, the error, an open dialog). */
+ * The owner's music, its library and its beat are host/fakemusic.c's, as
+ * pbgvm's are: made up, playing as the page says.
+ *
+ * Parts: the imports; the host built from them; driving a cart; the music;
+ * what the page reads back (the screen, the sound, the error, an open
+ * dialog). */
 
 #include <stdint.h>
 #include <string.h>
 #include "games/arcade/arcade.h"
+#include "fakemusic.h"
 
 #define IMPORT(name) __attribute__((import_module("env"), import_name(name)))
 #define EXPORT(name) __attribute__((export_name(name)))
@@ -23,7 +28,6 @@ IMPORT("date") void js_date(int32_t *out);
 IMPORT("click") void js_click(int beep);
 IMPORT("setting") int js_setting(const char *name, int32_t *num, char *buf,
                                  int cap);
-IMPORT("control") void js_control(int what);
 IMPORT("frame") int js_frame(unsigned *held, int *wheel);
 IMPORT("say") void js_say(const char *text, int queue);
 IMPORT("speech_busy") int js_speech_busy(void);
@@ -36,6 +40,7 @@ IMPORT("store_write") int js_store_write(const char *name, const void *buf,
 IMPORT("store_remove") int js_store_remove(const char *name);
 IMPORT("store_list") int js_store_list(char (*names)[33], int max);
 IMPORT("glyph") int js_glyph(uint32_t cp, uint8_t *out);
+IMPORT("music_say") void js_music_say(const char *s, int len);
 
 /* ---- the host ------------------------------------------------------------ */
 
@@ -47,7 +52,6 @@ static void print(void *ctx, const char *s, int len)
 
 static void date(void *ctx, int32_t out[7]) { (void)ctx; js_date(out); }
 static void click(void *ctx, int beep) { (void)ctx; js_click(beep); }
-static void control(void *ctx, int what) { (void)ctx; js_control(what); }
 
 static int setting(void *ctx, const char *name, int32_t *num, char *buf,
                    int cap)
@@ -100,9 +104,10 @@ static int glyph(void *ctx, uint32_t cp, uint8_t out[13])
 static const struct arcade_speak speak = { say, busy, stop, on };
 static const struct arcade_store store = { st_read, st_write, st_remove,
                                            st_list };
-static const struct arcade_host host = {
-    NULL, print, NULL, date, click, NULL, NULL, setting, NULL, control,
-    NULL, frame, &speak, &store, glyph
+/* playing and beat are set by web_music, before the cart loads */
+static struct arcade_host host = {
+    NULL, print, NULL, date, click, NULL, NULL, setting, NULL, fake_control,
+    &fake_tracks, frame, &speak, &store, glyph
 };
 
 /* ---- driving a cart ------------------------------------------------------ */
@@ -112,6 +117,8 @@ static uint64_t arena[512 * 1024 / 8];
 static uint8_t cart[4 << 20];
 static uint32_t cart_len, cart_at;
 static struct vm *vm;
+
+static void music_start(void);
 
 static uint32_t cart_read(void *ctx, void *buf, uint32_t n)
 {
@@ -134,6 +141,7 @@ EXPORT("web_load") int web_load(uint32_t len, uint32_t seed_lo,
 {
     cart_len = len < sizeof(cart) ? len : sizeof(cart);
     cart_at = 0;
+    music_start();
     vm = arcade_load(arena, sizeof(arena), cart_read, NULL, &host,
                      (uint64_t)seed_hi << 32 | seed_lo);
     return vm && !arcade_error(vm, NULL, NULL, NULL);
@@ -152,13 +160,22 @@ EXPORT("web_ceiling") void web_ceiling(uint32_t u)
 }
 EXPORT("web_skipped") void web_skipped(unsigned n) { arcade_skipped(vm, n); }
 
-/* One tick, as the player runs it: the input, the music's state (none to
- * follow), the last frame presented, then the tick. Without draw it is
- * the update the player runs alone when it has fallen behind, the screen
- * not presented. 1, or 0 on an error. */
-EXPORT("web_tick") int web_tick(unsigned held, int clicks, int pos, int draw)
+/* One tick, as the player runs it: the input, the music ms on and its
+ * state, each new press stamped with its clock, the last frame presented,
+ * then the tick. Without draw it is the update the player runs alone when
+ * it has fallen behind, the screen not presented. 1, or 0 on an error. */
+static unsigned last_held;
+
+EXPORT("web_tick") int web_tick(unsigned held, int clicks, int pos, int draw,
+                                int32_t ms)
 {
     struct arcade_music m = { 0, 0, 0, 0, { -1, -1, -1, -1, -1 } };
+    fake_music_advance(ms);
+    fake_music_tick(&m);
+    for (int i = 0; i < 5; i++)
+        if ((held & ~last_held) & (1u << i))
+            m.press[i] = m.clock;
+    last_held = held;
     arcade_input(vm, held, clicks, pos);
     arcade_music(vm, &m);
     if (draw)
@@ -167,6 +184,54 @@ EXPORT("web_tick") int web_tick(unsigned held, int clicks, int pos, int draw)
 }
 
 EXPORT("web_idle") void web_idle(void) { arcade_idle(vm); }
+
+/* ---- the music ---------------------------------------------------------- */
+
+static int music_playing, music_bpm;
+
+static void music_say(const char *line)
+{
+    js_music_say(line, (int)strlen(line));
+}
+
+/* Before a cart loads: whether playback.playing() and beat have music to
+ * report (pbgvm's --playing and --beat), the music playing at first, and
+ * a tempo for every track (0 for each its own) */
+EXPORT("web_music") void web_music(int playing_fn, int beat, int playing,
+                                   int bpm)
+{
+    host.playing = playing_fn ? fake_playing : NULL;
+    host.beat = beat ? &fake_beat : NULL;
+    music_playing = playing;
+    music_bpm = bpm;
+}
+
+static void music_start(void)
+{
+    fake_music_init(music_say);
+    fake_music_tempo(music_bpm);
+    fake_music_play(music_playing);
+    last_held = 0;
+}
+
+/* the page's own play, pause and skips (0 toggles, 1 next, 2 back) */
+EXPORT("web_music_control") void web_music_control(int what)
+{
+    fake_music_control(what);
+}
+
+EXPORT("web_music_tempo") void web_music_tempo(int bpm) { fake_music_tempo(bpm); }
+
+/* what is playing: the track's id, ms into it, length, tempo, and whether
+ * it plays; its title, artist and album through web_music_text */
+static int32_t now[5];
+
+EXPORT("web_music_now") int32_t *web_music_now(void)
+{
+    now[0] = fake_music_now(&now[1], &now[2], &now[3]);
+    now[4] = fake_playing(NULL);
+    return now;
+}
 
 /* ---- what the page reads back -------------------------------------------- */
 
@@ -257,6 +322,31 @@ EXPORT("web_error") const char *web_error(void)
         put(")");
     } else
         put(msg);
+    return text;
+}
+
+/* The playing track's title, artist or album (ARCADE_TRACK_*), or "" */
+EXPORT("web_music_text") const char *web_music_text(int what)
+{
+    text_len = 0;
+    text[0] = 0;
+    if (!fake_tracks.text(NULL, what, text, sizeof(text)))
+        text[0] = 0;
+    return text;
+}
+
+/* Any track of the library's field f (ARCADE_TRACK_*) as text, numbers
+ * too; "" past its end */
+EXPORT("web_track_field") const char *web_track_field(int id, int f)
+{
+    int32_t num = 0;
+    text_len = 0;
+    text[0] = 0;
+    int kind = fake_tracks.field(NULL, id, f, &num, text, sizeof(text));
+    if (kind == 1)
+        put_num(num);
+    else if (kind != 2)
+        text[0] = 0;
     return text;
 }
 

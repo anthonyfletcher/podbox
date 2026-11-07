@@ -7,7 +7,8 @@
  *   date()                    [year, month, day, hour, minute, second, weekday]
  *   click(beep)               the wheel's tick, or its beep
  *   setting(name)             sys.setting: a number, a string, or undefined
- *   control(what)             playback.toggle (0), next (1), prev (2)
+ *   musicSay(line)            what a cart asked of the made-up music:
+ *                             "seek 30000", "control 1"
  *   frame()                   a dialog's next tick: { held, wheel }, or null
  *                             to back out of it; called with no dialog open
  *                             (done) when it is over
@@ -65,7 +66,7 @@ export class Engine {
                 if (typeof v === 'string') { this.put(buf, cap, v); return 2; }
                 return 0;
             },
-            control: (what) => h().control && h().control(what),
+            music_say: (p, n) => h().musicSay && h().musicSay(this.cstr(p, n)),
             frame: (held, wheel) => this.frame(held, wheel),
             say: (t, q) => h().say && h().say(this.cstr(t), q),
             speech_busy: () => (h().speechBusy && h().speechBusy() ? 1 : 0),
@@ -149,8 +150,29 @@ export class Engine {
     }
 
     start() { return this.run(() => this.x.web_start() !== 0); }
-    tick(held, clicks, pos, draw = true) {
-        return this.run(() => this.x.web_tick(held, clicks, pos, draw ? 1 : 0) !== 0);
+    /* ms: how far the music has played since the last tick */
+    tick(held, clicks, pos, draw = true, ms = 0) {
+        return this.run(() => this.x.web_tick(held, clicks, pos, draw ? 1 : 0, ms | 0) !== 0);
+    }
+
+    /* Before load: whether playback.playing() and beat report music (as
+     * pbgvm's --playing and --beat), the music playing at first, and one
+     * tempo for every track (0, each its own) */
+    music(o) {
+        this.x.web_music(o.playingFn ? 1 : 0, o.beat ? 1 : 0, o.playing ? 1 : 0, o.bpm | 0);
+    }
+    musicControl(what) { this.x.web_music_control(what); }
+    /* any library track's field: 0 title, 1 artist, 2 album, 3 genre,
+     * 4 year, 5 length in ms, as text; "" past the library's end */
+    trackField(id, f) { return this.cstr(this.x.web_track_field(id, f)); }
+    musicTempo(bpm) { this.x.web_music_tempo(bpm | 0); }
+
+    /* what is playing: { id, ms, length, bpm, playing, title, artist, album } */
+    nowPlaying() {
+        const p = this.x.web_music_now(), v = new Int32Array(this.x.memory.buffer, p, 5);
+        const text = (k) => this.cstr(this.x.web_music_text(k));
+        return { id: v[0], ms: v[1], length: v[2], bpm: v[3], playing: v[4] !== 0,
+                 title: text(0), artist: text(1), album: text(2) };
     }
     idle() { this.x.web_idle(); }
     rate() { return this.x.web_rate(); }

@@ -202,6 +202,17 @@ show as `?`.
   would on that player, so a cart doing more than the player manages
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
+- **The music** under the screen stands in for the owner's: a made-up
+  library of five albums and a spoken chapter (Run > The music library),
+  its queue playing through the first ten tracks. `playback` and
+  `tracks` read it and `beat` hears each track's steady tempo; play,
+  pause and skip it there, set one tempo for every track, and tick
+  Metronome to hear the beat. `pbgvm --beat` and `pbgrun --beat` use the
+  same library.
+- **Pictures**: open `sheet.png` or an image to draw on it in palette
+  colours. Paste a picture from any program, or drop one on the editor:
+  colours not in the palette take the nearest, and the console says how
+  many. Copy puts the selection on the clipboard for other programs too.
 - **Errors** are marked in the code as you type. A runtime error stops the
   cart, marks its line and opens the file at it.
 - **Hints**: inside a call, the function's arguments show with the one

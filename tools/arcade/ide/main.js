@@ -355,7 +355,9 @@ async function run() {
     /* a run ends when another starts: each keeps its own engine */
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
+    e.music({ playingFn: true, beat: true, playing: musicOn, bpm: tempo() });
     if (!e.load(lastBuild.cart, BigInt(Date.now()))) return fault();
+    metronomeAt = -1;
     e.ceiling(CEILING);
     if (!audio) audio = new AudioContext({ sampleRate: 44100 });
     audio.resume();
@@ -386,7 +388,7 @@ async function run() {
         }
         const i = input();
         dialogShown = false;
-        const ok = await e.tick(i.held, i.clicks, i.pos);
+        const ok = await e.tick(i.held, i.clicks, i.pos, true, Math.round(1000 / rate));
         if (!live()) break;
         if (!ok) return fault();
         if (dialogShown) rebase(e);
@@ -401,6 +403,7 @@ async function run() {
         present();
         shown(rate);
         sound();
+        music(e);
         e.idle();
     }
 }
@@ -448,6 +451,7 @@ function sound() {
 /* the engine's calls on the page, for the run whose engine is e() */
 const hostFor = (e, live) => ({
     print: (s) => say('print', s),
+    musicSay: (line) => say('music', 'music: ' + line),
     click: () => {},
     say: (text, queue) => say('say', (queue ? 'then says: ' : 'says: ') + text),
     speechOn: () => $('speech').classList.contains('on'),
@@ -575,6 +579,80 @@ $('screen').addEventListener('blur', () => { keys = 0; });
     svg.addEventListener('pointerup', up);
     svg.addEventListener('pointercancel', up);
 })();
+
+/* ---- the made-up music ---------------------------------------------------- */
+
+let musicOn = true, metronomeAt = -1;
+
+function tempo() {
+    const v = +$('m-bpm').value;
+    return v >= 40 && v <= 240 ? Math.round(v) : 0;
+}
+
+const clockText = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
+
+/* the panel, and the metronome's click on each beat it crossed */
+function music(e) {
+    const n = e.nowPlaying();
+    musicOn = n.playing;
+    $('m-play').innerHTML = n.playing ? '&#x23F8;' : '&#x23F5;';
+    $('m-now').firstChild.textContent = n.id < 0 ? 'Nothing playing' : n.title;
+    $('m-now').lastChild.textContent = n.id < 0 ? '' : n.artist + ' \u2013 ' + n.album;
+    $('m-time').textContent = n.id < 0 ? '' : clockText(n.ms) + ' / ' + clockText(n.length) +
+        (n.bpm ? ', ' + n.bpm + ' bpm' : ', spoken');
+    if (!n.bpm || !n.playing) { metronomeAt = -1; return; }
+    const beat = Math.floor(n.ms / (60000 / n.bpm));
+    if (metronomeAt >= 0 && beat !== metronomeAt && $('m-click').checked) tick(beat % 4 === 0);
+    metronomeAt = beat;
+}
+
+function tick(accent) {
+    if (!audio) return;
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + 0.01;
+    o.frequency.value = accent ? 1760 : 1320;
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    o.connect(g).connect(audio.destination);
+    o.start(t);
+    o.stop(t + 0.06);
+}
+
+$('m-play').onclick = () => {
+    if (engine && running) { engine.musicControl(0); music(engine); } else {
+        musicOn = !musicOn;
+        $('m-play').innerHTML = musicOn ? '&#x23F8;' : '&#x23F5;';
+    }
+};
+$('m-next').onclick = () => { if (engine && running) { engine.musicControl(1); music(engine); } };
+$('m-prev').onclick = () => { if (engine && running) { engine.musicControl(2); music(engine); } };
+$('m-bpm').onchange = () => { if (engine && running) engine.musicTempo(tempo()); };
+
+/* the library, read from the engine that holds it */
+function showLibrary() {
+    const e = new Engine(wasm, {});
+    const list = $('library-list');
+    list.innerHTML = '';
+    let album = null, table = null;
+    for (let id = 0; e.trackField(id, 0); id++) {
+        const [title, artist, alb, genre, year, length] = [0, 1, 2, 3, 4, 5].map((f) => e.trackField(id, f));
+        if (alb !== album) {
+            album = alb;
+            const h = document.createElement('h3');
+            h.textContent = alb + ' \u2013 ' + artist + ' (' + genre + ', ' + year + ')';
+            table = document.createElement('table');
+            list.append(h, table);
+        }
+        const tr = document.createElement('tr');
+        for (const [text, cls] of [[id, 'n'], [title, ''], [clockText(+length), 'n']]) {
+            const td = document.createElement('td');
+            td.textContent = text;
+            if (cls) td.className = cls;
+            tr.append(td);
+        }
+        table.append(tr);
+    }
+    $('library').showModal();
+}
 
 /* ---- the console, and what the player would show -------------------------- */
 
@@ -792,7 +870,8 @@ const ACTIONS = {
     stop: stop,
     speech: () => $('speech').classList.toggle('on'),
     keys: () => $('help-keys').showModal(),
-    devices: () => $('help-devices').showModal()
+    devices: () => $('help-devices').showModal(),
+    library: showLibrary
 };
 
 /* the menus: a click opens one; while one is open, hovering moves along

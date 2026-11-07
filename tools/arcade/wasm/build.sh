@@ -17,7 +17,7 @@ if [ ! -x "$WASI_SDK/bin/clang" ] || [ ! -x "$BINARYEN/bin/wasm-opt" ]; then
     exit 1
 fi
 
-srcs="$here/web.c $engine/vm.c $engine/gc.c $engine/loader.c
+srcs="$here/web.c $here/../host/fakemusic.c $engine/vm.c $engine/gc.c $engine/loader.c
       $engine/verify.c $engine/natives.c $engine/core_math.c
       $engine/core_draw.c $engine/core_input.c $engine/present.c
       $engine/core_sound.c $engine/sys_actors.c $engine/sys_plane.c
@@ -28,7 +28,7 @@ srcs="$here/web.c $engine/vm.c $engine/gc.c $engine/loader.c
 
 "$WASI_SDK/bin/clang" --target=wasm32-wasip1 -std=gnu11 -O2 \
     -W -Wall -Wextra -Wundef -Wstrict-prototypes -Wno-unknown-attributes \
-    -I"$apps" \
+    -I"$apps" -I"$here/../host" \
     -nostartfiles -Wl,--no-entry -Wl,-z,stack-size=1048576 \
     -o "$here/arcade.raw.wasm" $srcs
 "$BINARYEN/bin/wasm-opt" -O2 --asyncify \

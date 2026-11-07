@@ -614,7 +614,8 @@ function update() {
      * began, beats on the half-second, the press stamped with its tick */
     assert.deepEqual(r.out.trim().split('\n'), [
         '0 -1', '1212 1 120 500', '1500 3 2000 0', '0 30',
-        'press 1545 1545', '30 178182 0']);
+        /* the first track is 214 s long */
+        'press 1545 1545', '30 212182 0']);
     /* with no music, the clock stands still and nothing locks */
     const q = run(cart, 45);
     assert.deepEqual(q.out.trim().split('\n'),
@@ -805,8 +806,8 @@ function update() {}`);
 test('playback and tracks: the playing track, the library, the queue, and owning the music', () => {
     const main = `var ids = new Int32Array(8), near = [0, 0, 0], snd = new Int32Array(SOUND.SIZE), tk = 0;
 function init() {
-    // pbgvm's library: twenty tracks, Rock, Jazz and Pop in turn from 1970,
-    // track 19 spoken; a queue of the first ten, playing the first
+    // pbgvm's library (host/fakemusic.c): five albums of four, the last
+    // of three and a spoken chapter; a queue of the first ten, playing the first
     printh(playback.track() + " " + playback.title() + "|" + playback.artist() + "|" + playback.album() + " " + playback.length());
     printh(tracks.count() + " " + tracks.count({ music: true }) + " " + tracks.count({ genre: "Jazz" }) + " " + tracks.count({ decade: 1980, music: true }) + " " + tracks.count({ minlen: 200000 }));
     var k = tracks.pick(3, { genre: "Pop" }, ids);
@@ -834,14 +835,16 @@ function update() {
     const r = spawnSync(exe, [file, '--ticks', '5'], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(r.stdout.replace(/\r/g, '').trim().split('\n'), [
-        '0 Track 0|Artist A|Album 0 120000',
-        /* 20 in all, 19 music; Jazz is 1, 4, 7 ... 19 (7); the 80s are
-         * 10-18 (9, none spoken); 200 s or more is 14 on (6) */
-        '20 19 7 9 6',
-        '3 2 5 8',
-        'Track 4|Jazz|1974|144000|null',
-        '3 3,9,0',
-        '1 430',
+        '0 Lighthouse|Harbour Lamps|Northern Lights 214000',
+        /* 20 in all, 19 music; Jazz is Blue Hours, 4-7; the 80s Engine
+         * Room, 12-15; under 200 s are 1, 7, 9 and 11, so 16 are not */
+        '20 19 4 4 16',
+        '3 8 9 10',
+        'Half Past Midnight|Jazz|1962|326000|null',
+        /* the Jazz nearest track 6 */
+        '3 5,7,4',
+        /* track 3 at 84 bpm: a beat every 714 ms */
+        '1 714',
         '10 0 2 -1',
         '1 11 15',
         'seek 30000',

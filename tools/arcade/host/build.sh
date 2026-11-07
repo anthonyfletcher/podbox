@@ -28,7 +28,7 @@ fi
 out="$here/pbgvm"
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) out="$out.exe" ;; esac
 
-srcs="$here/pbgvm.c $engine/vm.c $engine/gc.c $engine/loader.c
+srcs="$here/pbgvm.c $here/fakemusic.c $engine/vm.c $engine/gc.c $engine/loader.c
       $engine/verify.c $engine/natives.c $engine/core_math.c
       $engine/core_draw.c $engine/core_input.c $engine/present.c
       $engine/core_sound.c $engine/sys_actors.c $engine/sys_plane.c $engine/sys_grid.c $engine/sys_path.c $engine/sys_noise.c $engine/sys_cells.c $engine/sys_links.c $engine/sys_land.c $engine/sys_walls.c $engine/sys_score.c $engine/sys_opt.c $engine/sys_ui.c $engine/sys_speak.c $engine/sys_data.c $engine/json.c"
@@ -38,7 +38,7 @@ srcs="$here/pbgvm.c $engine/vm.c $engine/gc.c $engine/loader.c
 stale=1
 if [ -f "$out" ]; then
     stale=0
-    for f in $srcs "$engine"/*.h "$engine"/*.def "$apps/games/arcade/arcade.h"; do
+    for f in $srcs "$here"/*.h "$engine"/*.h "$engine"/*.def "$apps/games/arcade/arcade.h"; do
         if [ "$f" -nt "$out" ]; then stale=1; break; fi
     done
 fi

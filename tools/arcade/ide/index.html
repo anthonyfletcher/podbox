@@ -47,6 +47,22 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #play { display: flex; align-items: center; gap: 8px; width: 320px; }
 #play button { padding: 3px 12px; }
 #rate { font-size: 12px; color: var(--dim); white-space: pre-line; }
+#music { width: 320px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+         display: flex; flex-direction: column; gap: 4px; }
+#music .row { display: flex; align-items: center; gap: 6px; }
+#music .row.small { font-size: 12px; color: var(--dim); gap: 10px; white-space: nowrap; }
+#music .row.small label { display: flex; align-items: center; gap: 4px; }
+#m-time { flex: 1; }
+#music button { padding: 2px 8px; font-size: 13px; }
+#m-now { display: flex; flex-direction: column; min-width: 0; font-size: 12px; line-height: 1.3; }
+#m-now b, #m-now span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#m-now span { color: var(--dim); }
+#m-bpm { width: 56px; font: inherit; background: var(--bg); color: var(--ink);
+         border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
+#library table { border-collapse: collapse; font-size: 13px; }
+#library td { padding: 2px 10px 2px 0; }
+#library td.n { color: var(--dim); text-align: right; }
+#library h3 { margin: 12px 0 4px; font-size: 14px; }
 .pix { display: flex; flex-direction: column; height: 100%; outline: none; }
 .pix-tools { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
 .pix-tools button { padding: 3px 9px; font-size: 13px; }
@@ -113,6 +129,7 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
 #console div { white-space: pre-wrap; word-break: break-word; }
 #console .error { color: var(--bad); }
 #console .say { color: var(--accent); }
+#console .music { color: var(--dim); }
 #console .link { cursor: pointer; text-decoration: underline dotted; }
 @media (max-width: 900px) {
     main { grid-template-columns: 1fr; grid-template-rows: auto 50vh auto; }
@@ -153,6 +170,7 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
       <button data-device="free" class="choice">No limit</button>
       <hr>
       <button data-do="speech" class="check" id="speech">Menus spoken</button>
+      <button data-do="library">The music library&hellip;</button>
     </div></div>
     <div class="menu"><button class="title">Help</button><div class="items">
       <button data-do="keys">Keys and the wheel</button>
@@ -178,6 +196,20 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
     </svg>
     <div id="play"><button id="run" class="primary" title="Ctrl+Enter">Run</button>
       <button id="stop" title="Shift+Ctrl+Enter">Stop</button><span id="rate"></span></div>
+    <div id="music">
+      <div class="row">
+        <button id="m-prev" title="Back a track">&#x23EE;</button>
+        <button id="m-play" title="Play or pause the music">&#x23F5;</button>
+        <button id="m-next" title="Next track">&#x23ED;</button>
+        <div id="m-now"><b>The owner's music</b><span>made up: plays while a cart runs</span></div>
+      </div>
+      <div class="row small">
+        <span id="m-time"></span>
+        <label title="A click on each beat, the bar's first higher"><input type="checkbox" id="m-click"> Metronome</label>
+        <label title="Every track at this tempo; empty for each its own">Tempo
+          <input id="m-bpm" type="number" min="40" max="240" placeholder="own"></label>
+      </div>
+    </div>
     <div id="console"></div>
   </aside>
 </main>
@@ -197,6 +229,14 @@ it falls far behind.</p>
 <p>The iPod Video with music playing is the slowest a game will meet, and
 a game that keeps its frame rate there keeps it everywhere. The timings
 are estimates from measurements on the players.</p>
+<form method="dialog"><button>Close</button></form></dialog>
+<dialog id="library"><h2>The music library</h2>
+<p>While a cart runs in the IDE, this made-up library stands in for the
+owner's music: <code>playback</code> and <code>tracks</code> read it, the queue
+plays the first ten tracks in turn, and <code>beat</code> hears each track's
+steady tempo, locking a second after the cart starts listening. The
+spoken chapter has no beat.</p>
+<div id="library-list"></div>
 <form method="dialog"><button>Close</button></form></dialog>
 <script>/*SCRIPT*/</script>
 </body>
