@@ -18,8 +18,10 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
-import { PixelEditor, toPalette } from './pixels.js';
+import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { hints, about } from './hints.js';
+import { ask } from './ask.js';
+import capsBdf from '../fonts/caps.bdf';
 import wasmBytes from '../wasm/arcade.wasm';
 
 const $ = (id) => document.getElementById(id);
@@ -200,12 +202,20 @@ function showPicture(pane, file) {
             else for (const [k, v] of Object.entries(f)) flags[+k] = v;
         } catch (e) { /* the build reports it */ }
     }
-    pixels = new PixelEditor(pane, {
-        width: pic.width, height: pic.height, px: pic.px, rgb: rgb, sheet: sheet, flags: flags,
-        changed: (px) => {
-            folder[file] = writePicture(pic.width, pic.height, px, rgb);
-            changed();
-        },
+    const write = (px) => {
+        folder[file] = writePicture(pic.width, pic.height, px, rgb);
+        changed();
+    };
+    const say_ = (text, bad) => say(bad ? 'error' : 'print', text);
+    if (!sheet) {
+        pixels = new PixelEditor(pane, { width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
+                                         changed: write, say: say_ });
+        pixels.root.focus();
+        return;
+    }
+    pixels = new SheetEditor(pane, {
+        px: pic.px, rgb: rgb, flags: flags,
+        changed: write,
         flagsChanged: (f) => {
             const out = {};
             f.forEach((v, i) => { if (v) out[i] = v; });
@@ -214,9 +224,8 @@ function showPicture(pane, file) {
             showFiles();
             changed();
         },
-        say: (text, bad) => say(bad ? 'error' : 'print', text)
+        say: say_
     });
-    pixels.root.focus();
 }
 
 function showFiles() {
@@ -355,7 +364,7 @@ async function run() {
     /* a run ends when another starts: each keeps its own engine */
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
-    e.music({ playingFn: true, beat: true, playing: musicOn, bpm: tempo() });
+    e.music({ playingFn: true, beat: true, playing: musicOn, bpm: 0 });
     if (!e.load(lastBuild.cart, BigInt(Date.now()))) return fault();
     metronomeAt = -1;
     e.ceiling(CEILING);
@@ -408,15 +417,19 @@ async function run() {
     }
 }
 
-function stop() {
+/* the cart stopped; the screen cleared, but for an error, whose last
+ * frame stays to be looked at */
+function stop(keep) {
     running = false;
     paused = false;
     document.body.classList.remove('running', 'paused');
+    if (keep !== true) screen.clearRect(0, 0, 160, 120);
+    showDevice();
 }
 
 function fault() {
     const msg = engine.error();
-    stop();
+    stop(true);
     const m = /^([^:]+):(\d+): (.*)$/.exec(msg);
     say('error', msg, m ? { file: m[1], line: +m[2] } : null);
     if (m) {
@@ -584,11 +597,6 @@ $('screen').addEventListener('blur', () => { keys = 0; });
 
 let musicOn = true, metronomeAt = -1;
 
-function tempo() {
-    const v = +$('m-bpm').value;
-    return v >= 40 && v <= 240 ? Math.round(v) : 0;
-}
-
 const clockText = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
 
 /* the panel, and the metronome's click on each beat it crossed */
@@ -625,34 +633,6 @@ $('m-play').onclick = () => {
 };
 $('m-next').onclick = () => { if (engine && running) { engine.musicControl(1); music(engine); } };
 $('m-prev').onclick = () => { if (engine && running) { engine.musicControl(2); music(engine); } };
-$('m-bpm').onchange = () => { if (engine && running) engine.musicTempo(tempo()); };
-
-/* the library, read from the engine that holds it */
-function showLibrary() {
-    const e = new Engine(wasm, {});
-    const list = $('library-list');
-    list.innerHTML = '';
-    let album = null, table = null;
-    for (let id = 0; e.trackField(id, 0); id++) {
-        const [title, artist, alb, genre, year, length] = [0, 1, 2, 3, 4, 5].map((f) => e.trackField(id, f));
-        if (alb !== album) {
-            album = alb;
-            const h = document.createElement('h3');
-            h.textContent = alb + ' \u2013 ' + artist + ' (' + genre + ', ' + year + ')';
-            table = document.createElement('table');
-            list.append(h, table);
-        }
-        const tr = document.createElement('tr');
-        for (const [text, cls] of [[id, 'n'], [title, ''], [clockText(+length), 'n']]) {
-            const td = document.createElement('td');
-            td.textContent = text;
-            if (cls) td.className = cls;
-            tr.append(td);
-        }
-        table.append(tr);
-    }
-    $('library').showModal();
-}
 
 /* ---- the console, and what the player would show -------------------------- */
 
@@ -833,31 +813,193 @@ async function exportCart() {
     a.click();
 }
 
-function newFile() {
-    const name = window.prompt('A new file: its name, such as enemy.js, sheet.png or images/title.png');
-    if (!name) return;
-    if (folder[name] !== undefined) { show(name); return; }
-    if (!/^([A-Za-z_]\w*\.js|sheet\.png|(images\/\w+\.png|palettes\/\w+\.gpl|maps\/\w+\.json|sounds\/\w+\.json|data\/\w+\.(json|txt)|fonts\/\w+\.bdf))$/.test(name)) {
-        say('error', name + ': a code file is a name and .js; pictures are sheet.png and images/name.png; ' +
-            'data goes in data/, as data/levels.json');
+/* ---- the cart's files: made, added from disk, renamed, deleted ----------- */
+
+const NAME = /^[A-Za-z_]\w*$/;
+
+/* where a file of each kind lives, by its name */
+const KINDS = {
+    code: { label: 'Code', path: (n) => n + '.js' },
+    sheet: { label: 'The sprite sheet', path: () => 'sheet.png' },
+    image: { label: 'An image', path: (n) => 'images/' + n + '.png' },
+    palette: { label: 'A palette', path: (n) => 'palettes/' + n + '.gpl' },
+    map: { label: 'A map', path: (n) => 'maps/' + n + '.json' },
+    sound: { label: 'A sound', path: (n) => 'sounds/' + n + '.json' },
+    data: { label: 'Data (JSON)', path: (n) => 'data/' + n + '.json' },
+    text: { label: 'Text', path: (n) => 'data/' + n + '.txt' },
+    font: { label: 'A font, starting from CAPS', path: (n) => 'fonts/' + n + '.bdf' }
+};
+
+/* the cart's palette as a GIMP palette */
+function gpl(name, rgb) {
+    return 'GIMP Palette\nName: ' + name + '\n#\n' +
+        rgb.map((c) => [c >> 16, c >> 8 & 255, c & 255].map((v) => String(v).padStart(3)).join(' ')).join('\n') + '\n';
+}
+
+/* what a new file of each kind holds */
+function fresh(kind, name, a) {
+    const rgb = palette(folder);
+    switch (kind) {
+    case 'code': return '// ' + name + '.js: its functions are ' + name + '.name() elsewhere\n';
+    case 'sheet': return writePicture(128, 128, new Uint8Array(128 * 128), rgb);
+    case 'image': return writePicture(+a.w, +a.h, new Uint8Array(a.w * a.h), rgb);
+    case 'palette': return gpl(name, rgb);
+    case 'map': return JSON.stringify({ width: +a.mw, height: +a.mh,
+        rows: Array.from({ length: +a.mh }, () => '00'.repeat(+a.mw)), objects: [] }, null, 1) + '\n';
+    case 'sound': return JSON.stringify({ wave_type: 0, p_env_attack: 0, p_env_sustain: 0.08,
+        p_env_decay: 0.12, p_base_freq: 0.45, sound_vol: 0.5 }) + '\n';
+    case 'data': return '{\n}\n';
+    case 'text': return '';
+    case 'font': return capsBdf;
+    }
+    return '';
+}
+
+async function newFile() {
+    const kinds = Object.entries(KINDS).filter(([k]) => k !== 'sheet' || folder['sheet.png'] === undefined);
+    const a = await ask('New file', [
+        { name: 'kind', label: 'What', options: kinds.map(([k, v]) => [k, v.label]) },
+        { name: 'name', label: 'Name', value: '', when: (v) => v.kind !== 'sheet',
+          note: 'Letters, digits and _: the name the code calls it by' },
+        { name: 'w', label: 'Width', type: 'number', value: 64, when: (v) => v.kind === 'image' },
+        { name: 'h', label: 'Height', type: 'number', value: 64, when: (v) => v.kind === 'image',
+          note: 'Pixels, up to 1024 each way' },
+        { name: 'mw', label: 'Width', type: 'number', value: 32, when: (v) => v.kind === 'map' },
+        { name: 'mh', label: 'Height', type: 'number', value: 16, when: (v) => v.kind === 'map',
+          note: 'Cells, up to 256 each way' }
+    ], 'Make it');
+    if (!a) return;
+    const name = a.kind === 'sheet' ? 'sheet' : a.name.trim();
+    if (!NAME.test(name)) { say('error', 'A name is letters, digits and _, not starting with a digit.'); return; }
+    if (a.kind === 'code' && name === 'main') { say('error', 'main.js is there already.'); return; }
+    if (a.kind === 'image' && !(a.w >= 1 && a.w <= 1024 && a.h >= 1 && a.h <= 1024)) {
+        say('error', 'An image is 1 to 1024 pixels each way.');
         return;
     }
-    if (name === 'sheet.png') folder[name] = writePicture(128, 128, new Uint8Array(128 * 128), palette(folder));
-    else if (/\.png$/.test(name)) {
-        const size = /^(\d+)\s*x\s*(\d+)$/.exec(window.prompt('Its size: width x height', '64 x 64') || '');
-        const w = size && +size[1], h = size && +size[2];
-        if (!w || !h || w > 1024 || h > 1024) { say('error', 'A picture is 1 to 1024 pixels a side.'); return; }
-        folder[name] = writePicture(w, h, new Uint8Array(w * h), palette(folder));
-    } else folder[name] = '';
+    if (a.kind === 'map' && !(a.mw >= 1 && a.mw <= 256 && a.mh >= 1 && a.mh <= 256)) {
+        say('error', 'A map is 1 to 256 cells each way.');
+        return;
+    }
+    const path = KINDS[a.kind].path(name);
+    if (folder[path] !== undefined) { say('error', path + ' is there already.'); show(path); return; }
+    folder[path] = fresh(a.kind, name, a);
     showFiles();
-    show(name);
+    show(path);
+    changed();
+}
+
+/* where a file from disk goes, by its kind */
+function placeFor(file, text) {
+    const base = file.name.replace(/\.[^.]*$/, '').replace(/[^\w]/g, '_').replace(/^(\d)/, '_$1');
+    const ext = (/\.([^.]*)$/.exec(file.name) || [])[1] || '';
+    switch (ext.toLowerCase()) {
+    case 'js': return base + '.js';
+    case 'gpl': return 'palettes/' + base + '.gpl';
+    case 'bdf': return 'fonts/' + base + '.bdf';
+    case 'txt': return 'data/' + base + '.txt';
+    case 'png': case 'gif': case 'jpg': case 'jpeg':
+        return base === 'sheet' ? 'sheet.png' : 'images/' + base + '.png';
+    case 'json': {
+        let v = null;
+        try { v = JSON.parse(text); } catch (e) { /* data, to show its error */ }
+        if (base === 'flags') return 'flags.json';
+        if (v && v.width && v.height && Array.isArray(v.rows)) return 'maps/' + base + '.json';
+        if (v && ('wave_type' in v || 'p_base_freq' in v)) return 'sounds/' + base + '.json';
+        return 'data/' + base + '.json';
+    }
+    }
+    return null;
+}
+
+/* files from disk, each put where its kind belongs; a picture that is not
+ * of palette numbers is matched to the palette */
+function addFiles() {
+    const i = document.createElement('input');
+    i.type = 'file';
+    i.multiple = true;
+    i.accept = '.js,.json,.png,.gif,.jpg,.jpeg,.gpl,.bdf,.txt';
+    i.onchange = async () => {
+        for (const f of i.files) {
+            const picture = /^image\//.test(f.type);
+            const text = picture ? '' : await f.text();
+            const to = placeFor(f, text);
+            if (!to) { say('error', f.name + ': not a kind of file a cart holds.'); continue; }
+            if (folder[to] !== undefined &&
+                await ask('Replace ' + to + '?', [], 'Replace it') === null) continue;
+            if (!picture) folder[to] = text;
+            else {
+                const bytes = new Uint8Array(await f.arrayBuffer());
+                const rgb = palette(folder);
+                let pic = null;
+                try { pic = /\.png$/i.test(f.name) ? readPicture(bytes) : null; } catch (e) { /* matched below */ }
+                if (pic) folder[to] = bytes;
+                else {
+                    const bmp = await createImageBitmap(f);
+                    const c = document.createElement('canvas');
+                    c.width = bmp.width;
+                    c.height = bmp.height;
+                    c.getContext('2d').drawImage(bmp, 0, 0);
+                    const { px, near } = toPalette(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, rgb);
+                    folder[to] = writePicture(c.width, c.height, px, rgb);
+                    if (near) say('print', f.name + ': ' + near + ' pixels took the nearest colour of the palette.');
+                }
+            }
+            say('print', 'Added ' + to + '.');
+            delete states[to];
+            showFiles();
+            show(to);
+            changed();
+        }
+    };
+    i.click();
+}
+
+const KEPT = ['main.js', 'cart.json'];
+
+async function renameFile() {
+    const f = current;
+    if (KEPT.includes(f) || f === 'sheet.png' || f === 'flags.json') {
+        say('error', f + ' keeps its name: the engine looks for it by it.');
+        return;
+    }
+    const m = /^(.*\/)?([^/]+)(\.[^.]+)$/.exec(f);
+    const a = await ask('Rename ' + f, [{ name: 'name', label: 'Name', value: m[2],
+        note: 'The code then calls it by the new name' }], 'Rename');
+    if (!a) return;
+    const name = a.name.trim();
+    if (!NAME.test(name)) { say('error', 'A name is letters, digits and _, not starting with a digit.'); return; }
+    const to = (m[1] || '') + name + m[3];
+    if (to === f) return;
+    if (folder[to] !== undefined) { say('error', to + ' is there already.'); return; }
+    folder[to] = folder[f];
+    delete folder[f];
+    if (states[f]) { states[to] = states[f]; delete states[f]; }
+    current = to;
+    showFiles();
+    show(to);
+    changed();
+}
+
+async function removeFile() {
+    const f = current;
+    if (KEPT.includes(f)) { say('error', 'Every cart has ' + f + '.'); return; }
+    if (await ask('Delete ' + f + '?', [], 'Delete') === null) return;
+    delete folder[f];
+    delete states[f];
+    current = 'main.js';
+    showFiles();
+    show('main.js');
     changed();
 }
 
 /* ---- the page ------------------------------------------------------------ */
 
 const ACTIONS = {
-    new: () => { if (confirmLeave()) { load(NEW_CART()); saveTo = null; } },
+    new: async () => {
+        if (await ask('Start a new cart?', [], 'New cart') === null) return;
+        load(NEW_CART());
+        saveTo = null;
+    },
     open: openCart,
     'open-folder': openFolder,
     save: save,
@@ -866,12 +1008,13 @@ const ACTIONS = {
     redo: () => view && redo(view),
     find: () => view && openSearchPanel(view),
     add: newFile,
+    import: addFiles,
+    rename: renameFile,
+    remove: removeFile,
     run: run,
     stop: stop,
     speech: () => $('speech').classList.toggle('on'),
     keys: () => $('help-keys').showModal(),
-    devices: () => $('help-devices').showModal(),
-    library: showLibrary
 };
 
 /* the menus: a click opens one; while one is open, hovering moves along
@@ -908,9 +1051,6 @@ showDevice();
 $('run').onclick = run;
 $('stop').onclick = stop;
 
-function confirmLeave() {
-    return window.confirm('Start a new cart? The one open now is kept only if you saved it.');
-}
 
 document.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -925,7 +1065,7 @@ document.addEventListener('drop', async (e) => {
     const f = e.dataTransfer.files[0];
     if (f && /\.pbg$/i.test(f.name)) openBytes(new Uint8Array(await f.arrayBuffer()), null);
     /* a picture dropped on the pixel editor goes in as a paste does */
-    else if (f && pixels && /^image\//.test(f.type)) pixels.pasteImage(f);
+    else if (f && pixels && /^image\//.test(f.type)) (pixels.editor || pixels).pasteImage(f);
 });
 
 (async function start() {

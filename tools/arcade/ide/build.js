@@ -27,7 +27,7 @@ const out = await esbuild.build({
     minify: true,
     write: false,
     target: ['es2020'],
-    loader: { '.def': 'text', '.md': 'text', '.wasm': 'binary' },
+    loader: { '.def': 'text', '.md': 'text', '.bdf': 'text', '.wasm': 'binary' },
     legalComments: 'eof'
 });
 const js = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');

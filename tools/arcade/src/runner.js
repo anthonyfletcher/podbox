@@ -162,10 +162,6 @@ export class Engine {
         this.x.web_music(o.playingFn ? 1 : 0, o.beat ? 1 : 0, o.playing ? 1 : 0, o.bpm | 0);
     }
     musicControl(what) { this.x.web_music_control(what); }
-    /* any library track's field: 0 title, 1 artist, 2 album, 3 genre,
-     * 4 year, 5 length in ms, as text; "" past the library's end */
-    trackField(id, f) { return this.cstr(this.x.web_track_field(id, f)); }
-    musicTempo(bpm) { this.x.web_music_tempo(bpm | 0); }
 
     /* what is playing: { id, ms, length, bpm, playing, title, artist, album } */
     nowPlaying() {

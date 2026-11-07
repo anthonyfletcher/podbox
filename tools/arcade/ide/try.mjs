@@ -11,7 +11,8 @@
  * the editor's cursor at the word HERE, and "PasteImage@t" pastes a
  * 24x16 rainbow, its bottom rows clear, as another program would;
  * "PasteEmpty@t" pastes with nothing on the clipboard, and
- * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds. BROWSER names a
+ * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds,
+ * and "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
  * policy still serves. */
@@ -67,6 +68,21 @@ const script = `<script>
                 const el = document.querySelector(sel);
                 el.focus();
                 el.dispatchEvent(new KeyboardEvent('keydown', { key: name, ctrlKey: mod === 'ctrl', bubbles: true }));
+            }, +at);
+            continue;
+        }
+        if (key.startsWith('Drag:')) {
+            /* Drag:<selector>:fx0;fy0;fx1;fy1, as fractions of its box */
+            const [, sel, spec] = key.split(':');
+            const [fx0, fy0, fx1, fy1] = spec.split(';').map(Number);
+            setTimeout(() => {
+                const el = document.querySelector(sel), r = el.getBoundingClientRect();
+                const ev = (type, fx, fy) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1,
+                    clientX: r.left + r.width * fx, clientY: r.top + r.height * fy }));
+                ev('pointerdown', fx0, fy0);
+                ev('pointermove', (fx0 + fx1) / 2, (fy0 + fy1) / 2);
+                ev('pointermove', fx1, fy1);
+                ev('pointerup', fx1, fy1);
             }, +at);
             continue;
         }

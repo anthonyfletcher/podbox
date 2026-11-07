@@ -220,8 +220,6 @@ EXPORT("web_music_control") void web_music_control(int what)
     fake_music_control(what);
 }
 
-EXPORT("web_music_tempo") void web_music_tempo(int bpm) { fake_music_tempo(bpm); }
-
 /* what is playing: the track's id, ms into it, length, tempo, and whether
  * it plays; its title, artist and album through web_music_text */
 static int32_t now[5];
@@ -331,21 +329,6 @@ EXPORT("web_music_text") const char *web_music_text(int what)
     text_len = 0;
     text[0] = 0;
     if (!fake_tracks.text(NULL, what, text, sizeof(text)))
-        text[0] = 0;
-    return text;
-}
-
-/* Any track of the library's field f (ARCADE_TRACK_*) as text, numbers
- * too; "" past its end */
-EXPORT("web_track_field") const char *web_track_field(int id, int f)
-{
-    int32_t num = 0;
-    text_len = 0;
-    text[0] = 0;
-    int kind = fake_tracks.field(NULL, id, f, &num, text, sizeof(text));
-    if (kind == 1)
-        put_num(num);
-    else if (kind != 2)
         text[0] = 0;
     return text;
 }

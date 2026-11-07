@@ -1,10 +1,12 @@
-/* The pixel editor: a picture of palette numbers -- the sheet, or one of
- * the cart's images -- drawn on, a pixel at a time or by shape, with undo.
+/* The pixel editor: a picture of palette numbers -- one of the cart's
+ * images, or a block of the sheet's sprites -- drawn on, a pixel at a time
+ * or by shape, with undo. The sheet itself is a picker beside it
+ * (SheetEditor): a block of cells chosen there opens here.
  *
  * Parts: the picture and its palette; drawing it, zoomed, with the grids,
  * the selection and anything floating; the tools; the selection, and
- * copying and pasting, within the IDE and with other programs; the
- * keys; the sheet's flags.
+ * copying and pasting, within the IDE and with other programs; the keys;
+ * the sheet, its picker and its sprites' flags.
  *
  * A picture pasted from another program has its colours matched to the
  * palette: exactly where a colour is in it, else to the nearest, and the
@@ -56,23 +58,28 @@ export function toPalette(rgba, rgb) {
 
 export class PixelEditor {
     /* opts: width, height, px (Uint8Array), rgb (the palette, 0xRRGGBB),
-     * sheet (the 8x8 grid, sprite numbers and flags), flags (the sheet's
-     * 256), changed(px), flagsChanged(flags), say(text, error) */
+     * grid (lines every so many pixels, 8 for sprites), fit (the largest
+     * the picture is shown, in pixels), was (another editor whose tool,
+     * colours and mirror carry on), changed(px), tooBig(picture) (a
+     * pasted picture wider or taller than this one: true when handled),
+     * say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.w = opts.width;
         this.h = opts.height;
         this.px = opts.px;
         this.rgb = opts.rgb;
-        this.colour = [Math.min(7, this.rgb.length - 1), 0];
-        this.tool = 'pencil';
-        this.zoom = Math.max(1, Math.min(16, Math.floor(560 / Math.max(this.w, this.h))));
+        const was = opts.was;
+        this.colour = was ? was.colour.slice() : [Math.min(7, this.rgb.length - 1), 0];
+        this.tool = was ? was.tool : 'pencil';
+        /* as large as the room it has, but whole pixels */
+        const fit = opts.fit || Math.max(128, Math.min(parent.clientWidth - 48, parent.clientHeight - 150));
+        this.zoom = Math.max(1, Math.min(32, Math.floor(fit / Math.max(this.w, this.h))));
         this.undo = [];
         this.redo = [];
         this.sel = null;          /* { x, y, w, h } */
         this.float = null;        /* { x, y, w, h, px } over the picture */
-        this.mirror = false;
-        this.sprite = 0;
+        this.mirror = was ? was.mirror : false;
         this.build(parent);
         this.render();
     }
@@ -134,19 +141,13 @@ export class PixelEditor {
         this.swatches = document.createElement('div');
         this.swatches.className = 'pix-palette';
         root.append(this.swatches);
-
-        if (this.o.sheet) {
-            this.flagRow = document.createElement('div');
-            this.flagRow.className = 'pix-flags';
-            root.append(this.flagRow);
-        }
         parent.append(root);
 
         this.image = new ImageData(this.w, this.h);
         this.listen();
-        this.use('pencil');
+        this.use(this.tool);
+        this.mirrorButton.classList.toggle('on', this.mirror);
         this.drawPalette();
-        this.drawFlags();
         this.setZoom(this.zoom);
     }
 
@@ -221,17 +222,13 @@ export class PixelEditor {
             for (let y = 1; y < this.h; y++) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
             g.stroke();
         }
-        if (this.o.sheet) {
-            g.strokeStyle = 'rgba(128,128,128,0.6)';
+        const grid = this.o.grid;
+        if (grid) {
+            g.strokeStyle = 'rgba(128,128,128,0.7)';
             g.beginPath();
-            for (let x = 8; x < this.w; x += 8) { g.moveTo(x * z + 0.5, 0); g.lineTo(x * z + 0.5, this.h * z); }
-            for (let y = 8; y < this.h; y += 8) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
+            for (let x = grid; x < this.w; x += grid) { g.moveTo(x * z + 0.5, 0); g.lineTo(x * z + 0.5, this.h * z); }
+            for (let y = grid; y < this.h; y += grid) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
             g.stroke();
-            const sx = (this.sprite % 16) * 8, sy = (this.sprite >> 4) * 8;
-            g.strokeStyle = '#ffd23c';
-            g.lineWidth = 2;
-            g.strokeRect(sx * z + 1, sy * z + 1, 8 * z - 2, 8 * z - 2);
-            g.lineWidth = 1;
         }
         const pixel = (x, y, c) => {
             const s = shown(this.rgb[c] || 0);
@@ -282,11 +279,7 @@ export class PixelEditor {
     put(x, y, c) {
         if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
         this.px[y * this.w + x] = c;
-        if (this.mirror) {
-            /* across the middle of the sprite, on the sheet; of the picture otherwise */
-            const mx = this.o.sheet ? (x & ~7) + 7 - (x & 7) : this.w - 1 - x;
-            this.px[y * this.w + mx] = c;
-        }
+        if (this.mirror) this.px[y * this.w + this.w - 1 - x] = c;
     }
 
     at(e) {
@@ -427,6 +420,7 @@ export class PixelEditor {
     /* a picture placed floating at the selection's corner, or where the
      * view is, to be moved and then dropped */
     place(c) {
+        if ((c.w > this.w || c.h > this.h) && this.o.tooBig && this.o.tooBig(c)) return;
         this.drop();
         this.keep();
         this.use('select');
@@ -523,10 +517,6 @@ export class PixelEditor {
             const p = this.at(e), c = this.colour[e.button === 2 ? 1 : 0];
             down = { p, c, shift: e.shiftKey };
             last = p;
-            if (this.o.sheet && p.x >= 0 && p.y >= 0 && p.x < this.w && p.y < this.h) {
-                this.sprite = (p.y >> 3) * 16 + (p.x >> 3);
-                this.drawFlags();
-            }
             const tool = e.altKey ? 'pick' : this.tool;
             if (tool === 'pick') {
                 const v = this.px[p.y * this.w + p.x];
@@ -643,7 +633,7 @@ export class PixelEditor {
         if (p.x < 0 || p.y < 0 || p.x >= this.w || p.y >= this.h) return '';
         const v = this.px[p.y * this.w + p.x];
         let s = 'x ' + p.x + ', y ' + p.y + ': colour ' + v;
-        if (this.o.sheet) s += '; sprite ' + ((p.y >> 3) * 16 + (p.x >> 3));
+        if (this.o.where) s += this.o.where(p);
         if (this.sel || this.float) {
             const b = this.float || this.sel;
             s += '; selection ' + b.w + 'x' + b.h;
@@ -651,26 +641,176 @@ export class PixelEditor {
         return s;
     }
 
-    /* the flags of the sprite last clicked on */
+    /* what an editor of the sheet's carries on into the next */
+    get state() { return { tool: this.tool, colour: this.colour, mirror: this.mirror }; }
+}
+
+/* The sheet: its 256 sprites as a picker, a block of cells chosen there --
+ * one, or a range dragged across -- open beside it in the editor, the
+ * edits written back to the sheet; and the chosen sprites' eight flags.
+ * A picture pasted into the block that is too big for it widens the block
+ * to fit, from its top left, as far as the sheet goes. */
+export class SheetEditor {
+    /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
+     * flagsChanged(flags), say(text, error) */
+    constructor(parent, opts) {
+        this.o = opts;
+        this.px = opts.px;
+        this.cell = { x: 0, y: 0, w: 1, h: 1 };
+        const root = this.root = document.createElement('div');
+        root.className = 'sheet';
+        const side = document.createElement('div');
+        side.className = 'sheet-side';
+        this.picker = document.createElement('canvas');
+        this.picker.className = 'sheet-picker';
+        this.picker.width = this.picker.height = 128 * 2;
+        this.info = document.createElement('div');
+        this.info.className = 'sheet-info';
+        this.flagRow = document.createElement('div');
+        this.flagRow.className = 'pix-flags';
+        const help = document.createElement('p');
+        help.className = 'sheet-help';
+        help.textContent = 'Click a sprite, or drag across several, to draw on them. Flags are ' +
+            'yours to give meanings: fget() reads them, and map() and actors.move() ' +
+            'pick cells by them.';
+        side.append(this.picker, this.info, this.flagRow, help);
+        this.edit = document.createElement('div');
+        this.edit.className = 'sheet-edit';
+        root.append(side, this.edit);
+        parent.append(root);
+        this.pick();
+        this.open();
+    }
+
+    destroy() {
+        if (this.editor) this.editor.destroy();
+        this.root.remove();
+    }
+
+    focus() { if (this.editor) this.editor.root.focus(); }
+
+    /* sprites of the chosen block, by number */
+    sprites() {
+        const out = [];
+        for (let y = this.cell.y; y < this.cell.y + this.cell.h; y++)
+            for (let x = this.cell.x; x < this.cell.x + this.cell.w; x++) out.push(y * 16 + x);
+        return out;
+    }
+
+    pick() {
+        const cv = this.picker;
+        let from = null;
+        const at = (e) => {
+            const r = cv.getBoundingClientRect();
+            return { x: Math.max(0, Math.min(15, Math.floor((e.clientX - r.left) / (r.width / 16)))),
+                     y: Math.max(0, Math.min(15, Math.floor((e.clientY - r.top) / (r.height / 16)))) };
+        };
+        cv.addEventListener('pointerdown', (e) => {
+            try { cv.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+            from = at(e);
+            this.cell = { x: from.x, y: from.y, w: 1, h: 1 };
+            this.drawPicker();
+        });
+        cv.addEventListener('pointermove', (e) => {
+            if (!from) return;
+            const p = at(e);
+            this.cell = { x: Math.min(from.x, p.x), y: Math.min(from.y, p.y),
+                          w: Math.abs(p.x - from.x) + 1, h: Math.abs(p.y - from.y) + 1 };
+            this.drawPicker();
+        });
+        const up = () => { if (from) { from = null; this.open(); } };
+        cv.addEventListener('pointerup', up);
+        cv.addEventListener('pointercancel', up);
+    }
+
+    /* the chosen block in the editor, as its own picture */
+    open(paste) {
+        const c = this.cell, w = c.w * 8, h = c.h * 8, block = new Uint8Array(w * h);
+        for (let y = 0; y < h; y++)
+            block.set(this.px.subarray((c.y * 8 + y) * 128 + c.x * 8, (c.y * 8 + y) * 128 + c.x * 8 + w), y * w);
+        const was = this.editor && this.editor.state;
+        if (this.editor) this.editor.destroy();
+        this.editor = new PixelEditor(this.edit, {
+            width: w, height: h, px: block, rgb: this.o.rgb, grid: 8, was: was,
+            where: (p) => '; sprite ' + ((c.y + (p.y >> 3)) * 16 + c.x + (p.x >> 3)),
+            changed: (b) => {
+                for (let y = 0; y < h; y++)
+                    this.px.set(b.subarray(y * w, (y + 1) * w), (c.y * 8 + y) * 128 + c.x * 8);
+                this.drawPicker();
+                this.o.changed(this.px);
+            },
+            tooBig: (pic) => this.grow(pic),
+            say: this.o.say
+        });
+        this.drawPicker();
+        this.drawFlags();
+        if (paste) this.editor.place(paste);
+        this.editor.root.focus();
+    }
+
+    /* a picture too big for the block: the block widened to hold it */
+    grow(pic) {
+        const c = this.cell;
+        const w = Math.min(16 - c.x, Math.max(c.w, Math.ceil(pic.w / 8)));
+        const h = Math.min(16 - c.y, Math.max(c.h, Math.ceil(pic.h / 8)));
+        if (w === c.w && h === c.h) return false;
+        this.cell = { x: c.x, y: c.y, w, h };
+        this.open(pic);
+        return true;
+    }
+
+    drawPicker() {
+        const g = this.picker.getContext('2d'), z = 2;
+        const im = new ImageData(128, 128);
+        for (let i = 0; i < this.px.length; i++) {
+            const s = shown(this.o.rgb[this.px[i]] || 0);
+            im.data[i * 4] = s >> 16; im.data[i * 4 + 1] = s >> 8 & 255; im.data[i * 4 + 2] = s & 255;
+            im.data[i * 4 + 3] = 255;
+        }
+        const tmp = document.createElement('canvas');
+        tmp.width = tmp.height = 128;
+        tmp.getContext('2d').putImageData(im, 0, 0);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(tmp, 0, 0, 128 * z, 128 * z);
+        g.strokeStyle = 'rgba(128,128,128,0.5)';
+        g.beginPath();
+        for (let k = 8; k < 128; k += 8) {
+            g.moveTo(k * z + 0.5, 0); g.lineTo(k * z + 0.5, 128 * z);
+            g.moveTo(0, k * z + 0.5); g.lineTo(128 * z, k * z + 0.5);
+        }
+        g.stroke();
+        const c = this.cell;
+        g.strokeStyle = '#ffd23c';
+        g.lineWidth = 2;
+        g.strokeRect(c.x * 8 * z + 1, c.y * 8 * z + 1, c.w * 8 * z - 2, c.h * 8 * z - 2);
+        g.lineWidth = 1;
+        const n = this.sprites();
+        this.info.textContent = n.length === 1 ? 'Sprite ' + n[0]
+            : 'Sprites ' + n[0] + ' to ' + n[n.length - 1] + ', ' + c.w + ' by ' + c.h +
+              ': spr(' + n[0] + ', x, y, ' + c.w + ', ' + c.h + ')';
+    }
+
+    /* each flag on for all the chosen sprites, for some, or for none; a
+     * click sets it on all of them, or clears it where all had it */
     drawFlags() {
-        if (!this.flagRow) return;
-        const f = this.o.flags;
+        const f = this.o.flags, n = this.sprites();
         this.flagRow.innerHTML = '';
         const label = document.createElement('span');
-        label.textContent = 'Sprite ' + this.sprite + ' flags';
+        label.textContent = 'Flags';
         this.flagRow.append(label);
         for (let b = 0; b < 8; b++) {
+            const on = n.filter((s) => f[s] >> b & 1).length;
             const t = document.createElement('button');
             t.textContent = b;
-            t.title = 'flag ' + b + ': fget(' + this.sprite + ', ' + b + ')';
-            t.classList.toggle('on', (f[this.sprite] >> b & 1) === 1);
+            t.title = 'flag ' + b + ' (worth ' + (1 << b) + ' in a set of flags): fget(n, ' + b + ')';
+            t.classList.toggle('on', on === n.length);
+            t.classList.toggle('some', on > 0 && on < n.length);
             t.onclick = () => {
-                f[this.sprite] ^= 1 << b;
+                for (const s of n) f[s] = on === n.length ? f[s] & ~(1 << b) : f[s] | 1 << b;
                 this.o.flagsChanged(f);
                 this.drawFlags();
             };
             this.flagRow.append(t);
         }
-        this.overlay();
     }
 }

@@ -203,14 +203,14 @@ show as `?`.
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
 - **The music** under the screen stands in for the owner's: a made-up
-  library of five albums and a spoken chapter (Run > The music library),
-  its queue playing through the first ten tracks. `playback` and
-  `tracks` read it and `beat` hears each track's steady tempo; play,
-  pause and skip it there, set one tempo for every track, and tick
-  Metronome to hear the beat. `pbgvm --beat` and `pbgrun --beat` use the
+  library of five albums and a spoken chapter, its queue playing through
+  the first ten tracks. `playback` and `tracks` read it and `beat`
+  hears each track's steady tempo; play, pause and skip it there, and
+  tick Metronome to hear the beat. `pbgvm --beat` and `pbgrun --beat` use the
   same library.
-- **Pictures**: open `sheet.png` or an image to draw on it in palette
-  colours. Paste a picture from any program, or drop one on the editor:
+- **Pictures**: open an image to draw on it in palette colours. The
+  sprite sheet opens as a picker: click a sprite, or drag across several,
+  to draw on them, and set the chosen sprites' flags. Paste a picture from any program, or drop one on the editor:
   colours not in the palette take the nearest, and the console says how
   many. Copy puts the selection on the clipboard for other programs too.
 - **Errors** are marked in the code as you type. A runtime error stops the
@@ -219,7 +219,10 @@ show as `?`.
   you are at in bold, and what it does; hovering over a name shows the
   same. Your own functions show their arguments and the comment above
   them. The API's are from `api.md`, the reference to every function.
-- **Open** (File menu) takes a `.pbg`, and dropping one on the page
+- **Files**: the File menu makes a new file of any kind a cart holds,
+  adds files from disk (each goes where its kind belongs, and a picture is
+  matched to the palette), and renames or deletes the one open.
+- **Open** (Cart menu) takes a `.pbg`, and dropping one on the page
   opens it too. **Save as .pbg** writes the cart. In Chrome and Edge, Save
   writes back to the file you opened, and **Open folder** edits a cart
   folder in place, Save writing its files back.
