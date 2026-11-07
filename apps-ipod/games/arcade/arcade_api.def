@@ -325,6 +325,9 @@ API(light_draw,       202, 5, 5, VOID, 0, PIXELS, LISTEN, 1)
 /* The plane's ceiling, a sprite table over the map like the floor's */
 API(plane_ceiling,    203, 1, 5, VOID, 0, PIXELS, LISTEN, 1)
 
+/* The height print would take: its lines, in the current font and size */
+API(texth,            204, 1, 1, VAL,  PARTS, FLAT, LISTEN, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

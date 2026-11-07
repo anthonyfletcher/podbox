@@ -1809,6 +1809,20 @@ NATIVE(textw)
     return 1;
 }
 
+NATIVE(texth)
+{
+    char *buf = text_buf;
+    if (!vm_parts(vm, a, argc, "texth"))
+        return 0;
+    uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
+    int lines = 1;
+    for (uint32_t i = 0; i < n; i++)
+        lines += buf[i] == '\n';
+    *out = mk(T_INT, lines * (vm->d.font == 2 ? TEXT_LINE : 6) *
+                     scale_of(vm));
+    return 1;
+}
+
 /* font(f) or font(f, size): size 1 or 2, 1 if left out */
 NATIVE(font)
 {

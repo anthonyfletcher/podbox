@@ -101,6 +101,29 @@ function update() {}`);
     assert.equal(out[3], '76 82');
 });
 
+test('text: in the current font and size, cutting UTF-8 whole', () => {
+    const out = run(['text'], `function init() {
+    font(FONT.CAPS, 2);
+    printh(text.width("ABC") + " " + texth("A") + " " + texth("A\\nB"));
+    cls(0);
+    printh(text.box("the quick brown fox", 0, 0, 80, 7));
+    font(FONT.WORLD);
+    printh(texth("") + " " + text.box("Ωμέγα Ωμέγα", 0, 0, textw("Ωμέγα") + 2, 7));
+    // no spaces: cut where it fills the box, never inside a character
+    cls(0);
+    var h = text.box("ЖЖЖЖЖЖ", 0, 0, textw("ЖЖЖ") + 2, 7);
+    var ink = 0;
+    for (var y = 0; y < 30; y++) for (var x = 0; x < 160; x++) if (pget(x, y) == 7) ink++;
+    cls(0); print("ЖЖЖ\\nЖЖЖ", 0, 0, 7);
+    var want = 0;
+    for (y = 0; y < 30; y++) for (x = 0; x < 160; x++) if (pget(x, y) == 7) want++;
+    printh(h + " " + (ink == want));
+}
+function update() {}`);
+    /* CAPS at 2: 8 a character, 12 a line; ten a line in 80 */
+    assert.deepEqual(out, ['24 12 24', '24', '12 24', '24 1']);
+});
+
 test('palfx: fades from the kept colours and back, and flashes', () => {
     const out = run(['palfx'], `function init() {
     setpal(7, 0xff8000);

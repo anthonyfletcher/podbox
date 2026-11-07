@@ -1,6 +1,5 @@
-// text: numbers, times and words laid out on the screen. Widths are the
-// FONT.CAPS's, four pixels a character; a cart drawing at size 2 uses
-// twice them.
+// text: numbers, times and words laid out on the screen, in the current
+// font and size.
 //
 //   text.pad(n, width)          n with noughts in front to width digits
 //   text.clock(seconds)         as m:ss.t
@@ -9,10 +8,8 @@
 //   text.right(s, x, y, c)      s ending at x
 //   text.outline(s, x, y, c, edge)
 //                               s in c with a one-pixel edge round it
-//   text.box(s, x, y, w, c)     s wrapped at spaces to lines w pixels wide,
-//                               a line every six pixels; returns the height
-
-const CHAR = 4, LINE = 6;
+//   text.box(s, x, y, w, c)     s wrapped at spaces to lines w pixels wide;
+//                               returns the height
 
 function pad(n, width) {
     var s = "" + n;
@@ -27,7 +24,7 @@ function clock(seconds) {
 }
 
 function width(s) {
-    return s.length * CHAR;
+    return textw(s);
 }
 
 function centre(s, x, y, c) {
@@ -45,22 +42,36 @@ function outline(s, x, y, c, edge) {
     print(s, x, y, c);
 }
 
+// the byte after the character starting at i
+function after(s, i) {
+    i++;
+    while (i < s.length && (s.charCodeAt(i) & 0xc0) == 0x80) i++;
+    return i;
+}
+
 // lines of whole words as wide as fit; a word wider than the box is cut
 function box(s, x, y, w, c) {
-    var per = max(1, flr(w / CHAR)), lines = 0, start = 0;
+    var line = texth(""), lines = 0, start = 0;
     while (start < s.length) {
         // skip the spaces a line would begin with
         while (start < s.length && s.charCodeAt(start) == 32) start++;
         if (start >= s.length) break;
-        var end = min(start + per, s.length);
+        // the most characters that fit, at least one; strings are UTF-8
+        // bytes, so a character is cut whole
+        var end = after(s, start);
+        while (end < s.length) {
+            var next = after(s, end);
+            if (textw(s.substring(start, next)) > w) break;
+            end = next;
+        }
         if (end < s.length && s.charCodeAt(end) != 32) {
             var back = end;
             while (back > start && s.charCodeAt(back) != 32) back--;
             if (back > start) end = back;
         }
-        print(s.substring(start, end), x, y + lines * LINE, c);
+        print(s.substring(start, end), x, y + lines * line, c);
         lines++;
         start = end;
     }
-    return lines * LINE;
+    return lines * line;
 }
