@@ -6,7 +6,9 @@
  *
  * The key script is the page's own: "Enter@500,ArrowDown@800" presses
  * Enter at 500 ms of the run and the wheel's down at 800; "Turn@1000"
- * drags a quarter turn clockwise round the drawn wheel. BROWSER names a
+ * drags a quarter turn clockwise round the drawn wheel, and
+ * "Click:<selector>@t" clicks what the selector finds, and "Mark@t" puts
+ * the editor's cursor at the word HERE. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
  * policy still serves. */
@@ -55,6 +57,18 @@ const script = `<script>
     window.arcadeIde.run();
     for (const k of ${JSON.stringify(keyScript.split(',').filter(Boolean))}) {
         const [key, at] = k.split('@');
+        if (key === 'Mark') {
+            setTimeout(() => {
+                const v = window.arcadeIde.view(), at = v.state.doc.toString().indexOf('HERE');
+                v.focus();
+                v.dispatch({ selection: { anchor: at }, scrollIntoView: true });
+            }, +at);
+            continue;
+        }
+        if (key.startsWith('Click:')) {
+            setTimeout(() => document.querySelector(key.slice(6)).click(), +at);
+            continue;
+        }
         if (key === 'Turn') {
             setTimeout(() => {
                 const w = document.getElementById('wheel'), r = w.getBoundingClientRect();

@@ -2,20 +2,23 @@
  *
  * Parts: the cart (its files, kept in the browser between visits); the
  * editor, with errors from the compiler and the API's names to complete;
- * running it on the engine, a tick at the cart's rate, a dialog's frames
- * included; the input (keys and the drawn click wheel); the meter and the
- * console; opening and saving. */
+ * running it on the engine as one of the players would, a tick at the
+ * cart's rate, a dialog's frames included; the input (keys and the drawn
+ * click wheel); the console; opening and saving; the menus. */
 
 import { EditorView, basicSetup } from 'codemirror';
+import { undo, redo } from '@codemirror/commands';
+import { openSearchPanel } from '@codemirror/search';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { setDiagnostics, lintGutter } from '@codemirror/lint';
 import { autocompletion } from '@codemirror/autocomplete';
-import { Engine, budget, fontGlyphs } from '../src/runner.js';
+import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART } from './cart.js';
+import { hints, about } from './hints.js';
 import wasmBytes from '../wasm/arcade.wasm';
 
 const $ = (id) => document.getElementById(id);
@@ -105,11 +108,18 @@ function completions(ctx) {
             ? fileFunctions(ns + '.js') : null;
         const list = own || n.members[ns];
         if (!list) return null;
-        return { from: word.from + dot + 1, options: list.map((l) => ({ label: l, type: 'function' })) };
+        return { from: word.from + dot + 1, options: list.map((l) => option(ns + '.' + l, l)) };
     }
     const files = Object.keys(folder).filter((f) => /^[A-Za-z_]\w*\.js$/.test(f) && f !== 'main.js')
         .map((f) => f.slice(0, -3));
-    return { from: word.from, options: [...n.top, ...files].map((l) => ({ label: l })) };
+    return { from: word.from, options: [...n.top, ...files].map((l) => option(l, l)) };
+}
+
+/* a completion, with its signature and line where it is a function */
+function option(name, label) {
+    const a = about(name, folder);
+    return a ? { label: label, type: 'function', detail: a.sig.slice(a.sig.indexOf('(')), info: a.doc || undefined }
+             : { label: label };
 }
 
 /* the functions a namespace file declares */
@@ -124,7 +134,7 @@ function stateFor(file) {
     const lang = /\.js$/.test(file) ? [javascript()] : /\.json$/.test(file) ? [json()] : [];
     states[file] = EditorState.create({
         doc: String(folder[file]),
-        extensions: [basicSetup, ...lang, ...dark, lintGutter(), autocompletion({ override: [completions] }),
+        extensions: [basicSetup, ...lang, ...dark, lintGutter(), ...(/\.js$/.test(file) ? hints(() => folder) : []), autocompletion({ override: [completions] }),
                      EditorView.updateListener.of((u) => {
                          if (!u.docChanged) return;
                          folder[current] = u.state.doc.toString();
@@ -218,7 +228,7 @@ function goTo(file, line) {
 
 /* ---- running it ---------------------------------------------------------- */
 
-let engine = null, running = false, paused = false, generation = 0;
+let engine = null, running = false, paused = false, generation = 0, dialogShown = false;
 let audio = null, audioAt = 0;
 const screen = $('screen').getContext('2d');
 const image = screen.createImageData(160, 120);
@@ -231,18 +241,53 @@ function present() {
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, Math.max(0, ms)));
 
-let nextAt = 0;
-/* until e's next tick is due, keeping time even when a tick runs late */
-async function nextTick(e, live) {
-    const step = 1000 / e.rate();
-    nextAt += step;
-    const now = performance.now();
-    if (nextAt < now - 5 * step) {
-        e.skipped(Math.floor((now - nextAt) / step));
-        nextAt = now;
-    }
-    await sleep(nextAt - performance.now());
+/* The players a cart can be run as: a unit of script and a whole screen's
+ * update, in ms on each. The iPod Video's are measured; the Classic's are
+ * from its speed against the Video. */
+const DEVICES = {
+    '6g': { name: 'iPod Classic', unit: 0.00016, screen: 2.0 },
+    '5g': { name: 'iPod Video', unit: 0.00055, screen: 6.2 },
+    '5g-music': { name: 'iPod Video, music playing', unit: 0.0011, screen: 6.6 },
+    'free': { name: 'this computer, no limit', unit: 0, screen: 0 }
+};
+let device = '5g-music';
+try { if (DEVICES[localStorage.getItem('arcade-device')]) device = localStorage.getItem('arcade-device'); } catch (e) { /* none kept */ }
+
+/* The units one call may run before the player stops the cart as not
+ * responding: the shell's CEILING */
+const CEILING = 2000000;
+
+/* The player's clock, in ms of its own time: each tick takes what its
+ * units and the rows it drew take on the player, and when a tick runs
+ * late the player's rule applies -- behind by a whole tick, one update
+ * without drawing; further behind, the time is given up. */
+let clock;
+
+function clockStart() {
+    clock = { real: performance.now(), emu: 0, start: 0, frame: 0, drawn: [] };
+}
+
+/* after time the player does not count (a pause, a dialog), from now on */
+function rebase(e) {
+    clock.emu = performance.now() - clock.real;
+    clock.start = clock.emu - clock.frame * (1000 / e.rate());
+}
+
+async function until(ms, e, live) {
+    await sleep(clock.real + ms - performance.now());
+    if (!paused) return;
     while (paused && live()) await sleep(50);
+    rebase(e);
+}
+
+function cost(e, drawn) {
+    const d = DEVICES[device];
+    let ms = e.units() * d.unit;
+    if (drawn) {
+        const [lo, hi] = e.dirty();
+        if (hi >= lo) ms += (d.screen * (hi - lo + 1)) / 120;
+    }
+    return ms;
 }
 
 async function run() {
@@ -258,6 +303,7 @@ async function run() {
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
     if (!e.load(lastBuild.cart, BigInt(Date.now()))) return fault();
+    e.ceiling(CEILING);
     if (!audio) audio = new AudioContext({ sampleRate: 44100 });
     audio.resume();
     audioAt = 0;
@@ -265,19 +311,42 @@ async function run() {
     paused = false;
     $('screen').focus();
     document.body.classList.add('running');
-    meterReset();
-    nextAt = performance.now();
+    clockStart();
     if (!(await e.start())) return live() ? fault() : undefined;
     present();
+    rebase(e);
+    let rate = e.rate();
     while (live()) {
-        await nextTick(e, live);
+        const p = 1000 / rate;
+        clock.emu = Math.max(clock.emu, clock.start + clock.frame * p);
+        await until(clock.emu, e, live);
         if (!live()) break;
+        clock.frame++;
+        const late = clock.emu - (clock.start + clock.frame * p);
+        if (late >= p) {
+            e.skipped(Math.floor(late / p));
+            const i = input();
+            if (!(await e.tick(i.held, i.clicks, i.pos, false))) return live() ? fault() : undefined;
+            clock.emu += cost(e, false);
+            clock.frame++;
+            if (late >= 2 * p) clock.start = clock.emu - clock.frame * p;
+        }
         const i = input();
+        dialogShown = false;
         const ok = await e.tick(i.held, i.clicks, i.pos);
         if (!live()) break;
         if (!ok) return fault();
+        if (dialogShown) rebase(e);
+        else clock.emu += cost(e, true);
+        if (e.rate() !== rate) {
+            rate = e.rate();
+            clock.start = clock.emu - clock.frame * (1000 / rate);
+        }
+        /* shown when the player would have it on its screen */
+        await until(clock.emu, e, live);
+        if (!live()) break;
         present();
-        meter(e.units());
+        shown(rate);
         sound();
         e.idle();
     }
@@ -300,8 +369,16 @@ function fault() {
     }
 }
 
+/* the sound since the last: what the time since then holds, so a cart
+ * running slow on its player still sounds whole, as the player's sound
+ * is drawn by the audio, not the ticks */
+let soundAt = 0;
+
 function sound() {
-    const frames = Math.round(44100 / engine.rate());
+    const now = performance.now();
+    const frames = Math.min(4096, Math.round(((now - (soundAt || now - 1000 / engine.rate())) * 44100) / 1000));
+    soundAt = now;
+    if (frames <= 0) return;
     const pcm = engine.audio(frames, 44100);
     if (!pcm.some((v) => v)) return;
     const buf = audio.createBuffer(2, frames, 44100);
@@ -320,7 +397,7 @@ const hostFor = (e, live) => ({
     print: (s) => say('print', s),
     click: () => {},
     say: (text, queue) => say('say', (queue ? 'then says: ' : 'says: ') + text),
-    speechOn: () => $('speech').checked,
+    speechOn: () => $('speech').classList.contains('on'),
     glyph: glyph,
     storeRead: (name) => {
         const v = localStorage.getItem(storeKey(name));
@@ -336,12 +413,16 @@ const hostFor = (e, live) => ({
     },
     storeList: () => Object.keys(localStorage).filter((k) => k.startsWith(storeKey(''))).
         map((k) => k.slice(storeKey('').length)).sort(),
-    /* a dialog's frame: shown, then the next tick's input; null backs out */
+    /* a dialog's frame: shown, then the next tick's input, a tick of the
+     * cart's rate later; null backs out. The player's clock starts again
+     * after it. */
     frame: (open) => {
         if (!open) return null;
+        dialogShown = true;
         return Promise.resolve().then(async () => {
             if (live()) present();
-            await nextTick(e(), live);
+            await sleep(1000 / e().rate());
+            while (paused && live()) await sleep(50);
             if (!live()) return null;
             const i = input(true);
             return { held: i.held, wheel: i.clicks };
@@ -442,25 +523,23 @@ $('screen').addEventListener('blur', () => { keys = 0; });
     svg.addEventListener('pointercancel', up);
 })();
 
-/* ---- the meter and the console ------------------------------------------- */
+/* ---- the console, and what the player would show -------------------------- */
 
-let ticks = [];
+/* the ticks drawn in the last second of the player's time, against the
+ * cart's rate, on the player it runs as */
+function shown(rate) {
+    const t = clock.drawn;
+    t.push(clock.emu);
+    while (t.length && t[0] < clock.emu - 1000) t.shift();
+    $('rate').textContent = (t.length >= rate ? rate : t.length + ' of ' + rate) +
+        ' frames a second\nas ' + (device === 'free' ? 'fast as this computer' : 'an ' + DEVICES[device].name);
+}
 
-function meterReset() { ticks = []; }
-
-function meter(units) {
-    ticks.push(units);
-    const rate = engine.rate();
-    if (ticks.length > rate) ticks.shift();
-    const most = budget(rate);
-    const mean = ticks.reduce((a, b) => a + b, 0) / ticks.length;
-    const worst = Math.max(...ticks);
-    $('meter-bar').style.width = Math.min(100, (100 * mean) / most) + '%';
-    $('meter-worst').style.left = Math.min(100, (100 * worst) / most) + '%';
-    $('meter').classList.toggle('over', worst > most);
-    $('meter-text').textContent = Math.round(mean).toLocaleString() + ' units a tick, ' +
-        Math.round((100 * mean) / most) + '% of the 5G with music; worst ' +
-        Math.round((100 * worst) / most) + '%';
+function showDevice() {
+    for (const b of document.querySelectorAll('[data-device]'))
+        b.classList.toggle('on', b.dataset.device === device);
+    $('rate').textContent = device === 'free' ? 'Runs as fast as this computer.'
+        : 'Runs as an ' + DEVICES[device].name + '.';
 }
 
 function say(kind, text, where) {
@@ -639,12 +718,54 @@ function newFile() {
 
 /* ---- the page ------------------------------------------------------------ */
 
-$('new').onclick = () => { if (confirmLeave()) load(NEW_CART()); saveTo = null; };
-$('open').onclick = openCart;
-$('open-folder').onclick = openFolder;
-$('save').onclick = save;
-$('export').onclick = exportCart;
-$('add').onclick = newFile;
+const ACTIONS = {
+    new: () => { if (confirmLeave()) { load(NEW_CART()); saveTo = null; } },
+    open: openCart,
+    'open-folder': openFolder,
+    save: save,
+    export: exportCart,
+    undo: () => view && undo(view),
+    redo: () => view && redo(view),
+    find: () => view && openSearchPanel(view),
+    add: newFile,
+    run: run,
+    stop: stop,
+    speech: () => $('speech').classList.toggle('on'),
+    keys: () => $('help-keys').showModal(),
+    devices: () => $('help-devices').showModal()
+};
+
+/* the menus: a click opens one; while one is open, hovering moves along
+ * the bar; choosing an item or clicking elsewhere closes it */
+(function menus() {
+    const all = [...document.querySelectorAll('.menu')];
+    const close = () => all.forEach((m) => m.classList.remove('open'));
+    for (const m of all) {
+        const title = m.querySelector('.title');
+        title.onclick = (e) => {
+            e.stopPropagation();
+            const was = m.classList.contains('open');
+            close();
+            if (!was) m.classList.add('open');
+        };
+        title.onmouseenter = () => {
+            if (all.some((o) => o.classList.contains('open'))) { close(); m.classList.add('open'); }
+        };
+    }
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    for (const b of document.querySelectorAll('.menu .items button'))
+        b.onclick = (e) => {
+            e.stopPropagation();
+            close();
+            if (b.dataset.device) {
+                device = b.dataset.device;
+                try { localStorage.setItem('arcade-device', device); } catch (x) { /* not kept */ }
+                showDevice();
+            } else ACTIONS[b.dataset.do]();
+        };
+})();
+showDevice();
 $('run').onclick = run;
 $('stop').onclick = stop;
 
@@ -653,8 +774,10 @@ function confirmLeave() {
 }
 
 document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); save(); }
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) stop(); else run(); }
+    if (e.key === 's') { e.preventDefault(); save(); }
+    if (e.key === 'o') { e.preventDefault(); openCart(); }
 });
 
 document.addEventListener('dragover', (e) => e.preventDefault());
@@ -672,4 +795,5 @@ document.addEventListener('drop', async (e) => {
 })();
 
 /* for the tests, which drive the page */
-window.arcadeIde = { load, run, stop, openBytes, folder: () => folder, show, build: () => lastBuild };
+window.arcadeIde = { load, run, stop, openBytes, folder: () => folder, show, build: () => lastBuild,
+                    view: () => view };

@@ -21,23 +21,51 @@ body { background: var(--bg); color: var(--ink);
        display: grid; grid-template-rows: auto 1fr; }
 header { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
          border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
-header h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; }
-#cart-name { font-weight: 600; margin-right: auto; }
+header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
+#cart-name { font-weight: 600; margin-left: auto; }
+#menubar { display: flex; gap: 2px; }
+.menu { position: relative; }
+.menu .title { border: none; background: none; padding: 5px 10px; }
+.menu .title:hover, .menu.open .title { background: var(--bg); }
+.menu .items { display: none; position: absolute; top: 100%; left: 0; z-index: 10;
+               min-width: 240px; padding: 4px; background: var(--panel);
+               border: 1px solid var(--line); border-radius: 8px;
+               box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
+.menu.open .items { display: block; }
+.menu .items button { display: flex; width: 100%; border: none; background: none;
+                      text-align: left; padding: 6px 10px; border-radius: 5px; }
+.menu .items button:hover { background: var(--accent); color: #fff; }
+.menu .items kbd { margin-left: auto; padding-left: 24px; font: 12px system-ui, sans-serif;
+                   color: var(--dim); }
+.menu .items button:hover kbd { color: #fff; }
+.menu .items hr { border: none; border-top: 1px solid var(--line); margin: 4px 6px; }
+.menu .items .label { font-size: 12px; color: var(--dim); padding: 4px 10px 2px; }
+.menu .items .choice::before, .menu .items .check::before { content: ""; display: inline-block;
+                      width: 18px; }
+.menu .items .choice.on::before { content: "\25CF"; }
+.menu .items .check.on::before { content: "\2713"; }
+#play { display: flex; align-items: center; gap: 8px; width: 320px; }
+#play button { padding: 3px 12px; }
+#rate { font-size: 12px; color: var(--dim); white-space: pre-line; }
+dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+         border-radius: 10px; max-width: 520px; }
+dialog h2 { margin-top: 0; font-size: 16px; }
 button { font: inherit; padding: 5px 12px; border-radius: 6px; cursor: pointer;
          border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 #stop { display: none; }
 body.running #stop { display: inline-block; }
+body.running #run { display: none; }
 main { display: grid; grid-template-columns: 190px minmax(0, 1fr) 360px; min-height: 0; }
-nav { border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; background: var(--panel); }
-nav ul { list-style: none; margin: 0; padding: 0; }
-nav li { padding: 4px 14px; cursor: pointer; font: 13px ui-monospace, Consolas, monospace;
+main > nav { border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; background: var(--panel); }
+main > nav ul { list-style: none; margin: 0; padding: 0; }
+main > nav li { padding: 4px 14px; cursor: pointer; font: 13px ui-monospace, Consolas, monospace;
          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-nav li:hover { background: var(--bg); }
-nav li.open { background: var(--accent); color: #fff; }
-nav li.bad::after { content: " \25CF"; color: var(--bad); }
-nav li.open.bad::after { color: #fff; }
+main > nav li:hover { background: var(--bg); }
+main > nav li.open { background: var(--accent); color: #fff; }
+main > nav li.bad::after { content: " \25CF"; color: var(--bad); }
+main > nav li.open.bad::after { color: #fff; }
 #add { margin: 8px 14px; font-size: 13px; }
 #editor { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
           background: var(--panel); }
@@ -51,22 +79,14 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
           border-radius: 4px; outline: none; box-shadow: 0 0 0 1px var(--line); }
 #screen:focus { box-shadow: 0 0 0 2px var(--accent); }
 .paused #screen { opacity: 0.5; }
-#keys { font-size: 12px; color: var(--dim); text-align: center; margin: -4px 0 0; }
 #wheel { width: 170px; height: 170px; touch-action: none; user-select: none; cursor: grab; }
 #wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
 #wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
 #wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
               dominant-baseline: middle; pointer-events: none; }
-#meter { width: 320px; }
-#meter .track { position: relative; height: 8px; background: var(--bg); border-radius: 4px;
                 box-shadow: inset 0 0 0 1px var(--line); }
-#meter-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--good); border-radius: 4px; }
-#meter-worst { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
-#meter.over #meter-bar { background: var(--bad); }
-#meter-text { font-size: 12px; color: var(--dim); margin-top: 4px; }
 #status { font-size: 12px; color: var(--dim); }
 #status.bad { color: var(--bad); }
-label.opt { font-size: 12px; color: var(--dim); align-self: flex-start; margin-left: 8px; }
 #console { width: 320px; flex: 1; min-height: 120px; overflow: auto; margin: 0;
            font: 12px/1.45 ui-monospace, Consolas, monospace; background: var(--panel);
            border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
@@ -76,8 +96,8 @@ label.opt { font-size: 12px; color: var(--dim); align-self: flex-start; margin-l
 #console .link { cursor: pointer; text-decoration: underline dotted; }
 @media (max-width: 900px) {
     main { grid-template-columns: 1fr; grid-template-rows: auto 50vh auto; }
-    nav { border-right: none; border-bottom: 1px solid var(--line); }
-    nav ul { display: flex; flex-wrap: wrap; }
+    main > nav { border-right: none; border-bottom: 1px solid var(--line); }
+    main > nav ul { display: flex; flex-wrap: wrap; }
     aside { border-left: none; }
 }
 </style>
@@ -85,22 +105,49 @@ label.opt { font-size: 12px; color: var(--dim); align-self: flex-start; margin-l
 <body>
 <header>
   <h1>Arcade</h1>
+  <nav id="menubar">
+    <div class="menu"><button class="title">File</button><div class="items">
+      <button data-do="new">New cart</button>
+      <button data-do="open">Open&hellip;<kbd>Ctrl+O</kbd></button>
+      <button data-do="open-folder">Open folder&hellip;</button>
+      <hr>
+      <button data-do="save">Save<kbd>Ctrl+S</kbd></button>
+      <button data-do="export">Save as .pbg&hellip;</button>
+    </div></div>
+    <div class="menu"><button class="title">Edit</button><div class="items">
+      <button data-do="undo">Undo<kbd>Ctrl+Z</kbd></button>
+      <button data-do="redo">Redo<kbd>Ctrl+Y</kbd></button>
+      <hr>
+      <button data-do="find">Find and replace<kbd>Ctrl+F</kbd></button>
+      <hr>
+      <button data-do="add">New file&hellip;</button>
+    </div></div>
+    <div class="menu"><button class="title">Run</button><div class="items">
+      <button data-do="run">Run<kbd>Ctrl+Enter</kbd></button>
+      <button data-do="stop">Stop<kbd>Shift+Ctrl+Enter</kbd></button>
+      <hr>
+      <div class="label">Run as</div>
+      <button data-device="6g" class="choice">iPod Classic</button>
+      <button data-device="5g" class="choice">iPod Video</button>
+      <button data-device="5g-music" class="choice">iPod Video, music playing</button>
+      <button data-device="free" class="choice">No limit</button>
+      <hr>
+      <button data-do="speech" class="check" id="speech">Menus spoken</button>
+    </div></div>
+    <div class="menu"><button class="title">Help</button><div class="items">
+      <button data-do="keys">Keys and the wheel</button>
+      <button data-do="devices">Running as a player</button>
+    </div></div>
+  </nav>
   <span id="cart-name"></span>
   <span id="status"></span>
-  <button id="new">New</button>
-  <button id="open">Open</button>
-  <button id="open-folder">Open folder</button>
-  <button id="save" title="Ctrl+S">Save</button>
-  <button id="export">Save .pbg</button>
-  <button id="run" class="primary" title="Ctrl+Enter">Run</button>
-  <button id="stop">Stop</button>
 </header>
 <main>
-  <nav><ul id="files"></ul><button id="add">New file</button></nav>
+  <nav><ul id="files"></ul></nav>
   <section id="editor"></section>
   <aside>
     <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
-    <p id="keys">Arrows: Prev, Next and the wheel. Enter: Select. Space: Play. Esc: Menu.</p>
+    
     <svg id="wheel" viewBox="-100 -100 200 200">
       <circle class="ring" r="98"/>
       <circle class="hub" r="36"/>
@@ -109,12 +156,28 @@ label.opt { font-size: 12px; color: var(--dim); align-self: flex-start; margin-l
       <text x="-72">|&#x25C0;&#x25C0;</text>
       <text y="74">&#x25B6; ||</text>
     </svg>
-    <div id="meter"><div class="track"><div id="meter-bar"></div><div id="meter-worst"></div></div>
-      <div id="meter-text">Run the cart to see what each tick costs.</div></div>
-    <label class="opt"><input type="checkbox" id="speech"> Menus spoken</label>
+    <div id="play"><button id="run" class="primary" title="Ctrl+Enter">Run</button>
+      <button id="stop" title="Shift+Ctrl+Enter">Stop</button><span id="rate"></span></div>
     <div id="console"></div>
   </aside>
 </main>
+<dialog id="help-keys"><h2>Keys and the wheel</h2>
+<p>Click the screen to give the game the keys. Left and Right are Prev and
+Next; Up and Down turn the wheel; Enter is Select, Space is Play and Esc is
+Menu, which pauses unless the game takes Menu as a button.</p>
+<p>On the drawn wheel, drag round the ring to turn it. Click the ring for
+Menu, Prev, Next or Play by where you click, or hold it half a second to
+hold that button. The middle is Select.</p>
+<form method="dialog"><button>Close</button></form></dialog>
+<dialog id="help-devices"><h2>Running as a player</h2>
+<p>Run as chooses which player the game runs as. Each tick takes as long
+as it would on that player, so a game that does more than a player can
+manage in a tick runs as it would there: it drops frames, and slows if
+it falls far behind.</p>
+<p>The iPod Video with music playing is the slowest a game will meet, and
+a game that keeps its frame rate there keeps it everywhere. The timings
+are estimates from measurements on the players.</p>
+<form method="dialog"><button>Close</button></form></dialog>
 <script>/*SCRIPT*/</script>
 </body>
 </html>

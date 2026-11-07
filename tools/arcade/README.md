@@ -197,14 +197,21 @@ show as `?`.
   wheel: drag round the ring to turn it, click the ring for Menu, Prev,
   Next or Play, hold it for a held button, and click the middle for
   Select.
+- **Run as** (in the Run menu) runs the cart as an iPod Classic, an iPod
+  Video, or an iPod Video playing music: each tick takes as long as it
+  would on that player, so a cart doing more than the player manages
+  drops frames there, and the frame rate under the screen shows it. The
+  iPod Video with music playing is the slowest a cart meets.
 - **Errors** are marked in the code as you type. A runtime error stops the
   cart, marks its line and opens the file at it.
-- **The meter** shows the units each tick costs against what the iPod
-  Video has with music playing: keep it green.
-- **Open** takes a `.pbg`, and dropping one on the page opens it too.
-  **Save .pbg** writes the cart. In Chrome and Edge, Save writes back to
-  the file you opened, and **Open folder** edits a cart folder in place,
-  Save writing its files back.
+- **Hints**: inside a call, the function's arguments show with the one
+  you are at in bold, and what it does; hovering over a name shows the
+  same. Your own functions show their arguments and the comment above
+  them. The API's are from `api.md`, the reference to every function.
+- **Open** (File menu) takes a `.pbg`, and dropping one on the page
+  opens it too. **Save as .pbg** writes the cart. In Chrome and Edge, Save
+  writes back to the file you opened, and **Open folder** edits a cart
+  folder in place, Save writing its files back.
 - The cart open when you close the page is there when you come back.
   `store` files are kept in the browser.
 

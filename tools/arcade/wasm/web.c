@@ -153,14 +153,17 @@ EXPORT("web_ceiling") void web_ceiling(uint32_t u)
 EXPORT("web_skipped") void web_skipped(unsigned n) { arcade_skipped(vm, n); }
 
 /* One tick, as the player runs it: the input, the music's state (none to
- * follow), the last frame presented, then the tick. 1, or 0 on an error. */
-EXPORT("web_tick") int web_tick(unsigned held, int clicks, int pos)
+ * follow), the last frame presented, then the tick. Without draw it is
+ * the update the player runs alone when it has fallen behind, the screen
+ * not presented. 1, or 0 on an error. */
+EXPORT("web_tick") int web_tick(unsigned held, int clicks, int pos, int draw)
 {
     struct arcade_music m = { 0, 0, 0, 0, { -1, -1, -1, -1, -1 } };
     arcade_input(vm, held, clicks, pos);
     arcade_music(vm, &m);
-    arcade_presented(vm);
-    return arcade_tick(vm, 1);
+    if (draw)
+        arcade_presented(vm);
+    return arcade_tick(vm, draw);
 }
 
 EXPORT("web_idle") void web_idle(void) { arcade_idle(vm); }

@@ -149,7 +149,9 @@ export class Engine {
     }
 
     start() { return this.run(() => this.x.web_start() !== 0); }
-    tick(held, clicks, pos) { return this.run(() => this.x.web_tick(held, clicks, pos) !== 0); }
+    tick(held, clicks, pos, draw = true) {
+        return this.run(() => this.x.web_tick(held, clicks, pos, draw ? 1 : 0) !== 0);
+    }
     idle() { this.x.web_idle(); }
     rate() { return this.x.web_rate(); }
     menuIsGame() { return this.x.web_menu_is_game() !== 0; }
@@ -169,12 +171,6 @@ export class Engine {
         const p = this.x.web_audio(frames, rate);
         return new Int16Array(this.x.memory.buffer.slice(p, p + frames * 4));
     }
-}
-
-/* Units a tick the 5G has for a cart with music playing, at rate ticks a
- * second: about 22,500 at 30 */
-export function budget(rate) {
-    return Math.round(675000 / rate);
 }
 
 /* host.glyph from font.bin, as gen_textfont.py --file lays it out: 256
