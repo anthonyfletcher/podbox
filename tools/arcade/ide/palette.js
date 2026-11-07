@@ -33,7 +33,7 @@ export class PaletteEditor {
         const bar = toolbar();
         const title = document.createElement('span');
         title.className = 'tb-title grow';
-        title.textContent = opts.name;
+        title.textContent = 'Palette';
         title.title = opts.first ? 'The cart\'s palette: the colours its pictures are drawn in'
             : 'PAL.' + opts.name + ': loadpal() shows the same pictures in these colours';
         bar.put(title);

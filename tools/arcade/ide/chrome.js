@@ -26,9 +26,11 @@ export function sidePanel(title, shown) {
 }
 
 /* a section's heading in a side panel that folds what is under it away:
- * a click on it shows or hides the body; .head is the heading, for
- * buttons of its own */
+ * a click on it shows or hides the body, and whether it is folded is kept
+ * between visits; .head is the heading, for buttons of its own */
 export function foldSection(title, body, open) {
+    const key = 'arcade-fold-' + title.toLowerCase();
+    try { const kept = localStorage.getItem(key); if (kept !== null) open = kept === '1'; } catch (e) { /* none kept */ }
     const head = document.createElement('div');
     head.className = 'ed-sub fold';
     const twist = document.createElement('span');
@@ -41,7 +43,11 @@ export function foldSection(title, body, open) {
         twist.innerHTML = icon(on ? 'down' : 'right');
         body.hidden = !on;
     };
-    head.onclick = (e) => { if (!e.target.closest('.ib')) set(body.hidden); };
+    head.onclick = (e) => {
+        if (e.target.closest('.ib')) return;
+        set(body.hidden);
+        try { localStorage.setItem(key, body.hidden ? '0' : '1'); } catch (x) { /* not kept */ }
+    };
     set(open !== false);
     return { head, body };
 }
