@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { Engine } from './src/runner.js';
+import { Engine, fontGlyphs } from './src/runner.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,20 +63,6 @@ function input(o) {
         for (const [at, n, p] of wheel)
             if (at === t) { clicks = n || 0; if (p !== undefined) pos = p; }
         return { held, clicks, pos };
-    };
-}
-
-/* font.bin's glyph for cp, as gen_textfont.py --file lays it out */
-function fontGlyph(file) {
-    return (cp) => {
-        const page = cp >> 8, off = file.readUInt32LE(8 + page * 36);
-        if (!off || cp > 0xffff) return undefined;
-        const bits = file.subarray(8 + page * 36 + 4, 8 + page * 36 + 36);
-        const lo = cp & 0xff;
-        if (!(bits[lo >> 3] & (1 << (lo & 7)))) return undefined;
-        let k = 0;
-        for (let i = 0; i < lo; i++) if (bits[i >> 3] & (1 << (i & 7))) k++;
-        return new Uint8Array(file.subarray(off + k * 13, off + k * 13 + 13));
     };
 }
 
@@ -128,7 +114,7 @@ function main() {
         say: (text, queue) => out.push((queue ? 'queue ' : 'say ') + text + '\n'),
         speechStop: () => out.push('stop\n'),
         speechOn: () => !!o.speech,
-        glyph: o.font ? fontGlyph(o.font) : undefined,
+        glyph: o.font ? fontGlyphs(new Uint8Array(o.font)) : undefined,
         /* a dialog's frame: the next tick's input, as pbgvm works it */
         frame: (open) => {
             if (!open) { said = false; return null; }

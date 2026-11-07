@@ -178,6 +178,36 @@ file's opening comment lists what it gives.
 - **A sort's comparator can't sort.** Calling `.sort()` from inside a
   comparator stops the cart with an error.
 
+## The IDE
+
+```sh
+node ide/build.js --font font.bin     # writes ide/dist/arcade-ide.html
+```
+
+The IDE is one HTML file: open it in a browser, from the web or from
+disk, with no server. It edits a cart's files and runs the cart beside
+them on the same engine as the player. `--font` builds in the Japanese,
+Chinese and Korean glyphs from the player's `font.bin`; without it they
+show as `?`.
+
+- **Run** (Ctrl+Enter) builds the cart and plays it at its rate. Click
+  the screen to give it the keys: Left and Right are Prev and Next, Up and
+  Down turn the wheel, Enter is Select, Space is Play and Esc is Menu,
+  which pauses unless the cart takes Menu as a button. Or use the drawn
+  wheel: drag round the ring to turn it, click the ring for Menu, Prev,
+  Next or Play, hold it for a held button, and click the middle for
+  Select.
+- **Errors** are marked in the code as you type. A runtime error stops the
+  cart, marks its line and opens the file at it.
+- **The meter** shows the units each tick costs against what the iPod
+  Video has with music playing: keep it green.
+- **Open** takes a `.pbg`, and dropping one on the page opens it too.
+  **Save .pbg** writes the cart. In Chrome and Edge, Save writes back to
+  the file you opened, and **Open folder** edits a cart folder in place,
+  Save writing its files back.
+- The cart open when you close the page is there when you come back.
+  `store` files are kept in the browser.
+
 ## Running a cart's script
 
 `host/pbgvm` is the player's engine built for this computer. It runs a

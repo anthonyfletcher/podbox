@@ -4,3 +4,4 @@ host/pbgvm.exe
 host/*.tmp
 wasm/arcade.wasm
 wasm/*.raw.wasm
+ide/dist/

@@ -7,6 +7,7 @@ import { compileFiles } from '../src/node.js';
 import { unpackCart } from '../src/unpack.js';
 import { encodeIndexedPng, decodeIndexedPng } from '../src/png.js';
 import { readCart, writeCart } from '../src/cart.js';
+import { compileInput } from '../src/folder.js';
 
 const deflate = (b) => new Uint8Array(zlib.deflateSync(b));
 const inflate = (b) => new Uint8Array(zlib.inflateSync(b));
@@ -48,28 +49,6 @@ function build(files, assets) {
     return res.cart;
 }
 
-/* The folder unpack wrote, as compileFiles takes it */
-function asFolder(files) {
-    const code = {}, assets = { palettes: {}, maps: {}, images: {}, sounds: {}, data: {},
-                                texts: {}, fonts: {} };
-    const dirs = { palettes: ['palettes', '.gpl'], maps: ['maps', '.json'], images: ['images', '.png'],
-                   sounds: ['sounds', '.json'], data: ['data', '.json'], texts: ['data', '.txt'],
-                   fonts: ['fonts', '.bdf'] };
-    for (const [name, bytes] of Object.entries(files)) {
-        if (!name.includes('/')) {
-            if (name === 'sheet.png') assets.sheet = bytes;
-            else if (name === 'flags.json') assets.flags = text(bytes);
-            else code[name] = text(bytes);
-            continue;
-        }
-        for (const [kind, [dir, ext]] of Object.entries(dirs))
-            if (name.startsWith(dir + '/') && name.endsWith(ext))
-                assets[kind][name.slice(dir.length + 1, -ext.length)] =
-                    kind === 'images' ? bytes : text(bytes);
-    }
-    return [code, assets];
-}
-
 test('unpack gives back every file as written, and pack the same cart', () => {
     const cart = build(CODE, ASSETS);
     const files = unpackCart(cart, inflateRaw, deflate);
@@ -90,8 +69,8 @@ test('unpack gives back every file as written, and pack the same cart', () => {
     assert.ok(Buffer.from(files['sheet.png']).includes(Buffer.from([0, 0, 0, 255, 255, 255])));
     assert.ok(Buffer.from(files['sheet.png']).includes(Buffer.from('tRNS')));
     /* and packed, the same bytes */
-    const [code, assets] = asFolder(files);
-    assert.ok(Buffer.from(build(code, assets)).equals(Buffer.from(cart)));
+    const input = compileInput(files);
+    assert.ok(Buffer.from(build(input.files, input.assets)).equals(Buffer.from(cart)));
 });
 
 test('a cart without palettes unpacks in the engine\'s sixteen; one without SRC_ is refused', () => {

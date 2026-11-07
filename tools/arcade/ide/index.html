@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade</title>
+<style>
+:root {
+    --bg: #f4f3f0; --panel: #ffffff; --ink: #1c1c22; --dim: #6b6a73;
+    --line: #dddbd5; --accent: #2f6fd6; --bad: #c8283c; --good: #2d8a4e;
+    --screen-bg: #101014;
+}
+@media (prefers-color-scheme: dark) {
+    :root { --bg: #18181c; --panel: #222227; --ink: #e8e6e1; --dim: #9a98a2;
+            --line: #34343b; --accent: #6ea0ff; --bad: #ff6b7d; --good: #5fcf86; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink);
+       font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+       display: grid; grid-template-rows: auto 1fr; }
+header { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+         border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 600; }
+#cart-name { font-weight: 600; margin-right: auto; }
+button { font: inherit; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+         border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#stop { display: none; }
+body.running #stop { display: inline-block; }
+main { display: grid; grid-template-columns: 190px minmax(0, 1fr) 360px; min-height: 0; }
+nav { border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; background: var(--panel); }
+nav ul { list-style: none; margin: 0; padding: 0; }
+nav li { padding: 4px 14px; cursor: pointer; font: 13px ui-monospace, Consolas, monospace;
+         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+nav li:hover { background: var(--bg); }
+nav li.open { background: var(--accent); color: #fff; }
+nav li.bad::after { content: " \25CF"; color: var(--bad); }
+nav li.open.bad::after { color: #fff; }
+#add { margin: 8px 14px; font-size: 13px; }
+#editor { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+          background: var(--panel); }
+#editor .cm-editor { flex: 1; min-height: 0; font-size: 13.5px; }
+#editor .cm-scroller { font-family: ui-monospace, Consolas, monospace; }
+#editor img.picture { image-rendering: pixelated; width: 512px; max-width: 90%; margin: 24px; }
+#editor p { margin: 0 24px; color: var(--dim); }
+aside { border-left: 1px solid var(--line); display: flex; flex-direction: column;
+        align-items: center; gap: 10px; padding: 12px; min-height: 0; overflow: auto; }
+#screen { width: 320px; height: 240px; image-rendering: pixelated; background: var(--screen-bg);
+          border-radius: 4px; outline: none; box-shadow: 0 0 0 1px var(--line); }
+#screen:focus { box-shadow: 0 0 0 2px var(--accent); }
+.paused #screen { opacity: 0.5; }
+#keys { font-size: 12px; color: var(--dim); text-align: center; margin: -4px 0 0; }
+#wheel { width: 170px; height: 170px; touch-action: none; user-select: none; cursor: grab; }
+#wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+#wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+#wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
+              dominant-baseline: middle; pointer-events: none; }
+#meter { width: 320px; }
+#meter .track { position: relative; height: 8px; background: var(--bg); border-radius: 4px;
+                box-shadow: inset 0 0 0 1px var(--line); }
+#meter-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--good); border-radius: 4px; }
+#meter-worst { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
+#meter.over #meter-bar { background: var(--bad); }
+#meter-text { font-size: 12px; color: var(--dim); margin-top: 4px; }
+#status { font-size: 12px; color: var(--dim); }
+#status.bad { color: var(--bad); }
+label.opt { font-size: 12px; color: var(--dim); align-self: flex-start; margin-left: 8px; }
+#console { width: 320px; flex: 1; min-height: 120px; overflow: auto; margin: 0;
+           font: 12px/1.45 ui-monospace, Consolas, monospace; background: var(--panel);
+           border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+#console div { white-space: pre-wrap; word-break: break-word; }
+#console .error { color: var(--bad); }
+#console .say { color: var(--accent); }
+#console .link { cursor: pointer; text-decoration: underline dotted; }
+@media (max-width: 900px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 50vh auto; }
+    nav { border-right: none; border-bottom: 1px solid var(--line); }
+    nav ul { display: flex; flex-wrap: wrap; }
+    aside { border-left: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Arcade</h1>
+  <span id="cart-name"></span>
+  <span id="status"></span>
+  <button id="new">New</button>
+  <button id="open">Open</button>
+  <button id="open-folder">Open folder</button>
+  <button id="save" title="Ctrl+S">Save</button>
+  <button id="export">Save .pbg</button>
+  <button id="run" class="primary" title="Ctrl+Enter">Run</button>
+  <button id="stop">Stop</button>
+</header>
+<main>
+  <nav><ul id="files"></ul><button id="add">New file</button></nav>
+  <section id="editor"></section>
+  <aside>
+    <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
+    <p id="keys">Arrows: Prev, Next and the wheel. Enter: Select. Space: Play. Esc: Menu.</p>
+    <svg id="wheel" viewBox="-100 -100 200 200">
+      <circle class="ring" r="98"/>
+      <circle class="hub" r="36"/>
+      <text y="-72">MENU</text>
+      <text x="72">&#x25B6;&#x25B6;|</text>
+      <text x="-72">|&#x25C0;&#x25C0;</text>
+      <text y="74">&#x25B6; ||</text>
+    </svg>
+    <div id="meter"><div class="track"><div id="meter-bar"></div><div id="meter-worst"></div></div>
+      <div id="meter-text">Run the cart to see what each tick costs.</div></div>
+    <label class="opt"><input type="checkbox" id="speech"> Menus spoken</label>
+    <div id="console"></div>
+  </aside>
+</main>
+<script>/*SCRIPT*/</script>
+</body>
+</html>

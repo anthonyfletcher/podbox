@@ -2029,6 +2029,8 @@ export function compile(input) {
     for (const f of fns) codeBytes += f.code.length;
     return {
         cart: bytes, errors: [],
+        groups: Object.assign({}, built.groups, { BOARD: board, OPT: option, ACH: ach,
+            IMG: Object.fromEntries(built.images.map((n) => [n, {}])) }),
         stats: { functions: fns.length, dropped: prog.fns.length - fns.length,
                  code: codeBytes, globals: prog.globals.length,
                  strings: prog.strings.length, size: bytes.length,
