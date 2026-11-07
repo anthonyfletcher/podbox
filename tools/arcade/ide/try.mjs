@@ -82,8 +82,12 @@ const script = `<script>
             const [fx0, fy0, fx1, fy1] = spec.split(';').map(Number);
             setTimeout(() => {
                 const el = document.querySelector(sel), r = el.getBoundingClientRect();
-                const ev = (type, fx, fy) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1,
-                    clientX: r.left + r.width * fx, clientY: r.top + r.height * fy }));
+                /* to what is under the point, as a real pointer's go */
+                const ev = (type, fx, fy) => {
+                    const x = r.left + r.width * fx, y = r.top + r.height * fy;
+                    (document.elementFromPoint(x, y) || el).dispatchEvent(new PointerEvent(type,
+                        { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+                };
                 ev('pointerdown', fx0, fy0);
                 ev('pointermove', (fx0 + fx1) / 2, (fy0 + fy1) / 2);
                 ev('pointermove', fx1, fy1);

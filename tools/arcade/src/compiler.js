@@ -1718,7 +1718,7 @@ function achievements(list) {
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
                    'menu_button', 'music', 'boards', 'options',
-                   'achievements'];
+                   'achievements', 'flags'];
 const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
 
 const OPTION_KEYS = ['name', 'title', 'type', 'choices', 'min', 'max', 'step',
@@ -1818,6 +1818,25 @@ function checkAchievements(list, bad) {
     }).filter(Boolean);
 }
 
+/* cart.flags checked: the sprite flags' names by number, up to eight,
+ * null for one left unnamed */
+function checkFlags(list, bad) {
+    if (list === undefined) return [];
+    if (!Array.isArray(list)) { bad('flags must be a list of names, flag 0 first'); return []; }
+    if (list.length > 8) bad('a sprite has 8 flags, so at most 8 names');
+    const seen = new Set();
+    return list.slice(0, 8).map((n, i) => {
+        if (n === null || n === '') return null;
+        if (typeof n !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)) {
+            bad('flag ' + i + ': a name must be usable in code as FLAG.<name>');
+            return null;
+        }
+        if (seen.has(n)) bad('flag ' + i + ': a second flag called ' + n);
+        seen.add(n);
+        return n;
+    });
+}
+
 /* cart.boards checked, with each one's defaults filled in */
 function checkBoards(list, bad) {
     if (list === undefined) return [];
@@ -1870,6 +1889,7 @@ function checkCart(cart, errors) {
     c.boards = checkBoards(cart.boards, bad);
     c.options = checkOptions(cart.options, bad);
     c.achievements = checkAchievements(cart.achievements, bad);
+    c.flags = checkFlags(cart.flags, bad);
     return c;
 }
 
@@ -1929,9 +1949,14 @@ export function compile(input) {
     cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });
     cart.options.forEach((o, i) => { option[o.name] = { value: i, version: 1 }; });
     cart.achievements.forEach((a, i) => { ach[a.name] = { value: i, version: 1 }; });
+    /* FLAG.<name> is the flag as a set of one: 1 << its number, so names
+     * combine with | for actors.move() and map(), and fget(n) & FLAG.x
+     * tests one */
+    const flag = {};
+    cart.flags.forEach((n, i) => { if (n) flag[n] = { value: 1 << i, version: 1 }; });
     prog.api = Object.assign({}, prog.api, {
         groups: Object.assign({}, prog.api.groups, built.groups,
-                              { BOARD: board, OPT: option, ACH: ach,
+                              { BOARD: board, OPT: option, ACH: ach, FLAG: flag,
                                 FONT: Object.assign({}, prog.api.groups.FONT,
                                                     built.groups.FONT) })
     });
@@ -2029,7 +2054,7 @@ export function compile(input) {
     for (const f of fns) codeBytes += f.code.length;
     return {
         cart: bytes, errors: [],
-        groups: Object.assign({}, built.groups, { BOARD: board, OPT: option, ACH: ach,
+        groups: Object.assign({}, built.groups, { BOARD: board, OPT: option, ACH: ach, FLAG: flag,
             IMG: Object.fromEntries(built.images.map((n) => [n, {}])) }),
         stats: { functions: fns.length, dropped: prog.fns.length - fns.length,
                  code: codeBytes, globals: prog.globals.length,

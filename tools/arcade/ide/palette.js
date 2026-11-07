@@ -1,13 +1,15 @@
 /* The palette editor: a palette's entries as swatches, each set by hex or
- * by red, green and blue, and shown as the player shows it (RGB565). The
+ * by red, green and blue, and shown as the iPod shows it (its screen has
+ * 65,536 colours: RGB565). A swatch dragged onto another moves there; +
+ * adds one, and Delete removes the chosen one. The
  * cart's first palette is the one its pictures' numbers mean; the others
- * recolour the same numbers. Moving or sorting entries rewrites the
+ * recolour the same numbers. Moving or deleting entries rewrites the
  * numbers in every picture, and in the other palettes, so nothing changes
  * how it looks; code that names a colour by number is the cart's to
  * follow.
  *
- * Parts: the palette and its pictures; the swatches; the chosen entry;
- * rearranging. */
+ * Parts: the palette and its pictures; the swatches, dragged; the chosen
+ * entry; rearranging. */
 
 import { shown } from './pixels.js';
 
@@ -39,22 +41,13 @@ export class PaletteEditor {
         this.grid.className = 'pal-grid';
         this.panel = document.createElement('div');
         this.panel.className = 'pal-panel';
-        const tools = document.createElement('div');
-        tools.className = 'pal-tools';
-        const act = (label, title, fn) => {
-            const b = document.createElement('button');
-            b.textContent = label;
-            b.title = title;
-            b.onclick = fn;
-            tools.append(b);
-        };
-        act('← Move', 'Swap with the one before', () => this.move(-1));
-        act('Move →', 'Swap with the one after', () => this.move(1));
-        act('Add', 'A new colour at the end', () => this.add());
-        act('Delete', 'Remove this colour, if no picture uses it', () => this.remove());
-        act('Sort by brightness', 'Darkest first, colour 0 kept first', () => this.sort('light'));
-        act('Sort by hue', 'Round the colour wheel, greys first, colour 0 kept first', () => this.sort('hue'));
-        root.append(head, this.grid, this.panel, tools);
+        root.append(head, this.grid, this.panel);
+        root.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.remove(); }
+            if (e.key === 'ArrowLeft' && this.at > 0) { this.at--; this.draw(); }
+            if (e.key === 'ArrowRight' && this.at < this.rgb.length - 1) { this.at++; this.draw(); }
+        });
         parent.append(root);
         this.count();
         this.draw();
@@ -82,13 +75,52 @@ export class PaletteEditor {
             /* light text on dark colours */
             const sc = shown(c), lum = (sc >> 16) * 0.3 + (sc >> 8 & 255) * 0.59 + (sc & 255) * 0.11;
             s.style.color = lum < 120 ? '#ffffffcc' : '#000000aa';
-            s.onclick = () => { this.at = i; this.draw(); };
+            s.onpointerdown = (e) => this.drag(e, i);
             this.grid.append(s);
             const k = shown(c);
             seen.set(k, (seen.get(k) || []).concat(i));
         });
+        if (this.rgb.length < 256) {
+            const plus = document.createElement('button');
+            plus.className = 'pal-swatch pal-add';
+            plus.textContent = '+';
+            plus.title = 'A new colour, the chosen one to start from';
+            plus.onclick = () => this.add();
+            this.grid.append(plus);
+        }
         this.same = [...seen.values()].filter((v) => v.length > 1);
         this.drawPanel();
+        this.root.focus();
+    }
+
+    /* a press chooses a swatch; dragged onto another, it moves there and
+     * those between shift along */
+    drag(e, i) {
+        e.preventDefault();
+        this.at = i;
+        const swatches = [...this.grid.querySelectorAll('.pal-swatch:not(.pal-add)')];
+        swatches.forEach((s, k) => s.classList.toggle('on', k === i));
+        this.drawPanel();
+        this.root.focus();
+        let over = i;
+        const under = (ev) => {
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const k = swatches.indexOf(el);
+            return k < 0 ? over : k;
+        };
+        const move = (ev) => {
+            over = under(ev);
+            swatches.forEach((s, k) => s.classList.toggle('drop', k === over && k !== i));
+        };
+        const up = async (ev) => {
+            document.removeEventListener('pointermove', move);
+            document.removeEventListener('pointerup', up);
+            swatches.forEach((s) => s.classList.remove('drop'));
+            const to = under(ev);
+            if (to !== i) await this.moveTo(i, to);
+        };
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
     }
 
     drawPanel() {
@@ -103,6 +135,7 @@ export class PaletteEditor {
         const title = document.createElement('div');
         title.innerHTML = '<b>Colour ' + i + '</b>' + (i === 0 ? ' (clear in sprites, the map and images)' : '');
         const hexIn = document.createElement('input');
+        hexIn.className = 'pal-hex';
         hexIn.value = hex(c);
         hexIn.spellcheck = false;
         hexIn.onchange = () => {
@@ -120,22 +153,31 @@ export class PaletteEditor {
             r.min = 0;
             r.max = 255;
             r.value = c >> shift & 255;
-            const n = document.createElement('span');
-            n.textContent = c >> shift & 255;
+            const n = document.createElement('input');
+            n.type = 'number';
+            n.min = 0;
+            n.max = 255;
+            n.value = c >> shift & 255;
             r.oninput = () => {
-                n.textContent = r.value;
+                n.value = r.value;
                 this.set(this.rgb[this.at] & ~(255 << shift) | +r.value << shift, true);
             };
             r.onchange = () => this.draw();
+            n.onchange = () => {
+                const v = Math.max(0, Math.min(255, Math.round(+n.value) || 0));
+                this.set(this.rgb[this.at] & ~(255 << shift) | v << shift);
+            };
             row.append(name, r, n);
             fields.append(row);
         });
         const note = document.createElement('div');
         note.className = 'pal-note';
         const twins = this.same.find((v) => v.includes(i));
-        note.textContent = 'On the player: ' + hex(shown(c)) + '. ' +
+        const others = twins ? twins.filter((k) => k !== i) : [];
+        note.textContent = (shown(c) === c ? '' : 'The iPod shows it as ' + hex(shown(c)) +
+                                                  ', the nearest colour its screen has. ') +
             (this.uses[i] ? this.uses[i] + ' pixels use it.' : 'No picture uses it.') +
-            (twins ? ' Colours ' + twins.join(' and ') + ' look the same on the player.' : '');
+            (others.length ? ' On the iPod it looks the same as colour ' + others.join(' and ') + '.' : '');
         if (twins) note.classList.add('warn');
         fields.append(note);
         p.append(big, fields);
@@ -167,12 +209,11 @@ export class PaletteEditor {
         return true;
     }
 
-    async move(d) {
-        const i = this.at, j = i + d;
-        if (j < 0 || j >= this.rgb.length) return;
+    /* entry i to place j, those between shifting along */
+    async moveTo(i, j) {
         const order = this.rgb.map((_, k) => k);
-        [order[i], order[j]] = [order[j], order[i]];
-        if (await this.reorder(order, 'Colours ' + i + ' and ' + j + ' swapped.')) {
+        order.splice(j, 0, order.splice(i, 1)[0]);
+        if (await this.reorder(order, 'Colour ' + i + ' is now colour ' + j + '.')) {
             this.at = j;
             this.draw();
         }
@@ -205,23 +246,5 @@ export class PaletteEditor {
         this.o.changed(this.rgb.slice(), order);
         this.count();
         return true;
-    }
-
-    async sort(by) {
-        const key = (c) => {
-            const r = (c >> 16) / 255, g = (c >> 8 & 255) / 255, b = (c & 255) / 255;
-            const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
-            if (by === 'light') return 0.3 * r + 0.59 * g + 0.11 * b;
-            if (max - min < 0.08) return -1 + l;           /* greys first, dark to light */
-            const d = max - min;
-            const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-            return h + l / 10;
-        };
-        const rest = this.rgb.map((_, k) => k).slice(1).sort((a, b) => key(this.rgb[a]) - key(this.rgb[b]));
-        const order = [0, ...rest];
-        if (await this.reorder(order, by === 'light' ? 'Sorted by brightness.' : 'Sorted by hue.')) {
-            this.at = order.indexOf(this.at);
-            this.draw();
-        }
     }
 }

@@ -252,3 +252,18 @@ test('the loader refuses damaged assets, and loadmap and mapprop check their arg
     assert.match(bad('mapprop(0, "x");'), /mapprop\(\) needs an object of the active map/);
     assert.match(bad('loadpal(0);'), /loadpal\(\) needs one of the cart's palettes/);
 });
+
+test('cart.json names the sprite flags: FLAG.<name> is the flag as a set of one', () => {
+    const cart = (flags) => JSON.stringify({ id: '00000000000f1a65', name: 'Flags', flags: flags });
+    const main = 'function init() { printh(FLAG.solid + " " + FLAG.ladder + " " + (FLAG.solid | FLAG.ladder)); }\nfunction update() {}';
+    const ok = compileFiles({ 'cart.json': cart(['solid', null, 'ladder']), 'main.js': main });
+    assert.deepEqual(ok.errors, []);
+    assert.deepEqual(ok.groups.FLAG, { solid: { value: 1, version: 1 }, ladder: { value: 4, version: 1 } });
+    const why = (flags, code) => compileFiles({ 'cart.json': cart(flags),
+        'main.js': (code || 'function init() {}') + '\nfunction update() {}' }).errors.map((e) => e.message);
+    assert.match(why('solid')[0], /flags must be a list/);
+    assert.match(why(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])[0], /at most 8 names/);
+    assert.match(why(['solid', 'solid'])[0], /a second flag called solid/);
+    assert.match(why(['no way'])[0], /usable in code as FLAG/);
+    assert.ok(why(['solid'], 'function init() { printh(FLAG.ladder); }').length > 0);
+});

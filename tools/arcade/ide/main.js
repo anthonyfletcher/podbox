@@ -350,6 +350,34 @@ function showPicture(pane, file) {
     }
     pixels = new SheetEditor(pane, {
         px: pic.px, rgb: rgb, flags: flags, fitColours: fitPicture,
+        flagNames: () => {
+            try {
+                const n = JSON.parse(String(folder['cart.json'])).flags || [];
+                return Array.from({ length: 8 }, (_, b) => n[b] || null);
+            } catch (e) { return new Array(8).fill(null); }
+        },
+        nameFlag: async (b) => {
+            let cart;
+            try { cart = JSON.parse(String(folder['cart.json'])); } catch (e) {
+                say('error', 'cart.json has an error to put right first.');
+                return;
+            }
+            const names = (cart.flags || []).slice();
+            const a = await ask('Name flag ' + b, [
+                { name: 'name', label: 'Name', value: names[b] || '',
+                  note: 'Code then has FLAG.' + (names[b] || 'name') + '; empty for no name' }], 'Name it');
+            if (!a) return;
+            const name = a.name.trim();
+            if (name && !NAME.test(name)) { say('error', 'A name is letters, digits and _, not starting with a digit.'); return; }
+            while (names.length <= b) names.push(null);
+            names[b] = name || null;
+            while (names.length && !names[names.length - 1]) names.pop();
+            if (names.length) cart.flags = names; else delete cart.flags;
+            folder['cart.json'] = JSON.stringify(cart, null, 2) + '\n';
+            delete states['cart.json'];
+            changed();
+            pixels.drawFlags();
+        },
         changed: write,
         flagsChanged: (f) => {
             const out = {};

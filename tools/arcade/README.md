@@ -43,6 +43,7 @@ A cart is a folder:
 | `music` | `listen` (the default), `control` or `own` |
 | `boards` | the high-score tables, up to 8, below |
 | `options` | the settings the pause menu shows, up to 8, below |
+| `flags` | names for the sprite flags, flag 0 first: `["solid", null, "ladder"]` gives `FLAG.solid` and `FLAG.ladder`, each the flag as a set of flags (1 and 4), for `actors.move()` and `map()`; `fget(n) & FLAG.solid` tests one |
 
 Errors name the file, line and column, and say what to write instead.
 

@@ -103,7 +103,7 @@ A pixel of the sheet.
 Sets a pixel of the sheet.
 
 ### fget(n, [f])
-Sprite `n`'s flags: all eight as a number, or flag `f` (0 to 7) as true or false.
+Sprite `n`'s flags: all eight as a number, or flag `f` (0 to 7) as true or false. With flags named in `cart.json`, `fget(n) & FLAG.solid` tests one by name.
 
 ### fset(n, [f], v)
 Sets sprite `n`'s flags: all eight, or flag `f`.

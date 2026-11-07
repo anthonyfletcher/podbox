@@ -86,7 +86,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .sheet-picker { width: 256px; height: 256px; image-rendering: pixelated; cursor: pointer;
                 touch-action: none; }
 .sheet-info { font: 12px ui-monospace, Consolas, monospace; color: var(--dim); }
-#editor .sheet-help { font-size: 12px; color: var(--dim); margin: 4px 0 0; line-height: 1.4; }
+
 .sheet .pix-flags { padding: 0; flex-wrap: wrap; }
 .sheet .pix-flags span { width: 100%; }
 .sheet-edit { flex: 1; min-width: 0; }
@@ -96,7 +96,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .pal { padding: 14px; overflow: auto; height: 100%; outline: none; }
 .pal-head { color: var(--dim); font-size: 13px; margin-bottom: 10px; }
 .pal-head button { margin-left: 8px; padding: 2px 8px; font-size: 12px; }
-.pal-grid { display: grid; grid-template-columns: repeat(16, 34px); gap: 4px; }
+.pal-grid { display: inline-grid; grid-template-columns: repeat(16, 34px); gap: 4px; }
 .pal-swatch { width: 34px; height: 34px; padding: 0; border-radius: 5px; font-size: 10px;
               border: 1px solid var(--line); position: relative; }
 .pal-swatch.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
@@ -105,14 +105,15 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .pal-panel { display: flex; gap: 16px; margin: 18px 0 12px; align-items: flex-start; }
 .pal-big { width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line); flex: none; }
 .pal-fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-.pal-fields input:not([type]) { width: 100px; font: 13px ui-monospace, Consolas, monospace;
-              padding: 3px 6px; border-radius: 4px; border: 1px solid var(--line);
-              background: var(--bg); color: var(--ink); }
-.pal-slider { display: grid; grid-template-columns: 50px 220px 34px; align-items: center; gap: 8px; }
+.pal-hex { width: 100px; }
+.pal-slider { display: grid; grid-template-columns: 50px 220px 64px; align-items: center; gap: 8px; }
+.pal-slider input[type=number], .pal-hex { font: 13px ui-monospace, Consolas, monospace; padding: 3px 6px;
+              border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.pal-swatch.drop { box-shadow: -4px 0 0 0 var(--accent); }
+.pal-add { background: none; color: var(--dim); font-size: 18px; border-style: dashed; }
 .pal-note { color: var(--dim); font-size: 12px; max-width: 420px; }
 .pal-note.warn { color: var(--bad); }
-.pal-tools { display: flex; flex-wrap: wrap; gap: 6px; }
-.pal-tools button { padding: 4px 10px; font-size: 13px; }
+
 dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
          border-radius: 10px; max-width: 520px; }
 dialog h2 { margin-top: 0; font-size: 16px; }

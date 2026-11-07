@@ -662,7 +662,9 @@ export class PixelEditor {
  * to fit, from its top left, as far as the sheet goes. */
 export class SheetEditor {
     /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
-     * flagsChanged(flags), fitColours (as the PixelEditor's), say(text, error) */
+     * flagsChanged(flags), flagNames() (the eight names cart.json gives,
+     * null where none), nameFlag(b) (to ask for flag b's name),
+     * fitColours (as the PixelEditor's), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.px = opts.px;
@@ -678,12 +680,7 @@ export class SheetEditor {
         this.info.className = 'sheet-info';
         this.flagRow = document.createElement('div');
         this.flagRow.className = 'pix-flags';
-        const help = document.createElement('p');
-        help.className = 'sheet-help';
-        help.textContent = 'Click a sprite, or drag across several, to draw on them. Flags are ' +
-            'yours to give meanings: fget() reads them, and map() and actors.move() ' +
-            'pick cells by them.';
-        side.append(this.picker, this.info, this.flagRow, help);
+        side.append(this.picker, this.info, this.flagRow);
         this.edit = document.createElement('div');
         this.edit.className = 'sheet-edit';
         root.append(side, this.edit);
@@ -810,7 +807,7 @@ export class SheetEditor {
     /* each flag on for all the chosen sprites, for some, or for none; a
      * click sets it on all of them, or clears it where all had it */
     drawFlags() {
-        const f = this.o.flags, n = this.sprites();
+        const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
         this.flagRow.innerHTML = '';
         const label = document.createElement('span');
         label.textContent = 'Flags';
@@ -818,8 +815,10 @@ export class SheetEditor {
         for (let b = 0; b < 8; b++) {
             const on = n.filter((s) => f[s] >> b & 1).length;
             const t = document.createElement('button');
-            t.textContent = b;
-            t.title = 'flag ' + b + ' (worth ' + (1 << b) + ' in a set of flags): fget(n, ' + b + ')';
+            t.textContent = names[b] || b;
+            t.title = (names[b] ? 'FLAG.' + names[b] + ', flag ' + b : 'Flag ' + b) +
+                '. Double-click to name it.';
+            t.ondblclick = () => this.o.nameFlag(b);
             t.classList.toggle('on', on === n.length);
             t.classList.toggle('some', on > 0 && on < n.length);
             t.onclick = () => {
