@@ -1959,6 +1959,9 @@ const struct settings_list settings[] = {
                    &wps_select_default, "wps select action",
                    wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
                    wps_context_menu_is_changed, wps_context_menu_set_default),
+    CHOICE_SETTING(0, wps_menu_action, LANG_WPS_MENU_ACTION, WPS_MENU_PREVIOUS,
+                   "wps menu action", "previous,root", NULL, 2,
+                   ID2P(LANG_PREVIOUS_SCREEN), ID2P(LANG_MAIN_MENU)),
 
     /* Customizable icons */
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, icon_file, "iconset", DEFAULT_ICONSET,

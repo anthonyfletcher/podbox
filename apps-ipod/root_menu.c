@@ -87,6 +87,14 @@ static int last_screen = GO_TO_ROOT; /* unfortunatly needed so we can resume
 /* Set while the screen being loaded was reached by BACK */
 static bool came_back;
 
+/* Set when Now Playing left by going back, for root_menu() to choose a screen
+ * that can be reopened: see wps_back_to() */
+static bool back_from_wps;
+
+/* The screen that opened Album covers' track list, Album covers or Artist
+ * portraits, or GO_TO_ROOT when it was neither */
+static int album_tracks_from = GO_TO_ROOT;
+
 static int previous_music = GO_TO_WPS; /* Toggles behavior of the return-to
                                         * playback-button. Upstream this also
                                         * tracked the FM screen; this fork has
@@ -422,6 +430,9 @@ static int browser(void* param)
                 return GO_TO_PREVIOUS;
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
+            album_tracks_from = (last_screen == GO_TO_ALBUM_COVERS
+                                 || last_screen == GO_TO_ARTIST_PORTRAITS)
+                                ? last_screen : GO_TO_ROOT;
             /* browser_db_enter_album_tracks_on_next_load() was already armed by
              * album_covers.c's SELECT handler before it returned this code --
              * just need the standard ID3DB browse boilerplate here, same as
@@ -481,9 +492,11 @@ static int browser(void* param)
         TAGNAVI_CASE(12) TAGNAVI_CASE(13) TAGNAVI_CASE(14) TAGNAVI_CASE(15)
         TAGNAVI_CASE(16) TAGNAVI_CASE(17) TAGNAVI_CASE(18) TAGNAVI_CASE(19)
 #undef TAGNAVI_CASE
-            /* The screens a row opens in place of a deeper list; the browser
-             * leaves for them with its own state untouched. */
-            if (ret_val == GO_TO_BOOK_SHELF || ret_val == GO_TO_ALBUM_CHARTS
+            /* The screens a row opens in place of a deeper list, and Now
+             * Playing; the browser leaves for them with its own state
+             * untouched. */
+            if (ret_val == GO_TO_WPS
+                || ret_val == GO_TO_BOOK_SHELF || ret_val == GO_TO_ALBUM_CHARTS
                 || ret_val == GO_TO_DB_SEARCH
                 || ret_val == GO_TO_FEATURED_ARTISTS
                 || ret_val == GO_TO_MUSIC_QUIZ
@@ -521,7 +534,8 @@ static int browser(void* param)
         /* The same as a tagnavi row: Podcasts' table history is the Music
          * menu's, so Music cannot resume inside its own list after it. */
         case GO_TO_PODCASTS:
-            if (ret_val == GO_TO_DB_SEARCH || ret_val == GO_TO_LISTEN_STATS)
+            if (ret_val == GO_TO_WPS
+                || ret_val == GO_TO_DB_SEARCH || ret_val == GO_TO_LISTEN_STATS)
             {
                 row_slot = ROW_SLOT_PODCASTS;
                 row_dirlevel = tc->dirlevel;
@@ -687,8 +701,36 @@ static int wpsscrn(void* param)
     else
         pop_current_activity();
 
+    back_from_wps = ret_val == GO_TO_PREVIOUS;
     return ret_val;
 }
+
+/* Where going back from Now Playing lands, given the screen it was opened
+ * from. Only a screen that reopens as it was left is gone back to. Album
+ * covers' track list opens on a jump armed once, so it gives way to the screen
+ * that opened it; the rest act on being entered -- Random Album would play
+ * another album -- and give way to the root. */
+static int wps_back_to(int screen)
+{
+    if (screen >= GO_TO_TAGNAVI_FIRST && screen <= GO_TO_TAGNAVI_LAST)
+        return screen;
+    switch (screen)
+    {
+        case GO_TO_FILEBROWSER:
+        case GO_TO_DBBROWSER:
+        case GO_TO_PODCASTS:
+        case GO_TO_PLAYLISTS_SCREEN:
+        case GO_TO_PLAYLIST_VIEWER:
+        case GO_TO_ALBUM_COVERS:
+        case GO_TO_ARTIST_PORTRAITS:
+            return screen;
+        case GO_TO_ALBUM_COVERS_TRACKS:
+            return album_tracks_from;
+        default:
+            return GO_TO_ROOT;
+    }
+}
+
 /* Which of do_menu()'s return codes the root menu passes on, and which it
  * treats as "we are done with that menu". */
 static int menu_result(int result)
@@ -2159,6 +2201,17 @@ void root_menu(void)
             {
                 came_back = true;
                 next_screen = last_screen;
+                /* A screen other than the one left is reached with no history
+                 * of its own, so BACK from it goes to the root rather than to
+                 * Now Playing again */
+                if (back_from_wps)
+                {
+                    back_from_wps = false;
+                    next_screen = wps_back_to(last_screen);
+                    if (next_screen != last_screen)
+                        last_screen = GO_TO_ROOT;
+                    break;
+                }
                 if (last_screen == GO_TO_PLUGIN)/* for WPS */
                     last_screen = GO_TO_PREVIOUS;
                 else if (last_screen == GO_TO_PREVIOUS)

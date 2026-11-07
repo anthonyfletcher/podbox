@@ -1410,6 +1410,13 @@ opens the now-playing menu.
 What pressing Select and Play together does on the now-playing screen: any
 of the actions Select offers, or the whole now-playing menu, or nothing.
 
+[wps menu action]
+Where Menu goes from the now-playing screen. Previous Screen goes back to
+the list the music was started from, in the same place, and Menu from
+there reaches the main menu. A screen that would start something again,
+such as Random Album, is skipped for the main menu. Main Menu goes
+straight there.
+
 [shortcuts instead of quickscreen]
 Whether a long press opens the quick screen or the shortcuts menu.
 

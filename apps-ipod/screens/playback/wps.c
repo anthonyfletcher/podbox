@@ -989,7 +989,8 @@ long gui_wps_show(void)
             /* menu key functions */
             case ACTION_WPS_MENU:
                 gwps_leave_wps(true);
-                return GO_TO_ROOT;
+                return global_settings.wps_menu_action == WPS_MENU_PREVIOUS
+                       ? GO_TO_PREVIOUS : GO_TO_ROOT;
                 break;
 
 

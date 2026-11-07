@@ -307,6 +307,9 @@ enum { SCROLLBAR_OFF = 0, SCROLLBAR_LEFT, SCROLLBAR_RIGHT };
 enum { AUTORESUME_NEXTTRACK_NEVER = 0, AUTORESUME_NEXTTRACK_ALWAYS,
        AUTORESUME_NEXTTRACK_CUSTOM};
 
+/* Menu Action: back to the screen playback started from, or the root */
+enum { WPS_MENU_PREVIOUS = 0, WPS_MENU_ROOT };
+
 /* Keyclick stuff */
 
  /* Not really a setting but several files should stay synced */
@@ -594,6 +597,7 @@ struct user_settings
     int car_adapter_mode_delay; /* delay before resume,  in seconds*/
     int start_in_screen;
     int wps_select_action; /* a hotkey action, as item 0 -- see HK_CTX_SET */
+    int wps_menu_action;   /* where MENU leaves Now Playing for: WPS_MENU_ */
     int ff_rewind_min_step; /* FF/Rewind minimum step size */
     int ff_rewind_accel; /* FF/Rewind acceleration (in seconds per doubling) */
 

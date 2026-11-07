@@ -9,6 +9,11 @@
   Options. Your settings are kept. Like Select + Play, Select Action is no
   longer found by Search or listed in Changed Settings, and has no Explain
   entry.
+- **Menu on the now-playing screen now goes back to the list you started the
+  music from,** in the same place, and a second Menu reaches the main menu.
+  The end of the music returns there too. To have Menu go straight to
+  the main menu as before, set **Menu Action** (Settings > Playback > Now
+  Playing Screen) to Main Menu.
 - **Album covers are now kept per album, not per folder,** so a library whose
   folders hold several albums each -- one copied onto the player by iTunes,
   under `iPod_Control/Music` -- shows each album its own cover in Music and

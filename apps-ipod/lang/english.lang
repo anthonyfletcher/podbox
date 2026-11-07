@@ -28054,3 +28054,17 @@
     *: "not yet"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "Menu Action"
+  </dest>
+  <voice>
+    *: "Menu Action"
+  </voice>
+</phrase>
