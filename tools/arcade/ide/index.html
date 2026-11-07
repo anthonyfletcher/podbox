@@ -190,7 +190,7 @@ body.running #run { display: none; }
 .ed-sub .grow { flex: 1; }
 .ed-sub .ib { width: 22px; height: 22px; }
 .tb.flat { border: none; padding: 0; min-height: 28px; background: none; }
-.sheet { display: flex; height: 100%; min-height: 0; }
+.sheet, .map { display: flex; height: 100%; min-height: 0; }
 .sheet-body { padding: 12px 16px; overflow-x: hidden; overflow-y: auto; flex: 1;
               display: flex; flex-direction: column; gap: 8px; }
 .sheet-picker { width: 256px; height: 256px; image-rendering: pixelated; cursor: pointer;
@@ -202,6 +202,26 @@ body.running #run { display: none; }
 .sheet-anim-view { image-rendering: pixelated; align-self: flex-start; background: var(--screen-bg);
                    cursor: pointer; }
 .sheet-anim-code { font: 11px ui-monospace, Consolas, monospace; color: var(--dim); word-break: break-all; }
+
+/* ---- maps ---- */
+.map-main { flex: 1; min-width: 0; display: flex; flex-direction: column; outline: none; }
+.map-objs { max-height: 180px; overflow: auto; display: flex; flex-direction: column; flex: none;
+            font: 12px ui-monospace, Consolas, monospace; }
+.map-objs button { text-align: left; border: none; background: none; padding: 2px 6px; border-radius: 4px;
+                   white-space: pre; }
+.map-objs button:hover { background: var(--bg); }
+.map-objs button.on { background: var(--accent); color: #fff; }
+.map-none { color: var(--dim); font: 12px system-ui, sans-serif; }
+.map-insp { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--dim); }
+.map-insp input { font: 12px ui-monospace, Consolas, monospace; padding: 2px 4px; border-radius: 4px; min-width: 0;
+                  width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--ink); height: 24px; }
+.map-kind { display: grid; grid-template-columns: 36px 1fr; align-items: center; gap: 6px; }
+.map-xywh { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.map-xywh label { display: grid; grid-template-columns: 10px 1fr; align-items: center; gap: 4px; }
+.map-prop { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; align-items: center; }
+.map-prop .ib { width: 24px; height: 24px; }
+.tb select { font: 12px system-ui, sans-serif; height: 24px; padding: 0 4px; border-radius: 4px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 
 /* ---- fonts ---- */
 .font { display: flex; height: 100%; min-height: 0; }

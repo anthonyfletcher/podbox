@@ -22,6 +22,7 @@ import { build, open, names, NEW_CART, palette, readPicture, writePicture } from
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { PaletteEditor } from './palette.js';
 import { FontEditor } from './font.js';
+import { MapEditor } from './map.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
@@ -161,15 +162,17 @@ function show(file) {
     current = file;
     const pane = $('editor');
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
-    const visual = gplFile || bdfFile;
+    const mapFile = /^maps\/\w+\.json$/.test(file);
+    const visual = gplFile || bdfFile || mapFile;
     if (isBinary(file) || (visual && !asText[file])) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
         if (gplFile) showPalette(pane, file);
         else if (bdfFile) showFont(pane, file);
+        else if (mapFile) showMap(pane, file);
         else showPicture(pane, file);
     } else {
-        /* a palette or a font as text has a bar over it to go back */
+        /* a palette, a font or a map as text has a bar over it to go back */
         if (view && (visual || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
         if (!view) {
             pane.innerHTML = '';
@@ -177,8 +180,8 @@ function show(file) {
             if (visual) {
                 const bar = document.createElement('div');
                 bar.className = 'tb';
-                bar.append(iconButton(gplFile ? 'swatches' : 'glyphs',
-                    gplFile ? 'Edit as swatches' : 'Edit as glyphs',
+                bar.append(iconButton(gplFile ? 'swatches' : bdfFile ? 'glyphs' : 'grid',
+                    gplFile ? 'Edit as swatches' : bdfFile ? 'Edit as glyphs' : 'Edit as a map',
                     () => { delete asText[file]; check(); show(file); }));
                 host = document.createElement('div');
                 host.className = 'text-host';
@@ -195,7 +198,7 @@ function show(file) {
 /* the sheet's animation, as the sprite editor last had it */
 let sheetAnim = null;
 
-/* palettes shown as text rather than swatches */
+/* palettes, fonts and maps shown as text */
 const asText = {};
 
 /* a font in the font editor */
@@ -214,6 +217,49 @@ function showFont(pane, file) {
         say('error', file + ': ' + e.message + '. Shown as text to put right.');
         show(file);
     }
+}
+
+/* a map in the map editor, painted with the sheet */
+function showMap(pane, file) {
+    let sheet = null;
+    try { if (folder['sheet.png']) sheet = readPicture(folder['sheet.png']).px; } catch (e) { /* the build says */ }
+    try {
+        pixels = new MapEditor(pane, {
+            text: String(folder[file]), sheet: sheet, rgb: palette(folder), flags: readFlags(),
+            flagNames: flagNames, ask: ask,
+            picker: layout.picker,
+            pickerShown: (open) => { layout.picker = open; applyLayout(); },
+            say: (text, bad) => say(bad ? 'error' : 'print', text),
+            asText: () => { asText[file] = true; show(file); },
+            changed: (text) => { folder[file] = text; delete states[file]; changed(); }
+        });
+        pixels.focus();
+    } catch (e) {
+        asText[file] = true;
+        say('error', file + ': ' + e.message + '. Shown as text to put right.');
+        show(file);
+    }
+}
+
+/* the sheet's 256 flags, from flags.json */
+function readFlags() {
+    const flags = new Uint8Array(256);
+    if (folder['flags.json']) {
+        try {
+            const f = JSON.parse(String(folder['flags.json']));
+            if (Array.isArray(f)) f.forEach((v, i) => { flags[i] = v; });
+            else for (const [k, v] of Object.entries(f)) flags[+k] = v;
+        } catch (e) { /* the build reports it */ }
+    }
+    return flags;
+}
+
+/* the eight flags' names from cart.json, null where none */
+function flagNames() {
+    try {
+        const n = JSON.parse(String(folder['cart.json'])).flags || [];
+        return Array.from({ length: 8 }, (_, b) => n[b] || null);
+    } catch (e) { return new Array(8).fill(null); }
 }
 
 /* every picture of the cart: its file, size and palette numbers */
@@ -355,14 +401,7 @@ function showPicture(pane, file) {
         return;
     }
     const sheet = file === 'sheet.png';
-    const flags = new Uint8Array(256);
-    if (sheet && folder['flags.json']) {
-        try {
-            const f = JSON.parse(String(folder['flags.json']));
-            if (Array.isArray(f)) f.forEach((v, i) => { flags[i] = v; });
-            else for (const [k, v] of Object.entries(f)) flags[+k] = v;
-        } catch (e) { /* the build reports it */ }
-    }
+    const flags = readFlags();
     const write = (px) => {
         folder[file] = writePicture(pic.width, pic.height, px, rgb);
         changed();
@@ -380,12 +419,7 @@ function showPicture(pane, file) {
         anim: sheetAnim,
         animChanged: (a) => { sheetAnim = a; },
         pickerShown: (open) => { layout.picker = open; applyLayout(); },
-        flagNames: () => {
-            try {
-                const n = JSON.parse(String(folder['cart.json'])).flags || [];
-                return Array.from({ length: 8 }, (_, b) => n[b] || null);
-            } catch (e) { return new Array(8).fill(null); }
-        },
+        flagNames: flagNames,
         nameFlag: async (b) => {
             let cart;
             try { cart = JSON.parse(String(folder['cart.json'])); } catch (e) {
@@ -1207,8 +1241,8 @@ const ACTIONS = {
     'open-folder': openFolder,
     save: save,
     export: exportCart,
-    undo: () => view && undo(view),
-    redo: () => view && redo(view),
+    undo: () => view ? undo(view) : pixels && pixels.undoEdit && pixels.undoEdit(),
+    redo: () => view ? redo(view) : pixels && pixels.redoEdit && pixels.redoEdit(),
     find: () => view && openSearchPanel(view),
     add: newFile,
     'view-files': () => toggle('files'),
