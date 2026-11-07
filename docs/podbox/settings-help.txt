@@ -1401,10 +1401,10 @@ Playlists.
 
 [wps select action]
 What a press of Select does on the now-playing screen: go back to the
-previous screen, to Music, Album Covers or Files, open the lyrics, the queue
-or Theme Options, or one of the now-playing menu's other actions. Theme
-Options says Unavailable when the theme has none. Holding Select always
-opens the now-playing menu.
+previous screen as Menu Action does, or to the browser last used, to Music,
+Album Covers or Files, open the lyrics, the queue or Theme Options, or one
+of the now-playing menu's other actions. Theme Options says Unavailable when
+the theme has none. Holding Select always opens the now-playing menu.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: any

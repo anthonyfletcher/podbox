@@ -5,7 +5,7 @@
   that when a read from the disk fails.
 - **Select Action and Select + Play now offer the same list:** Select can run
   any of the now-playing menu's actions, Select + Play can go to Music,
-  Album Covers, Files or the previous screen, and both can open Theme
+  Album Covers, Files or the previous browser, and both can open Theme
   Options. Your settings are kept. Like Select + Play, Select Action is no
   longer found by Search or listed in Changed Settings, and has no Explain
   entry.
@@ -13,7 +13,12 @@
   music from,** in the same place, and a second Menu reaches the main menu.
   The end of the music returns there too. To have Menu go straight to
   the main menu as before, set **Menu Action** (Settings > Playback > Now
-  Playing Screen) to Main Menu.
+  Playing Screen) to Main Menu. Select Action and Select + Play Action
+  (Select + Play until now) offer this Previous Screen too; the choice they
+  called Previous Screen before, back to the browser last used, is now
+  **Previous Browser** and is still Select's default. If you had set Select +
+  Play to Previous Screen, it now goes back the new way; pick Previous
+  Browser to keep the old.
 - **Album covers are now kept per album, not per folder,** so a library whose
   folders hold several albums each -- one copied onto the player by iTunes,
   under `iPod_Control/Music` -- shows each album its own cover in Music and

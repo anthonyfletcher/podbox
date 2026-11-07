@@ -10659,15 +10659,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "Midden + Afspelen"
+    hotkey: "Actie van Midden + Afspelen"
   </dest>
   <voice>
     *: none
-    hotkey: "Midden en Afspelen"
+    hotkey: "Actie van Midden en Afspelen"
   </voice>
 </phrase>
 <phrase>
@@ -27975,5 +27975,47 @@
   </dest>
   <voice>
     *: "nog niet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "Actie van menuknop"
+  </dest>
+  <voice>
+    *: "Actie van menuknop"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "Vorige browser"
+  </dest>
+  <voice>
+    *: "Vorige browser"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "Vorig scherm"
+  </dest>
+  <voice>
+    *: "Vorig scherm"
   </voice>
 </phrase>

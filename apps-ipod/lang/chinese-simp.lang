@@ -10687,15 +10687,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "选择 + 播放"
+    hotkey: "选择 + 播放动作"
   </dest>
   <voice>
     *: none
-    hotkey: "选择和播放"
+    hotkey: "选择和播放动作"
   </voice>
 </phrase>
 <phrase>
@@ -27974,5 +27974,47 @@
   </dest>
   <voice>
     *: "未获得"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "菜单键动作"
+  </dest>
+  <voice>
+    *: "菜单键动作"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "上次的浏览器"
+  </dest>
+  <voice>
+    *: "上次的浏览器"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "上一画面"
+  </dest>
+  <voice>
+    *: "上一画面"
   </voice>
 </phrase>

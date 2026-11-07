@@ -10691,15 +10691,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "Mitt + Spela"
+    hotkey: "Funktion för Mitt + Spela"
   </dest>
   <voice>
     *: none
-    hotkey: "Mitt och Spela"
+    hotkey: "Funktion för Mitt och Spela"
   </voice>
 </phrase>
 <phrase>
@@ -27974,5 +27974,47 @@
   </dest>
   <voice>
     *: "inte än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "Menyknappens funktion"
+  </dest>
+  <voice>
+    *: "Menyknappens funktion"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "Föregående webbläsare"
+  </dest>
+  <voice>
+    *: "Föregående webbläsare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "Föregående skärm"
+  </dest>
+  <voice>
+    *: "Föregående skärm"
   </voice>
 </phrase>

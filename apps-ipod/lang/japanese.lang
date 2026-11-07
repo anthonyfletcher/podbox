@@ -10690,15 +10690,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "中央 + 再生"
+    hotkey: "中央 + 再生の動作"
   </dest>
   <voice>
     *: none
-    hotkey: "中央と再生"
+    hotkey: "中央と再生の動作"
   </voice>
 </phrase>
 <phrase>
@@ -27973,5 +27973,47 @@
   </dest>
   <voice>
     *: "未獲得"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "メニューボタンの動作"
+  </dest>
+  <voice>
+    *: "メニューボタンの動作"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "直前のブラウザ"
+  </dest>
+  <voice>
+    *: "直前のブラウザ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "直前の画面"
+  </dest>
+  <voice>
+    *: "直前の画面"
   </voice>
 </phrase>

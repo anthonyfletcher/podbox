@@ -11098,15 +11098,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </dest>
   <voice>
     *: none
-    hotkey: "Select and Play"
+    hotkey: "Select and Play Action"
   </voice>
 </phrase>
 <phrase>
@@ -28066,5 +28066,33 @@
   </dest>
   <voice>
     *: "Menu Action"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "Previous Browser"
+  </dest>
+  <voice>
+    *: "Previous Browser"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "Previous Screen"
+  </dest>
+  <voice>
+    *: "Previous Screen"
   </voice>
 </phrase>

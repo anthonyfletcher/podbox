@@ -10169,15 +10169,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "Środek + Odtwarzaj"
+    hotkey: "Działanie Środek + Odtwarzaj"
   </dest>
   <voice>
     *: none
-    hotkey: "Środek i Odtwarzaj"
+    hotkey: "Działanie Środek i Odtwarzaj"
   </voice>
 </phrase>
 <phrase>
@@ -27973,5 +27973,47 @@
   </dest>
   <voice>
     *: "jeszcze nie"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "Działanie przycisku Menu"
+  </dest>
+  <voice>
+    *: "Działanie przycisku Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "Poprzednia przeglądarka"
+  </dest>
+  <voice>
+    *: "Poprzednia przeglądarka"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "Poprzedni ekran"
+  </dest>
+  <voice>
+    *: "Poprzedni ekran"
   </voice>
 </phrase>

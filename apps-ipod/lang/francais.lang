@@ -10796,15 +10796,15 @@
   user: core
   <source>
     *: none
-    hotkey: "Select + Play"
+    hotkey: "Select + Play Action"
   </source>
   <dest>
     *: none
-    hotkey: "Centre + Lecture"
+    hotkey: "Action de Centre + Lecture"
   </dest>
   <voice>
     *: none
-    hotkey: "Centre et Lecture"
+    hotkey: "Action de Centre et Lecture"
   </voice>
 </phrase>
 <phrase>
@@ -27993,5 +27993,47 @@
   </dest>
   <voice>
     *: "pas encore"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_MENU_ACTION
+  desc: in settings_menu: what MENU does on the now-playing screen
+  user: core
+  <source>
+    *: "Menu Action"
+  </source>
+  <dest>
+    *: "Action du bouton Menu"
+  </dest>
+  <voice>
+    *: "Action du bouton Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREVIOUS_BROWSER
+  desc: a now-playing button's action: back to the browser last used
+  user: core
+  <source>
+    *: "Previous Browser"
+  </source>
+  <dest>
+    *: "Navigateur précédent"
+  </dest>
+  <voice>
+    *: "Navigateur précédent"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACK_PREVIOUS_SCREEN
+  desc: a now-playing button's action: back to the screen the music was started from
+  user: core
+  <source>
+    *: "Previous Screen"
+  </source>
+  <dest>
+    *: "Écran précédent"
+  </dest>
+  <voice>
+    *: "Écran précédent"
   </voice>
 </phrase>

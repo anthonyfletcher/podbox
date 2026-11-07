@@ -2561,9 +2561,15 @@ long context_menu_leave_for(void)
     return leave_for;
 }
 
-static int hotkey_previous_screen(void)
+static int hotkey_previous_browser(void)
 {
     return leave(GO_TO_PREVIOUS_BROWSER);
+}
+
+/* Back the way Menu Action's Previous Screen goes */
+static int hotkey_previous_screen(void)
+{
+    return leave(GO_TO_PREVIOUS);
 }
 
 static int hotkey_music(void)
@@ -2685,8 +2691,14 @@ static const struct hotkey_assignment hotkey_items[] = {
       .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
       .icon = Icon_NOICON },
     { .action = HOTKEY_PREVIOUS_SCREEN,
-      .lang_id = LANG_PREVIOUS_SCREEN,
+      .lang_id = LANG_BACK_PREVIOUS_SCREEN,
       .func = HOTKEY_FUNC(hotkey_previous_screen, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_PREVIOUS_BROWSER,
+      .lang_id = LANG_PREVIOUS_BROWSER,
+      .func = HOTKEY_FUNC(hotkey_previous_browser, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
@@ -2908,7 +2920,7 @@ static const struct
 } hotkey_old_names[] = {
     { "Add to Queue",       HOTKEY_INSERT },
     { "Shuffle into Queue", HOTKEY_INSERT_SHUFFLED },
-    { "default",            HOTKEY_PREVIOUS_SCREEN },
+    { "default",            HOTKEY_PREVIOUS_BROWSER },
     { "database",           HOTKEY_MUSIC },
     { "coverflow",          HOTKEY_ALBUM_COVERS },
     { "queue",              HOTKEY_VIEW_PLAYLIST },
