@@ -18,6 +18,10 @@
  * The host also asks through it (the resume question) and lays the
  * achievement banner over the game's top rows with it.
  *
+ * tools/arcade/lib/gui.js draws the same pieces for a cart's own screens,
+ * and a test checks the two give the same pixels: change the drawing here
+ * and change it there.
+ *
  * Parts, in order:
  *   text in       a cart's value as ended text, of a bounded length
  *   the line      ui.text's characters, and the wheel's cycle of them
@@ -252,7 +256,7 @@ static void wrap(struct vm *vm, struct dialog *g)
             uint32_t next = end + 1;
             while (next < n && ((uint8_t)s[next] & 0xc0) == 0x80)
                 next++;
-            if (next > i + 1 && text_width(vm, s + i, next - i) > INNER_W)
+            if (end > i && text_width(vm, s + i, next - i) > INNER_W)
                 break;
             if (s[end] == ' ')
                 space = end;

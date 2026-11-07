@@ -37,7 +37,7 @@ function run(libs, main, ticks = 1, extra = []) {
 }
 
 test('every library compiles alone and all together', () => {
-    for (const l of ['dial', 'tween', 'text', 'palfx'])
+    for (const l of ['dial', 'tween', 'text', 'palfx', 'gui'])
         run([l], 'function init() {}\nfunction update() {}');
     run(['dial', 'menu'], 'function init() {}\nfunction update() {}');
     run(['dial', 'tween', 'text', 'palfx', 'menu'], 'function init() {}\nfunction update() {}');
@@ -153,4 +153,51 @@ function update() {
 function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:12', '--buttons', '4:2,5:0,7:16']);
     /* 12 clicks is two detents: QUIT; NEXT wraps to PLAY; SELECT takes it */
     assert.deepEqual(out, ['at 2', '8 chose 0']);
+});
+
+test('gui: lines broken at newlines, spaces, and inside a long word', () => {
+    const out = run(['gui'], `function init() {
+    var l = gui.lines("THE QUICK BROWN FOX\\nJUMPS ABCDEFGHIJKLMNOP", 40);
+    for (var i = 0; i < l.length; i++) printh("[" + l[i] + "]");
+}
+function update() {}`);
+    assert.deepEqual(out, ['[THE QUICK]', '[BROWN FOX]', '[JUMPS]', '[ABCDEFGHIJ]', '[KLMNOP]']);
+});
+
+test('gui: a field typed with the wheel, Right and Left held; a list moved', () => {
+    const out = run(['gui'], `var f, l, tk = 0;
+function init() { f = gui.field(8, "XY"); l = gui.list(["A", "B", "C", "D"], 2); }
+function update() {
+    tk++;
+    if (gui.field_update(f)) printh("[" + gui.field_text(f) + "]");
+    var c = gui.list_update(l);
+    if (c >= 0) printh("chose " + c + " top " + l.top);
+}`, 30, ['--wheel', '1:6:0,2:0,4:12,5:0,8:-6,9:0',
+         '--buttons', '2:2,3:0,10:1,27:0,28:16,29:0']);
+    /* the wheel puts A after XY; Right keeps it; two on puts in A and
+     * turns it to B, back one makes it A; Left held deletes one. The list:
+     * NEXT, two rows on, PREV and PREV's repeat leave B */
+    assert.deepEqual(out, ['[XYA]', 'chose 1 top 1']);
+});
+
+/* The dialogs and the library draw the same pixels: each pair of carts
+ * shows one dialog and the same thing built from gui */
+test('gui: the same pixels as the dialogs', () => {
+    const pairs = [
+        ['ui.confirm("Sure?");',
+         'gui.box(6, 47, 153, 71); print("Sure?", 10, 51, 7); gui.buttons(["Yes", "No"], 1, 1, 0, 60, 160);'],
+        ['ui.text("Name", 8, "XYZ");',
+         'gui.box(6, 41, 153, 78); print("Name", 10, 45, 7); gui.field_draw(gui.field(8, "XYZ"), 10, 54, 140, 1); gui.buttons(["OK", "Cancel"], 0, 0, 0, 67, 160);'],
+        ['ui.choose("Pick one", ["Red", "Green", "Blue"]);',
+         'gui.box(6, 39, 153, 79); print("Pick one", 10, 43, 7); gui.list_draw(gui.list(["Red", "Green", "Blue"], 3), 8, 52, 146);'],
+        /* eleven rows of twelve, so with the scroll bar */
+        ['ui.choose("Pick one", ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]);',
+         'gui.box(6, 7, 153, 111); print("Pick one", 10, 11, 7); gui.list_draw(gui.list(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"], 11), 8, 20, 146);'],
+    ];
+    for (const [dialog, built] of pairs) {
+        const a = path.join(tmp, 'gui-a' + n + '.png'), b = path.join(tmp, 'gui-b' + n + '.png');
+        run(['gui'], `function init() { cls(3); ${dialog} }\nfunction update() {}`, 1, ['--shot', a]);
+        run(['gui'], `function init() {}\nfunction update() {}\nfunction draw() { cls(3); ${built} }`, 1, ['--shot', b]);
+        assert.ok(fs.readFileSync(a).equals(fs.readFileSync(b)), dialog);
+    }
 });

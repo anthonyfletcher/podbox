@@ -119,6 +119,7 @@ file's opening comment lists what it gives.
 | `text.js` | padded numbers, a clock, centred and right-aligned text, outlined text, words wrapped in a box |
 | `palfx.js` | fades and flashes of the whole palette, and colour cycling |
 | `menu.js` | an in-game menu on the wheel and SELECT; needs `dial.js` |
+| `gui.js` | the pieces the `ui` dialogs are made of, drawn the same way: a panel, text broken into lines, buttons, a scroll bar, a scrolling list and a text field typed with the wheel |
 
 ## How the language differs from JavaScript
 
