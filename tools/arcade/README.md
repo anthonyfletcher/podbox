@@ -15,7 +15,15 @@ npm install
 node pbgc.js new mygame "My Game"    # a folder with cart.json and main.js
 node pbgc.js build mygame            # writes mygame.pbg
 node pbgc.js dis mygame.pbg          # checks a cart and lists its bytecode
+node pbgc.js unpack game.pbg game    # the cart's folder, from the cart alone
+node pbgc.js pack game               # the same as build
 ```
+
+A cart carries its own sources, so `unpack` gives back every file as it
+was written. Pictures come back as indexed PNGs in the cart's first
+palette, with colour 0 transparent: the same palette numbers, though not
+the same file if it was saved with other colours. `pack` then makes the
+same cart, byte for byte.
 
 A cart is a folder:
 

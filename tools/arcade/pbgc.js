@@ -3,18 +3,24 @@
  *
  *   pbgc new <folder> <name>        a new cart folder, with its id
  *   pbgc build <folder> [-o file]   compile; the cart defaults to <folder>.pbg
+ *   pbgc pack <folder> [-o file]    the same: build is unpack's inverse
+ *   pbgc unpack <file.pbg> <folder> the cart's folder again, from its sources
  *   pbgc dis <file.pbg>             verify a cart and list its bytecode
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { compileFiles, readFolder, readAssets, loadDefs } from './src/node.js';
+import { unpackCart } from './src/unpack.js';
 import { load, verify, disassemble } from './src/bytecode.js';
 
 function usage() {
     console.error('usage: pbgc new <folder> <name>\n' +
                   '       pbgc build <folder> [-o file.pbg]\n' +
+                  '       pbgc pack <folder> [-o file.pbg]\n' +
+                  '       pbgc unpack <file.pbg> <folder>\n' +
                   '       pbgc dis <file.pbg>');
     process.exit(2);
 }
@@ -64,6 +70,23 @@ function cmdBuild(dir, out) {
                 s.globals + ' globals, API ' + s.api);
 }
 
+function cmdUnpack(file, dir) {
+    if (!file || !dir) usage();
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length) {
+        console.error(dir + ' is not empty');
+        process.exit(1);
+    }
+    const files = unpackCart(new Uint8Array(fs.readFileSync(file)),
+                             (b) => new Uint8Array(zlib.inflateRawSync(b)),
+                             (b) => new Uint8Array(zlib.deflateSync(b, { level: 9 })));
+    for (const name of Object.keys(files).sort()) {
+        const to = path.join(dir, ...name.split('/'));
+        fs.mkdirSync(path.dirname(to), { recursive: true });
+        fs.writeFileSync(to, files[name]);
+    }
+    console.log(dir + ': ' + Object.keys(files).length + ' files');
+}
+
 function cmdDis(file) {
     if (!file) usage();
     const d = loadDefs();
@@ -76,11 +99,13 @@ const argv = process.argv.slice(2);
 try {
     switch (argv[0]) {
     case 'new': cmdNew(argv[1], argv[2]); break;
-    case 'build': {
+    case 'build':
+    case 'pack': {
         const o = argv.indexOf('-o');
         cmdBuild(argv[1], o > 0 ? argv[o + 1] : null);
         break;
     }
+    case 'unpack': cmdUnpack(argv[1], argv[2]); break;
     case 'dis': cmdDis(argv[1]); break;
     default: usage();
     }

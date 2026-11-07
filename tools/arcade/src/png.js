@@ -1,6 +1,6 @@
-/* Reading an indexed PNG: the sheet and a cart's images are kept as their
- * pixels' palette indices, exactly. inflate is the zlib decoder of the
- * host (Node's, or the IDE's), given the IDAT data with its zlib header. */
+/* Indexed PNGs: the sheet and a cart's images are kept as their pixels'
+ * palette indices, exactly. inflate and deflate are the zlib coders of the
+ * host (Node's, or the IDE's), for the IDAT data with its zlib header. */
 
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
@@ -77,4 +77,57 @@ export function decodeIndexedPng(bytes, inflate) {
             px[y * width + x] = byte >> (8 - depth * (x % per + 1)) & mask;
         }
     return { width: width, height: height, px: px };
+}
+
+/* a chunk's CRC, over its type and then its data */
+function crc(type, data) {
+    let c = 0xffffffff;
+    const add = (b) => {
+        c ^= b;
+        for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+    };
+    type.forEach(add);
+    data.forEach(add);
+    return (c ^ 0xffffffff) >>> 0;
+}
+
+/* An 8-bit indexed PNG of px, w x h, with rgb (0xrrggbb a colour) as its
+ * palette -- as many entries as the pixels reach -- and index 0
+ * transparent */
+export function encodeIndexedPng(width, height, px, rgb, deflate) {
+    let top = 0;
+    for (const v of px) if (v > top) top = v;
+    const n = Math.max(rgb.length, top + 1);
+    const plte = new Uint8Array(n * 3);
+    for (let i = 0; i < n; i++) {
+        const c = rgb[i] || 0;
+        plte[i * 3] = c >> 16 & 0xff; plte[i * 3 + 1] = c >> 8 & 0xff; plte[i * 3 + 2] = c & 0xff;
+    }
+    const raw = new Uint8Array(height * (width + 1));
+    for (let y = 0; y < height; y++)
+        raw.set(px.subarray(y * width, (y + 1) * width), y * (width + 1) + 1);
+    const ihdr = new Uint8Array(13);
+    const dv = new DataView(ihdr.buffer);
+    dv.setUint32(0, width); dv.setUint32(4, height);
+    ihdr.set([8, 3, 0, 0, 0], 8);
+    const parts = [new Uint8Array(SIGNATURE)];
+    const chunk = (type, data) => {
+        const head = new Uint8Array(8);
+        new DataView(head.buffer).setUint32(0, data.length);
+        for (let i = 0; i < 4; i++) head[4 + i] = type.charCodeAt(i);
+        const tail = new Uint8Array(4);
+        new DataView(tail.buffer).setUint32(0, crc(head.subarray(4), data));
+        parts.push(head, data, tail);
+    };
+    chunk('IHDR', ihdr);
+    chunk('PLTE', plte);
+    chunk('tRNS', new Uint8Array([0]));
+    chunk('IDAT', deflate(raw));
+    chunk('IEND', new Uint8Array(0));
+    let len = 0;
+    for (const p of parts) len += p.length;
+    const out = new Uint8Array(len);
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
 }

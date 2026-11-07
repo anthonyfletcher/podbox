@@ -1999,8 +1999,17 @@ export function compile(input) {
     const srcFiles = {};
     for (const n in input.files)
         if (/\.js$/.test(n) || n === 'cart.json') srcFiles[n] = input.files[n];
-    const fontFiles = (input.assets && input.assets.fonts) || {};
-    for (const n in fontFiles) srcFiles['fonts/' + n + '.bdf'] = fontFiles[n];
+    /* every text asset as written; a picture is named with no contents,
+     * pbgc unpack making it again from its chunk */
+    const a = input.assets || {};
+    const kinds = [['palettes', 'palettes/', '.gpl'], ['maps', 'maps/', '.json'],
+                   ['sounds', 'sounds/', '.json'], ['data', 'data/', '.json'],
+                   ['texts', 'data/', '.txt'], ['fonts', 'fonts/', '.bdf']];
+    for (const [kind, dir, ext] of kinds)
+        for (const n in a[kind] || {}) srcFiles[dir + n + ext] = a[kind][n];
+    if (a.flags !== undefined) srcFiles['flags.json'] = a.flags;
+    if (a.sheet) srcFiles['sheet.png'] = '';
+    for (const n of built.images) srcFiles['images/' + n + '.png'] = '';
 
     const bytes = writeCart([
         { tag: 'PBG1', data: header(cart, prog) },
