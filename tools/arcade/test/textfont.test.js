@@ -1,4 +1,4 @@
-/* FONT.TEXT: text beyond ASCII, through pbgvm -- the engine's own glyphs,
+/* FONT.WORLD: text beyond ASCII, through pbgvm -- the engine's own glyphs,
  * and the font file's, from a small one made here. */
 
 import { test, before } from 'node:test';
@@ -55,7 +55,7 @@ const COUNT = `function count(c) {
 test('the engine\'s own letters: accented, Greek, Cyrillic', () => {
     const r = run(COUNT + `
 function init() {
-    font(FONT.TEXT);
+    font(FONT.WORLD);
     printh(textw("A") + " " + textw("AÅ") + " " + textw("Ж") + " " + textw("Ω") + " " + textw("??"));
     cls(0); print("Ж", 10, 10, 7); var ink = count(7);
     cls(0); print("Å", 10, 10, 7); var ring = count(7);
@@ -76,7 +76,7 @@ test('a glyph from the font file, and ? without it', () => {
     const file = fontFile();
     const main = COUNT + `
 function init() {
-    font(FONT.TEXT);
+    font(FONT.WORLD);
     cls(0); print("あ", 0, 0, 7);
     printh(textw("あ") + " " + count(7) + " " + textw("ぃ") + " " + textw("?"));
 }`;
@@ -89,9 +89,9 @@ function init() {
     assert.deepEqual(without.out.trim().split(' ').map(Number).slice(0, 1), [q]);
 });
 
-test('a line is 12 rows, and font() knows TEXT', () => {
+test('a line is 12 rows, and font() knows WORLD', () => {
     const r = run(`function init() {
-    font(FONT.TEXT);
+    font(FONT.WORLD);
     cls(0);
     cursor(0, 0);
     print("A\\nA", 7);
@@ -100,5 +100,25 @@ test('a line is 12 rows, and font() knows TEXT', () => {
 }`);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out.trim(), '7 7 0 1');
-    assert.match(run('function init() { font(3); }').err, /FONT.SMALL, FONT.BIG or FONT.TEXT/);
+    assert.match(run('function init() { font(3); }').err, /FONT.CAPS or FONT.WORLD/);
+});
+
+test('size 2 doubles either font, and is 1 or 2', () => {
+    const r = run(COUNT + `
+function init() {
+    var out = "";
+    font(FONT.CAPS); var c1 = textw("AB"); cls(0); print("A", 0, 0, 7); var i1 = count(7);
+    font(FONT.CAPS, 2); var c2 = textw("AB"); cls(0); print("A", 0, 0, 7); var i2 = count(7);
+    font(FONT.WORLD); var w1 = textw("AÅ"); cls(0); print("Ж", 0, 0, 7); var j1 = count(7);
+    font(FONT.WORLD, 2); var w2 = textw("AÅ"); cls(0); print("Ж", 0, 0, 7); var j2 = count(7);
+    cursor(0, 0); print("A\\nA", 7);
+    printh(c2 / c1 + " " + i2 / i1 + " " + w2 / w1 + " " + j2 / j1 + " " + (textw("A\\nA") == w2 / 2));
+    cls(0); cursor(0, 0); print("A\\nA", 7);
+    // the second line 24 rows down: A's left side on rows 32 to 41
+    printh(pget(0, 34) + " " + pget(0, 22));
+}`);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['2 4 2 4 1', '7 0']);
+    assert.match(run('function init() { font(FONT.CAPS, 3); }').err, /size is 1 or 2/);
+    assert.match(run('function init() { font(FONT.CAPS, 0); }').err, /size is 1 or 2/);
 });

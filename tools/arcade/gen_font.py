@@ -1,5 +1,5 @@
 """Writes apps-ipod/games/arcade/core_font.h: the core's 3x5 font, drawn
-below, for ASCII 32-126. Lowercase letters use the capitals, so FONT.SMALL
+below, for ASCII 32-126. Lowercase letters use the capitals, so FONT.CAPS
 reads as small capitals. Each glyph is 15 bits, row by row from the top,
 the high bit of each row on the left."""
 

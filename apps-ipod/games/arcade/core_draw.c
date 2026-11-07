@@ -1567,7 +1567,7 @@ static uint32_t gather(struct vm *vm, struct value *a, int argc, char *buf,
 
 static int scale_of(struct vm *vm)
 {
-    return vm->d.font == 1 ? 2 : 1;
+    return vm->d.font == 1 ? 2 : vm->d.font_big + 1;
 }
 
 /* A glyph wholly inside the clip, unpatterned, k pixels to a dot: the
@@ -1652,7 +1652,7 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
     return cx;
 }
 
-/* ---- FONT.TEXT: beyond ASCII ---- *
+/* ---- FONT.WORLD: beyond ASCII ---- *
  * 12-row cells, each glyph its own advance, a 12-row line. The letters,
  * punctuation and symbols below U+3000 are the engine's own; kana, Hangul
  * and the ideographs come from the host, a glyph at a time. */
@@ -1697,9 +1697,9 @@ static const uint8_t *text_glyph(struct vm *vm, uint32_t cp, uint8_t *buf)
     return textfont_glyph['?' - 0x20];
 }
 
-/* text() for FONT.TEXT */
+/* text() for FONT.WORLD, k pixels to a dot */
 static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
-                         uint32_t n, int64_t x, int64_t y, int draw,
+                         uint32_t n, int64_t x, int64_t y, int k, int draw,
                          int64_t *widest, int *lines)
 {
     uint8_t buf[13];
@@ -1712,7 +1712,7 @@ static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
             if (cx - x > *widest)
                 *widest = cx - x;
             cx = x;
-            y += TEXT_LINE;
+            y += TEXT_LINE * k;
             (*lines)++;
             continue;
         }
@@ -1722,8 +1722,9 @@ static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
         if (draw && cp != ' ') {
             int64_t gx = cx + p->ox, gy = y + p->oy;
             p->cost += COST_GLYPH;
-            int inside = !p->pat && gx >= p->cx0 && gy >= p->cy0 &&
-                         gx + 8 <= p->cx1 && gy + TEXT_LINE <= p->cy1;
+            int inside = k == 1 && !p->pat && gx >= p->cx0 &&
+                         gy >= p->cy0 && gx + 8 <= p->cx1 &&
+                         gy + TEXT_LINE <= p->cy1;
             for (int r = 0; r < TEXT_LINE; r++) {
                 uint8_t bits = g[1 + r];
                 if (!bits)
@@ -1739,12 +1740,14 @@ static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
                 } else {
                     for (int c = 0; c < 8; c++)
                         if (bits & (0x80 >> c))
-                            span(p, y + r + p->oy, cx + c + p->ox,
-                                 cx + c + p->ox);
+                            for (int dy = 0; dy < k; dy++)
+                                span(p, y + r * k + dy + p->oy,
+                                     cx + c * k + p->ox,
+                                     cx + c * k + k - 1 + p->ox);
                 }
             }
         }
-        cx += g[0];
+        cx += g[0] * k;
     }
     if (cx - x > *widest)
         *widest = cx - x;
@@ -1779,12 +1782,13 @@ NATIVE(print)
     int lines;
     begin(vm, &p, c, 0);
     int wide = vm->d.font == 2;
-    int64_t end = wide ? text_wide(vm, &p, buf, n, x, y, 1, &widest, &lines)
+    int64_t end = wide ? text_wide(vm, &p, buf, n, x, y, k, 1, &widest,
+                                   &lines)
                        : text(&p, buf, n, x, y, k, 1, &widest, &lines);
     finish(vm, &p);
     vm->d.cur_x = x;
     vm->d.cur_y = (int32_t)clampc((int64_t)y +
-                                  lines * (wide ? TEXT_LINE : 6 * k));
+                                  lines * (wide ? TEXT_LINE : 6) * k);
     *out = mk(T_INT, (int32_t)clampc(end));
     return 1;
 }
@@ -1798,21 +1802,25 @@ NATIVE(textw)
     int64_t widest;
     int lines;
     if (vm->d.font == 2)
-        text_wide(vm, NULL, buf, n, 0, 0, 0, &widest, &lines);
+        text_wide(vm, NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     else
         text(NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     *out = mk(T_INT, (int32_t)widest);
     return 1;
 }
 
+/* font(f) or font(f, size): size 1 or 2, 1 if left out */
 NATIVE(font)
 {
     (void)out;
     WHOLE(0, 0, f, "font");
+    WHOLE(1, 1, size, "font");
     if (f < 0 || f > 2)
-        return vm_fail(vm, "font() needs FONT.SMALL, FONT.BIG or FONT.TEXT",
-                       "", "");
+        return vm_fail(vm, "font() needs FONT.CAPS or FONT.WORLD", "", "");
+    if (size < 1 || size > 2)
+        return vm_fail(vm, "font()'s size is 1 or 2", "", "");
     vm->d.font = (uint8_t)f;
+    vm->d.font_big = (uint8_t)(size - 1);
     return 1;
 }
 

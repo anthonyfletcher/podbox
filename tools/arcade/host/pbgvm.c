@@ -48,7 +48,7 @@
  * does, overwrites the arena, and resumes it from the copy, printing
  * "resumed" -- the run's output is then the same as one never suspended.
  * --store keeps store.* files in dir, as name.json, within the player's
- * bounds; without it nothing is kept. --font gives FONT.TEXT the glyphs of
+ * bounds; without it nothing is kept. --font gives FONT.WORLD the glyphs of
  * a font file (gen_textfont.py --file) beyond the engine's own. */
 
 #include <stdio.h>

@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to shell_font.c: FONT.TEXT's glyphs from the font file.
+ * Interface to shell_font.c: FONT.WORLD's glyphs from the font file.
  ****************************************************************************/
 #ifndef SHELL_FONT_H
 #define SHELL_FONT_H

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Put the Arcade's text font file into a rockbox.zip produced by `make zip`.
 #
-# One file and its licence: .rockbox/games/font.bin, FONT.TEXT's kana,
+# One file and its licence: .rockbox/games/font.bin, FONT.WORLD's kana,
 # Hangul and ideographs, which the player reads a glyph at a time; the
 # letters, punctuation and symbols are in the firmware already.
 #

@@ -59,9 +59,9 @@ function draw() {
     clip();
     tline(102, 70, 126, 70, 0, 0, 0.125, 0);
     tline(102, 74, 126, 74, 0, 0, 0.0625, 0);
-    font(FONT.BIG);
+    font(FONT.CAPS, 2);
     print("BIG", 2, 84, 10);
-    font(FONT.SMALL);
+    font(FONT.CAPS);
     var w = textw("width test");
     print("width test", 40, 86, 7);
     line(40, 92, 40 + w - 2, 92, 8);

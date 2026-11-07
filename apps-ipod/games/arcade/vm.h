@@ -160,7 +160,8 @@ struct draw
     int32_t cur_x, cur_y;
     uint16_t pen;               /* low byte the colour, high byte fillp's */
     uint16_t fill;
-    uint8_t font;
+    uint8_t font;               /* FONT.CAPS or FONT.WORLD; 1 is CAPS at 2 */
+    uint8_t font_big;           /* font()'s size, less one */
     uint8_t dpal[256];          /* drawing: colour -> colour */
     uint8_t spal[256];          /* the screen: index -> entry shown */
     uint8_t transparent[32];

@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * FONT.TEXT's kana, Hangul and ideographs on the player: the host's glyph
+ * FONT.WORLD's kana, Hangul and ideographs on the player: the host's glyph
  * call, from /.rockbox/games/font.bin (tools/arcade/gen_textfont.py; Fusion
  * Pixel 8 px, SIL Open Font License 1.1). The file opens the first time a
  * cart asks for a glyph the engine does not hold -- on the 5G that may wait

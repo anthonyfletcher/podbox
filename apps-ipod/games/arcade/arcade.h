@@ -57,7 +57,7 @@ struct arcade_host
     const struct arcade_speak *speak;
     /* store: the cart's own files, below; NULL for none */
     const struct arcade_store *store;
-    /* FONT.TEXT's glyphs beyond those the engine holds (kana, Hangul,
+    /* FONT.WORLD's glyphs beyond those the engine holds (kana, Hangul,
      * ideographs): codepoint cp's into out -- its advance, then 12 rows a
      * byte each, the high bit on the left -- 1, or 0 when there is none.
      * NULL for none. */

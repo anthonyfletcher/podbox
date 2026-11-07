@@ -1,5 +1,5 @@
 // text: numbers, times and words laid out on the screen. Widths are the
-// small font's, four pixels a character; a cart drawing in FONT.BIG uses
+// FONT.CAPS's, four pixels a character; a cart drawing at size 2 uses
 // twice them.
 //
 //   text.pad(n, width)          n with noughts in front to width digits

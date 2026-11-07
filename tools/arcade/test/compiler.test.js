@@ -153,14 +153,14 @@ test('locals may share a native\'s name', () => {
 test('folds constants, fractions and deg', () => {
     const { dis } = ok('const A = 3 * 4 + 1;\nconst B = "n" + A;\nconst H = 0.5;\n' +
                        'function init() { var a = A, b = B, c = H * 3, d = deg(90), ' +
-                       'e = -1.0, f = FONT.BIG, g = SCREEN + 2, h = "x" + H, ' +
+                       'e = -1.0, f = FONT.WORLD, g = SCREEN + 2, h = "x" + H, ' +
                        'i = 7 / 2, j = 7 / 2.0, k = 2.0; }\nfunction update() {}');
     assert.match(dis, /PUSHI8 13/);
     assert.match(dis, /PUSHS "n13"/);
     assert.match(dis, /PUSHF 1\.5\n.*STL 2/);
     assert.match(dis, /PUSHF 0\.25\n.*STL 3/);
     assert.match(dis, /PUSHF -1\n.*STL 4/);
-    assert.match(dis, /PUSHI8 1\n.*STL 5/);
+    assert.match(dis, /PUSHI8 2\n.*STL 5/);
     assert.match(dis, /PUSHI8 2\n.*STL 6/);
     assert.match(dis, /PUSHS "x0\.5"/);
     assert.match(dis, /PUSHI8 3\n.*STL 8/);

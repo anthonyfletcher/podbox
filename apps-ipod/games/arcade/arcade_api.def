@@ -47,7 +47,7 @@ API(camera,    20, 0, 2, VOID, 0,     FLAT,   LISTEN, 1)
 API(clip,      21, 0, 4, VOID, 0,     FLAT,   LISTEN, 1)
 API(print,     22, 1, 4, VAL,  PARTS, PIXELS, LISTEN, 1)
 API(textw,     23, 1, 1, VAL,  PARTS, FLAT,   LISTEN, 1)
-API(font,      24, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(font,      24, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)
 API(target,    25, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 
 /* Sprites and images */
@@ -330,10 +330,10 @@ API_ALIAS(time, t)
 /* The drawing target that is the screen; img() makes the others */
 API_CONST(SCREEN,   0, 1)
 
-/* Built-in fonts; a cart's own follow from 16 */
-API_CONSTG(FONT, SMALL, 0, 1)
-API_CONSTG(FONT, BIG,   1, 1)
-API_CONSTG(FONT, TEXT,  2, 1)
+/* Built-in fonts; a cart's own follow from 16. 1 is taken: carts built
+ * before font() had a size draw CAPS at 2 with it. */
+API_CONSTG(FONT, CAPS,  0, 1)
+API_CONSTG(FONT, WORLD, 2, 1)
 
 /* What actors.move() reports: the side of the actor that hit, or a
  * trigger cell entered */

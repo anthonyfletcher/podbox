@@ -233,7 +233,7 @@ setting switches on and does nothing. The third ships the synthesiser's
 `~/.cache/podbox-speech` the first time) and the build's own
 `.rockbox/langs/english.vstrings`; without them the Built-in voice says
 nothing. The fourth ships `.rockbox/games/font.bin`, the Arcade's
-`FONT.TEXT` kana, Hangul and ideographs (written by
+`FONT.WORLD` kana, Hangul and ideographs (written by
 `tools/arcade/gen_textfont.py` from Fusion Pixel, fetched into
 `~/.cache/podbox-font` the first time); without it a cart's Japanese,
 Chinese and Korean text shows as `?`. None makes anything else misbehave, so
