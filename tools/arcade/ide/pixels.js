@@ -14,6 +14,8 @@
  * as a PNG for other programs and as its palette numbers for the IDE, so
  * pasting back here is exact. */
 
+import { icon } from './icons.js';
+
 const MARK = 'arcade-pixels ';
 const MAX_UNDO = 100;
 
@@ -82,6 +84,8 @@ export class PixelEditor {
         this.sel = null;          /* { x, y, w, h } */
         this.float = null;        /* { x, y, w, h, px } over the picture */
         this.mirror = was ? was.mirror : false;
+        this.tile = was ? was.tile : false;
+        this.onion = null;          /* another frame, shown faintly under */
         this.build(parent);
         this.render();
     }
@@ -92,37 +96,44 @@ export class PixelEditor {
         const root = this.root = document.createElement('div');
         root.className = 'pix';
         root.tabIndex = 0;
-        const tools = [['pencil', 'Pencil', 'P'], ['line', 'Line', 'L'], ['rect', 'Box', 'R'],
-                       ['oval', 'Oval', 'O'], ['fill', 'Fill', 'F'], ['pick', 'Pick', 'I'],
-                       ['select', 'Select', 'S']];
+        const tools = [['pencil', 'pencil', 'Pencil (P)'], ['line', 'line', 'Line (L)'],
+                       ['rect', 'rect', 'Rectangle (R); Shift fills it'], ['oval', 'oval', 'Oval (O); Shift fills it'],
+                       ['fill', 'fill', 'Fill (F)'], ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool'],
+                       ['select', 'select', 'Select (S): drag to choose, drag inside to move']];
         const bar = document.createElement('div');
         bar.className = 'pix-tools';
         this.toolButtons = {};
-        for (const [id, name, key] of tools) {
+        for (const [id, ic, title] of tools) {
             const b = document.createElement('button');
-            b.textContent = name;
-            b.title = ({ Box: 'Rectangle', Pick: 'Colour picker; Alt+click picks with any tool' }[name] || name) + ' (' + key + ')' + (id === 'rect' || id === 'oval' ? '; Shift fills' : '');
+            b.className = 'tool';
+            b.innerHTML = icon(ic);
+            b.title = title;
             b.onclick = () => this.use(id);
             this.toolButtons[id] = b;
             bar.append(b);
         }
         const sep = () => { const s = document.createElement('span'); s.className = 'sep'; bar.append(s); };
         sep();
-        const act = (label, title, fn) => {
+        const act = (ic, title, fn) => {
             const b = document.createElement('button');
-            b.textContent = label;
+            b.className = 'tool';
+            b.innerHTML = icon(ic);
             b.title = title;
             b.onclick = () => { fn(); this.root.focus(); };
             bar.append(b);
             return b;
         };
-        this.mirrorButton = act('Mirror', 'Draw both halves at once (M)', () => this.toggleMirror());
-        act('Flip ↔', 'Flip across (H)', () => this.flip(true));
-        act('Flip ↕', 'Flip down (V)', () => this.flip(false));
-        act('Turn', 'Turn a quarter clockwise (T)', () => this.turn());
+        this.mirrorButton = act('mirror', 'Mirror: draw both halves at once (M)', () => this.toggleMirror());
+        act('flipH', 'Flip across (H)', () => this.flip(true));
+        act('flipV', 'Flip down (V)', () => this.flip(false));
+        act('turn', 'Turn a quarter clockwise (T)', () => this.turn());
+        act('invert', 'Invert: each colour to the one nearest its opposite; 0 stays clear (N)', () => this.invert());
         sep();
-        act('−', 'Zoom out (-)', () => this.setZoom(this.zoom - 1));
-        act('+', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
+        this.tileButton = act('tile', 'Tile: shown repeated round itself, drawing wrapping at the edges (W)',
+                              () => this.toggleTile());
+        sep();
+        act('zoomOut', 'Zoom out (-)', () => this.setZoom(this.zoom - 1));
+        act('zoomIn', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
         root.append(bar);
 
         const area = this.area = document.createElement('div');
@@ -149,6 +160,7 @@ export class PixelEditor {
         this.listen();
         this.use(this.tool);
         this.mirrorButton.classList.toggle('on', this.mirror);
+        this.tileButton.classList.toggle('on', this.tile);
         this.drawPalette();
         this.setZoom(this.zoom);
     }
@@ -158,13 +170,29 @@ export class PixelEditor {
         this.root.remove();
     }
 
+    /* copies drawn each side of the picture: one in tile mode */
+    get off() { return this.tile ? 1 : 0; }
+
     setZoom(z) {
         this.zoom = Math.max(1, Math.min(32, z));
+        const n = 1 + 2 * this.off;
         for (const c of [this.canvas, this.over]) {
-            c.width = this.w * this.zoom;
-            c.height = this.h * this.zoom;
+            c.width = this.w * this.zoom * n;
+            c.height = this.h * this.zoom * n;
         }
         this.render();
+    }
+
+    toggleTile() {
+        this.tile = !this.tile;
+        this.tileButton.classList.toggle('on', this.tile);
+        this.setZoom(this.tile ? Math.max(1, Math.floor(this.zoom / 2)) : this.zoom * 2);
+    }
+
+    /* another frame drawn faintly where this one is colour 0, or null */
+    setOnion(px) {
+        this.onion = px;
+        this.overlay();
     }
 
     use(tool) {
@@ -207,16 +235,36 @@ export class PixelEditor {
         tmp.width = this.w;
         tmp.height = this.h;
         tmp.getContext('2d').putImageData(this.image, 0, 0);
-        const g = this.canvas.getContext('2d');
+        const g = this.canvas.getContext('2d'), o = this.off, W = this.w * this.zoom, H = this.h * this.zoom;
         g.imageSmoothingEnabled = false;
-        g.drawImage(tmp, 0, 0, this.w * this.zoom, this.h * this.zoom);
+        for (let j = -o; j <= o; j++)
+            for (let i = -o; i <= o; i++) g.drawImage(tmp, (i + o) * W, (j + o) * H, W, H);
         this.overlay();
     }
 
     /* the grids, the selection, a floating picture and a shape's preview */
     overlay(preview) {
         const g = this.over.getContext('2d'), z = this.zoom;
+        g.setTransform(1, 0, 0, 1, 0, 0);
         g.clearRect(0, 0, this.over.width, this.over.height);
+        if (this.off) {
+            /* the copies dimmed, the picture itself clear */
+            g.fillStyle = 'rgba(0,0,0,0.4)';
+            g.fillRect(0, 0, this.over.width, this.over.height);
+            g.clearRect(this.w * z, this.h * z, this.w * z, this.h * z);
+            g.translate(this.w * z, this.h * z);
+        }
+        if (this.onion) {
+            g.globalAlpha = 0.35;
+            for (let y = 0; y < this.h; y++)
+                for (let x = 0; x < this.w; x++) {
+                    const v = this.onion[y * this.w + x];
+                    if (!v || this.px[y * this.w + x]) continue;
+                    g.fillStyle = '#' + shown(this.rgb[v] || 0).toString(16).padStart(6, '0');
+                    g.fillRect(x * z, y * z, z, z);
+                }
+            g.globalAlpha = 1;
+        }
         if (z >= 6) {
             g.strokeStyle = 'rgba(128,128,128,0.25)';
             g.beginPath();
@@ -279,14 +327,23 @@ export class PixelEditor {
     }
 
     put(x, y, c) {
+        if (this.tile) { x = ((x % this.w) + this.w) % this.w; y = ((y % this.h) + this.h) % this.h; }
         if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
         this.px[y * this.w + x] = c;
         if (this.mirror) this.px[y * this.w + this.w - 1 - x] = c;
     }
 
+    /* the picture's pixel under the pointer: past its edges in tile mode */
     at(e) {
         const r = this.canvas.getBoundingClientRect();
-        return { x: Math.floor((e.clientX - r.left) / this.zoom), y: Math.floor((e.clientY - r.top) / this.zoom) };
+        return { x: Math.floor((e.clientX - r.left) / this.zoom) - this.off * this.w,
+                 y: Math.floor((e.clientY - r.top) / this.zoom) - this.off * this.h };
+    }
+
+    /* a pixel past the edges, brought back in tile mode */
+    wrap(p) {
+        if (!this.tile) return p;
+        return { x: ((p.x % this.w) + this.w) % this.w, y: ((p.y % this.h) + this.h) % this.h };
     }
 
     /* the pixels of a shape from a to b: a line, or a rectangle's or an
@@ -500,6 +557,18 @@ export class PixelEditor {
         if (t.whole) this.changed(); else this.render();
     }
 
+    /* each colour to the palette's nearest to its opposite, colour 0
+     * left clear and never chosen */
+    invert() {
+        const t = this.target(), to = new Uint8Array(256);
+        for (let v = 1; v < this.rgb.length; v++) {
+            const c = this.rgb[v];
+            to[v] = 1 + nearest(this.rgb.slice(1), 255 - (c >> 16 & 255), 255 - (c >> 8 & 255), 255 - (c & 255));
+        }
+        for (let i = 0; i < t.px.length; i++) t.px[i] = to[t.px[i]];
+        if (t.whole) this.changed(); else this.render();
+    }
+
     turn() {
         const t = this.target();
         if (t.whole && t.w !== t.h) {
@@ -528,13 +597,14 @@ export class PixelEditor {
             down = { p, c, shift: e.shiftKey };
             last = p;
             const tool = e.altKey ? 'pick' : this.tool;
+            const q = this.wrap(p);
             if (tool === 'pick') {
-                const v = this.px[p.y * this.w + p.x];
+                const v = this.px[q.y * this.w + q.x];
                 if (v !== undefined) { this.colour[e.button === 2 ? 1 : 0] = v; this.drawPalette(); }
                 down = null;
             } else if (tool === 'fill') {
                 this.keep();
-                this.flood(p.x, p.y, c);
+                this.flood(q.x, q.y, c);
                 this.changed();
                 down = null;
             } else if (tool === 'pencil') {
@@ -612,6 +682,8 @@ export class PixelEditor {
             if (k === 'h') { done(); this.flip(true); return; }
             if (k === 'v') { done(); this.flip(false); return; }
             if (k === 't') { done(); this.turn(); return; }
+            if (k === 'n') { done(); this.invert(); return; }
+            if (k === 'w') { done(); this.toggleTile(); return; }
             if (k === '+' || k === '=') { done(); this.setZoom(this.zoom + 1); return; }
             if (k === '-') { done(); this.setZoom(this.zoom - 1); return; }
             if (k === 'delete' || k === 'backspace') { done(); this.erase(); return; }
@@ -652,20 +724,26 @@ export class PixelEditor {
     }
 
     /* what an editor of the sheet's carries on into the next */
-    get state() { return { tool: this.tool, colour: this.colour, mirror: this.mirror }; }
+    get state() { return { tool: this.tool, colour: this.colour, mirror: this.mirror, tile: this.tile }; }
 }
 
 /* The sheet: its 256 sprites as a picker, a block of cells chosen there --
  * one, or a range dragged across -- open beside it in the editor, the
  * edits written back to the sheet; and the chosen sprites' eight flags.
  * A picture pasted into the block that is too big for it widens the block
- * to fit, from its top left, as far as the sheet goes. */
+ * to fit, from its top left, as far as the sheet goes.
+ *
+ * An animation is blocks of one size running rightwards from a first:
+ * played beside the picker at its speed, with the line of code that plays
+ * it, and while one of its frames is drawn on the frame before can show
+ * faintly under it (onion skin). */
 export class SheetEditor {
     /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
      * flagsChanged(flags), flagNames() (the eight names cart.json gives,
      * null where none), nameFlag(b) (to ask for flag b's name), picker
      * (whether the picker is open) and pickerShown(open) when it is
-     * opened or closed,
+     * opened or closed, anim ({ x, y, w, h, n, fps, onion }, kept by the
+     * IDE between openings) and animChanged(anim),
      * fitColours (as the PixelEditor's), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
@@ -698,7 +776,9 @@ export class SheetEditor {
         this.info.className = 'sheet-info';
         this.flagRow = document.createElement('div');
         this.flagRow.className = 'pix-flags';
-        body.append(this.picker, this.info, this.flagRow);
+        this.animBox = document.createElement('div');
+        this.animBox.className = 'sheet-anim';
+        body.append(this.picker, this.info, this.flagRow, this.animBox);
         side.append(rail, head, body);
         this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
@@ -710,6 +790,7 @@ export class SheetEditor {
     }
 
     destroy() {
+        clearInterval(this.playing);
         if (this.editor) this.editor.destroy();
         this.root.remove();
     }
@@ -761,21 +842,121 @@ export class SheetEditor {
         if (this.editor) this.editor.destroy();
         this.editor = new PixelEditor(this.edit, {
             width: w, height: h, px: block, rgb: this.o.rgb, grid: 8, was: was,
-            where: (p) => '; sprite ' + ((c.y + (p.y >> 3)) * 16 + c.x + (p.x >> 3)),
             changed: (b) => {
                 for (let y = 0; y < h; y++)
                     this.px.set(b.subarray(y * w, (y + 1) * w), (c.y * 8 + y) * 128 + c.x * 8);
                 this.drawPicker();
                 this.o.changed(this.px);
             },
+            where: (p) => '; sprite ' + ((c.y + (p.y >> 3)) * 16 + c.x + (p.x >> 3)) +
+                (this.frameOf() >= 0 ? '; frame ' + (this.frameOf() + 1) + ' of ' + this.o.anim.n : ''),
             tooBig: (pic) => this.grow(pic),
             fitColours: this.o.fitColours,
             say: this.o.say
         });
         this.drawPicker();
         this.drawFlags();
+        this.drawAnim();
         if (paste) this.editor.place(paste);
         this.editor.root.focus();
+    }
+
+    /* ---- animation ---- */
+
+    /* the frame the chosen block is of the animation, or -1 */
+    frameOf() {
+        const a = this.o.anim, c = this.cell;
+        if (!a || a.n < 2 || c.w !== a.w || c.h !== a.h || c.y !== a.y) return -1;
+        const k = (c.x - a.x) / a.w;
+        return Number.isInteger(k) && k >= 0 && k < a.n ? k : -1;
+    }
+
+    /* frame k's pixels */
+    frame(k) {
+        const a = this.o.anim, w = a.w * 8, h = a.h * 8, out = new Uint8Array(w * h);
+        const x0 = (a.x + k * a.w) * 8, y0 = a.y * 8;
+        for (let y = 0; y < h; y++) out.set(this.px.subarray((y0 + y) * 128 + x0, (y0 + y) * 128 + x0 + w), y * w);
+        return out;
+    }
+
+    drawAnim() {
+        clearInterval(this.playing);
+        const box = this.animBox, c = this.cell;
+        box.innerHTML = '';
+        let a = this.o.anim;
+        const inside = this.frameOf() >= 0;
+        /* the most frames that fit to the right of the chosen block */
+        const room = Math.floor((16 - c.x) / c.w);
+        const head = document.createElement('div');
+        head.className = 'sheet-anim-head';
+        head.textContent = 'Animation';
+        const frames = document.createElement('input');
+        frames.type = 'number';
+        frames.min = 1;
+        frames.max = inside ? Math.floor((16 - a.x) / a.w) : room;
+        frames.value = inside ? a.n : 1;
+        frames.title = 'Frames: blocks of this size running rightwards from ' + (inside ? 'the first' : 'this one');
+        const fps = document.createElement('input');
+        fps.type = 'number';
+        fps.min = 1;
+        fps.max = 60;
+        fps.value = a ? a.fps : 8;
+        fps.title = 'Frames a second';
+        const row = document.createElement('div');
+        row.className = 'sheet-anim-row';
+        row.append('Frames', frames, 'a second', fps);
+        box.append(head, row);
+        const set = () => {
+            const n = Math.max(1, Math.min(+frames.max, Math.round(+frames.value) || 1));
+            const base = inside ? a : { x: c.x, y: c.y, w: c.w, h: c.h, onion: a ? a.onion : false };
+            this.o.anim = Object.assign({}, base, { n: n, fps: Math.max(1, Math.min(60, Math.round(+fps.value) || 8)) });
+            if (this.o.animChanged) this.o.animChanged(this.o.anim);
+            this.drawPicker();
+            this.drawAnim();
+        };
+        frames.onchange = set;
+        fps.onchange = set;
+        a = this.o.anim;
+        if (!inside && !(a && a.n >= 2 && this.frameOf() >= 0)) { this.editor.setOnion(null); return; }
+        /* playing, the onion skin and the code */
+        const view = document.createElement('canvas');
+        const w = a.w * 8, h = a.h * 8, k = Math.max(1, Math.floor(96 / Math.max(w, h)));
+        view.width = w * k;
+        view.height = h * k;
+        view.className = 'sheet-anim-view';
+        const onion = document.createElement('label');
+        onion.className = 'sheet-anim-row';
+        const tick = document.createElement('input');
+        tick.type = 'checkbox';
+        tick.checked = !!a.onion;
+        tick.onchange = () => { a.onion = tick.checked; this.drawAnim(); };
+        onion.append(tick, 'Onion skin: the frame before, faintly');
+        const first = a.y * 16 + a.x;
+        const code = document.createElement('code');
+        code.className = 'sheet-anim-code';
+        code.textContent = 'spr(' + first + ' + flr(t() * ' + a.fps + ') % ' + a.n +
+            (a.w > 1 ? ' * ' + a.w : '') + ', x, y' + (a.w > 1 || a.h > 1 ? ', ' + a.w + ', ' + a.h : '') + ')';
+        box.append(view, onion, code);
+        const g = view.getContext('2d'), im = new ImageData(w, h), tmp = document.createElement('canvas');
+        tmp.width = w;
+        tmp.height = h;
+        let at = 0;
+        const draw = () => {
+            const px = this.frame(at % a.n);
+            for (let i = 0; i < px.length; i++) {
+                const s = shown(this.o.rgb[px[i]] || 0);
+                im.data[i * 4] = s >> 16; im.data[i * 4 + 1] = s >> 8 & 255; im.data[i * 4 + 2] = s & 255;
+                im.data[i * 4 + 3] = 255;
+            }
+            tmp.getContext('2d').putImageData(im, 0, 0);
+            g.imageSmoothingEnabled = false;
+            g.drawImage(tmp, 0, 0, w * k, h * k);
+            at++;
+        };
+        draw();
+        this.playing = setInterval(draw, 1000 / a.fps);
+        const f = this.frameOf();
+        this.editor.setOnion(a.onion && f >= 0 ? this.frame((f + a.n - 1) % a.n) : null);
     }
 
     setPalette(rgb) {
@@ -815,6 +996,13 @@ export class SheetEditor {
             g.moveTo(0, k * z + 0.5); g.lineTo(128 * z, k * z + 0.5);
         }
         g.stroke();
+        const an = this.o.anim;
+        if (an && an.n >= 2) {
+            g.strokeStyle = 'rgba(110,160,255,0.9)';
+            g.setLineDash([3, 2]);
+            g.strokeRect(an.x * 8 * z + 0.5, an.y * 8 * z + 0.5, an.n * an.w * 8 * z - 1, an.h * 8 * z - 1);
+            g.setLineDash([]);
+        }
         const c = this.cell;
         g.strokeStyle = '#ffd23c';
         g.lineWidth = 2;

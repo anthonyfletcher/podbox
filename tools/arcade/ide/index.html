@@ -152,6 +152,7 @@ body.running #run { display: none; }
 .pix { display: flex; flex-direction: column; height: 100%; outline: none; }
 .pix-tools { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
 .pix-tools button { padding: 3px 9px; font-size: 13px; }
+.pix-tools button.tool { padding: 4px 6px; display: inline-flex; align-items: center; }
 .pix-tools button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pix-tools .sep { width: 10px; }
 .pix-area { flex: 1; overflow: auto; padding: 12px; background:
@@ -184,6 +185,13 @@ body.running #run { display: none; }
 .sheet .pix-flags { padding: 0; flex-wrap: wrap; }
 .sheet .pix-flags span { width: 100%; }
 .sheet-edit { flex: 1; min-width: 0; }
+.sheet-anim { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; font-size: 13px; }
+.sheet-anim-head { color: var(--dim); }
+.sheet-anim-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+.sheet-anim-row input[type=number] { width: 48px; font: inherit; padding: 2px 4px; border-radius: 4px;
+              border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.sheet-anim-view { image-rendering: pixelated; align-self: flex-start; background: var(--screen-bg); }
+.sheet-anim-code { font: 11px ui-monospace, Consolas, monospace; color: var(--dim); word-break: break-all; }
 
 /* ---- palettes ---- */
 .pal { padding: 14px; overflow: auto; height: 100%; outline: none; }

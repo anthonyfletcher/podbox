@@ -217,7 +217,12 @@ show as `?`.
   same library.
 - **Pictures**: open an image to draw on it in palette colours. The
   sprite sheet opens as a picker: click a sprite, or drag across several,
-  to draw on them, and set the chosen sprites' flags. Paste a picture
+  to draw on them, and set the chosen sprites' flags. Tile mode shows a
+  picture repeated round itself, drawing wrapping at its edges, for tiles
+  that join; invert turns each colour to the one nearest its opposite. An
+  animation is blocks of one size running rightwards: set how many frames
+  and how fast, and it plays beside the picker with the line of code that
+  plays it, the frame before showing faintly as you draw (onion skin). Paste a picture
   from any program, or drop one on the editor: where its colours are not
   in the palette, choose the nearest, the nearest dithered, or to add them
   to the palette (as many as it has room for, chosen to stand for the

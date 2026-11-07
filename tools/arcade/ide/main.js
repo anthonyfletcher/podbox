@@ -188,6 +188,9 @@ function show(file) {
     mark();
 }
 
+/* the sheet's animation, as the sprite editor last had it */
+let sheetAnim = null;
+
 /* palettes shown as text rather than swatches */
 const asText = {};
 
@@ -352,6 +355,8 @@ function showPicture(pane, file) {
     pixels = new SheetEditor(pane, {
         px: pic.px, rgb: rgb, flags: flags, fitColours: fitPicture,
         picker: layout.picker,
+        anim: sheetAnim,
+        animChanged: (a) => { sheetAnim = a; },
         pickerShown: (open) => { layout.picker = open; applyLayout(); },
         flagNames: () => {
             try {

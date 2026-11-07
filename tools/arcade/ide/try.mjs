@@ -101,6 +101,7 @@ const script = `<script>
             setTimeout(() => there(sel, (el) => {
                 el.value = value;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
             }), +at);
             continue;
         }
