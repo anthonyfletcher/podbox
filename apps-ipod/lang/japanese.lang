@@ -27751,3 +27751,227 @@
     *: "番組別"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ART_CHECK
+  desc: in Art cache settings, pick a file to make its art again and see how it was found
+  user: core
+  <source>
+    *: "Check a File's Art"
+  </source>
+  <dest>
+    *: "ファイルのアートを確認"
+  </dest>
+  <voice>
+    *: "ファイルのアートを確認"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_IPOD_GAMES
+  desc: in Database settings: leave the click-wheel games' sounds out of the scan
+  user: core
+  <source>
+    *: "Skip iPod Games"
+  </source>
+  <dest>
+    *: "iPodゲームを除外"
+  </dest>
+  <voice>
+    *: "iPodゲームを除外"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIGH_SCORES
+  desc: in a game cart's pause menu: its high-score tables
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "ハイスコア"
+  </dest>
+  <voice>
+    *: "ハイスコア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES
+  desc: in a game cart's High Scores: empty every one of its tables
+  user: core
+  <source>
+    *: "Clear High Scores"
+  </source>
+  <dest>
+    *: "ハイスコアを消去"
+  </dest>
+  <voice>
+    *: "ハイスコアを消去"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES_ASK
+  desc: asked before a game cart's high scores are cleared
+  user: core
+  <source>
+    *: "Every table of this game's scores is emptied."
+  </source>
+  <dest>
+    *: "このゲームのスコア表がすべて消去されます。"
+  </dest>
+  <voice>
+    *: "このゲームのスコア表がすべて消去されます。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_HIGH_SCORES
+  desc: a game cart's high-score table with nothing in it yet
+  user: core
+  <source>
+    *: "No scores yet"
+  </source>
+  <dest>
+    *: "スコアはまだありません"
+  </dest>
+  <voice>
+    *: "スコアはまだありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIMES_PLAYED
+  desc: in a game cart's High Scores: how many times it was started
+  user: core
+  <source>
+    *: "Times Played: %d"
+  </source>
+  <dest>
+    *: "プレイ回数: %d"
+  </dest>
+  <voice>
+    *: "プレイ回数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIME_PLAYED
+  desc: in a game cart's High Scores: hours and minutes it was played
+  user: core
+  <source>
+    *: "Time Played: %dh %02dm"
+  </source>
+  <dest>
+    *: "プレイ時間: %d時間%02d分"
+  </dest>
+  <voice>
+    *: "プレイ時間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_HELP
+  desc: in a game cart's pause menu: the cart's help text and its options' explanations
+  user: core
+  <source>
+    *: "Help"
+  </source>
+  <dest>
+    *: "ヘルプ"
+  </dest>
+  <voice>
+    *: "ヘルプ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_RESUME_ASK
+  desc: starting a game cart that was quit mid-game: carry on from there, or start again
+  user: core
+  <source>
+    *: "Carry on from where you quit?"
+  </source>
+  <dest>
+    *: "前回の続きから再開しますか?"
+  </dest>
+  <voice>
+    *: "前回の続きから再開しますか?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACHIEVEMENTS
+  desc: a game cart's achievements, listed under its High Scores
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "実績"
+  </dest>
+  <voice>
+    *: "実績"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_COUNT
+  desc: a game cart's High Scores row: achievements earned, of all
+  user: core
+  <source>
+    *: "Achievements: %d of %d"
+  </source>
+  <dest>
+    *: "実績: %d / %d"
+  </dest>
+  <voice>
+    *: "実績"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED
+  desc: the banner over a game when an achievement is earned, and one earned on an unknown date
+  user: core
+  <source>
+    *: "Achievement Earned"
+  </source>
+  <dest>
+    *: "実績獲得"
+  </dest>
+  <voice>
+    *: "実績獲得"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED_ON
+  desc: an achievement's box: the date it was earned, year-month-day
+  user: core
+  <source>
+    *: "Earned %04d-%02d-%02d"
+  </source>
+  <dest>
+    *: "獲得日 %04d-%02d-%02d"
+  </dest>
+  <voice>
+    *: "獲得日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_NOT_YET
+  desc: an achievement's box: not earned yet
+  user: core
+  <source>
+    *: "Not earned yet"
+  </source>
+  <dest>
+    *: "未獲得"
+  </dest>
+  <voice>
+    *: "未獲得"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_LOCKED
+  desc: in the list of achievements: one not earned yet
+  user: core
+  <source>
+    *: "%s (not yet)"
+  </source>
+  <dest>
+    *: "%s（未獲得）"
+  </dest>
+  <voice>
+    *: "未獲得"
+  </voice>
+</phrase>

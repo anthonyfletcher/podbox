@@ -27751,3 +27751,227 @@
     *: "Według audycji"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ART_CHECK
+  desc: in Art cache settings, pick a file to make its art again and see how it was found
+  user: core
+  <source>
+    *: "Check a File's Art"
+  </source>
+  <dest>
+    *: "Sprawdź okładkę pliku"
+  </dest>
+  <voice>
+    *: "Sprawdź okładkę pliku"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_IPOD_GAMES
+  desc: in Database settings: leave the click-wheel games' sounds out of the scan
+  user: core
+  <source>
+    *: "Skip iPod Games"
+  </source>
+  <dest>
+    *: "Pomiń gry iPod"
+  </dest>
+  <voice>
+    *: "Pomiń gry iPod"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIGH_SCORES
+  desc: in a game cart's pause menu: its high-score tables
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "Najlepsze wyniki"
+  </dest>
+  <voice>
+    *: "Najlepsze wyniki"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES
+  desc: in a game cart's High Scores: empty every one of its tables
+  user: core
+  <source>
+    *: "Clear High Scores"
+  </source>
+  <dest>
+    *: "Wyczyść najlepsze wyniki"
+  </dest>
+  <voice>
+    *: "Wyczyść najlepsze wyniki"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES_ASK
+  desc: asked before a game cart's high scores are cleared
+  user: core
+  <source>
+    *: "Every table of this game's scores is emptied."
+  </source>
+  <dest>
+    *: "Wszystkie tabele wyników tej gry zostaną wyczyszczone."
+  </dest>
+  <voice>
+    *: "Wszystkie tabele wyników tej gry zostaną wyczyszczone."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_HIGH_SCORES
+  desc: a game cart's high-score table with nothing in it yet
+  user: core
+  <source>
+    *: "No scores yet"
+  </source>
+  <dest>
+    *: "Brak wyników"
+  </dest>
+  <voice>
+    *: "Brak wyników"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIMES_PLAYED
+  desc: in a game cart's High Scores: how many times it was started
+  user: core
+  <source>
+    *: "Times Played: %d"
+  </source>
+  <dest>
+    *: "Liczba gier: %d"
+  </dest>
+  <voice>
+    *: "Liczba gier"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIME_PLAYED
+  desc: in a game cart's High Scores: hours and minutes it was played
+  user: core
+  <source>
+    *: "Time Played: %dh %02dm"
+  </source>
+  <dest>
+    *: "Czas gry: %d godz. %02d min"
+  </dest>
+  <voice>
+    *: "Czas gry"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_HELP
+  desc: in a game cart's pause menu: the cart's help text and its options' explanations
+  user: core
+  <source>
+    *: "Help"
+  </source>
+  <dest>
+    *: "Pomoc"
+  </dest>
+  <voice>
+    *: "Pomoc"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_RESUME_ASK
+  desc: starting a game cart that was quit mid-game: carry on from there, or start again
+  user: core
+  <source>
+    *: "Carry on from where you quit?"
+  </source>
+  <dest>
+    *: "Kontynuować od miejsca wyjścia?"
+  </dest>
+  <voice>
+    *: "Kontynuować od miejsca wyjścia?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACHIEVEMENTS
+  desc: a game cart's achievements, listed under its High Scores
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "Osiągnięcia"
+  </dest>
+  <voice>
+    *: "Osiągnięcia"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_COUNT
+  desc: a game cart's High Scores row: achievements earned, of all
+  user: core
+  <source>
+    *: "Achievements: %d of %d"
+  </source>
+  <dest>
+    *: "Osiągnięcia: %d z %d"
+  </dest>
+  <voice>
+    *: "Osiągnięcia"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED
+  desc: the banner over a game when an achievement is earned, and one earned on an unknown date
+  user: core
+  <source>
+    *: "Achievement Earned"
+  </source>
+  <dest>
+    *: "Osiągnięcie zdobyte"
+  </dest>
+  <voice>
+    *: "Osiągnięcie zdobyte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED_ON
+  desc: an achievement's box: the date it was earned, year-month-day
+  user: core
+  <source>
+    *: "Earned %04d-%02d-%02d"
+  </source>
+  <dest>
+    *: "Zdobyte %04d-%02d-%02d"
+  </dest>
+  <voice>
+    *: "Zdobyte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_NOT_YET
+  desc: an achievement's box: not earned yet
+  user: core
+  <source>
+    *: "Not earned yet"
+  </source>
+  <dest>
+    *: "Jeszcze nie zdobyte"
+  </dest>
+  <voice>
+    *: "Jeszcze nie zdobyte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_LOCKED
+  desc: in the list of achievements: one not earned yet
+  user: core
+  <source>
+    *: "%s (not yet)"
+  </source>
+  <dest>
+    *: "%s (jeszcze nie)"
+  </dest>
+  <voice>
+    *: "jeszcze nie"
+  </voice>
+</phrase>

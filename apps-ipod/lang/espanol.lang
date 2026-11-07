@@ -27753,3 +27753,227 @@
     *: "Por programa"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ART_CHECK
+  desc: in Art cache settings, pick a file to make its art again and see how it was found
+  user: core
+  <source>
+    *: "Check a File's Art"
+  </source>
+  <dest>
+    *: "Comprobar carátula de un archivo"
+  </dest>
+  <voice>
+    *: "Comprobar carátula de un archivo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_IPOD_GAMES
+  desc: in Database settings: leave the click-wheel games' sounds out of the scan
+  user: core
+  <source>
+    *: "Skip iPod Games"
+  </source>
+  <dest>
+    *: "Omitir juegos de iPod"
+  </dest>
+  <voice>
+    *: "Omitir juegos de iPod"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIGH_SCORES
+  desc: in a game cart's pause menu: its high-score tables
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "Récords"
+  </dest>
+  <voice>
+    *: "Récords"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES
+  desc: in a game cart's High Scores: empty every one of its tables
+  user: core
+  <source>
+    *: "Clear High Scores"
+  </source>
+  <dest>
+    *: "Borrar récords"
+  </dest>
+  <voice>
+    *: "Borrar récords"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CLEAR_HIGH_SCORES_ASK
+  desc: asked before a game cart's high scores are cleared
+  user: core
+  <source>
+    *: "Every table of this game's scores is emptied."
+  </source>
+  <dest>
+    *: "Se vaciarán todas las tablas de puntuación de este juego."
+  </dest>
+  <voice>
+    *: "Se vaciarán todas las tablas de puntuación de este juego."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_HIGH_SCORES
+  desc: a game cart's high-score table with nothing in it yet
+  user: core
+  <source>
+    *: "No scores yet"
+  </source>
+  <dest>
+    *: "Aún no hay puntuaciones"
+  </dest>
+  <voice>
+    *: "Aún no hay puntuaciones"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIMES_PLAYED
+  desc: in a game cart's High Scores: how many times it was started
+  user: core
+  <source>
+    *: "Times Played: %d"
+  </source>
+  <dest>
+    *: "Partidas: %d"
+  </dest>
+  <voice>
+    *: "Partidas"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TIME_PLAYED
+  desc: in a game cart's High Scores: hours and minutes it was played
+  user: core
+  <source>
+    *: "Time Played: %dh %02dm"
+  </source>
+  <dest>
+    *: "Tiempo jugado: %dh %02dm"
+  </dest>
+  <voice>
+    *: "Tiempo jugado"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_HELP
+  desc: in a game cart's pause menu: the cart's help text and its options' explanations
+  user: core
+  <source>
+    *: "Help"
+  </source>
+  <dest>
+    *: "Ayuda"
+  </dest>
+  <voice>
+    *: "Ayuda"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_RESUME_ASK
+  desc: starting a game cart that was quit mid-game: carry on from there, or start again
+  user: core
+  <source>
+    *: "Carry on from where you quit?"
+  </source>
+  <dest>
+    *: "¿Continuar la partida que se dejó?"
+  </dest>
+  <voice>
+    *: "¿Continuar la partida que se dejó?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACHIEVEMENTS
+  desc: a game cart's achievements, listed under its High Scores
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "Logros"
+  </dest>
+  <voice>
+    *: "Logros"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_COUNT
+  desc: a game cart's High Scores row: achievements earned, of all
+  user: core
+  <source>
+    *: "Achievements: %d of %d"
+  </source>
+  <dest>
+    *: "Logros: %d de %d"
+  </dest>
+  <voice>
+    *: "Logros"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED
+  desc: the banner over a game when an achievement is earned, and one earned on an unknown date
+  user: core
+  <source>
+    *: "Achievement Earned"
+  </source>
+  <dest>
+    *: "Logro conseguido"
+  </dest>
+  <voice>
+    *: "Logro conseguido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_EARNED_ON
+  desc: an achievement's box: the date it was earned, year-month-day
+  user: core
+  <source>
+    *: "Earned %04d-%02d-%02d"
+  </source>
+  <dest>
+    *: "Conseguido el %04d-%02d-%02d"
+  </dest>
+  <voice>
+    *: "Conseguido el"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_NOT_YET
+  desc: an achievement's box: not earned yet
+  user: core
+  <source>
+    *: "Not earned yet"
+  </source>
+  <dest>
+    *: "Aún no conseguido"
+  </dest>
+  <voice>
+    *: "Aún no conseguido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACH_LOCKED
+  desc: in the list of achievements: one not earned yet
+  user: core
+  <source>
+    *: "%s (not yet)"
+  </source>
+  <dest>
+    *: "%s (aún no)"
+  </dest>
+  <voice>
+    *: "aún no"
+  </voice>
+</phrase>
