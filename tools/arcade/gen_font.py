@@ -1,100 +1,27 @@
-"""Writes apps-ipod/games/arcade/core_font.h: the core's 3x5 font, drawn
-below, for ASCII 32-126. Lowercase letters use the capitals, so FONT.CAPS
-reads as small capitals. Each glyph is 15 bits, row by row from the top,
-the high bit of each row on the left."""
+"""Writes apps-ipod/games/arcade/core_font.h, the core's 3x5 font, from
+fonts/caps.bdf: ASCII 32-126, each glyph 15 bits, row by row from the top,
+the high bit of each row on the left. Edit the font in any BDF editor."""
 
 import os
 
-GLYPHS = r"""
-  ... ... ... ... ...
-! .#. .#. .#. ... .#.
-" #.# #.# ... ... ...
-# #.# ### #.# ### #.#
-$ .## ##. .#. .## ##.
-% #.# ..# .#. #.. #.#
-& .#. #.# ##. #.# .##
-' .#. .#. ... ... ...
-( ..# .#. .#. .#. ..#
-) #.. .#. .#. .#. #..
-* #.# .#. ### .#. #.#
-+ ... .#. ### .#. ...
-, ... ... ... .#. #..
-- ... ... ### ... ...
-. ... ... ... ... .#.
-/ ..# ..# .#. #.. #..
-0 ### #.# #.# #.# ###
-1 ##. .#. .#. .#. ###
-2 ### ..# ### #.. ###
-3 ### ..# .## ..# ###
-4 #.# #.# ### ..# ..#
-5 ### #.. ### ..# ###
-6 #.. #.. ### #.# ###
-7 ### ..# ..# ..# ..#
-8 ### #.# ### #.# ###
-9 ### #.# ### ..# ..#
-: ... .#. ... .#. ...
-; ... .#. ... .#. #..
-< ..# .#. #.. .#. ..#
-= ... ### ... ### ...
-> #.. .#. ..# .#. #..
-? ### ..# .## ... .#.
-@ .#. #.# #.# #.. .##
-A ### #.# ### #.# #.#
-B ##. #.# ##. #.# ###
-C .## #.. #.. #.. .##
-D ##. #.# #.# #.# ##.
-E ### #.. ##. #.. ###
-F ### #.. ##. #.. #..
-G .## #.. #.# #.# .##
-H #.# #.# ### #.# #.#
-I ### .#. .#. .#. ###
-J ### .#. .#. .#. ##.
-K #.# #.# ##. #.# #.#
-L #.. #.. #.. #.. ###
-M ### ### #.# #.# #.#
-N ##. #.# #.# #.# #.#
-O .## #.# #.# #.# ##.
-P ### #.# ### #.. #..
-Q .#. #.# #.# ##. .##
-R ### #.# ##. #.# #.#
-S .## #.. ### ..# ##.
-T ### .#. .#. .#. .#.
-U #.# #.# #.# #.# .##
-V #.# #.# #.# ### .#.
-W #.# #.# #.# ### ###
-X #.# #.# .#. #.# #.#
-Y #.# #.# ### .#. .#.
-Z ### ..# .#. #.. ###
-[ ##. #.. #.. #.. ##.
-\ #.. #.. .#. ..# ..#
-] .## ..# ..# ..# .##
-^ .#. #.# ... ... ...
-_ ... ... ... ... ###
-` .#. ..# ... ... ...
-{ .## .#. ##. .#. .##
-| .#. .#. .#. .#. .#.
-} ##. .#. .## .#. ##.
-~ ... ..# ### #.. ...
-"""
+import bdf
 
-glyphs = {}
-for line in GLYPHS.strip('\n').split('\n'):
-    ch, rows = line[0], line[2:].split()
-    assert len(rows) == 5 and all(len(r) == 3 for r in rows), line
-    bits = 0
-    for r in rows:
-        for c in r:
-            bits = (bits << 1) | (c == '#')
-    glyphs[ch] = bits
+here = os.path.dirname(os.path.abspath(__file__))
+ascent, descent, glyphs = bdf.read(os.path.join(here, 'fonts', 'caps.bdf'))
 
 table = []
 for code in range(32, 127):
-    ch = chr(code)
-    if 'a' <= ch <= 'z':
-        ch = ch.upper()
-    table.append(glyphs[ch])
+    g = glyphs[code]
+    top = ascent - (g.yo + g.h)
+    assert g.adv == 4 and 0 <= g.xo and g.xo + g.w <= 3 and \
+        0 <= top and top + g.h <= 5, 'U+%04X is not 3x5 in a 4x6 cell' % code
+    bits = 0
+    for r in range(5):
+        v = g.rows[r - top] if 0 <= r - top < g.h else 0
+        bits = (bits << 3) | (v << (3 - g.xo - g.w)) & 7
+    table.append(bits)
 
-out = os.path.join(os.path.dirname(__file__), '..', '..', 'apps-ipod',
+out = os.path.join(here, '..', '..', 'apps-ipod',
                    'games', 'arcade', 'core_font.h')
 with open(out, 'w', newline='\n') as f:
     f.write('/* GNU General Public License (version 2+)\n *\n'

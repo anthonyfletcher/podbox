@@ -1,5 +1,5 @@
 """Builds FONT.WORLD, the cart text font beyond ASCII, from Fusion Pixel 8 px
-(proportional, Japanese forms; OFL-1.1) and textfont.txt beside this file.
+(proportional, Japanese forms; OFL-1.1) and fonts/world.bdf beside this file.
 
     python gen_textfont.py fusion.bdf --header core_textfont.h
                            [--file font.bin] [--sheet sheet.png]
@@ -11,8 +11,9 @@ lower case on 5 to 8; the baseline is under row 8.
 Fusion supplies ASCII, punctuation, symbols, kana, Hangul and the
 ideographs. Its accented capitals drop their accents, and it has no Greek or
 Cyrillic, so every accented letter is composed here -- the base letter, then
-each accent of its canonical decomposition from textfont.txt, stacked above
-or hung below -- and the Greek and Cyrillic letters come from textfont.txt.
+each accent of its canonical decomposition from world.bdf, stacked above
+or hung below -- and the Greek and Cyrillic letters come from world.bdf,
+those that look like a Latin letter drawn as it is (SAME).
 
 --header writes the part compiled into the firmware: everything below
 U+3000, sorted by codepoint. --file writes the rest, which the player reads
@@ -32,6 +33,8 @@ import struct
 import unicodedata
 import zlib
 
+import bdf
+
 HEIGHT, ASCENT, CELL_W = 12, 9, 8
 CAP_TOP, X_TOP = 3, 5
 
@@ -40,79 +43,42 @@ here = os.path.dirname(os.path.abspath(__file__))
 
 # ---- reading ----------------------------------------------------------------
 
-def read_bdf(path):
+def cells(path):
     """codepoint -> (advance, [12 row bytes]) for glyphs no wider than a cell"""
     glyphs = {}
-    cp = adv = bbx = rows = None
-    for line in open(path, encoding='utf-8'):
-        p = line.split()
-        if not p:
-            continue
-        if p[0] == 'ENCODING':
-            cp, bbx, rows = int(p[1]), None, None
-        elif p[0] == 'DWIDTH':
-            adv = int(p[1])
-        elif p[0] == 'BBX':
-            bbx = [int(v) for v in p[1:5]]
-        elif p[0] == 'BITMAP':
-            rows = []
-        elif p[0] == 'ENDCHAR':
-            if cp is not None and bbx and rows is not None and cp < 0x10000:
-                w, h, xo, yo = bbx
-                if adv <= CELL_W and xo >= 0 and xo + w <= CELL_W:
-                    glyphs[cp] = (adv, cell_of(rows, w, xo,
-                                               ASCENT - (yo + h)))
-            cp = rows = None
-        elif rows is not None:
-            rows.append(p[0])
+    for cp, g in bdf.read(path)[2].items():
+        if cp < 0x10000 and g.adv <= CELL_W and g.xo >= 0 and                 g.xo + g.w <= CELL_W:
+            glyphs[cp] = (g.adv, cell_of(g, ASCENT - (g.yo + g.h)))
     return glyphs
 
 
-def cell_of(hexrows, w, xo, top):
-    """BDF rows (hex, padded to whole bytes) to cell rows, placed at xo"""
+def cell_of(g, top):
+    """a glyph's rows placed in a cell, from row top"""
     cell = [0] * HEIGHT
-    for i, h in enumerate(hexrows):
-        y = top + i
-        if not (0 <= y < HEIGHT) or w == 0:
-            continue
-        v = int(h, 16) >> (len(h) * 4 - w)
-        cell[y] = (v << (CELL_W - w - xo)) & 0xff
+    for i, v in enumerate(g.rows):
+        if 0 <= top + i < HEIGHT and g.w:
+            cell[top + i] = (v << (CELL_W - g.w - g.xo)) & 0xff
     return cell
 
 
-def read_art(path):
-    """glyphs (cp -> (adv, cell)), sames (cp -> cp), marks (cp -> rows)"""
-    glyphs, sames, marks = {}, {}, {}
-    lines = open(path, encoding='utf-8').read().split('\n')
-    i = 0
-    while i < len(lines):
-        p = lines[i].split()
-        i += 1
-        if not p or p[0] == '#':
-            continue
-        if p[0] == 'same':
-            sames[int(p[1][2:], 16)] = int(p[2][2:], 16)
-            continue
-        # the art: rows of only # (ink) and . (blank)
-        art = []
-        while i < len(lines) and lines[i].strip() and \
-                set(lines[i].strip()) <= set('#.'):
-            art.append(lines[i].strip())
-            i += 1
-        if p[0] == 'mark':
-            marks[int(p[1][2:], 16)] = art
-        elif p[0] == 'glyph':
-            row = int(p[2])
-            w = max(len(a) for a in art)
-            cell = [0] * HEIGHT
-            for k, a in enumerate(art):
-                v = 0
-                for x, ch in enumerate(a):
-                    if ch == '#':
-                        v |= 0x80 >> x
-                cell[row + k] = v
-            glyphs[int(p[1][2:], 16)] = (w + 1, cell)
-    return glyphs, sames, marks
+def marks_of(path):
+    """the accents: combining character -> its art"""
+    return {cp: bdf.art(g) for cp, g in bdf.read(path)[2].items()
+            if 0x300 <= cp < 0x370}
+
+
+# Greek and Cyrillic letters drawn as the Latin letter they look like
+SAME = {
+    0x0391: 0x41, 0x0392: 0x42, 0x0395: 0x45, 0x0396: 0x5A, 0x0397: 0x48,
+    0x0399: 0x49, 0x039A: 0x4B, 0x039C: 0x4D, 0x039D: 0x4E, 0x039F: 0x4F,
+    0x03A1: 0x50, 0x03A4: 0x54, 0x03A5: 0x59, 0x03A7: 0x58, 0x03BF: 0x6F,
+    0x03BD: 0x76, 0x03C1: 0x70, 0x03C7: 0x78,
+    0x0405: 0x53, 0x0406: 0x49, 0x0408: 0x4A, 0x0410: 0x41, 0x0412: 0x42,
+    0x0415: 0x45, 0x041A: 0x4B, 0x041C: 0x4D, 0x041D: 0x48, 0x041E: 0x4F,
+    0x0420: 0x50, 0x0421: 0x43, 0x0422: 0x54, 0x0425: 0x58, 0x0430: 0x61,
+    0x0435: 0x65, 0x043E: 0x6F, 0x0440: 0x70, 0x0441: 0x63, 0x0443: 0x79,
+    0x0445: 0x78, 0x0455: 0x73, 0x0456: 0x69, 0x0458: 0x6A,
+}
 
 
 # ---- composing --------------------------------------------------------------
@@ -192,10 +158,11 @@ COMPOSED = [(0x00C0, 0x024F), (0x1E00, 0x1EFF), (0x0370, 0x03FF),
             (0x0400, 0x045F), (0x0490, 0x0491)]
 
 
-def build(bdf, art):
-    fusion = read_bdf(bdf)
-    glyphs, sames, marks = read_art(art)
-    font = dict(fusion)
+def build(fusion_bdf, own_bdf):
+    marks = marks_of(own_bdf)
+    glyphs = {cp: g for cp, g in cells(own_bdf).items() if cp not in marks}
+    sames = SAME
+    font = cells(fusion_bdf)
     # the letters drawn here, then those shared with Latin
     for cp, g in glyphs.items():
         font[cp] = g
@@ -226,7 +193,7 @@ def write_header(path, font):
                 ' * FONT.WORLD below U+3000, from Fusion Pixel 8 px (SIL Open'
                 ' Font\n * License 1.1, '
                 'https://github.com/TakWolf/fusion-pixel-font) and\n'
-                ' * tools/arcade/textfont.txt: an advance, then 12 rows a '
+                ' * tools/arcade/fonts/world.bdf: an advance, then 12 rows a '
                 'byte each,\n * the high bit on the left. */\n\n')
         f.write('#define TEXTFONT_CORE %d\n\n' % len(cps))
         f.write('static const uint16_t textfont_cp[TEXTFONT_CORE] = {\n')
@@ -314,9 +281,8 @@ def write_sheet(path, font, mine):
 
 def main():
     args = sys.argv[1:]
-    bdf = args[0]
     opt = {args[i]: args[i + 1] for i in range(1, len(args) - 1, 2)}
-    font, mine = build(bdf, os.path.join(here, 'textfont.txt'))
+    font, mine = build(args[0], os.path.join(here, 'fonts', 'world.bdf'))
     if '--header' in opt:
         n = write_header(opt['--header'], font)
         print('%s: %d glyphs' % (opt['--header'], n))
