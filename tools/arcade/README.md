@@ -203,6 +203,12 @@ show as `?`.
   would on that player, so a cart doing more than the player manages
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
+- **Panels**: the files, the sprite picker and the player each fold away to a
+  rail, from the View menu (Ctrl+B for the files, Ctrl+Shift+B for the player)
+  or the panel's own header; the output opens under the editor when there is
+  something to read, and Ctrl+J shows or hides it. Drag the dividers to
+  resize. The status bar shows whether the cart builds and the frame rate it
+  gets as the chosen player; click the rate to choose another.
 - **The music** under the screen stands in for the owner's: a made-up
   library of five albums and a spoken chapter, its queue playing through
   the first ten tracks. `playback` and `tracks` read it and `beat`

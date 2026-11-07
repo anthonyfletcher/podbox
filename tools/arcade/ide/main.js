@@ -4,7 +4,8 @@
  * editor, with errors from the compiler and the API's names to complete;
  * running it on the engine as one of the players would, a tick at the
  * cart's rate, a dialog's frames included; the input (keys and the drawn
- * click wheel); the console; opening and saving; the menus. */
+ * click wheel); the output; opening and saving; the panels and the
+ * menus. */
 
 import { EditorView, basicSetup } from 'codemirror';
 import { undo, redo } from '@codemirror/commands';
@@ -350,6 +351,8 @@ function showPicture(pane, file) {
     }
     pixels = new SheetEditor(pane, {
         px: pic.px, rgb: rgb, flags: flags, fitColours: fitPicture,
+        picker: layout.picker,
+        pickerShown: (open) => { layout.picker = open; applyLayout(); },
         flagNames: () => {
             try {
                 const n = JSON.parse(String(folder['cart.json'])).flags || [];
@@ -416,8 +419,8 @@ function check() {
     for (const li of $('files').querySelectorAll('li'))
         li.classList.toggle('bad', errs.some((e) => e.file === li.dataset.file));
     $('status').textContent = errs.length
-        ? errs.length + (errs.length === 1 ? ' error' : ' errors')
-        : 'built: ' + lastBuild.stats.size + ' bytes';
+        ? '\u2716 ' + errs.length + (errs.length === 1 ? ' error' : ' errors')
+        : '\u2714 Built, ' + lastBuild.stats.size.toLocaleString() + ' bytes';
     $('status').classList.toggle('bad', errs.length > 0);
 }
 
@@ -524,6 +527,8 @@ async function run() {
         return;
     }
     $('console').textContent = '';
+    quietRun = false;
+    if (!layout.player) { layout.player = true; applyLayout(); }
     /* a run ends when another starts: each keeps its own engine */
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
@@ -806,7 +811,7 @@ function shown(rate) {
     t.push(clock.emu);
     while (t.length && t[0] < clock.emu - 1000) t.shift();
     $('rate').textContent = (t.length >= rate ? rate : t.length + ' of ' + rate) +
-        ' frames a second\nas ' + (device === 'free' ? 'fast as this computer' : 'an ' + DEVICES[device].name);
+        ' frames a second as ' + (device === 'free' ? 'fast as this computer' : 'an ' + DEVICES[device].name);
 }
 
 function showDevice() {
@@ -816,7 +821,15 @@ function showDevice() {
         : 'Runs as an ' + DEVICES[device].name + '.';
 }
 
+/* a line in the output, which opens to show it -- but for the game's own
+ * lines once the output was closed during this run */
+let quietRun = false;
+
 function say(kind, text, where) {
+    if (!layout.output && (kind === 'error' || !(running && quietRun))) {
+        layout.output = true;
+        applyLayout();
+    }
     const c = $('console');
     const line = document.createElement('div');
     line.className = kind;
@@ -1171,6 +1184,10 @@ const ACTIONS = {
     redo: () => view && redo(view),
     find: () => view && openSearchPanel(view),
     add: newFile,
+    'view-files': () => toggle('files'),
+    'view-picker': () => toggle('picker'),
+    'view-player': () => toggle('player'),
+    'view-output': () => toggle('output'),
     import: addFiles,
     'export-picture': exportPicture,
     rename: renameFile,
@@ -1200,7 +1217,7 @@ const ACTIONS = {
     }
     document.addEventListener('click', close);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    for (const b of document.querySelectorAll('.menu .items button'))
+    for (const b of document.querySelectorAll('.menu .items button, .panel-head [data-do]'))
         b.onclick = (e) => {
             e.stopPropagation();
             close();
@@ -1221,7 +1238,65 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) stop(); else run(); }
     if (e.key === 's') { e.preventDefault(); save(); }
     if (e.key === 'o') { e.preventDefault(); openCart(); }
+    if (e.key.toLowerCase() === 'b') { e.preventDefault(); toggle(e.shiftKey ? 'player' : 'files'); }
+    if (e.key === 'j') { e.preventDefault(); toggle('output'); }
 });
+
+/* ---- the panels ---------------------------------------------------------- */
+
+/* which panels are open, and how big, kept between visits */
+const layout = { files: true, player: true, output: false, picker: true, filesW: 200, outH: 180 };
+try { Object.assign(layout, JSON.parse(localStorage.getItem('arcade-layout') || '{}')); } catch (e) { /* none kept */ }
+layout.output = false;
+
+function applyLayout() {
+    const b = document.body.classList;
+    b.toggle('files-closed', !layout.files);
+    b.toggle('player-closed', !layout.player);
+    b.toggle('output-closed', !layout.output);
+    document.documentElement.style.setProperty('--files-w', layout.filesW + 'px');
+    document.documentElement.style.setProperty('--out-h', layout.outH + 'px');
+    for (const k of ['files', 'picker', 'player', 'output']) $('v-' + k).classList.toggle('on', !!layout[k]);
+    if (pixels && pixels.setPicker) pixels.setPicker(layout.picker);
+    try { localStorage.setItem('arcade-layout', JSON.stringify(layout)); } catch (e) { /* not kept */ }
+}
+
+function toggle(k) {
+    layout[k] = !layout[k];
+    if (k === 'output' && !layout.output && running) quietRun = true;
+    applyLayout();
+}
+
+for (const b of document.querySelectorAll('[data-toggle]')) b.onclick = () => toggle(b.dataset.toggle);
+$('clear-output').onclick = () => { $('console').textContent = ''; };
+$('status').onclick = () => { layout.output = true; applyLayout(); };
+$('rate').onclick = (e) => {
+    e.stopPropagation();
+    const run = [...document.querySelectorAll('.menu')].find((m) => m.querySelector('.title').textContent === 'Run');
+    run.classList.add('open');
+};
+
+/* the dividers: the files' width and the output's height, dragged */
+function splitter(el, set) {
+    el.addEventListener('pointerdown', (e) => {
+        try { el.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+        el.classList.add('drag');
+        const move = (ev) => { set(ev); applyLayout(); };
+        const up = () => {
+            el.classList.remove('drag');
+            el.removeEventListener('pointermove', move);
+            el.removeEventListener('pointerup', up);
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+    });
+}
+splitter($('split-files'), (e) => { layout.filesW = Math.max(120, Math.min(420, e.clientX)); });
+splitter($('split-output'), (e) => {
+    const box = $('centre').getBoundingClientRect();
+    layout.outH = Math.max(60, Math.min(box.height - 120, box.bottom - e.clientY));
+});
+applyLayout();
 
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', async (e) => {

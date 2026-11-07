@@ -9,6 +9,7 @@
     --bg: #f4f3f0; --panel: #ffffff; --ink: #1c1c22; --dim: #6b6a73;
     --line: #dddbd5; --accent: #2f6fd6; --bad: #c8283c; --good: #2d8a4e;
     --screen-bg: #101014;
+    --files-w: 200px; --out-h: 180px; --player-w: 360px;
 }
 @media (prefers-color-scheme: dark) {
     :root { --bg: #18181c; --panel: #222227; --ink: #e8e6e1; --dim: #9a98a2;
@@ -18,9 +19,15 @@
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--ink);
        font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
-       display: grid; grid-template-rows: auto 1fr; }
-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-         border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+       display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+button { font: inherit; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+         border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---- the menu bar ---- */
+header { display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+         border-bottom: 1px solid var(--line); background: var(--panel); }
 header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #cart-name { font-weight: 600; margin-left: auto; }
 #menubar { display: flex; gap: 2px; }
@@ -44,9 +51,92 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
                       width: 18px; }
 .menu .items .choice.on::before { content: "\25CF"; }
 .menu .items .check.on::before { content: "\2713"; }
+
+/* ---- the panels: files, the editor over the output, the player; each
+ * side collapses to a rail, and the output shows when there is something
+ * to read ---- */
+#layout { display: grid; min-height: 0;
+          grid-template-columns: var(--files-w) 4px minmax(0, 1fr) var(--player-w); }
+body.files-closed #layout { grid-template-columns: 28px 0 minmax(0, 1fr) var(--player-w); }
+body.player-closed #layout { grid-template-columns: var(--files-w) 4px minmax(0, 1fr) 28px; }
+body.files-closed.player-closed #layout { grid-template-columns: 28px 0 minmax(0, 1fr) 28px; }
+.side { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+#side-files { border-right: 1px solid var(--line); }
+#side-player { border-left: 1px solid var(--line); }
+.panel-head { display: flex; align-items: center; gap: 2px; padding: 0 4px 0 12px; min-height: 30px;
+              font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+              color: var(--dim); border-bottom: 1px solid var(--line); flex: none; }
+.panel-head .grow { flex: 1; }
+.icon { border: none; background: none; padding: 2px 7px; color: var(--dim); font-size: 15px;
+        line-height: 1; border-radius: 4px; }
+.icon:hover { background: var(--bg); color: var(--ink); }
+.rail { display: none; writing-mode: vertical-rl; border: none; border-radius: 0; background: none;
+        color: var(--dim); font-size: 12px; padding: 10px 0; width: 28px; height: 100%;
+        text-align: left; letter-spacing: 0.05em; }
+.rail:hover { color: var(--ink); background: var(--bg); }
+body.files-closed #side-files > :not(.rail), body.player-closed #side-player > :not(.rail) { display: none; }
+body.files-closed #side-files > .rail, body.player-closed #side-player > .rail { display: block; }
+.split { cursor: col-resize; }
+.split:hover, .split.drag { background: var(--accent); }
+.split.h { cursor: row-resize; height: 4px; flex: none; }
+body.files-closed .split:not(.h) { pointer-events: none; }
+#centre { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#output { height: var(--out-h); flex: none; display: flex; flex-direction: column; min-height: 0;
+          border-top: 1px solid var(--line); background: var(--panel); }
+body.output-closed #output, body.output-closed #centre > .split.h { display: none; }
+#console { flex: 1; overflow: auto; padding: 4px 12px;
+           font: 12px/1.45 ui-monospace, Consolas, monospace; }
+#console div { white-space: pre-wrap; word-break: break-word; }
+#console .error { color: var(--bad); }
+#console .say { color: var(--accent); }
+#console .music { color: var(--dim); }
+#console .link { cursor: pointer; text-decoration: underline dotted; }
+
+/* ---- the status bar ---- */
+#statusbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; min-height: 24px;
+             background: var(--accent); color: #fff; font-size: 12px; }
+#statusbar button { border: none; background: none; color: inherit; padding: 2px 8px;
+                    border-radius: 3px; font-size: 12px; }
+#statusbar button:hover { background: rgba(255, 255, 255, 0.18); }
+#statusbar .grow { flex: 1; }
+#status.bad { background: var(--bad); }
+
+/* ---- the files ---- */
+#files { list-style: none; margin: 0; padding: 4px 0; overflow: auto; flex: 1; }
+#files li { padding: 3px 14px; cursor: pointer; font: 13px ui-monospace, Consolas, monospace;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#files li:hover { background: var(--bg); }
+#files li.open { background: var(--accent); color: #fff; }
+#files li.bad::after { content: " \25CF"; color: var(--bad); }
+#files li.open.bad::after { color: #fff; }
+
+/* ---- the editor ---- */
+#editor { flex: 1; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+          background: var(--panel); }
+#editor .cm-editor { flex: 1; min-height: 0; font-size: 13.5px; }
+#editor .cm-scroller { font-family: ui-monospace, Consolas, monospace; }
+#editor p { margin: 0 24px; color: var(--dim); }
+.text-bar { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.text-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.text-host .cm-editor { flex: 1; min-height: 0; }
+
+/* ---- the player ---- */
+#player-body { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center;
+               gap: 10px; padding: 12px; }
+#screen { width: 320px; height: 240px; image-rendering: pixelated; background: var(--screen-bg);
+          border-radius: 4px; outline: none; box-shadow: 0 0 0 1px var(--line); flex: none; }
+#screen:focus { box-shadow: 0 0 0 2px var(--accent); }
+.paused #screen { opacity: 0.5; }
+#wheel { width: 170px; height: 170px; touch-action: none; user-select: none; cursor: grab; flex: none; }
+#wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+#wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+#wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
+              dominant-baseline: middle; pointer-events: none; }
 #play { display: flex; align-items: center; gap: 8px; width: 320px; }
 #play button { padding: 3px 12px; }
-#rate { font-size: 12px; color: var(--dim); white-space: pre-line; }
+#stop { display: none; }
+body.running #stop { display: inline-block; }
+body.running #run { display: none; }
 #music { width: 320px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
          display: flex; flex-direction: column; gap: 4px; }
 #music .row { display: flex; align-items: center; gap: 6px; }
@@ -58,6 +148,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #m-now b, #m-now span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #m-now span { color: var(--dim); }
 
+/* ---- pictures ---- */
 .pix { display: flex; flex-direction: column; height: 100%; outline: none; }
 .pix-tools { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
 .pix-tools button { padding: 3px 9px; font-size: 13px; }
@@ -76,23 +167,25 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .swatch.second { outline: 2px dashed var(--dim); outline-offset: 1px; }
 .pix-flags { display: flex; align-items: center; gap: 4px; padding: 4px 10px 10px; font-size: 13px; }
 .pix-flags span { margin-right: 6px; color: var(--dim); }
-.pix-flags button { width: 28px; padding: 3px 0; font-size: 12px; }
+.pix-flags button { min-width: 28px; padding: 3px 6px; font-size: 12px; }
 .pix-flags button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pix-flags button.some { border-color: var(--accent); border-style: dashed; }
 .sheet { display: flex; height: 100%; min-height: 0; }
-.sheet-side { width: 280px; flex: none; padding: 12px; border-right: 1px solid var(--line);
-              overflow-x: hidden; overflow-y: auto;
+.sheet-side { width: 280px; flex: none; border-right: 1px solid var(--line);
+              display: flex; flex-direction: column; min-height: 0; }
+.sheet-side.closed { width: 28px; }
+.sheet-side.closed > :not(.rail) { display: none; }
+.sheet-side.closed > .rail { display: block; }
+.sheet-body { padding: 12px; overflow-x: hidden; overflow-y: auto;
               display: flex; flex-direction: column; gap: 8px; }
 .sheet-picker { width: 256px; height: 256px; image-rendering: pixelated; cursor: pointer;
                 touch-action: none; }
 .sheet-info { font: 12px ui-monospace, Consolas, monospace; color: var(--dim); }
-
 .sheet .pix-flags { padding: 0; flex-wrap: wrap; }
 .sheet .pix-flags span { width: 100%; }
 .sheet-edit { flex: 1; min-width: 0; }
-.text-bar { padding: 6px 10px; border-bottom: 1px solid var(--line); }
-.text-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.text-host .cm-editor { flex: 1; min-height: 0; }
+
+/* ---- palettes ---- */
 .pal { padding: 14px; overflow: auto; height: 100%; outline: none; }
 .pal-head { color: var(--dim); font-size: 13px; margin-bottom: 10px; }
 .pal-head button { margin-left: 8px; padding: 2px 8px; font-size: 12px; }
@@ -102,6 +195,8 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .pal-swatch.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
 .pal-swatch.unused::after { content: ""; position: absolute; right: 3px; top: 3px; width: 6px;
               height: 6px; border-radius: 3px; background: var(--dim); opacity: 0.8; }
+.pal-swatch.drop { box-shadow: -4px 0 0 0 var(--accent); }
+.pal-add { background: none; color: var(--dim); font-size: 18px; border-style: dashed; }
 .pal-panel { display: flex; gap: 16px; margin: 18px 0 12px; align-items: flex-start; }
 .pal-big { width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line); flex: none; }
 .pal-fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
@@ -109,11 +204,10 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .pal-slider { display: grid; grid-template-columns: 50px 220px 64px; align-items: center; gap: 8px; }
 .pal-slider input[type=number], .pal-hex { font: 13px ui-monospace, Consolas, monospace; padding: 3px 6px;
               border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
-.pal-swatch.drop { box-shadow: -4px 0 0 0 var(--accent); }
-.pal-add { background: none; color: var(--dim); font-size: 18px; border-style: dashed; }
 .pal-note { color: var(--dim); font-size: 12px; max-width: 420px; }
 .pal-note.warn { color: var(--bad); }
 
+/* ---- dialogs ---- */
 dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
          border-radius: 10px; max-width: 520px; }
 dialog h2 { margin-top: 0; font-size: 16px; }
@@ -126,60 +220,9 @@ dialog.ask { min-width: 340px; }
            border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .ask-text { max-width: 380px; line-height: 1.45; color: var(--dim); }
 .ask-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-button { font: inherit; padding: 5px 12px; border-radius: 6px; cursor: pointer;
-         border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
-button:hover { border-color: var(--accent); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-#stop { display: none; }
-body.running #stop { display: inline-block; }
-body.running #run { display: none; }
-main { display: grid; grid-template-columns: 190px minmax(0, 1fr) 360px; min-height: 0; }
-main > nav { border-right: 1px solid var(--line); overflow: auto; padding: 8px 0; background: var(--panel); }
-main > nav ul { list-style: none; margin: 0; padding: 0; }
-main > nav li { padding: 4px 14px; cursor: pointer; font: 13px ui-monospace, Consolas, monospace;
-         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-main > nav li:hover { background: var(--bg); }
-main > nav li.open { background: var(--accent); color: #fff; }
-main > nav li.bad::after { content: " \25CF"; color: var(--bad); }
-main > nav li.open.bad::after { color: #fff; }
-#add { margin: 8px 14px; font-size: 13px; }
-#editor { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
-          background: var(--panel); }
-#editor .cm-editor { flex: 1; min-height: 0; font-size: 13.5px; }
-#editor .cm-scroller { font-family: ui-monospace, Consolas, monospace; }
-#editor img.picture { image-rendering: pixelated; width: 512px; max-width: 90%; margin: 24px; }
-#editor p { margin: 0 24px; color: var(--dim); }
-aside { border-left: 1px solid var(--line); display: flex; flex-direction: column;
-        align-items: center; gap: 10px; padding: 12px; min-height: 0; overflow: auto; }
-#screen { width: 320px; height: 240px; image-rendering: pixelated; background: var(--screen-bg);
-          border-radius: 4px; outline: none; box-shadow: 0 0 0 1px var(--line); }
-#screen:focus { box-shadow: 0 0 0 2px var(--accent); }
-.paused #screen { opacity: 0.5; }
-#wheel { width: 170px; height: 170px; touch-action: none; user-select: none; cursor: grab; }
-#wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
-#wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
-#wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
-              dominant-baseline: middle; pointer-events: none; }
-                box-shadow: inset 0 0 0 1px var(--line); }
-#status { font-size: 12px; color: var(--dim); }
-#status.bad { color: var(--bad); }
-#console { width: 320px; flex: 1; min-height: 120px; overflow: auto; margin: 0;
-           font: 12px/1.45 ui-monospace, Consolas, monospace; background: var(--panel);
-           border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
-#console div { white-space: pre-wrap; word-break: break-word; }
-#console .error { color: var(--bad); }
-#console .say { color: var(--accent); }
-#console .music { color: var(--dim); }
-#console .link { cursor: pointer; text-decoration: underline dotted; }
-@media (max-width: 900px) {
-    main { grid-template-columns: 1fr; grid-template-rows: auto 50vh auto; }
-    main > nav { border-right: none; border-bottom: 1px solid var(--line); }
-    main > nav ul { display: flex; flex-wrap: wrap; }
-    aside { border-left: none; }
-}
 </style>
 </head>
-<body>
+<body class="output-closed">
 <header>
   <h1>Arcade</h1>
   <nav id="menubar">
@@ -205,6 +248,12 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
       <hr>
       <button data-do="find">Find and replace<kbd>Ctrl+F</kbd></button>
     </div></div>
+    <div class="menu"><button class="title">View</button><div class="items">
+      <button data-do="view-files" class="check" id="v-files">Files<kbd>Ctrl+B</kbd></button>
+      <button data-do="view-picker" class="check" id="v-picker">Sprite picker</button>
+      <button data-do="view-player" class="check" id="v-player">Player<kbd>Ctrl+Shift+B</kbd></button>
+      <button data-do="view-output" class="check" id="v-output">Output<kbd>Ctrl+J</kbd></button>
+    </div></div>
     <div class="menu"><button class="title">Run</button><div class="items">
       <button data-do="run">Run<kbd>Ctrl+Enter</kbd></button>
       <button data-do="stop">Stop<kbd>Shift+Ctrl+Enter</kbd></button>
@@ -222,39 +271,62 @@ aside { border-left: 1px solid var(--line); display: flex; flex-direction: colum
     </div></div>
   </nav>
   <span id="cart-name"></span>
-  <span id="status"></span>
 </header>
-<main>
-  <nav><ul id="files"></ul></nav>
-  <section id="editor"></section>
-  <aside>
-    <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
-    
-    <svg id="wheel" viewBox="-100 -100 200 200">
-      <circle class="ring" r="98"/>
-      <circle class="hub" r="36"/>
-      <text y="-72">MENU</text>
-      <text x="72">&#x25B6;&#x25B6;|</text>
-      <text x="-72">|&#x25C0;&#x25C0;</text>
-      <text y="74">&#x25B6; ||</text>
-    </svg>
-    <div id="play"><button id="run" class="primary" title="Ctrl+Enter">Run</button>
-      <button id="stop" title="Shift+Ctrl+Enter">Stop</button><span id="rate"></span></div>
-    <div id="music">
-      <div class="row">
-        <button id="m-prev" title="Back a track">&#x23EE;</button>
-        <button id="m-play" title="Play or pause the music">&#x23F5;</button>
-        <button id="m-next" title="Next track">&#x23ED;</button>
-        <div id="m-now"><b>The owner's music</b><span>made up: plays while a cart runs</span></div>
-      </div>
-      <div class="row small">
-        <span id="m-time"></span>
-        <label title="A click on each beat of the track, the bar's first higher"><input type="checkbox" id="m-click"> Metronome</label>
+<main id="layout">
+  <aside id="side-files" class="side">
+    <button class="rail" data-toggle="files" title="Show the files (Ctrl+B)">Files</button>
+    <div class="panel-head"><span class="grow">Files</span>
+      <button class="icon" data-do="add" title="New file">+</button>
+      <button class="icon" data-toggle="files" title="Hide (Ctrl+B)">&lsaquo;</button></div>
+    <ul id="files"></ul>
+  </aside>
+  <div class="split" id="split-files"></div>
+  <section id="centre">
+    <section id="editor"></section>
+    <div class="split h" id="split-output"></div>
+    <section id="output">
+      <div class="panel-head"><span class="grow">Output</span>
+        <button class="icon" id="clear-output" title="Clear">&#x239A;</button>
+        <button class="icon" data-toggle="output" title="Hide (Ctrl+J)">&times;</button></div>
+      <div id="console"></div>
+    </section>
+  </section>
+  <aside id="side-player" class="side">
+    <button class="rail" data-toggle="player" title="Show the player (Ctrl+Shift+B)">Player</button>
+    <div class="panel-head"><span class="grow">Player</span>
+      <button class="icon" data-toggle="player" title="Hide (Ctrl+Shift+B)">&rsaquo;</button></div>
+    <div id="player-body">
+      <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
+      <svg id="wheel" viewBox="-100 -100 200 200">
+        <circle class="ring" r="98"/>
+        <circle class="hub" r="36"/>
+        <text y="-72">MENU</text>
+        <text x="72">&#x25B6;&#x25B6;|</text>
+        <text x="-72">|&#x25C0;&#x25C0;</text>
+        <text y="74">&#x25B6; ||</text>
+      </svg>
+      <div id="play"><button id="run" class="primary" title="Ctrl+Enter">Run</button>
+        <button id="stop" title="Shift+Ctrl+Enter">Stop</button></div>
+      <div id="music">
+        <div class="row">
+          <button id="m-prev" title="Back a track">&#x23EE;</button>
+          <button id="m-play" title="Play or pause the music">&#x23F5;</button>
+          <button id="m-next" title="Next track">&#x23ED;</button>
+          <div id="m-now"><b>The owner's music</b><span>made up: plays while a cart runs</span></div>
+        </div>
+        <div class="row small">
+          <span id="m-time"></span>
+          <label title="A click on each beat of the track, the bar's first higher"><input type="checkbox" id="m-click"> Metronome</label>
+        </div>
       </div>
     </div>
-    <div id="console"></div>
   </aside>
 </main>
+<footer id="statusbar">
+  <button id="status" title="Show the output"></button>
+  <span class="grow"></span>
+  <button id="rate" title="Run as another player: the Run menu"></button>
+</footer>
 <dialog id="help-keys"><h2>Keys and the wheel</h2>
 <p>Click the screen to give the game the keys. Left and Right are Prev and
 Next; Up and Down turn the wheel; Enter is Select, Space is Play and Esc is

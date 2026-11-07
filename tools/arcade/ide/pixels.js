@@ -663,7 +663,9 @@ export class PixelEditor {
 export class SheetEditor {
     /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
      * flagsChanged(flags), flagNames() (the eight names cart.json gives,
-     * null where none), nameFlag(b) (to ask for flag b's name),
+     * null where none), nameFlag(b) (to ask for flag b's name), picker
+     * (whether the picker is open) and pickerShown(open) when it is
+     * opened or closed,
      * fitColours (as the PixelEditor's), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
@@ -671,8 +673,24 @@ export class SheetEditor {
         this.cell = { x: 0, y: 0, w: 1, h: 1 };
         const root = this.root = document.createElement('div');
         root.className = 'sheet';
-        const side = document.createElement('div');
+        const side = this.side = document.createElement('div');
         side.className = 'sheet-side';
+        const rail = document.createElement('button');
+        rail.className = 'rail';
+        rail.textContent = 'Sprites';
+        rail.title = 'Show the sprites';
+        rail.onclick = () => this.o.pickerShown(true);
+        const head = document.createElement('div');
+        head.className = 'panel-head';
+        head.innerHTML = '<span class="grow">Sprites</span>';
+        const hide = document.createElement('button');
+        hide.className = 'icon';
+        hide.innerHTML = '&lsaquo;';
+        hide.title = 'Hide the sprites';
+        hide.onclick = () => this.o.pickerShown(false);
+        head.append(hide);
+        const body = document.createElement('div');
+        body.className = 'sheet-body';
         this.picker = document.createElement('canvas');
         this.picker.className = 'sheet-picker';
         this.picker.width = this.picker.height = 128 * 2;
@@ -680,7 +698,9 @@ export class SheetEditor {
         this.info.className = 'sheet-info';
         this.flagRow = document.createElement('div');
         this.flagRow.className = 'pix-flags';
-        side.append(this.picker, this.info, this.flagRow);
+        body.append(this.picker, this.info, this.flagRow);
+        side.append(rail, head, body);
+        this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
         this.edit.className = 'sheet-edit';
         root.append(side, this.edit);
@@ -693,6 +713,8 @@ export class SheetEditor {
         if (this.editor) this.editor.destroy();
         this.root.remove();
     }
+
+    setPicker(open) { this.side.classList.toggle('closed', !open); }
 
     focus() { if (this.editor) this.editor.root.focus(); }
 
