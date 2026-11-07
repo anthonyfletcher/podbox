@@ -1931,7 +1931,9 @@ export function compile(input) {
     cart.achievements.forEach((a, i) => { ach[a.name] = { value: i, version: 1 }; });
     prog.api = Object.assign({}, prog.api, {
         groups: Object.assign({}, prog.api.groups, built.groups,
-                              { BOARD: board, OPT: option, ACH: ach })
+                              { BOARD: board, OPT: option, ACH: ach,
+                                FONT: Object.assign({}, prog.api.groups.FONT,
+                                                    built.groups.FONT) })
     });
     if (prog.byNs.has('IMG'))
         errors.push({ file: 'IMG.js', line: 1, column: 1, message:
@@ -1997,6 +1999,8 @@ export function compile(input) {
     const srcFiles = {};
     for (const n in input.files)
         if (/\.js$/.test(n) || n === 'cart.json') srcFiles[n] = input.files[n];
+    const fontFiles = (input.assets && input.assets.fonts) || {};
+    for (const n in fontFiles) srcFiles['fonts/' + n + '.bdf'] = fontFiles[n];
 
     const bytes = writeCart([
         { tag: 'PBG1', data: header(cart, prog) },

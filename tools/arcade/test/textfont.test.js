@@ -100,7 +100,7 @@ test('a line is 12 rows, and font() knows WORLD', () => {
 }`);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out.trim(), '7 7 0 1');
-    assert.match(run('function init() { font(3); }').err, /FONT.CAPS or FONT.WORLD/);
+    assert.match(run('function init() { font(3); }').err, /FONT.CAPS, FONT.WORLD or one of the game's fonts/);
 });
 
 test('size 2 doubles either font, and is 1 or 2', () => {

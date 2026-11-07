@@ -235,6 +235,20 @@ struct sfxinfo
     int32_t scale;
 };
 
+/* A cart font, from the FONT chunk: an index of a u32 codepoint and a
+ * u32 offset a glyph, in codepoint order, into the glyphs, each an
+ * advance, x, y (from the line's top), w and h, then h rows of
+ * (w + 7) / 8 bytes. FONT.<name> is 3 and on. */
+#define MAX_CART_FONTS 16
+#define FIRST_CART_FONT 3
+
+struct cartfont
+{
+    const uint8_t *index, *glyphs;
+    uint32_t n;
+    uint8_t line;
+};
+
 /* A voice: an effect stepped through in 16.16 at its pitch, or a tone */
 enum { VOICE_OFF, VOICE_SFX, VOICE_TONE };
 struct voice
@@ -357,6 +371,8 @@ struct vm
     const uint8_t *sfx;
     uint32_t sfx_len, nsfx;
     struct sfxinfo *sfxdir;
+    struct cartfont fonts[MAX_CART_FONTS];
+    uint32_t nfonts;
     struct voice voices[4];
     uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
     struct planeview plane;
@@ -519,6 +535,7 @@ int32_t draw_text(struct vm *vm, const char *s, uint32_t n, int32_t x,
                   int32_t y, uint32_t c);
 int32_t text_width(struct vm *vm, const char *s, uint32_t n);
 int32_t text_line(struct vm *vm);
+int text_has(struct vm *vm, const char *s, uint32_t n);
 const char *vm_typename(uint32_t tag);
 int vm_new_string(struct vm *vm, const uint8_t *b, uint32_t len,
                   struct value *out);

@@ -73,6 +73,7 @@ export function readAssets(dir) {
         images: some('images', '.png', true),
         sounds: some('sounds', '.json', false),
         data: some('data', '.json', false),
-        texts: some('data', '.txt', false)
+        texts: some('data', '.txt', false),
+        fonts: some('fonts', '.bdf', false)
     };
 }

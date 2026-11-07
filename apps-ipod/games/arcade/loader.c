@@ -357,6 +357,43 @@ static int load_achievements(struct vm *vm, const uint8_t *p, uint32_t n)
     return 1;
 }
 
+/* The fonts, checked whole: each glyph inside the chunk and no bigger
+ * than 32 a side, the codepoints rising */
+static int load_fonts(struct vm *vm, const uint8_t *p, uint32_t n)
+{
+    if (!p)
+        return 1;
+    struct cur c = { p, p + n, 0 };
+    vm->nfonts = c8(&c);
+    if (!vm->nfonts || vm->nfonts > MAX_CART_FONTS)
+        return bad(vm, "fonts");
+    for (uint32_t i = 0; i < vm->nfonts; i++) {
+        struct cartfont *f = &vm->fonts[i];
+        f->line = (uint8_t)c8(&c);
+        f->n = c16(&c);
+        f->index = take(&c, f->n * 8);
+        if (c.bad || !f->n || !f->line || f->line > 32)
+            return bad(vm, "fonts");
+        f->glyphs = c.p;
+        uint32_t room = (uint32_t)(c.end - c.p), end = 0, last = 0;
+        for (uint32_t g = 0; g < f->n; g++) {
+            uint32_t cp = rd32(f->index + g * 8);
+            uint32_t off = rd32(f->index + g * 8 + 4);
+            if ((g && cp <= last) || off > room || room - off < 5)
+                return bad(vm, "fonts");
+            const uint8_t *q = f->glyphs + off;
+            uint32_t size = 5 + q[4] * ((q[3] + 7u) >> 3);
+            if (q[3] > 32 || q[4] > 32 || size > room - off)
+                return bad(vm, "fonts");
+            if (off + size > end)
+                end = off + size;
+            last = cp;
+        }
+        c.p += end;
+    }
+    return c.p == c.end ? 1 : bad(vm, "fonts");
+}
+
 static int load_code(struct vm *vm, const uint8_t *p, uint32_t n)
 {
     struct cur c = { p, p + n, 0 };
@@ -578,11 +615,11 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[14] = { 0 };
-    uint32_t clen[14] = { 0 };
-    static const char tags[14][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+    const uint8_t *chunk[15] = { 0 };
+    uint32_t clen[15] = { 0 };
+    static const char tags[15][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
                                       "PALS", "SHET", "MAPS", "IMGS", "SFX_",
-                                      "BORD", "OPTN", "DATA", "ACHV" };
+                                      "BORD", "OPTN", "DATA", "ACHV", "FONT" };
     int first = 1;
     crc_init();
     for (;;) {
@@ -599,7 +636,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 14; i++)
+        for (int i = 0; i < 15; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -647,6 +684,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
         load_boards(vm, chunk[10], clen[10]) &&
         load_options(vm, chunk[11], clen[11]) &&
         load_achievements(vm, chunk[13], clen[13]) &&
+        load_fonts(vm, chunk[14], clen[14]) &&
         load_code(vm, chunk[1], clen[1]) &&
         load_constants(vm, chunk[2], clen[2]) &&
         load_globals(vm, chunk[3], clen[3]);

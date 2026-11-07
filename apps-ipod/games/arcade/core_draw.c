@@ -390,7 +390,8 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
 #define COST_COPY      25   /* copy_rect's setup, on top of the call's */
 #define COST_ROW       2
 #define COST_GLYPH     12
-#define COST_BIG_GLYPH 25
+#define COST_BIG_GLYPH 36
+#define COST_TEXT_GLYPH 20  /* FONT.WORLD's and a cart font's */
 #define COST_TILE      5
 #define PER16_FILL     1
 #define PER16_PATTERN  10
@@ -401,6 +402,7 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
 #define PER16_TLINE    48
 #define PER16_FLOOR    12   /* a row of the floor on the map */
 #define PER16_EDGE     18   /* one that leaves it */
+#define PER16_TEXT     12   /* FONT.WORLD's and a cart font's dots */
 
 struct surf
 {
@@ -1652,12 +1654,19 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
     return cx;
 }
 
-/* ---- FONT.WORLD: beyond ASCII ---- *
- * 12-row cells, each glyph its own advance, a 12-row line. The letters,
- * punctuation and symbols below U+3000 are the engine's own; kana, Hangul
- * and the ideographs come from the host, a glyph at a time. */
+/* ---- FONT.WORLD and the cart's fonts ---- *
+ * Each glyph its own advance and box in the line. WORLD's are 12-row cells
+ * a byte wide: the letters, punctuation and symbols below U+3000 are the
+ * engine's own; kana, Hangul and the ideographs come from the host, a
+ * glyph at a time. A cart's come from its FONT chunk, up to 32 a side. */
 
 #define TEXT_LINE 12
+
+struct glyph_box
+{
+    const uint8_t *bits;            /* h rows of stride bytes */
+    int32_t adv, x, y, w, h, stride;
+};
 
 /* The next character of UTF-8 text at *i, which moves past it; a byte
  * that does not begin one is taken alone, as U+FFFD */
@@ -1676,9 +1685,11 @@ static uint32_t utf8_next(const char *s, uint32_t n, uint32_t *i)
     return cp;
 }
 
-/* cp's glyph: the engine's, the host's (into buf), or the engine's ? */
+/* cp's WORLD glyph: the engine's, the host's (into buf), or the engine's ? */
 static const uint8_t *text_glyph(struct vm *vm, uint32_t cp, uint8_t *buf)
 {
+    if (cp >= 0x20 && cp < 0x7f && textfont_cp[cp - 0x20] == cp)
+        return textfont_glyph[cp - 0x20];
     if (cp < 0x10000) {
         int32_t lo = 0, hi = TEXTFONT_CORE - 1;
         while (lo <= hi) {
@@ -1697,13 +1708,134 @@ static const uint8_t *text_glyph(struct vm *vm, uint32_t cp, uint8_t *buf)
     return textfont_glyph['?' - 0x20];
 }
 
-/* text() for FONT.WORLD, k pixels to a dot */
+/* cp's glyph in a cart font, or NULL */
+static const uint8_t *cart_find(const struct cartfont *f, uint32_t cp)
+{
+    /* most fonts run unbroken from their first codepoint */
+    uint32_t guess = cp - le32(f->index);
+    if (guess < f->n && le32(f->index + guess * 8) == cp)
+        return f->glyphs + le32(f->index + guess * 8 + 4);
+    int32_t lo = 0, hi = (int32_t)f->n - 1;
+    while (lo <= hi) {
+        int32_t m = (lo + hi) / 2;
+        uint32_t at = le32(f->index + m * 8);
+        if (at == cp)
+            return f->glyphs + le32(f->index + m * 8 + 4);
+        if (at < cp)
+            lo = m + 1;
+        else
+            hi = m - 1;
+    }
+    return NULL;
+}
+
+/* cp's glyph in a cart font: its own, its ?, or nothing at all */
+static void cart_glyph(const struct cartfont *f, uint32_t cp,
+                       struct glyph_box *b)
+{
+    const uint8_t *g = cart_find(f, cp);
+    if (!g)
+        g = cart_find(f, '?');
+    if (!g) {
+        b->adv = b->x = b->y = b->w = b->h = b->stride = 0;
+        b->bits = NULL;
+        return;
+    }
+    b->adv = g[0];
+    b->x = (int8_t)g[1];
+    b->y = (int8_t)g[2];
+    b->w = g[3];
+    b->h = g[4];
+    b->stride = (g[3] + 7) >> 3;
+    b->bits = g + 5;
+}
+
+/* A glyph's row as a word, its first pixel in the top bit */
+static uint32_t row_word(const uint8_t *row, int stride)
+{
+    uint32_t v = (uint32_t)row[0] << 24;
+    for (int j = 1; j < stride; j++)
+        v |= (uint32_t)row[j] << (24 - 8 * j);
+    return v;
+}
+
+/* A glyph at (gx, gy) in screen space, k pixels to a dot: nothing when
+ * wholly outside the clip; wholly inside and unpatterned, its dots written
+ * straight to the pixels, each row only as far as its last; otherwise
+ * drawn by span(). */
+static void draw_glyph(struct pen *p, const struct glyph_box *b, int64_t gx,
+                       int64_t gy, int k)
+{
+    const uint8_t *row = b->bits;
+    p->cost += COST_TEXT_GLYPH;
+    if (!p->pat && gx >= p->cx0 && gy >= p->cy0 && gx + b->w * k <= p->cx1 &&
+        gy + b->h * k <= p->cy1) {
+        int32_t w = p->s.w, top = -1, bot = 0;
+        uint32_t dots = 0;
+        uint8_t ink = p->c, *line = p->s.px + gy * w + gx;
+        for (int r = 0; r < b->h; r++, row += b->stride, line += w * k) {
+            uint32_t v = row_word(row, b->stride);
+            if (!v)
+                continue;
+            if (top < 0)
+                top = r;
+            bot = r;
+            uint8_t *d = line;
+            if (k == 1) {
+                for (; v; v <<= 1, d++)
+                    if (v & 0x80000000u) {
+                        *d = ink;
+                        dots++;
+                    }
+                continue;
+            }
+            for (; v; v <<= 1, d += k)
+                if (v & 0x80000000u) {
+                    for (int dy = 0; dy < k; dy++)
+                        for (int dx = 0; dx < k; dx++)
+                            d[dy * w + dx] = ink;
+                    dots++;
+                }
+        }
+        if (top >= 0) {
+            p->count += dots * (uint32_t)(k * k);
+            row_touched(p, (int32_t)(gy + top * k));
+            row_touched(p, (int32_t)(gy + bot * k + k - 1));
+        }
+        return;
+    }
+    if (gx >= p->cx1 || gy >= p->cy1 || gx + b->w * k <= p->cx0 ||
+        gy + b->h * k <= p->cy0)
+        return;
+    for (int r = 0; r < b->h; r++, row += b->stride) {
+        uint32_t v = row_word(row, b->stride);
+        for (int c = 0; v; c++, v <<= 1)
+            if (v & 0x80000000u)
+                for (int dy = 0; dy < k; dy++)
+                    span(p, gy + r * k + dy, gx + c * k, gx + c * k + k - 1);
+    }
+}
+
+/* The unscaled line of the font being drawn in */
+static int32_t line_of(struct vm *vm)
+{
+    if (vm->d.font >= FIRST_CART_FONT)
+        return vm->fonts[vm->d.font - FIRST_CART_FONT].line;
+    return vm->d.font == 2 ? TEXT_LINE : 6;
+}
+
+/* text() for FONT.WORLD and the cart's fonts, k pixels to a dot */
 static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
                          uint32_t n, int64_t x, int64_t y, int k, int draw,
                          int64_t *widest, int *lines)
 {
     uint8_t buf[13];
+    const struct cartfont *f = vm->d.font >= FIRST_CART_FONT
+        ? &vm->fonts[vm->d.font - FIRST_CART_FONT] : NULL;
+    int32_t line = f ? f->line : TEXT_LINE;
     int64_t cx = x;
+    if (draw)
+        p->per16 = PER16_TEXT;
     *widest = 0;
     *lines = 1;
     for (uint32_t i = 0; i < n;) {
@@ -1712,42 +1844,27 @@ static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
             if (cx - x > *widest)
                 *widest = cx - x;
             cx = x;
-            y += TEXT_LINE * k;
+            y += line * k;
             (*lines)++;
             continue;
         }
         if (cp < 0x20)
             cp = ' ';
-        const uint8_t *g = text_glyph(vm, cp, buf);
-        if (draw && cp != ' ') {
-            int64_t gx = cx + p->ox, gy = y + p->oy;
-            p->cost += COST_GLYPH;
-            int inside = k == 1 && !p->pat && gx >= p->cx0 &&
-                         gy >= p->cy0 && gx + 8 <= p->cx1 &&
-                         gy + TEXT_LINE <= p->cy1;
-            for (int r = 0; r < TEXT_LINE; r++) {
-                uint8_t bits = g[1 + r];
-                if (!bits)
-                    continue;
-                if (inside) {
-                    uint8_t *d = p->s.px + (gy + r) * p->s.w + gx;
-                    for (int c = 0; c < 8; c++)
-                        if (bits & (0x80 >> c)) {
-                            d[c] = p->c;
-                            p->count++;
-                        }
-                    row_touched(p, (int32_t)(gy + r));
-                } else {
-                    for (int c = 0; c < 8; c++)
-                        if (bits & (0x80 >> c))
-                            for (int dy = 0; dy < k; dy++)
-                                span(p, y + r * k + dy + p->oy,
-                                     cx + c * k + p->ox,
-                                     cx + c * k + k - 1 + p->ox);
-                }
-            }
+        struct glyph_box b;
+        if (f)
+            cart_glyph(f, cp, &b);
+        else {
+            const uint8_t *g = text_glyph(vm, cp, buf);
+            b.adv = g[0];
+            b.x = b.y = 0;
+            b.w = 8;
+            b.h = TEXT_LINE;
+            b.stride = 1;
+            b.bits = g + 1;
         }
-        cx += g[0] * k;
+        if (draw && cp != ' ' && b.h)
+            draw_glyph(p, &b, cx + b.x * k + p->ox, y + b.y * k + p->oy, k);
+        cx += b.adv * k;
     }
     if (cx - x > *widest)
         *widest = cx - x;
@@ -1781,14 +1898,14 @@ NATIVE(print)
     int64_t widest;
     int lines;
     begin(vm, &p, c, 0);
-    int wide = vm->d.font == 2;
+    int wide = vm->d.font >= 2;
     int64_t end = wide ? text_wide(vm, &p, buf, n, x, y, k, 1, &widest,
                                    &lines)
                        : text(&p, buf, n, x, y, k, 1, &widest, &lines);
     finish(vm, &p);
     vm->d.cur_x = x;
     vm->d.cur_y = (int32_t)clampc((int64_t)y +
-                                  lines * (wide ? TEXT_LINE : 6) * k);
+                                  lines * line_of(vm) * k);
     *out = mk(T_INT, (int32_t)clampc(end));
     return 1;
 }
@@ -1801,7 +1918,7 @@ NATIVE(textw)
     uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
     int64_t widest;
     int lines;
-    if (vm->d.font == 2)
+    if (vm->d.font >= 2)
         text_wide(vm, NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     else
         text(NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
@@ -1818,8 +1935,7 @@ NATIVE(texth)
     int lines = 1;
     for (uint32_t i = 0; i < n; i++)
         lines += buf[i] == '\n';
-    *out = mk(T_INT, lines * (vm->d.font == 2 ? TEXT_LINE : 6) *
-                     scale_of(vm));
+    *out = mk(T_INT, lines * line_of(vm) * scale_of(vm));
     return 1;
 }
 
@@ -1830,7 +1946,7 @@ int32_t draw_text(struct vm *vm, const char *s, uint32_t n, int32_t x,
     int64_t widest;
     int lines;
     begin(vm, &p, c, 0);
-    int64_t end = vm->d.font == 2
+    int64_t end = vm->d.font >= 2
         ? text_wide(vm, &p, s, n, x, y, scale_of(vm), 1, &widest, &lines)
         : text(&p, s, n, x, y, scale_of(vm), 1, &widest, &lines);
     finish(vm, &p);
@@ -1841,26 +1957,45 @@ int32_t text_width(struct vm *vm, const char *s, uint32_t n)
 {
     int64_t widest;
     int lines;
-    if (vm->d.font == 2)
+    if (vm->d.font >= 2)
         text_wide(vm, NULL, s, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     else
         text(NULL, s, n, 0, 0, scale_of(vm), 0, &widest, &lines);
     return (int32_t)widest;
 }
 
-int32_t text_line(struct vm *vm)
+/* Whether the font has every character of s */
+int text_has(struct vm *vm, const char *s, uint32_t n)
 {
-    return (vm->d.font == 2 ? TEXT_LINE : 6) * scale_of(vm);
+    if (vm->d.font == 2)
+        return 1;
+    const struct cartfont *f = vm->d.font >= FIRST_CART_FONT
+        ? &vm->fonts[vm->d.font - FIRST_CART_FONT] : NULL;
+    for (uint32_t i = 0; i < n;) {
+        uint32_t cp = utf8_next(s, n, &i);
+        if (cp == '\n')
+            continue;
+        if (f ? !cart_find(f, cp) : cp < 0x20 || cp > 126)
+            return 0;
+    }
+    return 1;
 }
 
-/* font(f) or font(f, size): size 1 or 2, 1 if left out */
+int32_t text_line(struct vm *vm)
+{
+    return line_of(vm) * scale_of(vm);
+}
+
+/* font(f) or font(f, size): FONT.CAPS, FONT.WORLD or a cart font; size 1
+ * or 2, 1 if left out */
 NATIVE(font)
 {
     (void)out;
     WHOLE(0, 0, f, "font");
     WHOLE(1, 1, size, "font");
-    if (f < 0 || f > 2)
-        return vm_fail(vm, "font() needs FONT.CAPS or FONT.WORLD", "", "");
+    if (f < 0 || f >= FIRST_CART_FONT + (int32_t)vm->nfonts)
+        return vm_fail(vm, "font() needs FONT.CAPS, FONT.WORLD or one of "
+                       "the game's fonts", "", "");
     if (size < 1 || size > 2)
         return vm_fail(vm, "font()'s size is 1 or 2", "", "");
     vm->d.font = (uint8_t)f;

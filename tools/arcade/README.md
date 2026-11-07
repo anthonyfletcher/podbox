@@ -90,6 +90,7 @@ A cart's art goes in the same folder:
 | `images/<name>.png` | any other picture, up to 1024 pixels a side |
 | `data/<name>.json` | data the code reads: levels, waves, dialogue |
 | `data/<name>.txt` | text the code reads as one string |
+| `fonts/<name>.bdf` | a font in BDF, the bitmap font format FontForge and other font editors save: up to 16 a cart, glyphs up to 32 pixels a side, 64 KB of glyphs in all |
 
 Save every PNG as an **indexed** (palette) PNG: each pixel's palette number
 is the colour number the cart draws with, whatever colours the PNG shows.
@@ -97,6 +98,13 @@ is the colour number the cart draws with, whatever colours the PNG shows.
 In code, `MAP.<name>` and `PAL.<name>` are for `loadmap()` and `loadpal()`,
 `OBJ.<kind>` is the number `mapobj()` gives an object of that kind, and
 `IMG.<name>` is the picture itself, for `blit()`, `target()` and the rest.
+`font(FONT.<name>)` draws text in a cart font, and `font(FONT.<name>, 2)`
+doubles it, as for the engine's `FONT.CAPS` and `FONT.WORLD`. A character
+the font lacks draws as its `?`, or not at all if it has none; a `ui`
+dialog whose text the font lacks is drawn in `FONT.WORLD`. Text in a cart
+font or WORLD costs more than in CAPS: about 20 units a character and
+three quarters of a unit a pixel drawn. This SDK's own `fonts/caps.bdf`
+is CAPS itself, a starting point to draw from.
 `data.read(DATA.<name>)` gives a data file as the cart's own values --
 arrays, records, strings, numbers, with `true` and `false` as 1 and 0 --
 or a `.txt` file as a string, made afresh at each call, so read it once

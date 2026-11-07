@@ -708,12 +708,10 @@ static void input(struct vm *vm, struct dialog *g, unsigned held, int wheel)
 
 /* ---- the loop ------------------------------------------------------------ */
 
-static int beyond_ascii(const char *s)
+/* Whether the cart's font lacks a character of s */
+static int lacks(struct vm *vm, const char *s)
 {
-    for (; s && *s; s++)
-        if ((uint8_t)*s >= 0x80)
-            return 1;
-    return 0;
+    return s && !text_has(vm, s, (uint32_t)strlen(s));
 }
 
 /* Drawing of the engine's own: the game's state kept, the screen's rows
@@ -757,16 +755,20 @@ static void quiet_end(struct vm *vm, int rows)
  * back after; nothing it costs is charged to the cart */
 static void run(struct vm *vm, struct dialog *g)
 {
-    int world = beyond_ascii(g->prompt) || beyond_ascii(g->yes) ||
-                beyond_ascii(g->no);
+    int world = lacks(vm, g->prompt) || lacks(vm, g->yes) ||
+                lacks(vm, g->no);
     for (int i = 0; i < g->n; i++)
-        world |= beyond_ascii(g->items[i]);
+        world |= lacks(vm, g->items[i]);
     if (g->kind != ARCADE_DIALOG_CHOOSE && g->kind != ARCADE_DIALOG_NUMBER) {
         const char *w[] = { "Yes", "No", "OK", "Cancel" };
         for (int i = 0; i < 4; i++)
-            world |= beyond_ascii(word(vm, w[i]));
+            world |= lacks(vm, word(vm, w[i]));
     }
-    quiet_begin(vm, SCREEN_H, world && vm->d.font != 2);
+    if (g->kind == ARCADE_DIALOG_NUMBER)
+        world |= lacks(vm, "-0123456789");
+    if (g->kind == ARCADE_DIALOG_TEXT)
+        world |= lacks(vm, cycle_ascii);
+    quiet_begin(vm, SCREEN_H, world);
     if (g->kind == ARCADE_DIALOG_TEXT)
         cycle_make(vm);
     wrap(vm, g);
@@ -1035,8 +1037,7 @@ int arcade_banner(struct vm *vm, const char *head, const char *title)
 {
     if (vm->dialog)
         return banner_rows = 0;
-    quiet_begin(vm, SCREEN_H, (beyond_ascii(head) || beyond_ascii(title)) &&
-                vm->d.font != 2);
+    quiet_begin(vm, SCREEN_H, lacks(vm, head) || lacks(vm, title));
     int32_t l = text_line(vm), h = 2 * PAD + 2 * l;
     int32_t x0 = BOX_X0 + PAD, y0 = MARGIN;
     fill(vm, BOX_X0, y0, BOX_X1, y0 + h - 1, vm->ui_box);

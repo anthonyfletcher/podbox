@@ -9,10 +9,12 @@
  *   images/<name>.png    other images, indexed PNGs
  *   sounds/<name>.json   sound effects: sfxr parameters in jsfxr's JSON,
  *                        rendered here and stored as 8-bit PCM at 22,050 Hz
+ *   fonts/<name>.bdf     fonts, BDF; bdf.js has the FONT chunk
  *
  * Each palette, map and image is named after its file; maps and palettes
  * become MAP.<name> and PAL.<name> (numbered in name order), object kinds
- * OBJ.<kind>, sounds SFX.<name>, and images IMG.<name>, an image value
+ * OBJ.<kind>, sounds SFX.<name>, fonts FONT.<name> (after the engine's
+ * CAPS and WORLD), and images IMG.<name>, an image value
  * the loader makes.
  *
  * Chunks, little-endian (lengths and counts u16, sizes u32):
@@ -31,6 +33,10 @@ import { Writer } from './cart.js';
 import { lz4Compress } from './lz4.js';
 import { decodeIndexedPng } from './png.js';
 import { sfxrParams, sfxrRender, halve } from './sfxr.js';
+import { parseBdf, fontChunk, MAX_FONTS, MAX_FONT_BYTES } from './bdf.js';
+
+/* FONT.<name> numbers: the engine's fonts are 0 to 2 */
+const FIRST_FONT = 3, ENGINE_FONTS = ['CAPS', 'WORLD'];
 
 const NAME = /^[A-Za-z_][\w]*$/;
 const MAX_MAP = 256;
@@ -75,7 +81,7 @@ export function parseGpl(text) {
  * them (PNGs as bytes, the rest as text); string(s) numbers a constant
  * string. Errors go to errors; returns { groups, images, chunks }. */
 export function buildAssets(assets, inflate, string, errors) {
-    const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {}, DATA: {} },
+    const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {}, DATA: {}, FONT: {} },
                   images: [], chunks: [] };
     if (!assets) return out;
     function err(file, message) {
@@ -265,6 +271,32 @@ export function buildAssets(assets, inflate, string, errors) {
             w.bytes(s.bytes);
         }
         out.chunks.push({ tag: 'SFX_', data: w.done() });
+    }
+
+    /* fonts */
+    const fonts = [];
+    for (const name of sortedNames(assets.fonts)) {
+        const file = 'fonts/' + name + '.bdf';
+        if (!named(file, name)) continue;
+        if (ENGINE_FONTS.includes(name)) {
+            err(file, 'FONT.' + name + ' is the engine\'s; call the file something else');
+            continue;
+        }
+        if (fonts.length === MAX_FONTS) {
+            err(file, 'a cart holds at most ' + MAX_FONTS + ' fonts');
+            continue;
+        }
+        try {
+            fonts.push(parseBdf(assets.fonts[name]));
+            out.groups.FONT[name] = { value: FIRST_FONT + fonts.length - 1, version: 1 };
+        } catch (e) { err(file, e.message); }
+    }
+    if (fonts.length) {
+        const data = fontChunk(fonts);
+        if (data.length > MAX_FONT_BYTES)
+            err('fonts/', 'the fonts come to ' + data.length + ' bytes; a cart\'s are at most ' +
+                MAX_FONT_BYTES + ' -- leave out the characters it does not show');
+        else out.chunks.push({ tag: 'FONT', data: data });
     }
 
     /* data files: JSON checked and stored without its spaces, text as it
