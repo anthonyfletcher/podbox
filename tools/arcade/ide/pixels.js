@@ -14,7 +14,8 @@
  * as a PNG for other programs and as its palette numbers for the IDE, so
  * pasting back here is exact. */
 
-import { icon } from './icons.js';
+import { iconButton } from './icons.js';
+import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 const MARK = 'arcade-pixels ';
 const MAX_UNDO = 100;
@@ -101,26 +102,18 @@ export class PixelEditor {
                        ['rect', 'rect', 'Rectangle (R); Shift fills it'], ['oval', 'oval', 'Oval (O); Shift fills it'],
                        ['fill', 'fill', 'Fill (F)'], ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool'],
                        ['select', 'select', 'Select (S): drag to choose, drag inside to move']];
-        const bar = document.createElement('div');
-        bar.className = 'pix-tools';
+        const bar = this.bar = document.createElement('div');
+        bar.className = 'tb';
         this.toolButtons = {};
         for (const [id, ic, title] of tools) {
-            const b = document.createElement('button');
-            b.className = 'tool';
-            b.innerHTML = icon(ic);
-            b.title = title;
-            b.onclick = () => this.use(id);
+            const b = iconButton(ic, title, () => this.use(id));
             this.toolButtons[id] = b;
             bar.append(b);
         }
         const sep = () => { const s = document.createElement('span'); s.className = 'sep'; bar.append(s); };
         sep();
         const act = (ic, title, fn) => {
-            const b = document.createElement('button');
-            b.className = 'tool';
-            b.innerHTML = icon(ic);
-            b.title = title;
-            b.onclick = () => { fn(); this.root.focus(); };
+            const b = iconButton(ic, title, () => { fn(); this.root.focus(); });
             bar.append(b);
             return b;
         };
@@ -743,42 +736,31 @@ export class PixelEditor {
  * A picture pasted into the block that is too big for it widens the block
  * to fit, from its top left, as far as the sheet goes.
  *
- * An animation is blocks of one size running rightwards from a first:
- * played beside the picker at its speed, with the line of code that plays
- * it, and while one of its frames is drawn on the frame before can show
- * faintly under it (onion skin). */
+ * An animation is blocks of one size running rightwards from a first,
+ * made from a selection of several cells: played under the picker at its
+ * speed, with the line of code that plays it. The onion skin is another
+ * block shown faintly under the one being drawn: one right-clicked on the
+ * picker, or in an animation the frame before. */
 export class SheetEditor {
     /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
      * flagsChanged(flags), flagNames() (the eight names cart.json gives,
      * null where none), nameFlag(b) (to ask for flag b's name), picker
      * (whether the picker is open) and pickerShown(open) when it is
-     * opened or closed, anim ({ x, y, w, h, n, fps, onion }, kept by the
-     * IDE between openings) and animChanged(anim),
-     * fitColours (as the PixelEditor's), say(text, error) */
+     * opened or closed, anim ({ x, y, w, h, n, fps }, kept by the IDE
+     * between openings) and animChanged(anim), fitColours (as the
+     * PixelEditor's), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.px = opts.px;
         this.cell = { x: 0, y: 0, w: 1, h: 1 };
+        this.onion = null;        /* null, 'prev' or the { x, y } of a block */
         const root = this.root = document.createElement('div');
         root.className = 'sheet';
-        const side = this.side = document.createElement('div');
-        side.className = 'sheet-side';
-        const rail = document.createElement('button');
-        rail.className = 'rail';
-        rail.textContent = 'Sprites';
-        rail.title = 'Show the sprites';
-        rail.onclick = () => this.o.pickerShown(true);
-        const head = document.createElement('div');
-        head.className = 'panel-head';
-        head.innerHTML = '<span class="grow">Sprites</span>';
-        const hide = document.createElement('button');
-        hide.className = 'icon';
-        hide.innerHTML = '&lsaquo;';
-        hide.title = 'Hide the sprites';
-        hide.onclick = () => this.o.pickerShown(false);
-        head.append(hide);
-        const body = document.createElement('div');
-        body.className = 'sheet-body';
+        this.side = sidePanel('Sprites', (open) => this.o.pickerShown(open));
+        const bar = toolbar();
+        this.animButton = bar.add('animate', 'Animate the chosen cells: frames left to right', () => this.animate());
+        this.onionButton = bar.add('onion', 'Onion skin: the frame before, faintly. ' +
+                                   'Right-click a cell to show that one instead', () => this.toggleOnion());
         this.picker = document.createElement('canvas');
         this.picker.className = 'sheet-picker';
         this.picker.width = this.picker.height = 128 * 2;
@@ -788,12 +770,14 @@ export class SheetEditor {
         this.flagRow.className = 'pix-flags';
         this.animBox = document.createElement('div');
         this.animBox.className = 'sheet-anim';
+        const body = document.createElement('div');
+        body.className = 'sheet-body';
         body.append(this.picker, this.info, this.flagRow, this.animBox);
-        side.append(rail, head, body);
+        this.side.body.append(bar.el, body);
         this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
         this.edit.className = 'sheet-edit';
-        root.append(side, this.edit);
+        root.append(this.side.el, this.edit);
         parent.append(root);
         this.pick();
         this.open();
@@ -805,7 +789,7 @@ export class SheetEditor {
         this.root.remove();
     }
 
-    setPicker(open) { this.side.classList.toggle('closed', !open); }
+    setPicker(open) { this.side.setOpen(open); }
 
     focus() { if (this.editor) this.editor.root.focus(); }
 
@@ -825,7 +809,15 @@ export class SheetEditor {
             return { x: Math.max(0, Math.min(15, Math.floor((e.clientX - r.left) / (r.width / 16)))),
                      y: Math.max(0, Math.min(15, Math.floor((e.clientY - r.top) / (r.height / 16)))) };
         };
+        cv.addEventListener('contextmenu', (e) => e.preventDefault());
         cv.addEventListener('pointerdown', (e) => {
+            if (e.button === 2) {
+                const p = at(e), o = this.onion;
+                this.onion = o && o.x === p.x && o.y === p.y ? null : p;
+                this.refresh();
+                return;
+            }
+            if (e.button !== 0) return;
             try { cv.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
             from = at(e);
             this.cell = { x: from.x, y: from.y, w: 1, h: 1 };
@@ -843,15 +835,24 @@ export class SheetEditor {
         cv.addEventListener('pointercancel', up);
     }
 
+    /* the pixels of a block of cells, blank past the sheet's edge */
+    block(x0, y0, w, h) {
+        const out = new Uint8Array(w * h * 64);
+        for (let y = 0; y < h * 8; y++)
+            for (let x = 0; x < w * 8; x++) {
+                const sx = x0 * 8 + x, sy = y0 * 8 + y;
+                if (sx < 128 && sy < 128) out[y * w * 8 + x] = this.px[sy * 128 + sx];
+            }
+        return out;
+    }
+
     /* the chosen block in the editor, as its own picture */
     open(paste) {
-        const c = this.cell, w = c.w * 8, h = c.h * 8, block = new Uint8Array(w * h);
-        for (let y = 0; y < h; y++)
-            block.set(this.px.subarray((c.y * 8 + y) * 128 + c.x * 8, (c.y * 8 + y) * 128 + c.x * 8 + w), y * w);
+        const c = this.cell, w = c.w * 8, h = c.h * 8;
         const was = this.editor && this.editor.state;
         if (this.editor) this.editor.destroy();
         this.editor = new PixelEditor(this.edit, {
-            width: w, height: h, px: block, rgb: this.o.rgb, grid: 8, was: was,
+            width: w, height: h, px: this.block(c.x, c.y, c.w, c.h), rgb: this.o.rgb, grid: 8, was: was,
             changed: (b) => {
                 for (let y = 0; y < h; y++)
                     this.px.set(b.subarray(y * w, (y + 1) * w), (c.y * 8 + y) * 128 + c.x * 8);
@@ -864,89 +865,107 @@ export class SheetEditor {
             fitColours: this.o.fitColours,
             say: this.o.say
         });
-        this.drawPicker();
         this.drawFlags();
         this.drawAnim();
+        this.refresh();
         if (paste) this.editor.place(paste);
         this.editor.root.focus();
     }
 
+    /* the toolbar, the picker and the onion skin brought up to date */
+    refresh() {
+        this.animButton.disabled = !this.framing();
+        if (this.onion === 'prev' && this.frameOf() < 0) this.onion = null;
+        this.onionButton.disabled = !this.onion && this.frameOf() < 0;
+        this.onionButton.classList.toggle('on', !!this.onion);
+        const c = this.cell, o = this.onion, a = this.o.anim;
+        let skin = null;
+        if (o === 'prev') skin = this.frame((this.frameOf() + a.n - 1) % a.n);
+        else if (o) skin = this.block(o.x, o.y, c.w, c.h);
+        this.editor.setOnion(skin);
+        this.drawPicker();
+    }
+
+    toggleOnion() {
+        this.onion = this.onion ? null : 'prev';
+        this.refresh();
+        this.focus();
+    }
+
     /* ---- animation ---- */
+
+    /* the frames the chosen cells make: square ones where they divide the
+     * row, else a cell wide; null for fewer than two */
+    framing() {
+        const c = this.cell, w = c.w % c.h === 0 ? c.h : 1, n = c.w / w;
+        return n >= 2 ? { w, n } : null;
+    }
+
+    animate() {
+        const f = this.framing(), c = this.cell, a = this.o.anim;
+        if (!f) return;
+        this.setAnim({ x: c.x, y: c.y, w: f.w, h: c.h, n: f.n, fps: a ? a.fps : 8 });
+        this.cell = { x: c.x, y: c.y, w: f.w, h: c.h };
+        this.open();
+    }
+
+    setAnim(a) {
+        this.o.anim = a;
+        if (this.o.animChanged) this.o.animChanged(a);
+    }
 
     /* the frame the chosen block is of the animation, or -1 */
     frameOf() {
         const a = this.o.anim, c = this.cell;
-        if (!a || a.n < 2 || c.w !== a.w || c.h !== a.h || c.y !== a.y) return -1;
+        if (!a || c.w !== a.w || c.h !== a.h || c.y !== a.y) return -1;
         const k = (c.x - a.x) / a.w;
         return Number.isInteger(k) && k >= 0 && k < a.n ? k : -1;
     }
 
     /* frame k's pixels */
     frame(k) {
-        const a = this.o.anim, w = a.w * 8, h = a.h * 8, out = new Uint8Array(w * h);
-        const x0 = (a.x + k * a.w) * 8, y0 = a.y * 8;
-        for (let y = 0; y < h; y++) out.set(this.px.subarray((y0 + y) * 128 + x0, (y0 + y) * 128 + x0 + w), y * w);
-        return out;
+        const a = this.o.anim;
+        return this.block(a.x + k * a.w, a.y, a.w, a.h);
     }
 
+    /* the animation's panel: frame width and speed, playing, the code */
     drawAnim() {
         clearInterval(this.playing);
-        const box = this.animBox, c = this.cell;
+        const box = this.animBox, a = this.o.anim;
         box.innerHTML = '';
-        let a = this.o.anim;
-        const inside = this.frameOf() >= 0;
-        /* the most frames that fit to the right of the chosen block */
-        const room = Math.floor((16 - c.x) / c.w);
+        if (!a) return;
         const head = document.createElement('div');
-        head.className = 'sheet-anim-head';
-        head.textContent = 'Animation';
-        const frames = document.createElement('input');
-        frames.type = 'number';
-        frames.min = 1;
-        frames.max = inside ? Math.floor((16 - a.x) / a.w) : room;
-        frames.value = inside ? a.n : 1;
-        frames.title = 'Frames: blocks of this size running rightwards from ' + (inside ? 'the first' : 'this one');
-        const fps = document.createElement('input');
-        fps.type = 'number';
-        fps.min = 1;
-        fps.max = 60;
-        fps.value = a ? a.fps : 8;
-        fps.title = 'Frames a second';
-        const row = document.createElement('div');
-        row.className = 'sheet-anim-row';
-        row.append('Frames', frames, 'a second', fps);
-        box.append(head, row);
-        const set = () => {
-            const n = Math.max(1, Math.min(+frames.max, Math.round(+frames.value) || 1));
-            const base = inside ? a : { x: c.x, y: c.y, w: c.w, h: c.h, onion: a ? a.onion : false };
-            this.o.anim = Object.assign({}, base, { n: n, fps: Math.max(1, Math.min(60, Math.round(+fps.value) || 8)) });
-            if (this.o.animChanged) this.o.animChanged(this.o.anim);
-            this.drawPicker();
+        head.className = 'ed-sub';
+        head.innerHTML = '<span class="grow">Animation</span>';
+        head.append(iconButton('close', 'No animation', () => {
+            this.setAnim(null);
             this.drawAnim();
-        };
-        frames.onchange = set;
-        fps.onchange = set;
-        a = this.o.anim;
-        if (!inside && !(a && a.n >= 2 && this.frameOf() >= 0)) { this.editor.setOnion(null); return; }
-        /* playing, the onion skin and the code */
+            this.refresh();
+        }));
+        const total = a.n * a.w;
+        const bar = toolbar();
+        bar.el.classList.add('flat');
+        bar.put(numberBox('Frame width', a.w, 1, total, 'Cells across each frame', (w, i) => {
+            if (Math.floor(total / w) < 2) { i.value = a.w; return; }
+            this.setAnim(Object.assign({}, a, { w, n: Math.floor(total / w) }));
+            this.cell = { x: a.x, y: a.y, w, h: a.h };
+            this.open();
+        }), numberBox('a second', a.fps, 1, 60, 'Frames a second', (fps) => {
+            this.setAnim(Object.assign({}, a, { fps }));
+            this.drawAnim();
+        }));
         const view = document.createElement('canvas');
         const w = a.w * 8, h = a.h * 8, k = Math.max(1, Math.floor(96 / Math.max(w, h)));
         view.width = w * k;
         view.height = h * k;
         view.className = 'sheet-anim-view';
-        const onion = document.createElement('label');
-        onion.className = 'sheet-anim-row';
-        const tick = document.createElement('input');
-        tick.type = 'checkbox';
-        tick.checked = !!a.onion;
-        tick.onchange = () => { a.onion = tick.checked; this.drawAnim(); };
-        onion.append(tick, 'Onion skin: the frame before, faintly');
-        const first = a.y * 16 + a.x;
+        view.title = 'Click to draw the first frame';
+        view.onclick = () => { this.cell = { x: a.x, y: a.y, w: a.w, h: a.h }; this.open(); };
         const code = document.createElement('code');
         code.className = 'sheet-anim-code';
-        code.textContent = 'spr(' + first + ' + flr(t() * ' + a.fps + ') % ' + a.n +
+        code.textContent = 'spr(' + (a.y * 16 + a.x) + ' + flr(t() * ' + a.fps + ') % ' + a.n +
             (a.w > 1 ? ' * ' + a.w : '') + ', x, y' + (a.w > 1 || a.h > 1 ? ', ' + a.w + ', ' + a.h : '') + ')';
-        box.append(view, onion, code);
+        box.append(head, bar.el, view, code);
         const g = view.getContext('2d'), im = new ImageData(w, h), tmp = document.createElement('canvas');
         tmp.width = w;
         tmp.height = h;
@@ -965,8 +984,6 @@ export class SheetEditor {
         };
         draw();
         this.playing = setInterval(draw, 1000 / a.fps);
-        const f = this.frameOf();
-        this.editor.setOnion(a.onion && f >= 0 ? this.frame((f + a.n - 1) % a.n) : null);
     }
 
     setPalette(rgb) {
@@ -1006,14 +1023,19 @@ export class SheetEditor {
             g.moveTo(0, k * z + 0.5); g.lineTo(128 * z, k * z + 0.5);
         }
         g.stroke();
-        const an = this.o.anim;
-        if (an && an.n >= 2) {
+        const an = this.o.anim, c = this.cell, o = this.onion;
+        if (an) {
             g.strokeStyle = 'rgba(110,160,255,0.9)';
             g.setLineDash([3, 2]);
             g.strokeRect(an.x * 8 * z + 0.5, an.y * 8 * z + 0.5, an.n * an.w * 8 * z - 1, an.h * 8 * z - 1);
             g.setLineDash([]);
         }
-        const c = this.cell;
+        if (o && o !== 'prev') {
+            g.strokeStyle = 'rgba(200,120,255,0.95)';
+            g.setLineDash([2, 2]);
+            g.strokeRect(o.x * 8 * z + 1.5, o.y * 8 * z + 1.5, c.w * 8 * z - 3, c.h * 8 * z - 3);
+            g.setLineDash([]);
+        }
         g.strokeStyle = '#ffd23c';
         g.lineWidth = 2;
         g.strokeRect(c.x * 8 * z + 1, c.y * 8 * z + 1, c.w * 8 * z - 2, c.h * 8 * z - 2);
@@ -1029,7 +1051,8 @@ export class SheetEditor {
     drawFlags() {
         const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
         this.flagRow.innerHTML = '';
-        const label = document.createElement('span');
+        const label = document.createElement('div');
+        label.className = 'ed-sub';
         label.textContent = 'Flags';
         this.flagRow.append(label);
         for (let b = 0; b < 8; b++) {

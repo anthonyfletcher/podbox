@@ -8,6 +8,8 @@
  * Parts: reading and writing BDF; the editor. */
 
 import { PixelEditor } from './pixels.js';
+import { icon, iconButton } from './icons.js';
+import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 /* ---- reading and writing BDF ---- */
 
@@ -115,7 +117,8 @@ const label = (cp) => cp < 32 ? 'U+' + cp.toString(16).toUpperCase().padStart(4,
 
 export class FontEditor {
     /* opts: text (the BDF), changed(text), ask (the IDE's dialog),
-     * say(text, error), asText() */
+     * say(text, error), asText(), picker (whether the glyphs are shown)
+     * and pickerShown(open) */
     constructor(parent, opts) {
         this.o = opts;
         this.f = readFont(opts.text);
@@ -124,27 +127,18 @@ export class FontEditor {
         this.sample = 'The quick brown fox, 0123';
         const root = this.root = document.createElement('div');
         root.className = 'font';
-        const side = document.createElement('div');
-        side.className = 'font-side';
-        const head = document.createElement('div');
-        head.className = 'font-head';
-        const num = (labelText, value, set, title) => {
-            const l = document.createElement('label');
-            l.title = title;
-            const i = document.createElement('input');
-            i.type = 'number';
-            i.min = 0;
-            i.max = 32;
-            i.value = value;
-            i.onchange = () => set(Math.max(0, Math.min(32, Math.round(+i.value) || 0)));
-            l.append(labelText, i);
-            return l;
-        };
-        const text = document.createElement('button');
-        text.textContent = 'Edit as text';
-        text.onclick = () => opts.asText();
-        head.append(num('Ascent', this.f.ascent, (v) => this.lines(v, this.f.descent), 'Rows above the baseline'),
-                    num('Descent', this.f.descent, (v) => this.lines(this.f.ascent, v), 'Rows below it'), text);
+        this.side = sidePanel('Glyphs', (open) => opts.pickerShown(open));
+        const bar = toolbar();
+        bar.put(numberBox('Ascent', this.f.ascent, 0, 32, 'Rows above the baseline',
+                          (v) => this.lines(v, this.f.descent)),
+                numberBox('Descent', this.f.descent, 0, 32, 'Rows below it',
+                          (v) => this.lines(this.f.ascent, v)));
+        const grow = document.createElement('span');
+        grow.className = 'grow';
+        bar.put(grow);
+        bar.add('text', 'Edit as text', () => opts.asText());
+        const body = document.createElement('div');
+        body.className = 'font-body';
         this.grid = document.createElement('div');
         this.grid.className = 'font-grid';
         this.preview = document.createElement('canvas');
@@ -154,10 +148,12 @@ export class FontEditor {
         sample.value = this.sample;
         sample.title = 'Text shown in the font';
         sample.oninput = () => { this.sample = sample.value; this.drawPreview(); };
-        side.append(head, this.grid, sample, this.preview);
+        body.append(this.grid, sample, this.preview);
+        this.side.body.append(bar.el, body);
+        this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
         this.edit.className = 'font-edit';
-        root.append(side, this.edit);
+        root.append(this.side.el, this.edit);
         parent.append(root);
         this.drawGrid();
         this.open();
@@ -167,6 +163,10 @@ export class FontEditor {
         if (this.editor) this.editor.destroy();
         this.root.remove();
     }
+
+    setPicker(open) { this.side.setOpen(open); }
+
+    focus() { if (this.editor) this.editor.root.focus(); }
 
     save() {
         this.o.changed(writeFont(this.f));
@@ -210,7 +210,7 @@ export class FontEditor {
         });
         const add = document.createElement('button');
         add.className = 'font-glyph font-add';
-        add.textContent = '+';
+        add.innerHTML = icon('plus');
         add.title = 'Add a character';
         add.onclick = () => this.add();
         this.grid.append(add);
@@ -248,27 +248,9 @@ export class FontEditor {
         if (this.editor) { this.editor.destroy(); this.editor = null; }
         this.edit.innerHTML = '';
         if (!g) return;
-        const bar = document.createElement('div');
-        bar.className = 'font-bar';
-        const name = document.createElement('b');
-        name.textContent = label(g.cp) + '  U+' + g.cp.toString(16).toUpperCase().padStart(4, '0');
-        const adv = document.createElement('input');
-        adv.type = 'number';
-        adv.min = 0;
-        adv.max = 32;
-        adv.value = g.adv;
-        adv.title = 'How far the text moves on after it';
-        adv.onchange = () => this.advance(g, Math.max(0, Math.min(32, Math.round(+adv.value) || 0)));
-        const del = document.createElement('button');
-        del.textContent = 'Delete';
-        del.title = 'Remove this character from the font';
-        del.onclick = () => this.remove();
-        const l = document.createElement('label');
-        l.append('Advance', adv);
-        bar.append(name, l, del);
         const host = document.createElement('div');
         host.className = 'font-host';
-        this.edit.append(bar, host);
+        this.edit.append(host);
         this.editor = new PixelEditor(host, {
             width: g.cell.w, height: this.f.ascent + this.f.descent, px: g.cell.px.slice(), rgb: INK,
             baseline: this.f.ascent, was: this.was,
@@ -281,6 +263,15 @@ export class FontEditor {
             say: this.o.say
         });
         this.was = this.editor.state;
+        /* the character's own controls on the end of the drawing toolbar */
+        const bar = this.editor.bar, sep = document.createElement('span');
+        sep.className = 'sep';
+        const name = document.createElement('span');
+        name.className = 'note';
+        name.textContent = label(g.cp) + '  U+' + g.cp.toString(16).toUpperCase().padStart(4, '0');
+        bar.append(sep, numberBox('Advance', g.adv, 0, 32, 'How far the text moves on after it',
+                                  (v) => this.advance(g, v)),
+                   iconButton('trash', 'Remove this character from the font', () => this.remove()), name);
     }
 
     /* the advance set: the cell widened to it, or narrowed to it where no

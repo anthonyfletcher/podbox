@@ -26,6 +26,7 @@ import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
 import { ask } from './ask.js';
+import { icon, iconButton } from './icons.js';
 import capsBdf from '../fonts/caps.bdf';
 import wasmBytes from '../wasm/arcade.wasm';
 
@@ -175,11 +176,10 @@ function show(file) {
             let host = pane;
             if (visual) {
                 const bar = document.createElement('div');
-                bar.className = 'text-bar';
-                const b = document.createElement('button');
-                b.textContent = gplFile ? 'Edit as swatches' : 'Edit as glyphs';
-                b.onclick = () => { delete asText[file]; check(); show(file); };
-                bar.append(b);
+                bar.className = 'tb';
+                bar.append(iconButton(gplFile ? 'swatches' : 'glyphs',
+                    gplFile ? 'Edit as swatches' : 'Edit as glyphs',
+                    () => { delete asText[file]; check(); show(file); }));
                 host = document.createElement('div');
                 host.className = 'text-host';
                 pane.append(bar, host);
@@ -203,6 +203,8 @@ function showFont(pane, file) {
     try {
         pixels = new FontEditor(pane, {
             text: String(folder[file]), ask: ask,
+            picker: layout.picker,
+            pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),
             asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
@@ -796,7 +798,7 @@ const clockText = (ms) => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 
 function music(e) {
     const n = e.nowPlaying();
     musicOn = n.playing;
-    $('m-play').innerHTML = n.playing ? '&#x23F8;' : '&#x23F5;';
+    $('m-play').innerHTML = icon(n.playing ? 'pause' : 'play');
     $('m-now').firstChild.textContent = n.id < 0 ? 'Nothing playing' : n.title;
     $('m-now').lastChild.textContent = n.id < 0 ? '' : n.artist + ' \u2013 ' + n.album;
     $('m-time').textContent = n.id < 0 ? '' : clockText(n.ms) + ' / ' + clockText(n.length) +
@@ -821,7 +823,7 @@ function tick(accent) {
 $('m-play').onclick = () => {
     if (engine && running) { engine.musicControl(0); music(engine); } else {
         musicOn = !musicOn;
-        $('m-play').innerHTML = musicOn ? '&#x23F8;' : '&#x23F5;';
+        $('m-play').innerHTML = icon(musicOn ? 'pause' : 'play');
     }
 };
 $('m-next').onclick = () => { if (engine && running) { engine.musicControl(1); music(engine); } };
@@ -1292,6 +1294,7 @@ function toggle(k) {
     applyLayout();
 }
 
+for (const b of document.querySelectorAll('[data-icon]')) b.innerHTML = icon(b.dataset.icon);
 for (const b of document.querySelectorAll('[data-toggle]')) b.onclick = () => toggle(b.dataset.toggle);
 $('clear-output').onclick = () => { $('console').textContent = ''; };
 $('status').onclick = () => { layout.output = true; applyLayout(); };

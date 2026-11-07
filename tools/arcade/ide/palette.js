@@ -12,6 +12,8 @@
  * entry; rearranging. */
 
 import { shown } from './pixels.js';
+import { icon } from './icons.js';
+import { toolbar } from './chrome.js';
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 
@@ -28,20 +30,22 @@ export class PaletteEditor {
         const root = this.root = document.createElement('div');
         root.className = 'pal';
         root.tabIndex = 0;
-        const head = document.createElement('div');
-        head.className = 'pal-head';
-        head.textContent = opts.first
+        const bar = toolbar();
+        const note = document.createElement('span');
+        note.className = 'note grow';
+        note.textContent = opts.first
             ? 'The cart\'s palette: the colours its pictures are drawn in.'
             : 'Another palette: loadpal() shows the same pictures in these colours.';
-        const text = document.createElement('button');
-        text.textContent = 'Edit as text';
-        text.onclick = () => opts.asText();
-        head.append(' ', text);
+        bar.put(note);
+        bar.add('text', 'Edit as text', () => opts.asText());
+        const body = document.createElement('div');
+        body.className = 'pal-body';
         this.grid = document.createElement('div');
         this.grid.className = 'pal-grid';
         this.panel = document.createElement('div');
         this.panel.className = 'pal-panel';
-        root.append(head, this.grid, this.panel);
+        body.append(this.grid, this.panel);
+        root.append(bar.el, body);
         root.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT') return;
             if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.remove(); }
@@ -83,7 +87,7 @@ export class PaletteEditor {
         if (this.rgb.length < 256) {
             const plus = document.createElement('button');
             plus.className = 'pal-swatch pal-add';
-            plus.textContent = '+';
+            plus.innerHTML = icon('plus');
             plus.title = 'A new colour, the chosen one to start from';
             plus.onclick = () => this.add();
             this.grid.append(plus);

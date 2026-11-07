@@ -12,7 +12,8 @@
  * 24x16 rainbow, its bottom rows clear, as another program would;
  * "PasteEmpty@t" pastes with nothing on the clipboard, and
  * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds,
- * "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions, and
+ * "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions,
+ * "RightClick:<selector>:fx;fy@t" right-clicks a point of it, and
  * "Choose:<selector>:<value>@t" sets a choice. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
@@ -92,6 +93,19 @@ const script = `<script>
                 ev('pointermove', (fx0 + fx1) / 2, (fy0 + fy1) / 2);
                 ev('pointermove', fx1, fy1);
                 ev('pointerup', fx1, fy1);
+            }, +at);
+            continue;
+        }
+        if (key.startsWith('RightClick:')) {
+            /* RightClick:<selector>:fx;fy, as fractions of its box */
+            const [, sel, spec] = key.split(':');
+            const [fx, fy] = spec.split(';').map(Number);
+            setTimeout(() => {
+                const el = document.querySelector(sel), r = el.getBoundingClientRect();
+                const x = r.left + r.width * fx, y = r.top + r.height * fy;
+                for (const type of ['pointerdown', 'pointerup'])
+                    el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, button: 2,
+                                                             clientX: x, clientY: y }));
             }, +at);
             continue;
         }
