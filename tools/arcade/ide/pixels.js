@@ -14,7 +14,7 @@
  * as a PNG for other programs and as its palette numbers for the IDE, so
  * pasting back here is exact. */
 
-import { iconButton } from './icons.js';
+import { iconButton, toolCursor } from './icons.js';
 import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 const MARK = 'arcade-pixels ';
@@ -193,7 +193,19 @@ export class PixelEditor {
         if (tool !== 'select') this.drop();
         this.tool = tool;
         for (const [id, b] of Object.entries(this.toolButtons)) b.classList.toggle('on', id === tool);
+        this.cursor(null, false);
         this.root.focus();
+    }
+
+    /* the cursor says what a click there does: the tool's icon, the picker
+     * while Alt is held, and moving over a selection */
+    cursor(p, alt) {
+        const box = this.float || this.sel;
+        let c = toolCursor(alt ? 'pick' : this.tool);
+        if (!alt && this.tool === 'select' && p && box &&
+            p.x >= box.x && p.y >= box.y && p.x < box.x + box.w && p.y < box.y + box.h) c = 'move';
+        this.over.style.cursor = c;
+        this.lastPoint = p;
     }
 
     toggleMirror() {
@@ -625,12 +637,11 @@ export class PixelEditor {
                     moving = null;
                 }
             }
-            this.over.style.cursor = tool === 'select' ? 'move' : 'crosshair';
         });
         this.over.addEventListener('pointermove', (e) => {
             const p = this.at(e);
             this.status.textContent = this.where(p);
-            if (!down) return;
+            if (!down) { this.cursor(p, e.altKey); return; }
             const tool = this.tool;
             if (tool === 'pencil') {
                 for (const [x, y] of this.shape('line', last, p)) this.put(x, y, down.c);
@@ -670,7 +681,9 @@ export class PixelEditor {
             this.setZoom(this.zoom + (e.deltaY < 0 ? 1 : -1));
         }, { passive: false });
 
+        this.root.addEventListener('keyup', (e) => { if (e.key === 'Alt') this.cursor(this.lastPoint, false); });
         this.root.addEventListener('keydown', (e) => {
+            if (e.key === 'Alt') { this.cursor(this.lastPoint, true); e.preventDefault(); return; }
             const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
             const done = () => { e.preventDefault(); e.stopPropagation(); };
             if (ctrl && k === 'z') { done(); this.drop(); this.undoOne(!e.shiftKey); return; }

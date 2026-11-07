@@ -13,7 +13,8 @@
  * "PasteEmpty@t" pastes with nothing on the clipboard, and
  * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds,
  * "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions,
- * "RightClick:<selector>:fx;fy@t" right-clicks a point of it, and
+ * "RightClick:<selector>:fx;fy@t" right-clicks a point of it,
+ * "Hover:<selector>:fx;fy[:alt]@t" moves the pointer over one, and
  * "Choose:<selector>:<value>@t" sets a choice. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
@@ -96,6 +97,17 @@ const script = `<script>
             }, +at);
             continue;
         }
+        if (key.startsWith('Hover:')) {
+            /* Hover:<selector>:fx;fy[:alt], the pointer moved over a point of it */
+            const [, sel, spec, mod] = key.split(':');
+            const [fx, fy] = spec.split(';').map(Number);
+            setTimeout(() => {
+                const el = document.querySelector(sel), r = el.getBoundingClientRect();
+                el.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, altKey: mod === 'alt',
+                    clientX: r.left + r.width * fx, clientY: r.top + r.height * fy }));
+            }, +at);
+            continue;
+        }
         if (key.startsWith('RightClick:')) {
             /* RightClick:<selector>:fx;fy, as fractions of its box */
             const [, sel, spec] = key.split(':');
@@ -126,7 +138,11 @@ const script = `<script>
                 const ed = document.querySelector('.sheet-edit, #editor');
                 d.textContent = 'files: ' + Object.keys(window.arcadeIde.folder()).join(' ') +
                     ' | canvases: ' + (ed ? ed.querySelectorAll('canvas').length : -1) +
-                    ' | sizes: ' + [...(ed ? ed.querySelectorAll('canvas') : [])].map((c) => c.width + 'x' + c.height).join(',');
+                    ' | sizes: ' + [...(ed ? ed.querySelectorAll('canvas') : [])].map((c) => c.width + 'x' + c.height).join(',') +
+                    ' | cursor: ' + [...document.querySelectorAll('.pix-over')].map((c) => {
+                        const s = c.style.cursor, m = /path%20d%3D%22([^%]{0,10})/.exec(s);
+                        return m ? 'icon(' + m[1] + ') ' + s.slice(s.lastIndexOf(')') + 2) : s;
+                    }).join(',');
                 document.getElementById('console').append(d);
             }, +at);
             continue;

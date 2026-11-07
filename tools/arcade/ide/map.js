@@ -12,7 +12,7 @@
  * placed on whole cells unless Shift is held. */
 
 import { shown } from './pixels.js';
-import { iconButton } from './icons.js';
+import { iconButton, toolCursor } from './icons.js';
 import { sidePanel, toolbar } from './chrome.js';
 
 const MAX = 256;
@@ -201,7 +201,7 @@ export class MapEditor {
     use(tool) {
         this.tool = tool;
         for (const [id, b] of Object.entries(this.toolButtons)) b.classList.toggle('on', id === tool);
-        this.over.style.cursor = tool === 'object' ? 'default' : 'crosshair';
+        this.cursor(this.hover, false);
         this.refresh();
         this.main.focus();
     }
@@ -414,6 +414,7 @@ export class MapEditor {
         ov.addEventListener('pointermove', (e) => {
             const p = at(e), d = this.drag;
             this.hover = p;
+            if (!d) this.cursor(p, e.altKey);
             if (d && d.object) this.objectMove(p, e);
             else if (d && this.tool === 'rect') d.rect = this.cellRect(d.from, p);
             else if (d) this.paintAt(p);
@@ -434,6 +435,7 @@ export class MapEditor {
         ov.addEventListener('pointerup', end);
         ov.addEventListener('pointercancel', end);
         this.main.addEventListener('keydown', (e) => this.key(e));
+        this.main.addEventListener('keyup', (e) => { if (e.key === 'Alt') this.cursor(this.hover, false); });
     }
 
     /* the cells between two points, in map pixels */
@@ -457,18 +459,40 @@ export class MapEditor {
 
     snap(v, e) { return e.shiftKey ? v : Math.round(v / 8) * 8; }
 
-    objectDown(p, e) {
+    /* whether a point is on the chosen object's corner, to size it */
+    onHandle(p) {
         const o = this.m.objects[this.sel], z = this.zoom;
-        const near = (x, y) => Math.abs(p.px - x) * z <= 5 && Math.abs(p.py - y) * z <= 5;
-        if (o && near(o.x + Math.max(o.w || 0, 1), o.y + Math.max(o.h || 0, 1))) {
-            this.save();
-            this.drag = { object: 'size', from: p, was: Object.assign({}, o) };
-            return;
-        }
+        return !!o && Math.abs(p.px - (o.x + Math.max(o.w || 0, 1))) * z <= 5 &&
+                      Math.abs(p.py - (o.y + Math.max(o.h || 0, 1))) * z <= 5;
+    }
+
+    /* the topmost object under a point, or -1 */
+    objectAt(p) {
         let hit = -1;
         this.m.objects.forEach((q, i) => {
             if (p.px >= q.x && p.py >= q.y && p.px < q.x + Math.max(q.w || 0, 1) && p.py < q.y + Math.max(q.h || 0, 1)) hit = i;
         });
+        return hit;
+    }
+
+    /* the cursor says what a click there does: the tool's icon, the picker
+     * while Alt is held, and with Objects, place, move or size */
+    cursor(p, alt) {
+        let c = toolCursor(this.tool);
+        if (this.tool === 'object')
+            c = p && this.onHandle(p) ? 'nwse-resize' : p && this.objectAt(p) >= 0 ? 'move' : toolCursor('object');
+        else if (alt) c = toolCursor('pick');
+        this.over.style.cursor = c;
+    }
+
+    objectDown(p, e) {
+        const o = this.m.objects[this.sel];
+        if (this.onHandle(p)) {
+            this.save();
+            this.drag = { object: 'size', from: p, was: Object.assign({}, o) };
+            return;
+        }
+        const hit = this.objectAt(p);
         if (hit >= 0) {
             this.choose(hit);
             this.save();
@@ -654,6 +678,7 @@ export class MapEditor {
 
     key(e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.key === 'Alt') { this.cursor(this.hover, true); e.preventDefault(); return; }
         const k = e.key.toLowerCase(), o = this.m.objects[this.sel];
         if (e.ctrlKey || e.metaKey) {
             if (k === 'z' && !e.shiftKey) { e.preventDefault(); this.undoEdit(); }
