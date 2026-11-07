@@ -19,6 +19,9 @@ import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
+import { PaletteEditor } from './palette.js';
+import { missing, dither, medianCut } from './colours.js';
+import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
 import { ask } from './ask.js';
 import capsBdf from '../fonts/caps.bdf';
@@ -154,17 +157,148 @@ function show(file) {
     if (pixels) { pixels.destroy(); pixels = null; }
     current = file;
     const pane = $('editor');
-    if (isBinary(file)) {
+    const gplFile = /^palettes\/\w+\.gpl$/.test(file);
+    if (isBinary(file) || (gplFile && !asText[file])) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
-        showPicture(pane, file);
-    } else if (!view) {
-        pane.innerHTML = '';
-        view = new EditorView({ state: stateFor(file), parent: pane });
-    } else view.setState(stateFor(file));
+        if (gplFile) showPalette(pane, file); else showPicture(pane, file);
+    } else {
+        /* a palette as text has a bar over it to go back to the swatches */
+        if (view && (gplFile || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
+        if (!view) {
+            pane.innerHTML = '';
+            let host = pane;
+            if (gplFile) {
+                const bar = document.createElement('div');
+                bar.className = 'text-bar';
+                const b = document.createElement('button');
+                b.textContent = 'Edit as swatches';
+                b.onclick = () => { delete asText[file]; check(); show(file); };
+                bar.append(b);
+                host = document.createElement('div');
+                host.className = 'text-host';
+                pane.append(bar, host);
+            }
+            view = new EditorView({ state: stateFor(file), parent: host });
+        } else view.setState(stateFor(file));
+    }
     for (const li of $('files').querySelectorAll('li'))
         li.classList.toggle('open', li.dataset.file === file);
     mark();
+}
+
+/* palettes shown as text rather than swatches */
+const asText = {};
+
+/* every picture of the cart: its file, size and palette numbers */
+function pictures() {
+    const out = [];
+    for (const f of Object.keys(folder).filter((n) => isBinary(n))) {
+        try { const p = readPicture(folder[f]); out.push({ name: f, w: p.width, h: p.height, px: p.px }); } catch (e) { /* not ours */ }
+    }
+    return out;
+}
+
+function paletteFiles() {
+    return Object.keys(folder).filter((f) => /^palettes\/\w+\.gpl$/.test(f)).sort();
+}
+
+/* a palette in its editor. Entries moved in the cart's own palette move
+ * in every picture and in the other palettes too, so nothing looks
+ * different. */
+function showPalette(pane, file) {
+    let rgb;
+    try { rgb = parseGpl(String(folder[file])).map(([r, g, b]) => r << 16 | g << 8 | b); } catch (e) {
+        asText[file] = true;
+        say('error', file + ': ' + e.message + '. Shown as text to put right.');
+        show(file);
+        return;
+    }
+    const first = paletteFiles()[0] === file;
+    const name = file.slice(9, -4);
+    pixels = new PaletteEditor(pane, {
+        rgb: rgb, first: first, pictures: () => pictures(),
+        say: (text, bad) => say(bad ? 'error' : 'print', text),
+        asText: () => { asText[file] = true; show(file); },
+        sure: async () => await ask('Move colours?', [{
+            text: 'The pictures are rewritten so they look the same. Code that names a ' +
+                  'colour by its number -- cls(12), print(s, x, y, 7) -- is not: it will ' +
+                  'draw in whichever colour now has that number.' }], 'Move them') !== null,
+        changed: (next, order) => {
+            folder[file] = gpl(name, next);
+            delete states[file];
+            if (order && first) {
+                /* new number k was old order[k] */
+                const now = new Uint8Array(256);
+                order.forEach((old, k) => { now[old] = k; });
+                for (const p of pictures()) {
+                    for (let i = 0; i < p.px.length; i++) p.px[i] = now[p.px[i]];
+                    folder[p.name] = writePicture(p.w, p.h, p.px, next);
+                }
+                for (const other of paletteFiles().slice(1)) {
+                    try {
+                        const o = parseGpl(String(folder[other])).map(([r, g, b]) => r << 16 | g << 8 | b);
+                        folder[other] = gpl(other.slice(9, -4), order.map((k) => o[k] === undefined ? 0 : o[k]));
+                        delete states[other];
+                    } catch (e) { /* a broken palette: the build says so */ }
+                }
+            } else if (first) {
+                /* the pictures carry the palette too, for other programs */
+                for (const p of pictures()) folder[p.name] = writePicture(p.w, p.h, p.px, next);
+            }
+            changed();
+        }
+    });
+}
+
+/* The cart's own palette replaced, as when colours are added to it: its
+ * first palette file rewritten, or palettes/main.gpl made from the
+ * engine's sixteen; the pictures keep their numbers and carry the new
+ * colours for other programs. */
+function setCartPalette(rgb) {
+    const file = paletteFiles()[0] || 'palettes/main.gpl';
+    folder[file] = gpl(file.slice(9, -4), rgb);
+    delete states[file];
+    for (const p of pictures()) folder[p.name] = writePicture(p.w, p.h, p.px, rgb);
+    showFiles();
+    if (pixels && pixels.setPalette) pixels.setPalette(rgb);
+    changed();
+}
+
+/* A picture from elsewhere as palette numbers. Where its colours are not
+ * all in the palette, the owner chooses: the nearest, the nearest
+ * dithered, or new colours added -- reduced to the room the palette has.
+ * null when not wanted. */
+async function fitPicture(rgba, w, h) {
+    let rgb = palette(folder);
+    const miss = missing(rgba, rgb);
+    if (!miss.n) return toPalette(rgba, rgb).px;
+    const room = 256 - rgb.length;
+    const options = [['near', 'The nearest colours of the palette'],
+                     ['dither', 'The nearest, dithered: mixes for the shades between']];
+    if (room > 0)
+        options.push(['add', miss.n <= room ? 'Its ' + miss.n + ' colours, added to the palette'
+            : room + ' colours added to the palette, standing for its ' + miss.n]);
+    const a = await ask('Colours not in the palette', [
+        { text: miss.n + (miss.n === 1 ? ' colour' : ' colours') + ' of this picture (' + miss.pixels +
+                ' pixels) are not in the palette' + (room ? '' : ', which is full') + '.' },
+        { name: 'how', label: 'Use', options: options }], 'Use them');
+    if (!a) return null;
+    if (a.how === 'add') {
+        rgb = rgb.concat(medianCut(miss.colours, Math.min(room, miss.n)));
+        setCartPalette(rgb);
+        say('print', 'Added ' + Math.min(room, miss.n) + ' colours to the palette.');
+    }
+    return a.how === 'dither' ? dither(rgba, w, h, rgb) : toPalette(rgba, rgb).px;
+}
+
+/* the open picture saved to disk, an indexed PNG in the cart's palette */
+function exportPicture() {
+    if (!isBinary(current)) { say('error', 'Open a picture to export it.'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([folder[current]], { type: 'image/png' }));
+    a.download = current.split('/').pop();
+    a.click();
 }
 
 /* the sheet or an image in the pixel editor; a PNG that is not indexed is
@@ -183,9 +317,10 @@ function showPicture(pane, file) {
             c.width = bmp.width;
             c.height = bmp.height;
             c.getContext('2d').drawImage(bmp, 0, 0);
-            const { px, near } = toPalette(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, rgb);
-            folder[file] = writePicture(c.width, c.height, px, rgb);
-            say('print', 'Converted ' + file + (near ? ': ' + near + ' pixels took the nearest colour.' : '.'));
+            const px = await fitPicture(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+            if (!px) return;
+            folder[file] = writePicture(c.width, c.height, px, palette(folder));
+            say('print', 'Converted ' + file + '.');
             changed();
             show(file);
         };
@@ -209,12 +344,12 @@ function showPicture(pane, file) {
     const say_ = (text, bad) => say(bad ? 'error' : 'print', text);
     if (!sheet) {
         pixels = new PixelEditor(pane, { width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
-                                         changed: write, say: say_ });
+                                         changed: write, fitColours: fitPicture, say: say_ });
         pixels.root.focus();
         return;
     }
     pixels = new SheetEditor(pane, {
-        px: pic.px, rgb: rgb, flags: flags,
+        px: pic.px, rgb: rgb, flags: flags, fitColours: fitPicture,
         changed: write,
         flagsChanged: (f) => {
             const out = {};
@@ -929,7 +1064,6 @@ function addFiles() {
             if (!picture) folder[to] = text;
             else {
                 const bytes = new Uint8Array(await f.arrayBuffer());
-                const rgb = palette(folder);
                 let pic = null;
                 try { pic = /\.png$/i.test(f.name) ? readPicture(bytes) : null; } catch (e) { /* matched below */ }
                 if (pic) folder[to] = bytes;
@@ -939,9 +1073,10 @@ function addFiles() {
                     c.width = bmp.width;
                     c.height = bmp.height;
                     c.getContext('2d').drawImage(bmp, 0, 0);
-                    const { px, near } = toPalette(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, rgb);
-                    folder[to] = writePicture(c.width, c.height, px, rgb);
-                    if (near) say('print', f.name + ': ' + near + ' pixels took the nearest colour of the palette.');
+                    const px = await fitPicture(c.getContext('2d').getImageData(0, 0, c.width, c.height).data,
+                                                c.width, c.height);
+                    if (!px) continue;
+                    folder[to] = writePicture(c.width, c.height, px, palette(folder));
                 }
             }
             say('print', 'Added ' + to + '.');
@@ -1009,6 +1144,7 @@ const ACTIONS = {
     find: () => view && openSearchPanel(view),
     add: newFile,
     import: addFiles,
+    'export-picture': exportPicture,
     rename: renameFile,
     remove: removeFile,
     run: run,
@@ -1065,7 +1201,8 @@ document.addEventListener('drop', async (e) => {
     const f = e.dataTransfer.files[0];
     if (f && /\.pbg$/i.test(f.name)) openBytes(new Uint8Array(await f.arrayBuffer()), null);
     /* a picture dropped on the pixel editor goes in as a paste does */
-    else if (f && pixels && /^image\//.test(f.type)) (pixels.editor || pixels).pasteImage(f);
+    else if (f && pixels && /^image\//.test(f.type) && (pixels.editor || pixels).pasteImage)
+        (pixels.editor || pixels).pasteImage(f);
 });
 
 (async function start() {

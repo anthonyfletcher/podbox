@@ -12,7 +12,8 @@
  * 24x16 rainbow, its bottom rows clear, as another program would;
  * "PasteEmpty@t" pastes with nothing on the clipboard, and
  * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds,
- * and "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions. BROWSER names a
+ * "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions, and
+ * "Choose:<selector>:<value>@t" sets a choice. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
  * policy still serves. */
@@ -59,16 +60,20 @@ const script = `<script>
         window.arcadeIde.load(f);
     }
     window.arcadeIde.run();
+    /* fn once sel is in the page: what a step acts on may come late */
+    const there = (sel, fn, tries = 100) => {
+        const el = document.querySelector(sel);
+        if (el) fn(el); else if (tries > 0) setTimeout(() => there(sel, fn, tries - 1), 50);
+    };
     for (const k of ${JSON.stringify(keyScript.split(',').filter(Boolean))}) {
         const [key, at] = k.split('@');
         if (key.startsWith('Key:')) {
             /* Key:<selector>:<key>[:ctrl] */
             const [, sel, name, mod] = key.split(':');
-            setTimeout(() => {
-                const el = document.querySelector(sel);
+            setTimeout(() => there(sel, (el) => {
                 el.focus();
                 el.dispatchEvent(new KeyboardEvent('keydown', { key: name, ctrlKey: mod === 'ctrl', bubbles: true }));
-            }, +at);
+            }), +at);
             continue;
         }
         if (key.startsWith('Drag:')) {
@@ -83,6 +88,27 @@ const script = `<script>
                 ev('pointermove', (fx0 + fx1) / 2, (fy0 + fy1) / 2);
                 ev('pointermove', fx1, fy1);
                 ev('pointerup', fx1, fy1);
+            }, +at);
+            continue;
+        }
+        if (key.startsWith('Choose:')) {
+            /* Choose:<select selector>:<value> */
+            const [, sel, value] = key.split(':');
+            setTimeout(() => there(sel, (el) => {
+                el.value = value;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+            }), +at);
+            continue;
+        }
+        if (key === 'Dump') {
+            /* the cart's files and the open editor's state, into the console */
+            setTimeout(() => {
+                const d = document.createElement('div');
+                const ed = document.querySelector('.sheet-edit, #editor');
+                d.textContent = 'files: ' + Object.keys(window.arcadeIde.folder()).join(' ') +
+                    ' | canvases: ' + (ed ? ed.querySelectorAll('canvas').length : -1) +
+                    ' | sizes: ' + [...(ed ? ed.querySelectorAll('canvas') : [])].map((c) => c.width + 'x' + c.height).join(',');
+                document.getElementById('console').append(d);
             }, +at);
             continue;
         }
@@ -117,7 +143,7 @@ const script = `<script>
             continue;
         }
         if (key.startsWith('Click:')) {
-            setTimeout(() => document.querySelector(key.slice(6)).click(), +at);
+            setTimeout(() => there(key.slice(6), (el) => setTimeout(() => el.click(), 150)), +at);
             continue;
         }
         if (key === 'Turn') {

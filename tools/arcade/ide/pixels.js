@@ -62,7 +62,9 @@ export class PixelEditor {
      * the picture is shown, in pixels), was (another editor whose tool,
      * colours and mirror carry on), changed(px), tooBig(picture) (a
      * pasted picture wider or taller than this one: true when handled),
-     * say(text, error) */
+     * fitColours(rgba, w, h) (a picture from elsewhere as palette numbers, asking
+     * how where its colours are not in the palette; a Promise, of null if
+     * not wanted), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.w = opts.width;
@@ -465,11 +467,19 @@ export class PixelEditor {
         cv.height = bmp.height;
         const g = cv.getContext('2d');
         g.drawImage(bmp, 0, 0);
-        const { px, near } = toPalette(g.getImageData(0, 0, bmp.width, bmp.height).data, this.rgb);
+        const rgba = g.getImageData(0, 0, bmp.width, bmp.height).data;
+        const px = this.o.fitColours ? await this.o.fitColours(rgba, bmp.width, bmp.height) : toPalette(rgba, this.rgb).px;
+        if (!px) return;
         this.place({ w: bmp.width, h: bmp.height, px });
-        this.o.say('Pasted ' + bmp.width + 'x' + bmp.height + ' pixels' + (near
-            ? ': ' + near + ' were not in the palette and took the nearest colour.'
-            : ', every colour already in the palette.') + ' Move it, then press Enter or choose another tool to place it.');
+        this.o.say('Pasted ' + bmp.width + 'x' + bmp.height + ' pixels. Move it, then press Enter ' +
+                   'or choose another tool to place it.');
+    }
+
+    /* the palette changed: colours added, or set */
+    setPalette(rgb) {
+        this.rgb = rgb;
+        this.drawPalette();
+        this.render();
     }
 
     /* ---- turning and flipping: the floating picture, the selection, or all */
@@ -652,7 +662,7 @@ export class PixelEditor {
  * to fit, from its top left, as far as the sheet goes. */
 export class SheetEditor {
     /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
-     * flagsChanged(flags), say(text, error) */
+     * flagsChanged(flags), fitColours (as the PixelEditor's), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.px = opts.px;
@@ -740,12 +750,19 @@ export class SheetEditor {
                 this.o.changed(this.px);
             },
             tooBig: (pic) => this.grow(pic),
+            fitColours: this.o.fitColours,
             say: this.o.say
         });
         this.drawPicker();
         this.drawFlags();
         if (paste) this.editor.place(paste);
         this.editor.root.focus();
+    }
+
+    setPalette(rgb) {
+        this.o.rgb = rgb;
+        this.editor.setPalette(rgb);
+        this.drawPicker();
     }
 
     /* a picture too big for the block: the block widened to hold it */

@@ -210,9 +210,17 @@ show as `?`.
   same library.
 - **Pictures**: open an image to draw on it in palette colours. The
   sprite sheet opens as a picker: click a sprite, or drag across several,
-  to draw on them, and set the chosen sprites' flags. Paste a picture from any program, or drop one on the editor:
-  colours not in the palette take the nearest, and the console says how
-  many. Copy puts the selection on the clipboard for other programs too.
+  to draw on them, and set the chosen sprites' flags. Paste a picture
+  from any program, or drop one on the editor: where its colours are not
+  in the palette, choose the nearest, the nearest dithered, or to add them
+  to the palette (as many as it has room for, chosen to stand for the
+  rest). Copy puts the selection on the clipboard for other programs too,
+  and File > Export picture saves the open one.
+- **Palettes**: open one to set its colours, shown as the player shows
+  them; colours no picture uses are marked, and two that look the same on
+  the player are pointed out. Moving and sorting colours rewrites the
+  pictures so they look the same -- but code naming a colour by number
+  draws whichever colour now has that number.
 - **Errors** are marked in the code as you type. A runtime error stops the
   cart, marks its line and opens the file at it.
 - **Hints**: inside a call, the function's arguments show with the one

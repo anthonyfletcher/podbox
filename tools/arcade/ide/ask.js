@@ -5,8 +5,9 @@
  *
  * fields: { name, label, value } for text; with options ([[value, label],
  * ...]) a choice; with type 'number' a number; with note, text under it;
- * with when(answers), shown only while that holds. No fields asks only to
- * confirm: the answer is {} for ok, null otherwise. */
+ * with when(answers), shown only while that holds; { text } is a paragraph
+ * to read. No fields asks only to confirm: the answer is {} for ok, null
+ * otherwise. */
 
 export function ask(title, fields, ok) {
     return new Promise((done) => {
@@ -20,6 +21,13 @@ export function ask(title, fields, ok) {
         const inputs = {};
         const rows = [];
         for (const f of fields || []) {
+            if (f.text) {
+                const p = document.createElement('p');
+                p.className = 'ask-text';
+                p.textContent = f.text;
+                form.append(p);
+                continue;
+            }
             const row = document.createElement('label');
             row.className = 'ask-row';
             const label = document.createElement('span');
