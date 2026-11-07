@@ -10,7 +10,7 @@ import { lz4Decompress } from './lz4.js';
 import { encodeIndexedPng } from './png.js';
 
 /* The engine's sixteen, for a cart without palettes */
-const DEFAULT_RGB = [
+export const DEFAULT_RGB = [
     0x000000, 0x1a2244, 0x6b2a5e, 0x0f6640, 0x8a5236, 0x4f4a52, 0xb8b4bc,
     0xf6f2ea, 0xe8304a, 0xf5962a, 0xf8e43c, 0x3cd250, 0x2f9cf0, 0x7e7aa8,
     0xf27ab4, 0xf9c89a

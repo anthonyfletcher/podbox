@@ -1,0 +1,676 @@
+/* The pixel editor: a picture of palette numbers -- the sheet, or one of
+ * the cart's images -- drawn on, a pixel at a time or by shape, with undo.
+ *
+ * Parts: the picture and its palette; drawing it, zoomed, with the grids,
+ * the selection and anything floating; the tools; the selection, and
+ * copying and pasting, within the IDE and with other programs; the
+ * keys; the sheet's flags.
+ *
+ * A picture pasted from another program has its colours matched to the
+ * palette: exactly where a colour is in it, else to the nearest, and the
+ * editor says how many were approximated. Copied out, the selection goes
+ * as a PNG for other programs and as its palette numbers for the IDE, so
+ * pasting back here is exact. */
+
+const MARK = 'arcade-pixels ';
+const MAX_UNDO = 100;
+
+/* The colour the player shows for an entry: RGB565, widened again */
+export function shown(c) {
+    const r = (c >> 16) & 0xf8, g = (c >> 8) & 0xfc, b = c & 0xf8;
+    return (r | r >> 5) << 16 | (g | g >> 6) << 8 | (b | b >> 5);
+}
+
+/* the palette entry nearest a colour, weighting the channels as the eye
+ * does (the "redmean" distance) */
+function nearest(rgb, r, g, b) {
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < rgb.length; i++) {
+        const c = rgb[i], cr = c >> 16 & 255, cg = c >> 8 & 255, cb = c & 255;
+        const rm = (r + cr) / 2, dr = r - cr, dg = g - cg, db = b - cb;
+        const d = (2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db;
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+/* RGBA pixels as palette numbers: exact colours as they are, transparent
+ * ones as 0, the rest to the nearest; and how many of each */
+export function toPalette(rgba, rgb) {
+    const exact = new Map();
+    rgb.forEach((c, i) => { if (!exact.has(c)) exact.set(c, i); });
+    const shownExact = new Map();
+    rgb.forEach((c, i) => { if (!shownExact.has(shown(c))) shownExact.set(shown(c), i); });
+    const px = new Uint8Array(rgba.length / 4);
+    let near = 0;
+    for (let i = 0; i < px.length; i++) {
+        const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
+        if (rgba[i * 4 + 3] < 128) { px[i] = 0; continue; }
+        const c = r << 16 | g << 8 | b;
+        if (exact.has(c)) px[i] = exact.get(c);
+        else if (shownExact.has(c)) px[i] = shownExact.get(c);
+        else { px[i] = nearest(rgb, r, g, b); near++; }
+    }
+    return { px, near };
+}
+
+export class PixelEditor {
+    /* opts: width, height, px (Uint8Array), rgb (the palette, 0xRRGGBB),
+     * sheet (the 8x8 grid, sprite numbers and flags), flags (the sheet's
+     * 256), changed(px), flagsChanged(flags), say(text, error) */
+    constructor(parent, opts) {
+        this.o = opts;
+        this.w = opts.width;
+        this.h = opts.height;
+        this.px = opts.px;
+        this.rgb = opts.rgb;
+        this.colour = [Math.min(7, this.rgb.length - 1), 0];
+        this.tool = 'pencil';
+        this.zoom = Math.max(1, Math.min(16, Math.floor(560 / Math.max(this.w, this.h))));
+        this.undo = [];
+        this.redo = [];
+        this.sel = null;          /* { x, y, w, h } */
+        this.float = null;        /* { x, y, w, h, px } over the picture */
+        this.mirror = false;
+        this.sprite = 0;
+        this.build(parent);
+        this.render();
+    }
+
+    /* ---- the page ---------------------------------------------------- */
+
+    build(parent) {
+        const root = this.root = document.createElement('div');
+        root.className = 'pix';
+        root.tabIndex = 0;
+        const tools = [['pencil', 'Pencil', 'P'], ['line', 'Line', 'L'], ['rect', 'Box', 'R'],
+                       ['oval', 'Oval', 'O'], ['fill', 'Fill', 'F'], ['pick', 'Pick', 'I'],
+                       ['select', 'Select', 'S']];
+        const bar = document.createElement('div');
+        bar.className = 'pix-tools';
+        this.toolButtons = {};
+        for (const [id, name, key] of tools) {
+            const b = document.createElement('button');
+            b.textContent = name;
+            b.title = ({ Box: 'Rectangle', Pick: 'Colour picker; Alt+click picks with any tool' }[name] || name) + ' (' + key + ')' + (id === 'rect' || id === 'oval' ? '; Shift fills' : '');
+            b.onclick = () => this.use(id);
+            this.toolButtons[id] = b;
+            bar.append(b);
+        }
+        const sep = () => { const s = document.createElement('span'); s.className = 'sep'; bar.append(s); };
+        sep();
+        const act = (label, title, fn) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.title = title;
+            b.onclick = () => { fn(); this.root.focus(); };
+            bar.append(b);
+            return b;
+        };
+        this.mirrorButton = act('Mirror', 'Draw both halves at once (M)', () => this.toggleMirror());
+        act('Flip ↔', 'Flip across (H)', () => this.flip(true));
+        act('Flip ↕', 'Flip down (V)', () => this.flip(false));
+        act('Turn', 'Turn a quarter clockwise (T)', () => this.turn());
+        sep();
+        act('−', 'Zoom out (-)', () => this.setZoom(this.zoom - 1));
+        act('+', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
+        root.append(bar);
+
+        const area = this.area = document.createElement('div');
+        area.className = 'pix-area';
+        const stack = this.stack = document.createElement('div');
+        stack.className = 'pix-stack';
+        this.canvas = document.createElement('canvas');
+        this.over = document.createElement('canvas');
+        this.over.className = 'pix-over';
+        stack.append(this.canvas, this.over);
+        area.append(stack);
+        root.append(area);
+
+        this.status = document.createElement('div');
+        this.status.className = 'pix-status';
+        root.append(this.status);
+
+        this.swatches = document.createElement('div');
+        this.swatches.className = 'pix-palette';
+        root.append(this.swatches);
+
+        if (this.o.sheet) {
+            this.flagRow = document.createElement('div');
+            this.flagRow.className = 'pix-flags';
+            root.append(this.flagRow);
+        }
+        parent.append(root);
+
+        this.image = new ImageData(this.w, this.h);
+        this.listen();
+        this.use('pencil');
+        this.drawPalette();
+        this.drawFlags();
+        this.setZoom(this.zoom);
+    }
+
+    destroy() {
+        document.removeEventListener('paste', this.onPaste);
+        this.root.remove();
+    }
+
+    setZoom(z) {
+        this.zoom = Math.max(1, Math.min(32, z));
+        for (const c of [this.canvas, this.over]) {
+            c.width = this.w * this.zoom;
+            c.height = this.h * this.zoom;
+        }
+        this.render();
+    }
+
+    use(tool) {
+        if (tool !== 'select') this.drop();
+        this.tool = tool;
+        for (const [id, b] of Object.entries(this.toolButtons)) b.classList.toggle('on', id === tool);
+        this.root.focus();
+    }
+
+    toggleMirror() {
+        this.mirror = !this.mirror;
+        this.mirrorButton.classList.toggle('on', this.mirror);
+    }
+
+    drawPalette() {
+        this.swatches.innerHTML = '';
+        this.rgb.forEach((c, i) => {
+            const s = document.createElement('button');
+            s.className = 'swatch';
+            s.style.background = '#' + shown(c).toString(16).padStart(6, '0');
+            s.title = i + ': #' + c.toString(16).padStart(6, '0') +
+                ' (left click draws with it, right click is the second colour)';
+            s.classList.toggle('first', i === this.colour[0]);
+            s.classList.toggle('second', i === this.colour[1]);
+            s.onclick = () => { this.colour[0] = i; this.drawPalette(); };
+            s.oncontextmenu = (e) => { e.preventDefault(); this.colour[1] = i; this.drawPalette(); };
+            this.swatches.append(s);
+        });
+    }
+
+    /* ---- drawing it -------------------------------------------------- */
+
+    render() {
+        const d = this.image.data;
+        for (let i = 0; i < this.px.length; i++) {
+            const c = shown(this.rgb[this.px[i]] || 0);
+            d[i * 4] = c >> 16; d[i * 4 + 1] = c >> 8 & 255; d[i * 4 + 2] = c & 255; d[i * 4 + 3] = 255;
+        }
+        const tmp = this.tmp || (this.tmp = document.createElement('canvas'));
+        tmp.width = this.w;
+        tmp.height = this.h;
+        tmp.getContext('2d').putImageData(this.image, 0, 0);
+        const g = this.canvas.getContext('2d');
+        g.imageSmoothingEnabled = false;
+        g.drawImage(tmp, 0, 0, this.w * this.zoom, this.h * this.zoom);
+        this.overlay();
+    }
+
+    /* the grids, the selection, a floating picture and a shape's preview */
+    overlay(preview) {
+        const g = this.over.getContext('2d'), z = this.zoom;
+        g.clearRect(0, 0, this.over.width, this.over.height);
+        if (z >= 6) {
+            g.strokeStyle = 'rgba(128,128,128,0.25)';
+            g.beginPath();
+            for (let x = 1; x < this.w; x++) { g.moveTo(x * z + 0.5, 0); g.lineTo(x * z + 0.5, this.h * z); }
+            for (let y = 1; y < this.h; y++) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
+            g.stroke();
+        }
+        if (this.o.sheet) {
+            g.strokeStyle = 'rgba(128,128,128,0.6)';
+            g.beginPath();
+            for (let x = 8; x < this.w; x += 8) { g.moveTo(x * z + 0.5, 0); g.lineTo(x * z + 0.5, this.h * z); }
+            for (let y = 8; y < this.h; y += 8) { g.moveTo(0, y * z + 0.5); g.lineTo(this.w * z, y * z + 0.5); }
+            g.stroke();
+            const sx = (this.sprite % 16) * 8, sy = (this.sprite >> 4) * 8;
+            g.strokeStyle = '#ffd23c';
+            g.lineWidth = 2;
+            g.strokeRect(sx * z + 1, sy * z + 1, 8 * z - 2, 8 * z - 2);
+            g.lineWidth = 1;
+        }
+        const pixel = (x, y, c) => {
+            const s = shown(this.rgb[c] || 0);
+            g.fillStyle = '#' + s.toString(16).padStart(6, '0');
+            g.fillRect(x * z, y * z, z, z);
+        };
+        if (this.float) {
+            const f = this.float;
+            for (let y = 0; y < f.h; y++)
+                for (let x = 0; x < f.w; x++) pixel(f.x + x, f.y + y, f.px[y * f.w + x]);
+        }
+        if (preview) for (const [x, y, c] of preview) pixel(x, y, c);
+        const box = this.float || this.sel;
+        if (box) {
+            g.setLineDash([4, 3]);
+            g.strokeStyle = '#ffffff';
+            g.strokeRect(box.x * z + 0.5, box.y * z + 0.5, box.w * z - 1, box.h * z - 1);
+            g.strokeStyle = '#000000';
+            g.lineDashOffset = 3;
+            g.strokeRect(box.x * z + 0.5, box.y * z + 0.5, box.w * z - 1, box.h * z - 1);
+            g.setLineDash([]);
+            g.lineDashOffset = 0;
+        }
+    }
+
+    /* ---- changing it ------------------------------------------------- */
+
+    keep() {
+        this.undo.push(this.px.slice());
+        if (this.undo.length > MAX_UNDO) this.undo.shift();
+        this.redo = [];
+    }
+
+    changed() {
+        this.render();
+        this.o.changed(this.px);
+    }
+
+    undoOne(back) {
+        const from = back ? this.undo : this.redo, to = back ? this.redo : this.undo;
+        if (!from.length) return;
+        to.push(this.px.slice());
+        this.px.set(from.pop());
+        this.float = null;
+        this.changed();
+    }
+
+    put(x, y, c) {
+        if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+        this.px[y * this.w + x] = c;
+        if (this.mirror) {
+            /* across the middle of the sprite, on the sheet; of the picture otherwise */
+            const mx = this.o.sheet ? (x & ~7) + 7 - (x & 7) : this.w - 1 - x;
+            this.px[y * this.w + mx] = c;
+        }
+    }
+
+    at(e) {
+        const r = this.canvas.getBoundingClientRect();
+        return { x: Math.floor((e.clientX - r.left) / this.zoom), y: Math.floor((e.clientY - r.top) / this.zoom) };
+    }
+
+    /* the pixels of a shape from a to b: a line, or a rectangle's or an
+     * oval's outline or fill */
+    shape(kind, a, b, filled) {
+        const out = [];
+        if (kind === 'line') {
+            let x = a.x, y = a.y;
+            const dx = Math.abs(b.x - x), dy = -Math.abs(b.y - y), sx = x < b.x ? 1 : -1, sy = y < b.y ? 1 : -1;
+            let err = dx + dy;
+            for (;;) {
+                out.push([x, y]);
+                if (x === b.x && y === b.y) break;
+                const e2 = 2 * err;
+                if (e2 >= dy) { err += dy; x += sx; }
+                if (e2 <= dx) { err += dx; y += sy; }
+            }
+            return out;
+        }
+        const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+        if (kind === 'rect') {
+            for (let y = y0; y <= y1; y++)
+                for (let x = x0; x <= x1; x++)
+                    if (filled || x === x0 || x === x1 || y === y0 || y === y1) out.push([x, y]);
+            return out;
+        }
+        /* the oval inside the box: each row's span, and the outline as the
+         * pixels of the filled shape with an edge outside it */
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2 + 0.5, ry = (y1 - y0) / 2 + 0.5;
+        const inside = (x, y) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+        for (let y = y0; y <= y1; y++)
+            for (let x = x0; x <= x1; x++)
+                if (inside(x, y) && (filled || !inside(x - 1, y) || !inside(x + 1, y) ||
+                                     !inside(x, y - 1) || !inside(x, y + 1)))
+                    out.push([x, y]);
+        return out;
+    }
+
+    flood(x, y, c) {
+        if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+        const from = this.px[y * this.w + x];
+        if (from === c) return;
+        const stack = [[x, y]];
+        while (stack.length) {
+            const [px, py] = stack.pop();
+            if (px < 0 || py < 0 || px >= this.w || py >= this.h || this.px[py * this.w + px] !== from) continue;
+            this.px[py * this.w + px] = c;
+            stack.push([px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]);
+        }
+    }
+
+    /* ---- the selection, and the clipboard ---------------------------- */
+
+    /* the pixels under a box */
+    grab(b) {
+        const out = new Uint8Array(b.w * b.h);
+        for (let y = 0; y < b.h; y++)
+            for (let x = 0; x < b.w; x++) out[y * b.w + x] = this.px[(b.y + y) * this.w + b.x + x];
+        return out;
+    }
+
+    /* a floating picture written down where it is */
+    drop() {
+        const f = this.float;
+        if (!f) return;
+        this.float = null;
+        for (let y = 0; y < f.h; y++)
+            for (let x = 0; x < f.w; x++) {
+                const tx = f.x + x, ty = f.y + y;
+                if (tx >= 0 && ty >= 0 && tx < this.w && ty < this.h) this.px[ty * this.w + tx] = f.px[y * f.w + x];
+            }
+        this.sel = { x: f.x, y: f.y, w: f.w, h: f.h };
+        this.changed();
+    }
+
+    /* the selection lifted off the picture to move, leaving colour 0 */
+    lift() {
+        if (this.float || !this.sel) return;
+        this.keep();
+        const s = this.sel;
+        this.float = { ...s, px: this.grab(s) };
+        for (let y = 0; y < s.h; y++) this.px.fill(0, (s.y + y) * this.w + s.x, (s.y + y) * this.w + s.x + s.w);
+        this.sel = null;
+    }
+
+    /* what copy takes: the floating picture, the selection, or all */
+    copied() {
+        if (this.float) return { w: this.float.w, h: this.float.h, px: this.float.px.slice() };
+        const b = this.sel || { x: 0, y: 0, w: this.w, h: this.h };
+        return { w: b.w, h: b.h, px: this.grab(b) };
+    }
+
+    async copy() {
+        const c = this.copied();
+        PixelEditor.clip = c;
+        /* for other programs a PNG; for the IDE, the palette numbers */
+        try {
+            const cv = document.createElement('canvas');
+            cv.width = c.w;
+            cv.height = c.h;
+            const im = new ImageData(c.w, c.h);
+            for (let i = 0; i < c.px.length; i++) {
+                const s = shown(this.rgb[c.px[i]] || 0);
+                im.data[i * 4] = s >> 16; im.data[i * 4 + 1] = s >> 8 & 255; im.data[i * 4 + 2] = s & 255;
+                im.data[i * 4 + 3] = c.px[i] === 0 ? 0 : 255;
+            }
+            cv.getContext('2d').putImageData(im, 0, 0);
+            const png = await new Promise((done) => cv.toBlob(done, 'image/png'));
+            const text = new Blob([MARK + JSON.stringify({ w: c.w, h: c.h, px: Array.from(c.px) })],
+                                  { type: 'text/plain' });
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': png, 'text/plain': text })]);
+            this.o.say('Copied ' + c.w + 'x' + c.h + ' pixels.');
+        } catch (e) {
+            this.o.say('Copied ' + c.w + 'x' + c.h + ' pixels, for pasting in the IDE: the browser would not ' +
+                       'put them on the clipboard for other programs (' + e.message + ').');
+        }
+    }
+
+    cut() {
+        this.copy();
+        this.erase();
+    }
+
+    erase() {
+        if (this.float) { this.float = null; this.render(); return; }
+        if (!this.sel) return;
+        this.keep();
+        const s = this.sel;
+        for (let y = 0; y < s.h; y++) this.px.fill(0, (s.y + y) * this.w + s.x, (s.y + y) * this.w + s.x + s.w);
+        this.changed();
+    }
+
+    /* a picture placed floating at the selection's corner, or where the
+     * view is, to be moved and then dropped */
+    place(c) {
+        this.drop();
+        this.keep();
+        this.use('select');
+        const view = this.area.getBoundingClientRect(), r = this.canvas.getBoundingClientRect();
+        const x = this.sel ? this.sel.x : Math.max(0, Math.floor((view.left - r.left) / this.zoom));
+        const y = this.sel ? this.sel.y : Math.max(0, Math.floor((view.top - r.top) / this.zoom));
+        this.float = { x, y, w: c.w, h: c.h, px: c.px };
+        this.sel = null;
+        this.render();
+    }
+
+    async pasteEvent(e) {
+        const data = e.clipboardData;
+        const text = data && data.getData('text/plain');
+        if (text && text.startsWith(MARK)) {
+            e.preventDefault();
+            const c = JSON.parse(text.slice(MARK.length));
+            this.place({ w: c.w, h: c.h, px: Uint8Array.from(c.px) });
+            return;
+        }
+        const file = data && [...data.items].find((i) => i.kind === 'file' && /^image\//.test(i.type));
+        if (file) {
+            e.preventDefault();
+            await this.pasteImage(file.getAsFile());
+            return;
+        }
+        if (PixelEditor.clip) {
+            e.preventDefault();
+            this.place(PixelEditor.clip);
+        }
+    }
+
+    /* a picture from another program: its colours matched to the palette */
+    async pasteImage(blob) {
+        let bmp;
+        try { bmp = await createImageBitmap(blob); } catch (e) {
+            this.o.say('That picture could not be read: ' + e.message, true);
+            return;
+        }
+        const cv = document.createElement('canvas');
+        cv.width = bmp.width;
+        cv.height = bmp.height;
+        const g = cv.getContext('2d');
+        g.drawImage(bmp, 0, 0);
+        const { px, near } = toPalette(g.getImageData(0, 0, bmp.width, bmp.height).data, this.rgb);
+        this.place({ w: bmp.width, h: bmp.height, px });
+        this.o.say('Pasted ' + bmp.width + 'x' + bmp.height + ' pixels' + (near
+            ? ': ' + near + ' were not in the palette and took the nearest colour.'
+            : ', every colour already in the palette.') + ' Move it, then press Enter or choose another tool to place it.');
+    }
+
+    /* ---- turning and flipping: the floating picture, the selection, or all */
+
+    target() {
+        if (this.sel && !this.float) this.lift();
+        if (this.float) return this.float;
+        this.keep();
+        return { x: 0, y: 0, w: this.w, h: this.h, px: this.px, whole: true };
+    }
+
+    flip(across) {
+        const t = this.target(), out = new Uint8Array(t.px.length);
+        for (let y = 0; y < t.h; y++)
+            for (let x = 0; x < t.w; x++)
+                out[y * t.w + x] = t.px[across ? y * t.w + (t.w - 1 - x) : (t.h - 1 - y) * t.w + x];
+        t.px.set(out);
+        if (t.whole) this.changed(); else this.render();
+    }
+
+    turn() {
+        const t = this.target();
+        if (t.whole && t.w !== t.h) {
+            this.undo.pop();
+            this.o.say('Only a square picture turns whole; select a part of it to turn.', true);
+            return;
+        }
+        const out = new Uint8Array(t.px.length);
+        for (let y = 0; y < t.h; y++)
+            for (let x = 0; x < t.w; x++) out[x * t.h + (t.h - 1 - y)] = t.px[y * t.w + x];
+        t.px.set(out);
+        if (t.whole) { this.changed(); return; }
+        [t.w, t.h] = [t.h, t.w];
+        this.render();
+    }
+
+    /* ---- the pointer and the keys ------------------------------------ */
+
+    listen() {
+        let down = null, last = null, moving = null;
+        this.over.addEventListener('contextmenu', (e) => e.preventDefault());
+        this.over.addEventListener('pointerdown', (e) => {
+            this.root.focus();
+            try { this.over.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
+            const p = this.at(e), c = this.colour[e.button === 2 ? 1 : 0];
+            down = { p, c, shift: e.shiftKey };
+            last = p;
+            if (this.o.sheet && p.x >= 0 && p.y >= 0 && p.x < this.w && p.y < this.h) {
+                this.sprite = (p.y >> 3) * 16 + (p.x >> 3);
+                this.drawFlags();
+            }
+            const tool = e.altKey ? 'pick' : this.tool;
+            if (tool === 'pick') {
+                const v = this.px[p.y * this.w + p.x];
+                if (v !== undefined) { this.colour[e.button === 2 ? 1 : 0] = v; this.drawPalette(); }
+                down = null;
+            } else if (tool === 'fill') {
+                this.keep();
+                this.flood(p.x, p.y, c);
+                this.changed();
+                down = null;
+            } else if (tool === 'pencil') {
+                this.keep();
+                this.put(p.x, p.y, c);
+                this.render();
+            } else if (tool === 'select') {
+                const box = this.float || this.sel;
+                if (box && p.x >= box.x && p.y >= box.y && p.x < box.x + box.w && p.y < box.y + box.h) {
+                    this.lift();
+                    moving = { dx: p.x - this.float.x, dy: p.y - this.float.y };
+                } else {
+                    this.drop();
+                    this.sel = null;
+                    moving = null;
+                }
+            }
+            this.over.style.cursor = tool === 'select' ? 'move' : 'crosshair';
+        });
+        this.over.addEventListener('pointermove', (e) => {
+            const p = this.at(e);
+            this.status.textContent = this.where(p);
+            if (!down) return;
+            const tool = this.tool;
+            if (tool === 'pencil') {
+                for (const [x, y] of this.shape('line', last, p)) this.put(x, y, down.c);
+                last = p;
+                this.render();
+            } else if (tool === 'line' || tool === 'rect' || tool === 'oval') {
+                this.overlay(this.shape(tool, down.p, p, e.shiftKey).map(([x, y]) => [x, y, down.c]));
+            } else if (tool === 'select') {
+                if (moving) {
+                    this.float.x = p.x - moving.dx;
+                    this.float.y = p.y - moving.dy;
+                } else {
+                    const x0 = Math.max(0, Math.min(down.p.x, p.x)), y0 = Math.max(0, Math.min(down.p.y, p.y));
+                    const x1 = Math.min(this.w - 1, Math.max(down.p.x, p.x)), y1 = Math.min(this.h - 1, Math.max(down.p.y, p.y));
+                    this.sel = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+                }
+                this.overlay();
+            }
+        });
+        const up = (e) => {
+            if (!down) return;
+            const p = this.at(e), tool = this.tool;
+            if (tool === 'pencil') this.o.changed(this.px);
+            else if (tool === 'line' || tool === 'rect' || tool === 'oval') {
+                this.keep();
+                for (const [x, y] of this.shape(tool, down.p, p, e.shiftKey)) this.put(x, y, down.c);
+                this.changed();
+            }
+            down = null;
+            moving = null;
+        };
+        this.over.addEventListener('pointerup', up);
+        this.over.addEventListener('pointercancel', up);
+        this.area.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            this.setZoom(this.zoom + (e.deltaY < 0 ? 1 : -1));
+        }, { passive: false });
+
+        this.root.addEventListener('keydown', (e) => {
+            const ctrl = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+            const done = () => { e.preventDefault(); e.stopPropagation(); };
+            if (ctrl && k === 'z') { done(); this.drop(); this.undoOne(!e.shiftKey); return; }
+            if (ctrl && k === 'y') { done(); this.undoOne(false); return; }
+            if (ctrl && k === 'c') { done(); this.copy(); return; }
+            if (ctrl && k === 'x') { done(); this.cut(); return; }
+            if (ctrl && k === 'a') { done(); this.drop(); this.use('select'); this.sel = { x: 0, y: 0, w: this.w, h: this.h }; this.overlay(); return; }
+            if (ctrl) return;   /* Ctrl+V arrives as the paste event */
+            const keys = { p: 'pencil', l: 'line', r: 'rect', o: 'oval', f: 'fill', i: 'pick', s: 'select' };
+            if (keys[k]) { done(); this.use(keys[k]); return; }
+            if (k === 'm') { done(); this.toggleMirror(); return; }
+            if (k === 'h') { done(); this.flip(true); return; }
+            if (k === 'v') { done(); this.flip(false); return; }
+            if (k === 't') { done(); this.turn(); return; }
+            if (k === '+' || k === '=') { done(); this.setZoom(this.zoom + 1); return; }
+            if (k === '-') { done(); this.setZoom(this.zoom - 1); return; }
+            if (k === 'delete' || k === 'backspace') { done(); this.erase(); return; }
+            if (k === 'enter') { done(); this.drop(); return; }
+            if (k === 'escape') {
+                done();
+                if (this.float) { this.float = null; this.undoOne(true); }
+                this.sel = null;
+                this.render();
+                return;
+            }
+            const arrows = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] };
+            if (arrows[k] && (this.float || this.sel)) {
+                done();
+                if (!this.float) this.lift();
+                this.float.x += arrows[k][0];
+                this.float.y += arrows[k][1];
+                this.overlay();
+            }
+        });
+        this.onPaste = (e) => {
+            if (this.root.isConnected && (document.activeElement === this.root || this.root.contains(document.activeElement)))
+                this.pasteEvent(e);
+        };
+        document.addEventListener('paste', this.onPaste);
+    }
+
+    where(p) {
+        if (p.x < 0 || p.y < 0 || p.x >= this.w || p.y >= this.h) return '';
+        const v = this.px[p.y * this.w + p.x];
+        let s = 'x ' + p.x + ', y ' + p.y + ': colour ' + v;
+        if (this.o.sheet) s += '; sprite ' + ((p.y >> 3) * 16 + (p.x >> 3));
+        if (this.sel || this.float) {
+            const b = this.float || this.sel;
+            s += '; selection ' + b.w + 'x' + b.h;
+        }
+        return s;
+    }
+
+    /* the flags of the sprite last clicked on */
+    drawFlags() {
+        if (!this.flagRow) return;
+        const f = this.o.flags;
+        this.flagRow.innerHTML = '';
+        const label = document.createElement('span');
+        label.textContent = 'Sprite ' + this.sprite + ' flags';
+        this.flagRow.append(label);
+        for (let b = 0; b < 8; b++) {
+            const t = document.createElement('button');
+            t.textContent = b;
+            t.title = 'flag ' + b + ': fget(' + this.sprite + ', ' + b + ')';
+            t.classList.toggle('on', (f[this.sprite] >> b & 1) === 1);
+            t.onclick = () => {
+                f[this.sprite] ^= 1 << b;
+                this.o.flagsChanged(f);
+                this.drawFlags();
+            };
+            this.flagRow.append(t);
+        }
+        this.overlay();
+    }
+}

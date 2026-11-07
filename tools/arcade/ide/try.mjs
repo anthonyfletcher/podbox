@@ -8,7 +8,10 @@
  * Enter at 500 ms of the run and the wheel's down at 800; "Turn@1000"
  * drags a quarter turn clockwise round the drawn wheel, and
  * "Click:<selector>@t" clicks what the selector finds, and "Mark@t" puts
- * the editor's cursor at the word HERE. BROWSER names a
+ * the editor's cursor at the word HERE, and "PasteImage@t" pastes a
+ * 24x16 rainbow, its bottom rows clear, as another program would;
+ * "PasteEmpty@t" pastes with nothing on the clipboard, and
+ * "Key:<selector>:<key>[:ctrl]@t" presses a key on what the selector finds. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
  * policy still serves. */
@@ -57,6 +60,38 @@ const script = `<script>
     window.arcadeIde.run();
     for (const k of ${JSON.stringify(keyScript.split(',').filter(Boolean))}) {
         const [key, at] = k.split('@');
+        if (key.startsWith('Key:')) {
+            /* Key:<selector>:<key>[:ctrl] */
+            const [, sel, name, mod] = key.split(':');
+            setTimeout(() => {
+                const el = document.querySelector(sel);
+                el.focus();
+                el.dispatchEvent(new KeyboardEvent('keydown', { key: name, ctrlKey: mod === 'ctrl', bubbles: true }));
+            }, +at);
+            continue;
+        }
+        if (key === 'PasteEmpty') {
+            setTimeout(() => {
+                document.querySelector('.pix').focus();
+                document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: new DataTransfer() }));
+            }, +at);
+            continue;
+        }
+        if (key === 'PasteImage') {
+            setTimeout(async () => {
+                const c = document.createElement('canvas');
+                c.width = 24; c.height = 16;
+                const g = c.getContext('2d');
+                for (let x = 0; x < 24; x++) { g.fillStyle = 'hsl(' + x * 15 + ',80%,55%)'; g.fillRect(x, 0, 1, 16); }
+                g.clearRect(0, 12, 24, 4);
+                const blob = await new Promise((d) => c.toBlob(d, 'image/png'));
+                const dt = new DataTransfer();
+                dt.items.add(new File([blob], 'p.png', { type: 'image/png' }));
+                document.querySelector('.pix').focus();
+                document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt }));
+            }, +at);
+            continue;
+        }
         if (key === 'Mark') {
             setTimeout(() => {
                 const v = window.arcadeIde.view(), at = v.state.doc.toString().indexOf('HERE');

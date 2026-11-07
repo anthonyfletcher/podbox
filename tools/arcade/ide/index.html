@@ -47,6 +47,26 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #play { display: flex; align-items: center; gap: 8px; width: 320px; }
 #play button { padding: 3px 12px; }
 #rate { font-size: 12px; color: var(--dim); white-space: pre-line; }
+.pix { display: flex; flex-direction: column; height: 100%; outline: none; }
+.pix-tools { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); }
+.pix-tools button { padding: 3px 9px; font-size: 13px; }
+.pix-tools button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pix-tools .sep { width: 10px; }
+.pix-area { flex: 1; overflow: auto; padding: 12px; background:
+            repeating-conic-gradient(var(--bg) 0 25%, var(--panel) 0 50%) 0 0 / 16px 16px; }
+.pix-stack { position: relative; display: inline-block; }
+.pix-stack canvas { display: block; image-rendering: pixelated; }
+.pix-over { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none; }
+.pix-status { font: 12px ui-monospace, Consolas, monospace; color: var(--dim); padding: 4px 10px;
+              min-height: 1.6em; border-top: 1px solid var(--line); }
+.pix-palette { display: flex; flex-wrap: wrap; gap: 3px; padding: 6px 10px; }
+.swatch { width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 2px solid transparent; }
+.swatch.first { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+.swatch.second { outline: 2px dashed var(--dim); outline-offset: 1px; }
+.pix-flags { display: flex; align-items: center; gap: 4px; padding: 4px 10px 10px; font-size: 13px; }
+.pix-flags span { margin-right: 6px; color: var(--dim); }
+.pix-flags button { width: 28px; padding: 3px 0; font-size: 12px; }
+.pix-flags button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
          border-radius: 10px; max-width: 520px; }
 dialog h2 { margin-top: 0; font-size: 16px; }

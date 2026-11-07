@@ -5,7 +5,9 @@
 import { deflateSync, inflateSync, unzlibSync, zlibSync } from 'fflate';
 import { compile } from '../src/compiler.js';
 import { parseOpcodes, parseApi } from '../src/defs.js';
-import { unpackCart } from '../src/unpack.js';
+import { unpackCart, DEFAULT_RGB } from '../src/unpack.js';
+import { parseGpl } from '../src/assets.js';
+import { decodeIndexedPng, encodeIndexedPng } from '../src/png.js';
 import { compileInput, isBinary } from '../src/folder.js';
 import opcodesText from '../../../apps-ipod/games/arcade/opcodes.def';
 import apiText from '../../../apps-ipod/games/arcade/arcade_api.def';
@@ -27,6 +29,27 @@ export function open(bytes) {
     for (const name of Object.keys(files))
         if (!isBinary(name)) files[name] = new TextDecoder().decode(files[name]);
     return files;
+}
+
+/* The cart's palette, as 0xRRGGBB: its first palette by name, or the
+ * engine's sixteen */
+export function palette(folder) {
+    const first = Object.keys(folder).filter((f) => /^palettes\/\w+\.gpl$/.test(f)).sort()[0];
+    if (first) {
+        try {
+            return parseGpl(String(folder[first])).map(([r, g, b]) => r << 16 | g << 8 | b);
+        } catch (e) { /* a broken palette: the build says so */ }
+    }
+    return DEFAULT_RGB.slice();
+}
+
+/* a picture's palette numbers, or the error that stops it being read */
+export function readPicture(bytes) {
+    return decodeIndexedPng(bytes, (b) => unzlibSync(b));
+}
+
+export function writePicture(w, h, px, rgb) {
+    return encodeIndexedPng(w, h, px, rgb, (b) => zlibSync(b, { level: 9 }));
 }
 
 /* What the editor offers: the natives, constants and groups at the top,

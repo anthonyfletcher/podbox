@@ -17,7 +17,8 @@ import { setDiagnostics, lintGutter } from '@codemirror/lint';
 import { autocompletion } from '@codemirror/autocomplete';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
-import { build, open, names, NEW_CART } from './cart.js';
+import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
+import { PixelEditor, toPalette } from './pixels.js';
 import { hints, about } from './hints.js';
 import wasmBytes from '../wasm/arcade.wasm';
 
@@ -144,19 +145,17 @@ function stateFor(file) {
     return states[file];
 }
 
+let pixels = null;
+
 function show(file) {
     if (view) states[current] = view.state;
+    if (pixels) { pixels.destroy(); pixels = null; }
     current = file;
     const pane = $('editor');
     if (isBinary(file)) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(new Blob([folder[file]], { type: 'image/png' }));
-        img.className = 'picture';
-        const note = document.createElement('p');
-        note.textContent = file + ': the picture editor comes in a later step.';
-        pane.append(img, note);
+        showPicture(pane, file);
     } else if (!view) {
         pane.innerHTML = '';
         view = new EditorView({ state: stateFor(file), parent: pane });
@@ -164,6 +163,60 @@ function show(file) {
     for (const li of $('files').querySelectorAll('li'))
         li.classList.toggle('open', li.dataset.file === file);
     mark();
+}
+
+/* the sheet or an image in the pixel editor; a PNG that is not indexed is
+ * offered for converting to the palette */
+function showPicture(pane, file) {
+    const rgb = palette(folder);
+    let pic;
+    try { pic = readPicture(folder[file]); } catch (e) {
+        const p = document.createElement('p');
+        p.textContent = file + ' is not a picture of palette numbers (' + e.message + '). ';
+        const b = document.createElement('button');
+        b.textContent = 'Convert it to the palette';
+        b.onclick = async () => {
+            const bmp = await createImageBitmap(new Blob([folder[file]], { type: 'image/png' }));
+            const c = document.createElement('canvas');
+            c.width = bmp.width;
+            c.height = bmp.height;
+            c.getContext('2d').drawImage(bmp, 0, 0);
+            const { px, near } = toPalette(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, rgb);
+            folder[file] = writePicture(c.width, c.height, px, rgb);
+            say('print', 'Converted ' + file + (near ? ': ' + near + ' pixels took the nearest colour.' : '.'));
+            changed();
+            show(file);
+        };
+        p.append(b);
+        pane.append(p);
+        return;
+    }
+    const sheet = file === 'sheet.png';
+    const flags = new Uint8Array(256);
+    if (sheet && folder['flags.json']) {
+        try {
+            const f = JSON.parse(String(folder['flags.json']));
+            if (Array.isArray(f)) f.forEach((v, i) => { flags[i] = v; });
+            else for (const [k, v] of Object.entries(f)) flags[+k] = v;
+        } catch (e) { /* the build reports it */ }
+    }
+    pixels = new PixelEditor(pane, {
+        width: pic.width, height: pic.height, px: pic.px, rgb: rgb, sheet: sheet, flags: flags,
+        changed: (px) => {
+            folder[file] = writePicture(pic.width, pic.height, px, rgb);
+            changed();
+        },
+        flagsChanged: (f) => {
+            const out = {};
+            f.forEach((v, i) => { if (v) out[i] = v; });
+            folder['flags.json'] = JSON.stringify(out, null, 1) + '\n';
+            delete states['flags.json'];
+            showFiles();
+            changed();
+        },
+        say: (text, bad) => say(bad ? 'error' : 'print', text)
+    });
+    pixels.root.focus();
 }
 
 function showFiles() {
@@ -703,14 +756,21 @@ async function exportCart() {
 }
 
 function newFile() {
-    const name = window.prompt('A new file: its name, such as enemy.js');
+    const name = window.prompt('A new file: its name, such as enemy.js, sheet.png or images/title.png');
     if (!name) return;
     if (folder[name] !== undefined) { show(name); return; }
-    if (!/^([A-Za-z_]\w*\.js|(palettes\/\w+\.gpl|maps\/\w+\.json|sounds\/\w+\.json|data\/\w+\.(json|txt)|fonts\/\w+\.bdf))$/.test(name)) {
-        say('error', name + ': a code file is a name and .js; data goes in data/, as data/levels.json');
+    if (!/^([A-Za-z_]\w*\.js|sheet\.png|(images\/\w+\.png|palettes\/\w+\.gpl|maps\/\w+\.json|sounds\/\w+\.json|data\/\w+\.(json|txt)|fonts\/\w+\.bdf))$/.test(name)) {
+        say('error', name + ': a code file is a name and .js; pictures are sheet.png and images/name.png; ' +
+            'data goes in data/, as data/levels.json');
         return;
     }
-    folder[name] = '';
+    if (name === 'sheet.png') folder[name] = writePicture(128, 128, new Uint8Array(128 * 128), palette(folder));
+    else if (/\.png$/.test(name)) {
+        const size = /^(\d+)\s*x\s*(\d+)$/.exec(window.prompt('Its size: width x height', '64 x 64') || '');
+        const w = size && +size[1], h = size && +size[2];
+        if (!w || !h || w > 1024 || h > 1024) { say('error', 'A picture is 1 to 1024 pixels a side.'); return; }
+        folder[name] = writePicture(w, h, new Uint8Array(w * h), palette(folder));
+    } else folder[name] = '';
     showFiles();
     show(name);
     changed();
@@ -785,6 +845,8 @@ document.addEventListener('drop', async (e) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
     if (f && /\.pbg$/i.test(f.name)) openBytes(new Uint8Array(await f.arrayBuffer()), null);
+    /* a picture dropped on the pixel editor goes in as a paste does */
+    else if (f && pixels && /^image\//.test(f.type)) pixels.pasteImage(f);
 });
 
 (async function start() {
