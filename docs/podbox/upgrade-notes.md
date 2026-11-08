@@ -1,3 +1,8 @@
+- **Long comments and other tags in FLAC, Ogg, Opus, APE and WavPack files
+  are now kept to 500 characters,** as in MP3 and M4A files; until now they
+  were cut at about 260, or 127 in APE and WavPack. Files already in the
+  library keep the short text until you run **Rebuild Database** (Settings >
+  Library > Maintenance); an Update leaves them be.
 - **A cover drawn only partly, its top showing and the rest flat grey,** is
   not mended by this update on its own: the art cache keeps a picture until
   its image file changes. Run **Rebuild Art Cache**, or **Check a File's Art**

@@ -394,6 +394,8 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
     for (i = 0; i < comment_count && file.packet_remaining > 0; i++)
     {
         char name[TAG_NAME_LENGTH];
+        /* As long as ID3v2 and MP4 keep; id3->path would cut at 259. */
+        char value[ID3V2_MAX_ITEM_SIZE + 1];
         int32_t read_len;
 
         if (!file_read_int32(&file, &len))
@@ -413,22 +415,22 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
 #ifdef HAVE_ALBUMART
         int before_block_pos = lseek(fd, 0, SEEK_CUR);
 #endif
-        read_len = file_read_string(&file, id3->path, sizeof(id3->path), -1, len);
+        read_len = file_read_string(&file, value, sizeof(value), -1, len);
 
         if (read_len < 0)
         {
             return 0;
         }
 
-        logf("Vorbis comment %d: %s=%s", i, name, id3->path);
+        logf("Vorbis comment %d: %s=%s", i, name, value);
 #ifdef HAVE_ALBUMART
         if (!id3->has_embedded_albumart /* only use the first PICTURE */
             && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
         {
             int after_block_pos = lseek(fd, 0, SEEK_CUR);
 
-            char* buf = id3->path;
-            size_t outlen = base64_decode(buf, MIN(read_len, (int32_t) sizeof(id3->path) - 1), buf);
+            char* buf = value;
+            size_t outlen = base64_decode(buf, MIN(read_len, (int32_t) sizeof(value) - 1), buf);
 
             int picframe_pos;
             parse_flac_album_art(buf, outlen, &id3->albumart.type, &picframe_pos);
@@ -456,7 +458,7 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
             continue;
         }
 
-        len = parse_tag(name, id3->path, id3, buf, buf_remaining, TAGTYPE_VORBIS);
+        len = parse_tag(name, value, id3, buf, buf_remaining, TAGTYPE_VORBIS);
 
         buf += len;
         buf_remaining -= len;

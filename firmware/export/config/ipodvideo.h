@@ -222,6 +222,11 @@
 #define USB_VENDOR_ID 0x05ac
 #define USB_PRODUCT_ID 0x1209
 #define HAVE_USB_HID_MOUSE
+/* A dock's track info parses tags on the usb thread, with a 501-byte value
+ * buffer on the stack. */
+#ifndef BOOTLOADER
+#define USB_EXTRA_STACK 0x400
+#endif
 
 /* Define this if you have adjustable CPU frequency */
 #define HAVE_ADJUSTABLE_CPU_FREQ

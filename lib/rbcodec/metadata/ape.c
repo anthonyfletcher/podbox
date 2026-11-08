@@ -89,7 +89,7 @@ bool read_ape_tags(int fd, struct mp3entry* id3)
         {
             struct apetag_item_header item;
             char name[TAG_NAME_LENGTH];
-            char value[TAG_VALUE_LENGTH];
+            char value[ID3V2_MAX_ITEM_SIZE + 1];
             long r;
 
             if (tag_remaining < sizeof(item))

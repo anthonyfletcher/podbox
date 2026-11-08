@@ -250,6 +250,11 @@
 #define HAVE_USB_HID_MOUSE
 #define USB_VENDOR_ID 0x05AC
 #define USB_PRODUCT_ID 0x1261
+/* A dock's track info parses tags on the usb thread, with a 501-byte value
+ * buffer on the stack. */
+#ifndef BOOTLOADER
+#define USB_EXTRA_STACK 0x400
+#endif
 /* While the USB sound card is on. iTunes' Apple Mobile Device driver claims
  * 0x1261 by hardware ID, outranking Windows' composite driver, and passes on
  * only the disk interface -- so Windows never sees the audio function. The
