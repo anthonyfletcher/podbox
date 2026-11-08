@@ -176,7 +176,12 @@ export function createDock(root, panes, actions, changed) {
         const p = api.getPanel(id);
         if (!p) return;
         if (p.group.panels.length === 1) p.group.api.setVisible(false);
-        else api.removePanel(p);
+        else {
+            /* not the user's close, which onDidRemovePanel takes it for */
+            restoring = true;
+            api.removePanel(p);
+            restoring = false;
+        }
         settle();
         changed();
     }
@@ -245,6 +250,7 @@ export function createDock(root, panes, actions, changed) {
     }
 
     function reset() {
+        closed.clear();
         restoring = true;
         api.clear();
         for (const id of ORDER) add(id);

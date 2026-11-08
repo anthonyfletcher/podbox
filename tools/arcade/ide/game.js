@@ -7,7 +7,11 @@
  *
  *   createGame(opts) -> game
  *     opts: say(kind, text), ask (the dialog), cart() (cart.json, parsed),
- *     engine() (the running Engine, or null), restart(), dock
+ *     engine() (the running Engine, or null), free() (whether a menu item
+ *     or the options can be chosen now), choose(c) (a menu item, { i }, or
+ *     options, { o: [[option, value]] }, made on the run), hold(fn) (fn()
+ *     with the run held), restart(), dock, watchPane (the Watch panel's
+ *     content)
  *
  * Also the IDE's own tools for a cart: watch()'s values, in a panel of
  * their own, and the wheel's click, as the player's little speaker plays
@@ -49,6 +53,7 @@ export function createGame(o) {
         if (scores) e.setScores(scores);
         if (options) e.setOptions(options);
         watched.clear();
+        watchOpened = false;
         drawWatch();
         return {
             saves: saves ? b64(saves) : null, scores: scores ? b64(scores) : null,
@@ -91,7 +96,7 @@ export function createGame(o) {
         let items = 0;
         if (e) for (let i = 1; i <= 5; i++) {
             const label = e.menuItem(i);
-            if (label) { row(label, () => choose(i), true); items++; }
+            if (label) { row(label, () => o.choose({ i }), o.free()); items++; }
         }
         if (!items) {
             const l = document.createElement('div');
@@ -100,19 +105,12 @@ export function createGame(o) {
             list.append(l);
         }
         rule();
-        row('Options…', optionsDialog, !!e && (cart.options || []).length > 0);
+        row('Options…', optionsDialog, o.free() && (cart.options || []).length > 0);
         row('High scores…', () => showScores(-1, 0),
             !!e && ((cart.boards || []).length > 0 || (cart.achievements || []).length > 0));
         row('Help…', helpDialog, true);
         rule();
         row('Restart', () => o.restart(), true);
-    }
-
-    async function choose(i) {
-        const e = o.engine();
-        if (!e) return;
-        const r = await e.menuChoose(i);
-        if (r < 0) o.say('error', e.error());
     }
 
     async function optionsDialog() {
@@ -128,9 +126,9 @@ export function createGame(o) {
             return { name: 'o' + i, label: title, type: 'number', value: String(v), note: op.help,
                      check: (n) => n !== '' && +n >= min && +n <= max ? null : min + ' to ' + max };
         });
-        const a = await o.ask('Options', fields, 'Set');
-        if (!a || o.engine() !== e) return;
-        opts.forEach((op, i) => e.setOption(i, +a['o' + i]));
+        const a = await o.hold(() => o.ask('Options', fields, 'Set'));
+        if (!a || o.engine() !== e || !o.free()) return;
+        await o.choose({ o: opts.map((op, i) => [i, +a['o' + i]]) });
         if (!replaying) write('options', e.options());
     }
 
@@ -159,7 +157,7 @@ export function createGame(o) {
             }
             if (got.length) parts.push({ text: 'Achievements' }, { pre: got.join('\n') });
         }
-        o.ask('High scores', parts.length ? parts : [{ text: 'No boards.' }], 'Close');
+        o.hold(() => o.ask('High scores', parts.length ? parts : [{ text: 'No boards.' }], 'Close'));
     }
 
     const day = (d) => (d > 0 ? String(d).replace(/^(\d{4})(\d\d)(\d\d)$/, '$1-$2-$3') : '');
@@ -170,17 +168,21 @@ export function createGame(o) {
         if (cart.help) parts.push({ text: cart.help });
         for (const op of cart.options || [])
             if (op.help) parts.push({ text: (op.title || op.name) + ': ' + op.help });
-        o.ask((cart.name || 'The cart') + ': help', parts.length ? parts : [{ text: 'The cart has no help.' }], 'Close');
+        o.hold(() => o.ask((cart.name || 'The cart') + ': help', parts.length ? parts : [{ text: 'The cart has no help.' }], 'Close'));
     }
 
     /* ---- watch ---- */
 
     const watched = new Map();
-    let watchDue = false;
+    /* the panel opened at a run's first watch(), and left to the user after */
+    let watchDue = false, watchOpened = false;
 
     function watch(name, value) {
         watched.set(name, value);
-        if (!o.dock.shown('watch')) o.dock.show('watch', false);
+        if (!watchOpened) {
+            watchOpened = true;
+            if (!o.dock.shown('watch')) o.dock.show('watch', false);
+        }
         if (!watchDue) {
             watchDue = true;
             requestAnimationFrame(() => { watchDue = false; drawWatch(); });

@@ -13,8 +13,8 @@
  * whole cells unless Shift is held. The tile bar holds the brushes in use,
  * kept per map file, so the picker can be closed. A trace image -- a
  * picture from disk shown faintly under the map, a pixel to a map pixel,
- * to paint over -- is kept in the browser for the map file, never in the
- * cart. */
+ * to paint over -- is kept in the browser for the cart's map file, never in
+ * the cart: the most recent TRACE_KEEP, each up to TRACE_MAX. */
 
 import { shown } from './pixels.js';
 import { iconButton, toolCursor } from './icons.js';
@@ -22,6 +22,9 @@ import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 const MAX = 256;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/* the trace images kept, how many and how big each, so they leave the
+ * cart store its room in the browser's storage */
+const TRACES = 'arcade-traces', TRACE_KEEP = 4, TRACE_MAX = 512 * 1024;
 
 /* ---- the JSON ------------------------------------------------------------ */
 
@@ -88,7 +91,8 @@ function sheetCanvas(px, rgb) {
 
 export class MapEditor {
     /* opts: text (the JSON; readMap's error is thrown), file (its path,
-     * which the tile bar is kept under), sheet (the sheet's pixels,
+     * which the tile bar is kept under), cart (its id, which with the file
+     * keys the trace image), sheet (the sheet's pixels,
      * 128x128, or null), rgb, flags (256), flagNames() (the eight, null
      * where none), changed(text), ask (the IDE's dialog), say(text,
      * error) */
@@ -107,7 +111,7 @@ export class MapEditor {
         this.drag = null;
         this.selRect = null;      /* the selected cells, { x, y, w, h } */
         this.trayKey = 'arcade-tiles-' + (opts.file || '');
-        this.traceKey = 'arcade-trace-' + (opts.file || '');
+        this.traceKey = 'arcade-trace/' + (opts.cart || '') + '/' + (opts.file || '');
         this.tiles = sheetCanvas(opts.sheet, opts.rgb);
         this.build(parent);
         const room = Math.min(this.area.clientWidth - 24, this.area.clientHeight - 24);
@@ -344,10 +348,20 @@ export class MapEditor {
         this.keepTrace();
     }
 
+    /* the trace kept as the most recent, the oldest past TRACE_KEEP let go */
     keepTrace() {
         try {
+            let keys = [];
+            try { keys = JSON.parse(localStorage.getItem(TRACES)) || []; } catch (e) { /* none kept */ }
+            keys = keys.filter((k) => k !== this.traceKey);
+            localStorage.removeItem(this.traceKey);
+            if (this.traceSrc && this.traceSrc.length <= TRACE_MAX) {
+                keys.push(this.traceKey);
+                while (keys.length > TRACE_KEEP) localStorage.removeItem(keys.shift());
+            }
+            localStorage.setItem(TRACES, JSON.stringify(keys));
+            if (this.traceSrc && this.traceSrc.length > TRACE_MAX) throw new Error('too big');
             if (this.traceSrc) localStorage.setItem(this.traceKey, JSON.stringify({ src: this.traceSrc, opacity: this.traceOpacity }));
-            else localStorage.removeItem(this.traceKey);
         } catch (e) {
             this.o.say('The trace image is too big for the browser to keep: it shows until the map is closed.', true);
         }

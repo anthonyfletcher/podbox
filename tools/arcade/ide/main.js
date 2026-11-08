@@ -60,6 +60,8 @@ let folder = {};              /* name: text, or bytes for a picture */
 let current = 'main.js';
 let lastBuild = null;
 let saveTo = null;            /* a file or folder handle Save writes to */
+let dirty = false;            /* changed since it was opened or saved */
+const gone = new Set();       /* renamed or deleted since, for Save to delete */
 const states = {};            /* each text file's editor state, its undo */
 
 const DB = 'podbox-arcade-ide';
@@ -76,7 +78,7 @@ function db() {
 async function keep() {
     try {
         const d = await db();
-        d.transaction('carts', 'readwrite').objectStore('carts').put({ folder, current }, 'open');
+        d.transaction('carts', 'readwrite').objectStore('carts').put({ folder, current, dirty }, 'open');
     } catch (e) { /* a private window: nothing kept */ }
 }
 
@@ -94,24 +96,45 @@ async function kept() {
 let keepTimer = 0;
 function changed() {
     runError = null;
+    dirty = true;
     clearTimeout(keepTimer);
     keepTimer = setTimeout(() => { keep(); check(); }, 400);
+}
+
+/* the cart written out as it is: nothing to lose by replacing it */
+function saved() {
+    dirty = false;
+    keep();
 }
 
 function cartName() {
     try { return JSON.parse(folder['cart.json']).name || 'Untitled'; } catch (e) { return 'Untitled'; }
 }
 
-function load(files, file) {
+function cartId() {
+    try { return JSON.parse(folder['cart.json']).id || ''; } catch (e) { return ''; }
+}
+
+/* unsaved: the cart has changes not yet saved, as one kept from last time
+ * can */
+function load(files, file, unsaved) {
     stop();
     if (view) { view.destroy(); view = null; }
     folder = files;
     for (const k of Object.keys(states)) delete states[k];
+    gone.clear();
     current = file && folder[file] !== undefined ? file : 'main.js';
     showFiles();
     show(current);
     check();
+    clearTimeout(keepTimer);
+    dirty = !!unsaved;
     keep();
+}
+
+/* whether the open cart may be replaced, asked when it has changes unsaved */
+async function mayReplace() {
+    return !dirty || await ask('Discard the unsaved changes?', [], 'Discard them') !== null;
 }
 
 /* ---- the editor ---------------------------------------------------------- */
@@ -258,7 +281,7 @@ function showMap(pane, file) {
     try { if (folder['sheet.png']) sheet = readPicture(folder['sheet.png']).px; } catch (e) { /* the build says */ }
     try {
         pixels = new MapEditor(pane, {
-            text: String(folder[file]), file: file, sheet: sheet, rgb: palette(folder), flags: readFlags(),
+            text: String(folder[file]), file: file, cart: cartId(), sheet: sheet, rgb: palette(folder), flags: readFlags(),
             flagNames: flagNames, ask: ask,
             say: (text, bad) => say(bad ? 'error' : 'print', text),
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
@@ -462,8 +485,9 @@ function showPicture(pane, file) {
     }
     const sheet = file === 'sheet.png';
     const flags = readFlags();
+    /* the palette as it is now: adding colours rewrites it under the editor */
     const write = (px) => {
-        folder[file] = writePicture(pic.width, pic.height, px, rgb);
+        folder[file] = writePicture(pic.width, pic.height, px, palette(folder));
         changed();
     };
     const say_ = (text, bad) => say(bad ? 'error' : 'print', text);
@@ -637,8 +661,59 @@ function rebase(e) {
 
 async function until(ms, e, live) {
     await sleep(clock.real + ms - performance.now());
-    if (!paused) return;
-    while (paused && live()) await sleep(50);
+    if (!paused && !held()) return;
+    while ((paused || held()) && live()) await sleep(50);
+    rebase(e);
+}
+
+/* What holds the run between ticks, as the player's pause menu holds the
+ * game: a Game-menu dialog open, or a menu item's function running. A
+ * cart's own dialog waits for the first, not the second, which may open
+ * one. busy: in a call into the engine, which a menu item's must not
+ * overlap. */
+let dialogs = 0, choosing = 0, busy = 0;
+const held = () => dialogs > 0 || choosing > 0;
+
+async function call(p) {
+    busy++;
+    try { return await p; } finally { busy--; }
+}
+
+/* fn() run with the run held, the clock started again after */
+async function hold(fn) {
+    dialogs++;
+    try { return await fn(); } finally {
+        dialogs--;
+        if (running && engine) rebase(engine);
+    }
+}
+
+/* whether a Game-menu choice can be made now: a run between ticks, and
+ * not a replay, whose choices are its tape's */
+const free = () => running && !busy && !held() && !playing;
+
+/* A Game-menu choice: { i } a menu item, its dialog frames recorded in
+ * rec.d, or answered from c.d on a replay; { o: [[option, value]] } the
+ * options set. */
+async function makeChoice(e, c, rec) {
+    if (c.o) { for (const [k, v] of c.o) e.setOption(k, v); return; }
+    const was = step;
+    step = rec;
+    dialogTape = rec === c ? null : (c.d || []).slice();
+    choosing++;
+    try {
+        const r = await call(e.menuChoose(c.i));
+        if (r < 0 && engine === e && running) say('error', e.error());
+    } finally { choosing--; step = was; }
+}
+
+/* a choice from the Game menu, recorded for the run's next step */
+async function choose(c) {
+    if (!free()) return;
+    const e = engine;
+    await makeChoice(e, c, c);
+    if (engine !== e || !running) return;
+    choices.push(c);
     rebase(e);
 }
 
@@ -655,8 +730,9 @@ function cost(e, drawn) {
 /* the run being recorded, the last one recorded, and the tape being
  * played back with how far it has got */
 let tape = null, lastTape = null, playing = null, played = 0, diverged = false;
-/* this turn of the loop's record, and music buttons pressed since the last */
-let step = null, musicPressed = [];
+/* this turn of the loop's record, and music buttons pressed and Game-menu
+ * choices made since the last */
+let step = null, musicPressed = [], choices = [];
 /* where the run's store lives: the browser's, or a replay's own */
 let runStore = null;
 
@@ -693,7 +769,17 @@ const browserStore = {
 /* this tick's input, from the player or from the tape */
 const live3 = () => { const i = input(); return [i.held, i.clicks, i.pos]; };
 
+/* a run, and a fault of the IDE's own in one -- a tape it cannot follow --
+ * ending it and said, as the cart's own errors are */
 async function run(replay) {
+    const gen = generation;
+    try { await runCart(replay); } catch (x) {
+        if (generation === gen + 1 && running) stop(true);
+        say('error', 'The run stopped: ' + (x && x.message || x));
+    }
+}
+
+async function runCart(replay) {
     stop();
     check();
     if (lastBuild.errors.length) {
@@ -711,6 +797,7 @@ async function run(replay) {
     played = 0;
     diverged = false;
     musicPressed = [];
+    choices = [];
     const seed = replay ? replay.seed : String(Date.now());
     let id = '';
     try { id = JSON.parse(folder['cart.json']).id; } catch (x) { /* no id */ }
@@ -740,7 +827,8 @@ async function run(replay) {
     document.body.classList.add('running');
     $('power').title = 'Turn off: stop the cart (Shift+Ctrl+Enter)';
     clockStart();
-    if (!(await e.start())) return live() ? fault() : undefined;
+    if (!(await call(e.start()))) return live() ? fault() : undefined;
+    if (!live()) return;
     present();
     rebase(e);
     let rate = e.rate();
@@ -758,9 +846,16 @@ async function run(replay) {
         }
         step = {};
         tape.steps.push(step);
+        dialogShown = false;
         if (t && t.m) for (const w of t.m) { e.musicControl(w); music(e); }
         const pressed = t ? t.m || [] : musicPressed.splice(0);
         if (pressed.length) step.m = pressed;
+        if (t && t.g) for (const c of t.g) {
+            await makeChoice(e, c, {});
+            if (!live()) return;
+        }
+        const made = t ? t.g || [] : choices.splice(0);
+        if (made.length) step.g = made;
         dialogTape = t && t.d ? t.d.slice() : null;
         const skip = t ? t.s || 0 : late >= p ? Math.floor(late / p) : 0;
         if (skip) {
@@ -768,7 +863,8 @@ async function run(replay) {
             const i = t ? t.a : live3();
             step.s = skip;
             step.a = i;
-            if (!(await e.tick(i[0], i[1], i[2], false))) return live() ? fault() : undefined;
+            if (!(await call(e.tick(i[0], i[1], i[2], false)))) return live() ? fault() : undefined;
+            if (!live()) return;
             ticksRun++;
             const c = cost(e, false);
             clock.emu += c;
@@ -779,8 +875,7 @@ async function run(replay) {
         }
         const i = t ? t.b : live3();
         step.b = i;
-        dialogShown = false;
-        const ok = await e.tick(i[0], i[1], i[2], true, Math.round(1000 / rate));
+        const ok = await call(e.tick(i[0], i[1], i[2], true, Math.round(1000 / rate)));
         if (!live()) break;
         if (!ok) return fault();
         step.h = hashScreen(e.pixels());
@@ -918,7 +1013,7 @@ const hostFor = (e, live) => ({
         return Promise.resolve().then(async () => {
             if (live()) present();
             await sleep(1000 / e().rate());
-            while (paused && live()) await sleep(50);
+            while (((paused && !choosing) || dialogs) && live()) await sleep(50);
             if (!live()) return null;
             /* from the tape while it has them */
             const r = dialogTape && dialogTape.length ? dialogTape.shift() : null;
@@ -1176,7 +1271,8 @@ async function openCart() {
     openBytes(bytes, handle);
 }
 
-function openBytes(bytes, handle) {
+async function openBytes(bytes, handle) {
+    if (!(await mayReplace())) return;
     try {
         load(open(bytes));
         saveTo = handle ? { file: handle } : null;
@@ -1220,6 +1316,7 @@ async function openFolder() {
     }
     try { await walk(dir, '', 0); } catch (e) { say('error', 'Could not read that folder: ' + e.message); return; }
     if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
+    if (!(await mayReplace())) return;
     load(files);
     saveTo = { dir };
     say('print', 'Opened the folder ' + dir.name + ': Save writes its files back.');
@@ -1240,6 +1337,7 @@ function openFolderPlain() {
                 files[rel] = isBinary(rel) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
         }
         if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
+        if (!(await mayReplace())) return;
         load(files);
         saveTo = null;
         say('print', 'Opened the folder. This browser cannot write it back: Save writes a .pbg.');
@@ -1280,6 +1378,20 @@ async function save() {
                 await w.write(v);
                 await w.close();
             }
+            /* the files renamed or deleted since, deleted there too */
+            for (const name of gone) {
+                if (folder[name] !== undefined) continue;
+                const parts = name.split('/');
+                try {
+                    let d = saveTo.dir;
+                    for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+                    await d.removeEntry(parts[parts.length - 1]);
+                } catch (e) {
+                    if (e.name !== 'NotFoundError') throw e;
+                }
+            }
+            gone.clear();
+            saved();
             say('print', 'Saved the folder ' + saveTo.dir.name + '.');
             return;
         }
@@ -1287,6 +1399,7 @@ async function save() {
             const w = await saveTo.file.createWritable();
             await w.write(lastBuild.cart);
             await w.close();
+            saved();
             say('print', 'Saved ' + saveTo.file.name + '.');
             return;
         }
@@ -1317,6 +1430,7 @@ async function saveAs() {
                 await w.write(lastBuild.cart);
                 await w.close();
                 saveTo = { file: h };
+                saved();
                 say('print', 'Saved ' + h.name + '.');
                 return;
             } catch (e) { /* downloaded below */ }
@@ -1326,6 +1440,7 @@ async function saveAs() {
     a.href = URL.createObjectURL(new Blob([lastBuild.cart]));
     a.download = file;
     a.click();
+    saved();
     say('print', 'Downloaded ' + file + '.');
 }
 
@@ -1494,6 +1609,7 @@ async function renameFile() {
     if (folder[to] !== undefined) { say('error', to + ' is there already.'); return; }
     folder[to] = folder[f];
     delete folder[f];
+    gone.add(f);
     if (states[f]) { states[to] = states[f]; delete states[f]; }
     current = to;
     showFiles();
@@ -1506,6 +1622,7 @@ async function removeFile() {
     if (KEPT.includes(f)) { say('error', 'Every cart has ' + f + '.'); return; }
     if (await ask('Delete ' + f + '?', [], 'Delete') === null) return;
     delete folder[f];
+    gone.add(f);
     delete states[f];
     current = 'main.js';
     showFiles();
@@ -1517,7 +1634,7 @@ async function removeFile() {
 
 const ACTIONS = {
     new: async () => {
-        if (await ask('Start a new cart?', [], 'New cart') === null) return;
+        if (!(await mayReplace())) return;
         load(NEW_CART());
         saveTo = null;
     },
@@ -1625,6 +1742,7 @@ const game = createGame({
     say: say, ask: ask, dock: dock, watchPane: $('pane-watch'),
     cart: () => { try { return JSON.parse(folder['cart.json']); } catch (e) { return null; } },
     engine: () => (running ? engine : null),
+    free: free, choose: choose, hold: hold,
     restart: () => run()
 });
 
@@ -1678,7 +1796,8 @@ document.addEventListener('drop', async (e) => {
     /* the cart kept from last time, unless the browser's storage is slow
      * to answer or does not */
     const was = await Promise.race([kept(), sleep(1000).then(() => null)]);
-    load(was && was.folder && was.folder['cart.json'] ? was.folder : NEW_CART(), was && was.current);
+    const ok = was && was.folder && was.folder['cart.json'];
+    load(ok ? was.folder : NEW_CART(), was && was.current, ok && was.dirty);
 })();
 
 /* for the tests, which drive the page */
