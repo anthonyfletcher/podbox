@@ -19,7 +19,7 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { findPanel } from './search.js';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
-import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
+import { build, open, names, NEW_CART, palette, readPicture, writePicture, functions, apiName } from './cart.js';
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { PaletteEditor } from './palette.js';
 import { FontEditor } from './font.js';
@@ -27,6 +27,7 @@ import { MapEditor } from './map.js';
 import { SoundEditor } from './sound.js';
 import { CartSettings } from './settings.js';
 import { createDock } from './dock.js';
+import { Profiler } from './profiler.js';
 import { setPanelHost } from './chrome.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
@@ -663,6 +664,8 @@ async function run() {
     if (!e.load(lastBuild.cart, BigInt(Date.now()))) return fault();
     metronomeAt = -1;
     e.ceiling(CEILING);
+    profiler.begin(functions(lastBuild.cart));
+    e.profile(profiler.on);
     if (!audio) audio = new AudioContext({ sampleRate: 44100 });
     audio.resume();
     audioAt = 0;
@@ -687,7 +690,9 @@ async function run() {
             e.skipped(Math.floor(late / p));
             const i = input();
             if (!(await e.tick(i.held, i.clicks, i.pos, false))) return live() ? fault() : undefined;
-            clock.emu += cost(e, false);
+            const c = cost(e, false);
+            clock.emu += c;
+            profiler.frame(e.samples(), c, p, c - e.units() * DEVICES[device].unit);
             clock.frame++;
             if (late >= 2 * p) clock.start = clock.emu - clock.frame * p;
         }
@@ -697,7 +702,11 @@ async function run() {
         if (!live()) break;
         if (!ok) return fault();
         if (dialogShown) rebase(e);
-        else clock.emu += cost(e, true);
+        else {
+            const c = cost(e, true);
+            clock.emu += c;
+            profiler.frame(e.samples(), c, 1000 / rate, c - e.units() * DEVICES[device].unit);
+        }
         if (e.rate() !== rate) {
             rate = e.rate();
             clock.start = clock.emu - clock.frame * (1000 / rate);
@@ -1360,6 +1369,8 @@ const ACTIONS = {
     'view-objects': () => toggle('objects'),
     'view-player': () => toggle('player'),
     'view-output': () => toggle('output'),
+    'view-profiler': () => toggle('profiler'),
+    profile: () => { dock.show('profiler'); profiler.record(true); if (!running) run(); },
     'view-reset': () => dock.reset(),
     import: addFiles,
     'export-picture': exportPicture,
@@ -1423,9 +1434,15 @@ let dock = null;
  * shows its open panel's buttons */
 dock = createDock($('dock'), {
     files: $('pane-files'), editor: $('editor'), output: $('output'), player: $('pane-player'),
-    picker: $('pane-picker'), objects: $('pane-objects')
+    picker: $('pane-picker'), objects: $('pane-objects'), profiler: $('pane-profiler')
 }, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView);
 setPanelHost(dock);
+
+/* the profiler, sampling the running engine while it records */
+const profiler = new Profiler($('pane-profiler'), {
+    goTo: goTo, apiName: apiName, device: () => DEVICES[device],
+    recording: (on) => { if (engine && running) engine.profile(on); }
+});
 /* the output opens when there is something to read */
 dock.hide('output');
 
@@ -1433,7 +1450,7 @@ dock.hide('output');
  * for what the open editor puts there, and offered only when it does */
 function refreshView() {
     if (!dock) return;
-    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output']) {
+    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output', 'profiler']) {
         const b = $('v-' + k);
         b.classList.toggle('on', dock.shown(k));
         b.disabled = !dock.has(k);

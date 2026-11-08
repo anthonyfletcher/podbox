@@ -353,6 +353,11 @@ struct vm
     uint32_t units;             /* in the current call from the host */
     uint32_t budget;            /* until the next yield */
     uint32_t ceiling;
+    /* For a profiler at a yield: the API slot of the native running, or
+     * -1; and whether the yield is the bytecode's own, between
+     * instructions */
+    int32_t native;
+    uint8_t in_code;
 
     /* The core's state */
     struct draw d;

@@ -5,6 +5,7 @@
 import { deflateSync, inflateSync, unzlibSync, zlibSync } from 'fflate';
 import { compile } from '../src/compiler.js';
 import { parseOpcodes, parseApi } from '../src/defs.js';
+import { load } from '../src/bytecode.js';
 import { unpackCart, DEFAULT_RGB } from '../src/unpack.js';
 import { parseGpl } from '../src/assets.js';
 import { decodeIndexedPng, encodeIndexedPng } from '../src/png.js';
@@ -14,6 +15,18 @@ import apiText from '../../../apps-ipod/games/arcade/arcade_api.def';
 
 const isa = parseOpcodes(opcodesText);
 const api = parseApi(apiText);
+
+/* a built cart's functions, as the engine numbers them: each its name,
+ * file and [offset, line] pairs, from the cart's LINE chunk */
+export function functions(cart) {
+    return load(cart).fns.map((f) => ({ name: f.name || '?', file: f.file, lines: f.lines || [] }));
+}
+
+/* an API call's name, by its slot, as code writes it */
+export function apiName(slot) {
+    const n = api.bySlot[slot];
+    return n ? (n.label || n.name) + '()' : 'call ' + slot;
+}
 
 /* { cart, errors, stats } from the folder's files */
 export function build(folder) {

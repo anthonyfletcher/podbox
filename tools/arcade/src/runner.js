@@ -174,6 +174,16 @@ export class Engine {
     rate() { return this.x.web_rate(); }
     menuIsGame() { return this.x.web_menu_is_game() !== 0; }
     units() { return this.x.web_units() >>> 0; }
+    /* sampling for the profiler, every 2048 units, on or off */
+    profile(on) { this.x.web_profile(on ? 1 : 0); }
+    /* the samples since the last take, 12 words each: the native call (or
+     * -1), the offset in the innermost function, the depth, the outermost
+     * function, then the innermost eight, innermost first (-1 past the
+     * depth) */
+    samples() {
+        const n = this.x.web_prof_take(), p = this.x.web_prof_data();
+        return new Int32Array(this.mem.buffer.slice(p, p + n * 48));
+    }
     ceiling(u) { this.x.web_ceiling(u); }
     skipped(n) { this.x.web_skipped(n); }
     error() { return this.cstr(this.x.web_error()); }

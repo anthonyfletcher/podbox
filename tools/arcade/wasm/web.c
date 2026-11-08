@@ -9,9 +9,9 @@
  * The owner's music, its library and its beat are host/fakemusic.c's, as
  * pbgvm's are: made up, playing as the page says.
  *
- * Parts: the imports; the host built from them; driving a cart; the music;
- * what the page reads back (the screen, the sound, the error, an open
- * dialog). */
+ * Parts: the imports; the host built from them; driving a cart; the
+ * profiler's samples; the music; what the page reads back (the screen, the
+ * sound, the error, an open dialog). */
 
 #include <stdint.h>
 #include <string.h>
@@ -154,6 +154,59 @@ EXPORT("web_menu_is_game") int web_menu_is_game(void)
     return arcade_menu_is_game(vm);
 }
 EXPORT("web_units") uint32_t web_units(void) { return arcade_units(vm); }
+
+/* ---- the profiler's samples ---------------------------------------------- */
+
+/* While the page profiles, each yield -- every 2048 units -- is a sample of
+ * where the cart is: the native call it is in (or -1), the offset in the
+ * innermost function, how deep the frames go, the outermost function, and
+ * the innermost PROF_FNS functions, innermost first. */
+#define PROF_FNS 8
+#define PROF_WORDS (4 + PROF_FNS)
+#define PROF_MAX 1024
+static int32_t prof[PROF_MAX * PROF_WORDS];
+static int prof_n;
+
+static void sample(void *ctx)
+{
+    (void)ctx;
+    if (prof_n >= PROF_MAX)
+        return;
+    int32_t *s = prof + prof_n * PROF_WORDS;
+    uint32_t fns[PROF_FNS], pc, root, depth;
+    int32_t native;
+    depth = (uint32_t)arcade_where(vm, fns, PROF_FNS, &pc, &native);
+    s[0] = native;
+    s[1] = (int32_t)pc;
+    s[2] = (int32_t)depth;
+    root = 0;
+    if (depth > PROF_FNS) {
+        uint32_t all[256];        /* more than a cart may nest */
+        uint32_t k = (uint32_t)arcade_where(vm, all, 256, &pc, &native);
+        root = all[(k < 256 ? k : 256) - 1];
+    } else if (depth)
+        root = fns[depth - 1];
+    s[3] = depth ? (int32_t)root : -1;
+    for (uint32_t i = 0; i < PROF_FNS; i++)
+        s[4 + i] = i < depth ? (int32_t)fns[i] : -1;
+    prof_n++;
+}
+
+/* sampling on or off; the samples so far are dropped */
+EXPORT("web_profile") void web_profile(int on)
+{
+    host.yield = on ? sample : NULL;
+    prof_n = 0;
+}
+
+/* the samples since the last call, PROF_WORDS words each, at web_prof_data */
+EXPORT("web_prof_take") int web_prof_take(void)
+{
+    int n = prof_n;
+    prof_n = 0;
+    return n;
+}
+EXPORT("web_prof_data") int32_t *web_prof_data(void) { return prof; }
 EXPORT("web_ceiling") void web_ceiling(uint32_t u)
 {
     arcade_set_ceiling(vm, u);

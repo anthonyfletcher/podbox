@@ -703,6 +703,7 @@ struct vm *arcade_load(void *mem, uint32_t size, arcade_read_fn read,
     vm->host = host;
     vm->perm = (uint32_t)sizeof(struct vm);
     vm->ceiling = 0xffffffffu;
+    vm->native = -1;
     vm->wheelpos = -1;          /* untouched, until the host says */
     core_seed(vm, seed);
     if (!read_chunks(vm, read, rctx))

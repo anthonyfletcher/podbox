@@ -36,9 +36,13 @@ const PANELS = {
     picker: { title: 'Picker', place: (d) => d.getPanel('files') ? { referencePanel: 'files', direction: 'below' }
                                                                  : { direction: 'left' }, size: { height: 320 } },
     objects: { title: 'Objects', place: (d) => d.getPanel('picker') ? { referencePanel: 'picker', direction: 'below' }
-                                                                    : { direction: 'left' } }
+                                                                    : { direction: 'left' } },
+    profiler: { title: 'Profiler', place: (d) => d.getPanel('output') ? { referencePanel: 'output', direction: 'right' }
+                                                                      : { direction: 'below' } }
 };
-const ORDER = ['files', 'editor', 'player', 'output', 'picker', 'objects'];
+const ORDER = ['files', 'editor', 'player', 'output', 'picker', 'objects', 'profiler'];
+/* hidden until asked for */
+const LATER = ['profiler'];
 const OWN = ['picker', 'objects'];
 
 /* a tab: the panel's title, kept as written for the editor's file and in
@@ -246,6 +250,7 @@ export function createDock(root, panes, actions, changed) {
         defaults();
         for (const id of OWN) if (!filled[id]) hide(id);
         hide('output');
+        for (const id of LATER) hide(id);
         settle();
         changed();
     }
@@ -254,7 +259,10 @@ export function createDock(root, panes, actions, changed) {
     try { kept = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* none kept */ }
     restoring = true;
     try { if (kept && kept.layout) api.fromJSON(kept.layout); } catch (e) { api.clear(); }
-    for (const id of ORDER) if (!api.getPanel(id)) add(id);
+    for (const id of ORDER) if (!api.getPanel(id)) {
+        add(id);
+        if (LATER.includes(id)) hide(id);
+    }
     restoring = false;
     if (kept && kept.sizes) Object.assign(sizes, kept.sizes);
     new ResizeObserver(() => {

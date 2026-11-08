@@ -1313,11 +1313,15 @@ static int run(struct vm *vm, uint32_t stop)
 
 slice:
     /* Every YIELD_UNITS units: let the codec run, and stop a cart that has
-     * run away. */
+     * run away. Where the bytecode is goes in its frame, for a profiler. */
     vm->units += YIELD_UNITS;
     budget = YIELD_UNITS;
-    if (vm->host && vm->host->yield)
+    if (vm->host && vm->host->yield) {
+        vm->frames[vm->nframes - 1].pc = (uint32_t)(pc - code);
+        vm->in_code = 1;
         vm->host->yield(vm->host->ctx);
+        vm->in_code = 0;
+    }
     if (vm->units > vm->ceiling) {
         pc++;
         FAIL("The game stopped responding", "");
@@ -1651,9 +1655,12 @@ leave:
 op_NCALL: {
     uint32_t slot = U16(), argc = U8();
     struct value out = mk(T_NULL, 0);
+    int32_t outer = vm->native;
     SYNC();
+    vm->native = (int32_t)slot;
     if (!arcade_impl[slot](vm, sp - argc, (int)argc, &out))
         goto fail;
+    vm->native = outer;
     RELOAD();
     sp -= argc;
     if (arcade_api[slot].ret)
@@ -1873,6 +1880,22 @@ void arcade_idle(struct vm *vm)
 uint32_t arcade_units(const struct vm *vm)
 {
     return vm->units;
+}
+
+int arcade_where(const struct vm *vm, uint32_t *fns, int max, uint32_t *pc,
+                 int32_t *native)
+{
+    uint32_t n = vm->nframes;
+    *native = vm->in_code ? -1 : vm->native;
+    *pc = 0;
+    if (!n)
+        return 0;
+    const struct frame *top = &vm->frames[n - 1];
+    uint32_t off = vm->fns[top->fn].off;
+    *pc = top->pc > off ? top->pc - off - 1 : 0;
+    for (int i = 0; i < max && (uint32_t)i < n; i++)
+        fns[i] = vm->frames[n - 1 - (uint32_t)i].fn;
+    return (int)n;
 }
 
 void arcade_set_ceiling(struct vm *vm, uint32_t units)

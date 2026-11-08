@@ -292,6 +292,14 @@ uint32_t arcade_units(const struct vm *vm);
 /* Units at which one call is stopped as not responding. */
 void arcade_set_ceiling(struct vm *vm, uint32_t units);
 
+/* For a profiler, from the host's yield, which comes every 2048 units:
+ * the frames running, innermost first, as function numbers (LINE's order),
+ * up to max of them; the offset in the innermost function's code; and the
+ * API slot of the native call it is in, or -1. Returns how deep the frames
+ * go, 0 outside any function. */
+int arcade_where(const struct vm *vm, uint32_t *fns, int max, uint32_t *pc,
+                 int32_t *native);
+
 /* NULL while the cart is running; otherwise what stopped it, and where:
  * the source file, line and function, when known. */
 const char *arcade_error(const struct vm *vm, const char **file,

@@ -203,6 +203,15 @@ show as `?`.
   would on that player, so a cart doing more than the player manages
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
+- **The profiler** (Run > Run and profile, or View > Profiler and its
+  record button) shows where the time goes on the player you run as:
+  each frame's cost as a bar against the time a frame has, red where it
+  runs over, and a table of the functions and API calls that took it --
+  each one's own share, its share with everything it called, and its
+  milliseconds a frame -- or of the lines, with sending the screen as a
+  row of its own. Click a row to go to its code. It samples every 2048
+  units, so something cheaper than that a frame shows only now and then:
+  record a few seconds.
 - **Panels**: the files, the editor, the output, the player, and the open
   editor's own -- the sheet's sprites, a map's tiles and objects, a font's
   glyphs, a sound's generators -- can each be dragged by its tab beside,
