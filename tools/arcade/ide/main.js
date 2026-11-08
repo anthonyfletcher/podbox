@@ -16,6 +16,7 @@ import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { setDiagnostics, lintGutter } from '@codemirror/lint';
 import { autocompletion } from '@codemirror/autocomplete';
+import { findPanel } from './search.js';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture } from './cart.js';
@@ -143,10 +144,13 @@ function fileFunctions(file) {
 
 function stateFor(file) {
     if (states[file]) return states[file];
-    const lang = /\.js$/.test(file) ? [javascript()] : /\.json$/.test(file) ? [json()] : [];
+    const code = /\.js$/.test(file);
+    const lang = code ? [javascript()] : /\.json$/.test(file) ? [json()] : [];
+    /* the API's hints and completions are for code only */
+    const api = code ? [...hints(() => folder), autocompletion({ override: [completions] })] : [];
     states[file] = EditorState.create({
         doc: String(folder[file]),
-        extensions: [basicSetup, ...lang, ...dark, lintGutter(), ...(/\.js$/.test(file) ? hints(() => folder) : []), autocompletion({ override: [completions] }),
+        extensions: [basicSetup, findPanel, ...lang, ...dark, lintGutter(), ...api,
                      EditorView.updateListener.of((u) => {
                          if (!u.docChanged) return;
                          folder[current] = u.state.doc.toString();
@@ -162,6 +166,7 @@ function show(file) {
     if (view) states[current] = view.state;
     if (pixels) { pixels.destroy(); pixels = null; }
     current = file;
+    document.querySelector('[data-do="export-picture"]').hidden = !isBinary(file);
     const pane = $('editor');
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
     const mapFile = /^maps\/\w+\.json$/.test(file), sfxFile = /^sounds\/\w+\.json$/.test(file);
@@ -241,7 +246,7 @@ function showMap(pane, file) {
     try { if (folder['sheet.png']) sheet = readPicture(folder['sheet.png']).px; } catch (e) { /* the build says */ }
     try {
         pixels = new MapEditor(pane, {
-            text: String(folder[file]), sheet: sheet, rgb: palette(folder), flags: readFlags(),
+            text: String(folder[file]), file: file, sheet: sheet, rgb: palette(folder), flags: readFlags(),
             flagNames: flagNames, ask: ask,
             picker: layout.picker,
             pickerShown: (open) => { layout.picker = open; applyLayout(); },
@@ -538,7 +543,7 @@ function showFiles() {
         ul.append(li);
     }
     $('cart-name').textContent = cartName();
-    document.title = cartName() + ' - Arcade';
+    document.title = cartName() + ' - ArcadeIDE';
 }
 
 /* the compiler's errors: in the editor for this file, listed in the
@@ -675,6 +680,7 @@ async function run() {
     paused = false;
     $('screen').focus();
     document.body.classList.add('running');
+    $('power').title = 'Turn off: stop the cart (Shift+Ctrl+Enter)';
     clockStart();
     if (!(await e.start())) return live() ? fault() : undefined;
     present();
@@ -723,6 +729,7 @@ function stop(keep) {
     running = false;
     paused = false;
     document.body.classList.remove('running', 'paused');
+    $('power').title = 'Turn on: run the cart (Ctrl+Enter)';
     if (keep !== true) screen.clearRect(0, 0, 160, 120);
     showDevice();
 }
@@ -1172,10 +1179,18 @@ const KINDS = {
     palette: { label: 'A palette', path: (n) => 'palettes/' + n + '.gpl' },
     map: { label: 'A map', path: (n) => 'maps/' + n + '.json' },
     sound: { label: 'A sound', path: (n) => 'sounds/' + n + '.json' },
-    data: { label: 'Data (JSON)', path: (n) => 'data/' + n + '.json' },
+    data: { label: 'Data', path: (n) => 'data/' + n + '.json' },
     text: { label: 'Text', path: (n) => 'data/' + n + '.txt' },
-    font: { label: 'A font, starting from CAPS', path: (n) => 'fonts/' + n + '.bdf' }
+    font: { label: 'A font', path: (n) => 'fonts/' + n + '.bdf' },
+    caps: { label: 'A font, a copy of CAPS', path: (n) => 'fonts/' + n + '.bdf' }
 };
+
+/* a font with no characters but the space, 7 pixels over the baseline and
+ * 1 under, to draw from nothing */
+const EMPTY_BDF = 'STARTFONT 2.1\nFONT -PodBox-New-Medium-R-Normal--8-80-75-75-P-50-ISO10646-1\n' +
+    'SIZE 8 75 75\nFONTBOUNDINGBOX 5 7 0 0\nSTARTPROPERTIES 2\nFONT_ASCENT 7\nFONT_DESCENT 1\n' +
+    'ENDPROPERTIES\nCHARS 1\nSTARTCHAR space\nENCODING 32\nSWIDTH 500 0\nDWIDTH 4 0\n' +
+    'BBX 1 1 0 0\nBITMAP\n00\nENDCHAR\nENDFONT\n';
 
 /* the cart's palette as a GIMP palette */
 function gpl(name, rgb) {
@@ -1197,7 +1212,8 @@ function fresh(kind, name, a) {
         p_env_decay: 0.12, p_base_freq: 0.45, sound_vol: 0.5 }) + '\n';
     case 'data': return '{\n}\n';
     case 'text': return '';
-    case 'font': return capsBdf;
+    case 'font': return EMPTY_BDF;
+    case 'caps': return capsBdf;
     }
     return '';
 }
@@ -1207,28 +1223,24 @@ async function newFile() {
     const a = await ask('New file', [
         { name: 'kind', label: 'What', options: kinds.map(([k, v]) => [k, v.label]) },
         { name: 'name', label: 'Name', value: '', when: (v) => v.kind !== 'sheet',
-          note: 'Letters, digits and _: the name the code calls it by' },
-        { name: 'w', label: 'Width', type: 'number', value: 64, when: (v) => v.kind === 'image' },
+          note: 'Letters, digits and _: the name the code calls it by',
+          check: (n, v) => !NAME.test(n.trim()) ? 'Letters, digits and _, not starting with a digit'
+              : folder[KINDS[v.kind].path(n.trim())] !== undefined ? KINDS[v.kind].path(n.trim()) + ' is there already'
+              : null },
+        { name: 'w', label: 'Width', type: 'number', value: 64, when: (v) => v.kind === 'image',
+          check: (n) => n >= 1 && n <= 1024 && Number.isInteger(+n) ? null : '1 to 1024' },
         { name: 'h', label: 'Height', type: 'number', value: 64, when: (v) => v.kind === 'image',
-          note: 'Pixels, up to 1024 each way' },
-        { name: 'mw', label: 'Width', type: 'number', value: 32, when: (v) => v.kind === 'map' },
+          note: 'Pixels, up to 1024 each way',
+          check: (n) => n >= 1 && n <= 1024 && Number.isInteger(+n) ? null : '1 to 1024' },
+        { name: 'mw', label: 'Width', type: 'number', value: 32, when: (v) => v.kind === 'map',
+          check: (n) => n >= 1 && n <= 256 && Number.isInteger(+n) ? null : '1 to 256' },
         { name: 'mh', label: 'Height', type: 'number', value: 16, when: (v) => v.kind === 'map',
-          note: 'Cells, up to 256 each way' }
+          note: 'Cells, up to 256 each way',
+          check: (n) => n >= 1 && n <= 256 && Number.isInteger(+n) ? null : '1 to 256' }
     ], 'Make it');
     if (!a) return;
     const name = a.kind === 'sheet' ? 'sheet' : a.name.trim();
-    if (!NAME.test(name)) { say('error', 'A name is letters, digits and _, not starting with a digit.'); return; }
-    if (a.kind === 'code' && name === 'main') { say('error', 'main.js is there already.'); return; }
-    if (a.kind === 'image' && !(a.w >= 1 && a.w <= 1024 && a.h >= 1 && a.h <= 1024)) {
-        say('error', 'An image is 1 to 1024 pixels each way.');
-        return;
-    }
-    if (a.kind === 'map' && !(a.mw >= 1 && a.mw <= 256 && a.mh >= 1 && a.mh <= 256)) {
-        say('error', 'A map is 1 to 256 cells each way.');
-        return;
-    }
     const path = KINDS[a.kind].path(name);
-    if (folder[path] !== undefined) { say('error', path + ' is there already.'); show(path); return; }
     folder[path] = fresh(a.kind, name, a);
     showFiles();
     show(path);
@@ -1401,8 +1413,7 @@ const ACTIONS = {
         };
 })();
 showDevice();
-$('run').onclick = run;
-$('stop').onclick = stop;
+$('power').onclick = () => { if (running) stop(); else run(); };
 
 
 document.addEventListener('keydown', (e) => {

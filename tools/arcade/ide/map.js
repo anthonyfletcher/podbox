@@ -3,13 +3,15 @@
  *
  * Parts: reading and writing the map's JSON; the editor -- the tile picker
  * beside it, the toolbar, the map drawn zoomed with its grid, a flag's
- * cells marked and the objects over it; painting; the objects and their
- * inspector; the keys; undo.
+ * cells marked and the objects over it, and the tile bar under it; the
+ * shapes; painting; the objects and their inspector; the keys; undo.
  *
  * Cell 0 is empty, as map() leaves it, and colour 0 of a sprite is clear.
  * The brush is a block of the sheet: painting stamps it in steps of its
- * own size, and a rectangle or a fill repeats it. Objects are in pixels,
- * placed on whole cells unless Shift is held. */
+ * own size, and a line, a rectangle, an oval or a fill repeats it. A fill
+ * inside the selection fills all of it. Objects are in pixels, placed on
+ * whole cells unless Shift is held. The tile bar holds the brushes in use,
+ * kept per map file, so the picker can be closed. */
 
 import { shown } from './pixels.js';
 import { iconButton, toolCursor } from './icons.js';
@@ -19,6 +21,10 @@ const MAX = 256;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /* ---- the JSON ------------------------------------------------------------ */
+
+function sameBrush(a, b) {
+    return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
 
 /* { w, h, cells, objects, rest }: rest is any other field, kept */
 export function readMap(text) {
@@ -78,10 +84,11 @@ function sheetCanvas(px, rgb) {
 /* ---- the editor ---------------------------------------------------------- */
 
 export class MapEditor {
-    /* opts: text (the JSON; readMap's error is thrown), sheet (the sheet's
-     * pixels, 128x128, or null), rgb, flags (256), flagNames() (the
-     * eight, null where none), changed(text), ask (the IDE's dialog),
-     * say(text, error), asText(), picker and pickerShown(open) */
+    /* opts: text (the JSON; readMap's error is thrown), file (its path,
+     * which the tile bar is kept under), sheet (the sheet's pixels,
+     * 128x128, or null), rgb, flags (256), flagNames() (the eight, null
+     * where none), changed(text), ask (the IDE's dialog), say(text,
+     * error), asText(), picker and pickerShown(open) */
     constructor(parent, opts) {
         this.o = opts;
         this.m = readMap(opts.text);
@@ -95,12 +102,15 @@ export class MapEditor {
         this.redos = [];
         this.hover = null;
         this.drag = null;
+        this.selRect = null;      /* the selected cells, { x, y, w, h } */
+        this.trayKey = 'arcade-tiles-' + (opts.file || '');
         this.tiles = sheetCanvas(opts.sheet, opts.rgb);
         this.build(parent);
         const room = Math.min(this.area.clientWidth - 24, this.area.clientHeight - 24);
         this.setZoom(Math.floor(room / (Math.max(this.m.w, this.m.h) * 8)));
         this.drawPicker();
         this.drawObjects();
+        this.loadTray();
     }
 
     build(parent) {
@@ -129,14 +139,24 @@ export class MapEditor {
         const bar = toolbar();
         this.toolButtons = {};
         for (const [id, ic, title] of [
+            ['select', 'select', 'Select (S): drag to choose cells; Delete clears them, a fill inside fills them all'],
             ['pencil', 'pencil', 'Paint (P); the right button erases'],
-            ['rect', 'rect', 'Rectangle (R)'], ['fill', 'fill', 'Fill (F)'],
+            ['line', 'line', 'Line (L)'],
+            ['rect', 'rect', 'Rectangle (R)'], ['oval', 'oval', 'Oval (C); Shift fills it'],
+            ['fill', 'fill', 'Fill (F); inside the selection, all of it'],
             ['pick', 'pick', 'Pick a tile (I); Alt+click picks with any tool'],
             ['erase', 'erase', 'Erase (E)'],
             ['object', 'object', 'Objects (O): drag on the map to place one, click to choose, drag to move; ' +
                                  'Shift places off the grid']])
             this.toolButtons[id] = bar.add(ic, title, () => this.use(id));
+        /* what can be done to the selection */
+        this.selTools = document.createElement('span');
+        this.selTools.className = 'tb-group';
+        this.selTools.append(
+            iconButton('fill', 'Fill the selection with the brush', () => this.fillSelection(false)),
+            iconButton('trash', 'Clear the selection (Delete)', () => this.fillSelection(true)));
         bar.sep();
+        bar.put(this.selTools);
         this.gridButton = bar.add('grid', 'Grid (G)', () => { this.grid = !this.grid; this.refresh(); });
         const layer = document.createElement('label');
         layer.title = 'Mark the cells whose sprite has a flag';
@@ -178,7 +198,11 @@ export class MapEditor {
         this.area.append(stack);
         this.status = document.createElement('div');
         this.status.className = 'pix-status';
-        main.append(bar.el, this.area, this.status);
+        this.tray = document.createElement('div');
+        this.tray.className = 'map-tray';
+        this.tray.title = 'The tiles in use: click one to paint with it, right-click to take it off; ' +
+            'drag from the picker, or add the brush with +';
+        main.append(bar.el, this.area, this.status, this.tray);
         root.append(this.side.el, main);
         parent.append(root);
         this.fillLayers();
@@ -309,7 +333,17 @@ export class MapEditor {
         });
         g.lineWidth = 1;
         const d = this.drag, hv = this.hover;
-        if (d && d.rect) {
+        const sr = d && d.select ? null : this.selRect;
+        if (sr) {
+            g.strokeStyle = 'rgba(110,160,255,0.95)';
+            g.setLineDash([4, 3]);
+            g.strokeRect(sr.x * k + 0.5, sr.y * k + 0.5, sr.w * k - 1, sr.h * k - 1);
+            g.setLineDash([]);
+        }
+        if (d && d.cells) {
+            g.fillStyle = d.erase ? 'rgba(255,90,90,0.35)' : 'rgba(255,210,60,0.35)';
+            for (const [x, y] of d.cells) g.fillRect(x * k, y * k, k, k);
+        } else if (d && d.rect) {
             const r = d.rect;
             g.strokeStyle = '#ffd23c';
             g.setLineDash([4, 3]);
@@ -322,6 +356,8 @@ export class MapEditor {
         }
         let s = this.m.w + ' by ' + this.m.h + ' cells, ' + this.m.objects.length +
             (this.m.objects.length === 1 ? ' object' : ' objects');
+        if (this.selRect) s += '; ' + this.selRect.w + ' by ' + this.selRect.h + ' selected';
+        this.selTools.hidden = !this.selRect;
         if (hv) {
             const v = this.cell(hv.cx, hv.cy), names = this.o.flagNames();
             const fl = [];
@@ -350,9 +386,67 @@ export class MapEditor {
         g.lineWidth = 2;
         g.strokeRect(b.x * 16 + 1, b.y * 16 + 1, b.w * 16 - 2, b.h * 16 - 2);
         g.lineWidth = 1;
+        if (this.trayItems) this.drawTray();
         const first = b.y * 16 + b.x;
         this.info.textContent = b.w * b.h === 1 ? 'Sprite ' + first
             : 'Sprites ' + first + ' to ' + ((b.y + b.h - 1) * 16 + b.x + b.w - 1) + ', ' + b.w + ' by ' + b.h;
+    }
+
+    /* ---- the tile bar ---- */
+
+    /* the brushes kept for this map, or at first the tiles it uses most */
+    loadTray() {
+        let t = null;
+        try { t = JSON.parse(localStorage.getItem(this.trayKey)); } catch (e) { /* none kept */ }
+        if (!Array.isArray(t)) {
+            const count = new Map();
+            for (const v of this.m.cells) if (v) count.set(v, (count.get(v) || 0) + 1);
+            t = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 24)
+                .map(([v]) => ({ x: v & 15, y: v >> 4, w: 1, h: 1 }));
+        }
+        this.trayItems = t;
+        this.drawTray();
+    }
+
+    saveTray() {
+        try { localStorage.setItem(this.trayKey, JSON.stringify(this.trayItems)); } catch (e) { /* not kept */ }
+        this.drawTray();
+    }
+
+    addToTray(b) {
+        if (this.trayItems.some((q) => sameBrush(q, b))) return;
+        this.trayItems.push({ x: b.x, y: b.y, w: b.w, h: b.h });
+        this.saveTray();
+    }
+
+    drawTray() {
+        this.tray.innerHTML = '';
+        this.trayItems.forEach((b, i) => {
+            const t = document.createElement('button');
+            t.className = 'map-tile' + (sameBrush(b, this.brush) ? ' on' : '');
+            t.title = b.w * b.h === 1 ? 'Sprite ' + (b.y * 16 + b.x)
+                : 'Sprites from ' + (b.y * 16 + b.x) + ', ' + b.w + ' by ' + b.h;
+            const c = document.createElement('canvas');
+            c.width = b.w * 8;
+            c.height = b.h * 8;
+            const g = c.getContext('2d');
+            g.drawImage(this.tiles, b.x * 8, b.y * 8, c.width, c.height, 0, 0, c.width, c.height);
+            t.append(c);
+            t.onclick = () => {
+                this.brush = { x: b.x, y: b.y, w: b.w, h: b.h };
+                this.drawPicker();
+                if (this.tool !== 'pencil' && this.tool !== 'line' && this.tool !== 'rect' &&
+                    this.tool !== 'oval' && this.tool !== 'fill') this.use('pencil');
+                this.main.focus();
+            };
+            t.oncontextmenu = (e) => {
+                e.preventDefault();
+                this.trayItems.splice(i, 1);
+                this.saveTray();
+            };
+            this.tray.append(t);
+        });
+        this.tray.append(iconButton('plus', 'Add the brush to the bar', () => this.addToTray(this.brush)));
     }
 
     /* ---- the map's cells ---- */
@@ -383,8 +477,11 @@ export class MapEditor {
             for (let x = r.x; x < r.x + r.w; x++) this.set(x, y, erase ? 0 : this.pattern(x, y, r.x, r.y));
     }
 
-    /* the cells joined to x, y that share its sprite, filled */
+    /* the cells joined to x, y that share its sprite, filled; inside the
+     * selection, every cell of it */
     flood(x, y, erase) {
+        const r = this.selRect;
+        if (r && x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h) { this.fillRect(r, erase); return; }
         const W = this.m.w, from = this.cell(x, y), seen = new Uint8Array(W * this.m.h), todo = [[x, y]];
         while (todo.length) {
             const [px, py] = todo.pop();
@@ -395,6 +492,48 @@ export class MapEditor {
         for (let i = 0; i < seen.length; i++)
             if (seen[i]) this.set(i % W, Math.floor(i / W), erase ? 0 : this.pattern(i % W, Math.floor(i / W), x, y));
     }
+
+    fillSelection(erase) {
+        if (!this.selRect) return;
+        this.save();
+        this.fillRect(this.selRect, erase);
+        this.commit();
+        this.main.focus();
+    }
+
+    /* ---- the shapes, as lists of cells ---- */
+
+    /* the cells from a to b, a step at a time */
+    lineCells(a, b) {
+        const out = [];
+        let x = a.cx, y = a.cy;
+        const dx = Math.abs(b.cx - x), dy = -Math.abs(b.cy - y), sx = x < b.cx ? 1 : -1, sy = y < b.cy ? 1 : -1;
+        let err = dx + dy;
+        for (;;) {
+            out.push([x, y]);
+            if (x === b.cx && y === b.cy) break;
+            const e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x += sx; }
+            if (e2 <= dx) { err += dx; y += sy; }
+        }
+        return out;
+    }
+
+    /* the cells of the oval in a rectangle of cells: its edge, or all of it */
+    ovalCells(r, filled) {
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2, ry = r.h / 2;
+        const inside = (x, y) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h &&
+            ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1.0001;
+        const out = [];
+        for (let y = r.y; y < r.y + r.h; y++)
+            for (let x = r.x; x < r.x + r.w; x++)
+                if (inside(x, y) && (filled || !inside(x - 1, y) || !inside(x + 1, y) ||
+                                     !inside(x, y - 1) || !inside(x, y + 1))) out.push([x, y]);
+        return out;
+    }
+
+    /* a rectangle in map pixels, as cells */
+    cellsOf(r) { return { x: r.x / 8, y: r.y / 8, w: r.w / 8, h: r.h / 8 }; }
 
     pickAt(cx, cy) {
         const v = this.cell(cx, cy);
@@ -421,14 +560,18 @@ export class MapEditor {
         });
         cv.addEventListener('pointermove', (e) => {
             if (!from) return;
+            const r = cv.getBoundingClientRect();
+            if (e.clientX < r.left || e.clientY < r.top || e.clientX >= r.right || e.clientY >= r.bottom) return;
             const p = cellOf(e);
             this.brush = { x: Math.min(from.x, p.x), y: Math.min(from.y, p.y),
                            w: Math.abs(p.x - from.x) + 1, h: Math.abs(p.y - from.y) + 1 };
             this.drawPicker();
         });
-        const up = () => {
+        const up = (e) => {
             if (!from) return;
             from = null;
+            const over = e && document.elementFromPoint(e.clientX, e.clientY);
+            if (over && this.tray.contains(over)) this.addToTray(this.brush);
             if (this.tool === 'pick' || this.tool === 'erase' || this.tool === 'object') this.use('pencil');
             this.main.focus();
         };
@@ -448,9 +591,17 @@ export class MapEditor {
             try { ov.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
             if (this.tool === 'object') { this.objectDown(p, e); return; }
             if (e.altKey || this.tool === 'pick') { this.pickAt(p.cx, p.cy); return; }
+            if (this.tool === 'select') { this.drag = { from: p, select: true, rect: this.cellRect(p, p) }; this.refresh(); return; }
             this.save();
             if (this.tool === 'fill') { this.flood(p.cx, p.cy, erase); this.commit(); return; }
             if (this.tool === 'rect') { this.drag = { from: p, erase, rect: this.cellRect(p, p) }; this.refresh(); return; }
+            if (this.tool === 'line') { this.drag = { from: p, erase, cells: [[p.cx, p.cy]] }; this.refresh(); return; }
+            if (this.tool === 'oval') {
+                const rect = this.cellRect(p, p);
+                this.drag = { from: p, erase, rect, cells: this.ovalCells(this.cellsOf(rect), e.shiftKey) };
+                this.refresh();
+                return;
+            }
             this.drag = { from: p, erase, last: null };
             this.paintAt(p);
         });
@@ -459,8 +610,12 @@ export class MapEditor {
             this.hover = p;
             if (!d) this.cursor(p, e.altKey);
             if (d && d.object) this.objectMove(p, e);
-            else if (d && this.tool === 'rect') d.rect = this.cellRect(d.from, p);
-            else if (d) this.paintAt(p);
+            else if (d && (d.select || this.tool === 'rect')) d.rect = this.cellRect(d.from, p);
+            else if (d && this.tool === 'line') d.cells = this.lineCells(d.from, p);
+            else if (d && this.tool === 'oval') {
+                d.rect = this.cellRect(d.from, p);
+                d.cells = this.ovalCells(this.cellsOf(d.rect), e.shiftKey);
+            } else if (d) this.paintAt(p);
             this.refresh();
         });
         ov.addEventListener('pointerleave', () => { this.hover = null; this.refresh(); });
@@ -469,9 +624,11 @@ export class MapEditor {
             if (!d) return;
             this.drag = null;
             if (d.object) { this.objectUp(d); return; }
-            if (this.tool === 'rect') {
-                const r = d.rect;
-                this.fillRect({ x: r.x / 8, y: r.y / 8, w: r.w / 8, h: r.h / 8 }, d.erase);
+            if (d.select) { this.selRect = this.cellsOf(d.rect); this.refresh(); return; }
+            if (this.tool === 'rect') this.fillRect(this.cellsOf(d.rect), d.erase);
+            if (d.cells) {
+                const x0 = d.rect ? d.rect.x / 8 : d.from.cx, y0 = d.rect ? d.rect.y / 8 : d.from.cy;
+                for (const [x, y] of d.cells) this.set(x, y, d.erase ? 0 : this.pattern(x, y, x0, y0));
             }
             this.commit();
         };
@@ -719,13 +876,16 @@ export class MapEditor {
             else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); this.redoEdit(); }
             return;
         }
-        const tools = { p: 'pencil', r: 'rect', f: 'fill', i: 'pick', e: 'erase', o: 'object' };
+        const tools = { s: 'select', p: 'pencil', l: 'line', r: 'rect', c: 'oval', f: 'fill', i: 'pick',
+                        e: 'erase', o: 'object' };
         if (tools[k]) this.use(tools[k]);
+        else if ((k === 'delete' || k === 'backspace') && this.selRect && !(this.tool === 'object' && o))
+            this.fillSelection(true);
         else if (k === 'g') { this.grid = !this.grid; this.refresh(); }
         else if (k === '+' || k === '=') this.setZoom(this.zoom + 1);
         else if (k === '-') this.setZoom(this.zoom - 1);
         else if ((k === 'delete' || k === 'backspace') && o) this.removeObject();
-        else if (k === 'escape') this.choose(-1);
+        else if (k === 'escape') { this.selRect = null; this.choose(-1); this.refresh(); }
         else if (o && k.startsWith('arrow')) {
             const step = e.shiftKey ? 8 : 1;
             this.save();

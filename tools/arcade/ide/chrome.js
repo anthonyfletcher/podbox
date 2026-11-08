@@ -78,3 +78,41 @@ export function numberBox(label, value, min, max, title, set) {
     l.append(label, i);
     return l;
 }
+
+/* a toolbar button that drops a list down under it: fill(list) puts the
+ * list's rows in each time it opens; it closes on a click elsewhere or
+ * Escape. setLabel(text) changes what the button says. */
+export function dropdown(label, title, fill) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tb-drop';
+    b.title = title;
+    const text = document.createElement('span');
+    b.append(text);
+    b.insertAdjacentHTML('beforeend', icon('down'));
+    const setLabel = (t) => { text.textContent = t; };
+    setLabel(label);
+    let list = null;
+    const close = () => {
+        if (!list) return;
+        list.remove();
+        list = null;
+        document.removeEventListener('pointerdown', outside, true);
+        document.removeEventListener('keydown', key, true);
+    };
+    const outside = (e) => { if (list && !list.contains(e.target) && !b.contains(e.target)) close(); };
+    const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    const open = () => {
+        list = document.createElement('div');
+        list.className = 'drop-list';
+        fill(list);
+        const r = b.getBoundingClientRect();
+        list.style.left = r.left + 'px';
+        list.style.top = r.bottom + 2 + 'px';
+        document.body.append(list);
+        document.addEventListener('pointerdown', outside, true);
+        document.addEventListener('keydown', key, true);
+    };
+    b.onclick = () => { if (list) close(); else open(); };
+    return { el: b, setLabel, close, refill: () => { if (list) { list.innerHTML = ''; fill(list); } } };
+}

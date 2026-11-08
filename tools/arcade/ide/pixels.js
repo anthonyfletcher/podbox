@@ -15,7 +15,7 @@
  * pasting back here is exact. */
 
 import { iconButton, toolCursor } from './icons.js';
-import { sidePanel, toolbar, numberBox } from './chrome.js';
+import { sidePanel, toolbar, numberBox, dropdown } from './chrome.js';
 
 const MARK = 'arcade-pixels ';
 const MAX_UNDO = 100;
@@ -98,10 +98,10 @@ export class PixelEditor {
         const root = this.root = document.createElement('div');
         root.className = 'pix';
         root.tabIndex = 0;
-        const tools = [['pencil', 'pencil', 'Pencil (P)'], ['line', 'line', 'Line (L)'],
+        const tools = [['select', 'select', 'Select (S): drag to choose, drag inside to move'],
+                       ['pencil', 'pencil', 'Pencil (P)'], ['line', 'line', 'Line (L)'],
                        ['rect', 'rect', 'Rectangle (R); Shift fills it'], ['oval', 'oval', 'Oval (O); Shift fills it'],
-                       ['fill', 'fill', 'Fill (F)'], ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool'],
-                       ['select', 'select', 'Select (S): drag to choose, drag inside to move']];
+                       ['fill', 'fill', 'Fill (F)'], ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool']];
         const bar = this.bar = document.createElement('div');
         bar.className = 'tb';
         this.toolButtons = {};
@@ -261,11 +261,12 @@ export class PixelEditor {
             g.translate(this.w * z, this.h * z);
         }
         if (this.onion) {
-            g.globalAlpha = 0.35;
+            /* faintly over the picture, wherever the other frame differs */
+            g.globalAlpha = 0.45;
             for (let y = 0; y < this.h; y++)
                 for (let x = 0; x < this.w; x++) {
                     const v = this.onion[y * this.w + x];
-                    if (!v || this.px[y * this.w + x]) continue;
+                    if (!v || v === this.px[y * this.w + x]) continue;
                     g.fillStyle = '#' + shown(this.rgb[v] || 0).toString(16).padStart(6, '0');
                     g.fillRect(x * z, y * z, z, z);
                 }
@@ -782,7 +783,7 @@ export class SheetEditor {
         this.side = sidePanel('Sprites', (open) => this.o.pickerShown(open));
         const bar = toolbar();
         this.animButton = bar.add('animate', 'Animate the chosen cells: frames left to right', () => this.animate());
-        this.onionButton = bar.add('onion', 'Onion skin: the frame before, faintly. ' +
+        this.onionButton = bar.add('onion', 'Onion skin: the frame or sprites before, faintly over these. ' +
                                    'Right-click a cell to show that one instead', () => this.toggleOnion());
         this.picker = document.createElement('canvas');
         this.picker.className = 'sheet-picker';
@@ -894,9 +895,8 @@ export class SheetEditor {
         if (this.o.flags) {
             const sep = document.createElement('span');
             sep.className = 'sep';
-            this.flagRow = document.createElement('span');
-            this.flagRow.className = 'pix-flags';
-            this.editor.bar.append(sep, this.flagRow);
+            this.flagDrop = dropdown('Flags', 'The chosen sprites\' flags', (list) => this.flagList(list));
+            this.editor.bar.append(sep, this.flagDrop.el);
             this.drawFlags();
         }
         if (this.o.tools) {
@@ -913,15 +913,23 @@ export class SheetEditor {
     /* the toolbar, the picker and the onion skin brought up to date */
     refresh() {
         this.animButton.disabled = !this.framing();
-        if (this.onion === 'prev' && this.frameOf() < 0) this.onion = null;
-        this.onionButton.disabled = !this.onion && this.frameOf() < 0;
+        if (this.onion === 'prev' && !this.before()) this.onion = null;
+        this.onionButton.disabled = !this.onion && !this.before();
         this.onionButton.classList.toggle('on', !!this.onion);
-        const c = this.cell, o = this.onion, a = this.o.anim;
-        let skin = null;
-        if (o === 'prev') skin = this.frame((this.frameOf() + a.n - 1) % a.n);
-        else if (o) skin = this.block(o.x, o.y, c.w, c.h);
+        const c = this.cell, o = this.onion === 'prev' ? this.before() : this.onion;
+        const skin = o ? this.block(o.x, o.y, c.w, c.h) : null;
         this.editor.setOnion(skin);
         this.drawPicker();
+    }
+
+    /* the block before the chosen one: the frame before in its animation,
+     * else the block to its left, or at the end of the row above */
+    before() {
+        const c = this.cell, a = this.o.anim, k = this.frameOf();
+        if (k >= 0) return { x: a.x + (k + a.n - 1) % a.n * a.w, y: a.y };
+        if (c.x >= c.w) return { x: c.x - c.w, y: c.y };
+        if (c.y >= c.h) return { x: this.cols - c.w, y: c.y - c.h };
+        return null;
     }
 
     toggleOnion() {
@@ -1069,14 +1077,14 @@ export class SheetEditor {
             g.moveTo(0, k * z + 0.5); g.lineTo(this.cols * 8 * z, k * z + 0.5);
         }
         g.stroke();
-        const an = this.o.anim, c = this.cell, o = this.onion;
+        const an = this.o.anim, c = this.cell, o = this.onion === 'prev' ? this.before() : this.onion;
         if (an) {
             g.strokeStyle = 'rgba(110,160,255,0.9)';
             g.setLineDash([3, 2]);
             g.strokeRect(an.x * 8 * z + 0.5, an.y * 8 * z + 0.5, an.n * an.w * 8 * z - 1, an.h * 8 * z - 1);
             g.setLineDash([]);
         }
-        if (o && o !== 'prev') {
+        if (o) {
             g.strokeStyle = 'rgba(200,120,255,0.95)';
             g.setLineDash([2, 2]);
             g.strokeRect(o.x * 8 * z + 1.5, o.y * 8 * z + 1.5, c.w * 8 * z - 3, c.h * 8 * z - 3);
@@ -1096,28 +1104,36 @@ export class SheetEditor {
     /* each flag on for all the chosen sprites, for some, or for none; a
      * click sets it on all of them, or clears it where all had it */
     drawFlags() {
-        if (!this.o.flags) return;
+        if (!this.o.flags || !this.flagDrop) return;
         const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
-        this.flagRow.innerHTML = '';
-        const label = document.createElement('span');
-        label.className = 'note';
-        label.textContent = 'Flags';
-        this.flagRow.append(label);
+        const set = [];
+        for (let b = 0; b < 8; b++)
+            if (n.every((s) => f[s] >> b & 1)) set.push(names[b] || b);
+        this.flagDrop.setLabel('Flags: ' + (set.length ? set.join(', ') : 'none'));
+        this.flagDrop.refill();
+    }
+
+    /* the eight flags in the dropdown: each ticked where all the chosen
+     * sprites have it, a dash where some do; a click sets it on all of
+     * them, or clears it where all had it */
+    flagList(list) {
+        const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
         for (let b = 0; b < 8; b++) {
             const on = n.filter((s) => f[s] >> b & 1).length;
+            const row = document.createElement('div');
+            row.className = 'drop-row';
             const t = document.createElement('button');
-            t.textContent = names[b] || b;
-            t.title = (names[b] ? 'FLAG.' + names[b] + ', flag ' + b : 'Flag ' + b) +
-                '. Double-click to name it.';
-            t.ondblclick = () => this.o.nameFlag(b);
-            t.classList.toggle('on', on === n.length);
-            t.classList.toggle('some', on > 0 && on < n.length);
+            t.className = 'drop-item' + (on === n.length ? ' on' : on ? ' some' : '');
+            t.textContent = names[b] ? names[b] : 'Flag ' + b;
+            t.title = names[b] ? 'FLAG.' + names[b] + ', flag ' + b : 'Flag ' + b;
             t.onclick = () => {
                 for (const s of n) f[s] = on === n.length ? f[s] & ~(1 << b) : f[s] | 1 << b;
                 this.o.flagsChanged(f);
                 this.drawFlags();
             };
-            this.flagRow.append(t);
+            const name = iconButton('pencil', 'Name flag ' + b, () => { this.flagDrop.close(); this.o.nameFlag(b); });
+            row.append(t, name);
+            list.append(row);
         }
     }
 }

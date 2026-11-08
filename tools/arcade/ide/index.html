@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arcade</title>
+<title>ArcadeIDE</title>
 <style>
 :root {
     --bg: #f4f3f0; --panel: #ffffff; --ink: #1c1c22; --dim: #6b6a73;
@@ -39,6 +39,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
                border: 1px solid var(--line); border-radius: 8px;
                box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
 .menu.open .items { display: block; }
+.menu .items [hidden] { display: none; }
 .menu .items button { display: flex; width: 100%; border: none; background: none;
                       text-align: left; padding: 6px 10px; border-radius: 5px; }
 .menu .items button:hover { background: var(--accent); color: #fff; }
@@ -47,8 +48,8 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .menu .items button:hover kbd { color: #fff; }
 .menu .items hr { border: none; border-top: 1px solid var(--line); margin: 4px 6px; }
 .menu .items .label { font-size: 12px; color: var(--dim); padding: 4px 10px 2px; }
-.menu .items .choice::before, .menu .items .check::before { content: ""; display: inline-block;
-                      width: 18px; }
+/* every item keeps the tick's column, so a ticked one lines up with the rest */
+.menu .items button::before { content: ""; display: inline-block; width: 18px; flex: none; }
 .menu .items .choice.on::before { content: "\25CF"; }
 .menu .items .check.on::before { content: "\2713"; }
 
@@ -88,8 +89,8 @@ body.files-closed.player-closed #layout { grid-template-columns: 28px 0 minmax(0
 .ib.go { color: var(--good); }
 .ib svg { display: block; }
 .rail { display: none; writing-mode: vertical-rl; border: none; border-radius: 0; background: none;
-        color: var(--dim); font-size: 12px; padding: 10px 0; width: 28px; height: 100%;
-        text-align: left; letter-spacing: 0.05em; }
+        color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase;
+        padding: 10px 0; width: 28px; height: 100%; text-align: left; letter-spacing: 0.05em; }
 .rail:hover { color: var(--ink); background: var(--bg); }
 body.files-closed #side-files > :not(.rail), body.player-closed #side-player > :not(.rail) { display: none; }
 body.files-closed #side-files > .rail, body.player-closed #side-player > .rail { display: block; }
@@ -132,6 +133,8 @@ body.output-closed #output, body.output-closed #centre > .split.h { display: non
           background: var(--panel); }
 #editor .cm-editor { flex: 1; min-height: 0; font-size: 13.5px; }
 #editor .cm-scroller { font-family: ui-monospace, Consolas, monospace; }
+#editor .cm-panels { background: var(--panel); color: var(--ink); border: none; }
+.tb.find input[type=text] { width: 200px; font: 13px ui-monospace, Consolas, monospace; height: 26px; }
 #editor p { margin: 0 24px; color: var(--dim); }
 .text-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .text-host .cm-editor { flex: 1; min-height: 0; }
@@ -148,10 +151,9 @@ body.output-closed #output, body.output-closed #centre > .split.h { display: non
 #wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
 #wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
               dominant-baseline: middle; pointer-events: none; }
-#play { width: 320px; border: none; justify-content: center; background: none; }
-#stop { display: none; }
-body.running #stop { display: inline-flex; }
-body.running #run { display: none; }
+body.running #power { color: var(--good); }
+/* the owner's music stands idle while the player is off */
+body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 #music { width: 320px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
          display: flex; flex-direction: column; gap: 4px; }
 #music .row { display: flex; align-items: center; gap: 6px; }
@@ -175,11 +177,22 @@ body.running #run { display: none; }
 .swatch { width: 22px; height: 22px; padding: 0; border-radius: 4px; border: 2px solid transparent; }
 .swatch.first { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
 .swatch.second { outline: 2px dashed var(--dim); outline-offset: 1px; }
-.pix-flags { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; }
-.pix-flags .note { margin: 0 4px 0 0; }
-.pix-flags button { min-width: 24px; height: 24px; padding: 0 6px; font-size: 12px; border-radius: 5px; }
-.pix-flags button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pix-flags button.some { border-color: var(--accent); border-style: dashed; }
+/* a toolbar dropdown and its list */
+.tb-drop { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 8px;
+        font-size: 12px; border-radius: 5px; max-width: 260px; }
+.tb-drop span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-drop svg { width: 14px; height: 14px; flex: none; color: var(--dim); }
+.drop-list { position: fixed; z-index: 20; min-width: 180px; padding: 4px; background: var(--panel);
+             border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
+.drop-row { display: flex; align-items: center; }
+.drop-row .ib { width: 24px; height: 24px; opacity: 0; }
+.drop-row:hover .ib { opacity: 1; }
+.drop-item { flex: 1; display: flex; align-items: center; border: none; background: none; text-align: left;
+             padding: 5px 8px; border-radius: 5px; font-size: 13px; }
+.drop-item:hover { background: var(--bg); }
+.drop-item::before { content: ""; display: inline-block; width: 18px; flex: none; }
+.drop-item.on::before { content: "\2713"; }
+.drop-item.some::before { content: "\2013"; }
 /* an editor's own side panel, folding to a rail like the IDE's */
 .ed-side { width: 288px; flex: none; border-right: 1px solid var(--line); background: var(--panel);
            display: flex; flex-direction: column; min-height: 0; }
@@ -217,7 +230,14 @@ body.running #run { display: none; }
 .map-insp input { font: 12px ui-monospace, Consolas, monospace; padding: 2px 4px; border-radius: 4px; min-width: 0;
                   width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--ink); height: 24px; }
 .tb .map-kindbox input { width: 96px; }
+.tb-group { display: inline-flex; align-items: center; gap: 2px; }
 .tb [hidden], .ed-side [hidden] { display: none; }
+/* the map's tile bar, as the pictures' palette */
+.map-tray { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 6px 10px; min-height: 40px; }
+.map-tile { width: auto; min-width: 28px; height: 28px; padding: 1px; border-radius: 4px; display: inline-flex;
+            align-items: center; justify-content: center; border: 2px solid transparent; background: var(--bg); }
+.map-tile canvas { height: 22px; image-rendering: pixelated; }
+.map-tile.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
 .ed-sub.fold { cursor: pointer; user-select: none; }
 .ed-sub .twist { display: inline-flex; width: 18px; margin-left: -4px; }
 .ed-sub .twist svg { width: 14px; height: 14px; }
@@ -324,6 +344,9 @@ dialog.ask { min-width: 340px; }
            margin: 8px 0; }
 .ask-row[hidden] { display: none; }
 .ask-row small { grid-column: 2; color: var(--dim); font-size: 12px; }
+.ask-row small.bad { color: var(--bad); }
+.ask-row small[hidden] { display: none; }
+.ask-buttons button:disabled { opacity: 0.45; cursor: default; }
 .ask-row input, .ask-row select { font: inherit; padding: 4px 6px; border-radius: 5px;
            border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .ask-text { max-width: 380px; line-height: 1.45; color: var(--dim); }
@@ -332,21 +355,22 @@ dialog.ask { min-width: 340px; }
 </head>
 <body class="output-closed">
 <header>
-  <h1>Arcade</h1>
+  <h1>ArcadeIDE</h1>
   <nav id="menubar">
     <div class="menu"><button class="title">Cart</button><div class="items">
       <button data-do="new">New cart</button>
-      <button data-do="settings">Settings&hellip;</button>
       <button data-do="open">Open&hellip;<kbd>Ctrl+O</kbd></button>
       <button data-do="open-folder">Open folder&hellip;</button>
       <hr>
       <button data-do="save">Save<kbd>Ctrl+S</kbd></button>
       <button data-do="export">Save as .pbg&hellip;</button>
+      <hr>
+      <button data-do="settings">Settings&hellip;</button>
     </div></div>
     <div class="menu"><button class="title">File</button><div class="items">
       <button data-do="add">New file&hellip;</button>
       <button data-do="import">Add files from disk&hellip;</button>
-      <button data-do="export-picture">Export picture&hellip;</button>
+      <button data-do="export-picture" hidden>Export picture&hellip;</button>
       <hr>
       <button data-do="rename">Rename&hellip;</button>
       <button data-do="remove">Delete</button>
@@ -403,6 +427,7 @@ dialog.ask { min-width: 340px; }
   <aside id="side-player" class="side">
     <button class="rail" data-toggle="player" title="Show the player (Ctrl+Shift+B)">Player</button>
     <div class="panel-head"><span class="grow">Player</span>
+      <button class="ib" id="power" data-icon="power" title="Turn on: run the cart (Ctrl+Enter)"></button>
       <button class="ib" data-toggle="player" data-icon="right" title="Hide (Ctrl+Shift+B)"></button></div>
     <div id="player-body">
       <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
@@ -414,8 +439,6 @@ dialog.ask { min-width: 340px; }
         <text x="-72">|&#x25C0;&#x25C0;</text>
         <text y="74">&#x25B6; ||</text>
       </svg>
-      <div id="play" class="tb"><button id="run" class="ib go" data-icon="play" title="Run (Ctrl+Enter)"></button>
-        <button id="stop" class="ib" data-icon="stop" title="Stop (Shift+Ctrl+Enter)"></button></div>
       <div id="music">
         <div class="row">
           <button id="m-prev" class="ib" data-icon="prev" title="Back a track"></button>

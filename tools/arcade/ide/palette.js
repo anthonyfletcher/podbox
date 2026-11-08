@@ -178,9 +178,7 @@ export class PaletteEditor {
         note.className = 'pal-note';
         const twins = this.same.find((v) => v.includes(i));
         const others = twins ? twins.filter((k) => k !== i) : [];
-        note.textContent = (shown(c) === c ? '' : 'The iPod shows it as ' + hex(shown(c)) +
-                                                  ', the nearest colour its screen has. ') +
-            (this.uses[i] ? this.uses[i] + ' pixels use it.' : 'No picture uses it.') +
+        note.textContent = (this.uses[i] ? this.uses[i] + ' pixels use it.' : 'No picture uses it.') +
             (others.length ? ' On the iPod it looks the same as colour ' + others.join(' and ') + '.' : '');
         if (twins) note.classList.add('warn');
         fields.append(note);

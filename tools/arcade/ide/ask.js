@@ -5,8 +5,9 @@
  *
  * fields: { name, label, value } for text; with options ([[value, label],
  * ...]) a choice; with type 'number' a number; with note, text under it;
- * with when(answers), shown only while that holds; { text } is a paragraph
- * to read. No fields asks only to confirm: the answer is {} for ok, null
+ * with when(answers), shown only while that holds; with check(value,
+ * answers), the problem with an answer, or nothing when it will do: OK
+ * waits until every field shown will do. { text } is a paragraph to read. No fields asks only to confirm: the answer is {} for ok, null
  * otherwise. */
 
 export function ask(title, fields, ok) {
@@ -50,18 +51,29 @@ export function ask(title, fields, ok) {
             input.name = f.name;
             inputs[f.name] = input;
             row.append(label, input);
-            if (f.note) {
-                const n = document.createElement('small');
-                n.textContent = f.note;
-                row.append(n);
-            }
+            const n = document.createElement('small');
+            n.textContent = f.note || '';
+            row.append(n);
             form.append(row);
-            rows.push([row, f]);
+            rows.push([row, f, input, n]);
         }
         const values = () => Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]));
-        const refresh = () => { for (const [row, f] of rows) row.hidden = !!f.when && !f.when(values()); };
-        form.addEventListener('input', refresh);
-        refresh();
+        /* each field shown or not, and its problem in place of its note once
+         * something is typed; OK only when there is none */
+        const refresh = () => {
+            const v = values();
+            let ready = true;
+            for (const [row, f, input, n] of rows) {
+                row.hidden = !!f.when && !f.when(v);
+                const problem = !row.hidden && f.check ? f.check(input.value, v) : null;
+                if (problem) ready = false;
+                const say = problem && input.value !== '';
+                n.textContent = say ? problem : f.note || '';
+                n.classList.toggle('bad', !!say);
+                n.hidden = !n.textContent;
+            }
+            yes.disabled = !ready;
+        };
         const buttons = document.createElement('div');
         buttons.className = 'ask-buttons';
         const cancel = document.createElement('button');
@@ -71,6 +83,9 @@ export function ask(title, fields, ok) {
         yes.className = 'primary';
         yes.textContent = ok || 'OK';
         buttons.append(cancel, yes);
+        form.addEventListener('input', refresh);
+        form.addEventListener('change', refresh);
+        refresh();
         form.append(buttons);
         d.append(form);
         document.body.append(d);
