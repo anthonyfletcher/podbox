@@ -3975,7 +3975,9 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
         row_touched(&p, lo);
         row_touched(&p, p.cy1 - 1);
     }
-    p.cost += samples * 5 / 4 + filled / 4;
+    /* measured on the ARM rig (drawprobe): a smooth sample, with a ramp,
+     * costs twice a plain one */
+    p.cost += samples * (l->ramp ? 11 : 5) / 4 + filled / 4;
     finish(vm, &p);
     return samples;
 }
@@ -4051,12 +4053,15 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                              (uint32_t)du, (uint32_t)dv, &e);
                 read += (uint32_t)n * PER16_EDGE;
             }
-            if (step == 2)
+            if (step == 2) {
                 for (int32_t i = 0, x = x0; x < x1; i++, x += 2) {
                     px[x] = half[i];
                     if (x + 1 < x1)
                         px[x + 1] = half[i];
                 }
+                /* the doubling, a byte at a time: measured on the rig */
+                read += (uint32_t)(x1 - x0) * 6;
+            }
             if (r->fog)
                 fog_row(px, y, x0, x1, r->fog, fogc);
         }
@@ -4098,7 +4103,9 @@ static void billboard_copy(struct pen *p, const struct sheet *sh, int32_t s,
     m.xl = ones;
     copy_rect(&m, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
               cw * 8, ch * 8, x, y, w, h, flip, 0);
-    p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16;
+    /* the table and the second copy: about 80 units a fogged billboard,
+     * measured on the ARM rig (drawprobe) */
+    p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16 + 80;
     for (int32_t r = y0; r < y1; r++) {
         const uint8_t *b = bayer[r & 3], *mr = mask + r * SCREEN_W;
         uint8_t *dr = p->s.px + r * p->s.w;
@@ -4178,11 +4185,17 @@ void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
     int32_t y0 = top > p.cy0 ? top : p.cy0;
     int32_t y1 = bottom < p.cy1 ? bottom : p.cy1;
     uint32_t drawn = 0;
+    /* (x - SCREEN_W / 2) * fov / SCREEN_W, rounded toward zero as a 64-bit
+     * divide would, without one a column: with fov = q * SCREEN_W + r it is
+     * k * q + k * r / SCREEN_W, and k * r is small */
+    int64_t fov_q = v->fov / SCREEN_W;
+    int32_t fov_r = (int32_t)(v->fov % SCREEN_W);
     if (y0 < y1)
         for (int32_t x = p.cx0; x < p.cx1; x++) {
             /* turns round from the angle, 16.16: east is the image's left */
-            int64_t turn = -(int64_t)v->angle +
-                           (int64_t)(x - SCREEN_W / 2) * v->fov / SCREEN_W;
+            int32_t k = x - SCREEN_W / 2;
+            int64_t turn = -(int64_t)v->angle + k * fov_q +
+                           k * fov_r / SCREEN_W;
             int32_t u = (int32_t)(((turn & 0xffff) * w) >> 16);
             const uint8_t *src = px + (y0 - top) * w + u;
             uint8_t *dst = p.s.px + y0 * p.s.w + x;
@@ -4199,7 +4212,9 @@ void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
         row_touched(&p, y1 - 1);
     }
     p.count += drawn;
-    p.cost += (uint32_t)((p.cx1 - p.cx0) * (y1 > y0 ? y1 - y0 : 0)) / 4;
+    /* measured on the ARM rig (drawprobe): about 10 units per 16 pixels
+     * of the area, the columns read down the image */
+    p.cost += (uint32_t)((p.cx1 - p.cx0) * (y1 > y0 ? y1 - y0 : 0)) * 10 / 16;
     finish(vm, &p);
 }
 
@@ -4386,7 +4401,9 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
         row_touched(&p, y1 - 1);
     }
     v->depth_set = 1;
-    p.cost += steps * 2 + hit * 40 + drawn * PER16_FLOOR / 16;
+    /* the parts as weighed, a third more: measured on the ARM rig
+     * (drawprobe) */
+    p.cost += (steps * 2 + hit * 40 + drawn * PER16_FLOOR / 16) * 4 / 3;
     finish(vm, &p);
     return hit;
 }
@@ -4544,7 +4561,7 @@ NATIVE(light_draw)
             measured += (uint32_t)(xb - xa);
         }
         if (measured > 65536) {
-            if (!vm_spend(vm, measured / 16))
+            if (!vm_spend(vm, measured * 11 / 16))
                 return 0;
             measured = 0;
         }
@@ -4583,8 +4600,13 @@ NATIVE(light_draw)
                 px[x] = lut[row[x]][px[x]];
         row_touched(&p, y);
     }
+    /* measured on the ARM rig (drawprobe): the tables about 460 units a
+     * level, the buffer cleared a unit per 16 bytes, the lit rows 11 units
+     * per 16 pixels, the map pass 4 per 16 */
     p.count = (uint32_t)(w * h);
-    p.cost += measured / 16;
+    p.per16 = 4;
+    p.cost += levels * 460 + (uint32_t)(w * h) / BYTES_PER_UNIT +
+              measured * 11 / 16;
     finish(vm, &p);
     return 1;
 }

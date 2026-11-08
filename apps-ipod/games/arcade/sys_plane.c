@@ -382,7 +382,9 @@ NATIVE(plane_billboards)
                             column_at(&c[7], i, 1),
                             column_true(vm, &c[5], i, 0), dep[i]);
     }
-    vm_charge(vm, 10 + (uint32_t)n * 4);
+    /* each billboard's projection and sizing, its 64-bit divides most of
+     * it: about 33 units, measured on the ARM rig (drawprobe) */
+    vm_charge(vm, 10 + (uint32_t)n * 33);
     *out = mk(T_INT, k);
     return 1;
 }
