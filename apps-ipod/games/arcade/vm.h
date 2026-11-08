@@ -352,6 +352,11 @@ struct vm
     /* Cost */
     uint32_t units;             /* in the current call from the host */
     uint32_t budget;            /* until the next yield */
+    /* the units the slice running holds: YIELD_UNITS, but for a call's
+     * first, which carries on the last call's, so yields -- and the
+     * profiler's samples -- fall at different places in each tick's work
+     * rather than always at the same one */
+    uint32_t slice;
     uint32_t ceiling;
     /* For a profiler at a yield: the API slot of the native running, or
      * -1; and whether the yield is the bytecode's own, between

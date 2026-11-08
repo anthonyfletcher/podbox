@@ -718,12 +718,13 @@ static int lacks(struct vm *vm, const char *s)
  * from 0 to rows - 1 too, and the drawing made plain -- no camera, clip,
  * fill pattern or palette swaps -- in the cart's font, or FONT.WORLD
  * when the text needs it */
-static uint32_t quiet_units, quiet_budget;
+static uint32_t quiet_units, quiet_budget, quiet_slice;
 
 static void quiet_begin(struct vm *vm, int rows, int world)
 {
     quiet_units = vm->units;
     quiet_budget = vm->budget;
+    quiet_slice = vm->slice;
     if (!(vm->ui_box | vm->ui_ink | vm->ui_hi)) {
         /* until ui.style(): the palette's dark blue, white and yellow */
         vm->ui_box = 1;
@@ -749,6 +750,7 @@ static void quiet_end(struct vm *vm, int rows)
     vm->d = saved;
     vm->units = quiet_units;
     vm->budget = quiet_budget;
+    vm->slice = quiet_slice;
 }
 
 /* g shown and answered: the game's screen and drawing state kept, and put

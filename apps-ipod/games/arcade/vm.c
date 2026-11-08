@@ -1235,7 +1235,8 @@ void vm_charge(struct vm *vm, uint32_t units)
 {
     while (units >= vm->budget) {
         units -= vm->budget;
-        vm->units += YIELD_UNITS;
+        vm->units += vm->slice;
+        vm->slice = YIELD_UNITS;
         vm->budget = YIELD_UNITS;
         if (vm->host && vm->host->yield)
             vm->host->yield(vm->host->ctx);
@@ -1350,7 +1351,8 @@ static int run(struct vm *vm, uint32_t stop)
 slice:
     /* Every YIELD_UNITS units: let the codec run, and stop a cart that has
      * run away. Where the bytecode is goes in its frame, for a profiler. */
-    vm->units += YIELD_UNITS;
+    vm->units += vm->slice;
+    vm->slice = YIELD_UNITS;
     budget = YIELD_UNITS;
     if (vm->host && vm->host->yield) {
         vm->frames[vm->nframes - 1].pc = (uint32_t)(pc - code);
@@ -1849,12 +1851,14 @@ static int call_entry(struct vm *vm, int which)
 static void begin(struct vm *vm)
 {
     vm->units = 0;
-    vm->budget = YIELD_UNITS;
+    if (!vm->budget || vm->budget > YIELD_UNITS)
+        vm->budget = YIELD_UNITS;
+    vm->slice = vm->budget;
 }
 
 static void end(struct vm *vm)
 {
-    vm->units += YIELD_UNITS - vm->budget;
+    vm->units += vm->slice - vm->budget;
 }
 
 int arcade_menu_choose(struct vm *vm, int i, int button)
@@ -1937,7 +1941,7 @@ void vm_out_set(struct vm *vm, struct value o, uint32_t i, struct value v)
 
 uint32_t arcade_units_now(const struct vm *vm)
 {
-    return vm->units + (YIELD_UNITS - vm->budget);
+    return vm->units + (vm->slice - vm->budget);
 }
 
 int arcade_where(const struct vm *vm, uint32_t *fns, int max, uint32_t *pc,
