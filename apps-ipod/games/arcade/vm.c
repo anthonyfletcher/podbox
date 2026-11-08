@@ -676,11 +676,14 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         if (!need(vm, self, T_ARR, ".push() needs an array, not a "))
             return 0;
         uint32_t n = ARR(vm, self)->len;
-        if (!arr_reserve(vm, self, n + 1))
+        if (!arr_reserve(vm, self, n + (uint32_t)argc))
             return 0;
-        BUF(vm, ARR(vm, self)->buf)->v[n] = a[0];
-        ARR(vm, self)->len = n + 1;
-        out = mk(T_INT, (int32_t)(n + 1));
+        struct value *v = BUF(vm, ARR(vm, self)->buf)->v;
+        for (int k = 0; k < argc; k++)
+            v[n + (uint32_t)k] = a[k];
+        n += (uint32_t)argc;
+        ARR(vm, self)->len = n;
+        out = mk(T_INT, (int32_t)n);
         break;
     }
     case M_pop:
@@ -706,15 +709,16 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
     case M_unshift: {
         if (!need(vm, self, T_ARR, ".unshift() needs an array, not a "))
             return 0;
-        uint32_t n = ARR(vm, self)->len;
-        if (!arr_reserve(vm, self, n + 1))
+        uint32_t n = ARR(vm, self)->len, k = (uint32_t)argc;
+        if (!arr_reserve(vm, self, n + k))
             return 0;
         struct value *v = BUF(vm, ARR(vm, self)->buf)->v;
-        memmove(v + 1, v, n * sizeof(struct value));
+        memmove(v + k, v, n * sizeof(struct value));
         work = n * sizeof(struct value);
-        v[0] = a[0];
-        ARR(vm, self)->len = n + 1;
-        out = mk(T_INT, (int32_t)(n + 1));
+        for (uint32_t i = 0; i < k; i++)
+            v[i] = a[i];
+        ARR(vm, self)->len = n + k;
+        out = mk(T_INT, (int32_t)(n + k));
         break;
     }
     case M_splice: {
@@ -730,18 +734,22 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             k = a[1].v < 0 ? 0 : (uint32_t)a[1].v > len - s ? len - s
                                                              : (uint32_t)a[1].v;
         }
+        uint32_t add = argc > 2 ? (uint32_t)argc - 2 : 0;
+        if (add > k && !arr_reserve(vm, self, len - k + add))
+            return 0;
         if (!vm_new_array(vm, k, &out))
             return 0;
         struct arr *p = ARR(vm, self);
         struct value *v = BUF(vm, p->buf)->v;
-        if (k) {
+        if (k)
             memcpy(BUF(vm, ARR(vm, out)->buf)->v, v + s, k * sizeof(*v));
-            memmove(v + s, v + s + k, (len - s - k) * sizeof(*v));
-            for (uint32_t i = len - k; i < len; i++)
-                v[i] = mk(T_NULL, 0);
-        }
-        p->len = len - k;
-        work = len * sizeof(struct value);
+        memmove(v + s + add, v + s + k, (len - s - k) * sizeof(*v));
+        for (uint32_t i = 0; i < add; i++)
+            v[s + i] = a[2 + i];
+        for (uint32_t i = len - k + add; i < len; i++)
+            v[i] = mk(T_NULL, 0);
+        p->len = len - k + add;
+        work = (len + add) * sizeof(struct value);
         break;
     }
     case M_slice: {
@@ -778,38 +786,68 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         }
         break;
     }
-    case M_indexOf: {
-        int32_t found = -1;
+    case M_indexOf:
+    case M_lastIndexOf: {
+        /* forward from 'from' (0 by default), or back from it (the end by
+         * default); a negative 'from' counts from the end, as JS's */
+        int back = m == M_lastIndexOf;
+        const char *name = back ? ".lastIndexOf()" : ".indexOf()";
+        int32_t found = -1, len;
+        if (is_arr)
+            len = (int32_t)ARR(vm, self)->len;
+        else if (self.tag == T_I32)
+            len = (int32_t)I32(vm, self)->len;
+        else if (self.tag == T_U8)
+            len = (int32_t)U8A(vm, self)->len;
+        else if (is_str)
+            len = (int32_t)STR(vm, self)->len;
+        else
+            return vm_fail(vm, name, " needs an array or string, not a ",
+                           vm_typename(self.tag));
+        int32_t from = back ? len - 1 : 0;
+        if (argc > 1) {
+            if (!is_num(a[1]))
+                return vm_fail(vm, name, " needs a number to start from, not a ",
+                               vm_typename(a[1].tag));
+            from = to_int(a[1]);
+            if (from < 0)
+                from += len;
+            if (back && from >= len)
+                from = len - 1;
+            if (!back && from < 0)
+                from = 0;
+        }
+        int32_t step = back ? -1 : 1;
         if (is_arr) {
-            struct arr *p = ARR(vm, self);
-            for (uint32_t i = 0; i < p->len && found < 0; i++)
-                if (equal(vm, BUF(vm, p->buf)->v[i], a[0]))
-                    found = (int32_t)i;
-            work = p->len * 4;
+            struct value *v = BUF(vm, ARR(vm, self)->buf)->v;
+            for (int32_t i = from; i >= 0 && i < len && found < 0; i += step)
+                if (equal(vm, v[i], a[0]))
+                    found = i;
+            work = (uint32_t)len * 4;
         } else if (self.tag == T_I32 || self.tag == T_U8) {
             if (a[0].tag == T_INT) {
-                uint32_t n = self.tag == T_I32 ? I32(vm, self)->len
-                                               : U8A(vm, self)->len;
-                for (uint32_t i = 0; i < n && found < 0; i++) {
+                for (int32_t i = from; i >= 0 && i < len && found < 0; i += step) {
                     int32_t e = self.tag == T_I32 ? I32(vm, self)->d[i]
                                                   : U8A(vm, self)->d[i];
                     if (e == a[0].v)
-                        found = (int32_t)i;
+                        found = i;
                 }
-                work = n * 4;
+                work = (uint32_t)len * 4;
             }
-        } else if (is_str) {
-            if (!need(vm, a[0], T_STR, ".indexOf() on a string needs a "
-                      "string, not a "))
-                return 0;
+        } else {
+            if (a[0].tag != T_STR)
+                return vm_fail(vm, name, " on a string needs a string, not a ",
+                               vm_typename(a[0].tag));
             struct str *h = STR(vm, self), *nd = STR(vm, a[0]);
+            int32_t last = (int32_t)h->len - (int32_t)nd->len;
+            if (back && (from > last || argc < 2))
+                from = last;
             /* each place tried costs the needle's length at most, and is
              * charged as it goes: a long search is stopped */
             uint32_t cost = 1 + nd->len / BYTES_PER_UNIT, tried = 0;
-            for (uint32_t i = 0; nd->len <= h->len && i <= h->len - nd->len
-                 && found < 0; i++) {
+            for (int32_t i = from; i >= 0 && i <= last && found < 0; i += step) {
                 if (!memcmp(h->b + i, nd->b, nd->len))
-                    found = (int32_t)i;
+                    found = i;
                 if (++tried == 1024) {
                     tried = 0;
                     if (!vm_spend(vm, cost * 1024))
@@ -817,9 +855,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                 }
             }
             vm_charge(vm, cost * tried);
-        } else
-            return vm_fail(vm, ".indexOf() needs an array or string, not a ",
-                           vm_typename(self.tag), "");
+        }
         out = mk(T_INT, found);
         break;
     }

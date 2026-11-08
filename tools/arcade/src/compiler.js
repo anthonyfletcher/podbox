@@ -83,7 +83,7 @@ const MISSING_METHODS = nullProto({
     concat: 'push the elements, or join strings with +',
     split: 'use indexOf and substring', trim: null,
     includes: 'use indexOf(x) != -1', charAt: 'use charCodeAt or substring',
-    substr: 'use substring', lastIndexOf: null, startsWith: 'use indexOf',
+    substr: 'use substring', startsWith: 'use indexOf',
     endsWith: null, replace: null, match: null, search: null,
     padStart: 'the text library pads numbers', padEnd: null, repeat: null,
     toFixed: 'join it to a string: "" + x', hasOwnProperty: null,

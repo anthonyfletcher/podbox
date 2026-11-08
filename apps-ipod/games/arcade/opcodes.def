@@ -98,13 +98,13 @@ OP(JNE,      "h",    2, 0)
 /* Methods, numbered by position: MTH(name, min args, max args). The
  * receiver's type at run time picks the implementation; one a type does
  * not have is a runtime error. */
-MTH(push,        1, 1)
+MTH(push,        1, 16)
 MTH(pop,         0, 0)
 MTH(shift,       0, 0)
-MTH(unshift,     1, 1)
-MTH(splice,      1, 2)
+MTH(unshift,     1, 16)
+MTH(splice,      1, 18)   /* start, count, then items put in their place */
 MTH(slice,       0, 2)
-MTH(indexOf,     1, 1)
+MTH(indexOf,     1, 2)    /* from where, as JS: negative counts from the end */
 MTH(join,        0, 1)
 MTH(reverse,     0, 0)
 MTH(sort,        1, 1)
@@ -112,6 +112,7 @@ MTH(charCodeAt,  1, 1)
 MTH(substring,   1, 2)
 MTH(toUpperCase, 0, 0)
 MTH(toLowerCase, 0, 0)
+MTH(lastIndexOf, 1, 2)    /* searching back from the end, or from where */
 
 /* Intrinsics, numbered by position: INTRINSIC(name, min args, max args).
  * The language's own globals, as distinct from the API's natives. */
