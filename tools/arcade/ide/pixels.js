@@ -610,7 +610,7 @@ export class PixelEditor {
             this.root.focus();
             try { this.over.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
             const p = this.at(e), c = this.colour[e.button === 2 ? 1 : 0];
-            down = { p, c, shift: e.shiftKey };
+            down = { p, c, shift: e.shiftKey, moved: false };
             last = p;
             const tool = e.altKey ? 'pick' : this.tool;
             const q = this.wrap(p);
@@ -629,9 +629,9 @@ export class PixelEditor {
                 this.render();
             } else if (tool === 'select') {
                 const box = this.float || this.sel;
+                /* lifted to move once the pointer moves, so a click only lets go */
                 if (box && p.x >= box.x && p.y >= box.y && p.x < box.x + box.w && p.y < box.y + box.h) {
-                    this.lift();
-                    moving = { dx: p.x - this.float.x, dy: p.y - this.float.y };
+                    moving = { lazy: true };
                 } else {
                     this.drop();
                     this.sel = null;
@@ -643,6 +643,7 @@ export class PixelEditor {
             const p = this.at(e);
             this.status.textContent = this.where(p);
             if (!down) { this.cursor(p, e.altKey); return; }
+            if (p.x !== down.p.x || p.y !== down.p.y) down.moved = true;
             const tool = this.tool;
             if (tool === 'pencil') {
                 for (const [x, y] of this.shape('line', last, p)) this.put(x, y, down.c);
@@ -651,6 +652,10 @@ export class PixelEditor {
             } else if (tool === 'line' || tool === 'rect' || tool === 'oval') {
                 this.overlay(this.shape(tool, down.p, p, e.shiftKey).map(([x, y]) => [x, y, down.c]));
             } else if (tool === 'select') {
+                if (moving && moving.lazy) {
+                    this.lift();
+                    moving = { dx: down.p.x - this.float.x, dy: down.p.y - this.float.y };
+                }
                 if (moving) {
                     this.float.x = p.x - moving.dx;
                     this.float.y = p.y - moving.dy;
@@ -666,7 +671,12 @@ export class PixelEditor {
             if (!down) return;
             const p = this.at(e), tool = this.tool;
             if (tool === 'pencil') this.o.changed(this.px);
-            else if (tool === 'line' || tool === 'rect' || tool === 'oval') {
+            /* a click without a drag lets the selection go */
+            else if (tool === 'select' && !down.moved) {
+                this.drop();
+                this.sel = null;
+                this.overlay();
+            } else if (tool === 'line' || tool === 'rect' || tool === 'oval') {
                 this.keep();
                 for (const [x, y] of this.shape(tool, down.p, p, e.shiftKey)) this.put(x, y, down.c);
                 this.changed();

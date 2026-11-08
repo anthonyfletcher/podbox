@@ -608,7 +608,10 @@ export class MapEditor {
             this.hover = p;
             if (!d) this.cursor(p, e.altKey);
             if (d && d.object) this.objectMove(p, e);
-            else if (d && (d.select || this.tool === 'rect')) d.rect = this.cellRect(d.from, p);
+            else if (d && (d.select || this.tool === 'rect')) {
+                d.rect = this.cellRect(d.from, p);
+                if (p.cx !== d.from.cx || p.cy !== d.from.cy) d.moved = true;
+            }
             else if (d && this.tool === 'line') d.cells = this.lineCells(d.from, p);
             else if (d && this.tool === 'oval') {
                 d.rect = this.cellRect(d.from, p);
@@ -622,7 +625,8 @@ export class MapEditor {
             if (!d) return;
             this.drag = null;
             if (d.object) { this.objectUp(d); return; }
-            if (d.select) { this.selRect = this.cellsOf(d.rect); this.refresh(); return; }
+            /* a click without a drag lets the selection go */
+            if (d.select) { this.selRect = d.moved ? this.cellsOf(d.rect) : null; this.refresh(); return; }
             if (this.tool === 'rect') this.fillRect(this.cellsOf(d.rect), d.erase);
             if (d.cells) {
                 const x0 = d.rect ? d.rect.x / 8 : d.from.cx, y0 = d.rect ? d.rect.y / 8 : d.from.cy;
