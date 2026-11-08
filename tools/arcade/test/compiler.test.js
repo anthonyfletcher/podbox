@@ -108,6 +108,12 @@ test('rejects a const that is not known when compiling', () => {
     rejects('var v = 3;\nconst K = v;' + ENTRY, 'needs a value known when compiling', 2);
 });
 
+test('a const refused once is not refused again where it is used', () => {
+    const res = build('const K = [1, 2];\nfunction f() { return K[1]; }' + ENTRY);
+    assert.deepEqual(res.errors.map((e) => e.message),
+                     ['const K needs a value known when compiling; use var']);
+});
+
 test('rejects a const cycle', () => {
     rejects('const A = B;\nconst B = A;' + ENTRY, 'refers to itself');
 });

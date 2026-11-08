@@ -1320,12 +1320,15 @@ class Program {
             return sym.api.value;
         }
         if (sym.state === 2) return sym.value;
+        if (sym.state === 3) return 0;      /* refused already: one error */
         if (sym.state === 1) fail(sym.node, 'const ' + sym.name + ' refers to itself');
         sym.state = 1;
         const v = this.fold(sym.node.init, new Scope(this, sym.file, null));
-        if (v === undefined)
+        if (v === undefined) {
+            sym.state = 3;
             fail(sym.node.init, 'const ' + sym.name + ' needs a value known when ' +
                  'compiling; use var');
+        }
         sym.state = 2;
         sym.value = v;
         return v;
