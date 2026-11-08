@@ -131,7 +131,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 
 /* ---- the profiler ---- */
 .prof-graph { width: 100%; height: 64px; flex: none; border-bottom: 1px solid var(--line); background: var(--bg); }
-.prof-table { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start;
+.prof-table { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; grid-auto-rows: max-content;
               grid-template-columns: minmax(120px, 2fr) minmax(80px, 1.2fr) 70px 70px 90px;
               font: 12px ui-monospace, Consolas, monospace; }
 .prof-table.lines { grid-template-columns: minmax(160px, 2fr) minmax(80px, 1fr) 70px 90px; }
