@@ -55,7 +55,9 @@ static const char *const particle_keys[P_FIELDS] = {
     "spin"
 };
 
-static int32_t fx(struct value v)
+/* always inlined: -Os would call it, and the pool systems read several
+ * fields an actor a tick */
+static inline __attribute__((always_inline)) int32_t fx(struct value v)
 {
     return is_num(v) ? wrap32(scaled(v)) : 0;
 }
@@ -735,9 +737,9 @@ NATIVE(actors_move)
             checked %= 8;
         }
     }
-    /* measured on the ARM rig (.build/arcade-rig, sysprobe): about 26
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe3): about 20
      * units an actor moved, most of it reading and writing its fields */
-    vm_charge(vm, 10 + n + moved * 26 + c.n * 8 + checked / 8);
+    vm_charge(vm, 10 + n + moved * 20 + c.n * 8 + checked / 8);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }

@@ -233,7 +233,7 @@ NATIVE(grid_full)
             o[k] = y;
         k++;
     }
-    /* measured on the ARM rig (.build/arcade-rig, sysprobe2), as are the
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe2 and 3), as are the
      * grid charges below */
     vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / 4);
     *out = mk(T_INT, (int32_t)k);
@@ -304,7 +304,7 @@ NATIVE(grid_fall)
             dst--;
         }
     }
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) * 6);
+    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) * 3 / 4);
     *out = mk(T_INT, moved);
     return 1;
 }
@@ -363,7 +363,7 @@ NATIVE(grid_slide)
     }
     if (merged && nmerged < mlen)
         merged[nmerged] = -1;
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) * 6);
+    vm_charge(vm, 10 + (uint32_t)(b.w * b.h));
     *out = mk(T_INT, changed);
     return 1;
 }
@@ -408,7 +408,7 @@ static int fit_or_place(struct vm *vm, struct value *a, int place,
                 fits = 0;
             }
         }
-    vm_charge(vm, 8 + (uint32_t)(s.w * s.h) * 3 / 2);
+    vm_charge(vm, 8 + (uint32_t)(s.w * s.h) * 6 / 5);
     *out = mk(T_INT, place ? n : fits);
     return 1;
 }

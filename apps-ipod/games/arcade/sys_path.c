@@ -48,7 +48,10 @@ static int walls_of(struct vm *vm, struct value *a, const char *fn,
     return 1;
 }
 
-static int wall(const struct walls *w, int32_t x, int32_t y)
+/* always inlined: the searches call it four times a cell, and -Os would
+ * make each a call */
+static inline __attribute__((always_inline))
+int wall(const struct walls *w, int32_t x, int32_t y)
 {
     if (x < 0 || y < 0 || x >= w->b.w || y >= w->b.h)
         return 1;
@@ -80,6 +83,9 @@ NATIVE(path_field)
     if (a[5].tag != T_I32 || I32(vm, a[5])->len < cells)
         return vm_fail(vm, "path.field() writes to an Int32Array as long as "
                        "the board", "", "");
+    if (w.b.w > 65535 || w.b.h > 65535)
+        return vm_fail(vm, "path.field() works on boards of up to 65535 "
+                       "across and down", "", "");
     int32_t x = whole(a[3], -1), y = whole(a[4], -1);
     uint32_t *queue = scratch(vm, cells * 4);
     if (!queue)
@@ -87,25 +93,28 @@ NATIVE(path_field)
     int32_t *d = I32(vm, a[5])->d;
     for (uint32_t i = 0; i < cells; i++)
         d[i] = -1;
+    /* the queue holds each cell as its row and column, y << 16 | x, so
+     * none is divided to find them */
     uint32_t head = 0, tail = 0;
     if (!wall(&w, x, y)) {
         d[y * w.b.w + x] = 0;
-        queue[tail++] = (uint32_t)(y * w.b.w + x);
+        queue[tail++] = (uint32_t)y << 16 | (uint32_t)x;
     }
     while (head < tail) {
-        int32_t i = (int32_t)queue[head++];
-        int32_t cx = i % w.b.w, cy = i / w.b.w;
+        uint32_t q = queue[head++];
+        int32_t cx = (int32_t)(q & 0xffff), cy = (int32_t)(q >> 16);
+        int32_t i = cy * w.b.w + cx;
         for (int k = 0; k < 4; k++) {
             int32_t nx = cx + step_x[k], ny = cy + step_y[k];
             int32_t j = ny * w.b.w + nx;
             if (wall(&w, nx, ny) || d[j] >= 0)
                 continue;
             d[j] = d[i] + 1;
-            queue[tail++] = (uint32_t)j;
+            queue[tail++] = (uint32_t)ny << 16 | (uint32_t)nx;
         }
     }
-    /* measured on the ARM rig (.build/arcade-rig, sysprobe) */
-    vm_charge(vm, 10 + cells + tail * 9);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe3) */
+    vm_charge(vm, 10 + cells + tail * 13 / 2);
     *out = mk(T_INT, (int32_t)tail);
     return 1;
 }
@@ -123,7 +132,7 @@ NATIVE(path_next)
     const int32_t *d = I32(vm, a[0])->d;
     int32_t h = (int32_t)(I32(vm, a[0])->len / (uint32_t)w);
     *out = mk(T_INT, -1);
-    vm_charge(vm, 10);                 /* measured on the rig, sysprobe2 */
+    vm_charge(vm, 7);                  /* measured on the rig, sysprobe3 */
     if (x < 0 || y < 0 || x >= w || y >= h || d[y * w + x] <= 0)
         return 1;
     int32_t here = d[y * w + x];
@@ -140,12 +149,13 @@ NATIVE(path_next)
 
 /* ---- paths --------------------------------------------------------------- */
 
-/* A* keeps per cell: the steps from the start, the way it was reached,
- * whether it is open or closed, and where it sits in the heap, an array
- * of cells ordered by steps plus the distance still to go. */
+/* A* keeps per cell: the steps from the start, the distance still to go
+ * (worked out once, as the cell is first reached: a division each way),
+ * the way it was reached, whether it is open or closed, and where it sits
+ * in the heap, an array of cells ordered by steps plus distance to go. */
 struct astar
 {
-    uint16_t *g, *heap, *pos;
+    uint16_t *g, *h, *heap, *pos;
     uint8_t *came, *state;
     uint32_t n;
     int32_t w, gx, gy;
@@ -164,7 +174,7 @@ static int32_t to_go(const struct astar *s, uint32_t i)
  * the one nearer the goal */
 static int before(const struct astar *s, uint32_t i, uint32_t j)
 {
-    int32_t hi = to_go(s, i), hj = to_go(s, j);
+    int32_t hi = s->h[i], hj = s->h[j];
     int32_t fi = s->g[i] + hi, fj = s->g[j] + hj;
     return fi < fj || (fi == fj && hi < hj);
 }
@@ -229,12 +239,13 @@ NATIVE(path_find)
         vm_charge(vm, 10);
         return 1;
     }
-    uint8_t *mem = scratch(vm, cells * 8);
+    uint8_t *mem = scratch(vm, cells * 10);
     if (!mem)
         return 0;
     struct astar s;
     s.g = (uint16_t *)mem;
-    s.heap = s.g + cells;
+    s.h = s.g + cells;
+    s.heap = s.h + cells;
     s.pos = s.heap + cells;
     s.came = (uint8_t *)(s.pos + cells);
     s.state = s.came + cells;
@@ -245,6 +256,7 @@ NATIVE(path_find)
     uint32_t start = (uint32_t)(y0 * w.b.w + x0);
     uint32_t goal = (uint32_t)(y1 * w.b.w + x1);
     s.state[start] = OPEN;
+    s.h[start] = (uint16_t)to_go(&s, start);
     put(&s, s.n++, (uint16_t)start);
     uint32_t expanded = 0;
     int found = 0;
@@ -269,14 +281,15 @@ NATIVE(path_find)
             s.came[j] = (uint8_t)k;
             if (s.state[j] == UNSEEN) {
                 s.state[j] = OPEN;
+                s.h[j] = (uint16_t)to_go(&s, j);
                 put(&s, s.n++, (uint16_t)j);
             }
             up(&s, s.pos[j]);
         }
     }
-    /* measured on the rig: about 60 units a cell expanded, the queue's
-     * ordering most of it */
-    vm_charge(vm, 10 + cells / 2 + expanded * 60);
+    /* measured on the rig (sysprobe3): about 34 units a cell expanded,
+     * the queue's ordering most of it */
+    vm_charge(vm, 10 + cells / 2 + expanded * 34);
     if (!found)
         return 1;
     /* back from the goal by the ways each cell was reached, into the heap's
@@ -330,7 +343,7 @@ NATIVE(path_sight)
         if ((x != x1 || y != y1) && wall(&w, x, y))
             clear = 0;
     }
-    vm_charge(vm, 8 + (uint32_t)(nx + ny) / 3);     /* measured, sysprobe2 */
+    vm_charge(vm, 8 + (uint32_t)(nx + ny) / 4);     /* measured, sysprobe3 */
     *out = mk(T_INT, clear);
     return 1;
 }
@@ -417,7 +430,7 @@ NATIVE(path_ray)
         }
         cells++;
         if (t > far) {
-            vm_charge(vm, 10 + cells * 16);
+            vm_charge(vm, 10 + cells * 11);
             return 1;
         }
     }
@@ -434,8 +447,8 @@ NATIVE(path_ray)
     vm_out_set(vm, a[5], 3, mk(T_INT, cy));
     vm_out_set(vm, a[5], 4, mk(T_INT, face));
     *out = mk(T_INT, 1);
-    /* measured on the rig (sysprobe2): a cell crossed is a 64-bit divide
-     * or two, about 16 units */
-    vm_charge(vm, 10 + cells * 16);
+    /* measured on the rig (sysprobe3): a cell crossed is a 64-bit divide
+     * or two, about 11 units */
+    vm_charge(vm, 10 + cells * 11);
     return 1;
 }
