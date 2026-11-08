@@ -212,6 +212,15 @@ show as `?`.
   row of its own. Click a row to go to its code. It samples every 2048
   units, so something cheaper than that a frame shows only now and then:
   record a few seconds.
+- **Replays**: every run is recorded -- its random seed, the store as it
+  began, the music, and every tick's buttons and wheel -- and Run >
+  Replay the last run plays it again exactly, frame for frame, whatever
+  player you run it as, and then the cart carries on with your input. Run
+  it again after changing the code to see the change on the same play,
+  or with the profiler recording to compare; if the screen stops matching
+  the recording, the output says from which frame. Save the last run as
+  a replay to keep it, and Open a replay to play it again: on the same
+  cart, and with the store as it was, so the browser's own is left alone.
 - **Panels**: the files, the editor, the output, the player, and the open
   editor's own -- the sheet's sprites, a map's tiles and objects, a font's
   glyphs, a sound's generators -- can each be dragged by its tab beside,

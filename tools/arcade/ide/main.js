@@ -28,6 +28,7 @@ import { SoundEditor } from './sound.js';
 import { CartSettings } from './settings.js';
 import { createDock } from './dock.js';
 import { Profiler } from './profiler.js';
+import { VERSION, hashScreen, hashCart, memoryStore, readTape } from './replay.js';
 import { setPanelHost } from './chrome.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
@@ -646,7 +647,42 @@ function cost(e, drawn) {
     return ms;
 }
 
-async function run() {
+/* the run being recorded, the last one recorded, and the tape being
+ * played back with how far it has got */
+let tape = null, lastTape = null, playing = null, played = 0, diverged = false;
+/* this turn of the loop's record, and music buttons pressed since the last */
+let step = null, musicPressed = [];
+/* where the run's store lives: the browser's, or a replay's own */
+let runStore = null;
+
+/* the cart's store as it is now, to start a tape with */
+function storeSnapshot() {
+    const out = {}, pre = storeKey('');
+    for (const k of Object.keys(localStorage)) if (k.startsWith(pre)) out[k.slice(pre.length)] = localStorage.getItem(k);
+    return out;
+}
+
+const browserStore = {
+    read: (name) => {
+        const v = localStorage.getItem(storeKey(name));
+        return v === null ? undefined : new TextEncoder().encode(v);
+    },
+    write: (name, bytes) => {
+        try { localStorage.setItem(storeKey(name), new TextDecoder().decode(bytes)); return true; } catch (e) { return false; }
+    },
+    remove: (name) => {
+        const had = localStorage.getItem(storeKey(name)) !== null;
+        localStorage.removeItem(storeKey(name));
+        return had;
+    },
+    list: () => Object.keys(localStorage).filter((k) => k.startsWith(storeKey(''))).
+        map((k) => k.slice(storeKey('').length)).sort()
+};
+
+/* this tick's input, from the player or from the tape */
+const live3 = () => { const i = input(); return [i.held, i.clicks, i.pos]; };
+
+async function run(replay) {
     stop();
     check();
     if (lastBuild.errors.length) {
@@ -660,8 +696,22 @@ async function run() {
     /* a run ends when another starts: each keeps its own engine */
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
-    e.music({ playingFn: true, beat: true, playing: musicOn, bpm: 0 });
-    if (!e.load(lastBuild.cart, BigInt(Date.now()))) return fault();
+    playing = replay || null;
+    played = 0;
+    diverged = false;
+    musicPressed = [];
+    const seed = replay ? replay.seed : String(Date.now());
+    let id = '';
+    try { id = JSON.parse(folder['cart.json']).id; } catch (x) { /* no id */ }
+    tape = { version: VERSION, cart: { id, name: cartName(), code: hashCart(lastBuild.cart) }, seed,
+             music: replay ? replay.music : musicOn, store: replay ? replay.store : storeSnapshot(), steps: [] };
+    runStore = replay ? memoryStore(replay.store) : browserStore;
+    if (replay) {
+        say('print', 'Replaying ' + replay.steps.length + ' frames of ' + replay.cart.name +
+            (replay.cart.code !== tape.cart.code ? '. The cart has changed since they were recorded, so it may go its own way.' : '.'));
+    }
+    e.music({ playingFn: true, beat: true, playing: tape.music, bpm: 0 });
+    if (!e.load(lastBuild.cart, BigInt(seed))) return fault();
     metronomeAt = -1;
     e.ceiling(CEILING);
     profiler.begin(functions(lastBuild.cart));
@@ -686,21 +736,42 @@ async function run() {
         if (!live()) break;
         clock.frame++;
         const late = clock.emu - (clock.start + clock.frame * p);
-        if (late >= p) {
-            e.skipped(Math.floor(late / p));
-            const i = input();
-            if (!(await e.tick(i.held, i.clicks, i.pos, false))) return live() ? fault() : undefined;
+        const t = playing && played < playing.steps.length ? playing.steps[played++] : null;
+        if (playing && !t) {
+            playing = null;
+            say('print', 'The replay is over: the cart carries on with your input.');
+        }
+        step = {};
+        tape.steps.push(step);
+        if (t && t.m) for (const w of t.m) { e.musicControl(w); music(e); }
+        const pressed = t ? t.m || [] : musicPressed.splice(0);
+        if (pressed.length) step.m = pressed;
+        dialogTape = t && t.d ? t.d.slice() : null;
+        const skip = t ? t.s || 0 : late >= p ? Math.floor(late / p) : 0;
+        if (skip) {
+            e.skipped(skip);
+            const i = t ? t.a : live3();
+            step.s = skip;
+            step.a = i;
+            if (!(await e.tick(i[0], i[1], i[2], false))) return live() ? fault() : undefined;
             const c = cost(e, false);
             clock.emu += c;
             profiler.frame(e.samples(), c, p, c - e.units() * DEVICES[device].unit);
             clock.frame++;
             if (late >= 2 * p) clock.start = clock.emu - clock.frame * p;
         }
-        const i = input();
+        const i = t ? t.b : live3();
+        step.b = i;
         dialogShown = false;
-        const ok = await e.tick(i.held, i.clicks, i.pos, true, Math.round(1000 / rate));
+        const ok = await e.tick(i[0], i[1], i[2], true, Math.round(1000 / rate));
         if (!live()) break;
         if (!ok) return fault();
+        step.h = hashScreen(e.pixels());
+        if (t && t.h !== step.h && !diverged) {
+            diverged = true;
+            say('print', 'The replay stops matching the recording at frame ' + tape.steps.length +
+                ', about ' + (tape.steps.length / rate).toFixed(1) + ' s in.');
+        }
         if (dialogShown) rebase(e);
         else {
             const c = cost(e, true);
@@ -725,6 +796,9 @@ async function run() {
 /* the cart stopped; the screen cleared, but for an error, whose last
  * frame stays to be looked at */
 function stop(keep) {
+    if (tape && tape.steps.length) lastTape = tape;
+    tape = null;
+    playing = null;
     running = false;
     paused = false;
     document.body.classList.remove('running', 'paused');
@@ -775,20 +849,10 @@ const hostFor = (e, live) => ({
     say: (text, queue) => say('say', (queue ? 'then says: ' : 'says: ') + text),
     speechOn: () => $('speech').classList.contains('on'),
     glyph: glyph,
-    storeRead: (name) => {
-        const v = localStorage.getItem(storeKey(name));
-        return v === null ? undefined : new TextEncoder().encode(v);
-    },
-    storeWrite: (name, bytes) => {
-        try { localStorage.setItem(storeKey(name), new TextDecoder().decode(bytes)); return true; } catch (e) { return false; }
-    },
-    storeRemove: (name) => {
-        const had = localStorage.getItem(storeKey(name)) !== null;
-        localStorage.removeItem(storeKey(name));
-        return had;
-    },
-    storeList: () => Object.keys(localStorage).filter((k) => k.startsWith(storeKey(''))).
-        map((k) => k.slice(storeKey('').length)).sort(),
+    storeRead: (name) => runStore.read(name),
+    storeWrite: (name, bytes) => runStore.write(name, bytes),
+    storeRemove: (name) => runStore.remove(name),
+    storeList: () => runStore.list(),
     /* a dialog's frame: shown, then the next tick's input, a tick of the
      * cart's rate later; null backs out. The player's clock starts again
      * after it. */
@@ -800,7 +864,10 @@ const hostFor = (e, live) => ({
             await sleep(1000 / e().rate());
             while (paused && live()) await sleep(50);
             if (!live()) return null;
-            const i = input(true);
+            /* from the tape while it has them */
+            const r = dialogTape && dialogTape.length ? dialogTape.shift() : null;
+            const i = r ? { held: r[0], clicks: r[1] } : input(true);
+            if (step) (step.d || (step.d = [])).push([i.held, i.clicks]);
             return { held: i.held, wheel: i.clicks };
         });
     }
@@ -815,6 +882,8 @@ function storeKey(name) {
 /* ---- the input ----------------------------------------------------------- */
 
 let keys = 0, wheelHeld = 0, clicksOwed = 0, wheelPos = -1;
+/* a replayed step's dialog frames, still to answer */
+let dialogTape = null;
 
 /* this tick's buttons and wheel; MENU goes to a dialog, or to a cart that
  * takes it as a button, else it pauses */
@@ -931,14 +1000,54 @@ function tick(accent) {
     o.stop(t + 0.06);
 }
 
+/* a music button while a cart runs: recorded with the run, and left to
+ * the tape while one plays */
+function musicButton(what) {
+    if (playing) return;
+    engine.musicControl(what);
+    musicPressed.push(what);
+    music(engine);
+}
 $('m-play').onclick = () => {
-    if (engine && running) { engine.musicControl(0); music(engine); } else {
+    if (engine && running) musicButton(0); else {
         musicOn = !musicOn;
         $('m-play').innerHTML = icon(musicOn ? 'pause' : 'play');
     }
 };
-$('m-next').onclick = () => { if (engine && running) { engine.musicControl(1); music(engine); } };
-$('m-prev').onclick = () => { if (engine && running) { engine.musicControl(2); music(engine); } };
+$('m-next').onclick = () => { if (engine && running) musicButton(1); };
+$('m-prev').onclick = () => { if (engine && running) musicButton(2); };
+
+/* ---- replays ------------------------------------------------------------ */
+
+/* the last run, or the one running, as a file to play again */
+function saveReplay() {
+    const t = tape && tape.steps.length ? tape : lastTape;
+    if (!t) { say('error', 'Run the cart first: each run is recorded to save.'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(t)], { type: 'application/json' }));
+    a.download = cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase() + '.replay.json';
+    a.click();
+    say('print', 'Saved a replay of ' + t.steps.length + ' frames.');
+}
+
+/* a replay from a file, played on the cart open, which must be the one
+ * it was made from */
+function openReplay() {
+    const i = document.createElement('input');
+    i.type = 'file';
+    i.accept = '.json';
+    i.onchange = async () => {
+        const f = i.files[0];
+        if (!f) return;
+        const t = readTape(await f.text());
+        if (t instanceof Error) { say('error', f.name + ': ' + t.message + '.'); return; }
+        let id = '';
+        try { id = JSON.parse(folder['cart.json']).id; } catch (x) { /* no id */ }
+        if (t.cart.id !== id) { say('error', f.name + ' is a replay of ' + t.cart.name + ', not of this cart.'); return; }
+        run(t);
+    };
+    i.click();
+}
 
 /* ---- the console, and what the player would show -------------------------- */
 
@@ -948,7 +1057,8 @@ function shown(rate) {
     const t = clock.drawn;
     t.push(clock.emu);
     while (t.length && t[0] < clock.emu - 1000) t.shift();
-    $('rate').textContent = (t.length >= rate ? rate : t.length + ' of ' + rate) +
+    $('rate').textContent = (playing ? 'Replaying ' + played + ' of ' + playing.steps.length + '; ' : '') +
+        (t.length >= rate ? rate : t.length + ' of ' + rate) +
         ' frames a second as ' + (device === 'free' ? 'fast as this computer' : 'an ' + DEVICES[device].name);
 }
 
@@ -1359,6 +1469,13 @@ const ACTIONS = {
     'open-folder': openFolder,
     save: save,
     export: saveAs,
+    replay: () => {
+        const t = tape && tape.steps.length ? tape : lastTape;
+        if (!t) { say('error', 'Run the cart first: each run is recorded to play again.'); return; }
+        run(t);
+    },
+    'save-replay': saveReplay,
+    'open-replay': openReplay,
     undo: () => view ? undo(view) : pixels && pixels.undoEdit && pixels.undoEdit(),
     redo: () => view ? redo(view) : pixels && pixels.redoEdit && pixels.redoEdit(),
     find: () => view && openSearchPanel(view),
