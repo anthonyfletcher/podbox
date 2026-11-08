@@ -245,6 +245,13 @@ show as `?`.
   and properties are beside the picker; objects sit on whole cells unless
   Shift is held. The map's
   size is set from the toolbar.
+- **Sounds**: open one to shape it with sfxr's settings -- the wave, its
+  envelope, pitch and slide, vibrato, filters and the rest -- or have a
+  generator beside it make a coin, a laser, an explosion and so on, again
+  for another; Mutate changes the one you have a little. Letting go of a
+  slider plays it (Space plays it again; double-click a slider for its
+  default), and what you hear and see is what the player stores, 8-bit at
+  22,050 Hz, with its length and size.
 - **Palettes**: open one to set its colours, shown as the player shows
   them; colours no picture uses are marked, and two that look the same on
   the player are pointed out. Moving and sorting colours rewrites the

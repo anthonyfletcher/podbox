@@ -7,8 +7,18 @@ import {
     SquareSplitHorizontal, FlipHorizontal2, FlipVertical2, RotateCw, Contrast, Grid3x3,
     Ghost, ZoomIn, ZoomOut, Play, Pause, Plus, ChevronLeft, ChevronRight, ChevronDown, X, Eraser,
     FileCode, Palette, Type, Trash2, Film, SkipBack, SkipForward, Ban,
-    Maximize2, Layers, MousePointer2, Grid2x2, Timer, MapPinPlus
+    Maximize2, Layers, MousePointer2, Grid2x2, Timer, MapPinPlus,
+    Coins, Zap, Bomb, Sparkles, Crosshair, ArrowBigUp, MousePointerClick, Dices, WandSparkles
 } from 'lucide';
+
+/* the four waves sfxr makes, drawn as Lucide draws */
+const wave = (d) => [['path', { d }]];
+const WAVES = {
+    square: wave('M2 16h4V8h6v8h6V8h4'),
+    saw: wave('M2 8l8 8V8l8 8V8l4 4'),
+    sine: wave('M2 12c1.5-5 4.5-5 6 0s4.5 5 6 0 4.5-5 6 0'),
+    noise: wave('M2 12l2-5 2 9 2-7 2 10 2-12 2 8 2-4 2 6 2-7 2 4')
+};
 
 const ICONS = {
     pencil: Pencil, line: Slash, rect: Square, oval: Circle, fill: PaintBucket, pick: Pipette,
@@ -18,7 +28,10 @@ const ICONS = {
     left: ChevronLeft, right: ChevronRight, down: ChevronDown, close: X, erase: Eraser, text: FileCode,
     swatches: Palette, glyphs: Type, trash: Trash2, animate: Film, object: MapPinPlus,
     prev: SkipBack, next: SkipForward, clear: Ban, resize: Maximize2, layers: Layers,
-    pointer: MousePointer2, grid: Grid2x2, metronome: Timer
+    pointer: MousePointer2, grid: Grid2x2, metronome: Timer,
+    coin: Coins, laser: Zap, explosion: Bomb, powerup: Sparkles, hit: Crosshair, jump: ArrowBigUp,
+    blip: MousePointerClick, random: Dices, mutate: WandSparkles,
+    waveSquare: WAVES.square, waveSaw: WAVES.saw, waveSine: WAVES.sine, waveNoise: WAVES.noise
 };
 
 export function icon(name) {

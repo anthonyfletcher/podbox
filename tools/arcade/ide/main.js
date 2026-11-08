@@ -23,6 +23,7 @@ import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { PaletteEditor } from './palette.js';
 import { FontEditor } from './font.js';
 import { MapEditor } from './map.js';
+import { SoundEditor } from './sound.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
@@ -162,17 +163,18 @@ function show(file) {
     current = file;
     const pane = $('editor');
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
-    const mapFile = /^maps\/\w+\.json$/.test(file);
-    const visual = gplFile || bdfFile || mapFile;
+    const mapFile = /^maps\/\w+\.json$/.test(file), sfxFile = /^sounds\/\w+\.json$/.test(file);
+    const visual = gplFile || bdfFile || mapFile || sfxFile;
     if (isBinary(file) || (visual && !asText[file])) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
         if (gplFile) showPalette(pane, file);
         else if (bdfFile) showFont(pane, file);
         else if (mapFile) showMap(pane, file);
+        else if (sfxFile) showSound(pane, file);
         else showPicture(pane, file);
     } else {
-        /* a palette, a font or a map as text has a bar over it to go back */
+        /* a palette, a font, a map or a sound as text has a bar over it to go back */
         if (view && (visual || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
         if (!view) {
             pane.innerHTML = '';
@@ -180,8 +182,8 @@ function show(file) {
             if (visual) {
                 const bar = document.createElement('div');
                 bar.className = 'tb';
-                bar.append(iconButton(gplFile ? 'swatches' : bdfFile ? 'glyphs' : 'grid',
-                    gplFile ? 'Edit as swatches' : bdfFile ? 'Edit as glyphs' : 'Edit as a map',
+                bar.append(iconButton(gplFile ? 'swatches' : bdfFile ? 'glyphs' : mapFile ? 'grid' : 'waveSine',
+                    gplFile ? 'Edit as swatches' : bdfFile ? 'Edit as glyphs' : mapFile ? 'Edit as a map' : 'Edit as a sound',
                     () => { delete asText[file]; check(); show(file); }));
                 host = document.createElement('div');
                 host.className = 'text-host';
@@ -198,7 +200,7 @@ function show(file) {
 /* the sheet's animation, as the sprite editor last had it */
 let sheetAnim = null;
 
-/* palettes, fonts and maps shown as text */
+/* palettes, fonts, maps and sounds shown as text */
 const asText = {};
 
 /* a font in the font editor */
@@ -227,6 +229,25 @@ function showMap(pane, file) {
         pixels = new MapEditor(pane, {
             text: String(folder[file]), sheet: sheet, rgb: palette(folder), flags: readFlags(),
             flagNames: flagNames, ask: ask,
+            picker: layout.picker,
+            pickerShown: (open) => { layout.picker = open; applyLayout(); },
+            say: (text, bad) => say(bad ? 'error' : 'print', text),
+            asText: () => { asText[file] = true; show(file); },
+            changed: (text) => { folder[file] = text; delete states[file]; changed(); }
+        });
+        pixels.focus();
+    } catch (e) {
+        asText[file] = true;
+        say('error', file + ': ' + e.message + '. Shown as text to put right.');
+        show(file);
+    }
+}
+
+/* a sound effect in the sound editor */
+function showSound(pane, file) {
+    try {
+        pixels = new SoundEditor(pane, {
+            text: String(folder[file]), name: file.slice(7, -5),
             picker: layout.picker,
             pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),

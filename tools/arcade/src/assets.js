@@ -32,7 +32,7 @@
 import { Writer } from './cart.js';
 import { lz4Compress } from './lz4.js';
 import { decodeIndexedPng } from './png.js';
-import { sfxrParams, sfxrRender, halve } from './sfxr.js';
+import { sfxrParams, sfxrRender, halve, soundSeed } from './sfxr.js';
 import { parseBdf, fontChunk, MAX_FONTS, MAX_FONT_BYTES } from './bdf.js';
 
 /* FONT.<name> numbers: the engine's fonts are 0 to 2 */
@@ -256,9 +256,7 @@ export function buildAssets(assets, inflate, string, errors) {
         if (!named(file, name)) continue;
         try {
             const params = sfxrParams(JSON.parse(assets.sounds[name]));
-            let seed = 2166136261;
-            for (const ch of name) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
-            sounds.push(quantise(halve(sfxrRender(params, seed >>> 0))));
+            sounds.push(quantise(halve(sfxrRender(params, soundSeed(name)))));
             out.groups.SFX[name] = { value: sounds.length - 1, version: 1 };
         } catch (e) { err(file, e.message); }
     }

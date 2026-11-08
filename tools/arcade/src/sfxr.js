@@ -8,7 +8,7 @@
 export const SFXR_RATE = 44100;
 const MAX_SECONDS = 10;
 
-const DEFAULTS = {
+export const DEFAULTS = {
     wave_type: 0, p_env_attack: 0, p_env_sustain: 0.3, p_env_punch: 0,
     p_env_decay: 0.4, p_base_freq: 0.3, p_freq_limit: 0, p_freq_ramp: 0,
     p_freq_dramp: 0, p_vib_strength: 0, p_vib_speed: 0, p_arp_mod: 0,
@@ -18,7 +18,7 @@ const DEFAULTS = {
 };
 
 /* Each parameter's range: [low, high] */
-const RANGES = {
+export const RANGES = {
     wave_type: [0, 3], p_freq_ramp: [-1, 1], p_freq_dramp: [-1, 1],
     p_arp_mod: [-1, 1], p_duty_ramp: [-1, 1], p_pha_offset: [-1, 1],
     p_pha_ramp: [-1, 1], p_lpf_ramp: [-1, 1], p_hpf_ramp: [-1, 1],
@@ -195,6 +195,14 @@ export function sfxrRender(p, seed) {
         out.push(ssample);
     }
     return Float64Array.from(out);
+}
+
+/* The noise seed a sound takes from its name, so it builds the same each
+ * time and the IDE plays what the build stores */
+export function soundSeed(name) {
+    let seed = 2166136261;
+    for (const ch of name) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+    return seed >>> 0;
 }
 
 /* Halved to 22,050 Hz, a pair of samples averaged, as 16-bit */
