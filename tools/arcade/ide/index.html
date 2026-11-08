@@ -249,6 +249,36 @@ body.running #run { display: none; }
 .snd-row input[type=number] { font: 12px ui-monospace, Consolas, monospace; padding: 2px 4px; height: 22px;
            border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 
+/* ---- cart settings ---- */
+.cfg { display: flex; flex-direction: column; height: 100%; outline: none; }
+.cfg-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 20px 24px; }
+.cfg-sec { max-width: 760px; display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.cfg-sec input, .cfg-sec select, .cfg-sec textarea { font: 13px system-ui, sans-serif; padding: 3px 6px;
+      border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+      min-width: 0; height: 28px; }
+.cfg-sec textarea { height: 60px; resize: vertical; }
+.cfg-sec .code { font: 12px ui-monospace, Consolas, monospace; }
+.cfg-sec .bad { border-color: var(--bad); }
+.cfg-sec input[readonly] { color: var(--dim); }
+.cfg-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 10px;
+           font-size: 13px; color: var(--dim); }
+.cfg-row > span { align-self: center; }
+.cfg-flags { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 12px; }
+.cfg-flags label { display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 6px;
+                   font: 12px ui-monospace, Consolas, monospace; color: var(--dim); }
+.cfg-table { display: grid; gap: 4px 6px; align-items: center; }
+.cfg-boards { grid-template-columns: 1.2fr 1.5fr 0.9fr 1.1fr 64px 28px; }
+.cfg-ach { grid-template-columns: 1fr 1.2fr 2fr 28px; }
+.cfg-th { font-size: 11px; color: var(--dim); }
+.cfg-card { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--line);
+            border-radius: 6px; }
+.cfg-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cfg-line > input { flex: 1; }
+.cfg-line label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+.cfg-line label input[type=number] { width: 72px; }
+.cfg-line label input[type=text] { width: 260px; }
+.cfg-none { font-size: 12px; color: var(--dim); }
+
 /* ---- fonts ---- */
 .font { display: flex; height: 100%; min-height: 0; }
 .font-body { flex: 1; min-height: 0; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -306,6 +336,7 @@ dialog.ask { min-width: 340px; }
   <nav id="menubar">
     <div class="menu"><button class="title">Cart</button><div class="items">
       <button data-do="new">New cart</button>
+      <button data-do="settings">Settings&hellip;</button>
       <button data-do="open">Open&hellip;<kbd>Ctrl+O</kbd></button>
       <button data-do="open-folder">Open folder&hellip;</button>
       <hr>

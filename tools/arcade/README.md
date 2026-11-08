@@ -252,6 +252,11 @@ show as `?`.
   slider plays it (Space plays it again; double-click a slider for its
   default), and what you hear and see is what the player stores, 8-bit at
   22,050 Hz, with its length and size.
+- **Settings** (Cart > Settings, or open `cart.json`): the cart's name
+  and text, its rate, what MENU and the music do for it, the sprite flags'
+  names, and its high-score boards, pause-menu options and achievements,
+  as a form. A name code could not use is marked as you type; the build
+  checks the rest.
 - **Palettes**: open one to set its colours, shown as the player shows
   them; colours no picture uses are marked, and two that look the same on
   the player are pointed out. Moving and sorting colours rewrites the

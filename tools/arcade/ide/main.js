@@ -24,6 +24,7 @@ import { PaletteEditor } from './palette.js';
 import { FontEditor } from './font.js';
 import { MapEditor } from './map.js';
 import { SoundEditor } from './sound.js';
+import { CartSettings } from './settings.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
@@ -164,7 +165,8 @@ function show(file) {
     const pane = $('editor');
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
     const mapFile = /^maps\/\w+\.json$/.test(file), sfxFile = /^sounds\/\w+\.json$/.test(file);
-    const visual = gplFile || bdfFile || mapFile || sfxFile;
+    const cfgFile = file === 'cart.json';
+    const visual = gplFile || bdfFile || mapFile || sfxFile || cfgFile;
     if (isBinary(file) || (visual && !asText[file])) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
@@ -172,9 +174,10 @@ function show(file) {
         else if (bdfFile) showFont(pane, file);
         else if (mapFile) showMap(pane, file);
         else if (sfxFile) showSound(pane, file);
+        else if (cfgFile) showSettings(pane, file);
         else showPicture(pane, file);
     } else {
-        /* a palette, a font, a map or a sound as text has a bar over it to go back */
+        /* a file with an editor of its own has a bar over its text to go back */
         if (view && (visual || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
         if (!view) {
             pane.innerHTML = '';
@@ -182,8 +185,10 @@ function show(file) {
             if (visual) {
                 const bar = document.createElement('div');
                 bar.className = 'tb';
-                bar.append(iconButton(gplFile ? 'swatches' : bdfFile ? 'glyphs' : mapFile ? 'grid' : 'waveSine',
-                    gplFile ? 'Edit as swatches' : bdfFile ? 'Edit as glyphs' : mapFile ? 'Edit as a map' : 'Edit as a sound',
+                const [ic, label] = gplFile ? ['swatches', 'Edit as swatches'] : bdfFile ? ['glyphs', 'Edit as glyphs']
+                    : mapFile ? ['grid', 'Edit as a map'] : sfxFile ? ['waveSine', 'Edit as a sound']
+                    : ['settings', 'Edit as a form'];
+                bar.append(iconButton(ic, label,
                     () => { delete asText[file]; check(); show(file); }));
                 host = document.createElement('div');
                 host.className = 'text-host';
@@ -200,7 +205,7 @@ function show(file) {
 /* the sheet's animation, as the sprite editor last had it */
 let sheetAnim = null;
 
-/* palettes, fonts, maps and sounds shown as text */
+/* files with editors of their own, shown as text */
 const asText = {};
 
 /* a font in the font editor */
@@ -232,6 +237,22 @@ function showMap(pane, file) {
             picker: layout.picker,
             pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),
+            asText: () => { asText[file] = true; show(file); },
+            changed: (text) => { folder[file] = text; delete states[file]; changed(); }
+        });
+        pixels.focus();
+    } catch (e) {
+        asText[file] = true;
+        say('error', file + ': ' + e.message + '. Shown as text to put right.');
+        show(file);
+    }
+}
+
+/* cart.json as a form */
+function showSettings(pane, file) {
+    try {
+        pixels = new CartSettings(pane, {
+            text: String(folder[file]),
             asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
         });
@@ -1028,47 +1049,86 @@ function openFolderPlain() {
     i.click();
 }
 
-async function save() {
-    check();
-    if (lastBuild.errors.length) { say('error', 'Fix the errors before saving: the cart would not build.'); return; }
-    if (saveTo && saveTo.dir) {
-        for (const [name, v] of Object.entries(folder)) {
-            let d = saveTo.dir;
-            const parts = name.split('/');
-            for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
-            const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
-            await w.write(v);
-            await w.close();
-        }
-        say('print', 'Saved the folder.');
-        return;
-    }
-    await exportCart();
+/* Whether the IDE may write where the cart came from. A cart opened
+ * with Open comes with leave to read only; the browser asks the owner for
+ * leave to write, and only while the click or key that asked to save is
+ * fresh -- so this is asked before anything slow. */
+async function canWrite(handle) {
+    try {
+        if (await handle.queryPermission({ mode: 'readwrite' }) === 'granted') return true;
+        return await handle.requestPermission({ mode: 'readwrite' }) === 'granted';
+    } catch (e) { return false; }
 }
 
-async function exportCart() {
+/* Save: back to the folder or the .pbg the cart came from, or else as a
+ * new .pbg. Where the browser will not write there, a new .pbg instead. */
+async function save() {
+    const target = saveTo && (saveTo.dir || saveTo.file);
+    const allowed = target ? await canWrite(target) : false;
     check();
-    if (lastBuild.errors.length) return;
-    const file = cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase() + '.pbg';
-    if (saveTo && saveTo.file) {
-        const w = await saveTo.file.createWritable();
-        await w.write(lastBuild.cart);
-        await w.close();
-        say('print', 'Saved ' + saveTo.file.name + '.');
-        return;
+    if (lastBuild.errors.length) { say('error', 'Fix the errors before saving: the cart would not build.'); return; }
+    if (target && !allowed) {
+        say('print', 'The browser would not let the IDE write to ' + target.name + ', so it is saved as a new .pbg.');
+        saveTo = null;
+        return saveAs();
     }
+    try {
+        if (saveTo && saveTo.dir) {
+            for (const [name, v] of Object.entries(folder)) {
+                let d = saveTo.dir;
+                const parts = name.split('/');
+                for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
+                const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
+                await w.write(v);
+                await w.close();
+            }
+            say('print', 'Saved the folder ' + saveTo.dir.name + '.');
+            return;
+        }
+        if (saveTo && saveTo.file) {
+            const w = await saveTo.file.createWritable();
+            await w.write(lastBuild.cart);
+            await w.close();
+            say('print', 'Saved ' + saveTo.file.name + '.');
+            return;
+        }
+    } catch (e) {
+        say('error', 'Could not save to ' + target.name + ' (' + e.message + '), so it is saved as a new .pbg.');
+        saveTo = null;
+    }
+    return saveAs();
+}
+
+/* Save as .pbg: asks where, and Save writes there after; where the
+ * browser has no such picker, or refuses it, the .pbg is downloaded */
+async function saveAs() {
+    check();
+    if (lastBuild.errors.length) { say('error', 'Fix the errors before saving: the cart would not build.'); return; }
+    const file = cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase() + '.pbg';
     if (window.showSaveFilePicker) {
+        let h;
         try {
-            const h = await window.showSaveFilePicker({ suggestedName: file,
+            h = await window.showSaveFilePicker({ suggestedName: file,
                 types: [{ description: 'Arcade cart', accept: { 'application/octet-stream': ['.pbg'] } }] });
-            saveTo = { file: h };
-            return exportCart();
-        } catch (e) { return; }
+        } catch (e) {
+            if (e && e.name === 'AbortError') return;
+        }
+        if (h) {
+            try {
+                const w = await h.createWritable();
+                await w.write(lastBuild.cart);
+                await w.close();
+                saveTo = { file: h };
+                say('print', 'Saved ' + h.name + '.');
+                return;
+            } catch (e) { /* downloaded below */ }
+        }
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([lastBuild.cart]));
     a.download = file;
     a.click();
+    say('print', 'Downloaded ' + file + '.');
 }
 
 /* ---- the cart's files: made, added from disk, renamed, deleted ----------- */
@@ -1261,7 +1321,7 @@ const ACTIONS = {
     open: openCart,
     'open-folder': openFolder,
     save: save,
-    export: exportCart,
+    export: saveAs,
     undo: () => view ? undo(view) : pixels && pixels.undoEdit && pixels.undoEdit(),
     redo: () => view ? redo(view) : pixels && pixels.redoEdit && pixels.redoEdit(),
     find: () => view && openSearchPanel(view),
@@ -1272,6 +1332,7 @@ const ACTIONS = {
     'view-output': () => toggle('output'),
     import: addFiles,
     'export-picture': exportPicture,
+    settings: () => { if (folder['cart.json'] !== undefined) { delete asText['cart.json']; show('cart.json'); } },
     rename: renameFile,
     remove: removeFile,
     run: run,
