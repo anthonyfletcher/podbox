@@ -291,15 +291,16 @@ static void pf_update_dynamic_colors(void)
 #define THREAD_STACK_SIZE DEFAULT_STACK_SIZE + 0x200
 
 /* Timing overlay, off. Set to 1 to draw a two-line readout over the covers:
- * frames a second, microseconds inside the render, inside the per-slide yields
- * and inside the flush, this screen's own share of wall clock, slides fetched
- * by the loader, then the clear and slide loops timed apart, nanoseconds of
- * slide loop per pixel written, and the CPU clock with its boost count.
+ * frames a second, microseconds inside the render, the worst gap between two
+ * frames in ms, microseconds inside the flush, this screen's own share of wall
+ * clock, slides fetched by the loader, then the clear and slide loops timed
+ * apart, nanoseconds of slide loop per pixel written, and the CPU clock with
+ * its boost count.
  *
  * Worth keeping, because none of that is guessable: measured on the 5G, the
  * flush is ~6% of wall clock and the render ~94%. Two rules if it is switched
- * back on: the yields must stay separated out, since USEC_TIMER is
- * wall clock and would otherwise bill the codec's time to the render; and
+ * back on: nothing timed may yield inside its timing, since USEC_TIMER is
+ * wall clock and would bill the codec's time to the render; and
  * ns-per-pixel means nothing without the clock beside it, being ~43 cycles at
  * 80 MHz and ~16 at 30. */
 #define PF_SHOW_STATS 0
@@ -462,8 +463,15 @@ static int fade;
 #define PF_MAX_FPS       30
 #endif
 #define PF_FRAME_TICKS   MAX(HZ / PF_MAX_FPS, 1)
-static long anim_last_tick;
+/* The flip's clock, see update_scroll_animation(): USEC_TIMER at the last
+ * advance, the step's carried remainder, four times the smoothed interval
+ * between advances in ms, the ms a long frame left to be made up, and whether
+ * the next advance is a flip's first. */
+static unsigned long anim_last_us;
 static int anim_frac;
+static int anim_avg4_ms = 4 * 1000 / PF_MAX_FPS;
+static int anim_owed_ms;
+static bool anim_started;
 /* Always 0: nothing sets it any more, but render_all_slides()'s fade
  * arithmetic still reads it, so it stays as a no-op term. */
 static int extra_fade;
@@ -536,10 +544,6 @@ static volatile unsigned int pf_slides_loaded;
  * counts only the ones worth a frame, and it is the far ones that cost the
  * disk. */
 static volatile unsigned int pf_loads_total;
-/* Wall clock handed to other threads by render_slide()'s per-slide yield(),
- * accumulated across one frame. Timing the render without separating this out
- * measures the codec and the slide loader and calls the result "drawing". */
-static unsigned long pf_yield_us;
 /* The clear and the slide loops timed apart, and the pixels the slide loops
  * actually wrote. Time per pixel is the number that matters: the loops are
  * maybe fifteen cycles of arithmetic each, so anything far above that is the
@@ -2810,17 +2814,6 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
     }
     if (ncols > 0)
         draw_tile(tile_up, tile_lo, ncols, f);
-    /* let the music play... */
-#if PF_SHOW_STATS
-    {
-        unsigned long y0 = USEC_TIMER;
-        yield();
-        pf_yield_us += USEC_TIMER - y0;
-    }
-#else
-    yield();
-#endif
-    return;
 }
 
 static void render_slide(struct slide_data *slide, const int alpha)
@@ -2995,8 +2988,10 @@ static void start_animation(void)
 {
     step = (target < center_slide.slide_index) ? -1 : 1;
     pf_state = pf_scrolling;
-    anim_last_tick = current_tick;
+    anim_last_us = USEC_TIMER;
     anim_frac = 0;
+    anim_owed_ms = 0;
+    anim_started = true;
     pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
 }
 
@@ -3376,7 +3371,7 @@ static void cover_rows(int *y0, int *y1)
 static void render_all_slides(int y, int h)
 {
 #if PF_SHOW_STATS
-    unsigned long t0, y0;
+    unsigned long t0;
 #endif
     lcd_set_background(pf_bg_color);
 #if PF_SHOW_STATS
@@ -3387,16 +3382,18 @@ static void render_all_slides(int y, int h)
     pf_clear_us = USEC_TIMER - t0;
     pf_px = 0;
     t0 = USEC_TIMER;
-    y0 = pf_yield_us;
 #endif
 
+    /* Trap: no yield anywhere in here. The covers are placed for one moment,
+     * and a turn handed to the codec mid-frame shows them late by however long
+     * it took, which differs from frame to frame and reads as judder. The
+     * frame's one yield comes after its flush. */
     if (flat_view())
         flat_render();
     else
         coverflow_render();
 #if PF_SHOW_STATS
-    /* The per-slide yields land in here, and belong to whoever ran. */
-    pf_slides_us = (USEC_TIMER - t0) - (pf_yield_us - y0);
+    pf_slides_us = USEC_TIMER - t0;
 #endif
 }
 
@@ -3498,35 +3495,36 @@ static void flat_animate(int s, PFreal ftick)
     pf_flat_moving = true;
 }
 
-static void update_scroll_animation(void)
+/* The flip's speed at `frame`, as a step per frame at CAROUSEL_NOMINAL_FPS:
+ * fastest leaving a cover and slowing to a crawl as it nears the target. */
+static int scroll_speed(int frame)
 {
-    if (step == 0)
-        return;
+    /* The flat view deals two covers per flip, one after the other, so it needs
+     * long enough for both moves to read -- and the ease curve below spends
+     * most of a flip crawling through its last tenth, which is a rotation
+     * settling in the 3D view and a stall in this one. Constant rate instead,
+     * at the pace the user is scrolling: see flat_rate(). */
+    if (flat_view())
+        return 65536 * HZ / (CAROUSEL_NOMINAL_FPS * flat_rate());
 
-    int speed = 16384;
-    int i;
-
-    /* deaccelerate when approaching the target */
     const int max = 2 * 65536;
-
-    int fi = slide_frame;
-    fi -= (target << 16);
+    int fi = frame - (target << 16);
     if (fi < 0)
         fi = -fi;
     fi = fmin(fi, max);
 
     int ia = IANGLE_MAX * (fi - max / 2) / (max * 2);
     int accel = 16384 * (PFREAL_ONE + fsin(ia)) / PFREAL_ONE;
-    speed = 512 * global_settings.album_covers_transition_speed / 100
-          + accel * global_settings.album_covers_scroll_speed / 100;
+    return 512 * global_settings.album_covers_transition_speed / 100
+         + accel * global_settings.album_covers_scroll_speed / 100;
+}
 
-    /* The flat view deals two covers per flip, one after the other, so it needs
-     * long enough for both moves to read -- and the ease curve above spends
-     * most of a flip crawling through its last tenth, which is a rotation
-     * settling in the 3D view and a stall in this one. Constant rate instead,
-     * at the pace the user is scrolling: see flat_rate(). */
-    if (flat_view())
-        speed = 65536 * HZ / (CAROUSEL_NOMINAL_FPS * flat_rate());
+static void update_scroll_animation(void)
+{
+    if (step == 0)
+        return;
+
+    int i;
 
     /* Advance by elapsed time, not per call. speed is calibrated as a
      * per-frame step at CAROUSEL_NOMINAL_FPS; a slower frame then takes a
@@ -3536,20 +3534,32 @@ static void update_scroll_animation(void)
      * twice over: fewer frames per second, and a flip that stretched in
      * proportion because it still needed the same number of frames.
      *
-     * The remainder is carried because HZ is 100 -- a ~30ms frame is about
-     * three ticks, and truncating each one would jitter the step size by a
-     * third. */
-    long now = current_tick;
-    int dt = now - anim_last_tick;
-    anim_last_tick = now;
-    if (dt < 0)
-        dt = 0;
-    else if (dt > HZ / 5)
-        dt = HZ / 5;        /* a stall must not teleport the flip */
+     * Timed in ms from USEC_TIMER, not in ticks: at HZ 100 a 70 ms frame is
+     * 6, 7 or 8 ticks by rounding alone, which jitters the step by a sixth.
+     *
+     * A frame is allowed half as long again as the smoothed interval and no
+     * more; the rest is owed and made up by the frames after it, so a frame
+     * the codec held up slows the flip briefly instead of jumping it. Over
+     * 200 ms is dropped outright -- a stall must not teleport the flip. */
+    unsigned long us = USEC_TIMER - anim_last_us;
+    if (us > 200000)
+    {
+        us = 200000;
+        anim_last_us = USEC_TIMER - us;
+    }
+    int dt = us / 1000;
+    anim_last_us += dt * 1000;
 
-    int num = speed * dt * CAROUSEL_NOMINAL_FPS + anim_frac;
-    int adv = num / HZ;
-    anim_frac = num - adv * HZ;
+    int avg = anim_avg4_ms / 4;
+    int due = dt + anim_owed_ms;
+    int use = MIN(due, MAX(avg + avg / 2, 1));
+    anim_owed_ms = MIN(due - use, 200);
+    /* The first advance of a flip is timed from the button, not from a
+     * frame, so it says nothing about the frame rate. */
+    if (anim_started)
+        anim_started = false;
+    else
+        anim_avg4_ms += dt - avg;
 
     /* Clamping dt bounds the time step, not the distance. speed reaches
      * 133120 and target is usually no more than two slides away, so one
@@ -3557,14 +3567,29 @@ static void update_scroll_animation(void)
      * function would throw the flip into reverse, and center_index would
      * meanwhile leave 0..number_of_slides-1, which album_covers.c's
      * draw_album_text() uses to index carousel_idx.album_index[] without a
-     * range
-     * check. Land on the target exactly instead. */
+     * range check. Land on the target exactly instead. */
     int remain = (step < 0) ? slide_frame - (target << 16)
                             : (target << 16) - slide_frame;
     if (remain < 0)
         remain = 0;
-    if (adv > remain)
-        adv = remain;
+
+    /* The frame's time is walked a nominal frame at a time, the speed read
+     * afresh for each. Trap: one step of speed x the whole frame runs the
+     * curve's fastest moment for all of it -- at 70 ms a frame a flip landed
+     * 97% of the way to the next cover in its first frame, and in one frame
+     * at 100 ms. `left` is in thousandths of a nominal frame. */
+    int left = use * CAROUSEL_NOMINAL_FPS;
+    int adv = 0;
+    while (left > 0 && adv < remain)
+    {
+        int part = MIN(left, 1000);
+        int num = scroll_speed(slide_frame + adv * step) * part + anim_frac;
+        int a = num / 1000;
+
+        anim_frac = num - a * 1000;
+        adv = MIN(adv + a, remain);
+        left -= part;
+    }
 
     slide_frame += adv * step;
 
@@ -3574,7 +3599,7 @@ static void update_scroll_animation(void)
      * left it ends the gap below C, and the centre is still C. Rounding
      * away from the direction of travel resolves both, and matters because
      * a frame can land exactly on a boundary -- the advance above is zero
-     * for two frames inside the same 10ms tick, and is clamped to land on
+     * for two calls inside the same millisecond, and is clamped to land on
      * the target.
      *
      * tick is progress through the gap, 0 at the start, and neg is what
@@ -3984,8 +4009,10 @@ bool carousel_reinit(void)
 #if PF_SHOW_STATS
 /* One second's worth of frames, reduced to a line drawn over the covers.
  *
- * The line reads "<n>fps r<us> f<us> b<pct>% l<n>": the frame rate actually
- * achieved, the average microseconds inside the render and inside the flush,
+ * The line reads "<n>fps r<us> w<ms> f<us> b<pct>% l<n>": the frame rate
+ * actually achieved, the average microseconds inside the render, the longest
+ * gap from one frame's start to the next -- a stutter the fps hides -- the
+ * average microseconds inside the flush,
  * the share of wall clock those two accounted for, and how many slides the
  * loader fetched. Between them those separate the three candidates, which is
  * the whole point of it:
@@ -4004,7 +4031,9 @@ bool carousel_reinit(void)
 static struct
 {
     unsigned long render;       /* usec accumulated over the window */
-    unsigned long yielded;
+    unsigned long worst_gap;    /* longest usec from one frame's start to the
+                                 * next's, in the window */
+    unsigned long last_start;
     unsigned long flush;
     int frames;
     unsigned long clear;
@@ -4016,14 +4045,17 @@ static struct
     char line2[48];
 } pf_stats;
 
-static void pf_stats_frame(unsigned long render_us, unsigned long yield_us,
+static void pf_stats_frame(unsigned long start_us, unsigned long render_us,
                            unsigned long flush_us)
 {
     long now = current_tick;
     long elapsed;
+    unsigned long gap = start_us - pf_stats.last_start;
 
+    pf_stats.last_start = start_us;
+    if (gap > pf_stats.worst_gap)
+        pf_stats.worst_gap = gap;
     pf_stats.render += render_us;
-    pf_stats.yielded += yield_us;
     pf_stats.flush  += flush_us;
     pf_stats.clear  += pf_clear_us;
     pf_stats.slides += pf_slides_us;
@@ -4041,10 +4073,10 @@ static void pf_stats_frame(unsigned long render_us, unsigned long yield_us,
     unsigned long busy = pf_stats.render + pf_stats.flush;
 
     snprintf(pf_stats.line, sizeof(pf_stats.line),
-             "%ldfps r%lu y%lu f%lu b%lu%% l%u%s",
+             "%ldfps r%lu w%lu f%lu b%lu%% l%u%s",
              (long)pf_stats.frames * HZ / elapsed,
              pf_stats.render / pf_stats.frames,
-             pf_stats.yielded / pf_stats.frames,
+             pf_stats.worst_gap / 1000,
              pf_stats.flush / pf_stats.frames,
              span ? busy * 100 / span : 0,
              pf_loads_total - pf_stats.loads,
@@ -4064,7 +4096,7 @@ static void pf_stats_frame(unsigned long render_us, unsigned long yield_us,
              FREQ / 1000000, get_cpu_boost_counter());
 
     pf_stats.render = 0;
-    pf_stats.yielded = 0;
+    pf_stats.worst_gap = 0;
     pf_stats.flush = 0;
     pf_stats.clear = 0;
     pf_stats.slides = 0;
@@ -4368,7 +4400,6 @@ static int album_covers_loop(void)
             last_frame_tick = current_tick;
 #if PF_SHOW_STATS
             unsigned long t_start = USEC_TIMER, t_flush;
-            pf_yield_us = 0;
             /* The overlay sits over the covers rather than in them, so it needs
              * the whole viewport in play to have anywhere to go. */
             full_repaint_owed = true;
@@ -4471,8 +4502,7 @@ static int album_covers_loop(void)
             }
             full_repaint_owed = false;
 #if PF_SHOW_STATS
-            pf_stats_frame((t_flush - t_start) - pf_yield_us, pf_yield_us,
-                           USEC_TIMER - t_flush);
+            pf_stats_frame(t_start, t_flush - t_start, USEC_TIMER - t_flush);
 #endif
             yield();
         }
