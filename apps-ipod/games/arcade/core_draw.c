@@ -390,6 +390,7 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
  * not they are transparent. */
 #define COST_CALL      20
 #define COST_COPY      25   /* copy_rect's setup, on top of the call's */
+#define COST_SMALL     6    /* small_sprite's, in its place: measured */
 #define COST_ROW       2
 #define COST_GLYPH     12
 #define COST_BIG_GLYPH 36
@@ -3121,7 +3122,10 @@ NATIVE(fill)
 
 /* ---- for the systems ---------------------------------------------------- */
 
-static int32_t num_or_0(struct value v)
+/* always inlined: -Os would call it, and the particle loops call it
+ * several times a particle */
+static inline __attribute__((always_inline))
+int32_t num_or_0(struct value v)
 {
     return is_num(v) ? floor_int(v) : 0;
 }
@@ -3296,6 +3300,33 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
     finish(vm, &p);
 }
 
+/* A sprite of at most 8 x 8 wholly inside the clip, at dx, dy in surface
+ * pixels, flipped by fl (1 across, 2 up and down), through xl: a plain
+ * loop, without copy_rect's clipping, for the small sprites particle pools
+ * draw by the dozen */
+static void small_sprite(struct pen *p, const uint8_t *src, int32_t stride,
+                         int32_t w, int32_t h, int32_t dx, int32_t dy,
+                         int32_t fl, const uint16_t *xl)
+{
+    uint8_t *dst = p->s.px + dy * p->s.w + dx;
+    int32_t step = fl & 1 ? -1 : 1, first = fl & 1 ? w - 1 : 0;
+    uint32_t n = 0;
+    for (int32_t v = 0; v < h; v++, dst += p->s.w) {
+        const uint8_t *s = src + (fl & 2 ? h - 1 - v : v) * stride + first;
+        for (int32_t u = 0; u < w; u++, s += step) {
+            uint32_t c = xl[*s];
+            if (!(c & XLAT_CLEAR)) {
+                dst[u] = (uint8_t)c;
+                n++;
+            }
+        }
+    }
+    p->count += n;
+    p->cost += (uint32_t)(w * h) * PER16_COPY / 16;
+    row_touched(p, dy);
+    row_touched(p, dy + h - 1);
+}
+
 /* particles.draw(): each live particle a pixel of its colour, or with a
  * sprite (arr[6], flipped by arr[7]) the top left w x h of that sprite,
  * its colours 1 to shade drawn as the particle's colour plus k - 1. The
@@ -3316,6 +3347,7 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
     p.cost += n / 8;
     const uint16_t *plain = p.xl;
     uint32_t dots = 0;
+    int32_t ramp_of = -1;           /* the colour ramp[] holds, -1 none */
     if (shade)
         memcpy(ramp, plain, sizeof(ramp));
     for (uint32_t i = 0; i < n; i++) {
@@ -3327,18 +3359,31 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
                 continue;
             int64_t xx = num_or_0(x[i]), yy = num_or_0(y[i]);
             p.cost += COST_CALL / 2;
-            if (clipped_out(&p, xx, yy, w, h))
-                continue;
-            p.xl = plain;
+            const uint16_t *xl = plain;
             if (shade && col > 0) {
-                for (int32_t k = 1; k <= shade; k++)
-                    ramp[k] = plain[(col + k - 1) & 0xff];
-                p.xl = ramp;
-                p.cost += (uint32_t)shade / 4;
+                /* the ramp made again only for a new colour: debris from
+                 * one brick shares one */
+                if (col != ramp_of) {
+                    for (int32_t k = 1; k <= shade; k++)
+                        ramp[k] = plain[(col + k - 1) & 0xff];
+                    ramp_of = col;
+                }
+                xl = ramp;
             }
             int32_t fl = num_or_0(flip[i]);
-            copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s), cell_y(&sh, s),
-                      w, h, xx, yy, w, h, fl & 1, (fl & 2) != 0);
+            int64_t dx = xx + p.ox, dy = yy + p.oy;
+            if (dx >= p.cx0 && dx + w <= p.cx1 && dy >= p.cy0 &&
+                dy + h <= p.cy1) {
+                p.cost += COST_SMALL;
+                small_sprite(&p, cell_px(&sh, s), sh.w, w, h, (int32_t)dx,
+                             (int32_t)dy, fl, xl);
+            } else if (!clipped_out(&p, xx, yy, w, h)) {
+                p.xl = xl;
+                copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s),
+                          cell_y(&sh, s), w, h, xx, yy, w, h, fl & 1,
+                          (fl & 2) != 0);
+                p.xl = plain;
+            }
             continue;
         }
         int64_t px = (int64_t)num_or_0(x[i]) + p.ox;
@@ -3351,7 +3396,9 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
         row_touched(&p, (int32_t)py);
     }
     p.xl = plain;
-    p.cost += dots * PER16_DOT / 16;
+    /* a pixel particle's reading of its arrays costs more than its pixel:
+     * about 6 units a particle in all, measured */
+    p.cost += dots * (5 + PER16_DOT / 16);
     finish(vm, &p);
 }
 

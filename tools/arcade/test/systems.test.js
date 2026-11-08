@@ -234,6 +234,24 @@ function draw() { cls(5); particles.draw(p); }`, 1, ['--dump', '10,20,4,2']);
     assert.deepEqual(r.out.trim().split('\n'), ['2', '1,1 1', '89a5', '5a98']);
 });
 
+/* Half off the screen's left edge a sprite particle goes the clipped way
+ * round; whole, the quick way; both draw the same pixels */
+test('sprite particles clipped by the edge draw what is on the screen', () => {
+    const r = run(`var p;
+function init() {
+    sset(8, 0, 1); sset(9, 0, 2); sset(10, 0, 3);
+    p = particles.pool(2);
+    p.w = 3; p.h = 1; p.shade = 3;
+    particles.emit(p, 2, 0, 0, 0, 0, 0, 9, 8, 1);
+    p.x[0] = -1; p.y[0] = 0; p.flip[0] = 0;
+    p.x[1] = 4; p.y[1] = 0; p.flip[1] = 0;
+}
+function update() {}
+function draw() { cls(5); particles.draw(p); }`, 1, ['--dump', '0,0,8,1']);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['9a5589a5']);
+});
+
 test('particles bounce off the floor, and sprites turn as they spin', () => {
     const r = run(`var p;
 function init() {

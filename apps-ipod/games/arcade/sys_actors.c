@@ -1494,7 +1494,8 @@ NATIVE(particles_step)
         if (fd.c)
             settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i], &scanned);
     }
-    vm_charge(vm, 10 + n / 8 + live * (fd.c ? 4 : 2) + scanned / 8);
+    /* about 7 units a live particle, measured; 2 more over a field */
+    vm_charge(vm, 10 + n / 8 + live * (fd.c ? 9 : 7) + scanned / 8);
     return 1;
 }
 
