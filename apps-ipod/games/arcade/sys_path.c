@@ -104,7 +104,8 @@ NATIVE(path_field)
             queue[tail++] = (uint32_t)j;
         }
     }
-    vm_charge(vm, 10 + cells / 4 + tail * 2);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe) */
+    vm_charge(vm, 10 + cells + tail * 9);
     *out = mk(T_INT, (int32_t)tail);
     return 1;
 }
@@ -122,7 +123,7 @@ NATIVE(path_next)
     const int32_t *d = I32(vm, a[0])->d;
     int32_t h = (int32_t)(I32(vm, a[0])->len / (uint32_t)w);
     *out = mk(T_INT, -1);
-    vm_charge(vm, 4);
+    vm_charge(vm, 10);                 /* measured on the rig, sysprobe2 */
     if (x < 0 || y < 0 || x >= w || y >= h || d[y * w + x] <= 0)
         return 1;
     int32_t here = d[y * w + x];
@@ -273,7 +274,9 @@ NATIVE(path_find)
             up(&s, s.pos[j]);
         }
     }
-    vm_charge(vm, 10 + cells / 8 + expanded * 6);
+    /* measured on the rig: about 60 units a cell expanded, the queue's
+     * ordering most of it */
+    vm_charge(vm, 10 + cells / 2 + expanded * 60);
     if (!found)
         return 1;
     /* back from the goal by the ways each cell was reached, into the heap's
@@ -327,7 +330,7 @@ NATIVE(path_sight)
         if ((x != x1 || y != y1) && wall(&w, x, y))
             clear = 0;
     }
-    vm_charge(vm, 8 + (uint32_t)(nx + ny));
+    vm_charge(vm, 8 + (uint32_t)(nx + ny) / 3);     /* measured, sysprobe2 */
     *out = mk(T_INT, clear);
     return 1;
 }
@@ -414,7 +417,7 @@ NATIVE(path_ray)
         }
         cells++;
         if (t > far) {
-            vm_charge(vm, 10 + cells * 2);
+            vm_charge(vm, 10 + cells * 16);
             return 1;
         }
     }
@@ -431,6 +434,8 @@ NATIVE(path_ray)
     vm_out_set(vm, a[5], 3, mk(T_INT, cy));
     vm_out_set(vm, a[5], 4, mk(T_INT, face));
     *out = mk(T_INT, 1);
-    vm_charge(vm, 10 + cells * 2);
+    /* measured on the rig (sysprobe2): a cell crossed is a 64-bit divide
+     * or two, about 16 units */
+    vm_charge(vm, 10 + cells * 16);
     return 1;
 }

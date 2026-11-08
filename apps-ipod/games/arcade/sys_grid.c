@@ -129,7 +129,9 @@ NATIVE(grid_fill)
         for (uint32_t i = 0; i < n; i++)
             b.c[queue[i]] = v;
     }
-    vm_charge(vm, 10 + n);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe): the flood
+     * about 7 units a cell */
+    vm_charge(vm, 10 + n * 7);
     *out = mk(T_INT, (int32_t)n);
     return 1;
 }
@@ -150,7 +152,7 @@ NATIVE(grid_region)
     int32_t *o = I32(vm, a[4])->d;
     for (uint32_t i = 0; i < n && i < len; i++)
         o[i] = (int32_t)queue[i];
-    vm_charge(vm, 10 + n);
+    vm_charge(vm, 10 + n * 7);         /* the flood, as grid.fill */
     *out = mk(T_INT, (int32_t)n);
     return 1;
 }
@@ -206,7 +208,8 @@ NATIVE(grid_runs)
                 o[k] = (int32_t)i;
             k++;
         }
-    vm_charge(vm, 10 + cells / 4);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe) */
+    vm_charge(vm, 10 + cells * 9 / 4);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
@@ -230,7 +233,9 @@ NATIVE(grid_full)
             o[k] = y;
         k++;
     }
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / 16);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe2), as are the
+     * grid charges below */
+    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / 4);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
@@ -299,7 +304,7 @@ NATIVE(grid_fall)
             dst--;
         }
     }
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / 4);
+    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) * 6);
     *out = mk(T_INT, moved);
     return 1;
 }
@@ -358,7 +363,7 @@ NATIVE(grid_slide)
     }
     if (merged && nmerged < mlen)
         merged[nmerged] = -1;
-    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) / 2);
+    vm_charge(vm, 10 + (uint32_t)(b.w * b.h) * 6);
     *out = mk(T_INT, changed);
     return 1;
 }
@@ -403,7 +408,7 @@ static int fit_or_place(struct vm *vm, struct value *a, int place,
                 fits = 0;
             }
         }
-    vm_charge(vm, 8 + (uint32_t)(s.w * s.h) / 4);
+    vm_charge(vm, 8 + (uint32_t)(s.w * s.h) * 3 / 2);
     *out = mk(T_INT, place ? n : fits);
     return 1;
 }
@@ -457,7 +462,7 @@ NATIVE(grid_rotate)
             }
             dst[ny * nw + nx] = src[y * w + x];
         }
-    vm_charge(vm, 8 + len / 4);
+    vm_charge(vm, 8 + len * 5 / 4);
     *out = mk(T_INT, nw);
     return 1;
 }

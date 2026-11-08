@@ -492,9 +492,10 @@ NATIVE(links_step)
     if (broken)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
-    /* a link a pass is a 64-bit root and three multiplies: about 12 */
-    vm_charge(vm, 10 + np * 4 + nl * (uint32_t)passes * 12 + (mask ? np : 0) +
-                  (field ? np * 2 : 0));
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe): a link a
+     * pass, a 64-bit root and divide, about 43 units */
+    vm_charge(vm, 10 + np * 14 + nl * (uint32_t)passes * 43 +
+                  (mask ? np * 4 : 0) + (field ? np * 7 : 0));
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }

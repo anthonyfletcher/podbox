@@ -3272,7 +3272,7 @@ void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
     begin(vm, &p, c, 1);
     p.per16 = PER16_DOT;
     for (uint32_t i = 0; i < n; i++, seg += 4) {
-        p.cost += 8;
+        p.cost += 18;               /* a line's setup, measured on the rig */
         walk_line(&p, seg[0], seg[1], seg[2], seg[3], plot_dot,
                   p.pat ? NULL : run_dots, NULL);
     }
@@ -3289,7 +3289,7 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
     for (uint32_t i = 0; i < n; i++, q += 8) {
         int64_t t[6];
         p.c = p.d->dpal[c[i]];
-        p.cost += 8;
+        p.cost += 80;               /* two triangles' setup, measured */
         for (int k = 0; k < 6; k++)
             t[k] = clampc(q[k]);
         fill_triangle(&p, t);

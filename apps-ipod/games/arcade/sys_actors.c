@@ -735,7 +735,9 @@ NATIVE(actors_move)
             checked %= 8;
         }
     }
-    vm_charge(vm, 10 + n / 4 + moved * 6 + c.n * 2 + checked / 8);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe): about 26
+     * units an actor moved, most of it reading and writing its fields */
+    vm_charge(vm, 10 + n + moved * 26 + c.n * 8 + checked / 8);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }
@@ -847,7 +849,9 @@ NATIVE(actors_overlaps)
             tests = 0;
         }
     }
-    vm_charge(vm, 10 + tests / 2 + live * 2);
+    /* measured on the rig: reading each actor of both pools costs about
+     * 14 units, far more than the tests between them */
+    vm_charge(vm, 10 + tests / 2 + (live + na) * 14);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
@@ -900,7 +904,9 @@ NATIVE(actors_zones)
             contact(&c, i, 4, in, column_at(&objs, (uint32_t)in * 5, 0));
         zone[i] = mk(T_INT, in);
     }
-    vm_charge(vm, 10 + n * (uint32_t)k / 4 + c.n * 2);
+    /* measured on the rig: about 6 units an actor, and 2 a zone it is
+     * tried against */
+    vm_charge(vm, 10 + n * (6 + (uint32_t)k * 2) + c.n * 2);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }
@@ -1117,7 +1123,9 @@ NATIVE(actors_bounce)
             tests = 0;
         }
     }
-    vm_charge(vm, 10 + tests / 2 + live * 2 + k * 8);
+    /* measured on the rig: reading each actor of both pools costs about
+     * 16 units */
+    vm_charge(vm, 10 + tests / 2 + (live + na) * 16 + k * 8);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
@@ -1241,7 +1249,8 @@ NATIVE(actors_bounce_map)
             checked %= 8;
         }
     }
-    vm_charge(vm, 10 + n / 4 + moved * 8 + k * 2 + checked / 8);
+    /* measured on the rig: about 32 units a circle moved */
+    vm_charge(vm, 10 + n + moved * 32 + k * 8 + checked / 8);
     *out = mk(T_INT, (int32_t)k);
     return 1;
 }
@@ -1312,7 +1321,9 @@ NATIVE(particles_emit)
             mk(T_INT, sprite > 0 ? (int32_t)(core_random(vm) & 3) : 0);
         made++;
     }
-    vm_charge(vm, 10 + (uint32_t)made * 2 + n / 16);
+    /* measured on the rig (sysprobe2): about 10 units a particle, its
+     * random numbers most of it */
+    vm_charge(vm, 10 + (uint32_t)made * 10 + n / 16);
     *out = mk(T_INT, made);
     return 1;
 }

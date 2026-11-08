@@ -95,7 +95,9 @@ NATIVE(noise_at)
     uint32_t n = noise(wrap32(scaled(a[0])), wrap32(scaled(a[1])),
                        (uint32_t)whole(a[2], 0),
                        argc > 3 ? octaves_of(a[3]) : 1);
-    vm_charge(vm, 6);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe): about 11
+     * units an octave */
+    vm_charge(vm, 4 + 11 * (uint32_t)(argc > 3 ? octaves_of(a[3]) : 1));
     *out = mk(T_FIX, (int32_t)n);
     return 1;
 }
@@ -147,7 +149,8 @@ NATIVE(noise_fill)
     uint32_t seed = (uint32_t)whole(a[6], 0);
     /* paid a row at a time, so a fill too big for the tick is stopped */
     for (int32_t y = 0; y < h; y++) {
-        if (!vm_spend(vm, (uint32_t)w * (uint32_t)octaves * 4))
+        /* measured on the rig (sysprobe2): about 12 units a cell an octave */
+        if (!vm_spend(vm, (uint32_t)w * (uint32_t)octaves * 12))
             return 0;
         for (int32_t x = 0; x < w; x++) {
             uint32_t n = noise(x0 + x * step, y0 + y * step, seed, octaves);

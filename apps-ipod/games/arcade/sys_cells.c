@@ -697,7 +697,9 @@ NATIVE(cells_step)
             summed++;
         }
     }
-    vm_charge(vm, 20 + visited + s.moves + summed * 16);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe): the parts
+     * as they were weighed, three and a half times over */
+    vm_charge(vm, (20 + visited + s.moves + summed * 16) * 7 / 2);
     *out = mk(T_INT, (int32_t)s.moves);
     return 1;
 }
@@ -811,7 +813,8 @@ NATIVE(cells_life)
                 changed++;
             }
         }
-    vm_charge(vm, 10 + cells * 3);
+    /* measured on the ARM rig (.build/arcade-rig, sysprobe) */
+    vm_charge(vm, 10 + cells * 11);
     *out = mk(T_INT, changed);
     return 1;
 }
