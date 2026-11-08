@@ -4054,13 +4054,23 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                 read += (uint32_t)n * PER16_EDGE;
             }
             if (step == 2) {
-                for (int32_t i = 0, x = x0; x < x1; i++, x += 2) {
+                /* each sample twice: two samples a 32-bit store where
+                 * the row starts on a word (the player is little-endian:
+                 * the first sample is the low half), else a byte at a
+                 * time */
+                int32_t i = 0, x = x0;
+                if (!((uintptr_t)(px + x0) & 3)) {
+                    uint32_t *d = (uint32_t *)(void *)(px + x0);
+                    for (; x + 3 < x1; i += 2, x += 4)
+                        *d++ = (half[i] | (uint32_t)half[i + 1] << 16) *
+                               0x0101u;
+                }
+                for (; x < x1; i++, x += 2) {
                     px[x] = half[i];
                     if (x + 1 < x1)
                         px[x + 1] = half[i];
                 }
-                /* the doubling, a byte at a time: measured on the rig */
-                read += (uint32_t)(x1 - x0) * 6;
+                read += (uint32_t)(x1 - x0) * 2;    /* measured on the rig */
             }
             if (r->fog)
                 fog_row(px, y, x0, x1, r->fog, fogc);
