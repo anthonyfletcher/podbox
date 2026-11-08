@@ -155,6 +155,7 @@ extern const uint32_t arcade_api_count;
 struct draw
 {
     struct value target;        /* 0 the screen, or an img */
+    struct value sheet;         /* 0 the cart's sheet, or an img: sheet() */
     int32_t cam_x, cam_y;
     int32_t clip_x0, clip_y0, clip_x1, clip_y1;   /* end exclusive */
     int32_t cur_x, cur_y;
@@ -611,6 +612,8 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                      int32_t top, int32_t bottom, int32_t outside,
                      int coarse, const uint8_t *remap);
 int32_t core_fog_level(const struct planeview *v, int64_t d);
+/* How many sprites the sheet sheet() chose has */
+int32_t core_sheet_sprites(struct vm *vm);
 void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
                          int32_t w, int32_t h, int32_t cw, int32_t ch,
                          int flip, int32_t depth);

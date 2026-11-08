@@ -1,7 +1,7 @@
 /* The pixel editor: a picture of palette numbers -- one of the cart's
  * images, or a block of the sheet's sprites -- drawn on, a pixel at a time
- * or by shape, with undo. The sheet itself is a picker beside it
- * (SheetEditor): a block of cells chosen there opens here.
+ * or by shape, with undo. The sheet, or an image edited as sprites, is a
+ * picker beside it (SheetEditor): a block of cells chosen there opens here.
  *
  * Parts: the picture and its palette; drawing it, zoomed, with the grids,
  * the selection and anything floating; the tools; the selection, and
@@ -755,16 +755,26 @@ export class PixelEditor {
  * block shown faintly under the one being drawn: one right-clicked on the
  * picker, or in an animation the frame before. */
 export class SheetEditor {
-    /* opts: px (the sheet, 128x128), rgb, flags (256), changed(px),
+    /* opts: px, width and height (the cart's sheet, 128x128, or an
+     * image's), image (the image's name, for IMG.<name>; none for the
+     * sheet), rgb, changed(px); for the sheet only, flags (256),
      * flagsChanged(flags), flagNames() (the eight names cart.json gives,
-     * null where none), nameFlag(b) (to ask for flag b's name), picker
+     * null where none) and nameFlag(b) (to ask for flag b's name); picker
      * (whether the picker is open) and pickerShown(open) when it is
      * opened or closed, anim ({ x, y, w, h, n, fps }, kept by the IDE
      * between openings) and animChanged(anim), fitColours (as the
-     * PixelEditor's), say(text, error) */
+     * PixelEditor's), say(text, error), and tools, buttons for the end of
+     * the drawing toolbar */
     constructor(parent, opts) {
         this.o = opts;
         this.px = opts.px;
+        this.W = opts.width || 128;
+        this.H = opts.height || 128;
+        /* the sprites are the whole 8x8 cells, numbered along the rows */
+        this.cols = this.W >> 3;
+        this.rows = this.H >> 3;
+        /* the picker 256 pixels across, or the image's own size past that */
+        this.zoom = Math.max(1, Math.min(4, Math.floor(256 / this.W)));
         this.cell = { x: 0, y: 0, w: 1, h: 1 };
         this.onion = null;        /* null, 'prev' or the { x, y } of a block */
         const root = this.root = document.createElement('div');
@@ -776,7 +786,10 @@ export class SheetEditor {
                                    'Right-click a cell to show that one instead', () => this.toggleOnion());
         this.picker = document.createElement('canvas');
         this.picker.className = 'sheet-picker';
-        this.picker.width = this.picker.height = 128 * 2;
+        this.picker.width = this.W * this.zoom;
+        this.picker.height = this.H * this.zoom;
+        this.picker.style.width = this.picker.width + 'px';
+        this.picker.style.height = this.picker.height + 'px';
         this.info = document.createElement('div');
         this.info.className = 'sheet-info';
         this.animBox = document.createElement('div');
@@ -808,7 +821,7 @@ export class SheetEditor {
     sprites() {
         const out = [];
         for (let y = this.cell.y; y < this.cell.y + this.cell.h; y++)
-            for (let x = this.cell.x; x < this.cell.x + this.cell.w; x++) out.push(y * 16 + x);
+            for (let x = this.cell.x; x < this.cell.x + this.cell.w; x++) out.push(y * this.cols + x);
         return out;
     }
 
@@ -817,8 +830,9 @@ export class SheetEditor {
         let from = null;
         const at = (e) => {
             const r = cv.getBoundingClientRect();
-            return { x: Math.max(0, Math.min(15, Math.floor((e.clientX - r.left) / (r.width / 16)))),
-                     y: Math.max(0, Math.min(15, Math.floor((e.clientY - r.top) / (r.height / 16)))) };
+            const k = r.width / this.W * 8;
+            return { x: Math.max(0, Math.min(this.cols - 1, Math.floor((e.clientX - r.left) / k))),
+                     y: Math.max(0, Math.min(this.rows - 1, Math.floor((e.clientY - r.top) / k))) };
         };
         cv.addEventListener('contextmenu', (e) => e.preventDefault());
         cv.addEventListener('pointerdown', (e) => {
@@ -852,7 +866,7 @@ export class SheetEditor {
         for (let y = 0; y < h * 8; y++)
             for (let x = 0; x < w * 8; x++) {
                 const sx = x0 * 8 + x, sy = y0 * 8 + y;
-                if (sx < 128 && sy < 128) out[y * w * 8 + x] = this.px[sy * 128 + sx];
+                if (sx < this.W && sy < this.H) out[y * w * 8 + x] = this.px[sy * this.W + sx];
             }
         return out;
     }
@@ -866,23 +880,30 @@ export class SheetEditor {
             width: w, height: h, px: this.block(c.x, c.y, c.w, c.h), rgb: this.o.rgb, grid: 8, was: was,
             changed: (b) => {
                 for (let y = 0; y < h; y++)
-                    this.px.set(b.subarray(y * w, (y + 1) * w), (c.y * 8 + y) * 128 + c.x * 8);
+                    this.px.set(b.subarray(y * w, (y + 1) * w), (c.y * 8 + y) * this.W + c.x * 8);
                 this.drawPicker();
                 this.o.changed(this.px);
             },
-            where: (p) => '; sprite ' + ((c.y + (p.y >> 3)) * 16 + c.x + (p.x >> 3)) +
+            where: (p) => '; sprite ' + ((c.y + (p.y >> 3)) * this.cols + c.x + (p.x >> 3)) +
                 (this.frameOf() >= 0 ? '; frame ' + (this.frameOf() + 1) + ' of ' + this.o.anim.n : ''),
             tooBig: (pic) => this.grow(pic),
             fitColours: this.o.fitColours,
             say: this.o.say
         });
         /* the chosen sprites' flags on the end of the drawing toolbar */
-        const sep = document.createElement('span');
-        sep.className = 'sep';
-        this.flagRow = document.createElement('span');
-        this.flagRow.className = 'pix-flags';
-        this.editor.bar.append(sep, this.flagRow);
-        this.drawFlags();
+        if (this.o.flags) {
+            const sep = document.createElement('span');
+            sep.className = 'sep';
+            this.flagRow = document.createElement('span');
+            this.flagRow.className = 'pix-flags';
+            this.editor.bar.append(sep, this.flagRow);
+            this.drawFlags();
+        }
+        if (this.o.tools) {
+            const sep = document.createElement('span');
+            sep.className = 'sep';
+            this.editor.bar.append(sep, ...this.o.tools);
+        }
         this.drawAnim();
         this.refresh();
         if (paste) this.editor.place(paste);
@@ -980,7 +1001,7 @@ export class SheetEditor {
         view.onclick = () => { this.cell = { x: a.x, y: a.y, w: a.w, h: a.h }; this.open(); };
         const code = document.createElement('code');
         code.className = 'sheet-anim-code';
-        code.textContent = 'spr(' + (a.y * 16 + a.x) + ' + flr(t() * ' + a.fps + ') % ' + a.n +
+        code.textContent = this.use() + 'spr(' + (a.y * this.cols + a.x) + ' + flr(t() * ' + a.fps + ') % ' + a.n +
             (a.w > 1 ? ' * ' + a.w : '') + ', x, y' + (a.w > 1 || a.h > 1 ? ', ' + a.w + ', ' + a.h : '') + ')';
         box.append(head, bar.el, view, code);
         const g = view.getContext('2d'), im = new ImageData(w, h), tmp = document.createElement('canvas');
@@ -1003,6 +1024,11 @@ export class SheetEditor {
         this.playing = setInterval(draw, 1000 / a.fps);
     }
 
+    /* the call that makes this the sprites' sheet, before the code shown */
+    use() {
+        return this.o.image ? 'sheet(IMG.' + this.o.image + '); ' : '';
+    }
+
     setPalette(rgb) {
         this.o.rgb = rgb;
         this.editor.setPalette(rgb);
@@ -1012,8 +1038,8 @@ export class SheetEditor {
     /* a picture too big for the block: the block widened to hold it */
     grow(pic) {
         const c = this.cell;
-        const w = Math.min(16 - c.x, Math.max(c.w, Math.ceil(pic.w / 8)));
-        const h = Math.min(16 - c.y, Math.max(c.h, Math.ceil(pic.h / 8)));
+        const w = Math.min(this.cols - c.x, Math.max(c.w, Math.ceil(pic.w / 8)));
+        const h = Math.min(this.rows - c.y, Math.max(c.h, Math.ceil(pic.h / 8)));
         if (w === c.w && h === c.h) return false;
         this.cell = { x: c.x, y: c.y, w, h };
         this.open(pic);
@@ -1021,23 +1047,26 @@ export class SheetEditor {
     }
 
     drawPicker() {
-        const g = this.picker.getContext('2d'), z = 2;
-        const im = new ImageData(128, 128);
+        const g = this.picker.getContext('2d'), z = this.zoom, W = this.W, H = this.H;
+        const im = new ImageData(W, H);
         for (let i = 0; i < this.px.length; i++) {
             const s = shown(this.o.rgb[this.px[i]] || 0);
             im.data[i * 4] = s >> 16; im.data[i * 4 + 1] = s >> 8 & 255; im.data[i * 4 + 2] = s & 255;
             im.data[i * 4 + 3] = 255;
         }
         const tmp = document.createElement('canvas');
-        tmp.width = tmp.height = 128;
+        tmp.width = W;
+        tmp.height = H;
         tmp.getContext('2d').putImageData(im, 0, 0);
         g.imageSmoothingEnabled = false;
-        g.drawImage(tmp, 0, 0, 128 * z, 128 * z);
+        g.drawImage(tmp, 0, 0, W * z, H * z);
         g.strokeStyle = 'rgba(128,128,128,0.5)';
         g.beginPath();
-        for (let k = 8; k < 128; k += 8) {
-            g.moveTo(k * z + 0.5, 0); g.lineTo(k * z + 0.5, 128 * z);
-            g.moveTo(0, k * z + 0.5); g.lineTo(128 * z, k * z + 0.5);
+        for (let k = 8; k <= this.cols * 8 && k < W; k += 8) {
+            g.moveTo(k * z + 0.5, 0); g.lineTo(k * z + 0.5, this.rows * 8 * z);
+        }
+        for (let k = 8; k <= this.rows * 8 && k < H; k += 8) {
+            g.moveTo(0, k * z + 0.5); g.lineTo(this.cols * 8 * z, k * z + 0.5);
         }
         g.stroke();
         const an = this.o.anim, c = this.cell, o = this.onion;
@@ -1058,14 +1087,16 @@ export class SheetEditor {
         g.strokeRect(c.x * 8 * z + 1, c.y * 8 * z + 1, c.w * 8 * z - 2, c.h * 8 * z - 2);
         g.lineWidth = 1;
         const n = this.sprites();
-        this.info.textContent = n.length === 1 ? 'Sprite ' + n[0]
+        this.info.textContent = n.length === 1
+            ? 'Sprite ' + n[0] + (this.o.image ? ': ' + this.use() + 'spr(' + n[0] + ', x, y)' : '')
             : 'Sprites ' + n[0] + ' to ' + n[n.length - 1] + ', ' + c.w + ' by ' + c.h +
-              ': spr(' + n[0] + ', x, y, ' + c.w + ', ' + c.h + ')';
+              ': ' + this.use() + 'spr(' + n[0] + ', x, y, ' + c.w + ', ' + c.h + ')';
     }
 
     /* each flag on for all the chosen sprites, for some, or for none; a
      * click sets it on all of them, or clears it where all had it */
     drawFlags() {
+        if (!this.o.flags) return;
         const f = this.o.flags, n = this.sprites(), names = this.o.flagNames();
         this.flagRow.innerHTML = '';
         const label = document.createElement('span');

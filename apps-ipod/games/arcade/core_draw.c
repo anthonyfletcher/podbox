@@ -19,7 +19,8 @@
  *   shapes         circles and ovals as spans, filled or outlined
  *   lines          line, and tline, which steps the same way
  *   triangles, rectangles, text
- *   sprites        spr, sspr, sget/sset, fget/fset, images
+ *   sprites        the sheet they come from; spr, sspr, sget/sset,
+ *                  fget/fset, images
  *   turned         rspr and rblit, rotated and scaled about their centres
  *   the map
  *   state          camera, clip, colour, cursor, palettes, target
@@ -301,6 +302,7 @@ int core_draw_init(struct vm *vm)
     ((struct u8a *)MEM(vm, vm->map - sizeof(struct u8a)))->len = MAP_W * MAP_H;
     memset(d, 0, sizeof(*d));
     d->target = mk(T_INT, 0);
+    d->sheet = mk(T_INT, 0);
     d->pen = 6;
     memcpy(d->rgb, default_rgb, sizeof(default_rgb));
     reset_palettes(d);
@@ -2183,9 +2185,11 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
     }
 }
 
-/* An unflipped 8x8 tile of the sheet, landing wholly inside the clip at
- * (x, y) in surface coordinates: copy_rect's pixels, without its setup. */
-static void tile8(struct pen *p, const uint8_t *src, int32_t x, int32_t y)
+/* An unflipped 8x8 tile, rows stride apart, landing wholly inside the
+ * clip at (x, y) in surface coordinates: copy_rect's pixels, without its
+ * setup. */
+static void tile8(struct pen *p, const uint8_t *src, int32_t stride,
+                  int32_t x, int32_t y)
 {
     p->cost += 64 * PER16_TILE / 16;
     const uint16_t *xl = p->xl;
@@ -2193,7 +2197,7 @@ static void tile8(struct pen *p, const uint8_t *src, int32_t x, int32_t y)
     uint8_t *d = p->s.px + y * w + x;
     int top = -1, bot = 0;
     uint32_t total = 0;
-    for (int r = 0; r < 8; r++, src += SHEET_W, d += w) {
+    for (int r = 0; r < 8; r++, src += stride, d += w) {
         uint32_t n = 0, c;
 #define TILE_PX(i) c = xl[src[i]]; \
         if (!(c & XLAT_CLEAR)) { d[i] = (uint8_t)c; n++; }
@@ -2227,6 +2231,70 @@ static int tile_inside(const struct pen *p, int64_t x, int64_t y,
     return 1;
 }
 
+/* Where the sprite calls read: the cart's sheet, or the image sheet()
+ * chose. Its sprites are its whole 8x8 cells, numbered along the rows. */
+struct sheet
+{
+    const uint8_t *px;
+    int32_t w, h;
+    int32_t cols, count;
+};
+
+static void sheet_of(struct vm *vm, struct sheet *s)
+{
+    if (vm->d.sheet.tag == T_IMG) {
+        struct img *im = MEM(vm, (uint32_t)vm->d.sheet.v);
+        s->px = im->px;
+        s->w = im->width;
+        s->h = im->height;
+    } else {
+        s->px = MEM(vm, vm->sheet);
+        s->w = SHEET_W;
+        s->h = SHEET_H;
+    }
+    s->cols = s->w / 8;
+    s->count = s->cols * (s->h / 8);
+}
+
+int32_t core_sheet_sprites(struct vm *vm)
+{
+    struct sheet s;
+    sheet_of(vm, &s);
+    return s.count;
+}
+
+/* Sprite n's top left, n below s->count */
+static inline int32_t cell_x(const struct sheet *s, int32_t n)
+{
+    return n % s->cols * 8;
+}
+
+static inline int32_t cell_y(const struct sheet *s, int32_t n)
+{
+    return n / s->cols * 8;
+}
+
+static inline const uint8_t *cell_px(const struct sheet *s, int32_t n)
+{
+    return s->px + cell_y(s, n) * s->w + cell_x(s, n);
+}
+
+/* sheet([i]): the image the sprite calls read from, or the cart's sheet
+ * again when there is none or 0 */
+NATIVE(sheet)
+{
+    (void)out;
+    if (argc < 1 || (is_num(a[0]) && floor_int(a[0]) == 0)) {
+        vm->d.sheet = mk(T_INT, 0);
+        return 1;
+    }
+    if (a[0].tag != T_IMG)
+        return bad(vm, "sheet", "() needs an image, or nothing for the cart's "
+                   "sheet, not a ", a[0]);
+    vm->d.sheet = a[0];
+    return 1;
+}
+
 /* A sprite count in sprites, which may be a fraction: pixels, rounded
  * down. */
 static int sprites(struct vm *vm, struct value *a, int argc, int i,
@@ -2249,7 +2317,9 @@ NATIVE(spr)
     if (!sprites(vm, a, argc, 3, "spr", &w) ||
         !sprites(vm, a, argc, 4, "spr", &h))
         return 0;
-    if (n < 0 || n > 255)
+    struct sheet sh;
+    sheet_of(vm, &sh);
+    if (n < 0 || n >= sh.count)
         return 1;
     int fx = flag(vm, a, argc, 5), fy = flag(vm, a, argc, 6);
     struct pen p;
@@ -2257,11 +2327,10 @@ NATIVE(spr)
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
     if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty)) {
-        tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W + (n & 15) * 8,
-              tx, ty);
+        tile8(&p, cell_px(&sh, (int32_t)n), sh.w, tx, ty);
     } else {
-        copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, (n & 15) * 8,
-                  (n >> 4) * 8, w, h, x, y, w, h, fx, fy);
+        copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, (int32_t)n),
+                  cell_y(&sh, (int32_t)n), w, h, x, y, w, h, fx, fy);
     }
     finish(vm, &p);
     return 1;
@@ -2278,10 +2347,12 @@ NATIVE(sspr)
     WHOLE(5, 0, dy, "sspr");
     WHOLE(6, sw, dw, "sspr");
     WHOLE(7, sh, dh, "sspr");
+    struct sheet src;
+    sheet_of(vm, &src);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
-    copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H, sx, sy, sw, sh,
+    copy_rect(&p, src.px, src.w, src.h, sx, sy, sw, sh,
               dx, dy, dw, dh, flag(vm, a, argc, 8), flag(vm, a, argc, 9));
     finish(vm, &p);
     return 1;
@@ -2291,9 +2362,10 @@ NATIVE(sget)
 {
     WHOLE(0, 0, x, "sget");
     WHOLE(1, 0, y, "sget");
-    uint8_t *sheet = MEM(vm, vm->sheet);
-    *out = mk(T_INT, (uint32_t)x < SHEET_W && (uint32_t)y < SHEET_H
-              ? sheet[y * SHEET_W + x] : 0);
+    struct sheet sh;
+    sheet_of(vm, &sh);
+    *out = mk(T_INT, x >= 0 && x < sh.w && y >= 0 && y < sh.h
+              ? sh.px[y * sh.w + x] : 0);
     return 1;
 }
 
@@ -2303,9 +2375,10 @@ NATIVE(sset)
     WHOLE(0, 0, x, "sset");
     WHOLE(1, 0, y, "sset");
     WHOLE(2, vm->d.pen, c, "sset");
-    uint8_t *sheet = MEM(vm, vm->sheet);
-    if ((uint32_t)x < SHEET_W && (uint32_t)y < SHEET_H)
-        sheet[y * SHEET_W + x] = (uint8_t)c;
+    struct sheet sh;
+    sheet_of(vm, &sh);
+    if (x >= 0 && x < sh.w && y >= 0 && y < sh.h)
+        ((uint8_t *)sh.px)[y * sh.w + x] = (uint8_t)c;
     return 1;
 }
 
@@ -2527,17 +2600,19 @@ NATIVE(rspr)
         !real(vm, a, argc, 3, 0, "rspr", &angle) ||
         !scale_arg(vm, a, argc, 4, "rspr", &scale))
         return 0;
-    if (n < 0 || n > 255 || w < 1 || h < 1)
+    struct sheet sh;
+    sheet_of(vm, &sh);
+    if (n < 0 || n >= sh.count || w < 1 || h < 1)
         return 1;
-    int32_t sx = (n & 15) * 8, sy = (n >> 4) * 8;
-    if (w > (SHEET_W - sx) / 8) w = (SHEET_W - sx) / 8;
-    if (h > (SHEET_H - sy) / 8) h = (SHEET_H - sy) / 8;
+    int32_t sx = cell_x(&sh, (int32_t)n), sy = cell_y(&sh, (int32_t)n);
+    if (w > (sh.w - sx) / 8) w = (sh.w - sx) / 8;
+    if (h > (sh.h - sy) / 8) h = (sh.h - sy) / 8;
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;
     struct turn t;
-    t.src = (const uint8_t *)MEM(vm, vm->sheet) + sy * SHEET_W + sx;
-    t.stride = SHEET_W;
+    t.src = sh.px + sy * sh.w + sx;
+    t.stride = sh.w;
     t.sw = (uint32_t)w * 8;
     t.sh = (uint32_t)h * 8;
     t.flip = flag(vm, a, argc, 7);
@@ -2624,7 +2699,7 @@ NATIVE(map)
                 p.cost += COST_TILE;
                 if (whole_rows && px >= p.cx0 && px + 8 <= p.cx1)
                     tile8(&p, sheet + (n >> 4) * 8 * SHEET_W + (n & 15) * 8,
-                          px, py);
+                          SHEET_W, px, py);
                 else
                     copy_rect(&p, sheet, SHEET_W, SHEET_H, (n & 15) * 8,
                               (n >> 4) * 8, 8, 8, px - ox, py - oy, 8, 8, 0,
@@ -2649,7 +2724,7 @@ NATIVE(map)
             int32_t tx, ty;
             if (tile_inside(&p, px - p.ox, py - p.oy, &tx, &ty)) {
                 tile8(&p, MEM(vm, vm->sheet) + (n >> 4) * 8 * SHEET_W +
-                      (n & 15) * 8, tx, ty);
+                      (n & 15) * 8, SHEET_W, tx, ty);
                 continue;
             }
             copy_rect(&p, MEM(vm, vm->sheet), SHEET_W, SHEET_H,
@@ -3119,19 +3194,20 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
                        const struct column *speed, uint32_t n)
 {
     struct pen p;
-    const uint8_t *sheet = MEM(vm, vm->sheet);
+    struct sheet sh;
+    sheet_of(vm, &sh);
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
     for (uint32_t i = 0; i < n; i++) {
         int32_t s = column_at(sp, i, -1);
-        if (s < 0 || s > 255 || !column_true(vm, on, i, 1))
+        if (s < 0 || s >= sh.count || !column_true(vm, on, i, 1))
             continue;
         int32_t k = column_at(frames, i, 1);
         if (k > 1) {
             int32_t t = column_at(speed, i, 8);
             s += (int32_t)(vm->frame / (uint32_t)(t > 0 ? t : 1) %
                            (uint32_t)k);
-            if (s > 255)
+            if (s >= sh.count)
                 continue;
         }
         int64_t xx = column_at(x, i, 0), yy = column_at(y, i, 0);
@@ -3139,9 +3215,9 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
         int32_t tx, ty;
         p.cost += COST_CALL / 2;
         if (!fl && tile_inside(&p, xx, yy, &tx, &ty))
-            tile8(&p, sheet + (s >> 4) * 8 * SHEET_W + (s & 15) * 8, tx, ty);
+            tile8(&p, cell_px(&sh, s), sh.w, tx, ty);
         else
-            copy_rect(&p, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+            copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s), cell_y(&sh, s),
                       8, 8, xx, yy, 8, 8, fl, 0);
     }
     finish(vm, &p);
@@ -3915,12 +3991,12 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
  * fog level fog: the sprite drawn again into a mask, its every opaque
  * pixel 1, and the fog's colour put where the mask is set and the screen's
  * dither says, as the ground's is, so it fades into the haze with it */
-static void billboard_copy(struct pen *p, const uint8_t *sheet, int32_t s,
+static void billboard_copy(struct pen *p, const struct sheet *sh, int32_t s,
                            int32_t x, int32_t y, int32_t w, int32_t h,
                            int32_t cw, int32_t ch, int flip, int32_t fog,
                            uint8_t fogc)
 {
-    copy_rect(p, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+    copy_rect(p, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
               cw * 8, ch * 8, x, y, w, h, flip, 0);
     if (fog <= 0)
         return;
@@ -3938,7 +4014,7 @@ static void billboard_copy(struct pen *p, const uint8_t *sheet, int32_t s,
     m.s.px = mask;
     m.s.w = SCREEN_W;
     m.xl = ones;
-    copy_rect(&m, sheet, SHEET_W, SHEET_H, (s & 15) * 8, (s >> 4) * 8,
+    copy_rect(&m, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
               cw * 8, ch * 8, x, y, w, h, flip, 0);
     p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16;
     for (int32_t r = y0; r < y1; r++) {
@@ -3960,11 +4036,12 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     p.cost = COST_CALL / 2;
     p.per16 = 0;                    /* copy_rect charges the area */
     const struct planeview *v = &vm->plane;
-    const uint8_t *sheet = MEM(vm, vm->sheet);
+    struct sheet sheet;
+    sheet_of(vm, &sheet);
     int32_t fog = core_fog_level(v, depth);
     uint8_t fogc = p.d->dpal[v->fog_colour];
     if (!v->depth_set && !v->land_set) {
-        billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
+        billboard_copy(&p, &sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);
         finish(vm, &p);
         return;
     }
@@ -3995,7 +4072,7 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
             p.cx1 = j;
             p.cy1 = hill && hill[i] < r1 ? hill[i] : r1;
             if (p.cy1 > p.cy0)
-                billboard_copy(&p, sheet, s, x, y, w, h, cw, ch, flip, fog,
+                billboard_copy(&p, &sheet, s, x, y, w, h, cw, ch, flip, fog,
                                fogc);
         }
         i = j;

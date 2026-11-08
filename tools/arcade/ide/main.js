@@ -204,6 +204,15 @@ function show(file) {
 
 /* the sheet's animation, as the sprite editor last had it */
 let sheetAnim = null;
+/* each image's animation, and the images edited as sprites, by file */
+const imageAnims = {};
+let asSprites = {};
+try { asSprites = JSON.parse(localStorage.getItem('arcade-as-sprites') || '{}'); } catch (e) { /* none kept */ }
+
+function setAsSprites(file, on) {
+    if (on) asSprites[file] = true; else delete asSprites[file];
+    try { localStorage.setItem('arcade-as-sprites', JSON.stringify(asSprites)); } catch (e) { /* not kept */ }
+}
 
 /* files with editors of their own, shown as text */
 const asText = {};
@@ -449,10 +458,30 @@ function showPicture(pane, file) {
         changed();
     };
     const say_ = (text, bad) => say(bad ? 'error' : 'print', text);
-    if (!sheet) {
+    /* an image a cell or more each way can be edited as sprites, for sheet() */
+    const cells = pic.width >= 8 && pic.height >= 8;
+    if (!sheet && !(cells && asSprites[file])) {
         pixels = new PixelEditor(pane, { width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
                                          changed: write, fitColours: fitPicture, say: say_ });
+        if (cells) {
+            const sep = document.createElement('span');
+            sep.className = 'sep';
+            pixels.bar.append(sep, iconButton('sprites', 'Edit as sprites: 8x8 cells, drawn after sheet(IMG.' +
+                file.slice(7, -4) + ')', () => { setAsSprites(file, true); show(file); }));
+        }
         pixels.root.focus();
+        return;
+    }
+    if (!sheet) {
+        pixels = new SheetEditor(pane, {
+            px: pic.px, width: pic.width, height: pic.height, image: file.slice(7, -4),
+            rgb: rgb, fitColours: fitPicture, picker: layout.picker,
+            anim: imageAnims[file] || null,
+            animChanged: (a) => { imageAnims[file] = a; },
+            pickerShown: (open) => { layout.picker = open; applyLayout(); },
+            tools: [iconButton('picture', 'Edit as one picture', () => { setAsSprites(file, false); show(file); })],
+            changed: write, say: say_
+        });
         return;
     }
     pixels = new SheetEditor(pane, {

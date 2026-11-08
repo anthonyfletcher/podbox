@@ -8,7 +8,7 @@ import {
     Ghost, ZoomIn, ZoomOut, Play, Pause, Plus, ChevronLeft, ChevronRight, ChevronDown, X, Eraser,
     FileCode, Palette, Type, Trash2, Film, SkipBack, SkipForward, Ban,
     Maximize2, Layers, MousePointer2, Grid2x2, Timer, MapPinPlus,
-    Settings, Coins, Zap, Bomb, Sparkles, Crosshair, ArrowBigUp, MousePointerClick, Dices, WandSparkles
+    LayoutGrid, Image, Settings, Coins, Zap, Bomb, Sparkles, Crosshair, ArrowBigUp, MousePointerClick, Dices, WandSparkles
 } from 'lucide';
 
 /* the four waves sfxr makes, drawn as Lucide draws */
@@ -30,7 +30,7 @@ const ICONS = {
     prev: SkipBack, next: SkipForward, clear: Ban, resize: Maximize2, layers: Layers,
     pointer: MousePointer2, grid: Grid2x2, metronome: Timer,
     coin: Coins, laser: Zap, explosion: Bomb, powerup: Sparkles, hit: Crosshair, jump: ArrowBigUp,
-    settings: Settings, blip: MousePointerClick, random: Dices, mutate: WandSparkles,
+    sprites: LayoutGrid, picture: Image, settings: Settings, blip: MousePointerClick, random: Dices, mutate: WandSparkles,
     waveSquare: WAVES.square, waveSaw: WAVES.saw, waveSine: WAVES.sine, waveNoise: WAVES.noise
 };
 

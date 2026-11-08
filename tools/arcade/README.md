@@ -96,7 +96,7 @@ A cart's art goes in the same folder:
 | `flags.json` | the 256 sprite flags: an array, or `{ "12": 3 }` for just some |
 | `palettes/<name>.gpl` | a palette in GIMP's format; the first, by name, is loaded when the cart starts |
 | `maps/<name>.json` | a map: `width` and `height` (up to 256), `rows` of two hex digits a cell, and `objects`, each with a `kind`, `x`, `y`, `w`, `h` in pixels and `props` of whole numbers or strings |
-| `images/<name>.png` | any other picture, up to 1024 pixels a side |
+| `images/<name>.png` | any other picture, up to 1024 pixels a side; after `sheet(IMG.<name>)` the sprite calls draw its 8x8 cells as sprites |
 | `data/<name>.json` | data the code reads: levels, waves, dialogue |
 | `data/<name>.txt` | text the code reads as one string |
 | `fonts/<name>.bdf` | a font in BDF, the bitmap font format FontForge and other font editors save: up to 16 a cart, glyphs up to 32 pixels a side, 64 KB of glyphs in all |
@@ -229,7 +229,9 @@ show as `?`.
   in the palette, choose the nearest, the nearest dithered, or to add them
   to the palette (as many as it has room for, chosen to stand for the
   rest). Copy puts the selection on the clipboard for other programs too,
-  and File > Export picture saves the open one.
+  and File > Export picture saves the open one. An image can be edited as
+  sprites too, with the grid button on its toolbar: it then opens as the
+  sheet does, its cells numbered for `sheet(IMG.<name>)`, without flags.
 - **Fonts**: open a `.bdf` to draw its characters: each in a cell the line
   tall with the baseline marked, its advance set by number; add a character
   by typing it, delete one, and change the ascent and descent. A line of

@@ -136,6 +136,18 @@ test('sprites: transparency, flipping, scaling and the draw palette', () => {
         '555555955559']));
 });
 
+test('sheet() makes an image the sprites\' sheet, its whole cells numbered along its rows', () => {
+    /* A 20x16 image is 2 by 2 sprites; its last 4 columns are no sprite's
+     * but sspr reaches them. */
+    assert.equal(pixels('sset(0,0,7); var im = img(20, 16); target(im); ' +
+                        'pset(8,0,8); pset(0,8,9); pset(16,0,10); target(SCREEN); ' +
+                        'rectfill(0,0,11,0,5); sheet(im); spr(1,0,0); spr(2,1,0); ' +
+                        'spr(4,2,0); sspr(16,0,1,1,3,0); sset(1,0,12); pset(4,0,sget(1,0)); ' +
+                        'sprites.draw(1, [10], [0], 1); sheet(); spr(0,5,0); ' +
+                        'pset(6,0,sget(1,0));', [0, 0, 12, 1]),
+    '895ac7055585');
+});
+
 test('the map draws only sprites whose flags hold the layers', () => {
     assert.equal(pixels('sset(8,0,7); sset(16,0,8); fset(2,1,1); ' +
                         'mset(0,0,1); mset(1,0,2); mset(2,0,0); ' +

@@ -350,12 +350,12 @@ NATIVE(plane_billboards)
     static int32_t order[MAX_BILLBOARDS], dep[MAX_BILLBOARDS];
     static int32_t px[MAX_BILLBOARDS], py[MAX_BILLBOARDS];
     static int32_t pw[MAX_BILLBOARDS], ph[MAX_BILLBOARDS];
-    int32_t k = 0;
+    int32_t k = 0, count = core_sheet_sprites(vm);
     for (int32_t i = 0; i < n; i++) {
         int32_t s = column_at(&c[3], (uint32_t)i, -1), sx, sy, sc, d;
         int32_t cw = column_at(&c[6], (uint32_t)i, 1);
         int32_t ch = column_at(&c[7], (uint32_t)i, 1);
-        if (s < 0 || s > 255 || cw < 1 || ch < 1 || cw > 16 || ch > 16 ||
+        if (s < 0 || s >= count || cw < 1 || ch < 1 || cw > 16 || ch > 16 ||
             !project(&vm->plane, column_fix(&c[0], (uint32_t)i),
                      column_fix(&c[1], (uint32_t)i),
                      column_fix(&c[2], (uint32_t)i), &sx, &sy, &sc, &d))

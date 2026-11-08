@@ -90,6 +90,9 @@ Where drawing goes: `SCREEN`, or an image made by `img`.
 
 ## Sprites and images
 
+### sheet([i])
+The sheet sprites come from: an image such as `IMG.hero`, or the cart's sheet again with none. An image's sprites are its whole 8x8 cells, numbered along its rows from 0: a 64x16 image is sprites 0 to 7 across the top and 8 to 15 below. `spr`, `sspr`, `rspr`, `sget`, `sset`, `sprites.draw`, `actors.draw` and `plane.billboards` use it. The map, `tline`, the plane's floor and ceiling, and `fget` and `fset` always use the cart's sheet.
+
 ### spr(n, x, y, [w, h], [flip_x], [flip_y])
 Sprite `n` of the sheet, or a block `w` by `h` sprites from it, at `x, y`.
 

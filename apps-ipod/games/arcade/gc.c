@@ -6,8 +6,8 @@
  *
  * Free blocks are kept on exact lists for 16..504 bytes and one first-fit
  * list above that; each sweep rebuilds them all, merging neighbours. The
- * roots are the globals, the value stack, vm->tmp, the drawing target and
- * the pause menu's labels.
+ * roots are the globals, the value stack, vm->tmp, the drawing target, the
+ * sprites' sheet and the pause menu's labels.
  * Marking uses a fixed stack; when it overflows, the heap is rescanned for
  * marked objects until nothing new is marked.
  ***************************************************************************/
@@ -167,6 +167,7 @@ void gc_collect(struct vm *vm)
     for (i = 0; i < vm->ntmp; i++)
         mark_value(vm, vm->tmp[i]);
     mark_value(vm, vm->d.target);
+    mark_value(vm, vm->d.sheet);
     for (i = 0; i < 5; i++)
         mark_value(vm, vm->menu_label[i]);
     drain(vm);
