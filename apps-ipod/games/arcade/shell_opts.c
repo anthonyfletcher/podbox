@@ -106,7 +106,8 @@ int shell_option_range(struct vm *vm, int i)
     const struct arcade_option *o = &arcade_options(vm)->o[i];
     if (o->type != ARCADE_OPT_NUMBER)
         return -1;
-    return (int)((int64_t)(o->value - o->min) * 100 / (o->max - o->min));
+    return (int)(((int64_t)o->value - o->min) * 100 /
+                 ((int64_t)o->max - o->min));
 }
 
 bool shell_option_edit(struct vm *vm, int i)

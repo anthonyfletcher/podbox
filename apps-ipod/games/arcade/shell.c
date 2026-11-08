@@ -76,6 +76,11 @@
  * until phase 1 measures what a frame costs on each player. */
 #define CEILING 2000000
 
+/* A call running this long is stopped whatever its units say: a native's
+ * work on the disk or the library can cost far more time than its units.
+ * A dialog's frames don't count, since they wait on the owner. */
+#define STALL (10 * HZ)
+
 /* Untouched this long, the game pauses: the pause menu hands the
  * backlight, the CPU and idle power-off back to their settings. */
 #define IDLE_PAUSE (5 * 60 * HZ)
@@ -182,9 +187,14 @@ static void host_print(void *ctx, const char *s, int len)
 
 static void sound_fill(void);
 
+static struct vm *sound_vm;     /* while a cart runs and may sound */
+static long call_began;         /* the current tick of a call or dialog frame */
+
 static void host_yield(void *ctx)
 {
     (void)ctx;
+    if (sound_vm && TIME_AFTER(current_tick, call_began + STALL))
+        arcade_set_ceiling(sound_vm, 0);
     sound_fill();
 #ifdef HAVE_LCD_UPDATE_ASYNC
     lcd_update_poll();
@@ -192,9 +202,6 @@ static void host_yield(void *ctx)
     yield();
 }
 
-/* Not forced: on the 5G a forced click never sounds, as piezo_clear()
- * leaves a stop queued, and on the 6G it waits out the last beep inside
- * the tick. Unforced, a click sounds unless the last is still sounding. */
 /* speak: the player's synthesiser, which says nothing while it is off */
 static void host_say(void *ctx, const char *text, int queue)
 {
@@ -224,6 +231,9 @@ static const struct arcade_speak speak_host = {
     host_say, host_speaking, host_hush, host_speech_on
 };
 
+/* Not forced: on the 5G a forced click never sounds, as piezo_clear()
+ * leaves a stop queued, and on the 6G it waits out the last beep inside
+ * the tick. Unforced, a click sounds unless the last is still sounding. */
 static void host_click(void *ctx, int beep)
 {
     (void)ctx;
@@ -543,14 +553,19 @@ static const char *host_translate(void *ctx, const char *english)
 }
 
 /* playback.toggle(), next() and prev(): the remote's keys */
+/* One press a kernel tick at most: each is a message to the audio thread,
+ * whose queue a cart pressing in a loop would overrun */
 static void host_control(void *ctx, int what)
 {
     static const long keys[] = { BUTTON_MULTIMEDIA_PLAYPAUSE,
                                  BUTTON_MULTIMEDIA_NEXT,
                                  BUTTON_MULTIMEDIA_PREV };
+    static long last = -1;
     (void)ctx;
-    if (what >= 0 && what < (int)ARRAYLEN(keys))
-        default_event_handler(keys[what]);
+    if (what < 0 || what >= (int)ARRAYLEN(keys) || current_tick == last)
+        return;
+    last = current_tick;
+    default_event_handler(keys[what]);
 }
 
 static int host_frame(void *ctx, unsigned *held, int *wheel);
@@ -575,7 +590,6 @@ static const struct arcade_host host = {
 static int16_t sound_slot[SOUND_SLOTS][SOUND_FRAMES * 2] MEM_ALIGN_ATTR;
 static int16_t sound_quiet[SOUND_FRAMES * 2] MEM_ALIGN_ATTR;
 static volatile unsigned sound_head, sound_tail;
-static struct vm *sound_vm;     /* while a cart runs and may sound */
 static bool sound_on;
 
 static void sound_more(const void **start, size_t *size)
@@ -878,6 +892,8 @@ static bool dialog_shown, dialog_to_root, dialog_open, dialog_took;
 
 static void remote_key(struct vm *vm, long b);
 static int event(struct vm *vm, long button);
+static int hold_pause(struct vm *vm, bool idle);
+static long dialog_touched;       /* the last input in a dialog */
 
 /* A frame of a dialog the engine drew on the game's screen (ui.*): shown,
  * a tick of the game's rate waited, and the buttons and wheel read --
@@ -887,6 +903,7 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
     (void)ctx;
     struct vm *vm = sound_vm;
     dialog_shown = true;
+    call_began = current_tick;
     if (!held) {
         dialog_open = false;
         shell_scores_run(true);
@@ -899,6 +916,7 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
     }
     if (!dialog_open) {
         dialog_open = true;
+        dialog_touched = current_tick;
         shell_scores_run(false);
     }
     if (dialog_to_root)
@@ -921,6 +939,19 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
         } else if (b & BUTTON_MULTIMEDIA)
             remote_key(vm, b);
     }
+    /* held or left alone, a dialog rests as the game does */
+    bool idle = TIME_AFTER(current_tick, dialog_touched + IDLE_PAUSE);
+    if (button_hold() || idle) {
+        if (hold_pause(vm, idle && !button_hold()) == USB) {
+            dialog_to_root = true;
+            return 0;
+        }
+        /* the press that woke it is not also an answer */
+        while (button_status())
+            button_get_w_tmo(HZ / 20);
+        dialog_touched = current_tick;
+        call_began = current_tick;
+    }
     int status = button_status(), pos = wheel_position();
     unsigned h = 0;
     if (status & BUTTON_LEFT)   h |= ARCADE_PREV;
@@ -930,8 +961,10 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
     if (status & BUTTON_MENU)   h |= ARCADE_MENU;
     *held = h;
     *wheel = wheel_clicks(pos);
-    if (status || pos >= 0)
+    if (status || pos >= 0) {
+        dialog_touched = current_tick;
         reset_poweroff_timer();
+    }
     return 1;
 }
 
@@ -1106,9 +1139,12 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
             return QUIT;
         if (kind == ROW_RESUME)
             break;
+        call_began = current_tick;
         int r = arcade_menu_choose(vm, item_index[row_item[selection]], 4);
         if (r < 0)
             return FAILED;
+        if (dialog_to_root)
+            return USB;             /* USB came during the item's dialog */
         if (r == 0)
             break;
     }
@@ -1145,8 +1181,9 @@ static void remote_key(struct vm *vm, long b)
 }
 
 /* The hold switch: the game waits, the screen shows it, until released;
- * meanwhile the CPU and the backlight go back to their settings. */
-static int hold_pause(struct vm *vm)
+ * meanwhile the CPU and the backlight go back to their settings. Idle,
+ * the same until a button or the wheel is touched. */
+static int hold_pause(struct vm *vm, bool idle)
 {
     int r = PLAYING;
     sound_stop();
@@ -1156,12 +1193,14 @@ static int hold_pause(struct vm *vm)
     shell_scores_write(vm, false);
     cpu_boost(false);
     hold_backlight(false);
-    while (r == PLAYING && button_hold()) {
+    while (r == PLAYING && (idle || button_hold())) {
         long b = button_get_w_tmo(HZ / 10);
         if (b & SYS_EVENT)
             r = event(vm, b);
         else if (b & BUTTON_MULTIMEDIA)
             default_event_handler(b);
+        else if (b != BUTTON_NONE || wheel_position() >= 0)
+            idle = false;
     }
     cpu_boost(true);
     hold_backlight(true);
@@ -1246,6 +1285,7 @@ static int run(const char *path, void *mem, size_t size)
                                    str(LANG_CHESSBOX_MENU_RESTART_GAME))) {
         give_screen();
         sound_vm = NULL;
+        shell_font_end();       /* the question may have opened it */
         return dialog_to_root ? USB : RESTART;
     }
     last_wheel = -1;
@@ -1255,6 +1295,7 @@ static int run(const char *path, void *mem, size_t size)
     sound_path[0] = '\0';         /* the track's record is read afresh */
     int status = PLAYING;
     bool suspend = false;           /* left by the pause menu's Quit */
+    call_began = current_tick;
     if (!resumed && !arcade_start(vm))
         status = FAILED;
     present(vm, true);
@@ -1313,7 +1354,7 @@ static int run(const char *path, void *mem, size_t size)
             continue;
         }
         if (button_hold()) {
-            status = hold_pause(vm);
+            status = hold_pause(vm, false);
             shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
@@ -1333,6 +1374,7 @@ static int run(const char *path, void *mem, size_t size)
             arcade_skipped(vm, (unsigned)(late * rate / HZ));
             arcade_input(vm, held, wheel_clicks(pos), pos);
             beat_tick(vm);
+            call_began = current_tick;
             if (!arcade_tick(vm, 0)) {
                 status = FAILED;
                 break;
@@ -1343,6 +1385,7 @@ static int run(const char *path, void *mem, size_t size)
         }
         arcade_input(vm, held, wheel_clicks(pos), pos);
         beat_tick(vm);
+        call_began = current_tick;
         if (!arcade_tick(vm, 1)) {
             status = FAILED;
             break;

@@ -114,7 +114,11 @@ struct tw
     uint8_t *p, *end;
     uint32_t n;
     uint32_t seen;                  /* elements visited */
+    int cut;                        /* stop once the buffer is full */
 };
+
+/* whether the walk can stop: a cut text is full */
+#define TW_DONE(w) ((w)->cut && (w)->p == (w)->end)
 
 #define TW_MOST (1u << 18)
 
@@ -152,7 +156,8 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
     if (v.tag == T_ARR) {
         struct arr *a = ARR(vm, v);
         w->seen += a->len;
-        for (uint32_t i = 0; i < a->len && w->seen <= TW_MOST; i++) {
+        for (uint32_t i = 0; i < a->len && w->seen <= TW_MOST &&
+                             !TW_DONE(w); i++) {
             if (i)
                 tw_put(w, sep, seplen);
             struct value e = BUF(vm, a->buf)->v[i];
@@ -162,7 +167,7 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
     } else if (v.tag == T_I32) {
         struct i32 *a = I32(vm, v);
         w->seen += a->len;
-        for (uint32_t i = 0; i < a->len; i++) {
+        for (uint32_t i = 0; i < a->len && !TW_DONE(w); i++) {
             if (i)
                 tw_put(w, sep, seplen);
             tw_put(w, num, decimal(a->d[i], num));
@@ -170,7 +175,7 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
     } else {
         struct u8a *a = U8A(vm, v);
         w->seen += a->len;
-        for (uint32_t i = 0; i < a->len; i++) {
+        for (uint32_t i = 0; i < a->len && !TW_DONE(w); i++) {
             if (i)
                 tw_put(w, sep, seplen);
             tw_put(w, num, decimal(a->d[i], num));
@@ -202,9 +207,13 @@ static void tw_value(struct vm *vm, struct tw *w, struct value v, int depth)
 /* v as text into dst, truncated to cap; returns the length written. */
 uint32_t vm_text(struct vm *vm, struct value v, char *dst, uint32_t cap)
 {
-    struct tw w = { (uint8_t *)dst, (uint8_t *)dst + cap, 0, 0 };
+    struct tw w = { (uint8_t *)dst, (uint8_t *)dst + cap, 0, 0, 1 };
     tw_value(vm, &w, v, 0);
-    return (uint32_t)(w.p - (uint8_t *)dst);
+    /* each element visited put a byte or more, until the text was full */
+    uint32_t made = (uint32_t)(w.p - (uint8_t *)dst);
+    vm_charge(vm, (w.seen < made + 1 ? w.seen : made + 1) +
+                  made / BYTES_PER_UNIT);
+    return made;
 }
 
 /* ---- strings ------------------------------------------------------------ */
@@ -238,7 +247,7 @@ int vm_tostring(struct vm *vm, struct value v, struct value *out)
         *out = v;
         return 1;
     }
-    struct tw w = { 0, 0, 0, 0 };
+    struct tw w = { 0, 0, 0, 0, 0 };
     tw_value(vm, &w, v, 0);
     if (!tw_spend(vm, &w))
         return 0;
@@ -246,7 +255,7 @@ int vm_tostring(struct vm *vm, struct value v, struct value *out)
     if (!off)
         return 0;
     struct str *s = MEM(vm, off);
-    struct tw o = { s->b, s->b + w.n, 0, 0 };
+    struct tw o = { s->b, s->b + w.n, 0, 0, 0 };
     tw_value(vm, &o, v, 0);
     *out = mk(T_STR, (int32_t)off);
     return 1;
@@ -256,7 +265,7 @@ int vm_tostring(struct vm *vm, struct value v, struct value *out)
 static int concat(struct vm *vm, struct value *dst, struct value a,
                   struct value b)
 {
-    struct tw m = { 0, 0, 0, 0 };
+    struct tw m = { 0, 0, 0, 0, 0 };
     tw_value(vm, &m, a, 0);
     uint32_t la = m.n;
     tw_value(vm, &m, b, 0);
@@ -267,7 +276,7 @@ static int concat(struct vm *vm, struct value *dst, struct value a,
     if (!off)
         return 0;
     struct str *s = MEM(vm, off);
-    struct tw o = { s->b, s->b + m.n, 0, 0 };
+    struct tw o = { s->b, s->b + m.n, 0, 0, 0 };
     tw_value(vm, &o, a, 0);
     o.p = s->b + la;
     tw_value(vm, &o, b, 0);
@@ -871,7 +880,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             sep = STR(vm, a[0])->b;
             seplen = STR(vm, a[0])->len;
         }
-        struct tw m0 = { 0, 0, 0, 0 };
+        struct tw m0 = { 0, 0, 0, 0, 0 };
         tw_join(vm, &m0, self, sep, seplen, 0);
         if (!tw_spend(vm, &m0))
             return 0;
@@ -881,7 +890,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         if (argc > 0)
             sep = STR(vm, a[0])->b;
         struct str *s = MEM(vm, off);
-        struct tw o = { s->b, s->b + m0.n, 0, 0 };
+        struct tw o = { s->b, s->b + m0.n, 0, 0, 0 };
         tw_join(vm, &o, self, sep, seplen, 0);
         out = mk(T_STR, (int32_t)off);
         break;
@@ -1903,7 +1912,7 @@ int arcade_tick(struct vm *vm, int draw)
     int ok = call_entry(vm, 2) && (!draw || call_entry(vm, 3));
     vm->opt_changed = 0;
     end(vm);
-    if (vm->listening && vm->host->playing &&
+    if (vm->listening && vm->host && vm->host->playing &&
         vm->host->playing(vm->host->ctx))
         vm->units += ANALYSER_UNITS_PER_SECOND / vm->rate;
     return ok;

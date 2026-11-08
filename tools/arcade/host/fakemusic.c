@@ -526,8 +526,16 @@ static int fake_enqueue(void *ctx, int32_t id, int next)
     return 1;
 }
 
+/* every walk looks at the whole library */
+static int32_t fake_walked(void *ctx)
+{
+    (void)ctx;
+    return LIB;
+}
+
 const struct arcade_tracks fake_tracks = {
     fake_current, fake_position, fake_text, fake_seek, fake_duck,
     fake_play, fake_stop, fake_started, fake_count, fake_pick, fake_field,
-    fake_near, fake_track_sound, fake_queued, fake_queue_at, fake_enqueue
+    fake_near, fake_track_sound, fake_queued, fake_queue_at, fake_enqueue,
+    fake_walked
 };

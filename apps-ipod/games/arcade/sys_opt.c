@@ -31,7 +31,7 @@ static int32_t fit(const struct arcade_option *o, int32_t value)
         value = o->min;
     if (value > o->max)
         value = o->max;
-    return o->min + (value - o->min) / o->step * o->step;
+    return (int32_t)(o->min + ((int64_t)value - o->min) / o->step * o->step);
 }
 
 void arcade_option_set(struct vm *vm, int i, int32_t value)

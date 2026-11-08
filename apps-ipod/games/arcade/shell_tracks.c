@@ -36,6 +36,7 @@
 #include "database/tagcache.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
+#include "metadata/book_resume.h"
 #include "games/arcade/shell_tracks.h"
 
 /* ---- tracks and their ids ------------------------------------------------ */
@@ -106,11 +107,14 @@ static int music_text(void *ctx, int what, char *buf, int cap)
                     id3->artist : id3->album);
 }
 
+/* A seek asked for, made at the next tick: each is a message to the audio
+ * thread, whose queue a cart seeking in a loop would overrun */
+static int32_t seek_ms = -1;
+
 static void music_seek(void *ctx, int32_t ms)
 {
     (void)ctx;
-    if (audio_status() & AUDIO_STATUS_PLAY)
-        audio_ff_rewind(ms);
+    seek_ms = ms < 0 ? 0 : ms;
 }
 
 /* The playback channel's level, 16.16 of the owner's, and where a duck
@@ -145,13 +149,22 @@ static bool owned;
 static char wanted_path[MAX_PATH];
 static int32_t wanted_ms;
 
+/* The owner's music stopped: a book's place written down first, as every
+ * other stop does */
+static void stop_owners(void)
+{
+    if (!owned)
+        book_resume_save();
+    audio_stop();
+}
+
 static int music_play(void *ctx, int32_t id, int32_t ms)
 {
     (void)ctx;
     char path[MAX_PATH];
     if (!path_of_id(id, path, sizeof(path)))
         return 0;
-    audio_stop();
+    stop_owners();
     if (!owned) {
         playlist_set_aside();
         audio_set_unrecorded(true);
@@ -170,7 +183,7 @@ static int music_play(void *ctx, int32_t id, int32_t ms)
 static void music_stop(void *ctx)
 {
     (void)ctx;
-    audio_stop();
+    stop_owners();
 }
 
 /* Heard: playing, the track asked for, and past where it was asked from */
@@ -229,12 +242,22 @@ static bool walk_passes(struct tagcache_search *tcs,
     return true;
 }
 
+/* the tracks the last walk looked at */
+static int32_t walked;
+
+static int32_t music_walked(void *ctx)
+{
+    (void)ctx;
+    return walked;
+}
+
 static int32_t music_count(void *ctx, const struct arcade_filter *f)
 {
     (void)ctx;
     struct tagcache_search tcs;
     char title[8];
     int32_t n = 0, seen = 0;
+    walked = 0;
     if (!walk_begin(&tcs, f))
         return 0;
     while (tagcache_get_next(&tcs, title, sizeof(title))) {
@@ -244,6 +267,7 @@ static int32_t music_count(void *ctx, const struct arcade_filter *f)
             yield();
     }
     tagcache_search_finish(&tcs);
+    walked = seen;
     return n;
 }
 
@@ -255,6 +279,7 @@ static int32_t music_pick(void *ctx, int32_t n, const struct arcade_filter *f,
     struct tagcache_search tcs;
     char title[8];
     int32_t found = 0, seen = 0;
+    walked = 0;
     if (n <= 0 || !walk_begin(&tcs, f))
         return 0;
     while (tagcache_get_next(&tcs, title, sizeof(title))) {
@@ -268,6 +293,7 @@ static int32_t music_pick(void *ctx, int32_t n, const struct arcade_filter *f,
             yield();
     }
     tagcache_search_finish(&tcs);
+    walked = seen;
     return found < n ? found : n;
 }
 
@@ -311,6 +337,7 @@ static int32_t music_near(void *ctx, int32_t id, int32_t n, int32_t *out)
     struct arcade_filter music = { 0, 0, NULL, 0, 1 };
     if (n > NEAR_MAX)
         n = NEAR_MAX;
+    walked = 0;
     if (n <= 0 || id < 0 || !walk_begin(&tcs, &music))
         return 0;
     bool has_genre = tagcache_entry_string(id, tag_genre, genre,
@@ -336,6 +363,7 @@ static int32_t music_near(void *ctx, int32_t id, int32_t n, int32_t *out)
         found[t]++;
     }
     tagcache_search_finish(&tcs);
+    walked = seen;
     for (int t = 0; t < 3; t++)
         for (int32_t i = 0; i < found[t] && i < n && k < n; i++)
             out[k++] = tier[t][i];
@@ -426,7 +454,7 @@ const struct arcade_tracks shell_tracks = {
     music_current, music_position, music_text, music_seek, music_duck,
     music_play, music_stop, music_started, music_count, music_pick,
     music_field, music_near, music_sound, music_queued, music_queue_at,
-    music_enqueue
+    music_enqueue, music_walked
 };
 
 /* ---- a cart starting, ticking and ending --------------------------------- */
@@ -441,6 +469,7 @@ void shell_tracks_start(void)
     playing_id = -1;
     duck_now = duck_to = MIX_AMP_UNITY;
     owned = false;
+    seek_ms = -1;
 }
 
 int shell_tracks_tick(void)
@@ -450,6 +479,9 @@ int shell_tracks_tick(void)
     int changed = strcmp(path, ticked_path) != 0;
     if (changed)
         strmemccpy(ticked_path, path, sizeof(ticked_path));
+    if (seek_ms >= 0 && (audio_status() & AUDIO_STATUS_PLAY))
+        audio_ff_rewind(seek_ms);
+    seek_ms = -1;
     duck_tick();
     return changed;
 }

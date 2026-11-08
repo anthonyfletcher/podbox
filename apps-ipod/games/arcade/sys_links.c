@@ -185,6 +185,23 @@ static uint32_t root(uint64_t v)
     return (uint32_t)r;
 }
 
+/* The length of (dx, dy, dz), 16.16: halved until the squares fit, and
+ * doubled back after */
+static int32_t span(int64_t dx, int64_t dy, int64_t dz)
+{
+    int shift = 0;
+    while (dx > INT32_MAX || dx < -INT32_MAX || dy > INT32_MAX ||
+           dy < -INT32_MAX || dz > INT32_MAX || dz < -INT32_MAX) {
+        dx /= 2;
+        dy /= 2;
+        dz /= 2;
+        shift++;
+    }
+    uint64_t d = (uint64_t)root((uint64_t)(dx * dx) + (uint64_t)(dy * dy) +
+                                (uint64_t)(dz * dz)) << shift;
+    return d > INT32_MAX ? INT32_MAX : (int32_t)d;
+}
+
 /* The distance between points i and j, 16.16 */
 static int32_t apart(const struct value *x, const struct value *y,
                      const struct value *z, uint32_t i, uint32_t j)
@@ -192,8 +209,7 @@ static int32_t apart(const struct value *x, const struct value *y,
     int64_t dx = (int64_t)fx(x[j]) - fx(x[i]);
     int64_t dy = (int64_t)fx(y[j]) - fx(y[i]);
     int64_t dz = (int64_t)fx(z[j]) - fx(z[i]);
-    return (int32_t)root((uint64_t)(dx * dx) + (uint64_t)(dy * dy) +
-                         (uint64_t)(dz * dz));
+    return span(dx, dy, dz);
 }
 
 /* links.link(p, i, j, [len]): points i and j held len apart (as far as
@@ -241,13 +257,16 @@ NATIVE(links_cloth)
         !is_num(a[5]) || fx(a[5]) <= 0)
         return vm_fail(vm, "links.cloth() needs x, y, at least 2 columns and "
                        "rows, and a gap above 0", "", "");
+    *out = mk(T_INT, -1);
+    /* no pool holds more: and the counts below cannot wrap */
+    if (cols > MAX_POINTS || rows > MAX_POINTS)
+        return 1;
     uint32_t np = used(&l, L_POINTS, l.cap_points);
     uint32_t nl = used(&l, L_LINKS, l.cap_links);
     uint32_t want = (uint32_t)cols * (uint32_t)rows;
     uint32_t links = (uint32_t)(cols - 1) * (uint32_t)rows +
                      (uint32_t)cols * (uint32_t)(rows - 1) +
                      2 * (uint32_t)(cols - 1) * (uint32_t)(rows - 1);
-    *out = mk(T_INT, -1);
     vm_charge(vm, 10);
     if (want > l.cap_points - np || links > l.cap_links - nl ||
         !ARR(vm, l.f[L_A])->len)
@@ -406,9 +425,7 @@ NATIVE(links_step)
             int32_t zi = fx(z[i]), zj = fx(z[j]);
             int64_t dx = (int64_t)xj - xi, dy = (int64_t)yj - yi;
             int64_t dz = (int64_t)zj - zi;
-            int32_t d = (int32_t)root((uint64_t)(dx * dx) +
-                                      (uint64_t)(dy * dy) +
-                                      (uint64_t)(dz * dz));
+            int32_t d = span(dx, dy, dz);
             /* torn on the first pass, at the stretch the tick left it */
             if (p == 0 && tear > 0 &&
                 d > fx(len[k]) + (((int64_t)fx(len[k]) * tear) >> 16)) {
@@ -475,7 +492,8 @@ NATIVE(links_step)
     if (broken)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
-    vm_charge(vm, 10 + np * 4 + nl * (uint32_t)passes * 6 + (mask ? np : 0) +
+    /* a link a pass is a 64-bit root and three multiplies: about 12 */
+    vm_charge(vm, 10 + np * 4 + nl * (uint32_t)passes * 12 + (mask ? np : 0) +
                   (field ? np * 2 : 0));
     *out = mk(T_INT, (int32_t)np);
     return 1;
@@ -566,9 +584,12 @@ NATIVE(links_fill)
     int32_t cols = whole(l.f[L_COLS], 0), rows = whole(l.f[L_ROWS], 0);
     int32_t first = whole(l.f[L_FIRST], 0), fl = whole(l.f[L_FIRSTLINK], 0);
     *out = mk(T_INT, 0);
-    if (cols < 2 || rows < 2 || first < 0 || fl < 0 ||
-        (uint32_t)first + (uint32_t)(cols * rows) > np ||
-        (uint32_t)fl + (uint32_t)((cols - 1) * rows + cols * (rows - 1)) > nl)
+    /* the fields are the cart's to change: each bounded by the pool
+     * before any product, so none can wrap */
+    if (cols < 2 || rows < 2 || (uint32_t)cols > np || (uint32_t)rows > np ||
+        first < 0 || fl < 0 || (uint32_t)first > np || (uint32_t)fl > nl ||
+        (uint32_t)(cols * rows) > np - (uint32_t)first ||
+        (uint32_t)((cols - 1) * rows + cols * (rows - 1)) > nl - (uint32_t)fl)
         return vm_fail(vm, "links.fill() needs a pool with a cloth from "
                        "links.cloth()", "", "");
     struct value *x = ELEMS(vm, l.f[L_X]), *y = ELEMS(vm, l.f[L_Y]);

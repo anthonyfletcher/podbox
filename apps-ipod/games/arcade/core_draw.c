@@ -1753,12 +1753,14 @@ static void cart_glyph(const struct cartfont *f, uint32_t cp,
 }
 
 /* A glyph's row as a word, its first pixel in the top bit */
-static uint32_t row_word(const uint8_t *row, int stride)
+static uint32_t row_word(const uint8_t *row, int stride, int w)
 {
     uint32_t v = (uint32_t)row[0] << 24;
     for (int j = 1; j < stride; j++)
         v |= (uint32_t)row[j] << (24 - 8 * j);
-    return v;
+    /* a cart's font can set bits past the width: they would draw outside
+     * the box the clip was tested against */
+    return w < 32 ? v & ~(0xffffffffu >> w) : v;
 }
 
 /* A glyph at (gx, gy) in screen space, k pixels to a dot: nothing when
@@ -1776,7 +1778,7 @@ static void draw_glyph(struct pen *p, const struct glyph_box *b, int64_t gx,
         uint32_t dots = 0;
         uint8_t ink = p->c, *line = p->s.px + gy * w + gx;
         for (int r = 0; r < b->h; r++, row += b->stride, line += w * k) {
-            uint32_t v = row_word(row, b->stride);
+            uint32_t v = row_word(row, b->stride, b->w);
             if (!v)
                 continue;
             if (top < 0)
@@ -1810,7 +1812,7 @@ static void draw_glyph(struct pen *p, const struct glyph_box *b, int64_t gx,
         gy + b->h * k <= p->cy0)
         return;
     for (int r = 0; r < b->h; r++, row += b->stride) {
-        uint32_t v = row_word(row, b->stride);
+        uint32_t v = row_word(row, b->stride, b->w);
         for (int c = 0; v; c++, v <<= 1)
             if (v & 0x80000000u)
                 for (int dy = 0; dy < k; dy++)
@@ -3539,8 +3541,9 @@ typedef int32_t land_slice_fn(const struct slice *, uint32_t, uint32_t,
 /* A slice of ground with a ramp: the height blended from the four pixels
  * round each sample, and the colour the ramp's at that height, so the
  * ground is slopes with smooth edges between its colours, and hills
- * smooth outlines, rather than a block a pixel. C only, and slower than
- * the plain loops: a cart asks for it */
+ * smooth outlines, rather than a block a pixel. Slower than the plain
+ * loops, so a cart asks for it. On the player a square map's go through
+ * land_smooth_arm_* (draw_arm.S) instead: see land_smooth_loop() */
 __attribute__((optimize("O2")))
 static int32_t land_slice_smooth(const struct slice *s, uint32_t u, uint32_t t,
                                uint32_t su, uint32_t sv, int32_t base,

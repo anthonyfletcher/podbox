@@ -58,9 +58,10 @@ static int insert(struct vm *vm, struct arcade_board *b, int32_t value,
 
 struct arcade_scores *arcade_scores(struct vm *vm, int *dirty)
 {
-    if (dirty)
+    if (dirty) {
         *dirty = vm->scores_dirty;
-    vm->scores_dirty = 0;
+        vm->scores_dirty = 0;
+    }
     return &vm->scores;
 }
 

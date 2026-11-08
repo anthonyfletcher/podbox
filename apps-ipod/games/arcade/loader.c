@@ -324,8 +324,16 @@ static int load_options(struct vm *vm, const uint8_t *p, uint32_t n)
             copy_text(&c, o->choice[k], sizeof(o->choice[k]));
         o->help_len = (int)c16(&c);
         o->help = (const char *)take(&c, (uint32_t)o->help_len);
-        if (c.bad || o->type > ARCADE_OPT_NUMBER || o->min > o->max ||
-            o->step < 1 || o->def < o->min || o->def > o->max)
+        /* the shapes the compiler writes, and no other: the pause menu
+         * indexes a choice's texts by value and divides by a number's
+         * range */
+        if (o->type == ARCADE_OPT_CHOICE ? o->nchoices < 2 || o->min != 0 ||
+                                           o->max != o->nchoices - 1
+            : o->type == ARCADE_OPT_ONOFF ? o->nchoices || o->min != 0 ||
+                                            o->max != 1
+            : o->type != ARCADE_OPT_NUMBER || o->nchoices || o->min >= o->max)
+            return bad(vm, "options");
+        if (c.bad || o->step < 1 || o->def < o->min || o->def > o->max)
             return bad(vm, "options");
         o->value = o->def;
     }

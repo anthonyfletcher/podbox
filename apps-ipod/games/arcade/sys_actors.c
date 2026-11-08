@@ -225,7 +225,8 @@ static int sweep(const struct vm *vm, int32_t *pos, int32_t v, int32_t size,
     /* a one-way cell stops only what comes down into it from above */
     if (!x_axis && v > 0)
         mask |= oneway;
-    int32_t a0 = lo >> CELL_SHIFT, a1 = (lo + hi - 1) >> CELL_SHIFT;
+    int32_t a0 = lo >> CELL_SHIFT;
+    int32_t a1 = (int32_t)(((int64_t)lo + hi - 1) >> CELL_SHIFT);
     int32_t across = x_axis ? vm->map_h : vm->map_w;
     int32_t along = x_axis ? vm->map_w : vm->map_h;
     if (a0 < 0)
@@ -437,15 +438,22 @@ static void carry(const struct world *w, int32_t *x, int32_t *y, int32_t W,
 
 /* The nearest air to column px in the ring r out from the box x0..x1,
  * y0..y1 (field pixels): its top first, then its sides from the top down,
- * then its bottom; 1 with it in *ax, *ay */
+ * then its bottom; 1 with it in *ax, *ay. Only the field's pixels are
+ * tried, since there is no air outside it; each counted in *checked. */
 static int air_near(const struct world *w, int32_t px,
                     int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t r,
-                    int32_t *ax, int32_t *ay)
+                    int32_t *ax, int32_t *ay, uint32_t *checked)
 {
     int32_t top = y0 - r, bottom = y1 + r, left = x0 - r, right = x1 + r;
     int32_t best = -1;
+    int32_t fx1 = w->fx0 + w->cw.w - 1, fy1 = w->fy0 + w->cw.h - 1;
     /* the top, nearest the cell first */
-    for (int32_t x = left; x <= right; x++) {
+    int32_t from = left > w->fx0 ? left : w->fx0;
+    int32_t to = right < fx1 ? right : fx1;
+    if (top < w->fy0 || top > fy1)
+        to = from - 1;
+    for (int32_t x = from; x <= to; x++) {
+        (*checked)++;
         int32_t d = x > px ? x - px : px - x;
         if ((best < 0 || d < best) && field_at(w, x, top) == 0) {
             best = d;
@@ -455,7 +463,10 @@ static int air_near(const struct world *w, int32_t px,
     }
     if (best >= 0)
         return 1;
-    for (int32_t y = top + 1; y <= bottom; y++) {
+    from = top + 1 > w->fy0 ? top + 1 : w->fy0;
+    to = bottom < fy1 ? bottom : fy1;
+    for (int32_t y = from; y <= to; y++) {
+        *checked += 2;
         int32_t first = px - left <= right - px ? left : right;
         int32_t other = first == left ? right : left;
         if (field_at(w, first, y) == 0) { *ax = first; *ay = y; return 1; }
@@ -468,21 +479,32 @@ static int air_near(const struct world *w, int32_t px,
  * under the actor's box pushed out to the nearest air just outside it,
  * above first, then beside it, a ring or two out when the first is full;
  * a cell with no air near stays where it is. For a pool with splash set. */
-static void splash(const struct world *w, int32_t X, int32_t Y, int32_t W,
-                   int32_t H, uint32_t *checked)
+static int splash(const struct world *w, int32_t X, int32_t Y, int32_t W,
+                  int32_t H, uint32_t *checked)
 {
     int32_t x0 = X >> 16, y0 = Y >> 16;
-    int32_t x1 = (X + W - 1) >> 16, y1 = (Y + H - 1) >> 16;
-    for (int32_t py = y0; py <= y1; py++)
-        for (int32_t px = x0; px <= x1; px++) {
+    int32_t x1 = (int32_t)(((int64_t)X + W - 1) >> 16);
+    int32_t y1 = (int32_t)(((int64_t)Y + H - 1) >> 16);
+    /* the box's pixels on the field: only those hold cells */
+    int32_t lx0 = x0 > w->fx0 ? x0 : w->fx0;
+    int32_t ly0 = y0 > w->fy0 ? y0 : w->fy0;
+    int32_t lx1 = x1 < w->fx0 + w->cw.w - 1 ? x1 : w->fx0 + w->cw.w - 1;
+    int32_t ly1 = y1 < w->fy0 + w->cw.h - 1 ? y1 : w->fy0 + w->cw.h - 1;
+    for (int32_t py = ly0; py <= ly1; py++) {
+        /* paid a row at a time, so a large splash is stopped */
+        if (*checked >= 8192) {
+            if (!vm_spend(w->vm, *checked / 8))
+                return 0;
+            *checked %= 8;
+        }
+        for (int32_t px = lx0; px <= lx1; px++) {
             int32_t m = field_at(w, px, py);
             (*checked)++;
             if (m <= 0 || (w->cw.flags[m] & CELL_SOLID))
                 continue;
             for (int32_t r = 1; r <= 3; r++) {
                 int32_t ax = 0, ay = 0;
-                *checked += (uint32_t)(2 * (x1 - x0 + y1 - y0) + 8 * r);
-                if (air_near(w, px, x0, y0, x1, y1, r, &ax, &ay)) {
+                if (air_near(w, px, x0, y0, x1, y1, r, &ax, &ay, checked)) {
                     w->cw.c[(ay - w->fy0) * w->cw.w + (ax - w->fx0)] =
                         (uint8_t)m;
                     w->cw.c[(py - w->fy0) * w->cw.w + (px - w->fx0)] = 0;
@@ -490,6 +512,8 @@ static void splash(const struct world *w, int32_t X, int32_t Y, int32_t W,
                 }
             }
         }
+    }
+    return 1;
 }
 
 /* Pushed: a platform that moved into the actor this tick -- clear of it
@@ -543,7 +567,8 @@ static void in_field(const struct world *w, struct contacts *c, uint32_t i,
                      uint32_t *checked)
 {
     int32_t x0 = X >> 16, y0 = Y >> 16;
-    int32_t x1 = (X + W - 1) >> 16, y1 = (Y + H - 1) >> 16;
+    int32_t x1 = (int32_t)(((int64_t)X + W - 1) >> 16);
+    int32_t y1 = (int32_t)(((int64_t)Y + H - 1) >> 16);
     /* every pixel it covers counts, but only those on the field are read */
     uint32_t cells = (uint32_t)(x1 - x0 + 1) * (uint32_t)(y1 - y0 + 1);
     uint32_t wet = 0, heavy = 0;
@@ -674,8 +699,8 @@ NATIVE(actors_move)
         if (wd.field) {
             in_field(&wd, &c, i, X, Y, W, H, &DX, &DY, g, density,
                      is_num(mat[i]) ? floor_int(mat[i]) : -1, &checked);
-            if (splashes)
-                splash(&wd, X, Y, W, H, &checked);
+            if (splashes && !splash(&wd, X, Y, W, H, &checked))
+                return 0;
         }
         x[i] = mk(T_FIX, X);
         y[i] = mk(T_FIX, Y);
@@ -746,10 +771,12 @@ NATIVE(actors_overlaps)
         return vm_fail(vm, "actors.overlaps() writes its pairs to an "
                        "Int32Array", "", "");
     int same = a[0].v == a[1].v;
-    struct box *bb = scratch(vm, nb * sizeof(struct box) + 1);
-    uint32_t *found = scratch(vm, nb * sizeof(uint32_t) + 1);
-    if (!bb || !found)
+    /* one block: a second scratch() could collect the first */
+    struct box *bb = scratch(vm, nb * (sizeof(struct box) + sizeof(uint32_t))
+                                 + 1);
+    if (!bb)
         return 0;
+    uint32_t *found = (uint32_t *)(bb + nb);
     const struct value *bon = ELEMS(vm, fb[A_ON]), *bx = ELEMS(vm, fb[A_X]);
     const struct value *by = ELEMS(vm, fb[A_Y]), *bw = ELEMS(vm, fb[A_W]);
     const struct value *bh = ELEMS(vm, fb[A_H]);
@@ -796,7 +823,7 @@ NATIVE(actors_overlaps)
         /* written in b's order, as a pass over all of them would */
         for (uint32_t s = 1; s < n; s++) {
             uint32_t t = found[s], u = s;
-            for (; u > 0 && found[u - 1] > t; u--)
+            for (; u > 0 && found[u - 1] > t; u--, tests++)
                 found[u] = found[u - 1];
             found[u] = t;
         }
@@ -944,7 +971,15 @@ static void rebound(int32_t *vx, int32_t *vy, int32_t nx, int32_t ny,
  * it has none */
 static int32_t normal(int64_t dx, int64_t dy, int32_t *nx, int32_t *ny)
 {
-    int64_t d = (int64_t)root((uint64_t)(dx * dx + dy * dy));
+    /* halved until the squares fit; the length doubled back after */
+    int shift = 0;
+    while (dx > INT32_MAX || dx < -INT32_MAX || dy > INT32_MAX ||
+           dy < -INT32_MAX) {
+        dx /= 2;
+        dy /= 2;
+        shift++;
+    }
+    int64_t d = (int64_t)root((uint64_t)(dx * dx) + (uint64_t)(dy * dy));
     if (!d) {
         *nx = 65536;
         *ny = 0;
@@ -952,7 +987,8 @@ static int32_t normal(int64_t dx, int64_t dy, int32_t *nx, int32_t *ny)
     }
     *nx = (int32_t)((dx << 16) / d);
     *ny = (int32_t)((dy << 16) / d);
-    return (int32_t)d;
+    d <<= shift;
+    return d > INT32_MAX ? INT32_MAX : (int32_t)d;
 }
 
 /* actors.bounce(a, b, out, [give]): live circles of a that touch circles
@@ -1024,7 +1060,10 @@ NATIVE(actors_bounce)
             int64_t dx = ((int64_t)fx(ax[i]) + ra) - ((int64_t)fx(bx[j]) + rb);
             int64_t dy = ((int64_t)fx(ay[i]) + ra) - ((int64_t)fx(by[j]) + rb);
             int64_t reach = (int64_t)ra + rb;
-            if (dx * dx + dy * dy >= reach * reach)
+            /* reach is within 31 bits: further apart cannot touch, and
+             * nearer, the squares fit */
+            if (dx > INT32_MAX || dx < -INT32_MAX || dy > INT32_MAX ||
+                dy < -INT32_MAX || dx * dx + dy * dy >= reach * reach)
                 continue;
             int32_t nx, ny, d = normal(dx, dy, &nx, &ny);
             int32_t over = (int32_t)(reach - d);
@@ -1116,12 +1155,23 @@ NATIVE(actors_bounce_map)
             steps = MAX_STEPS;
         int32_t hits[4][2], nh = 0;
         for (int32_t s = 0; s < steps; s++) {
+            /* paid a step at a time, so a large circle is stopped */
+            if (checked >= 8192) {
+                if (!vm_spend(vm, checked / 8))
+                    return 0;
+                checked %= 8;
+            }
             cx += vx / steps;
             cy += vy / steps;
             int32_t gx0 = (int32_t)((cx - r) >> CELL_SHIFT);
             int32_t gx1 = (int32_t)((cx + r - 1) >> CELL_SHIFT);
             int32_t gy0 = (int32_t)((cy - r) >> CELL_SHIFT);
             int32_t gy1 = (int32_t)((cy + r - 1) >> CELL_SHIFT);
+            /* off the map nothing is solid: only its cells are tried */
+            if (gx0 < 0) gx0 = 0;
+            if (gy0 < 0) gy0 = 0;
+            if (gx1 >= vm->map_w) gx1 = vm->map_w - 1;
+            if (gy1 >= vm->map_h) gy1 = vm->map_h - 1;
             for (int32_t gy = gy0; gy <= gy1; gy++)
                 for (int32_t gx = gx0; gx <= gx1; gx++) {
                     checked++;
@@ -1266,7 +1316,7 @@ struct dropfield
  * Air is material 0. */
 static void settle(const struct dropfield *f, struct value *life, uint32_t i,
                    int32_t ox, int32_t oy, int32_t nx, int32_t ny,
-                   struct value c)
+                   struct value c, uint32_t *scanned)
 {
     int32_t px = (nx >> 16) - f->x0, py = (ny >> 16) - f->y0;
     int32_t qx = (ox >> 16) - f->x0, qy = (oy >> 16) - f->y0;
@@ -1291,6 +1341,7 @@ static void settle(const struct dropfield *f, struct value *life, uint32_t i,
             int32_t cy = qy;
             while (cy >= 0 && f->c[cy * f->w + cx])
                 cy--;
+            *scanned += (uint32_t)(qy - cy);
             if (cy >= 0) {
                 f->c[cy * f->w + cx] = m;
                 break;
@@ -1390,13 +1441,19 @@ NATIVE(particles_step)
         fd.x0 = is_num(f[P_FIELD_X]) ? floor_int(f[P_FIELD_X]) : 0;
         fd.y0 = is_num(f[P_FIELD_Y]) ? floor_int(f[P_FIELD_Y]) : 0;
     }
-    uint32_t live = 0;
+    uint32_t live = 0, scanned = 0;
     for (uint32_t i = 0; i < n; i++) {
         int32_t l = floor_int(lf[i]);
         if (l <= 0)
             continue;
         live++;
         lf[i] = mk(T_INT, l - 1);
+        /* the columns settle() climbs, paid as they come */
+        if (scanned >= 8192) {
+            if (!vm_spend(vm, scanned / 8))
+                return 0;
+            scanned %= 8;
+        }
         int32_t DX = dragged(fx(dx[i]), drag), DY = dragged(fx(dy[i]) + g, drag);
         dx[i] = mk(T_FIX, DX);
         dy[i] = mk(T_FIX, DY);
@@ -1404,9 +1461,9 @@ NATIVE(particles_step)
         x[i] = mk(T_FIX, ox + DX);
         y[i] = mk(T_FIX, oy + DY);
         if (fd.c)
-            settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i]);
+            settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i], &scanned);
     }
-    vm_charge(vm, 10 + n / 8 + live * (fd.c ? 4 : 2));
+    vm_charge(vm, 10 + n / 8 + live * (fd.c ? 4 : 2) + scanned / 8);
     return 1;
 }
 

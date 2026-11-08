@@ -65,8 +65,10 @@ static int lit(struct jin *j, const char *w)
     return 1;
 }
 
-/* A number: whole within 32 bits as an integer, else a fraction within
- * the cart's range, rounded to the nearest 1/65536 */
+/* A number: a fraction when written with digits after its point that its
+ * exponent does not cancel, as in a cart's code (2.0 is a fraction, 1.5e1
+ * the integer 15), within the cart's range and rounded to the nearest
+ * 1/65536; otherwise an integer, within 32 bits */
 static int number(struct vm *vm, struct jin *j, struct value *out)
 {
     int neg = 0, digits = 0;
@@ -112,7 +114,7 @@ static int number(struct vm *vm, struct jin *j, struct value *out)
         exp10 += eneg ? -e : e;
     }
     if (mant == 0) {
-        *out = mk(T_INT, 0);
+        *out = mk(exp10 < 0 ? T_FIX : T_INT, 0);
         return 1;
     }
     /* whole: scaled up while it stays within 32 bits */
@@ -138,13 +140,13 @@ static int number(struct vm *vm, struct jin *j, struct value *out)
     int64_t den = 1;
     for (int32_t k = exp10; k < 0; k++)
         den *= 10;
+    /* the whole part checked first: mant * 65536 must not overflow */
+    if (mant / den > 32767)
+        return bad(vm, j, ": a fraction beyond a cart's (-32768 to 32767)");
     int64_t raw = (mant * 65536 + den / 2) / den;
     if (raw >= 0x80000000LL)
         return bad(vm, j, ": a fraction beyond a cart's (-32768 to 32767)");
-    if (raw % 65536 == 0)
-        *out = mk(T_INT, (int32_t)((neg ? -raw : raw) / 65536));
-    else
-        *out = mk(T_FIX, (int32_t)(neg ? -raw : raw));
+    *out = mk(T_FIX, (int32_t)(neg ? -raw : raw));
     return 1;
 }
 
@@ -261,6 +263,17 @@ static struct value held(struct vm *vm, struct value h, uint32_t down)
     return BUF(vm, a->buf)->v[a->len - 1 - down];
 }
 
+/* v pushed onto the holder: kept from the collector while the holder
+ * grows, since nothing else holds it yet */
+static int hold(struct vm *vm, struct value h, struct value v)
+{
+    if (!vm_root(vm, v))
+        return 0;
+    int ok = vm_push(vm, h, v);
+    vm_unroot(vm);
+    return ok;
+}
+
 /* v, just completed and the holder's top, given to what holds it: the
  * record under its key, or the array; 1 with *done when it was the whole */
 static int fold(struct vm *vm, struct value h, int *done)
@@ -310,12 +323,12 @@ int json_read(struct vm *vm, const uint8_t *text, uint32_t len,
             j.p++;
             if (!(c == '[' ? vm_new_array(vm, 0, &v)
                            : vm_new_record(vm, NULL, 0, &v)) ||
-                !vm_push(vm, h, v))
+                !hold(vm, h, v))
                 goto fail;
             open = 1;
         } else if (c == '"') {
             j.p++;
-            if (!string(vm, &j, &v) || !vm_push(vm, h, v))
+            if (!string(vm, &j, &v) || !hold(vm, h, v))
                 goto fail;
         } else if (lit(&j, "true")) {
             v = mk(T_INT, 1);
@@ -328,7 +341,7 @@ int json_read(struct vm *vm, const uint8_t *text, uint32_t len,
             bad(vm, &j, ": not a value");
             goto fail;
         }
-        if (v.tag != T_STR && !open && !vm_push(vm, h, v))
+        if (v.tag != T_STR && !open && !hold(vm, h, v))
             goto fail;
         /* what follows: a container's first key or element, a comma, or
          * closers that complete values, each folded in */
@@ -389,7 +402,7 @@ int json_read(struct vm *vm, const uint8_t *text, uint32_t len,
                 goto fail;
             }
             j.p++;
-            if (!string(vm, &j, &v) || !vm_push(vm, h, v))
+            if (!string(vm, &j, &v) || !hold(vm, h, v))
                 goto fail;
             ws(&j);
             if (j.p >= j.end || *j.p != ':') {
@@ -411,10 +424,16 @@ struct jout
 {
     uint8_t *p;                 /* NULL: only counting */
     uint32_t n;
+    uint32_t most;              /* bytes it may take */
+    int full;                   /* more were wanted: the rest is skipped */
 };
 
 static void put(struct jout *o, const void *b, uint32_t n)
 {
+    if (o->full || n > o->most - o->n) {
+        o->full = 1;
+        return;
+    }
     if (o->p)
         memcpy(o->p + o->n, b, n);
     o->n += n;
@@ -437,7 +456,7 @@ static void put_int(struct jout *o, int64_t v)
 }
 
 /* A fraction, five decimals or fewer: enough that reading it gives the
- * same 16.16 back */
+ * same 16.16 back; a whole one as 2.0, so it reads back a fraction */
 static void put_fix(struct jout *o, int32_t raw)
 {
     int64_t a = raw;
@@ -451,8 +470,10 @@ static void put_fix(struct jout *o, int32_t raw)
         d = 0;
     }
     put_int(o, whole);
-    if (!d)
+    if (!d) {
+        put(o, ".0", 2);
         return;
+    }
     char t[6];
     for (int i = 4; i >= 0; i--, d /= 10)
         t[i] = (char)('0' + d % 10);
@@ -492,6 +513,8 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
     if (depth > DEPTH)
         return vm_fail(vm, what, ": more than 64 lists inside one another, "
                        "or a list inside itself", "");
+    if (o->full)
+        return 1;
     if (!vm_spend(vm, 1))
         return 0;
     switch (v.tag) {
@@ -506,7 +529,7 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
         return 1;
     case T_STR:
         put_string(o, STR(vm, v)->b, STR(vm, v)->len);
-        return 1;
+        return vm_spend(vm, STR(vm, v)->len / SPEND_BYTES);
     case T_I32:
     case T_U8: {
         uint32_t n = v.tag == T_I32 ? I32(vm, v)->len : U8A(vm, v)->len;
@@ -521,7 +544,7 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
     }
     case T_ARR: {
         put_c(o, '[');
-        for (uint32_t i = 0; i < ARR(vm, v)->len; i++) {
+        for (uint32_t i = 0; i < ARR(vm, v)->len && !o->full; i++) {
             if (i)
                 put_c(o, ',');
             struct value e = BUF(vm, ARR(vm, v)->buf)->v[i];
@@ -533,8 +556,12 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
     }
     case T_OBJ: {
         struct value name, e;
+        /* vm_field() walks from the last key back to the i'th */
+        uint32_t keys = vm->shapes[OBJ(vm, v)->shape].nkeys;
         put_c(o, '{');
-        for (uint32_t i = 0; vm_field(vm, v, i, &name, &e); i++) {
+        for (uint32_t i = 0; !o->full && vm_field(vm, v, i, &name, &e); i++) {
+            if (!vm_spend(vm, (keys - i) / 8))
+                return 0;
             if (i)
                 put_c(o, ',');
             put_string(o, STR(vm, name)->b, STR(vm, name)->len);
@@ -553,10 +580,10 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
 int json_write(struct vm *vm, struct value v, const char *what,
                uint32_t most, struct value *out)
 {
-    struct jout count = { NULL, 0 };
+    struct jout count = { NULL, 0, most, 0 };
     if (!write_value(vm, &count, v, 0, what))
         return 0;
-    if (count.n > most)
+    if (count.full)
         return 2;
     if (!vm_root(vm, v))
         return 0;
@@ -564,6 +591,6 @@ int json_write(struct vm *vm, struct value v, const char *what,
     vm_unroot(vm);
     if (!ok)
         return 0;
-    struct jout text = { STR(vm, *out)->b, 0 };
+    struct jout text = { STR(vm, *out)->b, 0, count.n, 0 };
     return write_value(vm, &text, v, 0, what);
 }

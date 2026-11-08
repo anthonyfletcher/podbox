@@ -1539,6 +1539,9 @@ static bool get_index(int masterfd, int idxid,
 
     if (tc_stat.ramcache && use_ram)
     {
+        /* the id may come from a game's script, not the database */
+        if (idxid >= current_tcmh.tch.entry_count)
+            return false;
         if (tcramcache.hdr->indices[idxid].flag & FLAG_DELETED)
             return false;
 

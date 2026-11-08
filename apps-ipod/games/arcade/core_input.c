@@ -352,6 +352,13 @@ static void ids_store(struct vm *vm, struct value v, const int32_t *ids,
     }
 }
 
+/* A walk over the library: the call, and each track it looked at */
+static uint32_t walk_cost(struct vm *vm, const struct arcade_tracks *t)
+{
+    int32_t n = t && t->walked ? t->walked(vm->host->ctx) : 0;
+    return 200 + (n > 0 ? (uint32_t)n * 4 : 0);
+}
+
 NATIVE(tracks_count)
 {
     const struct arcade_tracks *t = music_of(vm);
@@ -361,7 +368,8 @@ NATIVE(tracks_count)
                    sizeof(genre), "tracks.count"))
         return 0;
     int32_t n = t && t->count ? t->count(vm->host->ctx, &f) : 0;
-    vm_charge(vm, 200 + (uint32_t)n / 4);
+    if (!vm_spend(vm, walk_cost(vm, t)))
+        return 0;
     return RET_INT(n);
 }
 
@@ -378,7 +386,8 @@ NATIVE(tracks_pick)
         return 0;
     int32_t k = t && t->pick && n ? t->pick(vm->host->ctx, n, &f, ids) : 0;
     ids_store(vm, a[2], ids, k);
-    vm_charge(vm, 200 + (uint32_t)k * 4);
+    if (!vm_spend(vm, walk_cost(vm, t) + (uint32_t)k * 4))
+        return 0;
     return RET_INT(k);
 }
 
@@ -418,7 +427,8 @@ NATIVE(tracks_near)
     int32_t k = t && t->near && n ? t->near(vm->host->ctx, floor_int(a[0]),
                                             n, ids) : 0;
     ids_store(vm, a[2], ids, k);
-    vm_charge(vm, 200 + (uint32_t)k * 4);
+    if (!vm_spend(vm, walk_cost(vm, t) + (uint32_t)k * 4))
+        return 0;
     return RET_INT(k);
 }
 

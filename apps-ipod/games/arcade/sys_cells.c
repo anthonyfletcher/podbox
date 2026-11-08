@@ -637,7 +637,7 @@ NATIVE(cells_step)
     struct cellsleep *sl = sleep_for(vm, &s.f);
     s.dir = sl->dir;
     /* a sleeping chunk drawn on since wakes */
-    uint32_t summed = 0, awake = 0;
+    uint32_t summed = 0;
     for (int32_t k = 0; k < s.cw * chh; k++) {
         s.slept[k] = 0;
         if (!sl->awake[k]) {
@@ -692,9 +692,7 @@ NATIVE(cells_step)
         wake = band[hi + 1] != band[lo];
         sl->awake[k] = (uint8_t)wake;
         /* a chunk that slept and nothing moved into keeps its sum */
-        if (wake)
-            awake++;
-        else if (!s.slept[k] || s.changed[k]) {
+        if (!wake && (!s.slept[k] || s.changed[k])) {
             sl->sum[k] = chunk_sum(&s.f, cx, cy);
             summed++;
         }

@@ -34,16 +34,19 @@ NATIVE(data_read)
 {
     (void)argc;
     const uint8_t *p = vm->data, *end = vm->data + vm->data_len;
-    uint32_t count = p ? rd16(p) : 0;
+    uint32_t count = p && vm->data_len >= 2 ? rd16(p) : 0;
     if (a[0].tag != T_INT || a[0].v < 0 || (uint32_t)a[0].v >= count)
         return vm_fail(vm, "data.read() needs one of the cart's data files, "
                        "DATA.<name>", "", "");
     p += 2;
     for (int32_t i = 0;; i++) {
+        /* each length checked against what is left before it is used */
+        if (end - p < 3 || (uint32_t)(end - p - 3) < rd16(p + 1) + 4u)
+            return vm_fail(vm, "this game file is damaged: data", "", "");
         uint32_t kind = p[0], nlen = rd16(p + 1);
         const uint8_t *name = p + 3, *body = name + nlen + 4;
         uint32_t len = rd32(name + nlen);
-        if (body + len > end)
+        if (len > (uint32_t)(end - body))
             return vm_fail(vm, "this game file is damaged: data", "", "");
         if (i == a[0].v) {
             static char what[48];
@@ -63,9 +66,13 @@ NATIVE(data_read)
 
 /* ---- storage ------------------------------------------------------------- */
 
+/* A store call is a file's work on the disk, which costs far more than
+ * its bytes; a write the more, being a write and a rename */
+#define STORE_CALL  2000
+#define STORE_WRITE 8000
+
 static const struct arcade_store *store_of(struct vm *vm)
 {
-    vm_charge(vm, 50);
     return vm->host->store;
 }
 
@@ -94,6 +101,8 @@ NATIVE(store_read)
     char name[33];
     static char what[48];
     if (!name_of(vm, a[0], "store.read", name))
+        return 0;
+    if (!vm_spend(vm, STORE_CALL))
         return 0;
     const struct arcade_store *s = store_of(vm);
     int32_t n = s && s->read ? s->read(vm->host->ctx, name, NULL, 0) : -1;
@@ -129,10 +138,13 @@ NATIVE(store_write)
     int r = json_write(vm, a[1], what, ARCADE_STORE_FILE, &text);
     if (r == 0)
         return 0;
+    if (!vm_spend(vm, STORE_CALL))
+        return 0;
     const struct arcade_store *s = store_of(vm);
     if (r == 2 || !s || !s->write)
         return RET_INT(0);
-    vm_charge(vm, STR(vm, text)->len / 16);
+    if (!vm_spend(vm, STORE_WRITE + STR(vm, text)->len / 16))
+        return 0;
     return RET_INT(s->write(vm->host->ctx, name, STR(vm, text)->b,
                             (int32_t)STR(vm, text)->len) != 0);
 }
@@ -144,6 +156,8 @@ NATIVE(store_remove)
     char name[33];
     if (!name_of(vm, a[0], "store.remove", name))
         return 0;
+    if (!vm_spend(vm, STORE_CALL))
+        return 0;
     const struct arcade_store *s = store_of(vm);
     return RET_INT(s && s->remove ? s->remove(vm->host->ctx, name) != 0 : 0);
 }
@@ -153,6 +167,8 @@ NATIVE(store_list)
 {
     (void)a; (void)argc;
     static char names[ARCADE_STORE_FILES][33];
+    if (!vm_spend(vm, STORE_CALL))
+        return 0;
     const struct arcade_store *s = store_of(vm);
     int n = s && s->list ? s->list(vm->host->ctx, names, ARCADE_STORE_FILES)
                          : 0;

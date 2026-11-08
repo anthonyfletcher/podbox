@@ -175,6 +175,9 @@ struct arcade_tracks
     int32_t (*queued)(void *ctx, int32_t *at);
     int32_t (*queue_at)(void *ctx, int32_t i);
     int (*enqueue)(void *ctx, int32_t id, int next);
+    /* the tracks the last count(), pick() or near() looked at, which
+     * the call is charged for */
+    int32_t (*walked)(void *ctx);
 };
 
 /* tracks.field()'s fields: TRACK.* in arcade_api.def */
@@ -420,8 +423,8 @@ struct arcade_scores
     struct arcade_achievement ach[ARCADE_ACHIEVEMENTS];
 };
 
-/* The running cart's boards; dirty is set when a score was recorded or
- * cleared since the last call, and cleared. */
+/* The running cart's boards; with dirty, it is set when a score was
+ * recorded or cleared since the last call that asked, and cleared. */
 struct arcade_scores *arcade_scores(struct vm *vm, int *dirty);
 /* Takes saved's tables for the boards that match by key and version */
 void arcade_scores_restore(struct vm *vm, const struct arcade_scores *saved);
