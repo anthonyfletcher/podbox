@@ -11,11 +11,14 @@
  * own size, and a line, a rectangle, an oval or a fill repeats it. A fill
  * inside the selection fills all of it. Objects are in pixels, placed on
  * whole cells unless Shift is held. The tile bar holds the brushes in use,
- * kept per map file, so the picker can be closed. */
+ * kept per map file, so the picker can be closed. A trace image -- a
+ * picture from disk shown faintly under the map, a pixel to a map pixel,
+ * to paint over -- is kept in the browser for the map file, never in the
+ * cart. */
 
 import { shown } from './pixels.js';
 import { iconButton, toolCursor } from './icons.js';
-import { sidePanel, toolbar } from './chrome.js';
+import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 const MAX = 256;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -104,6 +107,7 @@ export class MapEditor {
         this.drag = null;
         this.selRect = null;      /* the selected cells, { x, y, w, h } */
         this.trayKey = 'arcade-tiles-' + (opts.file || '');
+        this.traceKey = 'arcade-trace-' + (opts.file || '');
         this.tiles = sheetCanvas(opts.sheet, opts.rgb);
         this.build(parent);
         const room = Math.min(this.area.clientWidth - 24, this.area.clientHeight - 24);
@@ -111,6 +115,7 @@ export class MapEditor {
         this.drawPicker();
         this.drawObjects();
         this.loadTray();
+        this.loadTrace();
     }
 
     build(parent) {
@@ -186,6 +191,15 @@ export class MapEditor {
         bar.add('zoomIn', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
         bar.sep();
         bar.add('resize', 'Map size', () => this.resize());
+        bar.sep();
+        bar.add('trace', 'Trace image: a picture from disk under the map, to paint over. ' +
+                'Kept in this browser, never in the cart', () => this.pickTrace());
+        this.traceTools = document.createElement('span');
+        this.traceTools.className = 'tb-group';
+        this.traceTools.append(
+            numberBox('', 50, 5, 100, 'How strongly the trace image shows, in percent', (v) => this.setTraceOpacity(v)),
+            iconButton('traceOff', 'Remove the trace image', () => this.setTrace(null)));
+        bar.put(this.traceTools);
 
         this.area = document.createElement('div');
         this.area.className = 'pix-area';
@@ -194,7 +208,12 @@ export class MapEditor {
         this.canvas = document.createElement('canvas');
         this.over = document.createElement('canvas');
         this.over.className = 'pix-over';
-        stack.append(this.canvas, this.over);
+        this.canvas.className = 'map-cells';
+        this.trace = document.createElement('img');
+        this.trace.className = 'map-trace';
+        this.trace.alt = '';
+        this.trace.onload = () => this.sizeTrace();
+        stack.append(this.trace, this.canvas, this.over);
         this.area.append(stack);
         this.status = document.createElement('div');
         this.status.className = 'pix-status';
@@ -279,7 +298,66 @@ export class MapEditor {
             c.width = this.m.w * 8 * this.zoom;
             c.height = this.m.h * 8 * this.zoom;
         }
+        this.sizeTrace();
         this.drawMap();
+    }
+
+    /* ---- the trace image ---- */
+
+    loadTrace() {
+        let t = null;
+        try { t = JSON.parse(localStorage.getItem(this.traceKey)); } catch (e) { /* none kept */ }
+        if (t && t.src) this.setTrace(t.src, t.opacity, true);
+        else this.setTrace(null, 50, true);
+    }
+
+    pickTrace() {
+        const i = document.createElement('input');
+        i.type = 'file';
+        i.accept = 'image/*';
+        i.onchange = () => {
+            const f = i.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = () => this.setTrace(r.result, this.traceOpacity || 50);
+            r.readAsDataURL(f);
+        };
+        i.click();
+    }
+
+    /* the picture as a data URL, or null for none; kept unless restoring */
+    setTrace(src, opacity, restoring) {
+        this.traceSrc = src;
+        this.traceOpacity = opacity || this.traceOpacity || 50;
+        this.trace.hidden = !src;
+        this.traceTools.hidden = !src;
+        this.traceTools.querySelector('input').value = this.traceOpacity;
+        this.trace.style.opacity = this.traceOpacity / 100;
+        if (src) this.trace.src = src; else this.trace.removeAttribute('src');
+        if (!restoring) this.keepTrace();
+        this.main.focus();
+    }
+
+    setTraceOpacity(v) {
+        this.traceOpacity = v;
+        this.trace.style.opacity = v / 100;
+        this.keepTrace();
+    }
+
+    keepTrace() {
+        try {
+            if (this.traceSrc) localStorage.setItem(this.traceKey, JSON.stringify({ src: this.traceSrc, opacity: this.traceOpacity }));
+            else localStorage.removeItem(this.traceKey);
+        } catch (e) {
+            this.o.say('The trace image is too big for the browser to keep: it shows until the map is closed.', true);
+        }
+    }
+
+    /* a pixel of the picture to a pixel of the map, from its top left */
+    sizeTrace() {
+        if (!this.trace.naturalWidth) return;
+        this.trace.style.width = this.trace.naturalWidth * this.zoom + 'px';
+        this.trace.style.height = this.trace.naturalHeight * this.zoom + 'px';
     }
 
     /* ---- drawing ---- */

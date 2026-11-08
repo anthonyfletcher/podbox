@@ -268,6 +268,12 @@ body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 .tb .map-kindbox input { width: 96px; }
 .tb-group { display: inline-flex; align-items: center; gap: 2px; }
 .tb [hidden], .ed-side [hidden] { display: none; }
+/* the map's trace image, under its cells and over the area's checks */
+.map-trace { position: absolute; left: 0; top: 0; image-rendering: pixelated; pointer-events: none; z-index: 0; }
+.map-trace[hidden] { display: none; }
+.map-cells { position: relative; z-index: 1; }
+.map .pix-over { z-index: 2; }
+.tb .tb-group input[type=number] { width: 52px; }
 /* the map's tile bar, as the pictures' palette */
 .map-tray { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 6px 10px; min-height: 40px; }
 .map-tile { width: auto; min-width: 28px; height: 28px; padding: 1px; border-radius: 4px; display: inline-flex;

@@ -274,7 +274,9 @@ show as `?`.
   before placing, and the objects placed take it -- and its place, size
   and properties are beside the picker; objects sit on whole cells unless
   Shift is held. The map's
-  size is set from the toolbar.
+  size is set from the toolbar. A trace image -- a picture from disk, a
+  pixel to a map pixel -- shows faintly under the map to paint over; it is
+  kept in the browser for that map, never in the cart.
 - **Sounds**: open one to shape it with sfxr's settings -- the wave, its
   envelope, pitch and slide, vibrato, filters and the rest -- or have a
   generator beside it make a coin, a laser, an explosion and so on, again
