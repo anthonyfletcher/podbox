@@ -47,7 +47,8 @@ def cells(path):
     """codepoint -> (advance, [12 row bytes]) for glyphs no wider than a cell"""
     glyphs = {}
     for cp, g in bdf.read(path)[2].items():
-        if cp < 0x10000 and g.adv <= CELL_W and g.xo >= 0 and                 g.xo + g.w <= CELL_W:
+        if cp < 0x10000 and g.adv <= CELL_W and g.xo >= 0 and \
+                g.xo + g.w <= CELL_W:
             glyphs[cp] = (g.adv, cell_of(g, ASCENT - (g.yo + g.h)))
     return glyphs
 

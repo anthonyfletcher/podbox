@@ -16,8 +16,10 @@
  * --shot saves the panel as the player shows it, the 160x120 screen
  * doubled to 320x240, and --dump prints a rectangle of the screen as one
  * hex digit a pixel (the colour's low four bits), a row a line, and
- * --dirty prints "dirty lo hi", the rows the last tick drew (all of them
- * when the palette changed, as the player then sends every row). --wav saves
+ * --dirty prints "dirty lo hi", the rows the player sends next: those
+ * drawn since the last tick that drew began, a late tick drawing nothing
+ * (all of them when the palette changed, as the player then sends every
+ * row). --wav saves
  * the sound, 44.1 kHz stereo, a tick's worth after each tick, and click()
  * prints "click 0" or "click 1". --buttons holds button masks (1 PREV,
  * 2 NEXT, 4 MENU, 8 PLAY, 16 SELECT) from the ticks given, each until the
@@ -27,13 +29,14 @@
  * --wheel turns the wheel: "5:12:30" is 12 clicks at tick 5 with the
  * finger at 30 from then on (-1 lifts it).
  * --playing has playback.playing() report music playing, its clock a tick
- * on each tick. --beat bpm plays
- * a steady track at that tempo for beat: its clock follows the ticks, the
- * tracker locks a second after beat.listen(true), and presses are stamped
- * with the tick's time. --setting name=value is what sys.setting(name)
- * gives, a number where the value is one; sys.translate() is English. Each
- * --menu i then chooses pause-menu item i with SELECT, printing the items
- * before and the answer: "menu: <label>|<label>..." and "chose i: r".
+ * on each tick. --beat bpm plays a steady track at that tempo for beat,
+ * or with 0 each track at its own, as the IDE does: its clock follows the
+ * ticks, the tracker locks a second after beat.listen(true), and presses
+ * are stamped with the tick's time. --setting name=value is what
+ * sys.setting(name) gives, a number where the value is one;
+ * sys.translate() is English. Each --menu i then chooses pause-menu item i
+ * with SELECT, printing the items before and the answer:
+ * "menu: <label>|<label>..." and "chose i: r".
  * --scores keeps the cart's high scores in file, read before the start
  * and written after the last tick, in the player's own record. score.show
  * prints "show <title>", then a line for each rank, "<rank> <value>
@@ -552,11 +555,14 @@ static const struct arcade_store fake_store = {
 static unsigned char *font_data;
 static long font_size;
 
-/* As the player's shell_glyph(): the page, the codepoint's bit, its rank */
+#define FONT_TABLE (8 + 256 * 36)
+
+/* As the player's shell_glyph(): the page, the codepoint's bit, its rank;
+ * a glyph running past the file's end is none */
 static int font_glyph(void *ctx, uint32_t cp, uint8_t out[13])
 {
     (void)ctx;
-    if (!font_data || cp >= 0x10000)
+    if (!font_data || cp >= 0x10000 || cp == 0)
         return 0;
     const unsigned char *page = font_data + 8 + (cp >> 8) * 36;
     uint32_t base = page[0] | page[1] << 8 | page[2] << 16 |
@@ -565,12 +571,15 @@ static int font_glyph(void *ctx, uint32_t cp, uint8_t out[13])
         return 0;
     for (uint32_t b = 0; b < low; b++)
         rank += (page[4 + (b >> 3)] >> (b & 7)) & 1;
-    if ((long)(base + rank * 13 + 13) > font_size)
+    if ((unsigned long long)base + rank * 13 + 13 >
+        (unsigned long long)font_size)
         return 0;
     memcpy(out, font_data + base + rank * 13, 13);
     return 1;
 }
 
+/* As the player's font_open(): PBTF, version 1 and the whole page table,
+ * or no font */
 static void font_load(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -579,9 +588,10 @@ static void font_load(const char *path)
     fseek(f, 0, SEEK_END);
     font_size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    font_data = malloc((size_t)font_size);
-    if (font_data && fread(font_data, 1, (size_t)font_size, f) !=
-                     (size_t)font_size) {
+    font_data = font_size >= FONT_TABLE ? malloc((size_t)font_size) : NULL;
+    if (font_data && (fread(font_data, 1, (size_t)font_size, f) !=
+                      (size_t)font_size || memcmp(font_data, "PBTF", 4) ||
+                      font_data[4] != 1)) {
         free(font_data);
         font_data = NULL;
     }
@@ -804,6 +814,7 @@ int main(int argc, char **argv)
     int pos = -1;
     int playing_flag = 0;
     long bpm = 0;
+    int beat_flag = 0;
     int menu_picks[16], npicks = 0;
     const char *scores_path = NULL, *options_path = NULL, *opt_sets = NULL;
     const char *saves_path = NULL;
@@ -832,9 +843,10 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--setting") && i + 1 < argc &&
                  nsettings < 16)
             settings[nsettings++] = argv[++i];
-        else if (!strcmp(argv[i], "--beat") && i + 1 < argc)
+        else if (!strcmp(argv[i], "--beat") && i + 1 < argc) {
             bpm = atol(argv[++i]);
-        else if (!strcmp(argv[i], "--playing"))
+            beat_flag = 1;
+        } else if (!strcmp(argv[i], "--playing"))
             playing_flag = 1;
         else if (!strcmp(argv[i], "--scores") && i + 1 < argc)
             scores_path = argv[++i];
@@ -879,15 +891,16 @@ int main(int argc, char **argv)
     /* The player's limit: the 5G's whole app buffer. */
     static uint64_t arena[512 * 1024 / 8];
     struct arcade_host host = { NULL, print, NULL, date, click,
-                                playing_flag || bpm ? fake_playing : NULL,
-                                bpm > 0 ? &fake_beat : NULL, fake_setting,
+                                playing_flag || beat_flag ? fake_playing
+                                                          : NULL,
+                                beat_flag ? &fake_beat : NULL, fake_setting,
                                 NULL, fake_control, &fake_tracks, dialog_frame,
                                 &fake_speak, &fake_store, font_glyph, watch,
                                 prof };
     prof_units = units;
     fake_music_init(music_say);
     fake_music_tempo((int32_t)bpm);
-    fake_music_play(playing_flag || bpm > 0);
+    fake_music_play(playing_flag || beat_flag);
     unsigned last_held = 0;
     double track_ms = 0;
     int32_t track_at = 0;
@@ -956,7 +969,7 @@ int main(int argc, char **argv)
             /* with --beat the clock a tick on; each new press stamped
              * with it */
             struct arcade_music m = { 0, 0, 0, 0, { -1, -1, -1, -1, -1 } };
-            if (bpm > 0 || playing_flag) {
+            if (beat_flag || playing_flag) {
                 track_ms += 1000.0 / arcade_rate(vm);
                 fake_music_advance((int32_t)track_ms - track_at);
                 track_at = (int32_t)track_ms;
@@ -968,7 +981,9 @@ int main(int argc, char **argv)
             arcade_music(vm, &m);
         }
         last_held = held;
-        arcade_presented(vm);
+        /* a late tick draws nothing: the next present covers both */
+        if (!late)
+            arcade_presented(vm);
         if (!arcade_tick(vm, !late))
             return report(vm);
         if (units)

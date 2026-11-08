@@ -18,6 +18,9 @@
  *   storeRemove(name)         true when there was one
  *   storeList()               the names, sorted
  *   glyph(cp)                 13 bytes of FONT.WORLD glyph, or undefined
+ *   watch(name, value)        a watch() call, both as text
+ *   prof(name)                a prof() section opening, or with null the
+ *                             innermost ending; unitsNow() reads the units
  *
  * frame() may also return a Promise, in the IDE, where the next tick comes
  * from the page: the engine then pauses inside the call (Asyncify) and
@@ -252,16 +255,22 @@ export class Engine {
 
 /* host.glyph from font.bin, as gen_textfont.py --file lays it out: 256
  * pages of an offset and a bitmap of the codepoints present, each page's
- * glyphs 13 bytes apiece */
+ * glyphs 13 bytes apiece. As on the player, a file that is not PBTF
+ * version 1 with its whole page table has no glyphs, and a glyph running
+ * past the file's end is none. */
 export function fontGlyphs(file) {
     const dv = new DataView(file.buffer, file.byteOffset, file.byteLength);
+    if (file.length < 8 + 256 * 36 || new TextDecoder().decode(file.subarray(0, 4)) !== 'PBTF' ||
+        file[4] !== 1)
+        return () => undefined;
     return (cp) => {
-        if (cp > 0xffff) return undefined;
+        if (cp > 0xffff || cp === 0) return undefined;
         const at = 8 + (cp >> 8) * 36, off = dv.getUint32(at, true), lo = cp & 0xff;
         const has = (i) => file[at + 4 + (i >> 3)] & (1 << (i & 7));
         if (!off || !has(lo)) return undefined;
         let k = 0;
         for (let i = 0; i < lo; i++) if (has(i)) k++;
+        if (off + k * 13 + 13 > file.length) return undefined;
         return file.slice(off + k * 13, off + k * 13 + 13);
     };
 }

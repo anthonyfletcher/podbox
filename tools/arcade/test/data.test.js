@@ -57,10 +57,21 @@ test('a data file reads as the cart\'s values, a text file as a string', () => {
                  '2147483647 -2147483648 0.0625 -0.5 1 0 null 1500\nOnce, a cave.\nThe end.\n');
 });
 
+test('a data file\'s number is a fraction or an integer as written', () => {
+    const r = run(`function init() {
+    var d = data.read(DATA.n);
+    printh(d.a / 4 + " " + d.b / 4 + " " + d.c / 4 + " " + d.d / 4);
+}`, { data: { n: '{ "a": 2.0, "b": 2, "c": 1.50e1, "d": 1.5e1 }' } });
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, '0.5 0 3.75 3\n');
+});
+
 test('data files are checked when the cart is built', () => {
     const errs = (assets) => compile('function init() {}', assets).errors.map((e) => e.file + ': ' + e.message).join('\n');
     assert.match(errs({ data: { a: '{"x": 1e12}' } }), /data\/a\.json: 1000000000000 is beyond the whole numbers/);
     assert.match(errs({ data: { a: '[40000.5]' } }), /beyond the fractions a cart has/);
+    assert.match(errs({ data: { a: '[40000.0]' } }), /beyond the fractions a cart has/);
+    assert.equal(errs({ data: { a: '[40000, 4e4, "40000.0", 0.0e9]' } }), '');
     assert.match(errs({ data: { a: '{"x": ' } }), /data\/a\.json: /);
     assert.match(errs({ data: { a: '1' }, texts: { a: 'x' } }), /both called a/);
     assert.match(errs({ data: { 'a b': '1' } }), /usable as a name in code/);

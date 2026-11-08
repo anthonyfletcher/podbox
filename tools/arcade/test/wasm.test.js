@@ -29,8 +29,11 @@ before(() => {
     /* a module older than the engine's sources is not the engine tested */
     const engine = path.join(root, '..', '..', 'apps-ipod', 'games', 'arcade');
     const built = fs.statSync(wasmFile).mtimeMs;
-    const newer = fs.readdirSync(engine).filter((f) => /\.(c|h|def)$/.test(f) &&
-        fs.statSync(path.join(engine, f)).mtimeMs > built);
+    const newer = fs.readdirSync(engine).filter((f) => /\.(c|h|def)$/.test(f))
+        .map((f) => path.join(engine, f))
+        .concat(['wasm/web.c', 'host/fakemusic.c', 'host/fakemusic.h'].map((f) => path.join(root, f)))
+        .filter((f) => fs.statSync(f).mtimeMs > built)
+        .map((f) => path.basename(f));
     assert.deepEqual(newer, [], 'wasm/arcade.wasm is older than these; rebuild it');
 });
 
@@ -78,6 +81,27 @@ test('a drawing cart, with input, the wheel and skipped frames', () => {
     const file = build('drawdemo', readFolder(dir), readAssets(dir));
     both(file, ['--ticks', '40', '--dump', '0,0,160,120', '--dirty', '--buttons', '3:16,4:0,9:3,12:0',
                 '--wheel', '5:20:30,6:0,20:-7:-1', '--skip', '15:2']);
+});
+
+test('a late last tick: --dirty is the rows the next present sends', () => {
+    const file = build('late', { 'cart.json': CART, 'main.js': `function init() {}
+function update() {}
+function draw() { pset(0, frame() * 3, 7); }` });
+    both(file, ['--ticks', '6', '--dirty', '--skip', '5:1']);
+    const vm = spawnSync(exe, [file, '--ticks', '6', '--dirty', '--skip', '5:1'], { encoding: 'utf8' });
+    const [lo, hi] = lf(vm.stdout).trim().split(' ').slice(1).map(Number);
+    assert.ok(lo <= hi, vm.stdout);
+});
+
+test('watch() and prof(): the same lines and units', () => {
+    const file = build('watch', { 'cart.json': CART, 'main.js': `function init() {}
+function update() {
+    watch("half", (frame() >> 1) + "");
+    watch("same", "x");
+    prof("outer"); prof("inner"); cls(frame() & 7); prof(); prof();
+    prof();
+}` });
+    both(file, ['--ticks', '6']);
 });
 
 const DIALOGS = `var said = [];
@@ -149,6 +173,7 @@ function update() {
     assert.deepEqual(res.errors, []);
     const file = path.join(tmp, 'music.pbg');
     fs.writeFileSync(file, res.cart);
+    /* --beat 0: the IDE's, each track at its own tempo */
     both(file, ['--ticks', '80', '--beat', '0', '--buttons', '30:16,31:0']);
     both(file, ['--ticks', '80', '--beat', '90', '--buttons', '30:16,31:0']);
     both(file, ['--ticks', '20', '--playing']);

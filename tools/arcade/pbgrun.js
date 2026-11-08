@@ -10,9 +10,11 @@
  *
  * printh() lines go to stdout; a runtime error to stderr as file:line:
  * message (in function), with exit status 1; --units prints each call's
- * units to stderr. Each ui.* dialog prints what it showed, and is worked
- * a tick at a time from --buttons and --wheel, backed out of when the
- * ticks run out (--shot then shows it). See pbgvm.c for the rest. */
+ * units to stderr, and each prof() section's as "prof name units".
+ * watch() prints "watch name value" as a value changes. Each ui.* dialog
+ * prints what it showed, and is worked a tick at a time from --buttons
+ * and --wheel, backed out of when the ticks run out (--shot then shows
+ * it). An option not listed here is refused. See pbgvm.c for the rest. */
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,13 +40,14 @@ function args(argv) {
         else if (a === '--skip') o.skip = v();
         else if (a === '--speech') o.speech = true;
         else if (a === '--playing') o.playing = true;
-        else if (a === '--beat') o.bpm = +v();
+        else if (a === '--beat') { o.beat = true; o.bpm = +v(); }
         else if (a === '--font') o.font = fs.readFileSync(v());
         else if (a === '--setting') {
             const [k, ...rest] = v().split('=');
             const s = rest.join('=');
             o.settings[k] = /^-?\d+$/.test(s) ? +s : s;
-        } else o.cart = a;
+        } else if (a.startsWith('--')) throw new Error('pbgrun has no ' + a);
+        else o.cart = a;
     }
     return o;
 }
@@ -99,7 +102,8 @@ function shot(engine, file) {
 }
 
 function main() {
-    const o = args(process.argv.slice(2));
+    let o;
+    try { o = args(process.argv.slice(2)); } catch (e) { console.error(e.message); return 2; }
     if (!o.cart) {
         console.error('usage: pbgrun cart.pbg [--ticks n] [--seed s] [--units] [--shot file.png] ...');
         return 2;
@@ -108,7 +112,28 @@ function main() {
     const flush = () => { if (out.length) { process.stdout.write(out.join('')); out.length = 0; } };
     const at = input(o);
     let t = 0, said = false, shotTaken = false, engine;
+    /* pbgvm's watch() and prof(): 32 names watched, prof() 8 deep */
+    const watched = new Map(), open = [];
+    let depth = 0;
     const host = {
+        watch: (name, value) => {
+            if (watched.get(name) === value) return;
+            if (watched.has(name) || watched.size < 32) watched.set(name, value);
+            out.push('watch ' + name + ' ' + value + '\n');
+        },
+        prof: (name) => {
+            const now = engine.unitsNow();
+            if (name !== null) {
+                if (depth < 8) open[depth] = [name, now];
+                depth++;
+            } else if (depth > 0) {
+                depth--;
+                if (o.units && depth < 8) {
+                    flush();
+                    console.error('prof ' + open[depth][0] + ' ' + ((now - open[depth][1]) >>> 0));
+                }
+            }
+        },
         print: (s) => out.push(s + '\n'),
         click: (beep) => out.push('click ' + beep + '\n'),
         setting: (name) => o.settings[name],
@@ -136,8 +161,8 @@ function main() {
     engine = new Engine(wasm, host);
     /* the made-up music: there to read with --playing or --beat, its clock
      * running with the ticks, as pbgvm's */
-    engine.music({ playingFn: o.playing || o.bpm > 0, beat: o.bpm > 0,
-                   playing: o.playing || o.bpm > 0, bpm: o.bpm || 0 });
+    engine.music({ playingFn: o.playing || o.beat, beat: o.beat,
+                   playing: o.playing || o.beat, bpm: o.bpm || 0 });
     const report = () => { flush(); console.error(engine.error()); return 1; };
     if (!engine.load(new Uint8Array(fs.readFileSync(o.cart)), o.seed)) return report();
     if (o.ceiling) engine.ceiling(o.ceiling);
@@ -152,7 +177,7 @@ function main() {
         let late = false;
         for (const [when, n] of skips) if (when === t) { engine.skipped(n || 0); late = true; }
         let ms = 0;
-        if (o.bpm > 0 || o.playing) {
+        if (o.beat || o.playing) {
             trackMs += 1000 / engine.rate();
             ms = Math.trunc(trackMs) - trackAt;
             trackAt = Math.trunc(trackMs);

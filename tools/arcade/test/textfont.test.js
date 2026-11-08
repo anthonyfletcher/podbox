@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { compileFiles } from '../src/node.js';
+import { fontGlyphs } from '../src/runner.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const host = path.join(here, '..', 'host');
@@ -87,6 +88,29 @@ function init() {
     assert.deepEqual([w, ink, other], [8, 64, q]);
     const without = run(main);
     assert.deepEqual(without.out.trim().split(' ').map(Number).slice(0, 1), [q]);
+});
+
+test('a damaged font file gives no glyph, never a short or stray one', () => {
+    const whole = fs.readFileSync(fontFile());
+    const damaged = {
+        glyph: whole.subarray(0, whole.length - 5),
+        table: whole.subarray(0, 8 + 100),
+        magic: Buffer.concat([Buffer.from('PBTX'), whole.subarray(4)]),
+        version: Buffer.concat([whole.subarray(0, 4), Buffer.from([2]), whole.subarray(5)])
+    };
+    const main = `function init() { font(FONT.WORLD); printh(textw("あ") + " " + textw("?")); }`;
+    for (const [what, bytes] of Object.entries(damaged)) {
+        const file = path.join(tmp, 'font-' + what + '.bin');
+        fs.writeFileSync(file, bytes);
+        const r = run(main, ['--font', file]);
+        assert.equal(r.status, 0, what + ': ' + r.err);
+        const [w, q] = r.out.trim().split(' ');
+        assert.equal(w, q, what);
+        const glyph = fontGlyphs(new Uint8Array(bytes));
+        assert.equal(glyph(0x3042), undefined, what);
+        assert.equal(glyph(0), undefined, what);
+    }
+    assert.equal(fontGlyphs(new Uint8Array(whole))(0x3042).length, 13);
 });
 
 test('a line is 12 rows, and font() knows WORLD', () => {

@@ -43,6 +43,7 @@ A cart is a folder:
 | `music` | `listen` (the default), `control` or `own` |
 | `boards` | the high-score tables, up to 8, below |
 | `options` | the settings the pause menu shows, up to 8, below |
+| `achievements` | up to 32 records: `name`, used in code as `ACH.<name>`; `title`, 1 to 31 bytes (the name when left out); and `text`, up to 95 bytes |
 | `flags` | names for the sprite flags, flag 0 first: `["solid", null, "ladder"]` gives `FLAG.solid` and `FLAG.ladder`, each the flag as a set of flags (1 and 4), for `actors.move()` and `map()`; `fget(n) & FLAG.solid` tests one |
 
 Errors name the file, line and column, and say what to write instead.
@@ -160,6 +161,11 @@ file's opening comment lists what it gives.
     `Math.sqrt(2.0)` is 1.4142.
   - Fractions print with up to four decimal places: `1 / 3.0` prints
     `0.3333`.
+- **`rgb(0xRRGGBB)` is a palette number, found when compiling.** It gives
+  the colour nearest to the one written in the palette the cart starts
+  with -- its first palette by name, or the engine's sixteen -- the first
+  of any equally near: `cls(rgb(0x1a2244))` is `cls(1)`. Its argument must
+  be a number known when compiling; at run time, use the colour's number.
 - **`==` is `===`.** Nothing is converted for a comparison, so `1 == "1"` is
   false.
 - **Strings are bytes.** Text is stored as UTF-8. `length`, `charCodeAt` and
@@ -342,8 +348,9 @@ These options show what a cart drew, after the last tick:
   screen doubled to 320x240.
 - `--dump x,y,w,h` prints that part of the screen, one hex digit a pixel
   and a row a line.
-- `--dirty` prints `dirty lo hi`: the rows the last tick drew, which are
-  the rows the player sends to the screen.
+- `--dirty` prints `dirty lo hi`: the rows drawn since the last tick that
+  drew began, a late tick drawing nothing, which are the rows the player
+  sends to the screen next.
 - `--menu i` chooses the cart's pause-menu item `i` (from `menuitem()`), as
   SELECT would, printing the items first and what the item's function
   returned. Give it more than once to choose several in turn.
@@ -359,14 +366,21 @@ And these drive or keep more of a run (the comment at the top of
   keep saved numbers, scores, option values and stored files between
   runs; `--opt t:i:v` sets option `i` before tick `t`.
 - `--ui answers` answers dialogs; `--playing` and `--beat bpm` play
-  the made-up music.
+  the made-up music, `--beat 0` with each track at its own tempo, as the
+  IDE plays it.
 - `watch()` prints `watch name value` as a value changes; with
   `--units`, `prof()` sections print their units. `quit()` ends the run.
 
 `pbgrun.js` runs a cart the same way on `wasm/arcade.wasm`, the engine
-built as WebAssembly, which the IDE runs too. It takes the same options
-but `--menu`, `--wav` and the music, scores and store options, and
-prints the same lines, units and pixels:
+built as WebAssembly, which the IDE runs too, and prints the same lines,
+units and pixels -- `watch` and `prof` lines among them. It takes
+`--ticks`, `--seed`, `--ceiling`, `--units`, `--shot`, `--dump`,
+`--dirty`, `--buttons`, `--wheel`, `--skip`, `--setting`, `--speech`,
+`--font`, `--playing` and `--beat`, and refuses any other. So it has no
+`--menu`, `--wav`, `--ui`, `--scores`, `--saves`, `--options`, `--opt`,
+`--store` or `--suspend-at`: its dialogs are worked from `--buttons` and
+`--wheel`, nothing is kept between runs, and it prints no `show` or
+`achieved` lines for `score.show()` and achievements:
 
 ```sh
 sh wasm/build.sh                      # needs wasi-sdk and binaryen

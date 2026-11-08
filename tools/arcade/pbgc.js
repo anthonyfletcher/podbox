@@ -79,11 +79,19 @@ function cmdUnpack(file, dir) {
     const files = unpackCart(new Uint8Array(fs.readFileSync(file)),
                              (b) => new Uint8Array(zlib.inflateRawSync(b)),
                              (b) => new Uint8Array(zlib.deflateSync(b, { level: 9 })));
-    for (const name of Object.keys(files).sort()) {
-        const to = path.join(dir, ...name.split('/'));
-        fs.mkdirSync(path.dirname(to), { recursive: true });
-        fs.writeFileSync(to, files[name]);
-    }
+    /* every path checked before any is written */
+    const root = path.resolve(dir);
+    const names = Object.keys(files).sort();
+    const paths = names.map((name) => {
+        const to = path.resolve(root, ...name.split('/'));
+        if (!to.startsWith(root + path.sep))
+            throw new Error('the cart names a file outside ' + dir + ': ' + name);
+        return to;
+    });
+    names.forEach((name, i) => {
+        fs.mkdirSync(path.dirname(paths[i]), { recursive: true });
+        fs.writeFileSync(paths[i], files[name]);
+    });
     console.log(dir + ': ' + Object.keys(files).length + ' files');
 }
 

@@ -99,3 +99,21 @@ test('a cart built before its assets were kept says to build it again', () => {
     const old = writeCart(order.map((t) => ({ tag: t, data: t === 'SRC_' ? src : chunks[t] })));
     assert.throws(() => unpackCart(old, inflateRaw, deflate), /build it again from its folder/);
 });
+
+test('a source named outside the folder\'s shapes is refused, never written', () => {
+    const { chunks, order } = readCart(build(CODE, {}));
+    const withName = (name) => {
+        const w = [], u16 = (v) => w.push(v & 255, v >> 8);
+        const b = Buffer.from(name);
+        u16(1); u16(b.length); w.push(...b); u16(1); u16(0); w.push(120);
+        const src = new Uint8Array(zlib.deflateRawSync(Buffer.from(w)));
+        return writeCart(order.map((t) => ({ tag: t, data: t === 'SRC_' ? src : chunks[t] })));
+    };
+    for (const name of ['../escaped.txt', '..\\escaped.js', 'a/../../x.js', '/etc/x.js',
+                        'C:x.js', '.js', 'maps/../../x.json', 'maps/a-b.json', 'data/x.png',
+                        'images/sub/x.png', 'notes.txt'])
+        assert.throws(() => unpackCart(withName(name), inflateRaw, deflate),
+                      /names a file no cart folder holds/, name);
+    assert.deepEqual(Object.keys(unpackCart(withName('my-lib.js'), inflateRaw, deflate)),
+                     ['my-lib.js']);
+});

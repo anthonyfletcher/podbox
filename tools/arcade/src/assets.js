@@ -306,8 +306,8 @@ export function buildAssets(assets, inflate, string, errors) {
         else out.chunks.push({ tag: 'FONT', data: data });
     }
 
-    /* data files: JSON checked and stored without its spaces, text as it
-     * is; DATA.<name> numbers each, JSON and text together by name */
+    /* data files: JSON checked, then stored as written, as is text;
+     * DATA.<name> numbers each, JSON and text together by name */
     const files = [];
     const texts = assets.texts || {};
     for (const name of sortedNames(Object.assign({}, assets.data, texts))) {
@@ -322,11 +322,10 @@ export function buildAssets(assets, inflate, string, errors) {
             files.push({ name: name, kind: 1, bytes: utf8Bytes(texts[name]) });
         } else {
             try {
-                const value = JSON.parse(assets.data[name]);
-                const why = dataFault(value, 0);
+                const text = assets.data[name];
+                const why = dataFault(text, JSON.parse(text));
                 if (why) { err(file, why); continue; }
-                files.push({ name: name, kind: 0,
-                             bytes: utf8Bytes(JSON.stringify(value)) });
+                files.push({ name: name, kind: 0, bytes: utf8Bytes(text) });
             } catch (e) { err(file, e.message); continue; }
         }
         out.groups.DATA[name] = { value: files.length - 1, version: 1 };
@@ -349,20 +348,32 @@ function utf8Bytes(s) {
     return new TextEncoder().encode(s);
 }
 
-/* What in a data file's value a cart cannot hold, or null: numbers past
- * its range, lists more than 64 deep */
-function dataFault(v, depth) {
-    if (depth > 64) return 'more than 64 lists inside one another';
-    if (typeof v === 'number') {
-        if (Number.isInteger(v))
-            return v >= -2147483648 && v <= 2147483647 ? null
-                : v + ' is beyond the whole numbers a cart has';
-        return v > -32768 && v < 32768 ? null
-            : v + ' is beyond the fractions a cart has (-32768 to 32767)';
+/* What in a data file a cart cannot hold, or null: numbers past its
+ * range, lists more than 64 deep. A number is judged by its text, as
+ * json.c reads it: a fraction when it has more digits after the point
+ * than its exponent moves, so 2.0 is a fraction and 1.5e3 an integer. */
+function dataFault(text, value) {
+    const token = /"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g;
+    for (const [t] of text.matchAll(token)) {
+        if (t[0] === '"') continue;
+        const m = /^-?(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(t);
+        const v = Number(t);
+        if (!/[1-9]/.test(m[1] + (m[2] || ''))) continue;
+        if ((m[2] || '').length - (+m[3] || 0) <= 0) {
+            if (!(v >= -2147483648 && v <= 2147483647))
+                return v + ' is beyond the whole numbers a cart has';
+        } else if (!(v > -32768 && v < 32768)) {
+            return v + ' is beyond the fractions a cart has (-32768 to 32767)';
+        }
     }
+    return depthFault(value, 0);
+}
+
+function depthFault(v, depth) {
+    if (depth > 64) return 'more than 64 lists inside one another';
     if (v && typeof v === 'object') {
         for (const k in v) {
-            const why = dataFault(v[k], depth + 1);
+            const why = depthFault(v[k], depth + 1);
             if (why) return why;
         }
     }
