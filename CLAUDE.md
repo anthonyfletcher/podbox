@@ -492,6 +492,43 @@ cuts the rest without a sign; check 6 flags one that would not fit.
 `make zip` does not run it, and nothing else misbehaves without it, so a
 hand-built zip with every **Explain** entry silently empty looks finished.
 
+## Changing the Arcade API
+
+The Arcade -- the game engine in `apps-ipod/games/arcade/` and its SDK in
+`tools/arcade/` -- runs one engine in four places: the player, `pbgvm`, the
+WebAssembly build behind `pbgrun` and the IDE, and the ARM rig. A change to
+what a cart can call, or to what a call does, is finished only when every
+one of these agrees. Most of them fail silently when stale: the IDE shows
+the old hints, the manual teaches the old call, a host runner draws what the
+player no longer does.
+
+For any new, removed or changed function, argument, pool field or constant,
+in this order:
+
+1. **The engine.** The native in its file; `arcade_api.def` (argument counts;
+   a new native also takes `natives_impl.h`); `vm.h` for anything shared.
+   A change to `struct arcade_host` or one of its tables (`arcade_tracks`,
+   `arcade_store`, ...) also takes `shell*.c`, `tools/arcade/host/pbgvm.c` and
+   `fakemusic.c`, `tools/arcade/wasm/web.c` and `tools/arcade/src/runner.js`.
+2. **`tools/arcade/api.md`**, one entry. The IDE's hints are built from it, and
+   `test/reference.test.js` fails when its signatures disagree with
+   `arcade_api.def`. `README.md` too, if `cart.json`, a tool or an option
+   changes.
+3. **Tests** in `tools/arcade/test/` for the new behaviour, then `sh
+   host/build.sh` and `node --test test/*.test.js`.
+4. **Builds**: the WebAssembly (`wasm/build.sh`, on the build server; the wasm
+   tests refuse a module older than the engine), and both players. A new
+   engine `.c` file also goes in `host/build.sh`, `wasm/build.sh` and the
+   rig's `.build/arcade-rig/build.sh`.
+5. **The IDE**: rebuild `ide/dist/` (`node ide/build.js`, see the README), so
+   it carries the new hints and the new engine; and anything the IDE does in
+   the player's place (`ide/main.js`, `ide/game.js`) for a host change.
+6. **The manual** in `.build/arcade-manual/` (git-ignored for now): the
+   reference page, with any example run and its picture and cost measured
+   rather than guessed; its skill in `skill/SKILL.md`; and the link check.
+7. **`.specifications/game-engine.md`**, the design, and any cart in
+   `.build/arcade_source/` that uses what changed.
+
 ## Code Style
 
 - **C only** (gnu11). Assembly only when necessary for performance.
