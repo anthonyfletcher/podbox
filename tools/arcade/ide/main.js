@@ -39,7 +39,11 @@ import { icon, iconButton } from './icons.js';
 import capsBdf from '../fonts/caps.bdf';
 import wasmBytes from '../wasm/arcade.wasm';
 
-const $ = (id) => document.getElementById(id);
+/* the page's elements by id, found once: the dock takes a panel that is
+ * closed, or a tab behind another, out of the page, where getElementById
+ * cannot see it */
+const byId = new Map([...document.querySelectorAll('[id]')].map((el) => [el.id, el]));
+const $ = (id) => byId.get(id) || document.getElementById(id);
 window.addEventListener('error', (e) => say('error', 'The IDE: ' + e.message));
 window.addEventListener('unhandledrejection', (e) => say('error', 'The IDE: ' + (e.reason && e.reason.message || e.reason)));
 const wasm = new WebAssembly.Module(wasmBytes);
@@ -1604,6 +1608,9 @@ document.addEventListener('keydown', (e) => {
 
 let dock = null;
 
+/* before the dock, while every panel is in the page */
+for (const b of document.querySelectorAll('[data-icon]')) b.innerHTML = icon(b.dataset.icon);
+
 /* the panels in the dock, the editor's own among them; each group's header
  * shows its open panel's buttons */
 dock = createDock($('dock'), {
@@ -1647,7 +1654,6 @@ function toggle(k) {
     dock.toggle(k);
 }
 
-for (const b of document.querySelectorAll('[data-icon]')) b.innerHTML = icon(b.dataset.icon);
 $('new-file').onclick = () => ACTIONS.add();
 $('clear-output').onclick = () => { $('console').textContent = ''; };
 $('status').onclick = () => dock.show('output', false);

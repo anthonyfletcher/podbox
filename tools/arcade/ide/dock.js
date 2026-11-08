@@ -271,7 +271,9 @@ export function createDock(root, panes, actions, changed) {
         if (root.clientWidth !== rootW || root.clientHeight !== rootH) settle();
     }).observe(root);
     /* a panel closed by its tab is gone until shown again */
-    api.onDidRemovePanel((p) => { if (!restoring && PANELS[p.id]) { closed.add(p.id); changed(); } });
+    api.onDidRemovePanel((p) => {
+        if (!restoring && PANELS[p.id]) { closed.add(p.id); settle(); changed(); }
+    });
     api.onDidLayoutChange(save);
     api.onDidActivePanelChange(() => changed());
 
