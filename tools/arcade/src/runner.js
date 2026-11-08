@@ -67,6 +67,8 @@ export class Engine {
                 return 0;
             },
             music_say: (p, n) => h().musicSay && h().musicSay(this.cstr(p, n)),
+            watch: (n, v) => h().watch && h().watch(this.cstr(n), this.cstr(v)),
+            prof: (n) => h().prof && h().prof(n ? this.cstr(n) : null),
             frame: (held, wheel) => this.frame(held, wheel),
             say: (t, q) => h().say && h().say(this.cstr(t), q),
             speech_busy: () => (h().speechBusy && h().speechBusy() ? 1 : 0),
@@ -174,6 +176,53 @@ export class Engine {
     rate() { return this.x.web_rate(); }
     menuIsGame() { return this.x.web_menu_is_game() !== 0; }
     units() { return this.x.web_units() >>> 0; }
+    /* ---- the pause menu's contents, and what a host keeps between runs */
+
+    /* records go through the module's buffer: in before a restore, out after a pack */
+    recordIn(bytes) { this.mem.set(bytes, this.x.web_record()); }
+    recordOut(n) { const p = this.x.web_record(); return this.mem.slice(p, p + n); }
+
+    /* menuitem(i)'s label, 1 to 5, or null; choosing it runs its function */
+    menuItem(i) { const p = this.x.web_menu_item(i); return p ? this.cstr(p) : null; }
+    menuChoose(i) { return this.run(() => this.x.web_menu_choose(i)); }
+
+    option(i) { return this.x.web_option(i); }
+    setOption(i, v) { this.x.web_option_set(i, v | 0); }
+    options() { return this.recordOut(this.x.web_options_pack()); }
+    setOptions(bytes) { this.recordIn(bytes); this.x.web_options_unpack(bytes.length); }
+
+    /* the scores record, and whether a score was recorded since the last call */
+    scores() {
+        const bytes = this.recordOut(this.x.web_scores_pack());
+        return { bytes, dirty: this.x.web_scores_dirty() !== 0 };
+    }
+    setScores(bytes) { this.recordIn(bytes); return this.x.web_scores_restore(bytes.length) !== 0; }
+    /* board i: { title, rows: [[value, name, date]] }, or null */
+    board(i) {
+        const p = this.x.web_board(i);
+        if (!p) return null;
+        const [title, ...rows] = this.cstr(p).split('\n');
+        return { title, rows: rows.map((r) => r.split('\t')) };
+    }
+    /* achievement i: { title, text, date } (date 0 not yet), or null */
+    achievement(i) {
+        const p = this.x.web_achievement(i);
+        if (!p) return null;
+        const [title, text, date] = this.cstr(p).split('\n');
+        return { title, text, date: +date };
+    }
+    /* score.show() since the last call: { board, rank }, or null */
+    scoreShown() { const v = this.x.web_score_shown(); return v < 0 ? null : { board: v >> 8, rank: v & 255 }; }
+    /* an achievement newly earned, by index, or -1 */
+    achieved() { return this.x.web_achieved(); }
+    quitAsked() { return this.x.web_quit_asked() !== 0; }
+
+    /* the 256 saved numbers, and whether any changed since the last call */
+    saves() { const dirty = this.x.web_saves_pack() !== 0; return { bytes: this.recordOut(1056), dirty }; }
+    setSaves(bytes) { this.recordIn(bytes); this.x.web_saves_restore(); }
+
+    /* inside a call, from the host's prof(): the units so far in it */
+    unitsNow() { return this.x.web_units_now() >>> 0; }
     /* sampling for the profiler, every 2048 units, on or off */
     profile(on) { this.x.web_profile(on ? 1 : 0); }
     /* the samples since the last take, 12 words each: the native call (or

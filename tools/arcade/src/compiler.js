@@ -16,6 +16,7 @@
 import * as acorn from 'acorn';
 import { Writer, utf8, writeCart } from './cart.js';
 import { buildAssets } from './assets.js';
+import { DEFAULT_RGB } from './unpack.js';
 import * as num from './numbers.js';
 
 const FORMAT = 1;
@@ -80,7 +81,7 @@ const MISSING_METHODS = nullProto({
     reduce: 'use a for loop', some: 'use a for loop', every: 'use a for loop',
     find: 'use a for loop', findIndex: 'use a for loop', fill: 'use a for loop',
     concat: 'push the elements, or join strings with +',
-    split: 'the p8 library has split()', trim: null,
+    split: 'use indexOf and substring', trim: null,
     includes: 'use indexOf(x) != -1', charAt: 'use charCodeAt or substring',
     substr: 'use substring', lastIndexOf: null, startsWith: 'use indexOf',
     endsWith: null, replace: null, match: null, search: null,
@@ -1072,8 +1073,8 @@ class Fn extends Scope {
             return fail(node, 'deg() needs a number written in the code; ' +
                         'at run time, divide by 360.0');
         case 'rgb':
-            return fail(node, 'rgb() needs the cart\'s palette, which arrives with ' +
-                        'the asset editors; use the index for now');
+            return fail(node, 'rgb() needs a colour written in the code, such as ' +
+                        'rgb(0xff8800); at run time, use the colour\'s number');
         case 'Int32Array': case 'Uint8Array':
             return fail(node, 'write new ' + name + '(length)');
         }
@@ -1266,7 +1267,7 @@ class Program {
 
     use(def, node) {
         if (LEVELS[def.level] > this.level)
-            fail(node, def.name + '() needs the cart\'s music level to be ' +
+            fail(node, (def.label || def.name) + '() needs the cart\'s music level to be ' +
                  MUSIC[LEVELS[def.level]]);
         if (def.version > this.version) this.version = def.version;
     }
@@ -1413,13 +1414,16 @@ class Program {
         }
         case 'CallExpression': {
             const c = node.callee;
-            if (c.type !== 'Identifier' || c.name !== 'deg') return undefined;
+            if (c.type !== 'Identifier' || (c.name !== 'deg' && c.name !== 'rgb')) return undefined;
             const sym = scope.resolve(c.name, c);
             if (!sym || sym.kind !== 'builtin') return undefined;
             if (node.arguments.length !== 1)
                 fail(node, c.name + '() takes 1 argument');
             const x = this.number(node.arguments[0], scope);
             if (x === undefined) return undefined;
+            /* 0xRRGGBB to the nearest colour of the palette the cart
+             * starts in */
+            if (c.name === 'rgb') return nearestColour(this.palette || DEFAULT_RGB, x | 0);
             /* Degrees to turns, the unit of sin, cos and atan2. */
             return num.fromReal(x / 360);
         }
@@ -1898,6 +1902,18 @@ function checkCart(cart, errors) {
  *          isa, api: parsed .def tables, deflate: raw deflate }
  * returns { cart: Uint8Array or null, errors: [...], stats } */
 
+/* The index of the colour in palette (0xRRGGBB each) nearest to rgb: the
+ * first of any equally near */
+function nearestColour(palette, rgb) {
+    let best = 0, bestD = Infinity;
+    palette.forEach((c, i) => {
+        const dr = (c >> 16) - (rgb >> 16 & 255), dg = (c >> 8 & 255) - (rgb >> 8 & 255), db = (c & 255) - (rgb & 255);
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bestD) { best = i; bestD = d; }
+    });
+    return best;
+}
+
 export function compile(input) {
     const prog = new Program(input.isa, input.api);
     const errors = prog.errors;
@@ -1945,6 +1961,7 @@ export function compile(input) {
      * namespace of globals that the loader sets to the images. */
     const built = buildAssets(input.assets, input.inflate,
                               (str) => prog.string(str), errors);
+    prog.palette = built.palette;
     const board = {}, option = {}, ach = {};
     cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });
     cart.options.forEach((o, i) => { option[o.name] = { value: i, version: 1 }; });

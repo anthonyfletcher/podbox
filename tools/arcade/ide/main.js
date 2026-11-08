@@ -28,6 +28,7 @@ import { SoundEditor } from './sound.js';
 import { CartSettings } from './settings.js';
 import { createDock } from './dock.js';
 import { Profiler } from './profiler.js';
+import { createGame } from './game.js';
 import { VERSION, hashScreen, hashCart, memoryStore, readTape } from './replay.js';
 import { setPanelHost } from './chrome.js';
 import { missing, dither, medianCut } from './colours.js';
@@ -668,6 +669,12 @@ const browserStore = {
         return v === null ? undefined : new TextEncoder().encode(v);
     },
     write: (name, bytes) => {
+        /* the player's bounds: 64 names and 256 KB a cart */
+        const pre = storeKey(''), names = Object.keys(localStorage).filter((k) => k.startsWith(pre));
+        const fresh = localStorage.getItem(storeKey(name)) === null;
+        let total = bytes.length;
+        for (const k of names) if (k !== storeKey(name)) total += new TextEncoder().encode(localStorage.getItem(k)).length;
+        if ((fresh && names.length >= 64) || total > 256 * 1024) return false;
         try { localStorage.setItem(storeKey(name), new TextDecoder().decode(bytes)); return true; } catch (e) { return false; }
     },
     remove: (name) => {
@@ -712,6 +719,10 @@ async function run(replay) {
     }
     e.music({ playingFn: true, beat: true, playing: tape.music, bpm: 0 });
     if (!e.load(lastBuild.cart, BigInt(seed))) return fault();
+    tape.kept = game.begin(e, replay ? replay.kept || {} : null);
+    tape.start = replay && replay.start ? replay.start : Date.now();
+    ticksRun = 0;
+    profSections = new Map();
     metronomeAt = -1;
     e.ceiling(CEILING);
     profiler.begin(functions(lastBuild.cart));
@@ -754,9 +765,11 @@ async function run(replay) {
             step.s = skip;
             step.a = i;
             if (!(await e.tick(i[0], i[1], i[2], false))) return live() ? fault() : undefined;
+            ticksRun++;
             const c = cost(e, false);
             clock.emu += c;
-            profiler.frame(e.samples(), c, p, c - e.units() * DEVICES[device].unit);
+            profiler.frame(e.samples(), c, p, c - e.units() * DEVICES[device].unit, takeSections(), e.units());
+            if (game.tick(e)) return quitRun();
             clock.frame++;
             if (late >= 2 * p) clock.start = clock.emu - clock.frame * p;
         }
@@ -772,12 +785,14 @@ async function run(replay) {
             say('print', 'The replay stops matching the recording at frame ' + tape.steps.length +
                 ', about ' + (tape.steps.length / rate).toFixed(1) + ' s in.');
         }
+        ticksRun++;
         if (dialogShown) rebase(e);
         else {
             const c = cost(e, true);
             clock.emu += c;
-            profiler.frame(e.samples(), c, 1000 / rate, c - e.units() * DEVICES[device].unit);
+            profiler.frame(e.samples(), c, 1000 / rate, c - e.units() * DEVICES[device].unit, takeSections(), e.units());
         }
+        if (game.tick(e)) return quitRun();
         if (e.rate() !== rate) {
             rate = e.rate();
             clock.start = clock.emu - clock.frame * (1000 / rate);
@@ -791,6 +806,40 @@ async function run(replay) {
         music(e);
         e.idle();
     }
+}
+
+/* quit(): the cart is over, as on the player, which goes back to its menu */
+function quitRun() {
+    stop(true);
+    say('print', 'The cart quit.');
+}
+
+/* the ticks run, for the date the cart is told: the run's start and the
+ * player's time since, so a replay is told the same */
+let ticksRun = 0;
+
+function runDate() {
+    const d = new Date((tape ? tape.start : Date.now()) + ticksRun * 1000 / (engine ? engine.rate() : 33));
+    return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getDay()];
+}
+
+/* prof() sections: begun and ended within a tick, their units summed by
+ * name for the profiler */
+let profSections = new Map(), profOpen = [];
+
+function profHook(name) {
+    if (!engine) return;
+    const now = engine.unitsNow();
+    if (name !== null) { profOpen.push([name, now]); return; }
+    const top = profOpen.pop();
+    if (top) profSections.set(top[0], (profSections.get(top[0]) || 0) + now - top[1]);
+}
+
+function takeSections() {
+    const s = profSections;
+    profSections = new Map();
+    profOpen = [];
+    return s;
 }
 
 /* the cart stopped; the screen cleared, but for an error, whose last
@@ -844,8 +893,11 @@ function sound() {
 /* the engine's calls on the page, for the run whose engine is e() */
 const hostFor = (e, live) => ({
     print: (s) => say('print', s),
+    date: runDate,
+    watch: (name, value) => game.watch(name, value),
+    prof: profHook,
     musicSay: (line) => say('music', 'music: ' + line),
-    click: () => {},
+    click: (beep) => game.click(beep, audio),
     say: (text, queue) => say('say', (queue ? 'then says: ' : 'says: ') + text),
     speechOn: () => $('speech').classList.contains('on'),
     glyph: glyph,
@@ -1487,6 +1539,7 @@ const ACTIONS = {
     'view-player': () => toggle('player'),
     'view-output': () => toggle('output'),
     'view-profiler': () => toggle('profiler'),
+    'view-watch': () => toggle('watch'),
     profile: () => { dock.show('profiler'); profiler.record(true); if (!running) run(); },
     'view-reset': () => dock.reset(),
     import: addFiles,
@@ -1505,16 +1558,20 @@ const ACTIONS = {
 (function menus() {
     const all = [...document.querySelectorAll('.menu')];
     const close = () => all.forEach((m) => m.classList.remove('open'));
+    const open = (m) => {
+        if (m.id === 'game-menu') game.fill(m.querySelector('.items'), close);
+        m.classList.add('open');
+    };
     for (const m of all) {
         const title = m.querySelector('.title');
         title.onclick = (e) => {
             e.stopPropagation();
             const was = m.classList.contains('open');
             close();
-            if (!was) m.classList.add('open');
+            if (!was) open(m);
         };
         title.onmouseenter = () => {
-            if (all.some((o) => o.classList.contains('open'))) { close(); m.classList.add('open'); }
+            if (all.some((o) => o.classList.contains('open'))) { close(); open(m); }
         };
     }
     document.addEventListener('click', close);
@@ -1551,9 +1608,18 @@ let dock = null;
  * shows its open panel's buttons */
 dock = createDock($('dock'), {
     files: $('pane-files'), editor: $('editor'), output: $('output'), player: $('pane-player'),
-    picker: $('pane-picker'), objects: $('pane-objects'), profiler: $('pane-profiler')
+    picker: $('pane-picker'), objects: $('pane-objects'), profiler: $('pane-profiler'),
+    watch: $('pane-watch')
 }, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView);
 setPanelHost(dock);
+
+/* the pause menu's contents as the Game menu, and what the player keeps */
+const game = createGame({
+    say: say, ask: ask, dock: dock, watchPane: $('pane-watch'),
+    cart: () => { try { return JSON.parse(folder['cart.json']); } catch (e) { return null; } },
+    engine: () => (running ? engine : null),
+    restart: () => run()
+});
 
 /* the profiler, sampling the running engine while it records */
 const profiler = new Profiler($('pane-profiler'), {
@@ -1567,7 +1633,7 @@ dock.hide('output');
  * for what the open editor puts there, and offered only when it does */
 function refreshView() {
     if (!dock) return;
-    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output', 'profiler']) {
+    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output', 'profiler', 'watch']) {
         const b = $('v-' + k);
         b.classList.toggle('on', dock.shown(k));
         b.disabled = !dock.has(k);

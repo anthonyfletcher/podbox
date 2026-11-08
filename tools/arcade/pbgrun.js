@@ -135,7 +135,7 @@ function main() {
     const wasm = new WebAssembly.Module(fs.readFileSync(path.join(here, 'wasm', 'arcade.wasm')));
     engine = new Engine(wasm, host);
     /* the made-up music: there to read with --playing or --beat, its clock
-     * running with the ticks only with --beat, as pbgvm's */
+     * running with the ticks, as pbgvm's */
     engine.music({ playingFn: o.playing || o.bpm > 0, beat: o.bpm > 0,
                    playing: o.playing || o.bpm > 0, bpm: o.bpm || 0 });
     const report = () => { flush(); console.error(engine.error()); return 1; };
@@ -148,16 +148,19 @@ function main() {
     for (; t < o.ticks; t++) {
         /* the tick it began as, though a dialog may run on past it */
         const begun = t, i = at(t);
-        for (const [when, n] of skips) if (when === t) engine.skipped(n || 0);
+        /* a late tick: its skipped frames told, and it runs without drawing */
+        let late = false;
+        for (const [when, n] of skips) if (when === t) { engine.skipped(n || 0); late = true; }
         let ms = 0;
-        if (o.bpm > 0) {
+        if (o.bpm > 0 || o.playing) {
             trackMs += 1000 / engine.rate();
             ms = Math.trunc(trackMs) - trackAt;
             trackAt = Math.trunc(trackMs);
         }
-        if (!engine.tick(i.held, i.clicks, i.pos, true, ms)) return report();
+        if (!engine.tick(i.held, i.clicks, i.pos, !late, ms)) return report();
         if (o.units) { flush(); console.error('tick ' + (begun + 1) + ' ' + engine.units()); }
         engine.idle();
+        if (engine.quitAsked()) { out.push('quit\n'); t++; break; }
     }
     if (o.dump) {
         const [x, y, w, h] = o.dump.split(',').map(Number), px = engine.pixels();

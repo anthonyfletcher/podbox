@@ -11,7 +11,9 @@
  *
  * Parts: the imports; the host built from them; driving a cart; the
  * profiler's samples; the music; what the page reads back (the screen, the
- * sound, the error, an open dialog). */
+ * sound, the error, an open dialog); the pause menu's contents -- the
+ * cart's items, its options, its scores and achievements -- and its saved
+ * numbers, which the page keeps between runs. */
 
 #include <stdint.h>
 #include <string.h>
@@ -41,6 +43,8 @@ IMPORT("store_remove") int js_store_remove(const char *name);
 IMPORT("store_list") int js_store_list(char (*names)[33], int max);
 IMPORT("glyph") int js_glyph(uint32_t cp, uint8_t *out);
 IMPORT("music_say") void js_music_say(const char *s, int len);
+IMPORT("watch") void js_watch(const char *name, const char *value);
+IMPORT("prof") void js_prof(const char *name);
 
 /* ---- the host ------------------------------------------------------------ */
 
@@ -101,13 +105,25 @@ static int glyph(void *ctx, uint32_t cp, uint8_t out[13])
     return js_glyph(cp, out);
 }
 
+static void watch(void *ctx, const char *name, const char *value)
+{
+    (void)ctx;
+    js_watch(name, value);
+}
+
+static void prof_section(void *ctx, const char *name)
+{
+    (void)ctx;
+    js_prof(name);
+}
+
 static const struct arcade_speak speak = { say, busy, stop, on };
 static const struct arcade_store store = { st_read, st_write, st_remove,
                                            st_list };
 /* playing and beat are set by web_music, before the cart loads */
 static struct arcade_host host = {
     NULL, print, NULL, date, click, NULL, NULL, setting, NULL, fake_control,
-    &fake_tracks, frame, &speak, &store, glyph
+    &fake_tracks, frame, &speak, &store, glyph, watch, prof_section
 };
 
 /* ---- driving a cart ------------------------------------------------------ */
@@ -154,6 +170,8 @@ EXPORT("web_menu_is_game") int web_menu_is_game(void)
     return arcade_menu_is_game(vm);
 }
 EXPORT("web_units") uint32_t web_units(void) { return arcade_units(vm); }
+/* inside a call, from the page's prof(): the units so far in it */
+EXPORT("web_units_now") uint32_t web_units_now(void) { return arcade_units_now(vm); }
 
 /* ---- the profiler's samples ---------------------------------------------- */
 
@@ -308,9 +326,13 @@ EXPORT("web_pixels") const uint8_t *web_pixels(void)
     return arcade_screen(vm)->px;
 }
 
+/* the rows the player would send: those drawn, or every row when the
+ * palette changed, since each pixel's colour then changes on the panel */
 EXPORT("web_dirty") int web_dirty(void)
 {
     const struct arcade_screen *s = arcade_screen(vm);
+    if (s->palette_changed)
+        return 0 << 16 | (s->height - 1);
     return s->dirty_lo << 16 | (s->dirty_hi & 0xffff);
 }
 
@@ -426,6 +448,134 @@ EXPORT("web_dialog") const char *web_dialog(void)
         put_num(d.most);
     }
     return text;
+}
+
+/* ---- the pause menu's contents, and what the page keeps ------------------ */
+
+/* Records pass through here: the page writes one in before a restore, or
+ * reads one out after a pack, its length returned. */
+static uint8_t record[8192];
+
+EXPORT("web_record") uint8_t *web_record(void) { return record; }
+
+/* menuitem(i)'s label, 1 to 5, or NULL for none; choosing one runs its
+ * function, as SELECT on it would: 0 resumes, 1 keeps the menu, -1 fault */
+EXPORT("web_menu_item") const char *web_menu_item(int i)
+{
+    return arcade_menu_item(vm, i, text, sizeof(text)) ? text : NULL;
+}
+EXPORT("web_menu_choose") int web_menu_choose(int i)
+{
+    return arcade_menu_choose(vm, i, 4);
+}
+
+/* option i's value now, and the owner setting it */
+EXPORT("web_option") int32_t web_option(int i)
+{
+    const struct arcade_options *o = arcade_options(vm);
+    return i >= 0 && i < o->count ? o->o[i].value : 0;
+}
+EXPORT("web_option_set") void web_option_set(int i, int32_t v)
+{
+    arcade_option_set(vm, i, v);
+}
+
+EXPORT("web_options_pack") int web_options_pack(void)
+{
+    return arcade_options_pack(vm, record, sizeof(record));
+}
+EXPORT("web_options_unpack") int web_options_unpack(int n)
+{
+    return arcade_options_unpack(vm, record, n);
+}
+
+/* the scores record, and whether a score was recorded since the last
+ * pack; and one taken back for the cart's boards */
+static int scores_dirty;
+
+EXPORT("web_scores_pack") int web_scores_pack(void)
+{
+    const struct arcade_scores *sc = arcade_scores(vm, &scores_dirty);
+    return arcade_scores_pack(sc, record, sizeof(record));
+}
+EXPORT("web_scores_dirty") int web_scores_dirty(void) { return scores_dirty; }
+EXPORT("web_scores_restore") int web_scores_restore(int n)
+{
+    static struct arcade_scores saved;
+    if (!arcade_scores_unpack(&saved, record, n))
+        return 0;
+    arcade_scores_restore(vm, &saved);
+    return 1;
+}
+
+/* board i as text: its title, then a line a rank -- value, name, date --
+ * or NULL past the boards */
+
+EXPORT("web_board") const char *web_board(int i)
+{
+    const struct arcade_scores *sc = arcade_scores(vm, NULL);
+    if (i < 0 || i >= sc->count)
+        return NULL;
+    const struct arcade_board *b = &sc->b[i];
+    text_len = 0;
+    put(b->title);
+    for (int k = 0; k < b->count; k++) {
+        char v[32];
+        arcade_score_text(sc, i, b->e[k].value, v, sizeof(v));
+        put("\n");
+        put(v);
+        put("\t");
+        put(b->e[k].name);
+        put("\t");
+        put_num(b->e[k].date);
+    }
+    text[text_len] = 0;
+    return text;
+}
+
+/* achievement i: its title, what earns it, and the date earned (0 not
+ * yet), a line each; NULL past them */
+EXPORT("web_achievement") const char *web_achievement(int i)
+{
+    const struct arcade_scores *sc = arcade_scores(vm, NULL);
+    if (i < 0 || i >= sc->nach)
+        return NULL;
+    text_len = 0;
+    put(sc->ach[i].title);
+    put("\n");
+    put(sc->ach[i].text);
+    put("\n");
+    put_num(sc->ach[i].date);
+    text[text_len] = 0;
+    return text;
+}
+
+/* score.show() since the last call: board << 8 | rank, or -1; ach.earn()'s
+ * newly earned, or -1; quit() asked */
+EXPORT("web_score_shown") int web_score_shown(void)
+{
+    int rank, b = arcade_score_shown(vm, &rank);
+    return b < 0 ? -1 : b << 8 | rank;
+}
+EXPORT("web_achieved") int web_achieved(void) { return arcade_achieved(vm); }
+EXPORT("web_quit_asked") int web_quit_asked(void) { return arcade_quit_asked(vm); }
+
+/* the 256 saved numbers, then a bit each saying which are fractions;
+ * returns whether any changed since the last call */
+EXPORT("web_saves_pack") int web_saves_pack(void)
+{
+    int dirty;
+    const uint8_t *frac;
+    const int32_t *v = arcade_save(vm, &dirty, &frac);
+    memcpy(record, v, 256 * sizeof(int32_t));
+    memcpy(record + 256 * sizeof(int32_t), frac, 32);
+    return dirty;
+}
+EXPORT("web_saves_restore") void web_saves_restore(void)
+{
+    int32_t v[256];
+    memcpy(v, record, sizeof(v));
+    arcade_restore(vm, v, record + sizeof(v));
 }
 
 /* Asyncify's record of the paused stack: its start and end, then room */

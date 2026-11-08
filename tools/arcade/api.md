@@ -263,10 +263,10 @@ Back to the player's menu once this tick ends.
 A line in the IDE's console; nothing on the player.
 
 ### watch(name, v)
-A value the IDE shows as it changes; nothing on the player.
+A value the IDE shows in its Watch panel as it changes, and `pbgvm` prints when it changes; nothing on the player.
 
 ### prof([name])
-Starts a section the IDE's profiler times, or with no name ends it; nothing on the player.
+Starts a section the IDE's profiler times exactly, or with no name ends the latest; `pbgvm --units` prints each section's units. Nothing on the player.
 
 ### mem(MEM.name)
 The engine's own bytes as a `Uint8Array`: `MEM.SCREEN` (160x120), `MEM.SHEET`, `MEM.MAP` or `MEM.FLAGS`.

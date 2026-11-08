@@ -129,6 +129,15 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #console .music { color: var(--dim); }
 #console .link { cursor: pointer; text-decoration: underline dotted; }
 
+/* ---- the watch panel ---- */
+.watch { display: grid; grid-template-columns: minmax(80px, 1fr) 2fr; align-content: start; gap: 2px 10px;
+         padding: 6px 10px; overflow: auto; font: 12px ui-monospace, Consolas, monospace; }
+.watch-name { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-value { white-space: pre-wrap; word-break: break-word; }
+.watch-none { grid-column: 1 / -1; color: var(--dim); font: 12px system-ui, sans-serif; }
+.menu .items button:disabled { opacity: 0.45; cursor: default; }
+.menu .items button:disabled:hover { background: none; color: inherit; }
+
 /* ---- the profiler ---- */
 .prof-graph { width: 100%; height: 64px; flex: none; border-bottom: 1px solid var(--line); background: var(--bg); }
 .prof-table { flex: 1; min-height: 0; overflow: auto; display: grid; align-content: start; grid-auto-rows: max-content;
@@ -142,6 +151,7 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .prof-td { padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prof-td.num { text-align: right; }
 .prof-td.api { color: var(--accent); }
+.prof-td.section { color: var(--good); }
 .prof-td.link { cursor: pointer; }
 .prof-td:nth-child(5n+3) { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent)
                           var(--share, 0%), transparent var(--share, 0%)); }
@@ -392,6 +402,7 @@ dialog.ask { min-width: 340px; }
 .ask-row input, .ask-row select { font: inherit; padding: 4px 6px; border-radius: 5px;
            border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .ask-text { max-width: 380px; line-height: 1.45; color: var(--dim); }
+.ask-pre { font: 12px/1.5 ui-monospace, Consolas, monospace; margin: 0 0 8px; white-space: pre; overflow-x: auto; }
 .ask-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>
 </head>
@@ -430,6 +441,7 @@ dialog.ask { min-width: 340px; }
       <button data-do="view-objects" class="check" id="v-objects">Objects</button>
       <button data-do="view-output" class="check" id="v-output">Output<kbd>Ctrl+J</kbd></button>
       <button data-do="view-profiler" class="check" id="v-profiler">Profiler</button>
+      <button data-do="view-watch" class="check" id="v-watch">Watch</button>
       <button data-do="view-player" class="check" id="v-player">Player<kbd>Ctrl+Shift+B</kbd></button>
       <hr>
       <button data-do="view-reset">Reset the layout</button>
@@ -451,6 +463,7 @@ dialog.ask { min-width: 340px; }
       <hr>
       <button data-do="speech" class="check" id="speech">Menus spoken</button>
     </div></div>
+    <div class="menu" id="game-menu"><button class="title">Game</button><div class="items"></div></div>
     <div class="menu"><button class="title">Help</button><div class="items">
       <button data-do="keys">Keys and the wheel</button>
     </div></div>
@@ -466,6 +479,7 @@ dialog.ask { min-width: 340px; }
   <div id="pane-picker" class="pane"></div>
   <div id="pane-objects" class="pane"></div>
   <div id="pane-profiler" class="pane"></div>
+  <div id="pane-watch" class="pane watch"></div>
   <button class="ib" id="new-file" data-icon="plus" title="New file"></button>
   <button class="ib" id="clear-output" data-icon="clear" title="Clear"></button>
   <button class="ib" id="power" data-icon="power" title="Turn on: run the cart (Ctrl+Enter)"></button>

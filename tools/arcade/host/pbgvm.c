@@ -8,7 +8,7 @@
  *                  [--setting name=value]... [--menu i]...
  *                  [--scores file] [--options file] [--opt t:i:v,...]
  *                  [--ui answer,...] [--speech] [--suspend-at t]
- *                  [--store dir] [--font font.bin]
+ *                  [--store dir] [--saves file] [--font font.bin]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -16,16 +16,18 @@
  * --shot saves the panel as the player shows it, the 160x120 screen
  * doubled to 320x240, and --dump prints a rectangle of the screen as one
  * hex digit a pixel (the colour's low four bits), a row a line, and
- * --dirty prints "dirty lo hi", the rows the last tick drew. --wav saves
+ * --dirty prints "dirty lo hi", the rows the last tick drew (all of them
+ * when the palette changed, as the player then sends every row). --wav saves
  * the sound, 44.1 kHz stereo, a tick's worth after each tick, and click()
  * prints "click 0" or "click 1". --buttons holds button masks (1 PREV,
  * 2 NEXT, 4 MENU, 8 PLAY, 16 SELECT) from the ticks given, each until the
- * next: "30:16,31:0" presses SELECT for tick 30. --skip reports frames
- * the host fell behind by before the ticks given, as the player does when
- * a tick runs late: "10:1" is one skipped frame before tick 10.
+ * next: "30:16,31:0" presses SELECT for tick 30. --skip makes the ticks
+ * given late, as the player handles a tick that runs late: "10:1" reports
+ * one skipped frame before tick 10, which runs without drawing.
  * --wheel turns the wheel: "5:12:30" is 12 clicks at tick 5 with the
  * finger at 30 from then on (-1 lifts it).
- * --playing has playback.playing() report music playing. --beat bpm plays
+ * --playing has playback.playing() report music playing, its clock a tick
+ * on each tick. --beat bpm plays
  * a steady track at that tempo for beat: its clock follows the ticks, the
  * tracker locks a second after beat.listen(true), and presses are stamped
  * with the tick's time. --setting name=value is what sys.setting(name)
@@ -51,7 +53,11 @@
  * does, overwrites the arena, and resumes it from the copy, printing
  * "resumed" -- the run's output is then the same as one never suspended.
  * --store keeps store.* files in dir, as name.json, within the player's
- * bounds; without it nothing is kept. --font gives FONT.WORLD the glyphs of
+ * bounds; without it nothing is kept. --saves keeps dset()'s numbers in
+ * file, read before the start and written after the last tick. quit()
+ * ends the run after its tick, printing "quit". watch() prints "watch
+ * <name> <value>" each time a name's value changes; prof() sections, with
+ * --units, print "prof <name> <units>" to stderr as each ends. --font gives FONT.WORLD the glyphs of
  * a font file (gen_textfont.py --file) beyond the engine's own. */
 
 #include <stdio.h>
@@ -84,6 +90,52 @@ static void print(void *ctx, const char *s, int len)
     (void)ctx;
     fwrite(s, 1, (size_t)len, stdout);
     fputc('\n', stdout);
+}
+
+/* watch(): "watch name value" when a name's value changes. prof(): with
+ * --units, "prof name units" as each section ends. */
+static struct vm *prof_vm;
+static int prof_units;
+
+static void watch(void *ctx, const char *name, const char *value)
+{
+    static char names[32][64], values[32][128];
+    static int n;
+    int i;
+    (void)ctx;
+    for (i = 0; i < n && strcmp(names[i], name); i++)
+        ;
+    if (i < n && !strcmp(values[i], value))
+        return;
+    if (i == n && n < 32) {
+        snprintf(names[n], sizeof(names[0]), "%s", name);
+        n++;
+    }
+    if (i < 32)
+        snprintf(values[i], sizeof(values[0]), "%s", value);
+    printf("watch %s %s\n", name, value);
+}
+
+static void prof(void *ctx, const char *name)
+{
+    static char open[8][64];
+    static uint32_t at[8];
+    static int depth;
+    (void)ctx;
+    if (!prof_vm)
+        return;
+    uint32_t now = arcade_units_now(prof_vm);
+    if (name) {
+        if (depth < 8) {
+            snprintf(open[depth], sizeof(open[0]), "%s", name);
+            at[depth] = now;
+        }
+        depth++;
+    } else if (depth > 0) {
+        depth--;
+        if (prof_units && depth < 8)
+            fprintf(stderr, "prof %s %u\n", open[depth], (unsigned)(now - at[depth]));
+    }
 }
 
 /* The music, the library and the beat are fakemusic.c's, shared with the
@@ -221,6 +273,36 @@ static void scores_show(struct vm *vm)
         printf("%s%d %s %s %ld\n", k + 1 == rank ? "*" : "", k + 1, v,
                b->e[k].name, (long)b->e[k].date);
     }
+}
+
+/* ---- saved numbers ------------------------------------------------------- */
+
+/* the 256 values, then a bit each saying which are fractions */
+static void saves_read(struct vm *vm, const char *path)
+{
+    int32_t v[256];
+    uint8_t frac[32];
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return;
+    int ok = fread(v, sizeof(v), 1, f) == 1 && fread(frac, sizeof(frac), 1, f) == 1;
+    fclose(f);
+    if (ok)
+        arcade_restore(vm, v, frac);
+}
+
+static int saves_write(struct vm *vm, const char *path)
+{
+    int dirty;
+    const uint8_t *frac;
+    const int32_t *v = arcade_save(vm, &dirty, &frac);
+    FILE *f = fopen(path, "wb");
+    if (!f || fwrite(v, 256 * sizeof(int32_t), 1, f) != 1 || fwrite(frac, 32, 1, f) != 1) {
+        if (f)
+            fclose(f);
+        return 0;
+    }
+    return fclose(f) == 0;
 }
 
 /* ---- options ------------------------------------------------------------- */
@@ -724,6 +806,7 @@ int main(int argc, char **argv)
     long bpm = 0;
     int menu_picks[16], npicks = 0;
     const char *scores_path = NULL, *options_path = NULL, *opt_sets = NULL;
+    const char *saves_path = NULL;
     long suspend_at = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
@@ -755,6 +838,8 @@ int main(int argc, char **argv)
             playing_flag = 1;
         else if (!strcmp(argv[i], "--scores") && i + 1 < argc)
             scores_path = argv[++i];
+        else if (!strcmp(argv[i], "--saves") && i + 1 < argc)
+            saves_path = argv[++i];
         else if (!strcmp(argv[i], "--options") && i + 1 < argc)
             options_path = argv[++i];
         else if (!strcmp(argv[i], "--opt") && i + 1 < argc)
@@ -797,7 +882,9 @@ int main(int argc, char **argv)
                                 playing_flag || bpm ? fake_playing : NULL,
                                 bpm > 0 ? &fake_beat : NULL, fake_setting,
                                 NULL, fake_control, &fake_tracks, dialog_frame,
-                                &fake_speak, &fake_store, font_glyph };
+                                &fake_speak, &fake_store, font_glyph, watch,
+                                prof };
+    prof_units = units;
     fake_music_init(music_say);
     fake_music_tempo((int32_t)bpm);
     fake_music_play(playing_flag || bpm > 0);
@@ -811,6 +898,7 @@ int main(int argc, char **argv)
         return 1;
     }
     the_vm = vm;
+    prof_vm = vm;
     in_buttons = buttons;
     in_turns = turns;
     in_pos = pos;
@@ -824,6 +912,8 @@ int main(int argc, char **argv)
         scores_read(vm, scores_path);
     if (options_path)
         options_read(vm, options_path);
+    if (saves_path)
+        saves_read(vm, saves_path);
     if (!arcade_start(vm))
         return report(vm);
     if (units)
@@ -831,14 +921,16 @@ int main(int argc, char **argv)
     unsigned held = 0;
     for (; tick_now < ticks; tick_now++) {
         long t = tick_now;
-        int clicks = input_at(t, &held);
+        int clicks = input_at(t, &held), late = 0;
         for (const char *b = skips; b && *b;) {
             long at = strtol(b, (char **)&b, 10);
             unsigned n = 0;
             if (*b == ':')
                 n = (unsigned)strtoul(b + 1, (char **)&b, 10);
-            if (at == t)
+            if (at == t) {
                 arcade_skipped(vm, n);
+                late = 1;
+            }
             if (*b == ',')
                 b++;
             else
@@ -864,7 +956,7 @@ int main(int argc, char **argv)
             /* with --beat the clock a tick on; each new press stamped
              * with it */
             struct arcade_music m = { 0, 0, 0, 0, { -1, -1, -1, -1, -1 } };
-            if (bpm > 0) {
+            if (bpm > 0 || playing_flag) {
                 track_ms += 1000.0 / arcade_rate(vm);
                 fake_music_advance((int32_t)track_ms - track_at);
                 track_at = (int32_t)track_ms;
@@ -877,7 +969,7 @@ int main(int argc, char **argv)
         }
         last_held = held;
         arcade_presented(vm);
-        if (!arcade_tick(vm, 1))
+        if (!arcade_tick(vm, !late))
             return report(vm);
         if (units)
             fprintf(stderr, "tick %ld %u\n", t + 1, (unsigned)arcade_units(vm));
@@ -885,6 +977,15 @@ int main(int argc, char **argv)
             wav_tick(vm, t);
         scores_show(vm);
         arcade_idle(vm);
+        if (arcade_quit_asked(vm)) {
+            printf("quit\n");
+            tick_now++;
+            break;
+        }
+    }
+    if (saves_path && !saves_write(vm, saves_path)) {
+        fprintf(stderr, "could not write %s\n", saves_path);
+        return 2;
     }
     if (scores_path && !scores_write(vm, scores_path)) {
         fprintf(stderr, "could not write %s\n", scores_path);
@@ -900,7 +1001,11 @@ int main(int argc, char **argv)
         dump(vm, dump_spec);
     if (dirty) {
         const struct arcade_screen *s = arcade_screen(vm);
-        printf("dirty %d %d\n", s->dirty_lo, s->dirty_hi);
+        /* every row is sent when the palette changed */
+        if (s->palette_changed)
+            printf("dirty 0 %d\n", s->height - 1);
+        else
+            printf("dirty %d %d\n", s->dirty_lo, s->dirty_hi);
     }
     for (int k = 0; k < npicks; k++) {
         char label[64];

@@ -1882,6 +1882,28 @@ uint32_t arcade_units(const struct vm *vm)
     return vm->units;
 }
 
+int vm_out_ok(struct vm *vm, struct value o, uint32_t need)
+{
+    if (o.tag == T_ARR)
+        return ARR(vm, o)->len >= need;
+    if (o.tag == T_I32)
+        return I32(vm, o)->len >= need;
+    return 0;
+}
+
+void vm_out_set(struct vm *vm, struct value o, uint32_t i, struct value v)
+{
+    if (o.tag == T_ARR)
+        BUF(vm, ARR(vm, o)->buf)->v[i] = v;
+    else
+        I32(vm, o)->d[i] = v.tag == T_FIX ? v.v >> 16 : v.v;
+}
+
+uint32_t arcade_units_now(const struct vm *vm)
+{
+    return vm->units + (YIELD_UNITS - vm->budget);
+}
+
 int arcade_where(const struct vm *vm, uint32_t *fns, int max, uint32_t *pc,
                  int32_t *native)
 {

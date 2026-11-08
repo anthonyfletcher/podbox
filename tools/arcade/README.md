@@ -203,6 +203,15 @@ show as `?`.
   would on that player, so a cart doing more than the player manages
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
+- **The Game menu** holds what the player's pause menu holds, while the
+  cart runs: its own items from `menuitem()`, its options, its high
+  scores and achievements, its help, and Restart. Menu on the player's
+  wheel pauses. Scores, option values and saved numbers (`dset`) are kept
+  in the browser for the cart, as the player keeps them, so the next run
+  starts where the last left off; `score.show()` shows the board, an
+  achievement is announced in the output, and `quit()` stops the cart.
+- **Watch** (View > Watch) shows each `watch(name, value)` as it changes;
+  it opens by itself the first time a cart calls it.
 - **The profiler** (Run > Run and profile, or View > Profiler and its
   record button) shows where the time goes on the player you run as:
   each frame's cost as a bar against the time a frame has, red where it
@@ -338,6 +347,21 @@ These options show what a cart drew, after the last tick:
 - `--menu i` chooses the cart's pause-menu item `i` (from `menuitem()`), as
   SELECT would, printing the items first and what the item's function
   returned. Give it more than once to choose several in turn.
+
+And these drive or keep more of a run (the comment at the top of
+`host/pbgvm.c` lists every option):
+
+- `--buttons 30:16,31:0` holds button masks from those ticks (1 Prev,
+  2 Next, 4 Menu, 8 Play, 16 Select); `--wheel 5:12:30` turns the wheel
+  12 clicks at tick 5 with the finger at 30; `--skip 10:1` makes tick 10
+  late, run without drawing.
+- `--saves file`, `--scores file`, `--options file` and `--store dir`
+  keep saved numbers, scores, option values and stored files between
+  runs; `--opt t:i:v` sets option `i` before tick `t`.
+- `--ui answers` answers dialogs; `--playing` and `--beat bpm` play
+  the made-up music.
+- `watch()` prints `watch name value` as a value changes; with
+  `--units`, `prof()` sections print their units. `quit()` ends the run.
 
 `pbgrun.js` runs a cart the same way on `wasm/arcade.wasm`, the engine
 built as WebAssembly, which the IDE runs too. It takes the same options

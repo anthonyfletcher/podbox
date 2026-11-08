@@ -351,9 +351,9 @@ static int map_solid(const struct vm *vm, int32_t cx, int32_t cy, int32_t mask)
  * open. */
 NATIVE(path_ray)
 {
-    if (a[5].tag != T_ARR || ARR(vm, a[5])->len < 5)
-        return vm_fail(vm, "path.ray() writes to an array of at least five",
-                       "", "");
+    if (!vm_out_ok(vm, a[5], 5))
+        return vm_fail(vm, "path.ray() writes to an array or Int32Array of at "
+                       "least five", "", "");
     int32_t mask = whole(a[4], 0);
     int64_t x = scaled(a[0]), y = scaled(a[1]);
     int64_t dx = scaled(a[2]), dy = scaled(a[3]);
@@ -425,12 +425,11 @@ NATIVE(path_ray)
         hx = (int64_t)(face == 0 ? cx : cx + 1) << 19;
     else if (face == 2 || face == 3)
         hy = (int64_t)(face == 2 ? cy : cy + 1) << 19;
-    struct value *o = BUF(vm, ARR(vm, a[5])->buf)->v;
-    o[0] = mk(T_FIX, wrap32(hx));
-    o[1] = mk(T_FIX, wrap32(hy));
-    o[2] = mk(T_INT, cx);
-    o[3] = mk(T_INT, cy);
-    o[4] = mk(T_INT, face);
+    vm_out_set(vm, a[5], 0, mk(T_FIX, wrap32(hx)));
+    vm_out_set(vm, a[5], 1, mk(T_FIX, wrap32(hy)));
+    vm_out_set(vm, a[5], 2, mk(T_INT, cx));
+    vm_out_set(vm, a[5], 3, mk(T_INT, cy));
+    vm_out_set(vm, a[5], 4, mk(T_INT, face));
     *out = mk(T_INT, 1);
     vm_charge(vm, 10 + cells * 2);
     return 1;

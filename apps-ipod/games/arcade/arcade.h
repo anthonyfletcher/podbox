@@ -68,6 +68,11 @@ struct arcade_host
      * byte each, the high bit on the left -- 1, or 0 when there is none.
      * NULL for none. */
     int (*glyph)(void *ctx, uint32_t cp, uint8_t out[13]);
+    /* The IDE's tools, which the player leaves NULL. watch(): a value
+     * shown by name, as text. prof(): a section of the profiler begun
+     * (name) or ended (NULL); arcade_units_now() then times it. */
+    void (*watch)(void *ctx, const char *name, const char *value);
+    void (*prof)(void *ctx, const char *name);
 };
 
 /* store.*: a cart's own JSON files, each name.json, in an area of its own.
@@ -289,6 +294,9 @@ void arcade_idle(struct vm *vm);
  * and while it listens to playing music, the beat analyser's share of the
  * tick. */
 uint32_t arcade_units(const struct vm *vm);
+/* Units charged so far in the call running now, from inside it: for
+ * prof() sections */
+uint32_t arcade_units_now(const struct vm *vm);
 /* Units at which one call is stopped as not responding. */
 void arcade_set_ceiling(struct vm *vm, uint32_t units);
 

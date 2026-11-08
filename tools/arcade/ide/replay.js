@@ -11,7 +11,9 @@
  * whatever player it runs as. Each drawn tick's screen is hashed, so a
  * replay can say where it stopped matching.
  *
- *   tape: { version, cart: { id, name, code }, seed, music, store, steps }
+ *   tape: { version, cart: { id, name, code }, seed, music, store, kept,
+ *           start, steps } -- kept: the scores, options and saved numbers
+ *           the run began with; start: its date, in ms
  *   step: { s: ticks skipped, a: [held, clicks, pos] (the skipped tick's),
  *           b: [held, clicks, pos] (the drawn tick's), d: [[held, wheel]]
  *           (dialog frames), m: [music button] (before it), h: screen hash }
@@ -42,7 +44,14 @@ export function memoryStore(snapshot) {
     const m = new Map(Object.entries(snapshot || {}));
     return {
         read: (name) => (m.has(name) ? new TextEncoder().encode(m.get(name)) : undefined),
-        write: (name, bytes) => { m.set(name, new TextDecoder().decode(bytes)); return true; },
+        /* the player's bounds: 64 names and 256 KB a cart */
+        write: (name, bytes) => {
+            let total = bytes.length;
+            for (const [k, v] of m) if (k !== name) total += new TextEncoder().encode(v).length;
+            if ((!m.has(name) && m.size >= 64) || total > 256 * 1024) return false;
+            m.set(name, new TextDecoder().decode(bytes));
+            return true;
+        },
         remove: (name) => m.delete(name),
         list: () => [...m.keys()].sort()
     };

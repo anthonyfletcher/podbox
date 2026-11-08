@@ -558,7 +558,8 @@ static int host_frame(void *ctx, unsigned *held, int *wheel);
 static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
-    host_frame, &speak_host, &shell_store, shell_glyph
+    host_frame, &speak_host, &shell_store, shell_glyph,
+    NULL, NULL                  /* watch and prof: the IDE's alone */
 };
 
 /* ---- sound -----------------------------------------------------------------

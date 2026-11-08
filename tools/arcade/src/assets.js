@@ -41,6 +41,8 @@ const FIRST_FONT = 3, ENGINE_FONTS = ['CAPS', 'WORLD'];
 const NAME = /^[A-Za-z_][\w]*$/;
 const MAX_MAP = 256;
 const MAX_IMAGE = 1024;
+/* the most image bytes a cart with nothing else can load, measured */
+const IMAGE_BYTES = 345000;
 
 function sortedNames(obj) {
     return Object.keys(obj || {}).sort();
@@ -108,6 +110,8 @@ export function buildAssets(assets, inflate, string, errors) {
             out.groups.PAL[name] = { value: pals.length - 1, version: 1 };
         } catch (e) { err(file, e.message); }
     }
+    /* the palette the cart starts in, for rgb() */
+    if (pals.length) out.palette = pals[0].map((c) => c[0] << 16 | c[1] << 8 | c[2]);
     if (pals.length) {
         const w = new Writer();
         w.u8(pals.length);
@@ -239,6 +243,11 @@ export function buildAssets(assets, inflate, string, errors) {
             out.images.push(name);
         } catch (e) { err(file, e.message); }
     }
+    /* each image is held whole in the player's 512 KB as the cart starts */
+    const held = imgs.reduce((n, img) => n + ((16 + img.width * img.height + 7) & ~7), 0);
+    if (held > IMAGE_BYTES)
+        err('images/', 'the images take ' + Math.ceil(held / 1024) + ' KB, and the player has room for at most about ' +
+            Math.floor(IMAGE_BYTES / 1024) + ' KB of images, less what the rest of the cart needs');
     if (imgs.length) {
         const w = new Writer();
         w.u16(imgs.length);

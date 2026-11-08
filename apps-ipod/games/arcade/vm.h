@@ -528,6 +528,11 @@ static inline int vm_parts(struct vm *vm, const struct value *a, int argc,
 int vm_truthy(struct vm *vm, struct value v);
 int vm_tostring(struct vm *vm, struct value v, struct value *out);
 uint32_t vm_text(struct vm *vm, struct value v, char *dst, uint32_t cap);
+/* An array a native writes its results to: a plain array, which keeps
+ * fractions, or an Int32Array, which takes them rounded down. out_ok says
+ * whether o is one at least need long; out_set writes element i. */
+int vm_out_ok(struct vm *vm, struct value o, uint32_t need);
+void vm_out_set(struct vm *vm, struct value o, uint32_t i, struct value v);
 int vm_fix_op(struct vm *vm, int op, struct value a, struct value b,
               struct value *out);
 void vm_charge(struct vm *vm, uint32_t units);

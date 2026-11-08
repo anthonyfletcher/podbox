@@ -8,9 +8,11 @@
  *                           recording(on) (told when recording starts or
  *                           stops, to sample the engine or not)
  *   .begin(fns)             a run starts, with the cart's functions
- *   .frame(samples, ms, period, screen)  a frame ran: its samples, its
- *                           cost, the time it had, and its cost of
- *                           sending the screen, which no sample sees, in ms
+ *   .frame(samples, ms, period, screen, sections, units)  a frame ran:
+ *                           its samples, its cost, the time it had, and
+ *                           its cost of sending the screen, which no
+ *                           sample sees, in ms; the units of each of the
+ *                           cart's prof() sections in it, and its units
  *
  * A function's self is the samples taken in its own code, its total those
  * taken in it or anything it called; an API call's are the samples taken
@@ -66,6 +68,8 @@ export class Profiler {
         this.total = new Map();
         this.lineSelf = new Map();
         this.screen = 0;           /* ms sending the screen, in all */
+        this.sections = new Map();  /* prof() section -> units, in all */
+        this.units = 0;            /* the frames' units, in all */
     }
 
     record(on) {
@@ -82,10 +86,12 @@ export class Profiler {
         this.draw();
     }
 
-    frame(s, ms, period, screen) {
+    frame(s, ms, period, screen, sections, units) {
         if (!this.on) return;
         this.count++;
         this.screen += screen;
+        this.units += units || 0;
+        if (sections) for (const [k, v] of sections) this.sections.set(k, (this.sections.get(k) || 0) + v);
         this.frames.push([ms, period]);
         if (this.frames.length > KEEP) this.frames.shift();
         const add = (m, k) => m.set(k, (m.get(k) || 0) + 1);
@@ -210,6 +216,21 @@ export class Profiler {
                 }
                 t.append(c);
             });
+        }
+        /* the cart's prof() sections, timed exactly, as shares of all the
+         * frames' units */
+        if (this.count && !lines) {
+            for (const [k, v] of [...this.sections].sort((a, b) => b[1] - a[1])) {
+                const share = (100 * v / Math.max(1, this.units)).toFixed(1) + '%';
+                const a = v / this.count;
+                ['section ' + k, 'prof()', share, share, d.unit ? (a * d.unit).toFixed(2) : String(Math.round(a))]
+                    .forEach((text, i) => {
+                        const c = document.createElement('div');
+                        c.className = 'prof-td' + (i >= 2 ? ' num' : i === 0 ? ' section' : '');
+                        c.textContent = text;
+                        t.append(c);
+                    });
+            }
         }
         /* sending the screen, after the cart's own */
         if (d.unit && this.count && !lines) {

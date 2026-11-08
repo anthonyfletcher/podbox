@@ -7,7 +7,8 @@
  * ...]) a choice; with type 'number' a number; with note, text under it;
  * with when(answers), shown only while that holds; with check(value,
  * answers), the problem with an answer, or nothing when it will do: OK
- * waits until every field shown will do. { text } is a paragraph to read. No fields asks only to confirm: the answer is {} for ok, null
+ * waits until every field shown will do. { text } is a paragraph to read,
+ * { pre } text set out as written, in columns. No fields asks only to confirm: the answer is {} for ok, null
  * otherwise. */
 
 export function ask(title, fields, ok) {
@@ -22,10 +23,10 @@ export function ask(title, fields, ok) {
         const inputs = {};
         const rows = [];
         for (const f of fields || []) {
-            if (f.text) {
-                const p = document.createElement('p');
-                p.className = 'ask-text';
-                p.textContent = f.text;
+            if (f.text || f.pre !== undefined) {
+                const p = document.createElement(f.pre !== undefined ? 'pre' : 'p');
+                p.className = f.pre !== undefined ? 'ask-pre' : 'ask-text';
+                p.textContent = f.pre !== undefined ? f.pre : f.text;
                 form.append(p);
                 continue;
             }
@@ -82,7 +83,9 @@ export function ask(title, fields, ok) {
         const yes = document.createElement('button');
         yes.className = 'primary';
         yes.textContent = ok || 'OK';
-        buttons.append(cancel, yes);
+        /* nothing to answer: the one button closes it */
+        if (rows.length || !fields || !fields.length) buttons.append(cancel);
+        buttons.append(yes);
         form.addEventListener('input', refresh);
         form.addEventListener('change', refresh);
         refresh();

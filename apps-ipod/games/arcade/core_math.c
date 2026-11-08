@@ -340,15 +340,33 @@ NATIVE(printh)
     return 1;
 }
 
-/* IDE tools; nothing on the player. */
+/* IDE tools, passed to the host's hooks; the player has none. */
 NATIVE(watch)
 {
-    (void)vm; (void)a; (void)argc; (void)out;
+    static char name[64], value[128];
+    (void)argc; (void)out;
+    if (!vm->host || !vm->host->watch)
+        return 1;
+    uint32_t n = vm_text(vm, a[0], name, sizeof(name) - 1);
+    name[n] = 0;
+    n = vm_text(vm, a[1], value, sizeof(value) - 1);
+    value[n] = 0;
+    vm->host->watch(vm->host->ctx, name, value);
     return 1;
 }
 
 NATIVE(prof)
 {
-    (void)vm; (void)a; (void)argc; (void)out;
+    static char name[64];
+    (void)out;
+    if (!vm->host || !vm->host->prof)
+        return 1;
+    if (argc < 1 || a[0].tag == T_NULL) {
+        vm->host->prof(vm->host->ctx, NULL);
+        return 1;
+    }
+    uint32_t n = vm_text(vm, a[0], name, sizeof(name) - 1);
+    name[n] = 0;
+    vm->host->prof(vm->host->ctx, name);
     return 1;
 }

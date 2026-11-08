@@ -269,10 +269,9 @@ static int project(const struct planeview *v, int32_t x, int32_t y, int32_t z,
 static int out_array(struct vm *vm, struct value o, uint32_t need,
                      const char *fn)
 {
-    uint32_t len = o.tag == T_ARR ? ARR(vm, o)->len : 0;
-    if (len < need)
-        return vm_fail(vm, fn, "() writes to an array of at least the "
-                       "numbers it gives", "");
+    if (!vm_out_ok(vm, o, need))
+        return vm_fail(vm, fn, "() writes to an array or Int32Array of at "
+                       "least the numbers it gives", "");
     return 1;
 }
 
@@ -286,11 +285,10 @@ NATIVE(plane_project)
     int32_t sx, sy, s, d;
     *out = mk(T_INT, 0);
     if (project(&vm->plane, fx(a[0]), fx(a[1]), fx(a[2]), &sx, &sy, &s, &d)) {
-        struct value *o = BUF(vm, ARR(vm, a[3])->buf)->v;
-        o[0] = mk(T_FIX, sx);
-        o[1] = mk(T_FIX, sy);
-        o[2] = mk(T_FIX, s);
-        o[3] = mk(T_FIX, d);
+        vm_out_set(vm, a[3], 0, mk(T_FIX, sx));
+        vm_out_set(vm, a[3], 1, mk(T_FIX, sy));
+        vm_out_set(vm, a[3], 2, mk(T_FIX, s));
+        vm_out_set(vm, a[3], 3, mk(T_FIX, d));
         *out = mk(T_INT, 1);
     }
     vm_charge(vm, 8);
@@ -310,9 +308,8 @@ NATIVE(plane_pick)
         int32_t d = distance(v, dy);
         int32_t side = (int32_t)((int64_t)(fx(a[0]) - (SCREEN_W / 2 << 16)) *
                                  d / v->focal);
-        struct value *o = BUF(vm, ARR(vm, a[2])->buf)->v;
-        o[0] = mk(T_FIX, v->x + mul(v->dx, d) + mul(-v->dy, side));
-        o[1] = mk(T_FIX, v->y + mul(v->dy, d) + mul(v->dx, side));
+        vm_out_set(vm, a[2], 0, mk(T_FIX, v->x + mul(v->dx, d) + mul(-v->dy, side)));
+        vm_out_set(vm, a[2], 1, mk(T_FIX, v->y + mul(v->dy, d) + mul(v->dx, side)));
         *out = mk(T_INT, 1);
     }
     vm_charge(vm, 8);
