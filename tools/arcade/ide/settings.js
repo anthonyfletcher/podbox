@@ -7,7 +7,6 @@
  * output; the form marks a name code could not use as it is typed. */
 
 import { iconButton } from './icons.js';
-import { toolbar } from './chrome.js';
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const ORDER = ['id', 'name', 'author', 'version', 'help', 'rate', 'menu_button', 'music',
@@ -36,8 +35,7 @@ export function writeSettings(cart) {
 const field = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 
 export class CartSettings {
-    /* opts: text (cart.json; JSON.parse's error is thrown), changed(text),
-     * asText() */
+    /* opts: text (cart.json; JSON.parse's error is thrown), changed(text) */
     constructor(parent, opts) {
         this.o = opts;
         this.cart = JSON.parse(opts.text);
@@ -47,13 +45,8 @@ export class CartSettings {
         this.redos = [];
         const root = this.root = field('div', 'cfg');
         root.tabIndex = 0;
-        const bar = toolbar();
-        const title = field('span', 'tb-title grow');
-        title.textContent = 'Cart settings';
-        bar.put(title);
-        bar.add('text', 'Edit as text', () => opts.asText());
         this.body = field('div', 'cfg-body');
-        root.append(bar.el, this.body);
+        root.append(this.body);
         parent.append(root);
         root.addEventListener('keydown', (e) => {
             if (!(e.ctrlKey || e.metaKey) || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

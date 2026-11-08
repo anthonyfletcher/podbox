@@ -203,12 +203,18 @@ show as `?`.
   would on that player, so a cart doing more than the player manages
   drops frames there, and the frame rate under the screen shows it. The
   iPod Video with music playing is the slowest a cart meets.
-- **Panels**: the files, the picker (of sprites, glyphs or tiles) and the
-  player each fold away to a rail, from the View menu (Ctrl+B for the files, Ctrl+Shift+B for the player)
-  or the panel's own header; the output opens under the editor when there is
-  something to read, and Ctrl+J shows or hides it. Drag the dividers to
-  resize. The status bar shows whether the cart builds and the frame rate it
-  gets as the chosen player; click the rate to choose another.
+- **Panels**: the files, the editor, the output, the player, and the open
+  editor's own -- the sheet's sprites, a map's tiles and objects, a font's
+  glyphs, a sound's generators -- can each be dragged by its tab beside,
+  above or below another, or onto it to share its place as a tab, and are
+  kept where you leave them. The View menu shows or hides each (Ctrl+B the
+  files, Ctrl+Shift+B the player, Ctrl+J the output) and puts them all back
+  as they started. The output opens when there is something to read. A
+  file with an editor of its own -- a picture, map, font, sound, palette
+  or cart.json -- switches between it and its text from the button at the
+  right of its tab bar, as an image does between one picture and sprites.
+  The status bar shows whether the cart builds and the frame rate it gets
+  as the chosen player; click the rate to choose another.
 - **The music** under the screen stands in for the owner's: a made-up
   library of five albums and a spoken chapter, its queue playing through
   the first ten tracks. `playback` and `tracks` read it and `beat`
@@ -231,7 +237,7 @@ show as `?`.
   to the palette (as many as it has room for, chosen to stand for the
   rest). Copy puts the selection on the clipboard for other programs too,
   and File > Export picture saves the open one. An image can be edited as
-  sprites too, with the grid button on its toolbar: it then opens as the
+  sprites too, with the grid button on its tab bar: it then opens as the
   sheet does, its cells numbered for `sheet(IMG.<name>)`, without flags.
 - **Fonts**: open a `.bdf` to draw its characters: each in a cell the line
   tall with the baseline marked, its advance set by number; add a character

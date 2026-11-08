@@ -9,7 +9,6 @@
     --bg: #f4f3f0; --panel: #ffffff; --ink: #1c1c22; --dim: #6b6a73;
     --line: #dddbd5; --accent: #2f6fd6; --bad: #c8283c; --good: #2d8a4e;
     --screen-bg: #101014;
-    --files-w: 200px; --out-h: 180px; --player-w: 360px;
 }
 @media (prefers-color-scheme: dark) {
     :root { --bg: #18181c; --panel: #222227; --ink: #e8e6e1; --dim: #9a98a2;
@@ -53,22 +52,56 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 .menu .items .choice.on::before { content: "\25CF"; }
 .menu .items .check.on::before { content: "\2713"; }
 
-/* ---- the panels: files, the editor over the output, the player; each
- * side collapses to a rail, and the output shows when there is something
- * to read ---- */
-#layout { display: grid; min-height: 0;
-          grid-template-columns: var(--files-w) 4px minmax(0, 1fr) var(--player-w); }
-body.files-closed #layout { grid-template-columns: 28px 0 minmax(0, 1fr) var(--player-w); }
-body.player-closed #layout { grid-template-columns: var(--files-w) 4px minmax(0, 1fr) 28px; }
-body.files-closed.player-closed #layout { grid-template-columns: 28px 0 minmax(0, 1fr) 28px; }
-.side { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
-#side-files { border-right: 1px solid var(--line); }
-#side-player { border-left: 1px solid var(--line); }
-.panel-head { display: flex; align-items: center; gap: 2px; padding: 0 4px 0 12px; min-height: 30px;
-              font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
-              color: var(--dim); border-bottom: 1px solid var(--line); flex: none; }
-.panel-head .grow { flex: 1; }
-.panel-head .ib { width: 24px; height: 24px; }
+/* ---- the panels, in the dock: dockview's own look in the IDE's colours,
+ * tabs titled as the panels were ---- */
+#dock { min-height: 0; min-width: 0; }
+#dock .dockview-theme-dark, #dock.dockview-theme-dark {
+    --dv-group-view-background-color: var(--panel);
+    --dv-tabs-and-actions-container-background-color: var(--panel);
+    --dv-tabs-and-actions-container-height: 30px;
+    --dv-tabs-and-actions-container-font-size: 11px;
+    --dv-activegroup-visiblepanel-tab-background-color: var(--panel);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--panel);
+    --dv-inactivegroup-visiblepanel-tab-background-color: var(--panel);
+    --dv-inactivegroup-hiddenpanel-tab-background-color: var(--panel);
+    --dv-activegroup-visiblepanel-tab-color: var(--ink);
+    --dv-activegroup-hiddenpanel-tab-color: var(--dim);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--dim);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--dim);
+    --dv-tab-divider-color: transparent;
+    --dv-separator-border: var(--line);
+    --dv-paneview-header-border-color: var(--line);
+    --dv-sash-color: transparent;
+    --dv-active-sash-color: var(--accent);
+    --dv-drag-over-background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    --dv-drag-over-border-color: var(--accent);
+    --dv-icon-hover-background-color: var(--bg);
+    --dv-tabs-container-scrollbar-color: var(--line);
+    --dv-scrollbar-background-color: var(--line);
+    --dv-context-menu-background-color: var(--panel);
+    --dv-context-menu-color: var(--ink);
+    --dv-floating-box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    --dv-floating-border: 1px solid var(--line);
+    --dv-edge-dock-indicator-color: var(--accent);
+    background: var(--bg);
+    color: var(--ink);
+}
+#dock .dv-groupview { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#dock .dv-tabs-and-actions-container { border-bottom: 1px solid var(--line); }
+#dock .dv-tab { padding: 0; }
+#dock .ide-tab { display: flex; align-items: center; gap: 4px; height: 100%; padding: 0 4px 0 10px;
+           font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+#dock .ide-tab.file { text-transform: none; letter-spacing: 0; font: 12px ui-monospace, Consolas, monospace; }
+#dock .ide-tab .ib { width: 20px; height: 20px; opacity: 0; }
+#dock .ide-tab .ib svg { width: 14px; height: 14px; }
+#dock .dv-tab:hover .ide-tab .ib, #dock .dv-active-tab .ide-tab .ib { opacity: 1; }
+#dock .dv-tab.dv-active-tab { box-shadow: inset 0 -2px 0 var(--accent); }
+#dock .dv-inactive-group .dv-tab.dv-active-tab { box-shadow: inset 0 -2px 0 var(--line); }
+.dock-actions { display: flex; align-items: center; gap: 2px; height: 100%; padding: 0 4px; }
+.dock-actions .ib { width: 24px; height: 24px; }
+.pane { height: 100%; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+        background: var(--panel); overflow: hidden; }
+#panes { display: none; }
 
 /* ---- toolbars: one height, square icon buttons, thin dividers ---- */
 .tb { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 3px 6px; min-height: 34px;
@@ -88,20 +121,6 @@ body.files-closed.player-closed #layout { grid-template-columns: 28px 0 minmax(0
 .ib:disabled { opacity: 0.35; cursor: default; background: none; }
 .ib.go { color: var(--good); }
 .ib svg { display: block; }
-.rail { display: none; writing-mode: vertical-rl; border: none; border-radius: 0; background: none;
-        color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase;
-        padding: 10px 0; width: 28px; height: 100%; text-align: left; letter-spacing: 0.05em; }
-.rail:hover { color: var(--ink); background: var(--bg); }
-body.files-closed #side-files > :not(.rail), body.player-closed #side-player > :not(.rail) { display: none; }
-body.files-closed #side-files > .rail, body.player-closed #side-player > .rail { display: block; }
-.split { cursor: col-resize; }
-.split:hover, .split.drag { background: var(--accent); }
-.split.h { cursor: row-resize; height: 4px; flex: none; }
-body.files-closed .split:not(.h) { pointer-events: none; }
-#centre { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-#output { height: var(--out-h); flex: none; display: flex; flex-direction: column; min-height: 0;
-          border-top: 1px solid var(--line); background: var(--panel); }
-body.output-closed #output, body.output-closed #centre > .split.h { display: none; }
 #console { flex: 1; overflow: auto; padding: 4px 12px;
            font: 12px/1.45 ui-monospace, Consolas, monospace; }
 #console div { white-space: pre-wrap; word-break: break-word; }
@@ -136,8 +155,6 @@ body.output-closed #output, body.output-closed #centre > .split.h { display: non
 #editor .cm-panels { background: var(--panel); color: var(--ink); border: none; }
 .tb.find input[type=text] { width: 200px; font: 13px ui-monospace, Consolas, monospace; height: 26px; }
 #editor p { margin: 0 24px; color: var(--dim); }
-.text-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.text-host .cm-editor { flex: 1; min-height: 0; }
 
 /* ---- the player ---- */
 #player-body { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center;
@@ -193,12 +210,9 @@ body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 .drop-item::before { content: ""; display: inline-block; width: 18px; flex: none; }
 .drop-item.on::before { content: "\2713"; }
 .drop-item.some::before { content: "\2013"; }
-/* an editor's own side panel, folding to a rail like the IDE's */
-.ed-side { width: 288px; flex: none; border-right: 1px solid var(--line); background: var(--panel);
+/* an editor's own panel in the dock */
+.ed-side { height: 100%; background: var(--panel);
            display: flex; flex-direction: column; min-height: 0; }
-.ed-side.closed { width: 28px; }
-.ed-side.closed > :not(.rail) { display: none; }
-.ed-side.closed > .rail { display: block; }
 .ed-side-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ed-sub { display: flex; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
           text-transform: uppercase; color: var(--dim); min-height: 24px; width: 100%; }
@@ -219,7 +233,7 @@ body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 
 /* ---- maps ---- */
 .map-main { flex: 1; min-width: 0; display: flex; flex-direction: column; outline: none; }
-.map-objs { max-height: 180px; overflow: auto; display: flex; flex-direction: column; flex: none;
+.map-objs { flex: 1 1 auto; min-height: 60px; overflow: auto; display: flex; flex-direction: column;
             font: 12px ui-monospace, Consolas, monospace; }
 .map-objs button { text-align: left; border: none; background: none; padding: 2px 6px; border-radius: 4px;
                    white-space: pre; }
@@ -383,9 +397,13 @@ dialog.ask { min-width: 340px; }
     </div></div>
     <div class="menu"><button class="title">View</button><div class="items">
       <button data-do="view-files" class="check" id="v-files">Files<kbd>Ctrl+B</kbd></button>
-      <button data-do="view-picker" class="check" id="v-picker">Picker: sprites, glyphs, tiles, generators</button>
-      <button data-do="view-player" class="check" id="v-player">Player<kbd>Ctrl+Shift+B</kbd></button>
+      <button data-do="view-editor" class="check" id="v-editor">Editor</button>
+      <button data-do="view-picker" class="check" id="v-picker">Picker</button>
+      <button data-do="view-objects" class="check" id="v-objects">Objects</button>
       <button data-do="view-output" class="check" id="v-output">Output<kbd>Ctrl+J</kbd></button>
+      <button data-do="view-player" class="check" id="v-player">Player<kbd>Ctrl+Shift+B</kbd></button>
+      <hr>
+      <button data-do="view-reset">Reset the layout</button>
     </div></div>
     <div class="menu"><button class="title">Run</button><div class="items">
       <button data-do="run">Run<kbd>Ctrl+Enter</kbd></button>
@@ -405,30 +423,18 @@ dialog.ask { min-width: 340px; }
   </nav>
   <span id="cart-name"></span>
 </header>
-<main id="layout">
-  <aside id="side-files" class="side">
-    <button class="rail" data-toggle="files" title="Show the files (Ctrl+B)">Files</button>
-    <div class="panel-head"><span class="grow">Files</span>
-      <button class="ib" data-do="add" data-icon="plus" title="New file"></button>
-      <button class="ib" data-toggle="files" data-icon="left" title="Hide (Ctrl+B)"></button></div>
-    <ul id="files"></ul>
-  </aside>
-  <div class="split" id="split-files"></div>
-  <section id="centre">
-    <section id="editor"></section>
-    <div class="split h" id="split-output"></div>
-    <section id="output">
-      <div class="panel-head"><span class="grow">Output</span>
-        <button class="ib" id="clear-output" data-icon="clear" title="Clear"></button>
-        <button class="ib" data-toggle="output" data-icon="close" title="Hide (Ctrl+J)"></button></div>
-      <div id="console"></div>
-    </section>
-  </section>
-  <aside id="side-player" class="side">
-    <button class="rail" data-toggle="player" title="Show the player (Ctrl+Shift+B)">Player</button>
-    <div class="panel-head"><span class="grow">Player</span>
-      <button class="ib" id="power" data-icon="power" title="Turn on: run the cart (Ctrl+Enter)"></button>
-      <button class="ib" data-toggle="player" data-icon="right" title="Hide (Ctrl+Shift+B)"></button></div>
+<main id="dock"></main>
+<!-- each panel's content and its header buttons, which the dock takes -->
+<div id="panes" hidden>
+  <div id="pane-files" class="pane"><ul id="files"></ul></div>
+  <section id="editor" class="pane"></section>
+  <section id="output" class="pane"><div id="console"></div></section>
+  <div id="pane-picker" class="pane"></div>
+  <div id="pane-objects" class="pane"></div>
+  <button class="ib" id="new-file" data-icon="plus" title="New file"></button>
+  <button class="ib" id="clear-output" data-icon="clear" title="Clear"></button>
+  <button class="ib" id="power" data-icon="power" title="Turn on: run the cart (Ctrl+Enter)"></button>
+  <div id="pane-player" class="pane">
     <div id="player-body">
       <canvas id="screen" width="160" height="120" tabindex="0"></canvas>
       <svg id="wheel" viewBox="-100 -100 200 200">
@@ -452,8 +458,8 @@ dialog.ask { min-width: 340px; }
         </div>
       </div>
     </div>
-  </aside>
-</main>
+  </div>
+</div>
 <footer id="statusbar">
   <button id="status" title="Show the output"></button>
   <span class="grow"></span>

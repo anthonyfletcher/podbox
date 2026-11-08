@@ -1,28 +1,22 @@
-/* The editors' shared chrome: a side panel that folds to a rail, sections
- * in it that fold away, and a toolbar of icon buttons. */
+/* The editors' shared chrome: their panels in the IDE's dock, sections in
+ * them that fold away, a toolbar of icon buttons and a dropdown. */
 
 import { icon, iconButton } from './icons.js';
 
-/* a panel on an editor's left: its head, a hide button and a rail to
- * show it again; shown(open) is told when either is clicked. The panel's
- * content goes in .body. */
-export function sidePanel(title, shown) {
+/* where an editor's panels go: the IDE's dock, which sets it */
+let host = { mount: () => {} };
+export function setPanelHost(h) { host = h; }
+
+/* an editor's own panel in the dock, titled: 'picker' for what it draws
+ * with, 'objects' for a map's objects. Its content goes in .body. */
+export function sidePanel(title, id) {
     const el = document.createElement('div');
     el.className = 'ed-side';
-    const rail = document.createElement('button');
-    rail.className = 'rail';
-    rail.textContent = title;
-    rail.title = 'Show the ' + title.toLowerCase();
-    rail.onclick = () => shown(true);
-    const head = document.createElement('div');
-    head.className = 'panel-head';
-    head.innerHTML = '<span class="grow"></span>';
-    head.firstChild.textContent = title;
-    head.append(iconButton('left', 'Hide the ' + title.toLowerCase(), () => shown(false)));
     const body = document.createElement('div');
     body.className = 'ed-side-body';
-    el.append(rail, head, body);
-    return { el, head, body, setOpen: (open) => el.classList.toggle('closed', !open) };
+    el.append(body);
+    host.mount(id || 'picker', title, el);
+    return { el, body };
 }
 
 /* a section's heading in a side panel that folds what is under it away:

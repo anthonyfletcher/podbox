@@ -760,12 +760,9 @@ export class SheetEditor {
      * image's), image (the image's name, for IMG.<name>; none for the
      * sheet), rgb, changed(px); for the sheet only, flags (256),
      * flagsChanged(flags), flagNames() (the eight names cart.json gives,
-     * null where none) and nameFlag(b) (to ask for flag b's name); picker
-     * (whether the picker is open) and pickerShown(open) when it is
-     * opened or closed, anim ({ x, y, w, h, n, fps }, kept by the IDE
-     * between openings) and animChanged(anim), fitColours (as the
-     * PixelEditor's), say(text, error), and tools, buttons for the end of
-     * the drawing toolbar */
+     * null where none) and nameFlag(b) (to ask for flag b's name); anim
+     * ({ x, y, w, h, n, fps }, kept by the IDE between openings) and animChanged(anim), fitColours (as the
+     * PixelEditor's) and say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.px = opts.px;
@@ -780,7 +777,7 @@ export class SheetEditor {
         this.onion = null;        /* null, 'prev' or the { x, y } of a block */
         const root = this.root = document.createElement('div');
         root.className = 'sheet';
-        this.side = sidePanel('Sprites', (open) => this.o.pickerShown(open));
+        this.side = sidePanel('Sprites');
         const bar = toolbar();
         this.animButton = bar.add('animate', 'Animate the chosen cells: frames left to right', () => this.animate());
         this.onionButton = bar.add('onion', 'Onion skin: the frame or sprites before, faintly over these. ' +
@@ -799,10 +796,9 @@ export class SheetEditor {
         body.className = 'sheet-body';
         body.append(this.picker, this.info, this.animBox);
         this.side.body.append(bar.el, body);
-        this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
         this.edit.className = 'sheet-edit';
-        root.append(this.side.el, this.edit);
+        root.append(this.edit);
         parent.append(root);
         this.pick();
         this.open();
@@ -813,8 +809,6 @@ export class SheetEditor {
         if (this.editor) this.editor.destroy();
         this.root.remove();
     }
-
-    setPicker(open) { this.side.setOpen(open); }
 
     focus() { if (this.editor) this.editor.root.focus(); }
 
@@ -898,11 +892,6 @@ export class SheetEditor {
             this.flagDrop = dropdown('Flags', 'The chosen sprites\' flags', (list) => this.flagList(list));
             this.editor.bar.append(sep, this.flagDrop.el);
             this.drawFlags();
-        }
-        if (this.o.tools) {
-            const sep = document.createElement('span');
-            sep.className = 'sep';
-            this.editor.bar.append(sep, ...this.o.tools);
         }
         this.drawAnim();
         this.refresh();

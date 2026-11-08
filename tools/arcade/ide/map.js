@@ -15,7 +15,7 @@
 
 import { shown } from './pixels.js';
 import { iconButton, toolCursor } from './icons.js';
-import { sidePanel, toolbar, foldSection } from './chrome.js';
+import { sidePanel, toolbar } from './chrome.js';
 
 const MAX = 256;
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -88,7 +88,7 @@ export class MapEditor {
      * which the tile bar is kept under), sheet (the sheet's pixels,
      * 128x128, or null), rgb, flags (256), flagNames() (the eight, null
      * where none), changed(text), ask (the IDE's dialog), say(text,
-     * error), asText(), picker and pickerShown(open) */
+     * error) */
     constructor(parent, opts) {
         this.o = opts;
         this.m = readMap(opts.text);
@@ -116,7 +116,7 @@ export class MapEditor {
     build(parent) {
         const root = this.root = document.createElement('div');
         root.className = 'map';
-        this.side = sidePanel('Tiles', (open) => this.o.pickerShown(open));
+        this.side = sidePanel('Tiles');
         this.picker = document.createElement('canvas');
         this.picker.className = 'sheet-picker';
         this.picker.width = this.picker.height = 256;
@@ -124,14 +124,18 @@ export class MapEditor {
         this.info.className = 'sheet-info';
         this.list = document.createElement('div');
         this.list.className = 'map-objs';
-        const objects = foldSection('Objects', this.list);
         this.insp = document.createElement('div');
         this.insp.className = 'map-insp';
         const body = document.createElement('div');
         body.className = 'sheet-body';
-        body.append(this.picker, this.info, objects.head, this.list, this.insp);
+        body.append(this.picker, this.info);
         this.side.body.append(body);
-        this.setPicker(this.o.picker !== false);
+        /* the objects, and the chosen one's inspector, in a panel of their own */
+        const objects = sidePanel('Objects', 'objects');
+        const ob = document.createElement('div');
+        ob.className = 'sheet-body';
+        ob.append(this.list, this.insp);
+        objects.body.append(ob);
 
         const main = this.main = document.createElement('div');
         main.className = 'map-main';
@@ -182,10 +186,6 @@ export class MapEditor {
         bar.add('zoomIn', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
         bar.sep();
         bar.add('resize', 'Map size', () => this.resize());
-        const grow = document.createElement('span');
-        grow.className = 'grow';
-        bar.put(grow);
-        bar.add('text', 'Edit as text', () => this.o.asText());
 
         this.area = document.createElement('div');
         this.area.className = 'pix-area';
@@ -203,7 +203,7 @@ export class MapEditor {
         this.tray.title = 'The tiles in use: click one to paint with it, right-click to take it off; ' +
             'drag from the picker, or add the brush with +';
         main.append(bar.el, this.area, this.status, this.tray);
-        root.append(this.side.el, main);
+        root.append(main);
         parent.append(root);
         this.fillLayers();
         this.listen();
@@ -211,8 +211,6 @@ export class MapEditor {
     }
 
     destroy() { this.root.remove(); }
-
-    setPicker(open) { this.side.setOpen(open); }
 
     focus() { this.main.focus(); }
 

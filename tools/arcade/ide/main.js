@@ -26,6 +26,8 @@ import { FontEditor } from './font.js';
 import { MapEditor } from './map.js';
 import { SoundEditor } from './sound.js';
 import { CartSettings } from './settings.js';
+import { createDock } from './dock.js';
+import { setPanelHost } from './chrome.js';
 import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
@@ -161,11 +163,19 @@ function stateFor(file) {
 }
 
 let pixels = null;
+/* the switch between an editor and the text, in the editor's tab bar; the
+ * opener of an editor with a switch of its own sets it */
+let editorMode = null, showing = 0;
 
 function show(file) {
+    const at = ++showing;
+    editorMode = null;
     if (view) states[current] = view.state;
     if (pixels) { pixels.destroy(); pixels = null; }
+    dock.clear();
     current = file;
+    dock.setTitle('editor', file);
+    if (!dock.shown('editor')) dock.show('editor');
     document.querySelector('[data-do="export-picture"]').hidden = !isBinary(file);
     const pane = $('editor');
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
@@ -181,29 +191,27 @@ function show(file) {
         else if (sfxFile) showSound(pane, file);
         else if (cfgFile) showSettings(pane, file);
         else showPicture(pane, file);
+        if (visual) editorMode = iconButton('text', 'Edit as text', () => { asText[file] = true; show(file); });
     } else {
-        /* a file with an editor of its own has a bar over its text to go back */
-        if (view && (visual || view.dom.parentElement !== pane)) { view.destroy(); view = null; }
+        if (view && view.dom.parentElement !== pane) { view.destroy(); view = null; }
         if (!view) {
             pane.innerHTML = '';
-            let host = pane;
-            if (visual) {
-                const bar = document.createElement('div');
-                bar.className = 'tb';
-                const [ic, label] = gplFile ? ['swatches', 'Edit as swatches'] : bdfFile ? ['glyphs', 'Edit as glyphs']
-                    : mapFile ? ['grid', 'Edit as a map'] : sfxFile ? ['waveSine', 'Edit as a sound']
-                    : ['settings', 'Edit as a form'];
-                bar.append(iconButton(ic, label,
-                    () => { delete asText[file]; check(); show(file); }));
-                host = document.createElement('div');
-                host.className = 'text-host';
-                pane.append(bar, host);
-            }
-            view = new EditorView({ state: stateFor(file), parent: host });
+            view = new EditorView({ state: stateFor(file), parent: pane });
         } else view.setState(stateFor(file));
+        /* a file with an editor of its own goes back to it */
+        if (visual) {
+            const [ic, label] = gplFile ? ['swatches', 'Edit as swatches'] : bdfFile ? ['glyphs', 'Edit as glyphs']
+                : mapFile ? ['grid', 'Edit as a map'] : sfxFile ? ['waveSine', 'Edit as a sound']
+                : ['settings', 'Edit as a form'];
+            editorMode = iconButton(ic, label, () => { delete asText[file]; check(); show(file); });
+        }
     }
+    /* an editor that could not open shows its text instead, from within */
+    if (at !== showing) return;
+    dock.setActions('editor', editorMode ? [editorMode] : []);
     for (const li of $('files').querySelectorAll('li'))
         li.classList.toggle('open', li.dataset.file === file);
+    dock.done();
     mark();
 }
 
@@ -227,10 +235,7 @@ function showFont(pane, file) {
     try {
         pixels = new FontEditor(pane, {
             text: String(folder[file]), ask: ask,
-            picker: layout.picker,
-            pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),
-            asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
         });
     } catch (e) {
@@ -248,10 +253,7 @@ function showMap(pane, file) {
         pixels = new MapEditor(pane, {
             text: String(folder[file]), file: file, sheet: sheet, rgb: palette(folder), flags: readFlags(),
             flagNames: flagNames, ask: ask,
-            picker: layout.picker,
-            pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),
-            asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
         });
         pixels.focus();
@@ -267,7 +269,6 @@ function showSettings(pane, file) {
     try {
         pixels = new CartSettings(pane, {
             text: String(folder[file]),
-            asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
         });
         pixels.focus();
@@ -283,10 +284,7 @@ function showSound(pane, file) {
     try {
         pixels = new SoundEditor(pane, {
             text: String(folder[file]), name: file.slice(7, -5),
-            picker: layout.picker,
-            pickerShown: (open) => { layout.picker = open; applyLayout(); },
             say: (text, bad) => say(bad ? 'error' : 'print', text),
-            asText: () => { asText[file] = true; show(file); },
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
         });
         pixels.focus();
@@ -345,9 +343,8 @@ function showPalette(pane, file) {
     const first = paletteFiles()[0] === file;
     const name = file.slice(9, -4);
     pixels = new PaletteEditor(pane, {
-        rgb: rgb, name: name, first: first, pictures: () => pictures(),
+        rgb: rgb, first: first, pictures: () => pictures(),
         say: (text, bad) => say(bad ? 'error' : 'print', text),
-        asText: () => { asText[file] = true; show(file); },
         sure: async () => await ask('Move colours?', [{
             text: 'The pictures are rewritten so they look the same. Code that names a ' +
                   'colour by its number -- cls(12), print(s, x, y, 7) -- is not: it will ' +
@@ -468,33 +465,26 @@ function showPicture(pane, file) {
     if (!sheet && !(cells && asSprites[file])) {
         pixels = new PixelEditor(pane, { width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
                                          changed: write, fitColours: fitPicture, say: say_ });
-        if (cells) {
-            const sep = document.createElement('span');
-            sep.className = 'sep';
-            pixels.bar.append(sep, iconButton('sprites', 'Edit as sprites: 8x8 cells, drawn after sheet(IMG.' +
-                file.slice(7, -4) + ')', () => { setAsSprites(file, true); show(file); }));
-        }
+        if (cells) editorMode = iconButton('sprites', 'Edit as sprites: 8x8 cells, drawn after sheet(IMG.' +
+            file.slice(7, -4) + ')', () => { setAsSprites(file, true); show(file); });
         pixels.root.focus();
         return;
     }
     if (!sheet) {
         pixels = new SheetEditor(pane, {
             px: pic.px, width: pic.width, height: pic.height, image: file.slice(7, -4),
-            rgb: rgb, fitColours: fitPicture, picker: layout.picker,
+            rgb: rgb, fitColours: fitPicture,
             anim: imageAnims[file] || null,
             animChanged: (a) => { imageAnims[file] = a; },
-            pickerShown: (open) => { layout.picker = open; applyLayout(); },
-            tools: [iconButton('picture', 'Edit as one picture', () => { setAsSprites(file, false); show(file); })],
             changed: write, say: say_
         });
+        editorMode = iconButton('picture', 'Edit as one picture', () => { setAsSprites(file, false); show(file); });
         return;
     }
     pixels = new SheetEditor(pane, {
         px: pic.px, rgb: rgb, flags: flags, fitColours: fitPicture,
-        picker: layout.picker,
         anim: sheetAnim,
         animChanged: (a) => { sheetAnim = a; },
-        pickerShown: (open) => { layout.picker = open; applyLayout(); },
         flagNames: flagNames,
         nameFlag: async (b) => {
             let cart;
@@ -665,7 +655,7 @@ async function run() {
     }
     $('console').textContent = '';
     quietRun = false;
-    if (!layout.player) { layout.player = true; applyLayout(); }
+    if (!dock.shown('player')) dock.show('player', false);
     /* a run ends when another starts: each keeps its own engine */
     const gen = ++generation, live = () => running && generation === gen;
     const e = engine = new Engine(wasm, hostFor(() => e, live));
@@ -965,10 +955,7 @@ function showDevice() {
 let quietRun = false;
 
 function say(kind, text, where) {
-    if (!layout.output && (kind === 'error' || !(running && quietRun))) {
-        layout.output = true;
-        applyLayout();
-    }
+    if (dock && !dock.shown('output') && (kind === 'error' || !(running && quietRun))) dock.show('output', false);
     const c = $('console');
     const line = document.createElement('div');
     line.className = kind;
@@ -1368,9 +1355,12 @@ const ACTIONS = {
     find: () => view && openSearchPanel(view),
     add: newFile,
     'view-files': () => toggle('files'),
+    'view-editor': () => toggle('editor'),
     'view-picker': () => toggle('picker'),
+    'view-objects': () => toggle('objects'),
     'view-player': () => toggle('player'),
     'view-output': () => toggle('output'),
+    'view-reset': () => dock.reset(),
     import: addFiles,
     'export-picture': exportPicture,
     settings: () => { if (folder['cart.json'] !== undefined) { delete asText['cart.json']; show('cart.json'); } },
@@ -1401,7 +1391,7 @@ const ACTIONS = {
     }
     document.addEventListener('click', close);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    for (const b of document.querySelectorAll('.menu .items button, .panel-head [data-do]'))
+    for (const b of document.querySelectorAll('.menu .items button'))
         b.onclick = (e) => {
             e.stopPropagation();
             close();
@@ -1427,60 +1417,46 @@ document.addEventListener('keydown', (e) => {
 
 /* ---- the panels ---------------------------------------------------------- */
 
-/* which panels are open, and how big, kept between visits */
-const layout = { files: true, player: true, output: false, picker: true, filesW: 200, outH: 180 };
-try { Object.assign(layout, JSON.parse(localStorage.getItem('arcade-layout') || '{}')); } catch (e) { /* none kept */ }
-layout.output = false;
+let dock = null;
 
-function applyLayout() {
-    const b = document.body.classList;
-    b.toggle('files-closed', !layout.files);
-    b.toggle('player-closed', !layout.player);
-    b.toggle('output-closed', !layout.output);
-    document.documentElement.style.setProperty('--files-w', layout.filesW + 'px');
-    document.documentElement.style.setProperty('--out-h', layout.outH + 'px');
-    for (const k of ['files', 'picker', 'player', 'output']) $('v-' + k).classList.toggle('on', !!layout[k]);
-    if (pixels && pixels.setPicker) pixels.setPicker(layout.picker);
-    try { localStorage.setItem('arcade-layout', JSON.stringify(layout)); } catch (e) { /* not kept */ }
+/* the panels in the dock, the editor's own among them; each group's header
+ * shows its open panel's buttons */
+dock = createDock($('dock'), {
+    files: $('pane-files'), editor: $('editor'), output: $('output'), player: $('pane-player'),
+    picker: $('pane-picker'), objects: $('pane-objects')
+}, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView);
+setPanelHost(dock);
+/* the output opens when there is something to read */
+dock.hide('output');
+
+/* the View menu: each panel ticked while shown, the editor's own named
+ * for what the open editor puts there, and offered only when it does */
+function refreshView() {
+    if (!dock) return;
+    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output']) {
+        const b = $('v-' + k);
+        b.classList.toggle('on', dock.shown(k));
+        b.disabled = !dock.has(k);
+        b.hidden = !dock.has(k);
+    }
+    $('v-picker').firstChild.textContent = dock.title('picker');
 }
 
 function toggle(k) {
-    layout[k] = !layout[k];
-    if (k === 'output' && !layout.output && running) quietRun = true;
-    applyLayout();
+    if (k === 'output' && dock.shown('output') && running) quietRun = true;
+    dock.toggle(k);
 }
 
 for (const b of document.querySelectorAll('[data-icon]')) b.innerHTML = icon(b.dataset.icon);
-for (const b of document.querySelectorAll('[data-toggle]')) b.onclick = () => toggle(b.dataset.toggle);
+$('new-file').onclick = () => ACTIONS.add();
 $('clear-output').onclick = () => { $('console').textContent = ''; };
-$('status').onclick = () => { layout.output = true; applyLayout(); };
+$('status').onclick = () => dock.show('output', false);
 $('rate').onclick = (e) => {
     e.stopPropagation();
     const run = [...document.querySelectorAll('.menu')].find((m) => m.querySelector('.title').textContent === 'Run');
     run.classList.add('open');
 };
-
-/* the dividers: the files' width and the output's height, dragged */
-function splitter(el, set) {
-    el.addEventListener('pointerdown', (e) => {
-        try { el.setPointerCapture(e.pointerId); } catch (x) { /* gone */ }
-        el.classList.add('drag');
-        const move = (ev) => { set(ev); applyLayout(); };
-        const up = () => {
-            el.classList.remove('drag');
-            el.removeEventListener('pointermove', move);
-            el.removeEventListener('pointerup', up);
-        };
-        el.addEventListener('pointermove', move);
-        el.addEventListener('pointerup', up);
-    });
-}
-splitter($('split-files'), (e) => { layout.filesW = Math.max(120, Math.min(420, e.clientX)); });
-splitter($('split-output'), (e) => {
-    const box = $('centre').getBoundingClientRect();
-    layout.outH = Math.max(60, Math.min(box.height - 120, box.bottom - e.clientY));
-});
-applyLayout();
+refreshView();
 
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', async (e) => {

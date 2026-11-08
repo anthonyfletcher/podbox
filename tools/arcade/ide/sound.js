@@ -211,8 +211,7 @@ let audio = null;
 
 export class SoundEditor {
     /* opts: text (the JSON; readSound's error is thrown), name (the
-     * sound's, which seeds its noise), changed(text), asText(),
-     * say(text, error), picker and pickerShown(open) */
+     * sound's, which seeds its noise), changed(text), say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.s = readSound(opts.text);
@@ -225,7 +224,7 @@ export class SoundEditor {
     build(parent) {
         const root = this.root = document.createElement('div');
         root.className = 'snd';
-        this.side = sidePanel('Generate', (open) => this.o.pickerShown(open));
+        this.side = sidePanel('Generate');
         const list = document.createElement('div');
         list.className = 'snd-gen';
         for (const [kind, label] of GENERATORS) {
@@ -243,7 +242,6 @@ export class SoundEditor {
             list.append(b);
         }
         this.side.body.append(list);
-        this.setPicker(this.o.picker !== false);
 
         const main = this.main = document.createElement('div');
         main.className = 'snd-main';
@@ -261,10 +259,6 @@ export class SoundEditor {
         this.info = document.createElement('span');
         this.info.className = 'note';
         bar.put(this.info);
-        const grow = document.createElement('span');
-        grow.className = 'grow';
-        bar.put(grow);
-        bar.add('text', 'Edit as text', () => this.o.asText());
 
         this.shape = document.createElement('canvas');
         this.shape.className = 'snd-shape';
@@ -288,7 +282,7 @@ export class SoundEditor {
         }
         body.append(this.shape, grid);
         main.append(bar.el, body);
-        root.append(this.side.el, main);
+        root.append(main);
         parent.append(root);
         main.addEventListener('keydown', (e) => this.key(e));
         this.resizer = new ResizeObserver(() => this.drawShape());
@@ -342,8 +336,6 @@ export class SoundEditor {
         this.stop();
         this.root.remove();
     }
-
-    setPicker(open) { this.side.setOpen(open); }
 
     focus() { this.main.focus(); }
 

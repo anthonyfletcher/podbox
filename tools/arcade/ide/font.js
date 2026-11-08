@@ -117,8 +117,7 @@ const label = (cp) => cp < 32 ? 'U+' + cp.toString(16).toUpperCase().padStart(4,
 
 export class FontEditor {
     /* opts: text (the BDF), changed(text), ask (the IDE's dialog),
-     * say(text, error), asText(), picker (whether the glyphs are shown)
-     * and pickerShown(open) */
+     * say(text, error) */
     constructor(parent, opts) {
         this.o = opts;
         this.f = readFont(opts.text);
@@ -127,16 +126,12 @@ export class FontEditor {
         this.sample = 'The quick brown fox, 0123';
         const root = this.root = document.createElement('div');
         root.className = 'font';
-        this.side = sidePanel('Glyphs', (open) => opts.pickerShown(open));
+        this.side = sidePanel('Glyphs');
         const bar = toolbar();
         bar.put(numberBox('Ascent', this.f.ascent, 0, 32, 'Rows above the baseline',
                           (v) => this.lines(v, this.f.descent)),
                 numberBox('Descent', this.f.descent, 0, 32, 'Rows below it',
                           (v) => this.lines(this.f.ascent, v)));
-        const grow = document.createElement('span');
-        grow.className = 'grow';
-        bar.put(grow);
-        bar.add('text', 'Edit as text', () => opts.asText());
         const body = document.createElement('div');
         body.className = 'font-body';
         this.grid = document.createElement('div');
@@ -150,10 +145,9 @@ export class FontEditor {
         sample.oninput = () => { this.sample = sample.value; this.drawPreview(); };
         body.append(this.grid, sample, this.preview);
         this.side.body.append(bar.el, body);
-        this.setPicker(opts.picker !== false);
         this.edit = document.createElement('div');
         this.edit.className = 'font-edit';
-        root.append(this.side.el, this.edit);
+        root.append(this.edit);
         parent.append(root);
         this.drawGrid();
         this.open();
@@ -163,8 +157,6 @@ export class FontEditor {
         if (this.editor) this.editor.destroy();
         this.root.remove();
     }
-
-    setPicker(open) { this.side.setOpen(open); }
 
     focus() { if (this.editor) this.editor.root.focus(); }
 

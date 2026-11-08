@@ -13,15 +13,14 @@
 
 import { shown } from './pixels.js';
 import { icon } from './icons.js';
-import { toolbar } from './chrome.js';
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 
 export class PaletteEditor {
-    /* opts: rgb (this palette), name, first (whether it is the cart's own),
+    /* opts: rgb (this palette), first (whether it is the cart's own),
      * pictures() ([{ name, px }] the cart's pictures, as palette numbers),
      * changed(rgb, order) (order: the old entry each new one was, when
-     * entries moved or went), say(text, error), asText(), sure(question)
+     * entries moved or went), say(text, error), sure(question)
      * (a Promise: whether to go on) */
     constructor(parent, opts) {
         this.o = opts;
@@ -30,14 +29,6 @@ export class PaletteEditor {
         const root = this.root = document.createElement('div');
         root.className = 'pal';
         root.tabIndex = 0;
-        const bar = toolbar();
-        const title = document.createElement('span');
-        title.className = 'tb-title grow';
-        title.textContent = 'Palette';
-        title.title = opts.first ? 'The cart\'s palette: the colours its pictures are drawn in'
-            : 'PAL.' + opts.name + ': loadpal() shows the same pictures in these colours';
-        bar.put(title);
-        bar.add('text', 'Edit as text', () => opts.asText());
         const body = document.createElement('div');
         body.className = 'pal-body';
         this.grid = document.createElement('div');
@@ -45,7 +36,7 @@ export class PaletteEditor {
         this.panel = document.createElement('div');
         this.panel.className = 'pal-panel';
         body.append(this.grid, this.panel);
-        root.append(bar.el, body);
+        root.append(body);
         root.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT') return;
             if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.remove(); }
