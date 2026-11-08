@@ -17,6 +17,7 @@
 #include "file.h"
 #include "dir.h"
 #include "games/arcade/arcade.h"
+#include "games/arcade/shell.h"
 #include "games/arcade/shell_store.h"
 
 #define DATA_DIR "/.rockbox/games/data"
@@ -26,10 +27,7 @@ static char folder[MAX_PATH];
 
 void shell_store_start(const struct vm *vm)
 {
-    const uint8_t *id = arcade_id(vm);
-    snprintf(folder, sizeof(folder),
-             DATA_DIR "/%02x%02x%02x%02x%02x%02x%02x%02x",
-             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+    shell_id_path(folder, sizeof(folder), DATA_DIR, arcade_id(vm), "");
 }
 
 static void file_path(const char *name, char *path, size_t size)
@@ -85,26 +83,15 @@ static int scan(char (*names)[33], int max, const char *skip, long *bytes)
 static int st_write(void *ctx, const char *name, const void *buf, int32_t n)
 {
     (void)ctx;
-    char path[MAX_PATH], part[MAX_PATH];
+    char path[MAX_PATH];
     long bytes;
     int others = scan(NULL, 0, name, &bytes);
     if (others >= ARCADE_STORE_FILES || bytes + n > ARCADE_STORE_BYTES)
         return 0;
     mkdir("/.rockbox/games");
     mkdir(DATA_DIR);
-    mkdir(folder);
     file_path(name, path, sizeof(path));
-    snprintf(part, sizeof(part), "%s.new", path);
-    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
-        return 0;
-    bool whole = write(fd, buf, n) == n;
-    if (close(fd) < 0)
-        whole = false;
-    if (whole && rename(part, path) == 0)
-        return 1;
-    remove(part);
-    return 0;
+    return shell_write_file(folder, path, buf, (size_t)n, NULL, 0);
 }
 
 static int st_remove(void *ctx, const char *name)

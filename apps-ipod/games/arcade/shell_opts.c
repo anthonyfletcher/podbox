@@ -19,13 +19,13 @@
 #include "config.h"
 #include "system.h"
 #include "file.h"
-#include "dir.h"                    /* mkdir */
 #include "lang.h"
 #include "settings/settings.h"     /* set_option, set_int */
 #include "speech/talk.h"            /* UNIT_INT */
 #include "widgets/list.h"
 #include "widgets/dialog_prose.h"
 #include "games/arcade/arcade.h"
+#include "games/arcade/shell.h"
 #include "games/arcade/shell_opts.h"
 
 #define OPTIONS_DIR "/.rockbox/games/options"
@@ -34,8 +34,7 @@
 
 static void options_path(const uint8_t *id, char *path, size_t size)
 {
-    snprintf(path, size, OPTIONS_DIR "/%02x%02x%02x%02x%02x%02x%02x%02x.opt",
-             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+    shell_id_path(path, size, OPTIONS_DIR, id, ".opt");
 }
 
 void shell_options_load(struct vm *vm)
@@ -58,21 +57,13 @@ void shell_options_load(struct vm *vm)
  * refused write leaves the old values, and the next change tries again */
 static void options_write(struct vm *vm)
 {
-    char path[MAX_PATH], part[MAX_PATH];
+    char path[MAX_PATH];
     uint8_t b[ARCADE_OPTIONS_MAX];
     int n = arcade_options_pack(vm, b, sizeof(b));
-    mkdir("/.rockbox/games");
-    mkdir(OPTIONS_DIR);
-    options_path(arcade_id(vm), path, sizeof(path));
-    snprintf(part, sizeof(part), "%s.new", path);
-    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
+    if (n <= 0)
         return;
-    bool whole = n > 0 && write(fd, b, n) == n;
-    if (close(fd) < 0)
-        whole = false;
-    if (!whole || rename(part, path) != 0)
-        remove(part);
+    options_path(arcade_id(vm), path, sizeof(path));
+    shell_write_file(OPTIONS_DIR, path, b, (size_t)n, NULL, 0);
 }
 
 /* ---- the rows ------------------------------------------------------------ */

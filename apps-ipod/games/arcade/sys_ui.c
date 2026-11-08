@@ -125,34 +125,6 @@ static uint32_t next_cp(const char *s, uint32_t *i)
     return cp;
 }
 
-static int cp_bytes(uint32_t cp)
-{
-    return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
-}
-
-static int put_cp(char *d, uint32_t cp)
-{
-    if (cp < 0x80) {
-        d[0] = (char)cp;
-        return 1;
-    }
-    if (cp < 0x800) {
-        d[0] = (char)(0xc0 | cp >> 6);
-        d[1] = (char)(0x80 | (cp & 63));
-        return 2;
-    }
-    if (cp < 0x10000) {
-        d[0] = (char)(0xe0 | cp >> 12);
-        d[1] = (char)(0x80 | ((cp >> 6) & 63));
-        d[2] = (char)(0x80 | (cp & 63));
-        return 3;
-    }
-    d[0] = (char)(0xf0 | cp >> 18);
-    d[1] = (char)(0x80 | ((cp >> 12) & 63));
-    d[2] = (char)(0x80 | ((cp >> 6) & 63));
-    d[3] = (char)(0x80 | (cp & 63));
-    return 4;
-}
 
 /* The wheel's characters: the plain set in FONT.CAPS, which draws no
  * others; the owner's language's in FONT.WORLD. Space is always in it. */
@@ -181,7 +153,7 @@ static int line_bytes(const struct dialog *g)
 {
     int n = 0;
     for (int i = 0; i < g->len; i++)
-        n += cp_bytes(g->line[i]);
+        n += utf8_bytes(g->line[i]);
     return n;
 }
 
@@ -196,7 +168,7 @@ static void line_text(const struct dialog *g, char *d, int trim)
             b--;
     }
     for (int i = a; i < b; i++)
-        n += put_cp(d + n, g->line[i]);
+        n += utf8_put(d + n, g->line[i]);
     d[n] = 0;
 }
 
@@ -220,10 +192,10 @@ static void line_turn(struct dialog *g, int dir)
         idx++;
     if (idx == cycle_len)
         idx = 0;
-    int room = g->most - line_bytes(g) + cp_bytes(*c);
+    int room = g->most - line_bytes(g) + utf8_bytes(*c);
     for (int tries = 0; tries < cycle_len; tries++) {
         idx = ((idx + dir) % cycle_len + cycle_len) % cycle_len;
-        if (cp_bytes(cycle[idx]) <= room)
+        if (utf8_bytes(cycle[idx]) <= room)
             break;
     }
     *c = cycle[idx];
@@ -417,7 +389,7 @@ static void draw_line(struct vm *vm, struct dialog *g, int32_t y)
     for (int i = 0; i < g->len; i++) {
         if (i == g->caret - 1)
             mark_at = n;
-        n += put_cp(t + n, g->line[i]);
+        n += utf8_put(t + n, g->line[i]);
         if (i == g->caret - 1)
             caret_at = n;
     }
@@ -556,7 +528,7 @@ static void say_choice(struct vm *vm, struct dialog *g, int queue)
         if (g->focus)
             say(vm, word(vm, g->at ? "Cancel" : "OK"), queue);
         else if (g->editing) {
-            buf[put_cp(buf, g->line[g->caret - 1])] = 0;
+            buf[utf8_put(buf, g->line[g->caret - 1])] = 0;
             say(vm, buf, queue);
         }
         break;
@@ -1012,7 +984,7 @@ void arcade_dialog_answer(struct vm *vm, const char *answer)
         g->len = 0;
         for (uint32_t i = 0; answer[i] && g->len < LINE_MAX;) {
             uint32_t cp = next_cp(answer, &i);
-            if (line_bytes(g) + cp_bytes(cp) > g->most)
+            if (line_bytes(g) + utf8_bytes(cp) > g->most)
                 break;
             g->line[g->len++] = cp;
         }

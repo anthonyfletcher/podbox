@@ -18,8 +18,8 @@
 #include "config.h"
 #include "system.h"
 #include "file.h"
-#include "dir.h"                    /* mkdir */
 #include "games/arcade/arcade.h"
+#include "games/arcade/shell.h"
 #include "games/arcade/shell_suspend.h"
 
 #define SAVE_DIR "/.rockbox/games/saves"
@@ -33,9 +33,7 @@ struct head
 
 static void suspend_path(const struct vm *vm, char *path, size_t size)
 {
-    const uint8_t *id = arcade_id(vm);
-    snprintf(path, size, SAVE_DIR "/%02x%02x%02x%02x%02x%02x%02x%02x.sus",
-             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+    shell_id_path(path, size, SAVE_DIR, arcade_id(vm), ".sus");
 }
 
 /* What a snapshot of this cart, in this build, at this arena carries */
@@ -54,26 +52,15 @@ static void head_of(const struct vm *vm, const void *mem, uint32_t size,
  * nothing half-written to be offered */
 void shell_suspend_write(struct vm *vm)
 {
-    char path[MAX_PATH], part[MAX_PATH];
+    char path[MAX_PATH];
     uint32_t size;
     const void *mem = arcade_snapshot(vm, &size);
     struct head h;
     if (arcade_owns_music(vm))
         return;
     head_of(vm, mem, size, &h);
-    mkdir("/.rockbox/games");
-    mkdir(SAVE_DIR);
     suspend_path(vm, path, sizeof(path));
-    snprintf(part, sizeof(part), "%s.new", path);
-    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
-        return;
-    bool whole = write(fd, &h, sizeof(h)) == (ssize_t)sizeof(h) &&
-                 write(fd, mem, size) == (ssize_t)size;
-    if (close(fd) < 0)
-        whole = false;
-    if (!whole || rename(part, path) != 0)
-        remove(part);
+    shell_write_file(SAVE_DIR, path, &h, sizeof(h), mem, size);
 }
 
 struct vm *shell_suspend_offer(struct vm *vm, void *mem, uint32_t size,

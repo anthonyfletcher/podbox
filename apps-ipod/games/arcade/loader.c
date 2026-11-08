@@ -171,10 +171,6 @@ static uint32_t crc32(const uint8_t *b, uint32_t n)
 }
 
 static uint32_t rd16(const uint8_t *p) { return p[0] | (p[1] << 8); }
-static uint32_t rd32(const uint8_t *p)
-{
-    return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24);
-}
 
 /* A bounded cursor over a chunk. */
 struct cur
@@ -209,7 +205,7 @@ static uint32_t c16(struct cur *c)
 static uint32_t c32(struct cur *c)
 {
     const uint8_t *p = take(c, 4);
-    return p ? rd32(p) : 0;
+    return p ? rd_le32(p) : 0;
 }
 
 /* ---- the tables ------------------------------------------------------- */
@@ -235,6 +231,20 @@ static int load_header(struct vm *vm, const uint8_t *p, uint32_t n)
         return bad(vm, "rate");
     memcpy(vm->id, p + 12, 8);
     return 1;
+}
+
+/* Text from the chunk into a fixed buffer, cut to fit and ended */
+static void copy_text(struct cur *c, char *dst, uint32_t cap)
+{
+    uint32_t len = c16(c);
+    const uint8_t *t = take(c, len);
+    if (!t)
+        len = 0;
+    if (len > cap - 1)
+        len = cap - 1;
+    if (len)
+        memcpy(dst, t, len);
+    dst[len] = 0;
 }
 
 /* BORD, the cart's high-score boards: a count, then each one's key,
@@ -270,31 +280,12 @@ static int load_boards(struct vm *vm, const uint8_t *p, uint32_t n)
         b->version = (uint16_t)c16(&c);
         b->low = c8(&c) != 0;
         b->format = (uint8_t)c8(&c);
-        uint32_t len = c16(&c);
-        const uint8_t *t = take(&c, len);
+        copy_text(&c, b->title, sizeof(b->title));
         if (c.bad || b->format > ARCADE_SCORE_TICKS)
             return bad(vm, "boards");
-        if (len > sizeof(b->title) - 1)
-            len = sizeof(b->title) - 1;
-        memcpy(b->title, t, len);
-        b->title[len] = 0;
     }
     s->count = (int)count;
     return 1;
-}
-
-/* Text from the chunk into a fixed buffer, cut to fit and ended */
-static void copy_text(struct cur *c, char *dst, uint32_t cap)
-{
-    uint32_t len = c16(c);
-    const uint8_t *t = take(c, len);
-    if (!t)
-        len = 0;
-    if (len > cap - 1)
-        len = cap - 1;
-    if (len)
-        memcpy(dst, t, len);
-    dst[len] = 0;
 }
 
 /* OPTN, the cart's options: a count, then each one's key, type, default,
@@ -385,8 +376,8 @@ static int load_fonts(struct vm *vm, const uint8_t *p, uint32_t n)
         f->glyphs = c.p;
         uint32_t room = (uint32_t)(c.end - c.p), end = 0, last = 0;
         for (uint32_t g = 0; g < f->n; g++) {
-            uint32_t cp = rd32(f->index + g * 8);
-            uint32_t off = rd32(f->index + g * 8 + 4);
+            uint32_t cp = rd_le32(f->index + g * 8);
+            uint32_t off = rd_le32(f->index + g * 8 + 4);
             if ((g && cp <= last) || off > room || room - off < 5)
                 return bad(vm, "fonts");
             const uint8_t *q = f->glyphs + off;
@@ -623,11 +614,12 @@ static int load_runtime(struct vm *vm)
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
-    const uint8_t *chunk[15] = { 0 };
-    uint32_t clen[15] = { 0 };
-    static const char tags[15][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
-                                      "PALS", "SHET", "MAPS", "IMGS", "SFX_",
-                                      "BORD", "OPTN", "DATA", "ACHV", "FONT" };
+    static const char tags[][5] = { "PBG1", "CODE", "CNST", "GLOB", "LINE",
+                                    "PALS", "SHET", "MAPS", "IMGS", "SFX_",
+                                    "BORD", "OPTN", "DATA", "ACHV", "FONT" };
+    enum { CHUNKS = sizeof(tags) / sizeof(tags[0]) };
+    const uint8_t *chunk[CHUNKS] = { 0 };
+    uint32_t clen[CHUNKS] = { 0 };
     int first = 1;
     crc_init();
     for (;;) {
@@ -636,7 +628,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             break;
         if (got != 8)
             return bad(vm, "chunk header");
-        uint32_t len = rd32(hd + 4);
+        uint32_t len = rd_le32(hd + 4);
         /* no chunk is bigger than the memory, and len + 4 must not wrap */
         if (len > vm->size - 4)
             return bad(vm, "chunk length");
@@ -644,7 +636,7 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
             return vm_fail(vm, "not a game file", "", "");
         first = 0;
         int want = -1;
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < CHUNKS; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
         int is_meta = !memcmp(hd, "META", 4);
@@ -659,10 +651,10 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
         uint8_t *b = MEM(vm, off);
         if (read(ctx, b, len + 4) != len + 4)
             return bad(vm, "truncated");
-        if (crc32(b, len) != rd32(b + len))
+        if (crc32(b, len) != rd_le32(b + len))
             return bad(vm, "a checksum fails");
         vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
-                        rd32(b + len);
+                        rd_le32(b + len);
         if (is_meta) {
             vm->meta = b;
             vm->meta_len = len;

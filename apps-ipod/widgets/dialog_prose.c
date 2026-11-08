@@ -62,12 +62,6 @@ struct prose
 
 static int prose_wrap(const char *body, int w, int font);
 
-/* The title's band at the top of the box (dialog_draw_title) */
-static int prose_title_h(const struct prose *p)
-{
-    return dialog_title_height(p->title);
-}
-
 /* As tall as the title, the text and the button row need, up to PROSE_H_PCT
  * of the screen; past that the text scrolls */
 static void prose_measure(struct dialog *d, struct screen *s,
@@ -84,7 +78,8 @@ static void prose_measure(struct dialog *d, struct screen *s,
     max = sh * PROSE_H_PCT / 100;
     /* Everything but the text: the gap above the button, the button, the
      * frame and the title */
-    fixed = fh / 2 + fh + 8 + in.top + in.bottom + prose_title_h(p);
+    fixed = fh / 2 + fh + 8 + in.top + in.bottom +
+            dialog_title_height(p->title);
     lines = prose_wrap(p->body, box->width - in.left - in.right
                                 - PROSE_BAR_W - PROSE_BAR_GAP, box->font);
     /* Text that scrolls gets the whole lines that fit and no more, so the
@@ -128,7 +123,7 @@ static void prose_draw(struct dialog *d, struct screen *s,
     struct prose *p = data;
     int fh = font_get(content->font)->height;
     int bh = fh + 8;
-    int top = prose_title_h(p);
+    int top = dialog_title_height(p->title);
     /* Room for the scrollbar whether or not one is drawn. Measuring against
      * the full width and re-measuring narrower once a bar turns out to be
      * needed costs two wraps a frame, and reflows the text under the reader

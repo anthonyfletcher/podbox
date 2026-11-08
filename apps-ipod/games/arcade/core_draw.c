@@ -111,11 +111,6 @@ static uint32_t le16(const uint8_t *p)
     return p[0] | (uint32_t)p[1] << 8;
 }
 
-static uint32_t le32(const uint8_t *p)
-{
-    return le16(p) | le16(p + 2) << 16;
-}
-
 static int damaged(struct vm *vm, const char *what)
 {
     return vm_fail(vm, "this game file is damaged: ", what, "");
@@ -172,7 +167,7 @@ static int read_maps(struct vm *vm, uint32_t *cap)
             return damaged(vm, "maps");
         m->w = (uint16_t)le16(p);
         m->h = (uint16_t)le16(p + 2);
-        m->zlen = le32(p + 4);
+        m->zlen = rd_le32(p + 4);
         p += 8;
         if (!m->w || !m->h || m->w > MAP_MAX || m->h > MAP_MAX ||
             m->zlen > (uint32_t)(end - p))
@@ -231,11 +226,11 @@ static int read_sheet(struct vm *vm)
     if (!p)
         return 1;
     if (vm->shet_len < 8 || le16(p) != SHEET_W || le16(p + 2) != SHEET_H ||
-        le32(p + 4) > vm->shet_len - 8 ||
-        vm->shet_len - 8 - le32(p + 4) != 256 ||
-        !lz4_decode(p + 8, le32(p + 4), MEM(vm, vm->sheet), SHEET_W * SHEET_H))
+        rd_le32(p + 4) > vm->shet_len - 8 ||
+        vm->shet_len - 8 - rd_le32(p + 4) != 256 ||
+        !lz4_decode(p + 8, rd_le32(p + 4), MEM(vm, vm->sheet), SHEET_W * SHEET_H))
         return damaged(vm, "the sheet");
-    memcpy(MEM(vm, vm->flags), p + 8 + le32(p + 4), 256);
+    memcpy(MEM(vm, vm->flags), p + 8 + rd_le32(p + 4), 256);
     return 1;
 }
 
@@ -256,7 +251,7 @@ static int read_images(struct vm *vm)
         for (uint32_t i = 0; i < n; i++) {
             if (end - p < 8)
                 return damaged(vm, "images");
-            uint32_t w = le16(p), h = le16(p + 2), zlen = le32(p + 4);
+            uint32_t w = le16(p), h = le16(p + 2), zlen = rd_le32(p + 4);
             p += 8;
             if (!w || !h || w > IMAGE_MAX || h > IMAGE_MAX ||
                 zlen > (uint32_t)(end - p))
@@ -1715,15 +1710,15 @@ static const uint8_t *text_glyph(struct vm *vm, uint32_t cp, uint8_t *buf)
 static const uint8_t *cart_find(const struct cartfont *f, uint32_t cp)
 {
     /* most fonts run unbroken from their first codepoint */
-    uint32_t guess = cp - le32(f->index);
-    if (guess < f->n && le32(f->index + guess * 8) == cp)
-        return f->glyphs + le32(f->index + guess * 8 + 4);
+    uint32_t guess = cp - rd_le32(f->index);
+    if (guess < f->n && rd_le32(f->index + guess * 8) == cp)
+        return f->glyphs + rd_le32(f->index + guess * 8 + 4);
     int32_t lo = 0, hi = (int32_t)f->n - 1;
     while (lo <= hi) {
         int32_t m = (lo + hi) / 2;
-        uint32_t at = le32(f->index + m * 8);
+        uint32_t at = rd_le32(f->index + m * 8);
         if (at == cp)
-            return f->glyphs + le32(f->index + m * 8 + 4);
+            return f->glyphs + rd_le32(f->index + m * 8 + 4);
         if (at < cp)
             lo = m + 1;
         else
@@ -1921,13 +1916,7 @@ NATIVE(textw)
     if (!vm_parts(vm, a, argc, "textw"))
         return 0;
     uint32_t n = gather(vm, a, argc, buf, sizeof(text_buf));
-    int64_t widest;
-    int lines;
-    if (vm->d.font >= 2)
-        text_wide(vm, NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
-    else
-        text(NULL, buf, n, 0, 0, scale_of(vm), 0, &widest, &lines);
-    *out = mk(T_INT, (int32_t)widest);
+    *out = mk(T_INT, text_width(vm, buf, n));
     return 1;
 }
 
@@ -2850,7 +2839,7 @@ NATIVE(mapprop)
         uint32_t type = p[2];
         if (key->len == want->len && !memcmp(key->b, want->b, key->len)) {
             *out = type ? mk(T_STR, (int32_t)vm->strings[le16(p + 3)])
-                        : mk(T_INT, (int32_t)le32(p + 3));
+                        : mk(T_INT, (int32_t)rd_le32(p + 3));
             break;
         }
         p += 3 + (type ? 2 : 4);
@@ -4446,26 +4435,6 @@ light_row(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
 }
 #endif
 
-/* The square root of v, rounded down */
-static uint32_t root32(uint32_t v)
-{
-    uint32_t r = 0, bit = 1u << 30;
-    while (bit > v)
-        bit >>= 2;
-    while (bit) {
-        if (v >= r + bit) {
-            v -= r + bit;
-            r = (r >> 1) + bit;
-        } else
-            r >>= 1;
-        bit >>= 2;
-    }
-    return r;
-}
-
-static const uint8_t bayer4[16] = { 0, 8, 2, 10, 12, 4, 14, 6,
-                                    3, 11, 1, 9, 15, 7, 13, 5 };
-
 /* light.draw(x, y, r, n, ramp): n lights, each centre (x, y) and reach r,
  * as numbers or arrays; ramp a list of 1 to 8 colour tables, each an
  * array or Uint8Array taking a colour to its darker one (colours past its
@@ -4551,7 +4520,7 @@ NATIVE(light_draw)
             int32_t rem = (int32_t)r2 - dy * dy;
             if (rem <= 0)
                 continue;
-            int32_t half = (int32_t)root32((uint32_t)rem);
+            int32_t half = (int32_t)isqrt64((uint32_t)rem);
             int32_t xa = (lx - half) >> 4, xb = ((lx + half) >> 4) + 1;
             if (xa < p.cx0) xa = p.cx0;
             if (xb > p.cx1) xb = p.cx1;
@@ -4562,7 +4531,7 @@ NATIVE(light_draw)
             int32_t step = 32 * dx + 256;
 #ifdef ARCADE_ASM
             /* the row's dither steps a byte each, xa's lowest */
-            const uint8_t *b4 = bayer4 + (y & 3) * 4;
+            const uint8_t *b4 = bayer[y & 3];
             uint32_t bay = 0;
             for (int k = 3; k >= 0; k--)
                 bay = bay << 8 | b4[(xa + k) & 3];
@@ -4570,7 +4539,7 @@ NATIVE(light_draw)
                           inv, bay, fall, levels);
 #else
             light_row(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step, inv,
-                      bayer4 + (y & 3) * 4, fall, levels);
+                      bayer[y & 3], fall, levels);
 #endif
             measured += (uint32_t)(xb - xa);
         }

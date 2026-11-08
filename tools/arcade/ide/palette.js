@@ -11,10 +11,8 @@
  * Parts: the palette and its pictures; the swatches, dragged; the chosen
  * entry; rearranging. */
 
-import { shown } from './pixels.js';
+import { shown, hex } from './pixels.js';
 import { icon } from './icons.js';
-
-const hex = (c) => '#' + c.toString(16).padStart(6, '0');
 
 export class PaletteEditor {
     /* opts: rgb (this palette), first (whether it is the cart's own),

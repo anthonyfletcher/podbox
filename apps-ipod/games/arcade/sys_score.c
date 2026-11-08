@@ -116,8 +116,8 @@ static void put(struct out *o, const void *b, int n)
 
 static void put32(struct out *o, uint32_t v)
 {
-    uint8_t b[4] = { (uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16),
-                     (uint8_t)(v >> 24) };
+    uint8_t b[4];
+    wr_le32(b, v);
     put(o, b, 4);
 }
 
@@ -185,7 +185,7 @@ static const uint8_t *get(struct in *c, int n)
 static uint32_t get32(struct in *c)
 {
     const uint8_t *b = get(c, 4);
-    return b ? b[0] | b[1] << 8 | b[2] << 16 | (uint32_t)b[3] << 24 : 0;
+    return b ? rd_le32(b) : 0;
 }
 
 static void get_text(struct in *c, char *dst, int cap)

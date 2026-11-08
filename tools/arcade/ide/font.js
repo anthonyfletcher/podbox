@@ -16,6 +16,9 @@ import { sidePanel, toolbar, numberBox } from './chrome.js';
 /* { head: the lines before CHARS, ascent, descent, glyphs: [{ cp, name,
  * adv, cell: { w, px } }] }: each glyph as a cell of 0 and 1, the line
  * tall, its baseline ascent rows down */
+/* A code point as U+XXXX */
+const uplus = (cp) => 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
+
 export function readFont(text) {
     const lines = text.split(/\r?\n/);
     const head = [];
@@ -113,7 +116,7 @@ function trim(g, ascent) {
 /* ---- the editor ---- */
 
 const INK = [0x16161c, 0xf2efe6];
-const label = (cp) => cp < 32 ? 'U+' + cp.toString(16).toUpperCase().padStart(4, '0') : String.fromCodePoint(cp);
+const label = (cp) => cp < 32 ? uplus(cp) : String.fromCodePoint(cp);
 
 export class FontEditor {
     /* opts: text (the BDF), changed(text), ask (the IDE's dialog),
@@ -191,7 +194,7 @@ export class FontEditor {
             const b = document.createElement('button');
             b.className = 'font-glyph';
             b.classList.toggle('on', i === this.at);
-            b.title = label(g.cp) + ' (U+' + g.cp.toString(16).toUpperCase().padStart(4, '0') + ')';
+            b.title = label(g.cp) + ' (' + uplus(g.cp) + ')';
             const c = document.createElement('canvas');
             this.paint(c, [g], 2);
             const s = document.createElement('span');
@@ -260,7 +263,7 @@ export class FontEditor {
         sep.className = 'sep';
         const name = document.createElement('span');
         name.className = 'note';
-        name.textContent = label(g.cp) + '  U+' + g.cp.toString(16).toUpperCase().padStart(4, '0');
+        name.textContent = label(g.cp) + '  ' + uplus(g.cp);
         bar.append(sep, numberBox('Advance', g.adv, 0, 32, 'How far the text moves on after it',
                                   (v) => this.advance(g, v)),
                    iconButton('trash', 'Remove this character from the font', () => this.remove()), name);

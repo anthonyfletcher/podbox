@@ -167,26 +167,6 @@ static int hex4(struct jin *j, uint32_t *u)
     return 1;
 }
 
-static uint32_t utf8_put(uint32_t u, uint8_t *o)
-{
-    if (u < 0x80) {
-        if (o) o[0] = (uint8_t)u;
-        return 1;
-    }
-    if (u < 0x800) {
-        if (o) { o[0] = (uint8_t)(0xc0 | u >> 6); o[1] = (uint8_t)(0x80 | (u & 63)); }
-        return 2;
-    }
-    if (u < 0x10000) {
-        if (o) { o[0] = (uint8_t)(0xe0 | u >> 12); o[1] = (uint8_t)(0x80 | (u >> 6 & 63));
-                 o[2] = (uint8_t)(0x80 | (u & 63)); }
-        return 3;
-    }
-    if (o) { o[0] = (uint8_t)(0xf0 | u >> 18); o[1] = (uint8_t)(0x80 | (u >> 12 & 63));
-             o[2] = (uint8_t)(0x80 | (u >> 6 & 63)); o[3] = (uint8_t)(0x80 | (u & 63)); }
-    return 4;
-}
-
 /* The string from j->p, just past its opening quote, decoded into o, or
  * only measured when o is NULL; its length, or -1 when it is not one */
 static int32_t string_pass(struct jin *j, uint8_t *o)
@@ -237,7 +217,7 @@ static int32_t string_pass(struct jin *j, uint8_t *o)
         default:
             return -1;
         }
-        n += utf8_put(u, o ? o + n : NULL);
+        n += (uint32_t)(o ? utf8_put(o + n, u) : utf8_bytes(u));
     }
     return -1;
 }

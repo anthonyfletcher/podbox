@@ -19,7 +19,6 @@
 #include "system.h"
 #include "kernel.h"                 /* current_tick */
 #include "file.h"
-#include "dir.h"                    /* mkdir */
 #include "lang.h"
 #include "widgets/list.h"
 #include "widgets/dialog_prose.h"
@@ -36,8 +35,7 @@ static bool scores_owed;
 
 static void scores_path(const uint8_t *id, char *path, size_t size)
 {
-    snprintf(path, size, SCORES_DIR "/%02x%02x%02x%02x%02x%02x%02x%02x.sco",
-             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+    shell_id_path(path, size, SCORES_DIR, id, ".sco");
 }
 
 /* The record in and out; one at a time, so one buffer serves */
@@ -95,21 +93,12 @@ void shell_scores_write(struct vm *vm, bool leaving)
     run_ticks %= HZ;
     scores_owed = true;
     int n = arcade_scores_pack(s, record, sizeof(record));
-    char path[MAX_PATH], part[MAX_PATH];
-    mkdir("/.rockbox/games");
-    mkdir(SCORES_DIR);
-    scores_path(s->id, path, sizeof(path));
-    snprintf(part, sizeof(part), "%s.new", path);
-    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
+    if (n <= 0)
         return;
-    bool whole = n > 0 && write(fd, record, n) == n;
-    if (close(fd) < 0)
-        whole = false;
-    if (whole && rename(part, path) == 0)
+    char path[MAX_PATH];
+    scores_path(s->id, path, sizeof(path));
+    if (shell_write_file(SCORES_DIR, path, record, (size_t)n, NULL, 0))
         scores_owed = false;
-    else
-        remove(part);
 }
 
 /* ---- the screens --------------------------------------------------------- */

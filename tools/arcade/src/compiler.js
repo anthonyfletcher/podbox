@@ -1735,6 +1735,14 @@ function shortText(s) {
     return typeof s === 'string' && s !== '' && utf8(s).length <= 23;
 }
 
+/* A name a cart's options, achievements, flags and boards may take */
+const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/* Whether x is a plain record: an object, not null or an array */
+function isRecord(x) {
+    return x !== null && typeof x === 'object' && !Array.isArray(x);
+}
+
 /* cart.options checked, each made whole: the defaults filled in, and an
  * on/off or a choice given the range of its values */
 function checkOptions(list, bad) {
@@ -1745,12 +1753,12 @@ function checkOptions(list, bad) {
     const whole = (v) => Number.isInteger(v) && v >= -0x80000000 && v <= 0x7fffffff;
     return list.slice(0, 8).map((o, i) => {
         const at = 'option ' + (i + 1) + ': ';
-        if (o === null || typeof o !== 'object' || Array.isArray(o)) {
+        if (!isRecord(o)) {
             bad(at + 'must be a record'); return null;
         }
         for (const k in o)
             if (OPTION_KEYS.indexOf(k) < 0) bad(at + 'unknown setting ' + k);
-        if (typeof o.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(o.name))
+        if (typeof o.name !== 'string' || !NAME.test(o.name))
             bad(at + 'name must be usable in code as OPT.<name>');
         else if (seen.has(o.name)) bad(at + 'a second option called ' + o.name);
         seen.add(o.name);
@@ -1806,13 +1814,13 @@ function checkAchievements(list, bad) {
     const seen = new Set();
     return list.slice(0, 32).map((a, i) => {
         const at = 'achievement ' + (i + 1) + ': ';
-        if (a === null || typeof a !== 'object' || Array.isArray(a)) {
+        if (!isRecord(a)) {
             bad(at + 'must be a record'); return null;
         }
         for (const k in a)
             if (['name', 'title', 'text'].indexOf(k) < 0)
                 bad(at + 'unknown setting ' + k);
-        if (typeof a.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(a.name))
+        if (typeof a.name !== 'string' || !NAME.test(a.name))
             bad(at + 'name must be usable in code as ACH.<name>');
         else if (seen.has(a.name)) bad(at + 'a second achievement called ' + a.name);
         seen.add(a.name);
@@ -1834,7 +1842,7 @@ function checkFlags(list, bad) {
     const seen = new Set();
     return list.slice(0, 8).map((n, i) => {
         if (n === null || n === '') return null;
-        if (typeof n !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)) {
+        if (typeof n !== 'string' || !NAME.test(n)) {
             bad('flag ' + i + ': a name must be usable in code as FLAG.<name>');
             return null;
         }
@@ -1852,12 +1860,12 @@ function checkBoards(list, bad) {
     const seen = new Set();
     return list.slice(0, 8).map((b, i) => {
         const at = 'board ' + (i + 1) + ': ';
-        if (b === null || typeof b !== 'object' || Array.isArray(b)) {
+        if (!isRecord(b)) {
             bad(at + 'must be a record'); return null;
         }
         for (const k in b)
             if (BOARD_KEYS.indexOf(k) < 0) bad(at + 'unknown setting ' + k);
-        if (typeof b.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(b.name))
+        if (typeof b.name !== 'string' || !NAME.test(b.name))
             bad(at + 'name must be usable in code as BOARD.<name>');
         else if (seen.has(b.name)) bad(at + 'a second board called ' + b.name);
         seen.add(b.name);

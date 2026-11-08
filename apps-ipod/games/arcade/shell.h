@@ -7,6 +7,8 @@
 #define ARCADE_SHELL_H
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /* Plays the cart at path until the player quits it. Returns GO_TO_PREVIOUS,
  * or GO_TO_ROOT when USB took the screen. */
@@ -18,5 +20,14 @@ struct simplelist_info;
  * context-menu rows, which leave no room for icons. As
  * simplelist_show_list(): true when the owner went out to the root. */
 bool shell_list(struct simplelist_info *info);
+
+/* path as dir/<the cart id's sixteen hex digits><ext> */
+void shell_id_path(char *path, size_t size, const char *dir,
+                   const uint8_t *id, const char *ext);
+
+/* a then b written to path beside the old file, in dir (made if missing),
+ * and renamed over it: whether it was */
+bool shell_write_file(const char *dir, const char *path, const void *a,
+                      size_t na, const void *b, size_t nb);
 
 #endif /* ARCADE_SHELL_H */

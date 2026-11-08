@@ -47,19 +47,6 @@ void arcade_option_set(struct vm *vm, int i, int32_t value)
 
 /* "PBOP", a version byte, the count, two spare bytes, then each option's
  * key and value; little-endian */
-static void put32(uint8_t *p, uint32_t v)
-{
-    p[0] = (uint8_t)v;
-    p[1] = (uint8_t)(v >> 8);
-    p[2] = (uint8_t)(v >> 16);
-    p[3] = (uint8_t)(v >> 24);
-}
-
-static uint32_t get32(const uint8_t *p)
-{
-    return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24;
-}
-
 int arcade_options_pack(const struct vm *vm, uint8_t *buf, int cap)
 {
     const struct arcade_options *s = &vm->opts;
@@ -71,8 +58,8 @@ int arcade_options_pack(const struct vm *vm, uint8_t *buf, int cap)
     buf[5] = (uint8_t)s->count;
     buf[6] = buf[7] = 0;
     for (int i = 0; i < s->count; i++) {
-        put32(buf + 8 + i * 8, s->o[i].key);
-        put32(buf + 12 + i * 8, (uint32_t)s->o[i].value);
+        wr_le32(buf + 8 + i * 8, s->o[i].key);
+        wr_le32(buf + 12 + i * 8, (uint32_t)s->o[i].value);
     }
     return n;
 }
@@ -83,8 +70,8 @@ int arcade_options_unpack(struct vm *vm, const uint8_t *buf, int n)
         n < 8 + buf[5] * 8)
         return 0;
     for (int k = 0; k < buf[5]; k++) {
-        uint32_t key = get32(buf + 8 + k * 8);
-        int32_t value = (int32_t)get32(buf + 12 + k * 8);
+        uint32_t key = rd_le32(buf + 8 + k * 8);
+        int32_t value = (int32_t)rd_le32(buf + 12 + k * 8);
         for (int i = 0; i < vm->opts.count; i++)
             if (vm->opts.o[i].key == key)
                 vm->opts.o[i].value = fit(&vm->opts.o[i], value);

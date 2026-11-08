@@ -19,10 +19,6 @@
 #define RET_INT(v) (*out = mk(T_INT, (int32_t)(v)), 1)
 
 static uint32_t rd16(const uint8_t *p) { return p[0] | p[1] << 8; }
-static uint32_t rd32(const uint8_t *p)
-{
-    return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24;
-}
 
 /* ---- data files ---------------------------------------------------------- *
  * DATA: a count, then each file's kind (0 JSON, 1 text), its name and its
@@ -45,7 +41,7 @@ NATIVE(data_read)
             return vm_fail(vm, "this game file is damaged: data", "", "");
         uint32_t kind = p[0], nlen = rd16(p + 1);
         const uint8_t *name = p + 3, *body = name + nlen + 4;
-        uint32_t len = rd32(name + nlen);
+        uint32_t len = rd_le32(name + nlen);
         if (len > (uint32_t)(end - body))
             return vm_fail(vm, "this game file is damaged: data", "", "");
         if (i == a[0].v) {

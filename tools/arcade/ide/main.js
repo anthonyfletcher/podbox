@@ -111,6 +111,19 @@ function cartName() {
     try { return JSON.parse(folder['cart.json']).name || 'Untitled'; } catch (e) { return 'Untitled'; }
 }
 
+/* The cart's name as a file name, without its extension */
+function cartStem() {
+    return cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase();
+}
+
+/* blob downloaded as a file called name */
+function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+}
+
 function cartId() {
     try { return JSON.parse(folder['cart.json']).id || ''; } catch (e) { return ''; }
 }
@@ -450,10 +463,7 @@ async function fitPicture(rgba, w, h) {
 /* the open picture saved to disk, an indexed PNG in the cart's palette */
 function exportPicture() {
     if (!isBinary(current)) { say('error', 'Open a picture to export it.'); return; }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([folder[current]], { type: 'image/png' }));
-    a.download = current.split('/').pop();
-    a.click();
+    download(new Blob([folder[current]], { type: 'image/png' }), current.split('/').pop());
 }
 
 /* the sheet or an image in the pixel editor; a PNG that is not indexed is
@@ -1174,10 +1184,7 @@ $('m-prev').onclick = () => { if (engine && running) musicButton(2); };
 function saveReplay() {
     const t = tape && tape.steps.length ? tape : lastTape;
     if (!t) { say('error', 'Run the cart first: each run is recorded to save.'); return; }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(t)], { type: 'application/json' }));
-    a.download = cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase() + '.replay.json';
-    a.click();
+    download(new Blob([JSON.stringify(t)], { type: 'application/json' }), cartStem() + '.replay.json');
     say('print', 'Saved a replay of ' + t.steps.length + ' frames.');
 }
 
@@ -1415,7 +1422,7 @@ async function save() {
 async function saveAs() {
     check();
     if (lastBuild.errors.length) { say('error', 'Fix the errors before saving: the cart would not build.'); return; }
-    const file = cartName().replace(/[^\w -]/g, '').trim().replace(/ +/g, '_').toLowerCase() + '.pbg';
+    const file = cartStem() + '.pbg';
     if (window.showSaveFilePicker) {
         let h;
         try {
@@ -1436,10 +1443,7 @@ async function saveAs() {
             } catch (e) { /* downloaded below */ }
         }
     }
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([lastBuild.cart]));
-    a.download = file;
-    a.click();
+    download(new Blob([lastBuild.cart]), file);
     saved();
     say('print', 'Downloaded ' + file + '.');
 }

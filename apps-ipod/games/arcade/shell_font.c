@@ -31,11 +31,6 @@ static struct
     uint8_t glyph[13];
 } cache[CACHE];
 
-static uint32_t rd32(const uint8_t *p)
-{
-    return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24;
-}
-
 static bool font_open(void)
 {
     uint8_t head[FONT_HEAD];
@@ -66,7 +61,7 @@ int shell_glyph(void *ctx, uint32_t cp, uint8_t out[13])
     if (fd < 0 && (tried || !font_open()))
         return 0;
     const uint8_t *page = pages + (cp >> 8) * PAGE_BYTES;
-    uint32_t base = rd32(page), low = cp & 0xff;
+    uint32_t base = load_le32(page), low = cp & 0xff;
     const uint8_t *bits = page + 4;
     if (!base || !(bits[low >> 3] & (1 << (low & 7))))
         return 0;

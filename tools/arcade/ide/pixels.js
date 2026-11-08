@@ -26,6 +26,9 @@ export function shown(c) {
     return (r | r >> 5) << 16 | (g | g >> 6) << 8 | (b | b >> 5);
 }
 
+/* A colour as #rrggbb */
+export const hex = (c) => '#' + c.toString(16).padStart(6, '0');
+
 /* the palette entry nearest a colour, weighting the channels as the eye
  * does (the "redmean" distance) */
 function nearest(rgb, r, g, b) {
@@ -218,8 +221,8 @@ export class PixelEditor {
         this.rgb.forEach((c, i) => {
             const s = document.createElement('button');
             s.className = 'swatch';
-            s.style.background = '#' + shown(c).toString(16).padStart(6, '0');
-            s.title = i + ': #' + c.toString(16).padStart(6, '0') +
+            s.style.background = hex(shown(c));
+            s.title = i + ': ' + hex(c) +
                 ' (left click draws with it, right click is the second colour)';
             s.classList.toggle('first', i === this.colour[0]);
             s.classList.toggle('second', i === this.colour[1]);
@@ -267,7 +270,7 @@ export class PixelEditor {
                 for (let x = 0; x < this.w; x++) {
                     const v = this.onion[y * this.w + x];
                     if (!v || v === this.px[y * this.w + x]) continue;
-                    g.fillStyle = '#' + shown(this.rgb[v] || 0).toString(16).padStart(6, '0');
+                    g.fillStyle = hex(shown(this.rgb[v] || 0));
                     g.fillRect(x * z, y * z, z, z);
                 }
             g.globalAlpha = 1;
@@ -298,7 +301,7 @@ export class PixelEditor {
         }
         const pixel = (x, y, c) => {
             const s = shown(this.rgb[c] || 0);
-            g.fillStyle = '#' + s.toString(16).padStart(6, '0');
+            g.fillStyle = hex(s);
             g.fillRect(x * z, y * z, z, z);
         };
         if (this.float) {

@@ -107,11 +107,36 @@ static uint32_t file_read(void *ctx, void *buf, uint32_t n)
     return got < 0 ? 0 : (uint32_t)got;
 }
 
+void shell_id_path(char *path, size_t size, const char *dir,
+                   const uint8_t *id, const char *ext)
+{
+    snprintf(path, size, "%s/%02x%02x%02x%02x%02x%02x%02x%02x%s", dir,
+             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7], ext);
+}
+
+bool shell_write_file(const char *dir, const char *path, const void *a,
+                      size_t na, const void *b, size_t nb)
+{
+    char part[MAX_PATH];
+    mkdir("/.rockbox/games");
+    mkdir(dir);
+    snprintf(part, sizeof(part), "%s.new", path);
+    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0)
+        return false;
+    bool whole = write(fd, a, na) == (ssize_t)na &&
+                 (!nb || write(fd, b, nb) == (ssize_t)nb);
+    if (close(fd) < 0)
+        whole = false;
+    if (whole && rename(part, path) == 0)
+        return true;
+    remove(part);
+    return false;
+}
+
 static void save_path(struct vm *vm, char *path, size_t size)
 {
-    const uint8_t *id = arcade_id(vm);
-    snprintf(path, size, SAVE_DIR "/%02x%02x%02x%02x%02x%02x%02x%02x.sav",
-             id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]);
+    shell_id_path(path, size, SAVE_DIR, arcade_id(vm), ".sav");
 }
 
 /* The file: "PBGS", 256 little-endian values, then 32 bytes saying which
@@ -129,11 +154,8 @@ static void save_load(struct vm *vm)
     close(fd);
     if (got != (ssize_t)sizeof(b) || memcmp(b, "PBGS", 4))
         return;
-    for (int i = 0; i < 256; i++) {
-        const unsigned char *p = b + 4 + i * 4;
-        values[i] = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16) |
-                              ((uint32_t)p[3] << 24));
-    }
+    for (int i = 0; i < 256; i++)
+        values[i] = (int32_t)load_le32(b + 4 + i * 4);
     arcade_restore(vm, values, b + 4 + 256 * 4);
 }
 
@@ -144,7 +166,7 @@ static bool save_owed;
  * short write leaves the old save as it was */
 static void save_write(struct vm *vm)
 {
-    char path[MAX_PATH], part[MAX_PATH];
+    char path[MAX_PATH];
     unsigned char b[4 + 256 * 4 + 32];
     const uint8_t *frac;
     int dirty;
@@ -153,29 +175,12 @@ static void save_write(struct vm *vm)
         return;
     save_owed = true;
     memcpy(b, "PBGS", 4);
-    for (int i = 0; i < 256; i++) {
-        uint32_t v = (uint32_t)values[i];
-        unsigned char *p = b + 4 + i * 4;
-        p[0] = (unsigned char)v;
-        p[1] = (unsigned char)(v >> 8);
-        p[2] = (unsigned char)(v >> 16);
-        p[3] = (unsigned char)(v >> 24);
-    }
+    for (int i = 0; i < 256; i++)
+        store_le32(b + 4 + i * 4, (uint32_t)values[i]);
     memcpy(b + 4 + 256 * 4, frac, 32);
-    mkdir("/.rockbox/games");
-    mkdir(SAVE_DIR);
     save_path(vm, path, sizeof(path));
-    snprintf(part, sizeof(part), "%s.new", path);
-    int fd = open(part, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
-        return;
-    bool whole = write(fd, b, sizeof(b)) == (ssize_t)sizeof(b);
-    if (close(fd) < 0)
-        whole = false;
-    if (whole && rename(part, path) == 0)
+    if (shell_write_file(SAVE_DIR, path, b, sizeof(b), NULL, 0))
         save_owed = false;
-    else
-        remove(part);
 }
 
 /* ---- the engine's host --------------------------------------------------- */
@@ -730,14 +735,9 @@ static void present(struct vm *vm, bool all)
     int r0 = all ? 0 : s->dirty_lo, r1 = all ? s->height - 1 : s->dirty_hi;
     int under = banner_due(vm);
     if (under) {
-        if (r0 > r1) {
-            r0 = 0;
+        if (r0 > r1 || r1 < under - 1)
             r1 = under - 1;
-        } else {
-            r0 = 0;
-            if (r1 < under - 1)
-                r1 = under - 1;
-        }
+        r0 = 0;
     }
     if (r0 <= r1) {
         int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));

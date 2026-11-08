@@ -780,8 +780,7 @@ static const char *try_id3_token(struct wps_token *token, int offset,
         {
             *intval = numeric_ret;
         }
-        out_text = numeric_buf;
-        return out_text;
+        return numeric_buf;
     }
 
     struct wps_state *state = get_wps_state();

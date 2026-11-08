@@ -502,6 +502,53 @@ static inline uint32_t utf8_whole(const char *s, uint32_t n)
     return n;
 }
 
+/* The bytes of cp in UTF-8 */
+static inline int utf8_bytes(uint32_t cp)
+{
+    return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+}
+
+/* cp written at d in UTF-8: its bytes */
+static inline int utf8_put(void *d, uint32_t cp)
+{
+    uint8_t *o = d;
+    if (cp < 0x80) {
+        o[0] = (uint8_t)cp;
+        return 1;
+    }
+    if (cp < 0x800) {
+        o[0] = (uint8_t)(0xc0 | cp >> 6);
+        o[1] = (uint8_t)(0x80 | (cp & 63));
+        return 2;
+    }
+    if (cp < 0x10000) {
+        o[0] = (uint8_t)(0xe0 | cp >> 12);
+        o[1] = (uint8_t)(0x80 | ((cp >> 6) & 63));
+        o[2] = (uint8_t)(0x80 | (cp & 63));
+        return 3;
+    }
+    o[0] = (uint8_t)(0xf0 | cp >> 18);
+    o[1] = (uint8_t)(0x80 | ((cp >> 12) & 63));
+    o[2] = (uint8_t)(0x80 | ((cp >> 6) & 63));
+    o[3] = (uint8_t)(0x80 | (cp & 63));
+    return 4;
+}
+
+/* The little-endian 32 bits at p */
+static inline uint32_t rd_le32(const uint8_t *p)
+{
+    return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+/* v written little-endian at p */
+static inline void wr_le32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+}
+
 /* vm.c */
 int vm_fail(struct vm *vm, const char *a, const char *b, const char *c);
 int vm_call(struct vm *vm, struct value fn, int argc, struct value *out);
