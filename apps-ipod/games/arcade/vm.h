@@ -613,9 +613,8 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
                        const struct column *y, const struct column *flip,
                        const struct column *frames,
                        const struct column *speed, uint32_t n);
-void core_draw_dots(struct vm *vm, const struct value *life,
-                    const struct value *x, const struct value *y,
-                    const struct value *c, uint32_t n);
+void core_draw_particles(struct vm *vm, struct value *const *arr,
+                         uint32_t n, int32_t w, int32_t h, int32_t shade);
 void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
                      uint32_t n);
 void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
@@ -670,7 +669,9 @@ int cells_world(struct vm *vm, struct value field, struct value rules,
 enum { CELL_SOLID = 1, CELL_LIQUID = 2, CELL_HARM = 4 };
 
 /* sys_actors.c, for cells: actors' boxes as obstacles, and a particle
- * pool's arrays (life, x, y, dx, dy, c) for cells.lift */
+ * pool's PARTICLE_ARRAYS arrays (life, x, y, dx, dy, c, sp, flip) for
+ * cells.lift */
+#define PARTICLE_ARRAYS 8
 int32_t actors_boxes(struct vm *vm, struct value pools, uint8_t *bits,
                      int32_t w, int32_t h, int32_t *boxes, int32_t cap);
 int particles_arrays(struct vm *vm, struct value p, struct value **arr,

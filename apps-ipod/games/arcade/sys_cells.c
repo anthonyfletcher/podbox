@@ -714,7 +714,7 @@ NATIVE(cells_lift)
 {
     struct field f;
     struct rules r;
-    struct value *p[6];
+    struct value *p[PARTICLE_ARRAYS];
     uint32_t n;
     int32_t ox, oy;
     if (!field_of(vm, a[0], mk(T_INT, 0), "cells.lift", &f) ||
@@ -753,6 +753,8 @@ NATIVE(cells_lift)
             p[3][slot] = mk(T_FIX, d ? k * dx / len : 0);
             p[4][slot] = mk(T_FIX, (d ? k * dy / len : 0) - speed / 2);
             p[5][slot] = mk(T_INT, m);
+            p[6][slot] = mk(T_INT, 0);  /* a pixel, not a sprite */
+            p[7][slot] = mk(T_INT, 0);
             f.c[cy * f.w + cx] = 0;
             lifted++;
         }

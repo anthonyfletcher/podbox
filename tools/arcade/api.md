@@ -390,16 +390,16 @@ Actors as circles, pushed apart and bounced off one another. Returns the pairs t
 Actors as circles, moved and bounced off map cells whose flags meet `flags`. Returns the cells struck.
 
 ### particles.pool(n)
-A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, with `gravity` and `drag`.
+A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, `sp` and `flip`, with `gravity` and `drag`, and for sprite particles `w`, `h`, `shade`, `floor`, `bounce` and `spin`.
 
-### particles.emit(p, count, x, y, dx, dy, spread, life, c)
-Up to `count` particles at `x, y`, moving `dx, dy` plus up to `spread` either way, living about `life` ticks. Returns how many.
+### particles.emit(p, count, x, y, dx, dy, spread, life, c, [sp])
+Up to `count` particles at `x, y`, moving `dx, dy` plus up to `spread` either way, living about `life` ticks; with `sp`, each is that sprite, flipped at random. Returns how many.
 
 ### particles.step(p)
-A tick of every live particle.
+A tick of every live particle: gravity, drag and moving; bouncing off the pool's `floor`, and sprites turning every `spin` ticks.
 
 ### particles.draw(p)
-Every live particle as a pixel of its colour.
+Every live particle as a pixel of its colour, or as its sprite's top left `w` by `h`, its colours 1 to `shade` taken from the particle's colour onward.
 
 ### sprites.draw(sp, xs, ys, n, [flips])
 `n` sprites at once, from the cart's arrays; `sp` may be one number for all.

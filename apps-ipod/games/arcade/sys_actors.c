@@ -38,11 +38,21 @@ static const char *const actor_keys[A_FIELDS] = {
     "density", "oneway", "splash"
 };
 
-enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_ARRAYS,
-       P_GRAVITY = P_ARRAYS, P_DRAG, P_FIELD, P_FIELD_X, P_FIELD_Y, P_FIELDS };
+/* A particle is a pixel of colour c, or with sp set, that sprite's top
+ * left w x h, flipped by flip (1 across, 2 up and down) and with its
+ * colours 1 to shade taken from c's ramp: colour k drawn as c + k - 1.
+ * floor and bounce: one falling through floor turns back up at bounce of
+ * its speed, unless that is under a quarter pixel a tick. spin: a sprite
+ * turns a quarter (flip 0, 1, 3, 2) every spin ticks. */
+enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_SP, P_FLIP,
+       P_ARRAYS,                    /* PARTICLE_ARRAYS, in vm.h */
+       P_GRAVITY = P_ARRAYS, P_DRAG, P_FIELD, P_FIELD_X, P_FIELD_Y,
+       P_W, P_H, P_SHADE, P_FLOOR, P_BOUNCE, P_SPIN, P_FIELDS };
+_Static_assert(P_ARRAYS == PARTICLE_ARRAYS, "cells.lift's arrays");
 static const char *const particle_keys[P_FIELDS] = {
-    "life", "x", "y", "dx", "dy", "c", "gravity", "drag",
-    "field", "field_x", "field_y"
+    "life", "x", "y", "dx", "dy", "c", "sp", "flip", "gravity", "drag",
+    "field", "field_x", "field_y", "w", "h", "shade", "floor", "bounce",
+    "spin"
 };
 
 static int32_t fx(struct value v)
@@ -1264,16 +1274,18 @@ static int32_t spread(struct vm *vm, int32_t range)
     return (int32_t)(((int64_t)range * (int32_t)(r * 2 - 0xffff)) >> 16);
 }
 
-/* particles.emit(p, count, x, y, dx, dy, spread, life, c) */
+/* particles.emit(p, count, x, y, dx, dy, spread, life, c, [sp]): with sp,
+ * each is that sprite, flipped at random */
 NATIVE(particles_emit)
 {
     struct value f[P_FIELDS];
     uint32_t n;
-    int32_t count, life, c;
+    int32_t count, life, c, sprite = 0;
     if (!particles(vm, a[0], f, &n, "particles.emit") ||
         !whole_arg(vm, a, argc, 1, "particles.emit", &count) ||
         !whole_arg(vm, a, argc, 7, "particles.emit", &life) ||
-        !whole_arg(vm, a, argc, 8, "particles.emit", &c))
+        !whole_arg(vm, a, argc, 8, "particles.emit", &c) ||
+        (argc > 9 && !whole_arg(vm, a, argc, 9, "particles.emit", &sprite)))
         return 0;
     if (life > 30000)
         life = 30000;
@@ -1295,6 +1307,9 @@ NATIVE(particles_emit)
         ELEMS(vm, f[P_DX])[i] = mk(T_FIX, dx + spread(vm, sp));
         ELEMS(vm, f[P_DY])[i] = mk(T_FIX, dy + spread(vm, sp));
         ELEMS(vm, f[P_C])[i] = mk(T_INT, c);
+        ELEMS(vm, f[P_SP])[i] = mk(T_INT, sprite > 0 ? sprite : 0);
+        ELEMS(vm, f[P_FLIP])[i] =
+            mk(T_INT, sprite > 0 ? (int32_t)(core_random(vm) & 3) : 0);
         made++;
     }
     vm_charge(vm, 10 + (uint32_t)made * 2 + n / 16);
@@ -1429,9 +1444,14 @@ NATIVE(particles_step)
     if (!particles(vm, a[0], f, &n, "particles.step"))
         return 0;
     int32_t g = fx(f[P_GRAVITY]), drag = fx(f[P_DRAG]);
+    int32_t floor_y = fx(f[P_FLOOR]), bounce = fx(f[P_BOUNCE]);
+    int32_t spin = is_num(f[P_SPIN]) ? floor_int(f[P_SPIN]) : 0;
+    /* a quarter turn: flip 0, 1, 3, 2, round again */
+    static const uint8_t turned[4] = { 1, 3, 0, 2 };
     struct value *lf = ELEMS(vm, f[P_LIFE]), *x = ELEMS(vm, f[P_X]);
     struct value *y = ELEMS(vm, f[P_Y]), *dx = ELEMS(vm, f[P_DX]);
     struct value *dy = ELEMS(vm, f[P_DY]), *c = ELEMS(vm, f[P_C]);
+    struct value *sp = ELEMS(vm, f[P_SP]), *flip = ELEMS(vm, f[P_FLIP]);
     struct dropfield fd = { NULL, 0, 0, 0, 0 };
     if (f[P_FIELD].tag == T_IMG) {
         struct img *im = MEM(vm, (uint32_t)f[P_FIELD].v);
@@ -1458,8 +1478,19 @@ NATIVE(particles_step)
         dx[i] = mk(T_FIX, DX);
         dy[i] = mk(T_FIX, DY);
         int32_t ox = fx(x[i]), oy = fx(y[i]);
-        x[i] = mk(T_FIX, ox + DX);
-        y[i] = mk(T_FIX, oy + DY);
+        int32_t NY = wrap32((int64_t)oy + DY);
+        if (floor_y > 0 && DY > 0 && oy < floor_y && NY >= floor_y) {
+            int32_t up = (int32_t)(((int64_t)DY * bounce) >> 16);
+            if (up >= (1 << 14)) {      /* a quarter pixel a tick */
+                NY = floor_y;
+                dy[i] = mk(T_FIX, -up);
+            }
+        }
+        x[i] = mk(T_FIX, wrap32((int64_t)ox + DX));
+        y[i] = mk(T_FIX, NY);
+        if (spin > 0 && is_num(sp[i]) && floor_int(sp[i]) > 0 &&
+            (vm->frame + i) % (uint32_t)spin == 0)
+            flip[i] = mk(T_INT, turned[floor_int(flip[i]) & 3]);
         if (fd.c)
             settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i], &scanned);
     }
@@ -1474,7 +1505,14 @@ NATIVE(particles_draw)
     uint32_t n;
     if (!particles(vm, a[0], f, &n, "particles.draw"))
         return 0;
-    core_draw_dots(vm, ELEMS(vm, f[P_LIFE]), ELEMS(vm, f[P_X]),
-                   ELEMS(vm, f[P_Y]), ELEMS(vm, f[P_C]), n);
+    int32_t w = is_num(f[P_W]) ? floor_int(f[P_W]) : 0;
+    int32_t h = is_num(f[P_H]) ? floor_int(f[P_H]) : 0;
+    int32_t shade = is_num(f[P_SHADE]) ? floor_int(f[P_SHADE]) : 0;
+    struct value *arr[P_ARRAYS];
+    for (int i = 0; i < P_ARRAYS; i++)
+        arr[i] = ELEMS(vm, f[i]);
+    core_draw_particles(vm, arr, n, w < 1 || w > 8 ? 8 : w,
+                        h < 1 || h > 8 ? 8 : h,
+                        shade < 0 ? 0 : shade > 16 ? 16 : shade);
     return 1;
 }

@@ -215,6 +215,46 @@ function draw() { cls(); particles.draw(p); }`, 2, ['--dump', '10,20,4,1']);
     assert.equal(lines[2], '0090');
 });
 
+/* Sprite 1's top row is colours 1 2 3 0: drawn shaded from colour 8, it is
+ * 8 9 10 and see-through; flipped across, the other way round */
+test('sprite particles draw their sprite in their colour ramp, flipped', () => {
+    const r = run(`var p;
+function init() {
+    sset(8, 0, 1); sset(9, 0, 2); sset(10, 0, 3);
+    p = particles.pool(2);
+    p.w = 4; p.h = 1; p.shade = 3;
+    printh(particles.emit(p, 2, 0, 0, 0, 0, 0, 9, 8, 1));
+    printh(p.sp.join(",") + " " + (p.flip[0] >= 0 && p.flip[0] <= 3));
+    p.x[0] = 10; p.y[0] = 20; p.flip[0] = 0;
+    p.x[1] = 10; p.y[1] = 21; p.flip[1] = 1;
+}
+function update() {}
+function draw() { cls(5); particles.draw(p); }`, 1, ['--dump', '10,20,4,2']);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['2', '1,1 1', '89a5', '5a98']);
+});
+
+test('particles bounce off the floor, and sprites turn as they spin', () => {
+    const r = run(`var p;
+function init() {
+    p = particles.pool(3);
+    p.floor = 30; p.bounce = 0.5; p.spin = 1;
+    particles.emit(p, 1, 0, 29, 0, 2.0, 0, 50, 7, 1);
+    particles.emit(p, 1, 0, 29, 0, 0.25, 0, 50, 7);
+    p.flip[0] = 0;
+}
+function update() {
+    particles.step(p);
+    printh(p.y[0] + " " + p.dy[0] + " " + p.y[1] + " " + p.flip[0]);
+}`, 2);
+    assert.equal(r.status, 0, r.err);
+    /* the fast one bounces at half its speed; the slow one falls through,
+     * a quarter pixel's bounce being too little; flips go 0, 1, 3, 2 */
+    const lines = r.out.trim().split('\n');
+    assert.match(lines[0], /^30 -1 29\.25 [13]$/);
+    assert.match(lines[1], /^29 -1 29\.5 [032]$/);
+});
+
 test('pools are checked when handed back', () => {
     const r = run('function init() { actors.move({ x: 1 }, 1, 0, new Int32Array(4)); }\nfunction update() {}');
     assert.match(r.err, /actors\.move\(\) needs a pool from actors\.pool\(\)/);

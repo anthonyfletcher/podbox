@@ -3296,27 +3296,62 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
     finish(vm, &p);
 }
 
-/* particles.draw(): each live particle a pixel of its colour */
-void core_draw_dots(struct vm *vm, const struct value *life,
-                    const struct value *x, const struct value *y,
-                    const struct value *c, uint32_t n)
+/* particles.draw(): each live particle a pixel of its colour, or with a
+ * sprite (arr[6], flipped by arr[7]) the top left w x h of that sprite,
+ * its colours 1 to shade drawn as the particle's colour plus k - 1. The
+ * arrays are life, x, y, dx, dy, c, sp, flip. */
+void core_draw_particles(struct vm *vm, struct value *const *arr,
+                         uint32_t n, int32_t w, int32_t h, int32_t shade)
 {
+    const struct value *life = arr[0], *x = arr[1], *y = arr[2];
+    const struct value *c = arr[5], *sp = arr[6], *flip = arr[7];
     struct pen p;
+    struct sheet sh;
+    /* the colours a shaded sprite is drawn in: the draw palette's, with
+     * 1 to shade moved along to the particle's ramp each time */
+    static uint16_t ramp[256];
+    sheet_of(vm, &sh);
     begin(vm, &p, 0, 0);
-    p.per16 = PER16_DOT;
+    p.per16 = 0;                    /* copy_rect charges; dots below */
     p.cost += n / 8;
+    const uint16_t *plain = p.xl;
+    uint32_t dots = 0;
+    if (shade)
+        memcpy(ramp, plain, sizeof(ramp));
     for (uint32_t i = 0; i < n; i++) {
         if (num_or_0(life[i]) <= 0)
             continue;
+        int32_t s = num_or_0(sp[i]), col = num_or_0(c[i]) & 0xff;
+        if (s > 0) {
+            if (s >= sh.count)
+                continue;
+            int64_t xx = num_or_0(x[i]), yy = num_or_0(y[i]);
+            p.cost += COST_CALL / 2;
+            if (clipped_out(&p, xx, yy, w, h))
+                continue;
+            p.xl = plain;
+            if (shade && col > 0) {
+                for (int32_t k = 1; k <= shade; k++)
+                    ramp[k] = plain[(col + k - 1) & 0xff];
+                p.xl = ramp;
+                p.cost += (uint32_t)shade / 4;
+            }
+            int32_t fl = num_or_0(flip[i]);
+            copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s), cell_y(&sh, s),
+                      w, h, xx, yy, w, h, fl & 1, (fl & 2) != 0);
+            continue;
+        }
         int64_t px = (int64_t)num_or_0(x[i]) + p.ox;
         int64_t py = (int64_t)num_or_0(y[i]) + p.oy;
         if (px < p.cx0 || px >= p.cx1 || py < p.cy0 || py >= p.cy1)
             continue;
-        p.s.px[(int32_t)py * p.s.w + (int32_t)px] =
-            p.d->dpal[num_or_0(c[i]) & 0xff];
+        p.s.px[(int32_t)py * p.s.w + (int32_t)px] = p.d->dpal[col];
         p.count++;
+        dots++;
         row_touched(&p, (int32_t)py);
     }
+    p.xl = plain;
+    p.cost += dots * PER16_DOT / 16;
     finish(vm, &p);
 }
 
