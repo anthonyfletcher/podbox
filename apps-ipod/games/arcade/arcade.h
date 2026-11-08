@@ -300,7 +300,8 @@ uint32_t arcade_units(const struct vm *vm);
 /* Units charged so far in the call running now, from inside it: for
  * prof() sections */
 uint32_t arcade_units_now(const struct vm *vm);
-/* Units at which one call is stopped as not responding. */
+/* Units at which one call is stopped as not responding; arcade_start(),
+ * init() and the globals before it, may run to four times this. */
 void arcade_set_ceiling(struct vm *vm, uint32_t units);
 
 /* For a profiler, from the host's yield, which comes every 2048 units:

@@ -1888,11 +1888,23 @@ int arcade_menu_choose(struct vm *vm, int i, int button)
     return vm_truthy(vm, r) ? 1 : 0;
 }
 
+/* init() may run this many times a tick's ceiling: a cart's one-off
+ * setup -- a generated world, a big noise.fill -- is not a hung loop */
+#define INIT_CEILINGS 4
+
 int arcade_start(struct vm *vm)
 {
+    uint32_t tick_ceiling = vm->ceiling;
+    uint32_t setup = tick_ceiling <= 0xffffffffu / INIT_CEILINGS
+                     ? tick_ceiling * INIT_CEILINGS : 0xffffffffu;
+    vm->ceiling = setup;
     begin(vm);
     int ok = call_entry(vm, 0) && call_entry(vm, 1);
     end(vm);
+    /* back to a tick's, unless the host lowered it meanwhile (to stop
+     * a call running too long by the clock) */
+    if (vm->ceiling == setup)
+        vm->ceiling = tick_ceiling;
     return ok;
 }
 
