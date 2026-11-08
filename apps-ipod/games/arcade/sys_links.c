@@ -54,7 +54,9 @@ static const char *const link_keys[L_FIELDS] = {
 
 #define ELEMS(vm, arr) (BUF(vm, ARR(vm, arr)->buf)->v)
 
-static int32_t fx(struct value v)
+/* always inlined: -Os would call it, and links.step reads six a link a
+ * pass */
+static inline __attribute__((always_inline)) int32_t fx(struct value v)
 {
     return is_num(v) ? wrap32(scaled(v)) : 0;
 }
@@ -183,6 +185,24 @@ static uint32_t root(uint64_t v)
         bit >>= 2;
     }
     return (uint32_t)r;
+}
+
+/* The square root of a 32-bit square, rounded down: the short links'
+ * root, at a fraction of root()'s cost on an ARM7 */
+static uint32_t root32(uint32_t v)
+{
+    uint32_t r = 0, bit = 1u << 30;
+    while (bit > v)
+        bit >>= 2;
+    while (bit) {
+        if (v >= r + bit) {
+            v -= r + bit;
+            r = (r >> 1) + bit;
+        } else
+            r >>= 1;
+        bit >>= 2;
+    }
+    return r;
 }
 
 /* The length of (dx, dy, dz), 16.16: halved until the squares fit, and
@@ -413,49 +433,97 @@ NATIVE(links_step)
      * it to the free end when the other is pinned */
     struct value *la = ELEMS(vm, l.f[L_A]), *lb = ELEMS(vm, l.f[L_B]);
     struct value *len = ELEMS(vm, l.f[L_LEN]);
+    /* The passes work on plain numbers, read from the pool's arrays once
+     * and written back once, rather than six read and six written a link
+     * a pass: P the points (x, y, z), pinned, and each link's ends (-1
+     * for none or a broken one) and length */
+    static int32_t P[MAX_POINTS * 3], A[MAX_LINKS], B[MAX_LINKS];
+    static int32_t LEN[MAX_LINKS];
+    static uint8_t pinned[MAX_POINTS];
+    for (uint32_t i = 0; i < np; i++) {
+        P[i * 3] = fx(x[i]);
+        P[i * 3 + 1] = fx(y[i]);
+        P[i * 3 + 2] = fx(z[i]);
+        pinned[i] = (uint8_t)vm_truthy(vm, pin[i]);
+    }
+    for (uint32_t k = 0; k < nl; k++) {
+        int32_t i = whole(la[k], -1), j = whole(lb[k], -1);
+        int ok = i >= 0 && j >= 0 && (uint32_t)i < np && (uint32_t)j < np &&
+                 !(pinned[i] && pinned[j]);
+        A[k] = ok ? i : -1;
+        B[k] = j;
+        LEN[k] = fx(len[k]);
+    }
     for (int32_t p = 0; p < passes; p++)
         for (uint32_t k = 0; k < nl; k++) {
-            int32_t i = whole(la[k], -1), j = whole(lb[k], -1);
-            if (i < 0 || j < 0 || (uint32_t)i >= np || (uint32_t)j >= np)
+            int32_t i = A[k], j = B[k];
+            if (i < 0)
                 continue;
-            int pi = vm_truthy(vm, pin[i]), pj = vm_truthy(vm, pin[j]);
-            if (pi && pj)
-                continue;
-            int32_t xi = fx(x[i]), yi = fx(y[i]), xj = fx(x[j]), yj = fx(y[j]);
-            int32_t zi = fx(z[i]), zj = fx(z[j]);
+            int pi = pinned[i], pj = pinned[j];
+            int32_t *Pi = P + i * 3, *Pj = P + j * 3;
+            int32_t xi = Pi[0], yi = Pi[1], zi = Pi[2];
+            int32_t xj = Pj[0], yj = Pj[1], zj = Pj[2];
             int64_t dx = (int64_t)xj - xi, dy = (int64_t)yj - yi;
             int64_t dz = (int64_t)zj - zi;
-            int32_t d = span(dx, dy, dz);
+            /* A link under 64 pixels -- a cloth's or a rope's -- is worked
+             * in 1/256ths of a pixel, where its square fits 32 bits and its
+             * root and divide are 32-bit; a longer one exactly, in 64 */
+            const int64_t NEAR = (int64_t)1 << 22;
+            int short_link = dx > -NEAR && dx < NEAR && dy > -NEAR &&
+                             dy < NEAR && dz > -NEAR && dz < NEAR;
+            int32_t d, d8 = 0;
+            if (short_link) {
+                int32_t ax = (int32_t)dx >> 8, ay = (int32_t)dy >> 8;
+                int32_t az = (int32_t)dz >> 8;
+                d8 = (int32_t)root32((uint32_t)(ax * ax) + (uint32_t)(ay * ay) +
+                                     (uint32_t)(az * az));
+                d = d8 << 8;
+            } else
+                d = span(dx, dy, dz);
             /* torn on the first pass, at the stretch the tick left it */
             if (p == 0 && tear > 0 &&
-                d > fx(len[k]) + (((int64_t)fx(len[k]) * tear) >> 16)) {
+                d > LEN[k] + (((int64_t)LEN[k] * tear) >> 16)) {
                 la[k] = mk(T_INT, -1);
+                A[k] = -1;
                 broken++;
                 continue;
             }
             if (d < 16)
                 continue;
             /* the share of the gap each end moves, 16.16 of the vector */
-            int64_t gap = (int64_t)d - fx(len[k]);
-            int64_t s = (gap << 16) / d;
-            int64_t mx = (dx * s) >> 16, my = (dy * s) >> 16;
-            int64_t mz = (dz * s) >> 16;
+            int64_t gap = (int64_t)d - LEN[k];
+            int64_t s;
+            if (short_link && d8 > 0 && gap > -NEAR && gap < NEAR)
+                s = (int32_t)gap * 256 / d8;
+            else
+                s = (gap << 16) / d;
+            /* each move is under 32 bits once shifted, and halved there */
+            int32_t mx = (int32_t)((dx * s) >> 16);
+            int32_t my = (int32_t)((dy * s) >> 16);
+            int32_t mz = (int32_t)((dz * s) >> 16);
             if (pi) {
-                x[j] = mk(T_FIX, (int32_t)(xj - mx));
-                y[j] = mk(T_FIX, (int32_t)(yj - my));
-                z[j] = mk(T_FIX, (int32_t)(zj - mz));
+                Pj[0] = xj - mx;
+                Pj[1] = yj - my;
+                Pj[2] = zj - mz;
             } else if (pj) {
-                x[i] = mk(T_FIX, (int32_t)(xi + mx));
-                y[i] = mk(T_FIX, (int32_t)(yi + my));
-                z[i] = mk(T_FIX, (int32_t)(zi + mz));
+                Pi[0] = xi + mx;
+                Pi[1] = yi + my;
+                Pi[2] = zi + mz;
             } else {
-                x[i] = mk(T_FIX, (int32_t)(xi + mx / 2));
-                y[i] = mk(T_FIX, (int32_t)(yi + my / 2));
-                z[i] = mk(T_FIX, (int32_t)(zi + mz / 2));
-                x[j] = mk(T_FIX, (int32_t)(xj - mx / 2));
-                y[j] = mk(T_FIX, (int32_t)(yj - my / 2));
-                z[j] = mk(T_FIX, (int32_t)(zj - mz / 2));
+                Pi[0] = xi + mx / 2;
+                Pi[1] = yi + my / 2;
+                Pi[2] = zi + mz / 2;
+                Pj[0] = xj - mx / 2;
+                Pj[1] = yj - my / 2;
+                Pj[2] = zj - mz / 2;
             }
+        }
+    /* back into the pool; a pinned point never moves, so is left as it is */
+    for (uint32_t i = 0; i < np; i++)
+        if (!pinned[i]) {
+            x[i] = mk(T_FIX, P[i * 3]);
+            y[i] = mk(T_FIX, P[i * 3 + 1]);
+            z[i] = mk(T_FIX, P[i * 3 + 2]);
         }
     /* out of the walls: back along whichever axis came in */
     if (mask)
@@ -493,8 +561,8 @@ NATIVE(links_step)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
     /* measured on the ARM rig (.build/arcade-rig, sysprobe): a link a
-     * pass, a 64-bit root and divide, about 43 units */
-    vm_charge(vm, 10 + np * 14 + nl * (uint32_t)passes * 43 +
+     * pass about 17 units, most of it its root and divide */
+    vm_charge(vm, 10 + np * 14 + nl * (uint32_t)passes * 17 +
                   (mask ? np * 4 : 0) + (field ? np * 7 : 0));
     *out = mk(T_INT, (int32_t)np);
     return 1;

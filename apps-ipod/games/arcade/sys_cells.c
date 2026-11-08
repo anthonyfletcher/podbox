@@ -775,6 +775,43 @@ full:
  * bit n of survive is. Live is non-zero; a cell born is born (1 by
  * default). Life is birth 8, survive 12; smoothing a cave of walls is
  * birth 0x1e0, survive 0x1f0. Returns the cells that changed. */
+/* One generation over w x h: live[] holds 1 for each live cell of the
+ * last, c[] is changed where a cell is born or dies. A row at a time,
+ * each column's three cells summed once into sums[], so a cell's count
+ * is three sums less itself rather than eight tests at the edges.
+ * Returns the cells changed. */
+__attribute__((optimize("O2")))
+static int32_t life_rows(uint8_t *c, const uint8_t *live, int32_t w,
+                         int32_t h, uint32_t birth, uint32_t survive,
+                         uint8_t born)
+{
+    static uint8_t sums[FIELD_MAX + 2];
+    int32_t changed = 0;
+    sums[0] = 0;
+    sums[w + 1] = 0;
+    for (int32_t y = 0; y < h; y++) {
+        const uint8_t *row = live + y * w;
+        const uint8_t *up = y > 0 ? row - w : NULL;
+        const uint8_t *down = y < h - 1 ? row + w : NULL;
+        for (int32_t x = 0; x < w; x++)
+            sums[x + 1] = (uint8_t)(row[x] + (up ? up[x] : 0) +
+                                    (down ? down[x] : 0));
+        uint8_t *out = c + y * w;
+        for (int32_t x = 0; x < w; x++) {
+            uint32_t n = (uint32_t)(sums[x] + sums[x + 1] + sums[x + 2] -
+                                    row[x]);
+            uint8_t v = out[x];
+            uint8_t to = v ? (survive >> n & 1 ? v : 0)
+                           : (birth >> n & 1 ? born : 0);
+            if (to != v) {
+                out[x] = to;
+                changed++;
+            }
+        }
+    }
+    return changed;
+}
+
 NATIVE(cells_life)
 {
     struct field f;
@@ -787,34 +824,15 @@ NATIVE(cells_life)
     uint32_t survive = (uint32_t)floor_int(a[3]);
     uint8_t born = argc > 4 && is_num(a[4]) ? (uint8_t)floor_int(a[4]) : 1;
     uint32_t cells = (uint32_t)(f.w * f.h);
-    uint8_t *old = scratch(vm, cells);
-    if (!old)
+    uint8_t *live = scratch(vm, cells);
+    if (!live)
         return 0;
-    field_of(vm, a[0], a[1], "cells.life", &f);
-    memcpy(old, f.c, cells);
-    int32_t changed = 0;
-    for (int32_t y = 0; y < f.h; y++)
-        for (int32_t x = 0; x < f.w; x++) {
-            int n = 0;
-            for (int32_t j = -1; j <= 1; j++)
-                for (int32_t i = -1; i <= 1; i++) {
-                    int32_t nx = x + i, ny = y + j;
-                    if ((i || j) && nx >= 0 && ny >= 0 && nx < f.w &&
-                        ny < f.h && old[ny * f.w + nx])
-                        n++;
-                }
-            uint8_t v = old[y * f.w + x], to;
-            if (v)
-                to = survive & (1u << n) ? v : 0;
-            else
-                to = birth & (1u << n) ? born : 0;
-            if (to != v) {
-                f.c[y * f.w + x] = to;
-                changed++;
-            }
-        }
+    field_of(vm, a[0], a[1], "cells.life", &f);   /* the scratch may move it */
+    for (uint32_t i = 0; i < cells; i++)
+        live[i] = f.c[i] != 0;
+    int32_t changed = life_rows(f.c, live, f.w, f.h, birth, survive, born);
     /* measured on the ARM rig (.build/arcade-rig, sysprobe) */
-    vm_charge(vm, 10 + cells * 11);
+    vm_charge(vm, 10 + cells * 7 / 4);
     *out = mk(T_INT, changed);
     return 1;
 }
