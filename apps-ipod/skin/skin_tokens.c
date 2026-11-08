@@ -249,11 +249,8 @@ static bool plpct_db_minutes(const char *path, uint16_t *mins)
     return true;
 }
 
-void wps_playlist_percent_prepare(void)
+static void plpct_scan(void)
 {
-    if (!plpct.enabled)
-        return;
-
     plpct.nomem = true;
 
     int amount = playlist_amount();
@@ -330,6 +327,20 @@ void wps_playlist_percent_prepare(void)
     for (int t = 0; t < plpct.amount; t++)
         plpct.total_min += plpct.track_mins[t];
     plpct.nomem = false;
+}
+
+/* Called from the UI and from the threads that start playlists (iAP among
+ * them), and the scan yields as it reads tags: a scan already running is
+ * left to finish, rather than a second sharing plpct with it. */
+void wps_playlist_percent_prepare(void)
+{
+    static bool busy;
+
+    if (!plpct.enabled || busy)
+        return;
+    busy = true;
+    plpct_scan();
+    busy = false;
 }
 
 bool wps_get_playlist_percent(struct mp3entry *id3, unsigned long elapsed_ms,

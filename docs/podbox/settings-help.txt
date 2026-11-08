@@ -1412,10 +1412,10 @@ of the actions Select offers, or the whole now-playing menu, or nothing.
 
 [wps menu action]
 Where Menu goes from the now-playing screen. Previous Screen goes back to
-the list the music was started from, in the same place, and Menu from
-there reaches the main menu. A screen that would start something again,
-such as Random Album, is skipped for the main menu. Main Menu goes
-straight there.
+the list the music was started from, in the same place -- a Music list,
+Files, Playlists, Podcasts, the queue, Album Covers or Artist Portraits --
+and Menu from there reaches the main menu. Music started anywhere else
+goes back to the main menu. Main Menu goes straight there.
 
 [shortcuts instead of quickscreen]
 Whether a long press opens the quick screen or the shortcuts menu.

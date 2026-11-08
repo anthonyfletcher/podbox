@@ -95,8 +95,6 @@ unsigned int playback_status(void);
 void audio_set_unrecorded(bool unrecorded);
 bool audio_is_unrecorded(void);
 
-struct mp3entry* get_temp_mp3entry(struct mp3entry *free);
-
 void allocate_playback_log(void);
 void add_playbacklog(struct mp3entry *id3);
 /* Write the buffered log lines to their file now. Safe from any thread. */

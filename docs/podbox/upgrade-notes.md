@@ -15,7 +15,9 @@
   longer found by Search or listed in Changed Settings, and has no Explain
   entry.
 - **Menu on the now-playing screen now goes back to the list you started the
-  music from,** in the same place, and a second Menu reaches the main menu.
+  music from** -- a Music list, Files, Playlists, Podcasts, the queue, Album
+  Covers or Artist Portraits -- in the same place, and a second Menu reaches
+  the main menu.
   The end of the music returns there too. To have Menu go straight to
   the main menu as before, set **Menu Action** (Settings > Playback > Now
   Playing Screen) to Main Menu. Select Action and Select + Play Action

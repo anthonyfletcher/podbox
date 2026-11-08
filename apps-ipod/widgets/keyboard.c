@@ -37,7 +37,6 @@
 #define KBD_BTN_PAD_Y 5      /* vertical padding inside each button */
 
 struct kbd_edit {
-    const char *title;   /* in the box, above the line; NULL for none */
     struct edit_line ed;
     bool on_buttons;     /* focus is on the Cancel/OK button row, not the input */
     bool btn_ok;         /* on the button row, OK is selected (else Cancel) */
@@ -56,7 +55,7 @@ static struct kbd_edit st;
 static void kbd_measure(struct dialog *d, struct screen *display,
                         struct viewport *box, void *data)
 {
-    struct kbd_edit *s = data;
+    (void)data;
     struct dialog_insets in;
     int area_h = display->lcdheight;
     int sw = display->lcdwidth;
@@ -66,8 +65,7 @@ static void kbd_measure(struct dialog *d, struct screen *display,
 
     int bh = ch_h + 2 * KBD_BTN_PAD_Y;      /* button height */
     int gap = ch_h / 2;                     /* gap between edit line and buttons */
-    int box_h = dialog_title_height(s->title) + ch_h + gap + bh + in.top +
-                in.bottom;
+    int box_h = ch_h + gap + bh + in.top + in.bottom;
     if (box_h > area_h)
         box_h = area_h;
 
@@ -84,11 +82,8 @@ static void kbd_draw(struct dialog *d, struct screen *display,
     int ch_h = display->getcharheight();
     int bh = ch_h + 2 * KBD_BTN_PAD_Y;      /* button height */
 
-    dialog_draw_title(display, content, s->title);
-
     /* --- edit line in a clipped sub-viewport so long text can scroll --- */
     struct viewport tvp = *content;
-    tvp.y += dialog_title_height(s->title);
     tvp.height = edit_line_height(display);
     display->set_viewport(&tvp);
     edit_line_draw(display, &s->ed, tvp.width);
@@ -202,10 +197,9 @@ static int kbd_on_action(struct dialog *d, int action, void *data)
     return DIALOG_CONTINUE;
 }
 
-/* Click-wheel single-line text editor, title (or NULL) in the box above the
- * line. Returns 0 on accept (buffer updated), -1 on cancel or USB (buffer
- * left unchanged). */
-int dialog_input_titled(const char *title, char* text, int buflen)
+/* Click-wheel single-line text editor. Returns 0 on accept (buffer updated),
+ * -1 on cancel or USB (buffer left unchanged). */
+int dialog_input(char* text, int buflen)
 {
     static const struct dialog_callbacks cb = {
         .measure   = kbd_measure,
@@ -214,24 +208,18 @@ int dialog_input_titled(const char *title, char* text, int buflen)
     };
     struct dialog d;
 
-    st.title = title;
     edit_line_init(&st.ed, text, buflen - 1);
     st.on_buttons = false;   /* focus starts on the input line */
     st.btn_ok = true;
     st.dirty = false;
 
-    dialog_init(&d, CONTEXT_KEYBOARD, title, NULL, &cb, &st);
+    dialog_init(&d, CONTEXT_KEYBOARD, NULL, NULL, &cb, &st);
     edit_line_speak(&st.ed);    /* what is there to edit */
     if (dialog_run(&d, TIMEOUT_BLOCK) != DIALOG_ACCEPT)
         return -1;           /* cancelled or USB */
 
     edit_line_get(&st.ed, text, buflen, true);
     return 0;
-}
-
-int dialog_input(char* text, int buflen)
-{
-    return dialog_input_titled(NULL, text, buflen);
 }
 
 /* Plugin-ABI wrapper: the loadable-layout `kbd` argument is ignored. */
