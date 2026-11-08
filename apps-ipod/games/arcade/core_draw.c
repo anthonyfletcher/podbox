@@ -2295,6 +2295,15 @@ NATIVE(sheet)
     return 1;
 }
 
+/* Whether a w by h block at (x, y), in camera space, misses the clip
+ * altogether: nothing to draw, and none of copy_rect's setup to pay for */
+static int clipped_out(const struct pen *p, int64_t x, int64_t y, int64_t w,
+                       int64_t h)
+{
+    int64_t dx = clampc(x) + p->ox, dy = clampc(y) + p->oy;
+    return dx >= p->cx1 || dy >= p->cy1 || dx + w <= p->cx0 || dy + h <= p->cy0;
+}
+
 /* A sprite count in sprites, which may be a fraction: pixels, rounded
  * down. */
 static int sprites(struct vm *vm, struct value *a, int argc, int i,
@@ -2326,12 +2335,11 @@ NATIVE(spr)
     int32_t tx, ty;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
-    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty)) {
+    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty))
         tile8(&p, cell_px(&sh, (int32_t)n), sh.w, tx, ty);
-    } else {
+    else if (!clipped_out(&p, x, y, w, h))
         copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, (int32_t)n),
                   cell_y(&sh, (int32_t)n), w, h, x, y, w, h, fx, fy);
-    }
     finish(vm, &p);
     return 1;
 }
@@ -3216,7 +3224,7 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
         p.cost += COST_CALL / 2;
         if (!fl && tile_inside(&p, xx, yy, &tx, &ty))
             tile8(&p, cell_px(&sh, s), sh.w, tx, ty);
-        else
+        else if (!clipped_out(&p, xx, yy, 8, 8))
             copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s), cell_y(&sh, s),
                       8, 8, xx, yy, 8, 8, fl, 0);
     }
