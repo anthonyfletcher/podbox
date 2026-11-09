@@ -70,8 +70,8 @@ Palette entry `i` as `0xRRGGBB`.
 ### loadpal(PAL.name)
 Loads one of the cart's palettes whole.
 
-### camera([x, y])
-Moves everything drawn after by `-x, -y`: scrolling, and screen shake. `camera()` resets it.
+### camera([x, y], [turn], [px], [py])
+Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out: shapes turn whole, pictures and text stay upright at their turned places, and map, tline and the 3D systems are not turned. `camera()` resets it.
 
 ### clip([x, y, w, h])
 Draws only inside the rectangle. `clip()` resets it to the whole target.

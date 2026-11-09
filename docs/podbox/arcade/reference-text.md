@@ -11,7 +11,7 @@ is drawn in.
 ## How text works
 
 `print` draws text into the screen like any other drawing: in a colour,
-moved by the [camera](reference-drawing.md#camerax-y), cut off by the
+moved by the [camera](reference-drawing.md#camerax-y-turn-px-py), cut off by the
 [clip](reference-drawing.md#clipx-y-w-h) and the screen's edges. It does
 not wrap: a line too long for the screen runs off its edge.
 

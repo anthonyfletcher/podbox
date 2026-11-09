@@ -10,7 +10,7 @@ this page.
 - Lines and shapes: [line](#linex0-y0-x1-y1-c), [rect and rectfill](#rectx0-y0-x1-y1-c),
   [circ and circfill](#circx-y-r-c), [oval and ovalfill](#ovalx0-y0-x1-y1-c),
   [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend)
-- The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y),
+- The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py),
   [clip](#clipx-y-w-h), [target](#targett)
 
 ## How drawing works
@@ -46,7 +46,7 @@ circ(30, 30, 10);           // blue, like the rectangle
 draws both in colour 12. The pen starts as 6, light grey.
 
 **The drawing state lasts.** The pen colour, the [fill pattern](#fillpp),
-the [camera](#camerax-y), the [clip](#clipx-y-w-h) and the
+the [camera](#camerax-y-turn-px-py), the [clip](#clipx-y-w-h) and the
 [target](#targett) stay as they were set, from one call to the next and
 from one frame to the next, until changed. Set them, draw, and set them
 back.
@@ -95,7 +95,7 @@ function draw() {
 
 - `cls` also puts the [clip](#clipx-y-w-h) and the text cursor back to
   the whole screen and its top left. It does **not** reset the
-  [camera](#camerax-y), and its colour does not become the pen colour.
+  [camera](#camerax-y-turn-px-py), and its colour does not become the pen colour.
 - Call it first in `draw()`, unless every pixel is about to be covered
   anyway -- by a full-screen map or background image -- in which case it
   is about 1,200 units saved.
@@ -400,14 +400,17 @@ fillp();
 - Common patterns: `0x5a5a` checkerboard, `0x0f0f` horizontal stripes,
   `0x8421` diagonals, `0x0505` a light dither, `0x7d7d` a heavy one.
 
-## camera([x, y])
+## camera([x, y], [turn], [px], [py])
 
 Moves everything drawn afterwards by `-x`, `-y`: as if the screen were a
-window onto a larger world, looking at `x, y`.
+window onto a larger world, looking at `x, y`. With `turn`, the picture
+is also turned, as if the window were tilted.
 
 | Argument | |
 |---|---|
 | `x`, `y` | where the screen's top left is in the world; both 0 when left out |
+| `turn` | how far to turn the picture, in turns, clockwise: 0.25 is a quarter; 0 when left out |
+| `px`, `py` | the point on the screen it turns about; the middle of the screen (or of the image drawn into) when left out |
 
 **Returns** nothing.
 
@@ -448,6 +451,35 @@ camera();
 - It moves the map, sprites, text and shapes alike; not the
   [clip](#clipx-y-w-h), which stays on the screen.
 
+**Turning.** A game whose world tilts -- a ball rolled by tipping the
+board -- draws the world at its own positions and turns the camera:
+
+```js
+camera(0, 0, tilt);              // the world tilted a little clockwise
+cls(12);
+polyfill([-40, 60, 100, 200, 200, -40], [90, 80, 95, 70, 160, 160], 6, 3);
+rectfill(72, 60, 81, 89, 4);     // a post, tilted with the ground
+spr(1, 73, 52);                  // a ball on it, upright
+camera();                        // the score stays level
+print("TILT " + tilt, 2, 2, 7);
+```
+
+![Green hills tilted against a blue sky, a brown post leaning with them and a yellow ball upright on top; TILT 0.06 level at the top left](img/d-camera-turn.png)
+
+- **Shapes turn whole**: `pset`, `line`, `rect` and `rectfill`, `tri`
+  and `trifill`, `polyfill`, and the middles of circles and ovals (an
+  oval's axes stay upright). `pget` reads where `pset` would draw.
+- **Pictures stay upright** and go where their middle turns to: `spr`,
+  `sspr`, `blit`, `sprites.draw`, the actors and particles. Text goes
+  where its top left turns to. `rspr` and `rblit` turn with the camera,
+  on top of their own angle. `light.draw`'s lights go where their
+  middles turn to.
+- **Not turned**: `map` and `tline`, the 3D systems (they have their own
+  camera), and the clip. For a turning world drawn from a map, draw its
+  outlines with `polyfill`.
+- Turning costs little: about 2 units a point for `polyfill`, and nothing
+  that shows for the other calls.
+
 ## clip([x, y, w, h])
 
 Limits drawing to a rectangle of the screen: anything outside it is left
@@ -476,7 +508,7 @@ clip();
   second corner.
 - Use it for a window inside the screen -- a radar, a status panel, a
   playfield beside a score column -- so drawing in it cannot spill out.
-- It is in screen pixels: the [camera](#camerax-y) does not move it.
+- It is in screen pixels: the [camera](#camerax-y-turn-px-py) does not move it.
   `cls` resets it.
 
 ## target(t)

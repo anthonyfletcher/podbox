@@ -484,6 +484,65 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->xl = xlat_of(d);
 }
 
+/* ---- the camera's turn --------------------------------------------------- *
+ * A turned camera moves each point drawn about its pivot before the
+ * drawing takes the camera's offset off as ever: these give a point back
+ * turned but still before that offset. Shapes, lines, points and outlines
+ * turn whole; sprites, images, text and particles go where their middle
+ * turns to, upright. */
+
+/* x, y, 16.16, turned */
+static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
+{
+    int64_t ox = ((int64_t)d->cam_x << 16) + d->cam_px;
+    int64_t oy = ((int64_t)d->cam_y << 16) + d->cam_py;
+    int64_t sx = *x - ox, sy = *y - oy;
+    /* far beyond any target, kept where the multiply cannot overflow */
+    const int64_t far = (int64_t)1 << 44;
+    if (sx > far) sx = far;
+    if (sx < -far) sx = -far;
+    if (sy > far) sy = far;
+    if (sy < -far) sy = -far;
+    *x = ox + ((sx * d->cam_cos - sy * d->cam_sin) >> 16);
+    *y = oy + ((sx * d->cam_sin + sy * d->cam_cos) >> 16);
+}
+
+/* The pixel x, y turned: its middle, and the pixel that lands in */
+static void turn_px(const struct draw *d, int32_t *x, int32_t *y)
+{
+    if (!d->cam_turn)
+        return;
+    int64_t fx = ((int64_t)*x << 16) + 32768, fy = ((int64_t)*y << 16) + 32768;
+    turn_fix(d, &fx, &fy);
+    *x = (int32_t)clampc(fx >> 16);
+    *y = (int32_t)clampc(fy >> 16);
+}
+
+/* A w by h picture whose corner is x, y: its corner once its middle has
+ * turned */
+static void turn_box(const struct draw *d, int32_t *x, int32_t *y, int32_t w,
+                     int32_t h)
+{
+    if (!d->cam_turn)
+        return;
+    int64_t fx = ((int64_t)*x << 16) + ((int64_t)w << 15);
+    int64_t fy = ((int64_t)*y << 16) + ((int64_t)h << 15);
+    turn_fix(d, &fx, &fy);
+    *x = (int32_t)clampc((fx - ((int64_t)w << 15) + 32768) >> 16);
+    *y = (int32_t)clampc((fy - ((int64_t)h << 15) + 32768) >> 16);
+}
+
+/* rspr's and rblit's middle, 16.16, turned, and their angle with it:
+ * their angle turns the other way from the camera's */
+static void turn_turned(const struct draw *d, int64_t *x, int64_t *y,
+                        int64_t *angle)
+{
+    if (!d->cam_turn)
+        return;
+    turn_fix(d, x, y);
+    *angle -= d->cam_turn;
+}
+
 static void row_touched(struct pen *p, int32_t y)
 {
     if (y < p->lo)
@@ -762,6 +821,7 @@ static int circle(struct vm *vm, struct value *a, int argc, int outline,
     COLOUR(3, c, fn);
     if (r < 0)
         return 1;
+    turn_px(&vm->d, &x, &y);
     struct pen p;
     struct figure s = { circle_row, 0, 0, clampc(x), clampc(y),
                        r > FAR ? FAR : r, 0 };
@@ -800,6 +860,16 @@ static int oval(struct vm *vm, struct value *a, int argc, int outline,
     if (!box(vm, a, argc, fn, b, 16384))
         return 0;
     COLOUR(4, c, fn);
+    if (vm->d.cam_turn) {
+        /* its middle turned, its axes upright */
+        int32_t x = (int32_t)b[0], y = (int32_t)b[1];
+        turn_box(&vm->d, &x, &y, (int32_t)(b[2] - b[0] + 1),
+                 (int32_t)(b[3] - b[1] + 1));
+        b[2] += x - b[0];
+        b[3] += y - b[1];
+        b[0] = x;
+        b[1] = y;
+    }
     struct pen p;
     struct figure s = { oval_row, b[1], b[3], b[0] + b[2], b[1] + b[3],
                        b[2] - b[0], b[3] - b[1] };
@@ -1112,6 +1182,8 @@ NATIVE(line)
     WHOLE(2, 0, x1, "line");
     WHOLE(3, 0, y1, "line");
     COLOUR(4, c, "line");
+    turn_px(&vm->d, &x0, &y0);
+    turn_px(&vm->d, &x1, &y1);
     struct pen p;
     begin(vm, &p, c, 1);
     p.cost += 8;
@@ -1411,6 +1483,12 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
         v[i] = clampc(k);
     }
     COLOUR(6, c, fn);
+    for (int i = 0; i < 6 && vm->d.cam_turn; i += 2) {
+        int32_t x = (int32_t)v[i], y = (int32_t)v[i + 1];
+        turn_px(&vm->d, &x, &y);
+        v[i] = x;
+        v[i + 1] = y;
+    }
     struct pen p;
     begin(vm, &p, c, 1);
     if (outline) {
@@ -1451,6 +1529,7 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 #define POLY_CROSS 4
 #define POLY_SHIFT 2
 #define POLY_CURVE 30
+#define POLY_TURN  2    /* each point, when the camera turns */
 
 /* An edge: where it crosses the middle of its next row, and its step a
  * row, both 16.16; the row after its last; and the next edge to start on
@@ -1558,8 +1637,12 @@ static void poly_point(const struct pen *p, const struct column *xs,
                        const struct column *ys, uint32_t i, int64_t *x,
                        int64_t *y)
 {
-    *x = (int64_t)column_fix(xs, i) + (p->ox << 16);
-    *y = (int64_t)column_fix(ys, i) + (p->oy << 16);
+    *x = column_fix(xs, i);
+    *y = column_fix(ys, i);
+    if (p->d->cam_turn)
+        turn_fix(p->d, x, y);
+    *x += p->ox << 16;
+    *y += p->oy << 16;
 }
 
 /* Walking an outline: the point last on it, and the curve point waiting
@@ -1663,6 +1746,71 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
     return 1;
 }
 
+/* The rows the edges in g cover, filled by the even-odd rule; the units
+ * the walking cost, besides the spans */
+static uint32_t poly_rows(struct pen *p, struct poly *g, int32_t *act)
+{
+    /* the edges crossing the row, kept in order of where they cross: a
+     * row's order is nearly the last's, so putting it right is cheap */
+    uint32_t nact = 0, crossings = 0, shifts = 0;
+    for (int32_t y = g->lo; y < g->hi; y++) {
+        uint32_t m = 0;
+        for (uint32_t k = 0; k < nact; k++)
+            if (y < g->e[act[k]].y1)
+                act[m++] = act[k];
+        for (int32_t i = g->starts[y - p->cy0]; i; i = g->e[i - 1].next)
+            act[m++] = i - 1;
+        nact = m;
+        for (uint32_t k = 1; k < m; k++) {
+            int32_t i = act[k];
+            int64_t x = g->e[i].x;
+            uint32_t at = k;
+            while (at && g->e[act[at - 1]].x > x) {
+                act[at] = act[at - 1];
+                at--;
+                shifts++;
+            }
+            act[at] = i;
+        }
+        crossings += m;
+        /* the pixels whose middles lie from one crossing to the next */
+        for (uint32_t k = 0; k + 1 < m; k += 2) {
+            int64_t l = (g->e[act[k]].x - 32768 + 65535) >> 16;
+            int64_t r = ((g->e[act[k + 1]].x - 32768 + 65535) >> 16) - 1;
+            if (l <= r)
+                span(p, y, l, r);
+        }
+        for (uint32_t k = 0; k < m; k++)
+            g->e[act[k]].x += g->e[act[k]].dx;
+    }
+    return (uint32_t)(g->hi > g->lo ? g->hi - g->lo : 0) * POLY_ROW +
+           crossings * POLY_CROSS + shifts * POLY_SHIFT;
+}
+
+/* A quadrilateral, its corners 16.16 before the camera's offset, filled
+ * as polyfill() fills: a rectangle the camera turns */
+static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
+                     const int64_t qy[4])
+{
+    struct pen p;
+    begin(vm, &p, c, 1);
+    uint32_t rows = (uint32_t)(p.cy1 > p.cy0 ? p.cy1 - p.cy0 : 0);
+    uint8_t *mem = scratch(vm, 4 * sizeof(struct pedge) + 4 * 4 + rows * 4);
+    if (!mem)
+        return 0;
+    begin(vm, &p, c, 1);
+    struct poly g = { (struct pedge *)(void *)mem,
+                      (int32_t *)(void *)(mem + 4 * sizeof(struct pedge) + 16),
+                      0, 4, p.cy0, p.cy1, p.cy1, p.cy0, 0, 0, 0, 0 };
+    for (int k = 0; k < 4; k++)
+        poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
+                  qx[(k + 1) & 3] + (p.ox << 16), qy[(k + 1) & 3] + (p.oy << 16));
+    p.cost += COST_RECT + 4 * POLY_EDGE +
+              poly_rows(&p, &g, (int32_t *)(void *)(mem + 4 * sizeof(struct pedge)));
+    finish(vm, &p);
+    return 1;
+}
+
 /* polyfill(xs, ys, n, [c], [ends], [bend]): the n points as outlines,
  * filled by the even-odd rule. ends, when given, is where each outline
  * ends (the index after its last point); bend, where non-zero, makes a
@@ -1712,6 +1860,8 @@ NATIVE(polyfill)
     /* wholly left or right of the clip: no row is walked */
     if (g.xmax < ((int64_t)p.cx0 << 16) || g.xmin >= ((int64_t)p.cx1 << 16)) {
         p.cost += POLY_CALL + (uint32_t)n * POLY_POINT;
+        if (vm->d.cam_turn)
+            p.cost += (uint32_t)n * POLY_TURN;
         finish(vm, &p);
         return 1;
     }
@@ -1736,44 +1886,11 @@ NATIVE(polyfill)
     g.counting = 0;
     if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend, (uint32_t)n))
         return 0;
-    /* the edges crossing the row, kept in order of where they cross: a
-     * row's order is nearly the last's, so putting it right is cheap */
-    int32_t *act = (int32_t *)(void *)(mem + at_act);
-    uint32_t nact = 0, crossings = 0, shifts = 0;
-    for (int32_t y = g.lo; y < g.hi; y++) {
-        uint32_t m = 0;
-        for (uint32_t k = 0; k < nact; k++)
-            if (y < g.e[act[k]].y1)
-                act[m++] = act[k];
-        for (int32_t i = g.starts[y - p.cy0]; i; i = g.e[i - 1].next)
-            act[m++] = i - 1;
-        nact = m;
-        for (uint32_t k = 1; k < m; k++) {
-            int32_t i = act[k];
-            int64_t x = g.e[i].x;
-            uint32_t at = k;
-            while (at && g.e[act[at - 1]].x > x) {
-                act[at] = act[at - 1];
-                at--;
-                shifts++;
-            }
-            act[at] = i;
-        }
-        crossings += m;
-        /* the pixels whose middles lie from one crossing to the next */
-        for (uint32_t k = 0; k + 1 < m; k += 2) {
-            int64_t l = (g.e[act[k]].x - 32768 + 65535) >> 16;
-            int64_t r = ((g.e[act[k + 1]].x - 32768 + 65535) >> 16) - 1;
-            if (l <= r)
-                span(&p, y, l, r);
-        }
-        for (uint32_t k = 0; k < m; k++)
-            g.e[act[k]].x += g.e[act[k]].dx;
-    }
+    uint32_t units = poly_rows(&p, &g, (int32_t *)(void *)(mem + at_act));
     p.cost += POLY_CALL + (uint32_t)n * POLY_POINT + max * POLY_EDGE +
-              (uint32_t)(g.hi > g.lo ? g.hi - g.lo : 0) * POLY_ROW +
-              crossings * POLY_CROSS + shifts * POLY_SHIFT +
-              g.curves * POLY_CURVE;
+              g.curves * POLY_CURVE + units;
+    if (vm->d.cam_turn)
+        p.cost += (uint32_t)n * POLY_TURN;
     finish(vm, &p);
     return 1;
 }
@@ -1813,6 +1930,37 @@ static void rows(struct pen *p, int32_t from, int32_t to, int64_t x0,
     row_touched(p, to);
 }
 
+/* A rectangle the camera turns: filled, the pixels' area x0..x1 + 1 as a
+ * quadrilateral; outlined, four lines through its corner pixels */
+static int turned_rect(struct vm *vm, const int64_t b[4], uint32_t c,
+                       int outline)
+{
+    const struct draw *d = &vm->d;
+    if (!outline) {
+        int64_t qx[4] = { b[0], b[2] + 1, b[2] + 1, b[0] };
+        int64_t qy[4] = { b[1], b[1], b[3] + 1, b[3] + 1 };
+        for (int k = 0; k < 4; k++) {
+            qx[k] <<= 16;
+            qy[k] <<= 16;
+            turn_fix(d, &qx[k], &qy[k]);
+        }
+        return quad_fill(vm, c, qx, qy);
+    }
+    int32_t x[4] = { (int32_t)b[0], (int32_t)b[2], (int32_t)b[2], (int32_t)b[0] };
+    int32_t y[4] = { (int32_t)b[1], (int32_t)b[1], (int32_t)b[3], (int32_t)b[3] };
+    for (int k = 0; k < 4; k++)
+        turn_px(d, &x[k], &y[k]);
+    struct pen p;
+    begin(vm, &p, c, 1);
+    p.cost += COST_RECT;
+    p.per16 = PER16_DOT;
+    for (int k = 0; k < 4; k++)
+        walk_line(&p, x[k], y[k], x[(k + 1) & 3], y[(k + 1) & 3], plot_dot,
+                  p.pat ? NULL : run_dots, NULL);
+    finish(vm, &p);
+    return 1;
+}
+
 static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
                      const char *fn)
 {
@@ -1820,6 +1968,8 @@ static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
     if (!box(vm, a, argc, fn, b, FAR))
         return 0;
     COLOUR(4, c, fn);
+    if (vm->d.cam_turn)
+        return turned_rect(vm, b, c, outline);
     struct pen p;
     begin(vm, &p, c, 1);
     p.cost += COST_RECT;
@@ -1864,6 +2014,7 @@ NATIVE(pset)
     WHOLE(0, 0, x, "pset");
     WHOLE(1, 0, y, "pset");
     COLOUR(2, c, "pset");
+    turn_px(&vm->d, &x, &y);
     /* The screen without a fill pattern, the usual case, without a pen */
     struct draw *d = &vm->d;
     if (d->target.tag != T_IMG && !d->fill) {
@@ -1890,6 +2041,7 @@ NATIVE(pget)
     struct surf s;
     WHOLE(0, 0, x, "pget");
     WHOLE(1, 0, y, "pget");
+    turn_px(&vm->d, &x, &y);
     surf_of(vm, vm->d.target, &s, "pget");
     int64_t px = (int64_t)x - vm->d.cam_x, py = (int64_t)y - vm->d.cam_y;
     *out = mk(T_INT, px < 0 || py < 0 || px >= s.w || py >= s.h ? 0
@@ -2260,9 +2412,11 @@ NATIVE(print)
     int lines;
     begin(vm, &p, c, 0);
     int wide = vm->d.font >= 2;
-    int64_t end = wide ? text_wide(vm, &p, buf, n, x, y, k, 1, &widest,
+    int32_t tx = x, ty = y;         /* its corner turned, the text upright */
+    turn_px(&vm->d, &tx, &ty);
+    int64_t end = wide ? text_wide(vm, &p, buf, n, tx, ty, k, 1, &widest,
                                    &lines)
-                       : text(&p, buf, n, x, y, k, 1, &widest, &lines);
+                       : text(&p, buf, n, tx, ty, k, 1, &widest, &lines);
     finish(vm, &p);
     vm->d.cur_x = x;
     vm->d.cur_y = (int32_t)clampc((int64_t)y +
@@ -2684,6 +2838,7 @@ NATIVE(spr)
     if (n < 0 || n >= sh.count)
         return 1;
     int fx = flag(vm, a, argc, 5), fy = flag(vm, a, argc, 6);
+    turn_box(&vm->d, &x, &y, (int32_t)w, (int32_t)h);
     struct pen p;
     int32_t tx, ty;
     begin(vm, &p, 0, 0);
@@ -2711,6 +2866,7 @@ NATIVE(sspr)
     WHOLE(7, sh, dh, "sspr");
     struct sheet src;
     sheet_of(vm, &src);
+    turn_box(&vm->d, &dx, &dy, dw, dh);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
@@ -2812,6 +2968,7 @@ NATIVE(blit)
         return 0;
     WHOLE(1, 0, x, "blit");
     WHOLE(2, 0, y, "blit");
+    turn_box(&vm->d, &x, &y, s.w, s.h);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
@@ -2834,6 +2991,7 @@ NATIVE(blitpart)
     WHOLE(4, 0, h, "blitpart");
     WHOLE(5, 0, x, "blitpart");
     WHOLE(6, 0, y, "blitpart");
+    turn_box(&vm->d, &x, &y, w, h);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
@@ -2979,6 +3137,7 @@ NATIVE(rspr)
     t.sh = (uint32_t)h * 8;
     t.flip = flag(vm, a, argc, 7);
     t.xl = p.xl;
+    turn_turned(&vm->d, &x, &y, &angle);
     turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
     return 1;
@@ -3008,6 +3167,7 @@ NATIVE(rblit)
     t.sh = (uint32_t)s.h;
     t.flip = 0;
     t.xl = p.xl;
+    turn_turned(&vm->d, &x, &y, &angle);
     turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
     return 1;
@@ -3228,13 +3388,24 @@ static void full_clip(struct vm *vm)
     vm->d.clip_y1 = s.h;
 }
 
+/* camera([x, y], [turn], [px], [py]): what is drawn at x, y lands at the
+ * target's corner, and with turn (in turns, clockwise) the picture is
+ * turned about px, py on the target, its middle when left out */
 NATIVE(camera)
 {
     (void)out;
     WHOLE(0, 0, x, "camera");
     WHOLE(1, 0, y, "camera");
-    vm->d.cam_x = x;
-    vm->d.cam_y = y;
+    struct draw *d = &vm->d;
+    d->cam_x = x;
+    d->cam_y = y;
+    d->cam_turn = argc > 2 && is_num(a[2]) ? (int32_t)(wrap32(scaled(a[2])) & 0xffff) : 0;
+    struct surf s;
+    surf_of(vm, d->target, &s, "camera");
+    d->cam_px = argc > 3 && is_num(a[3]) ? wrap32(scaled(a[3])) : s.w << 15;
+    d->cam_py = argc > 4 && is_num(a[4]) ? wrap32(scaled(a[4])) : s.h << 15;
+    d->cam_cos = core_sine((uint32_t)d->cam_turn + 0x4000);
+    d->cam_sin = core_sine((uint32_t)d->cam_turn);
     return 1;
 }
 
@@ -3575,7 +3746,9 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
             if (s >= sh.count)
                 continue;
         }
-        int64_t xx = column_at(x, i, 0), yy = column_at(y, i, 0);
+        int32_t sx = column_at(x, i, 0), sy = column_at(y, i, 0);
+        turn_box(&vm->d, &sx, &sy, 8, 8);
+        int64_t xx = sx, yy = sy;
         int fl = column_true(vm, flip, i, 0);
         int32_t tx, ty;
         p.cost += COST_CALL / 2;
@@ -3708,7 +3881,9 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
         if (s > 0) {
             if (s >= sh.count)
                 continue;
-            int64_t xx = num_or_0(x[i]), yy = num_or_0(y[i]);
+            int32_t sx = num_or_0(x[i]), sy = num_or_0(y[i]);
+            turn_box(&vm->d, &sx, &sy, w, h);
+            int64_t xx = sx, yy = sy;
             p.cost += COST_CALL / 2;
             const uint16_t *xl = plain;
             if (shade && col > 0) {
@@ -3737,8 +3912,9 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
             }
             continue;
         }
-        int64_t px = (int64_t)num_or_0(x[i]) + p.ox;
-        int64_t py = (int64_t)num_or_0(y[i]) + p.oy;
+        int32_t qx = num_or_0(x[i]), qy = num_or_0(y[i]);
+        turn_px(&vm->d, &qx, &qy);
+        int64_t px = (int64_t)qx + p.ox, py = (int64_t)qy + p.oy;
         if (px < p.cx0 || px >= p.cx1 || py < p.cy0 || py >= p.cy1)
             continue;
         p.s.px[(int32_t)py * p.s.w + (int32_t)px] = p.d->dpal[col];
@@ -5137,8 +5313,16 @@ NATIVE(light_draw)
     uint32_t reach = 0;
     for (int32_t i = 0; i < n; i++) {
         struct lamp *m = &lamps[nl];
-        m->lx = (column_fix(&cx, (uint32_t)i) >> 12) + (int32_t)(p.ox * 16);
-        m->ly = (column_fix(&cy, (uint32_t)i) >> 12) + (int32_t)(p.oy * 16);
+        int64_t lx = column_fix(&cx, (uint32_t)i), ly = column_fix(&cy, (uint32_t)i);
+        if (vm->d.cam_turn) {
+            turn_fix(&vm->d, &lx, &ly);
+            /* a light turned far off cannot reach the clip */
+            if (lx > (1 << 30) || lx < -(1 << 30) || ly > (1 << 30) ||
+                ly < -(1 << 30))
+                continue;
+        }
+        m->lx = (int32_t)(lx >> 12) + (int32_t)(p.ox * 16);
+        m->ly = (int32_t)(ly >> 12) + (int32_t)(p.oy * 16);
         int32_t r = column_fix(&cr, (uint32_t)i) >> 12;
         if (r < 17)
             continue;                   /* under a pixel */

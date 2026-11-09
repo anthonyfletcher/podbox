@@ -709,6 +709,7 @@ static void quiet_begin(struct vm *vm, int rows, int world)
     saved = vm->d;
     vm->d.target = mk(T_INT, 0);
     vm->d.cam_x = vm->d.cam_y = 0;
+    vm->d.cam_turn = 0;
     clip(vm, 0, 0, SCREEN_W, SCREEN_H);
     vm->d.fill = 0;
     for (int i = 0; i < 256; i++)
