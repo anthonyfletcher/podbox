@@ -637,14 +637,15 @@ function present() {
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, Math.max(0, ms)));
 
-/* The players a cart can be run as: a unit of script and a whole screen's
- * update, in ms on each. The iPod Video's are measured; the Classic's are
- * from its speed against the Video. */
+/* The players a cart can be run as, in ms on each, all measured: a unit of
+ * script, a whole screen's rows changed and sent, and a whole screen's rows
+ * drawn but found unchanged against the last frame. Music means FLAC, the
+ * heaviest to decode. */
 const DEVICES = {
-    '6g': { name: 'iPod Classic', unit: 0.00016, screen: 2.0 },
-    '5g': { name: 'iPod Video', unit: 0.00055, screen: 6.2 },
-    '5g-music': { name: 'iPod Video, music playing', unit: 0.0011, screen: 6.6 },
-    'free': { name: 'this computer, no limit', unit: 0, screen: 0 }
+    '6g': { name: 'iPod Classic', unit: 0.00016, screen: 2.2, same: 0.5 },
+    '5g': { name: 'iPod Video', unit: 0.00055, screen: 5.0, same: 1.8 },
+    '5g-music': { name: 'iPod Video, playing FLAC', unit: 0.0019, screen: 6.6, same: 2.0 },
+    'free': { name: 'this computer, no limit', unit: 0, screen: 0, same: 0 }
 };
 let device = '5g-music';
 try { if (DEVICES[localStorage.getItem('arcade-device')]) device = localStorage.getItem('arcade-device'); } catch (e) { /* none kept */ }
@@ -652,6 +653,9 @@ try { if (DEVICES[localStorage.getItem('arcade-device')]) device = localStorage.
 /* The units one call may run before the player stops the cart as not
  * responding: the shell's CEILING */
 const CEILING = 2000000;
+
+/* the manual, on the repository's pages */
+const MANUAL = 'https://github.com/anthonyfletcher/podbox/blob/master/docs/podbox/arcade/';
 
 /* The player's clock, in ms of its own time: each tick takes what its
  * units and the rows it drew take on the player, and when a tick runs
@@ -661,10 +665,12 @@ let clock;
 
 function clockStart() {
     clock = { real: performance.now(), emu: 0, start: 0, frame: 0, drawn: [] };
+    seen = null;
 }
 
 /* after time the player does not count (a pause, a dialog), from now on */
 function rebase(e) {
+    seen = null;                    /* the player redraws it all after */
     clock.emu = performance.now() - clock.real;
     clock.start = clock.emu - clock.frame * (1000 / e.rate());
 }
@@ -727,12 +733,31 @@ async function choose(c) {
     rebase(e);
 }
 
+/* The last frame's pixels, as the player keeps them to compare each drawn
+ * row against: a row unchanged is not sent. Null until a frame is shown,
+ * and after a palette change, when every row is sent. */
+let seen = null;
+
 function cost(e, drawn) {
     const d = DEVICES[device];
     let ms = e.units() * d.unit;
     if (drawn) {
         const [lo, hi] = e.dirty();
-        if (hi >= lo) ms += (d.screen * (hi - lo + 1)) / 120;
+        if (hi >= lo) {
+            const now = e.pixels();
+            let changed = 0;
+            if (!seen || e.paletteChanged()) {
+                changed = hi - lo + 1;
+                seen = now;
+            } else {
+                for (let y = lo; y <= hi; y++) {
+                    const a = y * 160;
+                    for (let x = a; x < a + 160; x++)
+                        if (now[x] !== seen[x]) { changed++; seen.set(now.subarray(a, a + 160), a); break; }
+                }
+            }
+            ms += (d.screen * changed + d.same * (hi - lo + 1 - changed)) / 120;
+        }
     }
     return ms;
 }
@@ -1676,6 +1701,9 @@ const ACTIONS = {
     stop: stop,
     speech: () => $('speech').classList.toggle('on'),
     keys: () => $('help-keys').showModal(),
+    manual: () => window.open(MANUAL + 'README.md', '_blank', 'noopener'),
+    tutorial: () => window.open(MANUAL + 'tutorial-1-ball-and-bat.md', '_blank', 'noopener'),
+    'manual-fast': () => window.open(MANUAL + 'reference-fast.md', '_blank', 'noopener'),
 };
 
 /* the menus: a click opens one; while one is open, hovering moves along

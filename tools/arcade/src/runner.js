@@ -241,6 +241,7 @@ export class Engine {
     error() { return this.cstr(this.x.web_error()); }
     dialog() { return this.cstr(this.x.web_dialog()); }
     dirty() { const d = this.x.web_dirty(); return [d >> 16, (d << 16) >> 16]; }
+    paletteChanged() { return this.x.web_palette_changed() !== 0; }
 
     /* the screen: 160x120 RGBA, and its palette numbers */
     rgba() { const p = this.x.web_screen(); return this.mem.slice(p, p + 160 * 120 * 4); }

@@ -336,6 +336,13 @@ EXPORT("web_dirty") int web_dirty(void)
     return s->dirty_lo << 16 | (s->dirty_hi & 0xffff);
 }
 
+/* 1 when the palette changed: the player sends every row without first
+ * comparing it with the last frame's */
+EXPORT("web_palette_changed") int web_palette_changed(void)
+{
+    return arcade_screen(vm)->palette_changed != 0;
+}
+
 static int16_t sound[2 * 4096];
 
 /* frames of sound at rate Hz, stereo pairs, into the buffer returned */
