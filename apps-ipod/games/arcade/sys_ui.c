@@ -270,7 +270,7 @@ static void lay_out(struct vm *vm, struct dialog *g)
         break;
     }
     case ARCADE_DIALOG_NUMBER:
-        g->controls = (vm->d.font_big ? l : 2 * l) + 2;
+        g->controls = l + 2;
         break;
     case ARCADE_DIALOG_TEXT:
         g->controls = l + 4 + l / 2 + row;
@@ -370,11 +370,8 @@ static void draw_number(struct vm *vm, struct dialog *g, int32_t y)
         num[n++] = '-';
     while (k)
         num[n++] = rev[--k];
-    uint8_t big = vm->d.font_big;
-    vm->d.font_big = 1;
     int32_t w = text_width(vm, num, (uint32_t)n);
     draw_text(vm, num, (uint32_t)n, (SCREEN_W - w) / 2, y + 1, vm->ui_hi);
-    vm->d.font_big = big;
 }
 
 static void draw_line(struct vm *vm, struct dialog *g, int32_t y)
