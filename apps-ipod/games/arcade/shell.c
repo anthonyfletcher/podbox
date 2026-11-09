@@ -1428,7 +1428,10 @@ static int run(const char *path, void *mem, size_t size)
          * the clock gives up the time rather than racing to catch it. */
         long late = current_tick - (start + (long)((frame * HZ) / rate));
         if (late >= HZ / rate) {
-            arcade_skipped(vm, (unsigned)(late * rate / HZ));
+            /* rounded, and at least the frame not drawn: at 33 a tick is
+             * 3 of HZ, and 3 * 33 / 100 truncates to none */
+            long missed = (late * rate + HZ / 2) / HZ;
+            arcade_skipped(vm, missed > 1 ? (unsigned)missed : 1);
             arcade_input(vm, held, wheel_clicks(pos), pos);
             beat_tick(vm);
             call_began = current_tick;
