@@ -4427,45 +4427,228 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
  * dithered, so a torch fades rather than banding. */
 
 #define LIGHT_LEVELS 8
+/* a reach, in sixteenths, from which a light's middle is filled */
+#define LIGHT_SPLIT (32 * 16)
+
+/* measured on the ARM rig (drawprobe), in units: a colour table; the
+ * shade tables, when the ramp's length changes; a row any light reaches,
+ * and each light's row; per 32 pixels stepped through by a light, and
+ * per 32 mapped through their levels over darkening; and per 16 of the
+ * clip, all darkened or mapped */
+#define LIGHT_TABLE 20
+#define LIGHT_SHADE 1200
+#define LIGHT_ROW 13
+#define LIGHT_LAMP 13
+#define LIGHT_STEP32 9
+#define LIGHT_MAP32 3
+#define LIGHT_DARK16 3
+
+/* the units for the pixels stepped through and mapped, the rows lit and
+ * the lights' rows */
+static uint32_t light_units(uint32_t step, uint32_t map, uint32_t rows,
+                            uint32_t lamprows)
+{
+    return (step * LIGHT_STEP32 + map * LIGHT_MAP32) / 32 + rows * LIGHT_ROW +
+           lamprows * LIGHT_LAMP;
+}
 
 #ifdef ARCADE_ASM
 void light_map_arm(uint8_t *px, const uint8_t *lit, int32_t n,
                    const uint8_t *lut, uint32_t levels);
-void light_row_arm(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
-                   int32_t step, uint32_t inv, uint32_t bay,
-                   const uint16_t *fall, uint32_t levels);
+void light_dark_arm(uint8_t *px, int32_t n, const uint8_t *lut);
+void light_span_arm(uint8_t *row, int32_t n, uint32_t q, uint32_t dq,
+                    uint32_t inv, const uint8_t *const *tab);
 #endif
 
-#ifndef ARCADE_ASM
-/* One row of a light, xa to xb: each pixel's level from its squared
- * distance dd (stepping by step, which grows by 512 a pixel), its 256ths
- * of the reach's square (dd * inv over 2^32) through fall, with the row's
- * dither added; the highest of the lights kept. Its own function, so the
- * loop's few values stay in registers. */
-static void __attribute__((noinline))
-light_row(uint8_t *row, int32_t xa, int32_t xb, uint32_t dd,
-                      int32_t step, uint32_t inv, const uint8_t *bay,
-                      const uint16_t *fall, uint32_t levels)
+/* The level at a squared distance of i/256 of the reach's square, for the
+ * dither b: 2 * levels * (1 - its root) in sixteenths, plus b, over 16 --
+ * full light within half the reach, dithered steps across the outer half.
+ * Kept for vm->light_levels levels. */
+static uint8_t shade[16][260];
+
+static void light_shade(uint32_t levels)
 {
-    for (int32_t x = xa; x < xb; x++) {
-        uint32_t idx = (uint32_t)(((uint64_t)dd * inv) >> 32);
-        if (idx <= 256) {
-            uint32_t k = (uint32_t)(fall[idx] + bay[x & 3]) >> 4;
-            if (k > levels)
-                k = levels;
-            if (k > row[x])
-                row[x] = (uint8_t)k;
-        }
-        dd += (uint32_t)step;
-        step += 512;
+    int32_t root = 0;
+    for (int32_t i = 0; i <= 256; i++) {
+        /* the root of i * 256, walked up as i grows */
+        while ((root + 1) * (root + 1) <= i * 256)
+            root++;
+        int32_t f = (int32_t)levels * (256 - root) / 8;
+        /* (f + b) / 16 is f / 16 until b reaches 16 less f's remainder,
+         * then one more; at most levels */
+        int32_t k = f >> 4, split = 16 - (f & 15);
+        uint8_t lo = (uint8_t)(k > (int32_t)levels ? (int32_t)levels : k);
+        uint8_t up = (uint8_t)(k + 1 > (int32_t)levels ? (int32_t)levels
+                                                       : k + 1);
+        uint8_t *s = &shade[0][i], *mid = &shade[split][i];
+        uint8_t *end = &shade[15][i];
+        for (; s < mid; s += sizeof(shade[0]))
+            *s = lo;
+        for (; s <= end; s += sizeof(shade[0]))
+            *s = up;
     }
 }
+
+/* n pixels of a light's row from row: each pixel's level from q, its
+ * squared distance in 256ths of the reach's square with 23 bits of
+ * fraction, through its dither's shade table, tab[0] the first pixel's;
+ * the highest of the lights kept. q steps by dq, which grows by inv. */
+static void light_span(uint8_t *row, int32_t n, uint32_t q, uint32_t dq,
+                       uint32_t inv, const uint8_t *const *tab)
+{
+#ifdef ARCADE_ASM
+    light_span_arm(row, n, q, dq, inv, tab);
+#else
+    for (int32_t x = 0; x < n; x++) {
+        uint8_t k = tab[x & 3][q >> 23];
+        if (k > row[x])
+            row[x] = k;
+        q += dq;
+        dq += inv;
+    }
 #endif
+}
+
+/* pixels xa to xb of the row dy2 (sixteenths squared) from a light at lx:
+ * q and dq at xa, with inv 2^40 over the reach's square; row8 the row's
+ * shade tables by x & 3, twice over. dq, the step to the next pixel's
+ * squared distance (32 * (dx + 8)) times inv over 2^9, is (dx + 8) * inv
+ * over 16, rounded down, from one 32 by 32 multiply. */
+static void light_run(uint8_t *row, int32_t xa, int32_t xb, int32_t lx,
+                      int32_t dy2, uint32_t inv, const uint8_t *const *row8)
+{
+    if (xa >= xb)
+        return;
+    int32_t dx = xa * 16 + 8 - lx;
+    uint32_t dd = (uint32_t)(dx * dx + dy2);
+    int32_t s = dx + 8;
+    uint64_t m = (uint64_t)(uint32_t)(s < 0 ? -s : s) * inv;
+    uint32_t dq = s < 0 ? -(uint32_t)((m + 15) >> 4) : (uint32_t)(m >> 4);
+    light_span(row + xa, xb - xa, (uint32_t)(((uint64_t)dd * inv) >> 9), dq,
+               inv, row8 + (xa & 3));
+}
+
+/* lit zeroed from a to b, rounded out to whole words: a few in place,
+ * more by memset */
+static inline __attribute__((always_inline))
+void light_zero(uint8_t *lit, int32_t a, int32_t b)
+{
+    uint32_t *z = (uint32_t *)(void *)(lit + (a & ~3));
+    uint32_t *e = (uint32_t *)(void *)(lit + ((b + 3) & ~3));
+    if (e - z > 8)
+        memset(z, 0, (size_t)((uint8_t *)e - (uint8_t *)z));
+    else
+        while (z < e)
+            *z++ = 0;
+}
+
+/* n pixels through the darkest table */
+static void light_dark(uint8_t *px, int32_t n, const uint8_t *dark)
+{
+    int32_t x = 0;
+#ifdef ARCADE_ASM
+    for (; x < n && ((uintptr_t)(px + x) & 3); x++)
+        px[x] = dark[px[x]];
+    if (n - x >= 4) {
+        light_dark_arm(px + x, (n - x) & ~3, dark);
+        x += (n - x) & ~3;
+    }
+#endif
+    for (; x < n; x++)
+        px[x] = dark[px[x]];
+}
+
+/* n pixels each through its level's table; the brightest are left be.
+ * Four at a time where the levels are all dark or all bright. */
+static void light_map(uint8_t *px, const uint8_t *row, int32_t n,
+                      const uint8_t (*lut)[256], uint32_t levels)
+{
+    int32_t x = 0;
+#ifdef ARCADE_ASM
+    if (!(((uintptr_t)px | (uintptr_t)row) & 3)) {
+        x = n & ~3;
+        light_map_arm(px, row, x, lut[0], levels);
+    }
+#endif
+    for (; x + 4 <= n; x += 4) {
+        uint32_t l0 = row[x], l1 = row[x + 1], l2 = row[x + 2];
+        uint32_t l3 = row[x + 3];
+        /* all at the top level: an AND keeps every bit of levels only
+         * where each is levels */
+        if ((l0 | l1 | l2 | l3) == 0) {
+            px[x] = lut[0][px[x]];
+            px[x + 1] = lut[0][px[x + 1]];
+            px[x + 2] = lut[0][px[x + 2]];
+            px[x + 3] = lut[0][px[x + 3]];
+        } else if ((l0 & l1 & l2 & l3) != levels) {
+            for (int k = 0; k < 4; k++)
+                if (row[x + k] < levels)
+                    px[x + k] = lut[row[x + k]][px[x + k]];
+        }
+    }
+    for (; x < n; x++)
+        if (row[x] < levels)
+            px[x] = lut[row[x]][px[x]];
+}
+
+/* A light as the rows are drawn: its centre in sixteenths of a pixel, so a
+ * squared distance fits 32 bits and steps along a row by adding; its
+ * reach's square, a quarter of that, and 2^40 over it; its rows; the
+ * pixels of the last row whose centres are within the reach (l to r) and
+ * within half of it (il to ir), end exclusive; and the next light to start
+ * on its first row, plus one, or 0 */
+struct lamp
+{
+    int32_t lx, ly, r2, quarter, y0, y1;
+    uint32_t inv;
+    int32_t l, r, il, ir;
+    int32_t next;
+};
+
+/* whether pixel x's centre, dy2 (sixteenths squared) above or below the
+ * light's, is within lim of it */
+static inline __attribute__((always_inline))
+int lamp_in(const struct lamp *m, int32_t x, int32_t dy2, int32_t lim)
+{
+    int32_t dx = x * 16 + 8 - m->lx;
+    return dx * dx + dy2 <= lim;
+}
+
+/* The pixels of a row within lim of the light: l to r, moved from the
+ * last row's a pixel at a time, as a row's edges move little from the
+ * last's. The pixel holding the centre is the nearest, so none is within
+ * if it is not. Returns 0 for none. */
+static int lamp_row(const struct lamp *m, int32_t dy2, int32_t lim,
+                    int32_t *l, int32_t *r)
+{
+    int32_t c = m->lx >> 4;
+    if (!lamp_in(m, c, dy2, lim))
+        return 0;
+    int32_t a = *l > c ? c : *l, b = *r - 1 < c ? c : *r - 1;
+    if (lamp_in(m, a, dy2, lim))
+        while (lamp_in(m, a - 1, dy2, lim))
+            a--;
+    else
+        while (!lamp_in(m, a, dy2, lim))
+            a++;
+    if (lamp_in(m, b, dy2, lim))
+        while (lamp_in(m, b + 1, dy2, lim))
+            b++;
+    else
+        while (!lamp_in(m, b, dy2, lim))
+            b--;
+    *l = a;
+    *r = b + 1;
+    return 1;
+}
 
 /* light.draw(x, y, r, n, ramp): n lights, each centre (x, y) and reach r,
  * as numbers or arrays; ramp a list of 1 to 8 colour tables, each an
  * array or Uint8Array taking a colour to its darker one (colours past its
- * end kept). Over the target, within the clip, after the scene is drawn */
+ * end kept). Over the target, within the clip, after the scene is drawn.
+ * A row at a time: its lights' levels into one row of levels, then the
+ * pixels they reach through their levels' tables and the rest through the
+ * darkest. */
 NATIVE(light_draw)
 {
     (void)argc; (void)out;
@@ -4485,16 +4668,26 @@ NATIVE(light_draw)
         return vm_fail(vm, "light.draw() has fewer x, y or r than lights", "",
                        "");
     uint32_t levels = ARR(vm, a[4])->len;
+    /* the tables, each the colours as they are from cart[k] up: only those
+     * a cart's table covers are written each call */
     static uint8_t lut[LIGHT_LEVELS][256];
+    static uint16_t cart[LIGHT_LEVELS] = { 256, 256, 256, 256,
+                                           256, 256, 256, 256 };
     for (uint32_t k = 0; k < levels; k++) {
         struct column t;
         if (!column_of(vm, BUF(vm, ARR(vm, a[4])->buf)->v[k], &t) ||
             t.tag == T_INT)
             return vm_fail(vm, "light.draw()'s ramp holds colour tables: "
                            "arrays or Uint8Arrays", "", "");
-        for (int c = 0; c < 256; c++)
-            lut[k][c] = (uint8_t)((uint32_t)c < t.len
-                                  ? column_at(&t, (uint32_t)c, c) : c);
+        uint32_t m = t.len < 256 ? t.len : 256;
+        if (t.tag == T_U8)
+            memcpy(lut[k], t.p, m);
+        else
+            for (uint32_t c = 0; c < m; c++)
+                lut[k][c] = (uint8_t)column_at(&t, c, (int32_t)c);
+        for (uint32_t c = m; c < cart[k]; c++)
+            lut[k][c] = (uint8_t)c;
+        cart[k] = (uint16_t)m;
     }
     struct pen p;
     begin(vm, &p, 0, 0);
@@ -4503,120 +4696,131 @@ NATIVE(light_draw)
         finish(vm, &p);
         return 1;
     }
-    uint8_t *lit = scratch(vm, (uint32_t)(w * h));
-    if (!lit)
+    uint32_t cost = levels * LIGHT_TABLE;
+    if (vm->light_levels != levels) {
+        vm->light_levels = (uint8_t)levels;
+        light_shade(levels);
+        cost += LIGHT_SHADE;
+    }
+    /* the lamps; those lit on the row, by number; the first to start on
+     * each row, plus one; and a row of levels indexed by x */
+    uint32_t lamps_at = (uint32_t)n * sizeof(struct lamp);
+    uint32_t lit_at = lamps_at + (uint32_t)(n + h) * 4;
+    uint8_t *mem = scratch(vm, lit_at + (uint32_t)p.cx1 + 4);
+    if (!mem)
         return 0;
     /* scratch may have collected: the surface is found again */
     begin(vm, &p, 0, 0);
-    memset(lit, 0, (size_t)(w * h));
-    /* the level, in sixteenths, at a squared distance of i/256 of the
-     * reach's square: 2 * levels * (1 - its root) -- full light within
-     * half the reach, the steps across the outer half */
-    static uint16_t fall[257];
-    static uint32_t fall_levels;
-    if (fall_levels != levels) {
-        fall_levels = levels;
-        for (int i = 0; i <= 256; i++) {
-            int32_t root = (int32_t)isqrt64((uint64_t)i * 256);
-            int32_t v = (int32_t)levels * (256 - root) / 8;
-            fall[i] = (uint16_t)(v > (int32_t)levels * 16
-                                 ? (int32_t)levels * 16 : v);
-        }
-    }
-    uint32_t measured = 0;
+    struct lamp *lamps = (struct lamp *)(void *)mem;
+    int32_t *on = (int32_t *)(void *)(mem + lamps_at);
+    int32_t *starts = on + n;
+    uint8_t *lit = mem + lit_at;
+    int32_t nl = 0, non = 0;
     for (int32_t i = 0; i < n; i++) {
-        /* in sixteenths of a pixel, so a squared distance fits 32 bits and
-         * steps along a row by adding */
-        int32_t lx = (column_fix(&cx, (uint32_t)i) >> 12) +
-                     (int32_t)(p.ox * 16);
-        int32_t ly = (column_fix(&cy, (uint32_t)i) >> 12) +
-                     (int32_t)(p.oy * 16);
+        struct lamp *m = &lamps[nl];
+        m->lx = (column_fix(&cx, (uint32_t)i) >> 12) + (int32_t)(p.ox * 16);
+        m->ly = (column_fix(&cy, (uint32_t)i) >> 12) + (int32_t)(p.oy * 16);
         int32_t r = column_fix(&cr, (uint32_t)i) >> 12;
         if (r < 17)
             continue;                   /* under a pixel */
         if (r > 16 * 512)
             r = 16 * 512;
-        uint32_t r2 = (uint32_t)(r * r);
-        /* a squared distance times inv, over 2^32: its 256ths of r2 */
-        uint32_t inv = (uint32_t)(((uint64_t)256 << 32) / r2);
-        int32_t y0 = (ly - r) >> 4, y1 = ((ly + r) >> 4) + 1;
-        if (y0 < p.cy0) y0 = p.cy0;
-        if (y1 > p.cy1) y1 = p.cy1;
-        for (int32_t y = y0; y < y1; y++) {
-            int32_t dy = y * 16 + 8 - ly;
-            int32_t rem = (int32_t)r2 - dy * dy;
-            if (rem <= 0)
+        m->r2 = r * r;
+        m->quarter = m->r2 >> 2;
+        m->inv = (uint32_t)(((uint64_t)256 << 32) / (uint32_t)m->r2);
+        m->y0 = (m->ly - r) >> 4;
+        m->y1 = ((m->ly + r) >> 4) + 1;
+        if (m->y0 < p.cy0) m->y0 = p.cy0;
+        if (m->y1 > p.cy1) m->y1 = p.cy1;
+        if (m->y0 >= m->y1)
+            continue;
+        m->l = m->il = m->r = m->ir = m->lx >> 4;
+        m->next = starts[m->y0 - p.cy0];
+        starts[m->y0 - p.cy0] = ++nl;
+    }
+    /* the pixels stepped through and mapped, the rows lit and the
+     * lights' rows, since the last spend */
+    uint32_t step = 0, mapped = 0, rows = 0, lamprows = 0;
+    for (int32_t y = p.cy0; y < p.cy1; y++) {
+        /* the row's shade tables by x & 3, twice over, once a light
+         * reaches it */
+        const uint8_t *row8[8];
+        row8[0] = NULL;
+        /* lo to hi: the levels kept, whole words within the clip */
+        int32_t lo = p.cx1, hi = p.cx1;
+        for (int32_t i = starts[y - p.cy0]; i; i = lamps[i - 1].next)
+            on[non++] = i - 1;
+        for (int32_t k = 0; k < non; k++) {
+            struct lamp *m = &lamps[on[k]];
+            if (y >= m->y1) {
+                on[k--] = on[--non];
                 continue;
-            int32_t half = (int32_t)isqrt64((uint32_t)rem);
-            int32_t xa = (lx - half) >> 4, xb = ((lx + half) >> 4) + 1;
-            if (xa < p.cx0) xa = p.cx0;
-            if (xb > p.cx1) xb = p.cx1;
+            }
+            int32_t dy = y * 16 + 8 - m->ly, dy2 = dy * dy;
+            if (!lamp_row(m, dy2, m->r2, &m->l, &m->r))
+                continue;
+            int32_t xa = m->l < p.cx0 ? p.cx0 : m->l;
+            int32_t xb = m->r > p.cx1 ? p.cx1 : m->r;
             if (xa >= xb)
                 continue;
-            int32_t dx = xa * 16 + 8 - lx;
-            uint32_t dd = (uint32_t)(dx * dx + dy * dy);
-            int32_t step = 32 * dx + 256;
-#ifdef ARCADE_ASM
-            /* the row's dither steps a byte each, xa's lowest */
-            const uint8_t *b4 = bayer[y & 3];
-            uint32_t bay = 0;
-            for (int k = 3; k >= 0; k--)
-                bay = bay << 8 | b4[(xa + k) & 3];
-            light_row_arm(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step,
-                          inv, bay, fall, levels);
-#else
-            light_row(lit + (y - p.cy0) * w - p.cx0, xa, xb, dd, step, inv,
-                      bayer[y & 3], fall, levels);
-#endif
-            measured += (uint32_t)(xb - xa);
-        }
-        if (measured > 65536) {
-            if (!vm_spend(vm, measured * 11 / 16))
-                return 0;
-            measured = 0;
-        }
-    }
-    /* each pixel through its level's table; the brightest are left be.
-     * Four at a time where the levels are all dark or all bright. */
-    const uint8_t *dark = lut[0];
-    for (int32_t y = p.cy0; y < p.cy1; y++) {
-        uint8_t *px = p.s.px + y * p.s.w + p.cx0;
-        const uint8_t *row = lit + (y - p.cy0) * w;
-        int32_t x = 0;
-#ifdef ARCADE_ASM
-        if (!(((uintptr_t)px | (uintptr_t)row) & 3)) {
-            x = w & ~3;
-            light_map_arm(px, row, x, lut[0], levels);
-        }
-#endif
-        for (; x + 4 <= w; x += 4) {
-            uint32_t l0 = row[x], l1 = row[x + 1], l2 = row[x + 2];
-            uint32_t l3 = row[x + 3];
-            /* all at the top level: an AND keeps every bit of levels
-             * only where each is levels */
-            if ((l0 | l1 | l2 | l3) == 0) {
-                px[x] = dark[px[x]];
-                px[x + 1] = dark[px[x + 1]];
-                px[x + 2] = dark[px[x + 2]];
-                px[x + 3] = dark[px[x + 3]];
-            } else if ((l0 & l1 & l2 & l3) != levels) {
-                for (int k = 0; k < 4; k++)
-                    if (row[x + k] < levels)
-                        px[x + k] = lut[row[x + k]][px[x + k]];
+            lamprows++;
+            if (!row8[0])
+                for (int j = 0; j < 8; j++)
+                    row8[j] = shade[bayer[y & 3][j & 3]];
+            /* within half the reach, full light: filled rather than
+             * stepped through where that saves, a reach of 32 or more */
+            int32_t ia = xb, ib = xb;
+            if (m->r2 >= LIGHT_SPLIT * LIGHT_SPLIT &&
+                lamp_row(m, dy2, m->quarter, &m->il, &m->ir)) {
+                ia = m->il < xa ? xa : m->il;
+                ib = m->ir > xb ? xb : m->ir;
+                if (ia >= ib)
+                    ia = ib = xb;
             }
+            int32_t wa = xa & ~3, wb = (xb + 3) & ~3;
+            if (wa < p.cx0) wa = p.cx0;
+            if (wb > p.cx1) wb = p.cx1;
+            if (lo >= hi) {
+                light_zero(lit, wa, wb);
+                lo = wa, hi = wb;
+            } else {
+                if (wa < lo) {
+                    light_zero(lit, wa, lo);
+                    lo = wa;
+                }
+                if (wb > hi) {
+                    light_zero(lit, hi, wb);
+                    hi = wb;
+                }
+            }
+            light_run(lit, xa, ia, m->lx, dy2, m->inv, row8);
+            if (ia < ib) {
+                memset(lit + ia, (int)levels, (size_t)(ib - ia));
+                light_run(lit, ib, xb, m->lx, dy2, m->inv, row8);
+            }
+            step += (uint32_t)(xb - xa - (ib - ia));
         }
-        for (; x < w; x++)
-            if (row[x] < levels)
-                px[x] = lut[row[x]][px[x]];
+        uint8_t *px = p.s.px + y * p.s.w;
+        if (lo >= hi)
+            light_dark(px + p.cx0, w, lut[0]);
+        else {
+            light_dark(px + p.cx0, lo - p.cx0, lut[0]);
+            light_map(px + lo, lit + lo, hi - lo,
+                      (const uint8_t (*)[256])lut, levels);
+            light_dark(px + hi, p.cx1 - hi, lut[0]);
+            mapped += (uint32_t)(hi - lo);
+            rows++;
+        }
         row_touched(&p, y);
+        if (step + mapped > 65536) {
+            if (!vm_spend(vm, light_units(step, mapped, rows, lamprows)))
+                return 0;
+            step = mapped = rows = lamprows = 0;
+        }
     }
-    /* measured on the ARM rig (drawprobe): the tables about 460 units a
-     * level, the buffer cleared a unit per 16 bytes, the lit rows 11 units
-     * per 16 pixels, the map pass 4 per 16 */
     p.count = (uint32_t)(w * h);
-    p.per16 = 4;
-    p.cost += levels * 460 + (uint32_t)(w * h) / BYTES_PER_UNIT +
-              measured * 11 / 16;
+    p.per16 = LIGHT_DARK16;
+    p.cost += cost + light_units(step, mapped, rows, lamprows);
     finish(vm, &p);
     return 1;
 }

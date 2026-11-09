@@ -16,7 +16,8 @@
  *                    of rspr and rblit, banking's turn of the screen
  *   light_map_arm    light.draw()'s last pass: pixels through their
  *                    levels' tables, four a word
- *   light_row_arm    light_row(): one row of a light's levels
+ *   light_dark_arm   light_dark(): pixels through the darkest table
+ *   light_span_arm   light_span(): a span of a light's levels
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -603,40 +604,72 @@ light_map_arm:
     .ltorg
     .size   light_map_arm, . - light_map_arm
 
-/* light_row_arm(row, xa, xb, dd, step, inv, bay, fall, levels):
- * light_row() -- each pixel xa to xb of row takes the level its squared
- * distance dd gives, fall[(dd * inv) >> 32] plus the dither over 16, at
- * most levels, where that is more than it has. bay holds the row's four
- * dither steps a byte each, xa's lowest, turned a byte each pixel.
+/* light_dark_arm(px, n, lut): n pixels from px (a multiple of four, px
+ * word aligned) through the darkest table, four a word.
  *
- * r0 row, r1 x, r2 xb, r3 dd, r4 step, r5 inv, r6 bay, r7 fall, r8
- * levels, r9 the level, r10 the product's low word, then the old level */
-    .global light_row_arm
-    .type   light_row_arm, %function
-light_row_arm:
-    stmfd   sp!, {r4-r10, lr}
-    add     r12, sp, #32
-    ldmia   r12, {r4-r8}
-    cmp     r1, r2
-    bge     9f
-1:  umull   r10, r9, r3, r5
-    cmp     r9, #256
-    bhi     2f
-    add     r9, r7, r9, lsl #1
-    ldrh    r9, [r9]
-    and     r10, r6, #0xff
-    add     r9, r9, r10
-    mov     r9, r9, lsr #4
-    cmp     r9, r8
-    movhi   r9, r8
-    ldrb    r10, [r0, r1]
-    cmp     r9, r10
-    strbhi  r9, [r0, r1]
-2:  add     r3, r3, r4
-    add     r4, r4, #512
-    mov     r6, r6, ror #8
-    add     r1, r1, #1
-    cmp     r1, r2
-    blt     1b
-9:  ldmfd   sp!, {r4-r10, pc}
-    .size   light_row_arm, . - light_row_arm
+ * r0 px, r1 pixels left, r2 lut, r3 four pixels, r4 the four darkened,
+ * r12 and lr a pixel each, loaded a step before they are used */
+    .global light_dark_arm
+    .type   light_dark_arm, %function
+light_dark_arm:
+    stmfd   sp!, {r4, lr}
+1:  ldr     r3, [r0]
+    and     r12, r3, #0xff
+    and     lr, r3, #0xff00
+    ldrb    r4, [r2, r12]
+    ldrb    lr, [r2, lr, lsr #8]
+    and     r12, r3, #0xff0000
+    ldrb    r12, [r2, r12, lsr #16]
+    orr     r4, r4, lr, lsl #8
+    ldrb    lr, [r2, r3, lsr #24]
+    orr     r4, r4, r12, lsl #16
+    orr     r4, r4, lr, lsl #24
+    str     r4, [r0], #4
+    subs    r1, r1, #4
+    bgt     1b
+    ldmfd   sp!, {r4, pc}
+    .size   light_dark_arm, . - light_dark_arm
+
+/* One pixel of light_span_arm: its level from the shade table in tab at
+ * q's top nine bits, stored to [r0, #at] where more than it has */
+.macro  lspan tab, at
+    ldrb    r10, [\tab, r2, lsr #23]
+    ldrb    r11, [r0, #\at]
+    add     r2, r2, r3
+    add     r3, r3, r4
+    cmp     r10, r11
+    strbhi  r10, [r0, #\at]
+.endm
+
+/* light_span_arm(row, n, q, dq, inv, tab): light_span() -- n pixels from
+ * row, four a pass, each with the next of the four shade tables in tab.
+ *
+ * r0 row, r1 pixels left, r2 q, r3 dq, r4 inv, r5-r8 the tables, r10 the
+ * level, r11 the one the pixel has */
+    .global light_span_arm
+    .type   light_span_arm, %function
+light_span_arm:
+    stmfd   sp!, {r4-r11, lr}
+    ldr     r4, [sp, #36]
+    ldr     r12, [sp, #40]
+    ldmia   r12, {r5-r8}
+    subs    r1, r1, #4
+    blt     5f
+1:  lspan   r5, 0
+    lspan   r6, 1
+    lspan   r7, 2
+    lspan   r8, 3
+    add     r0, r0, #4
+    subs    r1, r1, #4
+    bge     1b
+5:  adds    r1, r1, #4
+    beq     9f
+    lspan   r5, 0
+    subs    r1, r1, #1
+    beq     9f
+    lspan   r6, 1
+    subs    r1, r1, #1
+    beq     9f
+    lspan   r7, 2
+9:  ldmfd   sp!, {r4-r11, pc}
+    .size   light_span_arm, . - light_span_arm
