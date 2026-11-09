@@ -724,6 +724,27 @@ static int banner_due(struct vm *vm)
     return banner_rows;
 }
 
+/* The screen as last presented, a word at a time, once seen_valid; any
+ * present of the whole screen refreshes it. */
+static uint32_t seen[160 * 120 / 4];
+static bool seen_valid;
+/* the next of the rows that go every frame, SWEEP_ROWS of them */
+#define SWEEP_ROWS 4
+static int sweep;
+
+/* Whether the row now differs from the row was, n words each; a row that
+ * does is copied over was. */
+static bool row_changed(uint32_t *was, const uint32_t *now, int n)
+{
+    for (int i = 0; i < n; i += 4)
+        if ((was[i] ^ now[i]) | (was[i + 1] ^ now[i + 1]) |
+            (was[i + 2] ^ now[i + 2]) | (was[i + 3] ^ now[i + 3])) {
+            memcpy(was + i, now + i, (size_t)(n - i) * 4);
+            return true;
+        }
+    return false;
+}
+
 static void present(struct vm *vm, bool all)
 {
     const struct arcade_screen *s = arcade_screen(vm);
@@ -739,14 +760,50 @@ static void present(struct vm *vm, bool all)
             r1 = under - 1;
         r0 = 0;
     }
-    if (r0 <= r1) {
-        int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
-        present_wait();
-        present_rows(s, FBADDR(0, 0), stride, r0, r1);
+    /* Only the rows that differ from the frame last shown are converted,
+     * and the band from the first to the last of them sent: a game that
+     * redraws its whole screen changes few of its rows. SWEEP_ROWS rows go
+     * each frame whether or not they changed, so anything drawn over the
+     * game's screen is gone within 30 frames. */
+    bool fits = s->width * s->height <= (int)sizeof(seen) &&
+                !((uintptr_t)s->px & 3) && !(s->width & 15);
+    bool compare = !all && seen_valid && fits;
+    int sw0 = 0, sw1 = 0;
+    if (compare) {
+        sw0 = sweep;
+        sw1 = sweep + SWEEP_ROWS;
+        sweep = sw1 >= s->height ? 0 : sw1;
+    }
+    int stride = (int)(FBADDR(0, 1) - FBADDR(0, 0));
+    int first = -1, last = -1;
+    for (int y = 0; y < s->height; y++) {
+        bool dirty = y >= r0 && y <= r1, swept = y >= sw0 && y < sw1;
+        if (!dirty && !swept)
+            continue;
+        const uint8_t *now = s->px + y * s->width;
+        uint32_t *was = seen + y * s->width / 4;
+        if (compare && !swept) {
+            if (!row_changed(was, (const uint32_t *)now, s->width / 4))
+                continue;
+        } else if (fits)
+            memcpy(was, now, (size_t)s->width);
+        if (first < 0)
+            present_wait();
+        present_rows(s, FBADDR(0, 0), stride, y, y);
+        if (first < 0)
+            first = y;
+        last = y;
+    }
+    /* the copy holds every row once a whole screen has gone */
+    if (!fits)
+        seen_valid = false;
+    else if (!compare && r0 == 0 && r1 == s->height - 1)
+        seen_valid = true;
+    if (first >= 0) {
 #ifdef HAVE_LCD_UPDATE_ASYNC
-        lcd_update_start(r0 * 2, (r1 - r0 + 1) * 2);
+        lcd_update_start(first * 2, (last - first + 1) * 2);
 #else
-        lcd_update_rect(0, r0 * 2, LCD_WIDTH, (r1 - r0 + 1) * 2);
+        lcd_update_rect(0, first * 2, LCD_WIDTH, (last - first + 1) * 2);
 #endif
     }
     if (banner_ach >= 0)
