@@ -787,11 +787,11 @@ static void present(struct vm *vm, bool all)
                 continue;
         } else if (fits)
             memcpy(was, now, (size_t)s->width);
-        if (first < 0)
+        if (first < 0) {
             present_wait();
-        present_rows(s, FBADDR(0, 0), stride, y, y);
-        if (first < 0)
             first = y;
+        }
+        present_rows(s, FBADDR(0, 0), stride, y, y);
         last = y;
     }
     /* the copy holds every row once a whole screen has gone */
@@ -1033,7 +1033,14 @@ static int event(struct vm *vm, long button)
     present_wait();
     save_write(vm);
     shell_scores_write(vm, false);
-    if (default_event_handler(button) == SYS_USB_CONNECTED)
+    /* the screen an event shows reads the wheel: the USB screen's wheel
+     * is the volume while the player is a sound card */
+    if (screen_held)
+        wheel_events(true);
+    int r = default_event_handler(button);
+    if (screen_held)
+        wheel_events(false);
+    if (r == SYS_USB_CONNECTED)
         return USB;
     present(vm, true);
     return PLAYING;

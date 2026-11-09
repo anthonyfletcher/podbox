@@ -71,12 +71,19 @@ static int handle_usb_events(void)
                 break;
 #ifdef USB_ENABLE_AUDIO
             /* The player is the computer's sound card: the wheel sets the
-             * codec's volume, as the host's own volume requests do. */
+             * codec's volume, as the host's own volume requests do; while
+             * the host has it muted, the volume unmuting brings back. */
             case BUTTON_SCROLL_FWD:
             case BUTTON_SCROLL_FWD|BUTTON_REPEAT:
             case BUTTON_SCROLL_BACK:
             case BUTTON_SCROLL_BACK|BUTTON_REPEAT:
-                if (usb_audio_get_active())
+                if (!usb_audio_get_active())
+                    break;
+                if (usb_audio_get_muted())
+                    usb_audio_set_unmute_volume(volume_stepped(
+                        usb_audio_get_unmute_volume(),
+                        (button & BUTTON_SCROLL_FWD) ? 1 : -1));
+                else
                     adjust_volume((button & BUTTON_SCROLL_FWD) ? 1 : -1);
                 break;
 #endif

@@ -119,12 +119,8 @@ int get_normalized_volume(void)
     return a;
 }
 
-void adjust_volume(int steps)
-{
-    adjust_volume_ex(steps, global_settings.volume_adjust_mode);
-}
-
-void adjust_volume_ex(int steps, enum volume_adjust_mode mode)
+/* global_status.volume moved by steps in mode; setvol() puts it in range */
+static void adjust_volume_mode(int steps, enum volume_adjust_mode mode)
 {
     switch (mode)
     {
@@ -136,8 +132,33 @@ void adjust_volume_ex(int steps, enum volume_adjust_mode mode)
         global_status.volume += steps * sound_steps(SOUND_VOLUME);
         break;
     }
+}
 
+void adjust_volume(int steps)
+{
+    adjust_volume_ex(steps, global_settings.volume_adjust_mode);
+}
+
+void adjust_volume_ex(int steps, enum volume_adjust_mode mode)
+{
+    adjust_volume_mode(steps, mode);
     setvol();
+}
+
+/* vol moved by steps in the owner's adjust mode and kept within the
+ * codec's range, without setting it */
+int volume_stepped(int vol, int steps)
+{
+    int live = global_status.volume;
+    global_status.volume = vol;
+    adjust_volume_mode(steps, global_settings.volume_adjust_mode);
+    int out = global_status.volume;
+    global_status.volume = live;
+    if (out < sound_min(SOUND_VOLUME))
+        out = sound_min(SOUND_VOLUME);
+    if (out > sound_max(SOUND_VOLUME))
+        out = sound_max(SOUND_VOLUME);
+    return out;
 }
 
 /* Return the ReplayGain mode adjusted by other relevant settings */

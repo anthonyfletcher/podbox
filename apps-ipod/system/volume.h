@@ -29,6 +29,7 @@ void set_normalized_volume(int vol);
 int get_normalized_volume(void);
 void adjust_volume(int steps);
 void adjust_volume_ex(int steps, enum volume_adjust_mode mode);
+int volume_stepped(int vol, int steps);
 
 /* Return current ReplayGain mode a file should have (REPLAYGAIN_TRACK or
  * REPLAYGAIN_ALBUM) if ReplayGain processing is enabled, or -1 if no

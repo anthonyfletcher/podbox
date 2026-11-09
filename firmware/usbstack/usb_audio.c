@@ -354,6 +354,8 @@ static struct usb_class_driver_ep_allocation ep_allocs[2] = {
 bool alloc_failed = false;
 bool usb_audio_playing = false;
 int tmp_saved_vol;
+/* the host has muted the player: tmp_saved_vol is what unmuting restores */
+static bool host_muted;
 
 /* buffers used for usb, queuing and playback */
 static unsigned char *rx_buffer;
@@ -944,6 +946,7 @@ static bool feature_unit_set_mute(int value, uint8_t cmd)
     {
         logf("usbaudio: mute !");
         tmp_saved_vol = sound_current(SOUND_VOLUME);
+        host_muted = true;
 
         // setvol does range checking for us!
         global_status.volume = sound_min(SOUND_VOLUME);
@@ -953,6 +956,7 @@ static bool feature_unit_set_mute(int value, uint8_t cmd)
     else if(value == 0)
     {
         logf("usbaudio: not muted !");
+        host_muted = false;
 
         // setvol does range checking for us!
         global_status.volume = tmp_saved_vol;
@@ -1239,6 +1243,7 @@ static int usb_audio_init_connection(void)
     set_playback_sampling_frequency(
         usb_audio_get_playback_sampling_frequency());
     tmp_saved_vol = sound_current(SOUND_VOLUME);
+    host_muted = false;
     usb_audio_playing = false;
     return 0;
 }
@@ -1263,6 +1268,21 @@ static void usb_audio_disconnect(void)
 bool usb_audio_get_active(void)
 {
     return usbaudio_active;
+}
+
+bool usb_audio_get_muted(void)
+{
+    return host_muted;
+}
+
+int usb_audio_get_unmute_volume(void)
+{
+    return tmp_saved_vol;
+}
+
+void usb_audio_set_unmute_volume(int vol)
+{
+    tmp_saved_vol = vol;
 }
 
 bool usb_audio_get_alloc_failed(void)

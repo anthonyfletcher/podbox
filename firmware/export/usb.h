@@ -439,6 +439,12 @@ void usb_set_audio(int value);
 /* true while host-PCM (USB-DAC) playback is active */
 bool usb_audio_get_active(void);
 
+/* While the host has the player muted, the volume unmuting brings back,
+ * which the player's own volume control moves instead of the silence */
+bool usb_audio_get_muted(void);
+int usb_audio_get_unmute_volume(void);
+void usb_audio_set_unmute_volume(int vol);
+
 /* Claim the USB-DAC receive and DSP buffers, ~129K. Call once at boot, after
  * the settings are loaded -- so the setting can be consulted -- and before
  * audio_init(), so nothing has to be shrunk to make room. It must not happen
