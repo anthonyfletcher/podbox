@@ -1127,6 +1127,7 @@ static int64_t seg_cross(const struct segs *s, int32_t k, int64_t ox,
  * Returns the material plus one it touched, 0 none, with the way out. */
 static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                         int32_t *OX, int32_t *OY, int32_t radius,
+                        const int32_t *gravity,
                         const int32_t *friction, uint32_t nfriction,
                         int32_t bounce, uint32_t *stamp, uint32_t *mark,
                         int32_t *nx, int32_t *ny, uint32_t *tests)
@@ -1139,6 +1140,11 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
     int64_t r = radius >> 8;
     if (r < 64)
         r = 64;                     /* a quarter pixel */
+    /* where it came in, to its 16.16: the collision moves it in 1/256s,
+     * and only that move is put back, so no fraction of its place or its
+     * speed is lost to rounding at each touch */
+    const int64_t px0 = px, py0 = py;
+    int32_t gx = gravity[0], gy = gravity[1];
     int32_t near[NEAR_SEGS];
     /* round the path, as far as a push can carry it */
     uint32_t n = seg_near(s, (px < ox ? px : ox) - 3 * r,
@@ -1148,7 +1154,10 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                           near, NEAR_SEGS, stamp, ++*mark);
     *tests += n;
     struct touch t = { -1, 0, 0 };
-    /* the path: stopped short of the first line it crosses */
+    /* the path across the first line it crosses: slid back out along
+     * that line's normal to r on the side it came from, keeping all of
+     * its move along the line -- stopping it at the crossing would lose
+     * that, every tick, on a curve */
     int64_t first = -1;
     int32_t fk = -1;
     for (uint32_t i = 0; i < n; i++) {
@@ -1159,10 +1168,13 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
         }
     }
     if (fk >= 0) {
-        px = ox + ((px - ox) * first >> 16);
-        py = oy + ((py - oy) * first >> 16);
-        /* now on the line: pushed out to o's side */
-        seg_push(s, fk, &px, &py, ox, oy, r, &t);
+        seg_side(s, fk, ox, oy, &t);
+        int64_t ax = (int64_t)s->x0[fk] >> 8, ay = (int64_t)s->y0[fk] >> 8;
+        int64_t side = ((px - ax) * t.nx + (py - ay) * t.ny) >> 16;
+        if (side < r) {
+            px += (int64_t)t.nx * (r - side) >> 16;
+            py += (int64_t)t.ny * (r - side) >> 16;
+        }
     }
     /* then nothing within r, twice over for corners */
     for (int pass = 0; pass < 2; pass++)
@@ -1193,11 +1205,47 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
         *nx = *ny = 0;
         return 0;
     }
+    /* in 16.16 from here: where it ends, and its speed against the set */
+    int64_t X1 = (int64_t)*X + ((px - px0) << 8);
+    int64_t Y1 = (int64_t)*Y + ((py - py0) << 8);
+    int64_t vx = X1 - *OX - s->mx, vy = Y1 - *OY - s->my;
     /* the speed against the line: along it, less its friction; into it,
      * bounced back by bounce */
-    int64_t vx = px - ox, vy = py - oy;     /* 1/256 pixels a tick */
     int64_t vn = (vx * t.nx + vy * t.ny) >> 16;
     int64_t tx = vx - (vn * t.nx >> 16), ty = vy - (vn * t.ny >> 16);
+    /* sliding -- coming within about 14 degrees of the line, as at each
+     * joint of a curve drawn in lines, or along one -- its speed is what it
+     * had before this tick's gravity, and what gravity gave or took over
+     * the way it went, all of it turned along the line: a curve of lines
+     * then slows a point no more than a curve. Friction follows. */
+    int64_t qx = (int64_t)*X - *OX - s->mx - gx;
+    int64_t qy = (int64_t)*Y - *OY - s->my - gy;
+    int64_t qn = (qx * t.nx + qy * t.ny) >> 16;
+    if (qx > -(1 << 26) && qx < (1 << 26) && qy > -(1 << 26) &&
+        qy < (1 << 26)) {
+        int64_t qq = qx * qx + qy * qy;
+        int64_t tl = (int64_t)root64((uint64_t)(tx * tx + ty * ty));
+        if (qn * qn * 16 < qq && tl > 0) {
+            int64_t dx = X1 - *OX - s->mx, dy = Y1 - *OY - s->my;
+            if (dx < -(1 << 26) || dx > (1 << 26) || dy < -(1 << 26) ||
+                dy > (1 << 26))
+                dx = dy = 0;
+            /* of its speed across the line, only a curve's turn -- up to a
+             * sixth of the whole, about 10 degrees -- is turned along it:
+             * more is a push into the line, a ring's pressure say, and is
+             * lost as any landing's; let through, a pressed bag would gain
+             * speed from its own pressure */
+            int64_t keep = qn * qn < qq / 32 ? qn * qn : qq / 32;
+            int64_t e = qq - qn * qn + keep +
+                        2 * ((int64_t)gx * dx + (int64_t)gy * dy);
+            int64_t speed = e > 0 ? (int64_t)root64((uint64_t)e) : 0;
+            if (speed > 0) {
+                tx = tx * speed / tl;
+                ty = ty * speed / tl;
+                vn = 0;
+            }
+        }
+    }
     uint8_t m = s->mat[t.k];
     int32_t f = nfriction ? friction[m < nfriction ? m : nfriction - 1] : 0;
     if (f < 0) f = 0;
@@ -1208,12 +1256,12 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
         vn = -(vn * bounce >> 16);
     vx = tx + (vn * t.nx >> 16);
     vy = ty + (vn * t.ny >> 16);
-    /* back to the world: p where the set is, o behind it by the speed
-     * kept, plus the set's own move, which carries it */
-    *X = wrap32((px << 8) + s->ox);
-    *Y = wrap32((py << 8) + s->oy);
-    *OX = wrap32(((px - vx) << 8) + s->ox - s->mx);
-    *OY = wrap32(((py - vy) << 8) + s->oy - s->my);
+    /* back to the world: o behind where it ends by the speed kept, and by
+     * the set's own move, which carries it */
+    *X = wrap32(X1);
+    *Y = wrap32(Y1);
+    *OX = wrap32(X1 - vx - s->mx);
+    *OY = wrap32(Y1 - vy - s->my);
     *nx = t.nx;
     *ny = t.ny;
     return m + 1;
@@ -1266,7 +1314,7 @@ NATIVE(links_ring)
         grow += gx * gx + gy * gy;
     }
     *out = mk(T_FIX, wrap32(have));
-    vm_charge(vm, 10 + (uint32_t)n * 20);
+    vm_charge(vm, 10 + (uint32_t)n * 24);
     if (!grow || !stiff)
         return 1;
     /* the share of each point's way to move, 16.16, at most half a pixel
@@ -1491,6 +1539,7 @@ NATIVE(links_step)
             mark = 0;
         }
         int32_t radius = fx(l.f[L_RADIUS]), bounce = fx(l.f[L_BOUNCE]);
+        const int32_t grav[2] = { gx, g };
         /* what each touched, three numbers a point, when asked */
         struct value o = argc > 2 ? a[2] : mk(T_NULL, 0);
         int give = o.tag != T_NULL;
@@ -1502,7 +1551,7 @@ NATIVE(links_step)
             if (!pinned[i]) {
                 int32_t X = fx(x[i]), Y = fx(y[i]), OX = fx(ox[i]);
                 int32_t OY = fx(oy[i]);
-                m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, fr, nfr, bounce,
+                m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, grav, fr, nfr, bounce,
                              stamp, &mark, &NX, &NY, &tests);
                 if (m) {
                     x[i] = mk(T_FIX, X);

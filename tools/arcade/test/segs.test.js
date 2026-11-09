@@ -184,3 +184,42 @@ test('segs.trace: each smoothing pass doubles the points, the sharp ones kept', 
     const one = run(MAP(['....', '.##.', '.##.', '....']).replace('SMOOTH', '1'));
     assert.equal(one.out[0].split(' ')[0], '16');
 });
+
+test('a frictionless curve of lines keeps a sliding point\'s height, and a pressed bag never gains', () => {
+    /* a round bowl of 48 lines; tops of each swing, after the first landing */
+    const r = run(`var one, bag, ground, gx = [], gy = [], N = 20, top = 999.0, btop = 999.0, side = 0, bside = 0;
+function init() {
+    for (var i = 0; i <= 48; i++) {
+        var a = 0.5 + i / 96.0;
+        gx.push(80 + cos(a) * 70); gy.push(40 + sin(a) * 70);
+    }
+    gx.push(160, 0); gy.push(200, 200);
+    ground = segs.make(gx, gy, gx.length);
+    one = links.pool(1, 0);
+    links.point(one, 19.4, 74);
+    one.gravity = 0.16; one.radius = 1; one.segs = ground;
+    bag = links.pool(N, N);
+    for (var k = 0; k < N; k++) links.point(bag, 30 + cos(k * 0.05) * 8, 70 + sin(k * 0.05) * 8);
+    for (var j = 0; j < N; j++) links.link(bag, j, (j + 1) % N, 2.64);
+    bag.gravity = 0.16; bag.damp = 0.3; bag.slack = 1; bag.passes = 6; bag.radius = 1; bag.segs = ground;
+}
+function update() {
+    links.step(one, 0);
+    links.ring(bag, 0, N, 160.8, 0.8);
+    links.step(bag, 0);
+    var bx = 0.0, by = 0.0;
+    for (var i = 0; i < N; i++) { bx += bag.x[i]; by += bag.y[i]; }
+    bx = bx / N; by = by / N;
+    top = min(top, one.y[0]); btop = min(btop, by);
+    var s = one.x[0] < 80 ? -1 : 1, bs = bx < 80 ? -1 : 1;
+    if (s != side) { if (side != 0) printh("point " + top); top = 999.0; side = s; }
+    if (bs != bside) { if (bside != 0) printh("bag " + btop); btop = 999.0; bside = bs; }
+}`, 900);
+    assert.equal(r.status, 0, r.err);
+    const tops = (k) => r.out.filter((l) => l.startsWith(k)).map((l) => Number(l.split(' ')[1]));
+    const p = tops('point'), b = tops('bag');
+    /* the point: within a pixel and a half of its second swing, swing after swing */
+    for (const y of p.slice(2)) assert.ok(Math.abs(y - p[1]) < 1.5, p.join(' '));
+    /* the bag: each top no higher than the last but one, on its side */
+    for (let i = 3; i < b.length; i++) assert.ok(b[i] >= b[i - 2] - 0.5, b.join(' '));
+});

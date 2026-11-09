@@ -481,7 +481,7 @@ size however it is squashed.
   them out of the lines as they go.
 - An area a little under the ring's own -- 0.8 of a circle's -- makes a
   body that slumps under its own weight.
-- About 20 units a point.
+- About 24 units a point.
 
 A soft body: a ring of slack links, under-filled, dropped into a bowl
 with ice up its right side:
