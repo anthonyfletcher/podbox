@@ -127,6 +127,10 @@ static int links_of(struct vm *vm, struct value p, const char *fn,
     }
     l->cap_points = ARR(vm, l->f[L_X])->len;
     l->cap_links = ARR(vm, l->f[L_A])->len;
+    /* links.step stages the pool in arrays of these sizes */
+    if (l->cap_points > MAX_POINTS || l->cap_links > MAX_LINKS)
+        return vm_fail(vm, fn, "() needs a pool whose arrays are as "
+                       "links.pool() made them", "");
     return 1;
 }
 
@@ -497,25 +501,25 @@ NATIVE(links_step)
                 s = (int32_t)gap * 256 / d8;
             else
                 s = (gap << 16) / d;
-            /* each move is under 32 bits once shifted, and halved there */
-            int32_t mx = (int32_t)((dx * s) >> 16);
-            int32_t my = (int32_t)((dy * s) >> 16);
-            int32_t mz = (int32_t)((dz * s) >> 16);
+            /* in 64 bits, wrapped as stored: a cart's far-flung points or
+             * long links can make a move of 32 bits or more */
+            int64_t mx = (dx * s) >> 16, my = (dy * s) >> 16;
+            int64_t mz = (dz * s) >> 16;
             if (pi) {
-                Pj[0] = xj - mx;
-                Pj[1] = yj - my;
-                Pj[2] = zj - mz;
+                Pj[0] = wrap32(xj - mx);
+                Pj[1] = wrap32(yj - my);
+                Pj[2] = wrap32(zj - mz);
             } else if (pj) {
-                Pi[0] = xi + mx;
-                Pi[1] = yi + my;
-                Pi[2] = zi + mz;
+                Pi[0] = wrap32(xi + mx);
+                Pi[1] = wrap32(yi + my);
+                Pi[2] = wrap32(zi + mz);
             } else {
-                Pi[0] = xi + mx / 2;
-                Pi[1] = yi + my / 2;
-                Pi[2] = zi + mz / 2;
-                Pj[0] = xj - mx / 2;
-                Pj[1] = yj - my / 2;
-                Pj[2] = zj - mz / 2;
+                Pi[0] = wrap32(xi + mx / 2);
+                Pi[1] = wrap32(yi + my / 2);
+                Pi[2] = wrap32(zi + mz / 2);
+                Pj[0] = wrap32(xj - mx / 2);
+                Pj[1] = wrap32(yj - my / 2);
+                Pj[2] = wrap32(zj - mz / 2);
             }
         }
     /* back into the pool; a pinned point never moves, so is left as it is */

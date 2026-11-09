@@ -39,8 +39,8 @@ engine's `sin` is upside down -- y grows down the screen, and down the map
 
 The floor is the cost: some 80 rows of 160 pixels, each pixel a step
 across the map, a sprite looked up, a colour copied. Done in script with
-one `tline` a row, it is about 42,600 units a frame -- two ticks' worth on
-an iPod Video playing music, before anything else is drawn. `plane.draw`
+one `tline` a row, it is about 42,600 units a frame -- over three ticks' worth
+on an iPod Video playing FLAC, before anything else is drawn. `plane.draw`
 does the same floor for about 11,800, and `coarse` brings it to about
 8,900.
 

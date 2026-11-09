@@ -13,12 +13,12 @@ import { sidePanel, toolbar, numberBox } from './chrome.js';
 
 /* ---- reading and writing BDF ---- */
 
-/* { head: the lines before CHARS, ascent, descent, glyphs: [{ cp, name,
- * adv, cell: { w, px } }] }: each glyph as a cell of 0 and 1, the line
- * tall, its baseline ascent rows down */
 /* A code point as U+XXXX */
 const uplus = (cp) => 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
 
+/* { head: the lines before CHARS, ascent, descent, glyphs: [{ cp, name,
+ * adv, cell: { w, px } }] }: each glyph as a cell of 0 and 1, the line
+ * tall, its baseline ascent rows down */
 export function readFont(text) {
     const lines = text.split(/\r?\n/);
     const head = [];

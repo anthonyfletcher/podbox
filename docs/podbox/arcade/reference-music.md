@@ -159,7 +159,8 @@ function newRound() {
   player can take a while: make them while a round is set up, not every
   frame. `tracks.count`, `tracks.pick` and `tracks.near` look at every
   track in the library and cost 200 units and 4 a track -- about 40,000
-  for a library of 10,000, two ticks' worth.
+  for a library of 10,000, over three ticks' worth on an iPod Video
+  playing FLAC.
 - In the IDE, `tracks.count()` is 20 and the queue holds 10.
 
 ---

@@ -1499,13 +1499,14 @@ NATIVE(particles_step)
                 dy[i] = mk(T_FIX, -up);
             }
         }
-        x[i] = mk(T_FIX, wrap32((int64_t)ox + DX));
+        int32_t NX = wrap32((int64_t)ox + DX);
+        x[i] = mk(T_FIX, NX);
         y[i] = mk(T_FIX, NY);
         if (spin > 0 && is_num(sp[i]) && floor_int(sp[i]) > 0 &&
             (vm->frame + i) % (uint32_t)spin == 0)
             flip[i] = mk(T_INT, turned[floor_int(flip[i]) & 3]);
         if (fd.c)
-            settle(&fd, lf, i, ox, oy, ox + DX, oy + DY, c[i], &scanned);
+            settle(&fd, lf, i, ox, oy, NX, NY, c[i], &scanned);
     }
     /* about 7 units a live particle, measured; 2 more over a field */
     vm_charge(vm, 10 + n / 8 + live * (fd.c ? 9 : 7) + scanned / 8);
@@ -1525,8 +1526,14 @@ NATIVE(particles_draw)
     struct value *arr[P_ARRAYS];
     for (int i = 0; i < P_ARRAYS; i++)
         arr[i] = ELEMS(vm, f[i]);
-    core_draw_particles(vm, arr, n, w < 1 || w > 8 ? 8 : w,
-                        h < 1 || h > 8 ? 8 : h,
-                        shade < 0 ? 0 : shade > 16 ? 16 : shade);
+    if (w < 1 || w > 8)
+        w = 8;
+    if (h < 1 || h > 8)
+        h = 8;
+    if (shade < 0)
+        shade = 0;
+    if (shade > 16)
+        shade = 16;
+    core_draw_particles(vm, arr, n, w, h, shade);
     return 1;
 }

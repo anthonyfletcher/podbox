@@ -391,7 +391,6 @@ struct vm
     uint32_t links_shape;                   /* ... and links */
     struct cellsleep sleep[2];
     uint32_t sleep_clock;
-    uint8_t light_levels;       /* light.draw()'s shade tables' levels */
     uint32_t frame;
     int64_t t_base;             /* t() at frame_base, 16.16, for setrate() */
     uint32_t frame_base;

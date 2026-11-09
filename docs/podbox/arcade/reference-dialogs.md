@@ -149,7 +149,7 @@ A line of text, typed with the wheel.
 | Argument | |
 |---|---|
 | `prompt` | the question |
-| `max` | the most characters it may hold, 1 to 64 |
+| `max` | the most bytes it may hold, 1 to 64: A to Z, digits and punctuation take one each, other letters 2 or 3 (8 holds 8 capitals, but only 2 kana) |
 | `start` | the text it starts with |
 
 **Returns** the text, or `null` when backed out of.
@@ -299,7 +299,7 @@ var resume = sys.translate("Resume Game");
 
 In the IDE, dialogs open in the Player and work with the keys: Up and
 Down for the wheel, Left and Right for Prev and Next, Enter for Select,
-Esc for Menu.
+Space for Play, Esc for Menu.
 
 `pbgvm` prints a line for each dialog saying what it showed, and works it
 a tick at a time from `--buttons` and `--wheel`, backing out when the

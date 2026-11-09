@@ -758,6 +758,8 @@ function cost(e, drawn) {
             }
             ms += (d.screen * changed + d.same * (hi - lo + 1 - changed)) / 120;
         }
+        /* and the four rows the player sends every frame regardless */
+        ms += (d.screen * 4) / 120;
     }
     return ms;
 }
@@ -1253,11 +1255,14 @@ function showDevice() {
 }
 
 /* a line in the output, which opens to show it -- but for the game's own
- * lines once the output was closed during this run */
+ * lines once the output was closed during this run, and for all but an
+ * error while it is minimised */
 let quietRun = false;
 
 function say(kind, text, where) {
-    if (dock && !dock.shown('output') && (kind === 'error' || !(running && quietRun))) dock.show('output', false);
+    if (dock && !dock.shown('output') &&
+        (kind === 'error' || !((running && quietRun) || dock.isMinimised('output'))))
+        dock.show('output', false);
     const c = $('console');
     const line = document.createElement('div');
     line.className = kind;

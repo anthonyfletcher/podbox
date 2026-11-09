@@ -198,7 +198,18 @@ export function createDock(root, panes, actions, changed, tray) {
         const beside = minimised.get(id);
         if (minimised.delete(id)) fillTray();
         if (!p || !p.group.api.isVisible) {
-            if (!p) p = add(id, beside && shown(beside) ? { referencePanel: beside, direction: 'within' } : null);
+            const ref = beside && api.getPanel(beside);
+            if (!p && ref && !shown(beside) && minimised.has(beside)) {
+                /* its partner minimised too, its group hidden: this one
+                 * takes the partner's place, and the partner comes back
+                 * beside it in turn */
+                p = add(id, { referencePanel: beside, direction: 'within' });
+                restoring = true;
+                api.removePanel(ref);
+                restoring = false;
+                minimised.set(beside, id);
+            } else if (!p)
+                p = add(id, beside && shown(beside) ? { referencePanel: beside, direction: 'within' } : null);
             p.group.api.setVisible(true);
             settle();
         }
@@ -331,5 +342,5 @@ export function createDock(root, panes, actions, changed, tray) {
     api.onDidLayoutChange(save);
     api.onDidActivePanelChange(() => changed());
 
-    return { api, shown, show, hide, toggle, setTitle, setActions, mount, clear, done, has, reset, title: (id) => titles[id] || PANELS[id].title };
+    return { api, shown, isMinimised: (id) => minimised.has(id), show, hide, toggle, setTitle, setActions, mount, clear, done, has, reset, title: (id) => titles[id] || PANELS[id].title };
 }

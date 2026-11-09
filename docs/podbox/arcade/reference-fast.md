@@ -54,7 +54,8 @@ screen every tick:
 In general:
 
 ```
-units a tick ≤ (1000 / rate − 6.6 × rows sent / 120) / 0.0019
+units a tick ≤ (1000 / rate − 6.6 × rows sent / 120
+                − 2.0 × rows drawn unchanged / 120) / 0.0019
 ```
 
 Aim well under it: busy moments -- an explosion, a crowded screen -- cost
@@ -81,7 +82,8 @@ after ten seconds, however few units it has used.
 After each drawn tick, the player sends the rows of the screen that
 changed to the display. On an iPod Video playing FLAC the whole screen
 takes about 6.6 ms -- a fifth of a tick at 33 -- and part of it takes its
-share: 10 rows, about 0.55 ms.
+share: 10 rows, about 0.55 ms. Four rows a frame are also sent
+whatever they hold, which costs about 0.2 ms.
 
 **What counts as changed**: the player compares each row the tick drew
 with the same row last frame, and sends only those whose pixels differ.
@@ -90,8 +92,8 @@ same is about 2 ms on the Video. Rows not drawn at all cost nothing.
 
 | A tick that... | Rows compared | Rows sent |
 |---|---|---|
-| clears the screen with `cls` and redraws it, a ball moved | all 120 | the ball's 7 |
-| erases and redraws a ball at y 100 | 97 to 103 | those 7 |
+| clears the screen with `cls` and redraws it, a ball moved | all 120 | the rows the ball left and those it entered |
+| erases and redraws a ball at y 100 | 97 to 103 | those it left and entered |
 | does that, and redraws a score at the top | 0 to 103 | the ball's, and the score's when it changed |
 | draws nothing | none | none |
 
@@ -103,22 +105,24 @@ exception: every row is sent, without comparing (see
 
 ## What things cost
 
-Measured on the engine. Script costs include nothing but the step itself;
-a loop adds about 4 units a turn around them.
+Measured on the engine. Each script cost includes storing the result in a
+local (`s = ...`) and nothing else; a loop adds 2 to 4 units a turn
+around it, as the first row says.
 
 | Script | Units |
 |---|---|
 | a turn of a `for` loop | 4; 2 up to a whole number from -128 to 127 |
-| `a = a + 1`, a comparison, reading a variable | about 4 |
-| a fraction multiplied | about 4 |
-| a record field: `o.x += 1` | about 6 |
-| an element of an array or typed array, read | about 6; 2 for a global array at a local index |
-| calling a function of your own | about 7 |
-| calling a simple API function: `abs`, `rnd`, `Math.abs` | about 5 |
-| `sin(t)` | about 7 |
+| `a = a + 1`, or a comparison | 4 |
+| reading a variable | 2 |
+| a fraction multiplied | 4 |
+| a record field: `o.x += 1` | 6 |
+| an element of an array or typed array, read: `s = a[i]` | 4; 2 for a global array at a local index |
+| calling a function of your own | about 3, plus its own steps |
+| calling a simple API function: `abs`, `rnd`, `Math.abs` | about 3 |
+| `sin(t)` | about 3 |
 | `push` and `pop` | about 7 the pair |
 | making a record `{ x: i, y: i }` | about 4 |
-| `o[k]` with a string key | about 6, against 5 for `o.name` (2 when `o` is a global) |
+| `o[k]` with a string key | about 4, against 3 for `o.name` (2 when `o` is a global) |
 | joining two strings | about 24 |
 | `splice(0, 1)` of a 100-long array, then a `push` | about 60 |
 | sorting 100 numbers | about 2,000 |
@@ -127,8 +131,9 @@ Three common patterns cost one step each rather than two or three: a
 local variable compared with a whole number from -128 to 127 (`i < 8`,
 `x >= 0`), a global array read at a local index (`grid[i]`), and a
 global record's field read (`player.x`). Code written the ordinary way
-gets this without trying; in a hot loop, copy a value used against a
-local into a local, and keep the arrays it reads global.
+gets this without trying. In a hot loop, a global compared with a small
+whole number (`<`, `<=`, `>` or `>=`, not `==`) is worth copying into a
+local first, and the arrays the loop reads are best kept global.
 
 | Drawing (see **Drawing**) | Units |
 |---|---|

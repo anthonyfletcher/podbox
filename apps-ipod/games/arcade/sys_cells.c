@@ -769,12 +769,6 @@ full:
 
 /* ---- life ---------------------------------------------------------------- */
 
-/* cells.life(field, w, birth, survive, [born]): one generation of a
- * Life-like rule: a cell with n live neighbours of eight (off the field
- * is dead) is born if bit n of birth is set, and a live one survives if
- * bit n of survive is. Live is non-zero; a cell born is born (1 by
- * default). Life is birth 8, survive 12; smoothing a cave of walls is
- * birth 0x1e0, survive 0x1f0. Returns the cells that changed. */
 /* One generation over w x h: live[] holds 1 for each live cell of the
  * last, c[] is changed where a cell is born or dies. A row at a time,
  * each column's three cells summed once into sums[], so a cell's count
@@ -812,6 +806,12 @@ static int32_t life_rows(uint8_t *c, const uint8_t *live, int32_t w,
     return changed;
 }
 
+/* cells.life(field, w, birth, survive, [born]): one generation of a
+ * Life-like rule: a cell with n live neighbours of eight (off the field
+ * is dead) is born if bit n of birth is set, and a live one survives if
+ * bit n of survive is. Live is non-zero; a cell born is born (1 by
+ * default). Life is birth 8, survive 12; smoothing a cave of walls is
+ * birth 0x1e0, survive 0x1f0. Returns the cells that changed. */
 NATIVE(cells_life)
 {
     struct field f;

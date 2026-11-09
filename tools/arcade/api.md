@@ -292,7 +292,7 @@ Text to read, and OK.
 A number turned by the wheel. Returns it, or `value` if backed out of.
 
 ### ui.text(prompt, max, [start])
-A line of up to `max` characters typed with the wheel. Returns it, or null if backed out of.
+A line of up to `max` bytes (1 to 64; a letter beyond A to Z takes 2 or 3) typed with the wheel. Returns it, or null if backed out of.
 
 ### ui.style(box, text, highlight)
 The dialogs' three colours.

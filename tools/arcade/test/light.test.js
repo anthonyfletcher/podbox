@@ -78,3 +78,17 @@ test('wrong arguments stop the cart', () => {
     assert.match(run('light.draw([1], [1], [1], 3, [black]);', '0,0,1,1').err, /fewer x, y or r than lights/);
     assert.match(run('light.draw("a", 1, 1, 1, [black]);', '0,0,1,1').err, /needs x, y and r/);
 });
+
+test('more lights than one call takes stop the cart, rather than overrun', () => {
+    const r = run('light.draw(80, 60, 20, 82595525, [black]);', '0,0,1,1');
+    assert.equal(r.status, 1, r.err);
+    assert.match(r.err, /at most 4096 lights/);
+});
+
+test('a small light on a pixel centre lights that pixel', () => {
+    /* at x.5, y.5 a light's centre pixel is at distance 0: its stepping
+     * must not wrap below the shade table's start */
+    const r = run('light.draw([10.5], [60.5], [2.5], 1, [black, half]);', '10,60,1,1');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out.trim(), '7');
+});

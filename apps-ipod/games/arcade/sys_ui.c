@@ -126,7 +126,6 @@ static uint32_t next_cp(const char *s, uint32_t *i)
     return cp;
 }
 
-
 /* The wheel's characters: the plain set in FONT.CAPS, which draws no
  * others; the owner's language's in FONT.WORLD. Space is always in it. */
 static void cycle_make(struct vm *vm)

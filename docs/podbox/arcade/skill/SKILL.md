@@ -123,7 +123,8 @@ pixels changed are sent; comparing a drawn row that did not change costs
 about a third of sending it), so a tick may take
 
 ```
-units ≤ (1000 / rate − 6.6 × rows changed / 120) / 0.0019
+units ≤ (1000 / rate − 6.6 × rows changed / 120
+         − 2.0 × rows drawn unchanged / 120) / 0.0019
 ```
 
 -- about 12,500 at 33 ticks a second with the whole screen changing,

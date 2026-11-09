@@ -1041,3 +1041,35 @@ function update() {}`;
     assert.ok(seen > 10, open.out);
     assert.ok(behind > 0 && behind < seen, seen + ' then ' + behind);
 });
+
+test('links: a pool given arrays longer than links.pool() allows is refused', () => {
+    const r = run(`var p;
+function init() {
+    p = links.pool(4, 4);
+    var pts = [], lks = [];
+    for (var i = 0; i < 1600; i++) pts.push(0);
+    for (var j = 0; j < 3000; j++) lks.push(0);
+    p.x = pts.slice(0); p.y = pts.slice(0); p.z = pts.slice(0);
+    p.ox = pts.slice(0); p.oy = pts.slice(0); p.oz = pts.slice(0);
+    p.pin = pts.slice(0); p.points = 1600;
+    p.a = lks.slice(0); p.b = lks.slice(0); p.len = lks.slice(0); p.links = 3000;
+    links.step(p, 0);
+}
+function update() {}
+function draw() {}`);
+    assert.equal(r.status, 1, r.err);
+    assert.match(r.err, /arrays are as links.pool\(\) made them/);
+});
+
+test('trifill wholly off the left or right costs the call, not its rows', () => {
+    const cost = (t) => {
+        const r = run(`function init() { prof("t"); ${t}; prof(); }
+function update() {}
+function draw() {}`, 1, ['--units']);
+        assert.equal(r.status, 0, r.err);
+        return Number(/prof t (\d+)/.exec(r.err)[1]);
+    };
+    assert.ok(cost('trifill(200,0, 600,0, 600,119, 8)') < 60);
+    assert.ok(cost('trifill(-600,0, -200,0, -200,119, 8)') < 60);
+    assert.ok(cost('camera(300, 0); trifill(200,0, 600,0, 600,119, 8)') > 600);
+});

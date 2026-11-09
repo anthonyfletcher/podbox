@@ -47,8 +47,8 @@ How much is left depends on the iPod:
 
 - The **iPod Classic** is fast: about three to four times the Video's
   speed.
-- The **iPod Video** is slower, and **playing music** takes about half of
-  it.
+- The **iPod Video** is slower, and **playing music** takes some of
+  that: FLAC, the heaviest, about two-thirds.
 
 So an iPod Video playing music is the slowest case, and the one every
 game must keep up on. The IDE runs your game as that by default: the

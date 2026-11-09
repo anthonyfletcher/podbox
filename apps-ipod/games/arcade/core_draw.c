@@ -1355,6 +1355,14 @@ static int triangle_near(struct pen *p, const int64_t v[6])
 /* A filled triangle, its corners v (x, y three times) before the camera */
 static void fill_triangle(struct pen *p, int64_t v[6])
 {
+    /* wholly left or right of the clip: no row is walked */
+    int64_t xmin = v[0], xmax = v[0];
+    for (int i = 2; i < 6; i += 2) {
+        if (v[i] < xmin) xmin = v[i];
+        if (v[i] > xmax) xmax = v[i];
+    }
+    if (xmax + p->ox < p->cx0 || xmin + p->ox >= p->cx1)
+        return;
     if (triangle_near(p, v))
         return;
     int64_t ymin = v[1], ymax = v[1];
@@ -3390,7 +3398,6 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
         dots++;
         row_touched(&p, (int32_t)py);
     }
-    p.xl = plain;
     /* a pixel particle's reading of its arrays costs more than its pixel:
      * about 6 units a particle in all, measured */
     p.cost += dots * (5 + PER16_DOT / 16);
@@ -4476,6 +4483,8 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
  * dithered, so a torch fades rather than banding. */
 
 #define LIGHT_LEVELS 8
+/* the most lights one call takes */
+#define LIGHT_MAX 4096
 /* a reach, in sixteenths, from which a light's middle is filled */
 #define LIGHT_SPLIT (32 * 16)
 
@@ -4491,6 +4500,11 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
 #define LIGHT_STEP32 11
 #define LIGHT_MAP32 3
 #define LIGHT_DARK16 4
+/* each light given, and each within the clip's rows: its set-up, a 64-bit
+ * division among it; and each row a light's edges are walked down */
+#define LIGHT_EACH 2
+#define LIGHT_SET 12
+#define LIGHT_WALK 1
 
 /* the units for the pixels stepped through and mapped, the rows lit and
  * the lights' rows */
@@ -4512,8 +4526,10 @@ void light_span_arm(uint8_t *row, int32_t n, uint32_t q, uint32_t dq,
 /* The level at a squared distance of i/256 of the reach's square, for the
  * dither b: 2 * levels * (1 - its root) in sixteenths, plus b, over 16 --
  * full light within half the reach, dithered steps across the outer half.
- * Kept for vm->light_levels levels. */
+ * Kept for shade_levels levels, beside the tables rather than in the
+ * game's state, which a resumed game brings back without them. */
 static uint8_t shade[16][260];
+static uint32_t shade_levels;
 
 static void light_shade(uint32_t levels)
 {
@@ -4562,7 +4578,9 @@ static void light_span(uint8_t *row, int32_t n, uint32_t q, uint32_t dq,
  * q and dq at xa, with inv 2^40 over the reach's square; row8 the row's
  * shade tables by x & 3, twice over. dq, the step to the next pixel's
  * squared distance (32 * (dx + 8)) times inv over 2^9, is (dx + 8) * inv
- * over 16, rounded down, from one 32 by 32 multiply. */
+ * over 16, from one 32 by 32 multiply. q and dq are both rounded up, so q
+ * stepped is never below the true value: at a light's very centre it
+ * would wrap below zero and index past the shade table. */
 static void light_run(uint8_t *row, int32_t xa, int32_t xb, int32_t lx,
                       int32_t dy2, uint32_t inv, const uint8_t *const *row8)
 {
@@ -4572,9 +4590,10 @@ static void light_run(uint8_t *row, int32_t xa, int32_t xb, int32_t lx,
     uint32_t dd = (uint32_t)(dx * dx + dy2);
     int32_t s = dx + 8;
     uint64_t m = (uint64_t)(uint32_t)(s < 0 ? -s : s) * inv;
-    uint32_t dq = s < 0 ? -(uint32_t)((m + 15) >> 4) : (uint32_t)(m >> 4);
-    light_span(row + xa, xb - xa, (uint32_t)(((uint64_t)dd * inv) >> 9), dq,
-               inv, row8 + (xa & 3));
+    uint32_t dq = s < 0 ? -(uint32_t)(m >> 4) : (uint32_t)((m + 15) >> 4);
+    light_span(row + xa, xb - xa,
+               (uint32_t)(((uint64_t)dd * inv + 511) >> 9), dq, inv,
+               row8 + (xa & 3));
 }
 
 /* lit zeroed from a to b, rounded out to whole words: a few in place,
@@ -4622,8 +4641,8 @@ static void light_map(uint8_t *px, const uint8_t *row, int32_t n,
     for (; x + 4 <= n; x += 4) {
         uint32_t l0 = row[x], l1 = row[x + 1], l2 = row[x + 2];
         uint32_t l3 = row[x + 3];
-        /* all at the top level: an AND keeps every bit of levels only
-         * where each is levels */
+        /* all four darkest; else all four at the top level (an AND keeps
+         * every bit of levels only where each is levels), left alone */
         if ((l0 | l1 | l2 | l3) == 0) {
             px[x] = lut[0][px[x]];
             px[x + 1] = lut[0][px[x + 1]];
@@ -4713,6 +4732,8 @@ NATIVE(light_draw)
     int32_t n = floor_int(a[3]);
     if (n < 0)
         n = 0;
+    if (n > LIGHT_MAX)
+        return vm_fail(vm, "light.draw() takes at most 4096 lights", "", "");
     if ((uint32_t)n > cx.len || (uint32_t)n > cy.len || (uint32_t)n > cr.len)
         return vm_fail(vm, "light.draw() has fewer x, y or r than lights", "",
                        "");
@@ -4746,8 +4767,8 @@ NATIVE(light_draw)
         return 1;
     }
     uint32_t cost = levels * LIGHT_TABLE;
-    if (vm->light_levels != levels) {
-        vm->light_levels = (uint8_t)levels;
+    if (shade_levels != levels) {
+        shade_levels = levels;
         light_shade(levels);
         cost += LIGHT_SHADE;
     }
@@ -4765,6 +4786,7 @@ NATIVE(light_draw)
     int32_t *starts = on + n;
     uint8_t *lit = mem + lit_at;
     int32_t nl = 0, non = 0;
+    uint32_t reach = 0;
     for (int32_t i = 0; i < n; i++) {
         struct lamp *m = &lamps[nl];
         m->lx = (column_fix(&cx, (uint32_t)i) >> 12) + (int32_t)(p.ox * 16);
@@ -4786,10 +4808,12 @@ NATIVE(light_draw)
         m->l = m->il = m->r = m->ir = m->lx >> 4;
         m->next = starts[m->y0 - p.cy0];
         starts[m->y0 - p.cy0] = ++nl;
+        reach += (uint32_t)r >> 5;      /* its first row's edges walked out */
     }
+    cost += (uint32_t)n * LIGHT_EACH + (uint32_t)nl * LIGHT_SET + reach;
     /* the pixels stepped through and mapped, the rows lit and the
      * lights' rows, since the last spend */
-    uint32_t step = 0, mapped = 0, rows = 0, lamprows = 0;
+    uint32_t step = 0, mapped = 0, rows = 0, lamprows = 0, walked = 0;
     for (int32_t y = p.cy0; y < p.cy1; y++) {
         /* the row's shade tables by x & 3, twice over, once a light
          * reaches it */
@@ -4806,6 +4830,8 @@ NATIVE(light_draw)
                 continue;
             }
             int32_t dy = y * 16 + 8 - m->ly, dy2 = dy * dy;
+            /* its edges walked whether or not the row reaches the clip */
+            walked++;
             if (!lamp_row(m, dy2, m->r2, &m->l, &m->r))
                 continue;
             int32_t xa = m->l < p.cx0 ? p.cx0 : m->l;
@@ -4861,15 +4887,17 @@ NATIVE(light_draw)
             rows++;
         }
         row_touched(&p, y);
-        if (step + mapped > 65536) {
-            if (!vm_spend(vm, light_units(step, mapped, rows, lamprows)))
+        if (step + mapped + walked * 32 > 65536) {
+            if (!vm_spend(vm, light_units(step, mapped, rows, lamprows) +
+                              walked * LIGHT_WALK))
                 return 0;
-            step = mapped = rows = lamprows = 0;
+            step = mapped = rows = lamprows = walked = 0;
         }
     }
     p.count = (uint32_t)(w * h);
     p.per16 = LIGHT_DARK16;
-    p.cost += cost + light_units(step, mapped, rows, lamprows);
+    p.cost += cost + light_units(step, mapped, rows, lamprows) +
+              walked * LIGHT_WALK;
     finish(vm, &p);
     return 1;
 }
