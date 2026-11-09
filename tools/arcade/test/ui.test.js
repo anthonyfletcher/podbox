@@ -146,19 +146,23 @@ function update() {
     assert.equal(r.stdout.replace(/\r/g, ''), 'confirm Sure?\nselect\n');
 });
 
-test('text: the wheel puts a letter in and turns it, Right keeps it, SELECT then OK', () => {
-    /* 6 clicks: A; Right; 12 clicks: B; SELECT to the buttons, SELECT OK */
+test('text: the wheel puts a letter in and turns it, Right keeps it, SELECT takes it', () => {
+    /* 6 clicks: A; Right; 12 clicks: B; SELECT */
     const r = run('function init() { printh(ui.text("Name", 8)); }', undefined,
                   ['--wheel', '1:6:0,2:0,4:12,5:0',
-                   '--buttons', '2:2,3:0,6:16,7:0,8:16,9:0'], 14);
+                   '--buttons', '2:2,3:0,6:16,7:0'], 14);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out, 'text Name: [] up to 8\nAB\n');
+    /* PLAY goes down to OK and Cancel, MENU back up, PLAY, SELECT on OK */
+    const ok = run('function init() { printh(ui.text("Name", 8, "XY")); }', undefined,
+                   ['--buttons', '1:8,2:0,3:4,4:0,5:8,6:0,7:16,8:0'], 14);
+    assert.equal(ok.out, 'text Name: [XY] up to 8\nXY\n');
     /* Left held half a second deletes; Cancel gives null */
     const del = run('function init() { printh(ui.text("Name", 8, "XYZ")); }', undefined,
-                    ['--buttons', '1:1,17:0,18:16,19:0,20:2,21:0,22:16,23:0'], 30);
+                    ['--buttons', '1:1,17:0,18:8,19:0,20:2,21:0,22:16,23:0'], 30);
     assert.equal(del.out, 'text Name: [XYZ] up to 8\nnull\n');
     const kept = run('function init() { printh(ui.text("Name", 8, "XYZ")); }', undefined,
-                     ['--buttons', '1:1,17:0,18:16,19:0,20:16,21:0'], 30);
+                     ['--buttons', '1:1,17:0,18:16,19:0'], 30);
     assert.equal(kept.out, 'text Name: [XYZ] up to 8\nXY\n');
 });
 

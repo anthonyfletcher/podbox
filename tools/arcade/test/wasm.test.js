@@ -119,7 +119,7 @@ function draw() { cls(3); circfill(80, 60, 20 + frame() % 10, 8); }`;
 test('dialogs worked a tick at a time, and an error, as pbgvm reports them', () => {
     const file = build('dialogs', { 'cart.json': CART, 'main.js': DIALOGS });
     both(file, ['--ticks', '60', '--wheel', '4:8,5:0,12:6,13:0',
-                '--buttons', '7:16,8:0,15:16,16:0,17:16,18:0,22:2,23:0,24:16,25:0']);
+                '--buttons', '7:16,8:0,15:8,16:0,17:16,18:0,22:2,23:0,24:16,25:0']);
     both(build('fault', { 'cart.json': CART, 'main.js':
         'function init() {}\nfunction update() { var a = null; a.b = 1; }' }), ['--ticks', '3']);
 });
@@ -127,8 +127,9 @@ test('dialogs worked a tick at a time, and an error, as pbgvm reports them', () 
 test('a dialog paused for each frame ends as one answered at once', async () => {
     const cart = new Uint8Array(fs.readFileSync(build('dialogs', { 'cart.json': CART, 'main.js': DIALOGS })));
     const wasm = new WebAssembly.Module(fs.readFileSync(wasmFile));
-    /* the same presses: SELECT on the frames given, the wheel on others */
-    const input = (n) => ({ held: [3, 8, 10, 14].includes(n) ? 16 : 0, wheel: n === 1 ? 8 : n === 6 ? 6 : 0 });
+    /* the same presses: SELECT on the frames given, PLAY on 8, the wheel
+     * on others */
+    const input = (n) => ({ held: n === 8 ? 8 : [3, 10, 14].includes(n) ? 16 : 0, wheel: n === 1 ? 8 : n === 6 ? 6 : 0 });
     async function play(paused) {
         let n = 0;
         const lines = [], units = [];

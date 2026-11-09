@@ -11,7 +11,8 @@
  * A dialog is a prompt, wrapped to the box, over its controls: OK; Yes and
  * No; a list; a number; or the player's text line -- the wheel puts a
  * character in at the caret and turns it, Left and Right keep it and move,
- * held they delete, SELECT goes to OK and Cancel. MENU backs out. Text
+ * held they delete, SELECT takes it, PLAY goes to OK and Cancel. MENU
+ * backs out of those to the line, and from the line out. Text
  * the cart's font cannot draw -- a translation in FONT.CAPS -- is shown in
  * FONT.WORLD at the same size.
  *
@@ -664,7 +665,12 @@ static void input(struct vm *vm, struct dialog *g, unsigned held, int wheel)
             g->editing = 0;
         else if (right == 2)
             line_delete(g, g->caret);
+        /* as the player's own text entry: SELECT takes the line, PLAY
+         * goes down to OK and Cancel */
         if (pressed & ARCADE_SELECT) {
+            g->answer = 1;
+            g->done = 1;
+        } else if (pressed & ARCADE_PLAY) {
             g->editing = 0;
             g->focus = 1;
             g->at = 0;
