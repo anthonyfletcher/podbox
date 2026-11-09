@@ -523,9 +523,11 @@ in this order:
 5. **The IDE**: rebuild `ide/dist/` (`node ide/build.js`, see the README), so
    it carries the new hints and the new engine; and anything the IDE does in
    the player's place (`ide/main.js`, `ide/game.js`) for a host change.
-6. **The manual** in `.build/arcade-manual/` (git-ignored for now): the
-   reference page, with any example run and its picture and cost measured
-   rather than guessed; its skill in `skill/SKILL.md`; and the link check.
+6. **The manual** in `docs/podbox/arcade/`: the reference page, with any
+   example run and its picture and cost measured rather than guessed; its
+   skill in `skill/SKILL.md`. A picture from `pbgvm --shot` is stored
+   uncompressed, about 230 KB: save it as an indexed PNG.
+   `test/manual.test.js` checks the links and the pictures' size.
 7. **`.specifications/game-engine.md`**, the design, and any cart in
    `.build/arcade_source/` that uses what changed.
 

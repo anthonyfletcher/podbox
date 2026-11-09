@@ -3,6 +3,10 @@
 The compiler for Arcade carts: games written in a small subset of
 JavaScript and played on the iPod as `.pbg` files.
 
+To learn to write one, read [the manual](../../docs/podbox/arcade/README.md):
+a tutorial that builds a first game, and a reference for every part of
+the Arcade. The IDE opens it from **Help**.
+
 Needs Node 20 or later. Once, in this folder:
 
 ```sh
