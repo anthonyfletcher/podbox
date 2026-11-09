@@ -382,19 +382,23 @@ static int flag(struct vm *vm, struct value *a, int argc, int i)
  * call's setup, then each row a shape works out, glyph or map tile, and
  * each pixel by its kind as units per 16 pixels -- the pixels drawn, or
  * for copies and tline the pixels read, which cost the same whether or
- * not they are transparent. */
+ * not they are transparent. Rectangles, copies, sprites, map tiles and
+ * text are timed on the player (the Timing cart, 2026-11-09). */
 #define COST_CALL      20
-#define COST_COPY      25   /* copy_rect's setup, on top of the call's */
+#define COST_COPY      60   /* copy_rect's setup, on top of the call's */
 #define COST_SMALL     6    /* small_sprite's, in its place: measured */
+#define COST_SPRITE    18   /* spr's of an 8x8 tile, on top of tile8's */
+#define COST_RECT      10   /* rect's and rectfill's, on top of the call's */
 #define COST_ROW       2
-#define COST_GLYPH     12
-#define COST_BIG_GLYPH 36
+#define COST_GLYPH     16
+#define COST_BIG_GLYPH 48
 #define COST_TEXT_GLYPH 20  /* FONT.WORLD's and a cart font's */
 #define COST_TILE      5
 #define PER16_FILL     1
 #define PER16_PATTERN  10
-#define PER16_TILE     5
-#define PER16_COPY     9
+#define PER16_TILE     6
+#define PER16_COPY     7
+#define PER16_SMALL    9    /* small_sprite's pixels */
 #define PER16_SCALED   16
 #define PER16_DOT      18
 #define PER16_TLINE    48
@@ -1462,6 +1466,7 @@ static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
     COLOUR(4, c, fn);
     struct pen p;
     begin(vm, &p, c, 1);
+    p.cost += COST_RECT;
     int64_t x0 = b[0] + p.ox, x1 = b[2] + p.ox;
     int64_t y0 = b[1] + p.oy, y1 = b[3] + p.oy;
     /* An outline two pixels thick or less is all edge. */
@@ -2327,9 +2332,10 @@ NATIVE(spr)
     int32_t tx, ty;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
-    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty))
+    if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty)) {
+        p.cost += COST_SPRITE;
         tile8(&p, cell_px(&sh, (int32_t)n), sh.w, tx, ty);
-    else if (!clipped_out(&p, x, y, w, h))
+    } else if (!clipped_out(&p, x, y, w, h))
         copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, (int32_t)n),
                   cell_y(&sh, (int32_t)n), w, h, x, y, w, h, fx, fy);
     finish(vm, &p);
@@ -3311,7 +3317,7 @@ static void small_sprite(struct pen *p, const uint8_t *src, int32_t stride,
         }
     }
     p->count += n;
-    p->cost += (uint32_t)(w * h) * PER16_COPY / 16;
+    p->cost += (uint32_t)(w * h) * PER16_SMALL / 16;
     row_touched(p, dy);
     row_touched(p, dy + h - 1);
 }
@@ -4070,14 +4076,15 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
                     if (x + 1 < x1)
                         px[x + 1] = half[i];
                 }
-                read += (uint32_t)(x1 - x0) * 2;    /* measured on the rig */
+                read += (uint32_t)(x1 - x0) * 3;    /* measured on the 5G */
             }
             if (r->fog)
                 fog_row(px, y, x0, x1, r->fog, fogc);
         }
         row_touched(&p, top);
         row_touched(&p, bottom);
-        p.cost += read / 16 + 64;
+        /* the rig's per-16 figures, times 7/6 as timed on the 5G */
+        p.cost += read * 7 / 96 + 64;
     }
     finish(vm, &p);
 }
@@ -4113,9 +4120,9 @@ static void billboard_copy(struct pen *p, const struct sheet *sh, int32_t s,
     m.xl = ones;
     copy_rect(&m, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
               cw * 8, ch * 8, x, y, w, h, flip, 0);
-    /* the table and the second copy: about 80 units a fogged billboard,
-     * measured on the ARM rig (drawprobe) */
-    p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16 + 80;
+    /* the table and the second copy: about 141 units a fogged billboard,
+     * timed on the 5G */
+    p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16 + 141;
     for (int32_t r = y0; r < y1; r++) {
         const uint8_t *b = bayer[r & 3], *mr = mask + r * SCREEN_W;
         uint8_t *dr = p->s.px + r * p->s.w;
@@ -4222,9 +4229,9 @@ void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
         row_touched(&p, y1 - 1);
     }
     p.count += drawn;
-    /* measured on the ARM rig (drawprobe): about 10 units per 16 pixels
-     * of the area, the columns read down the image */
-    p.cost += (uint32_t)((p.cx1 - p.cx0) * (y1 > y0 ? y1 - y0 : 0)) * 10 / 16;
+    /* timed on the 5G: about 12 units per 16 pixels of the area, the
+     * columns read down the image */
+    p.cost += (uint32_t)((p.cx1 - p.cx0) * (y1 > y0 ? y1 - y0 : 0)) * 12 / 16;
     finish(vm, &p);
 }
 
@@ -4430,18 +4437,18 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
 /* a reach, in sixteenths, from which a light's middle is filled */
 #define LIGHT_SPLIT (32 * 16)
 
-/* measured on the ARM rig (drawprobe), in units: a colour table; the
- * shade tables, when the ramp's length changes; a row any light reaches,
- * and each light's row; per 32 pixels stepped through by a light, and
- * per 32 mapped through their levels over darkening; and per 16 of the
- * clip, all darkened or mapped */
-#define LIGHT_TABLE 20
+/* measured on the ARM rig (drawprobe) and timed on the 5G, in units: a
+ * colour table; the shade tables, when the ramp's length changes; a row
+ * any light reaches, and each light's row; per 32 pixels stepped through
+ * by a light, and per 32 mapped through their levels over darkening; and
+ * per 16 of the clip, all darkened or mapped */
+#define LIGHT_TABLE 25
 #define LIGHT_SHADE 1200
-#define LIGHT_ROW 13
-#define LIGHT_LAMP 13
-#define LIGHT_STEP32 9
+#define LIGHT_ROW 16
+#define LIGHT_LAMP 16
+#define LIGHT_STEP32 11
 #define LIGHT_MAP32 3
-#define LIGHT_DARK16 3
+#define LIGHT_DARK16 4
 
 /* the units for the pixels stepped through and mapped, the rows lit and
  * the lights' rows */
