@@ -5,7 +5,8 @@
  * GNU General Public License (version 2+)
  *
  * The USB connection screen shown while the device is mounted: a plain message
- * box over whatever was on screen, plus HID keypad handling.
+ * box over whatever was on screen, plus HID keypad handling, and the wheel as
+ * volume while the player is a sound card.
  *
  * Themes do not get to draw this screen. See usb_screen_fix_viewports().
  ****************************************************************************/
@@ -29,6 +30,7 @@
 #include "system/activity.h"
 #include "system/shutdown.h"
 #include "widgets/splash.h"
+#include "system/volume.h"      /* adjust_volume */
 
 int usb_keypad_mode;
 static bool usb_hid;
@@ -67,6 +69,17 @@ static int handle_usb_events(void)
                 break;
             case SYS_TIMEOUT:
                 break;
+#ifdef USB_ENABLE_AUDIO
+            /* The player is the computer's sound card: the wheel sets the
+             * codec's volume, as the host's own volume requests do. */
+            case BUTTON_SCROLL_FWD:
+            case BUTTON_SCROLL_FWD|BUTTON_REPEAT:
+            case BUTTON_SCROLL_BACK:
+            case BUTTON_SCROLL_BACK|BUTTON_REPEAT:
+                if (usb_audio_get_active())
+                    adjust_volume((button & BUTTON_SCROLL_FWD) ? 1 : -1);
+                break;
+#endif
         }
 
     }

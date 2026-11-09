@@ -1529,8 +1529,9 @@ presentation controls.
 
 [usb-dac]
 Lets a computer play through the player: it shows up as a sound card, and what
-the computer plays comes out of the headphone socket. The computer's volume
-control sets the player's.
+the computer plays comes out of the headphone socket. The wheel sets the
+player's volume, and so does the computer's volume control where it asks the
+player rather than turning the sound down itself.
 
 Takes effect at the next restart, and while on it keeps about 130K of memory
 back from playback. On an iPod Video in mass-storage mode it takes USB HID's
