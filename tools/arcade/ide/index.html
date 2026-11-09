@@ -168,6 +168,10 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
                     border-radius: 3px; font-size: 12px; }
 #statusbar button:hover { background: rgba(255, 255, 255, 0.18); }
 #statusbar .grow { flex: 1; }
+/* the minimised panels, each a button that brings it back */
+#tray { display: flex; gap: 2px; }
+#tray button { text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+               box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
 #status.bad { background: var(--bad); }
 
 /* ---- the files ---- */
@@ -511,6 +515,7 @@ dialog.ask { min-width: 340px; }
 </div>
 <footer id="statusbar">
   <button id="status" title="Show the output"></button>
+  <span id="tray"></span>
   <span class="grow"></span>
   <button id="rate" title="Run as another player: the Run menu"></button>
 </footer>

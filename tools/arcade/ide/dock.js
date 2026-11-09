@@ -1,8 +1,8 @@
 /* The IDE's panels in a dock (dockview, MIT): each can be dragged beside,
- * above or below any other, or onto it as a tab, and the arrangement is
- * kept between visits.
+ * above or below any other, or onto it as a tab, or minimised to a button
+ * in tray, and the arrangement is kept between visits.
  *
- *   createDock(root, panes, actions, changed) -> the dock
+ *   createDock(root, panes, actions, changed, tray) -> the dock
  *
  * panes maps each panel's id to its content element; actions maps an id
  * to the buttons its group's header shows while it is the open tab, which
@@ -16,7 +16,7 @@
  * they come back where they were.
  *
  * Parts: the panels and where each goes at first; their sizes; showing
- * and hiding; the editor's panels; keeping the arrangement. */
+ * and hiding; minimising; the editor's panels; keeping the arrangement. */
 
 import { createDockview, themeDark } from 'dockview-core/dist/dockview-core.js';
 import { iconButton } from './icons.js';
@@ -48,14 +48,21 @@ const LATER = ['profiler', 'watch'];
 const OWN = ['picker', 'objects'];
 
 /* a tab: the panel's title, kept as written for the editor's file and in
- * capitals for the rest, and a button to close it */
-function tab(id) {
+ * capitals for the rest, and buttons to minimise it (all but the editor)
+ * and close it */
+function tab(id, minimise) {
     const el = document.createElement('div');
     el.className = 'ide-tab' + (id === 'editor' ? ' file' : '');
     const title = document.createElement('span');
     const close = iconButton('close', 'Close');
     close.addEventListener('pointerdown', (e) => e.stopPropagation());
-    el.append(title, close);
+    el.append(title);
+    if (id !== 'editor') {
+        const min = iconButton('minimise', 'Minimise', (e) => { e.stopPropagation(); minimise(id); });
+        min.addEventListener('pointerdown', (e) => e.stopPropagation());
+        el.append(min);
+    }
+    el.append(close);
     let off = null;
     return {
         element: el,
@@ -68,7 +75,7 @@ function tab(id) {
     };
 }
 
-export function createDock(root, panes, actions, changed) {
+export function createDock(root, panes, actions, changed, tray) {
     /* the group header's buttons: the open tab's own, which setActions()
      * changes */
     const fills = new Set();
@@ -98,7 +105,7 @@ export function createDock(root, panes, actions, changed) {
         theme: themeDark,
         createComponent: (o) => ({ element: panes[o.name], init: () => {} }),
         defaultTabComponent: 'tab',
-        createTabComponent: (o) => tab(o.id),
+        createTabComponent: (o) => tab(o.id, minimise),
         createRightHeaderActionComponent: headers
     });
     /* who the user closed, so the editor's panels stay closed for it */
@@ -106,10 +113,10 @@ export function createDock(root, panes, actions, changed) {
     const titles = {};
     let restoring = false;
 
-    function add(id) {
+    function add(id, position) {
         const p = PANELS[id];
         return api.addPanel({
-            id, component: id, title: titles[id] || p.title, position: p.place(api),
+            id, component: id, title: titles[id] || p.title, position: position || p.place(api),
             inactive: id !== 'editor',
             ...(p.min ? { minimumWidth: p.min } : {})
         });
@@ -188,8 +195,10 @@ export function createDock(root, panes, actions, changed) {
 
     function show(id, focus) {
         let p = api.getPanel(id);
+        const beside = minimised.get(id);
+        if (minimised.delete(id)) fillTray();
         if (!p || !p.group.api.isVisible) {
-            if (!p) p = add(id);
+            if (!p) p = add(id, beside && shown(beside) ? { referencePanel: beside, direction: 'within' } : null);
             p.group.api.setVisible(true);
             settle();
         }
@@ -205,6 +214,34 @@ export function createDock(root, panes, actions, changed) {
         titles[id] = title;
         const p = api.getPanel(id);
         if (p) p.api.setTitle(title);
+        fillTray();
+    }
+
+    /* ---- minimising ---- */
+
+    /* each minimised panel, and a panel it was a tab beside, if any, so it
+     * comes back as that tab; show() brings one back */
+    const minimised = new Map();
+
+    function minimise(id) {
+        const p = api.getPanel(id);
+        if (!p || !p.group.api.isVisible) return;
+        const other = p.group.panels.find((q) => q.id !== id);
+        minimised.set(id, other ? other.id : null);
+        hide(id);
+        fillTray();
+    }
+
+    /* the editor's own panels have a button only while it fills them */
+    function fillTray() {
+        if (!tray) return;
+        tray.replaceChildren(...[...minimised.keys()].filter(has).map((id) => {
+            const b = document.createElement('button');
+            b.textContent = titles[id] || PANELS[id].title;
+            b.title = 'Show ' + b.textContent;
+            b.onclick = () => show(id);
+            return b;
+        }));
     }
 
     /* ---- the editor's panels ---- */
@@ -228,9 +265,10 @@ export function createDock(root, panes, actions, changed) {
      * rest hidden */
     function done() {
         for (const id of OWN) {
-            if (filled[id] && !closed.has(id) && !shown(id)) show(id, false);
+            if (filled[id] && !closed.has(id) && !minimised.has(id) && !shown(id)) show(id, false);
             else if (!filled[id] && shown(id)) hide(id);
         }
+        fillTray();
         changed();
     }
 
@@ -239,7 +277,9 @@ export function createDock(root, panes, actions, changed) {
     /* ---- keeping the arrangement ---- */
 
     function keep() {
-        try { localStorage.setItem(KEY, JSON.stringify({ layout: api.toJSON(), sizes })); } catch (e) { /* not kept */ }
+        try {
+            localStorage.setItem(KEY, JSON.stringify({ layout: api.toJSON(), sizes, minimised: [...minimised] }));
+        } catch (e) { /* not kept */ }
     }
 
     /* a change of the user's own: a divider dragged, a panel moved */
@@ -251,6 +291,8 @@ export function createDock(root, panes, actions, changed) {
 
     function reset() {
         closed.clear();
+        minimised.clear();
+        fillTray();
         restoring = true;
         api.clear();
         for (const id of ORDER) add(id);
@@ -267,10 +309,16 @@ export function createDock(root, panes, actions, changed) {
     try { kept = JSON.parse(localStorage.getItem(KEY)); } catch (e) { /* none kept */ }
     restoring = true;
     try { if (kept && kept.layout) api.fromJSON(kept.layout); } catch (e) { api.clear(); }
-    for (const id of ORDER) if (!api.getPanel(id)) {
+    try {
+        for (const [id, beside] of (kept && kept.minimised) || [])
+            if (PANELS[id] && id !== 'editor') minimised.set(id, beside);
+    } catch (e) { minimised.clear(); }
+    /* one minimised from among tabs is out of the layout until shown */
+    for (const id of ORDER) if (!api.getPanel(id) && !minimised.has(id)) {
         add(id);
         if (LATER.includes(id)) hide(id);
     }
+    fillTray();
     restoring = false;
     if (kept && kept.sizes) Object.assign(sizes, kept.sizes);
     new ResizeObserver(() => {

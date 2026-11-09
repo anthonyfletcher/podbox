@@ -9,7 +9,8 @@ import {
     FileCode, Palette, Type, Trash2, Film, SkipBack, SkipForward, Ban,
     Maximize2, Layers, MousePointer2, Grid2x2, Timer, MapPinPlus,
     LayoutGrid, Image, ImagePlus, ImageOff, CircleDot, SquareFunction, ListOrdered, ChevronUp, CaseSensitive, WholeWord, Regex, Replace, ReplaceAll, Power,
-    Settings, Coins, Zap, Bomb, Sparkles, Crosshair, ArrowBigUp, MousePointerClick, Dices, WandSparkles
+    Settings, Coins, Zap, Bomb, Sparkles, Crosshair, ArrowBigUp, MousePointerClick, Dices, WandSparkles,
+    Minus
 } from 'lucide';
 
 /* the four waves sfxr makes, drawn as Lucide draws */
@@ -26,7 +27,7 @@ const ICONS = {
     select: SquareDashed, mirror: SquareSplitHorizontal, flipH: FlipHorizontal2,
     flipV: FlipVertical2, turn: RotateCw, invert: Contrast, tile: Grid3x3, onion: Ghost,
     zoomIn: ZoomIn, zoomOut: ZoomOut, play: Play, pause: Pause, stop: Square, plus: Plus,
-    left: ChevronLeft, right: ChevronRight, down: ChevronDown, close: X, erase: Eraser, text: FileCode,
+    left: ChevronLeft, right: ChevronRight, down: ChevronDown, close: X, minimise: Minus, erase: Eraser, text: FileCode,
     swatches: Palette, glyphs: Type, trash: Trash2, animate: Film, object: MapPinPlus,
     prev: SkipBack, next: SkipForward, clear: Ban, resize: Maximize2, layers: Layers,
     pointer: MousePointer2, grid: Grid2x2, metronome: Timer,

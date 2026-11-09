@@ -1738,7 +1738,7 @@ dock = createDock($('dock'), {
     files: $('pane-files'), editor: $('editor'), output: $('output'), player: $('pane-player'),
     picker: $('pane-picker'), objects: $('pane-objects'), profiler: $('pane-profiler'),
     watch: $('pane-watch')
-}, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView);
+}, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView, $('tray'));
 setPanelHost(dock);
 
 /* the pause menu's contents as the Game menu, and what the player keeps */
