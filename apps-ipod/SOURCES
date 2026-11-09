@@ -242,6 +242,7 @@ games/arcade/json.c
 games/arcade/present_arm.S
 games/arcade/cells_arm.S
 games/arcade/draw_arm.S
+games/arcade/links_arm.S
 #endif
 
 screens/settings/display_settings.c

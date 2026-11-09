@@ -418,10 +418,11 @@ static uint64_t root64(uint64_t v)
 #define MAX_SEGS  4096
 #define SEG_CELLS 16384             /* the grid's cells, at most */
 
-/* units: each line a point is tested against, and each point that touches
- * one -- its push, a root and a divide among it */
+/* units: each free point looked at, each line it is tested against, and
+ * each point that touches one -- its push, a root and a divide among it */
+#define SEG_POINT 26
 #define SEG_TEST  50
-#define SEG_TOUCH 120
+#define SEG_TOUCH 60
 
 enum { S_X0, S_Y0, S_X1, S_Y1, S_MAT, S_START, S_ITEMS, S_COUNT, S_OX, S_OY,
        S_MX, S_MY, S_MOVED, S_CELL, S_GX, S_GY, S_GW, S_GH, S_FIELDS };
@@ -831,7 +832,8 @@ NATIVE(segs_trace)
             }
     }
     /* the ways: 1 right, 2 down, 4 left, 8 up */
-    static const int32_t step_x[4] = { 1, 0, -1, 0 }, step_y[4] = { 0, 1, 0, -1 };
+    static const int32_t step_x[4] = { 1, 0, -1, 0 };
+    static const int32_t step_y[4] = { 0, 1, 0, -1 };
     uint32_t edges = 0;
     for (int32_t r = 0; r <= h; r++)
         for (int32_t c = 0; c <= w; c++) {
@@ -874,7 +876,8 @@ NATIVE(segs_trace)
                     n++;
                     last = d;
                 }
-                v = (uint32_t)((int32_t)v + step_y[d] * (int32_t)vw + step_x[d]);
+                v = (uint32_t)((int32_t)v + step_y[d] * (int32_t)vw +
+                               step_x[d]);
                 /* on: turning right first, then straight, then left */
                 int nd = -1;
                 static const int turn[3] = { 1, 0, 3 };
@@ -907,8 +910,10 @@ NATIVE(segs_trace)
                                    "corners; trace part of the map at a "
                                    "time", "", "");
                 /* half a cell, or half the side when shorter */
-                int64_t ax = (int64_t)px[a] - px[b], ay = (int64_t)py[a] - py[b];
-                int64_t cx2 = (int64_t)px[c] - px[b], cy2 = (int64_t)py[c] - py[b];
+                int64_t ax = (int64_t)px[a] - px[b];
+                int64_t ay = (int64_t)py[a] - py[b];
+                int64_t cx2 = (int64_t)px[c] - px[b];
+                int64_t cy2 = (int64_t)py[c] - py[b];
                 int64_t la = (ax < 0 ? -ax : ax) + (ay < 0 ? -ay : ay);
                 int64_t lc = (cx2 < 0 ? -cx2 : cx2) + (cy2 < 0 ? -cy2 : cy2);
                 int64_t cut = 4 << 16;
@@ -991,22 +996,25 @@ static uint32_t seg_near(const struct segs *s, int64_t x0, int64_t y0,
                          int64_t x1, int64_t y1, int32_t *out, uint32_t room,
                          uint32_t *stamp, uint32_t mark)
 {
-    int64_t c8 = (int64_t)s->cell << 8;
-    int64_t gx = (int64_t)s->gx << 8, gy = (int64_t)s->gy << 8;
-    int64_t a = (x0 - gx) / c8, b = (x1 - gx) / c8;
-    int64_t c = (y0 - gy) / c8, d = (y1 - gy) / c8;
-    if (x0 < gx) a = -1;
-    if (y0 < gy) c = -1;
-    if (a < 0) a = 0;
-    if (c < 0) c = 0;
-    if (b >= s->gw) b = s->gw - 1;
-    if (d >= s->gh) d = s->gh - 1;
-    if (x1 < gx || y1 < gy)
+    /* in whole pixels from the grid's corner, and its cells by a 32-bit
+     * divide once inside it: a 64-bit one costs a point more than all the
+     * rest of its search */
+    int64_t xa = (x0 >> 8) - s->gx, xb = (x1 >> 8) - s->gx;
+    int64_t ya = (y0 >> 8) - s->gy, yb = (y1 >> 8) - s->gy;
+    if (xb < 0 || yb < 0)
         return 0;
+    uint32_t cell = (uint32_t)s->cell;
+    int64_t wide = (int64_t)s->gw * cell, high = (int64_t)s->gh * cell;
+    int32_t a = xa <= 0 ? 0 : xa >= wide ? s->gw
+              : (int32_t)((uint32_t)xa / cell);
+    int32_t b = xb >= wide ? s->gw - 1 : (int32_t)((uint32_t)xb / cell);
+    int32_t c = ya <= 0 ? 0 : ya >= high ? s->gh
+              : (int32_t)((uint32_t)ya / cell);
+    int32_t d = yb >= high ? s->gh - 1 : (int32_t)((uint32_t)yb / cell);
     uint32_t n = 0;
-    for (int64_t r = c; r <= d; r++)
-        for (int64_t q = a; q <= b; q++) {
-            int32_t i = (int32_t)(r * s->gw + q);
+    for (int32_t r = c; r <= d; r++)
+        for (int32_t q = a; q <= b; q++) {
+            int32_t i = r * s->gw + q;
             for (int32_t t = s->start[i]; t < s->start[i + 1]; t++) {
                 int32_t k = s->items[t];
                 if ((uint32_t)k >= s->count || stamp[k] == mark)
@@ -1337,6 +1345,90 @@ NATIVE(links_ring)
     return 1;
 }
 
+/* A link as the passes work it: ij its ends' places in the points' array
+ * in bytes, i in the low half and j in the high, each with its low bit set
+ * when that end is pinned (QLINK_NONE for a broken link, or one with both
+ * ends pinned); l2 its length squared in 1/256 pixels, and inv 2^47 over
+ * that, 0 for a link of a pixel or less, or 128 or more, which goes the
+ * exact way. Its layout is links_arm.S's. */
+struct qlink
+{
+    uint32_t ij;
+    int32_t l2, inv;
+};
+#define QLINK_NONE 0xffffffffu
+
+_Static_assert(sizeof(struct qlink) == 12 && MAX_POINTS * 12 <= 65536,
+               "links_arm.S's link, and a point's place in 16 bits");
+
+#ifdef ARCADE_ASM
+const struct qlink *link_run_arm(int32_t *P, const struct qlink *q,
+                                 const struct qlink *end, int slack);
+#endif
+
+/* One pass of links q up to end the short way, until a link that needs
+ * the exact way, which is returned (end when there is none). With e the
+ * stretch of a link's square, (d^2 - L^2) / L^2, the share of the vector
+ * its ends move, (d - L) / d, is 1 - (1 + e)^-1/2: to the third order
+ * e/2 - 3e^2/8 + 5e^3/16, within 1 per cent while e is within a quarter.
+ * No root, no divide, all in 32 bits, the differences wrapped as the
+ * positions are. The exact way takes a link too long or short for inv,
+ * more than 64 pixels across, or stretched or squashed past a quarter. */
+static const struct qlink *link_run(int32_t *P, const struct qlink *q,
+                                    const struct qlink *end, int slack)
+{
+#ifdef ARCADE_ASM
+    return link_run_arm(P, q, end, slack);
+#else
+    for (; q < end; q++) {
+        uint32_t ij = q->ij;
+        if (ij == QLINK_NONE)
+            continue;
+        if (!q->inv)
+            return q;
+        int32_t *Pi = (int32_t *)((char *)P + (ij & 0xfffc));
+        int32_t *Pj = (int32_t *)((char *)P + ((ij >> 16) & 0xfffc));
+        int32_t ax = (int32_t)((uint32_t)Pj[0] - (uint32_t)Pi[0]) >> 8;
+        int32_t ay = (int32_t)((uint32_t)Pj[1] - (uint32_t)Pi[1]) >> 8;
+        int32_t az = (int32_t)((uint32_t)Pj[2] - (uint32_t)Pi[2]) >> 8;
+        if ((uint32_t)(ax + 16384) >= 32768 ||
+            (uint32_t)(ay + 16384) >= 32768 ||
+            (uint32_t)(az + 16384) >= 32768)
+            return q;
+        int32_t d2 = ax * ax + ay * ay + az * az;
+        int32_t e = (int32_t)((int64_t)(d2 - q->l2) * q->inv >> 31);
+        if ((uint32_t)(e + 16384) >= 32768)
+            return q;
+        if (slack && e < 0)
+            continue;
+        int32_t e2 = (e * e) >> 16, e3 = (e2 * e) >> 16;
+        int32_t sh = e / 2 - (3 * e2 >> 3) + (5 * e3 >> 4);
+        /* the move in 16.16 is (a * sh) >> 8, all of it to the free end
+         * when the other is pinned, else >> 9 to each */
+        ax *= sh;
+        ay *= sh;
+        az *= sh;
+        if (ij & 1) {
+            Pj[0] = (int32_t)((uint32_t)Pj[0] - (uint32_t)(ax >> 8));
+            Pj[1] = (int32_t)((uint32_t)Pj[1] - (uint32_t)(ay >> 8));
+            Pj[2] = (int32_t)((uint32_t)Pj[2] - (uint32_t)(az >> 8));
+        } else if (ij & 0x10000) {
+            Pi[0] = (int32_t)((uint32_t)Pi[0] + (uint32_t)(ax >> 8));
+            Pi[1] = (int32_t)((uint32_t)Pi[1] + (uint32_t)(ay >> 8));
+            Pi[2] = (int32_t)((uint32_t)Pi[2] + (uint32_t)(az >> 8));
+        } else {
+            Pi[0] = (int32_t)((uint32_t)Pi[0] + (uint32_t)(ax >> 9));
+            Pi[1] = (int32_t)((uint32_t)Pi[1] + (uint32_t)(ay >> 9));
+            Pi[2] = (int32_t)((uint32_t)Pi[2] + (uint32_t)(az >> 9));
+            Pj[0] = (int32_t)((uint32_t)Pj[0] - (uint32_t)(ax >> 9));
+            Pj[1] = (int32_t)((uint32_t)Pj[1] - (uint32_t)(ay >> 9));
+            Pj[2] = (int32_t)((uint32_t)Pj[2] - (uint32_t)(az >> 9));
+        }
+    }
+    return end;
+#endif
+}
+
 /* links.step(p, solid): a tick of every point and link, then points out
  * of map cells whose flags share a bit with solid (0, none), and out of
  * the pool's field's solid cells */
@@ -1351,7 +1443,7 @@ NATIVE(links_step)
     int32_t g = fx(l.f[L_GRAVITY]), gx = fx(l.f[L_GX]), drag = fx(l.f[L_DRAG]);
     int slack = vm_truthy(vm, l.f[L_SLACK]);
     int32_t tear = fx(l.f[L_TEAR]);
-    uint32_t broken = 0;
+    uint32_t broken = 0, exact = 0;
     int32_t passes = whole(l.f[L_PASSES], 4);
     if (passes < 1) passes = 1;
     if (passes > 16) passes = 16;
@@ -1425,10 +1517,9 @@ NATIVE(links_step)
     struct value *len = ELEMS(vm, l.f[L_LEN]);
     /* The passes work on plain numbers, read from the pool's arrays once
      * and written back once, rather than six read and six written a link
-     * a pass: P the points (x, y, z), pinned, and each link's ends (-1
-     * for none or a broken one) and length */
-    static int32_t P[MAX_POINTS * 3], A[MAX_LINKS], B[MAX_LINKS];
-    static int32_t LEN[MAX_LINKS];
+     * a pass: P the points (x, y, z), pinned, and Q the links */
+    static int32_t P[MAX_POINTS * 3];
+    static struct qlink Q[MAX_LINKS];
     static uint8_t pinned[MAX_POINTS];
     for (uint32_t i = 0; i < np; i++) {
         P[i * 3] = fx(x[i]);
@@ -1436,23 +1527,55 @@ NATIVE(links_step)
         P[i * 3 + 2] = fx(z[i]);
         pinned[i] = (uint8_t)vm_truthy(vm, pin[i]);
     }
+    /* inv for the last few lengths, as most of a pool's links share a few */
+    uint32_t seen_l8[8] = { 0 }, seen_inv[8];
     for (uint32_t k = 0; k < nl; k++) {
         int32_t i = whole(la[k], -1), j = whole(lb[k], -1);
-        int ok = i >= 0 && j >= 0 && (uint32_t)i < np && (uint32_t)j < np &&
-                 !(pinned[i] && pinned[j]);
-        A[k] = ok ? i : -1;
-        B[k] = j;
-        LEN[k] = fx(len[k]);
+        struct qlink *q = &Q[k];
+        q->ij = QLINK_NONE;
+        if (i < 0 || j < 0 || (uint32_t)i >= np || (uint32_t)j >= np ||
+            (pinned[i] && pinned[j]))
+            continue;
+        q->ij = ((uint32_t)i * 12 | pinned[i]) |
+                ((uint32_t)j * 12 | pinned[j]) << 16;
+        int32_t L = fx(len[k]);
+        uint32_t l8 = (uint32_t)L >> 8;
+        q->l2 = (int32_t)(l8 * l8);
+        q->inv = 0;
+        if (L > 0 && l8 > 256 && l8 < 32768) {
+            uint32_t h = l8 & 7;
+            if (seen_l8[h] != l8) {
+                uint64_t r = (1u << 31) / l8;
+                seen_l8[h] = l8;
+                seen_inv[h] = (uint32_t)(r * r >> 15);
+            }
+            q->inv = (int32_t)seen_inv[h];
+        }
     }
-    for (int32_t p = 0; p < passes; p++)
+    const struct qlink *qend = Q + nl;
+    for (int32_t p = 0; p < passes; p++) {
+        /* the first pass measures each link for its tear: the short way
+         * only takes a link stretched under 12 per cent, so with a tear
+         * of an eighth or more what it takes cannot tear; under that, the
+         * first pass goes the exact way */
+        int quick = !(p == 0 && tear > 0 && tear < 8192);
         for (uint32_t k = 0; k < nl; k++) {
-            int32_t i = A[k], j = B[k];
-            if (i < 0)
+            if (quick) {
+                const struct qlink *q = link_run(P, Q + k, qend, slack);
+                if (q == qend)
+                    break;
+                k = (uint32_t)(q - Q);
+            }
+            uint32_t ij = Q[k].ij;
+            if (ij == QLINK_NONE)
                 continue;
-            int pi = pinned[i], pj = pinned[j];
-            int32_t *Pi = P + i * 3, *Pj = P + j * 3;
+            exact++;
+            int pi = ij & 1, pj = (ij >> 16) & 1;
+            int32_t *Pi = (int32_t *)((char *)P + (ij & 0xfffc));
+            int32_t *Pj = (int32_t *)((char *)P + ((ij >> 16) & 0xfffc));
             int32_t xi = Pi[0], yi = Pi[1], zi = Pi[2];
             int32_t xj = Pj[0], yj = Pj[1], zj = Pj[2];
+            int32_t L = fx(len[k]);
             int64_t dx = (int64_t)xj - xi, dy = (int64_t)yj - yi;
             int64_t dz = (int64_t)zj - zi;
             /* A link under 64 pixels -- a cloth's or a rope's -- is worked
@@ -1462,6 +1585,7 @@ NATIVE(links_step)
             int short_link = dx > -NEAR && dx < NEAR && dy > -NEAR &&
                              dy < NEAR && dz > -NEAR && dz < NEAR;
             int32_t d, d8 = 0;
+            int64_t s;
             if (short_link) {
                 int32_t ax = (int32_t)dx >> 8, ay = (int32_t)dy >> 8;
                 int32_t az = (int32_t)dz >> 8;
@@ -1471,10 +1595,9 @@ NATIVE(links_step)
             } else
                 d = span(dx, dy, dz);
             /* torn on the first pass, at the stretch the tick left it */
-            if (p == 0 && tear > 0 &&
-                d > LEN[k] + (((int64_t)LEN[k] * tear) >> 16)) {
+            if (p == 0 && tear > 0 && d > L + (((int64_t)L * tear) >> 16)) {
                 la[k] = mk(T_INT, -1);
-                A[k] = -1;
+                Q[k].ij = QLINK_NONE;
                 broken++;
                 continue;
             }
@@ -1482,10 +1605,9 @@ NATIVE(links_step)
                 continue;
             /* the share of the gap each end moves, 16.16 of the vector;
              * a slack link only pulls */
-            int64_t gap = (int64_t)d - LEN[k];
+            int64_t gap = (int64_t)d - L;
             if (slack && gap < 0)
                 continue;
-            int64_t s;
             if (short_link && d8 > 0 && gap > -NEAR && gap < NEAR)
                 s = (int32_t)gap * 256 / d8;
             else
@@ -1511,6 +1633,7 @@ NATIVE(links_step)
                 Pj[2] = wrap32(zj - mz / 2);
             }
         }
+    }
     /* back into the pool; a pinned point never moves, so is left as it is */
     for (uint32_t i = 0; i < np; i++)
         if (!pinned[i]) {
@@ -1519,7 +1642,7 @@ NATIVE(links_step)
             z[i] = mk(T_FIX, P[i * 3 + 2]);
         }
     /* out of the segment set's lines, and what each point touched */
-    uint32_t tests = 0, touched = 0;
+    uint32_t tests = 0, touched = 0, segpts = 0;
     if (l.f[L_SEGS].tag == T_OBJ) {
         struct segs sg;
         if (!segs_of(vm, l.f[L_SEGS], "links.step", &sg))
@@ -1549,10 +1672,11 @@ NATIVE(links_step)
         for (uint32_t i = 0; i < np; i++) {
             int32_t m = 0, NX = 0, NY = 0;
             if (!pinned[i]) {
+                segpts++;
                 int32_t X = fx(x[i]), Y = fx(y[i]), OX = fx(ox[i]);
                 int32_t OY = fx(oy[i]);
-                m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, grav, fr, nfr, bounce,
-                             stamp, &mark, &NX, &NY, &tests);
+                m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, grav, fr, nfr,
+                             bounce, stamp, &mark, &NX, &NY, &tests);
                 if (m) {
                     x[i] = mk(T_FIX, X);
                     y[i] = mk(T_FIX, Y);
@@ -1603,11 +1727,12 @@ NATIVE(links_step)
     if (broken)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
-    /* measured on the ARM rig (.build/arcade-rig, sysprobe): a link a
-     * pass about 17 units, most of it its root and divide */
-    vm_charge(vm, 10 + np * 14 + nl * (uint32_t)passes * 17 +
-                  (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
-                  tests * SEG_TEST + touched * SEG_TOUCH);
+    /* measured on the ARM rig (.build/arcade-rig, linkprobe and
+     * bagprobe): a link a pass 3.25 units the short way, 15 more the
+     * exact way, its root and divide */
+    vm_charge(vm, 10 + np * 18 + nl * 3 + nl * (uint32_t)passes * 13 / 4 +
+                  exact * 15 + (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
+                  segpts * SEG_POINT + tests * SEG_TEST + touched * SEG_TOUCH);
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }
