@@ -217,10 +217,17 @@ API_NS(links)
 API(links_pool,    119, 2, 2, VAL,  0, CELLS,  LISTEN, 1)
 API(links_point,   120, 3, 4, VAL,  0, CELLS,  LISTEN, 1)
 API(links_link,    121, 3, 4, VAL,  0, CELLS,  LISTEN, 1)
-API(links_step,    122, 2, 2, VAL,  0, CELLS,  LISTEN, 1)
+API(links_step,    122, 2, 3, VAL,  0, CELLS,  LISTEN, 1)
 API(links_draw,    123, 2, 2, VOID, 0, PIXELS, LISTEN, 1)
 API(links_cloth,   148, 6, 7, VAL,  0, CELLS,  LISTEN, 1)
 API(links_fill,    149, 2, 2, VAL,  0, PIXELS, LISTEN, 1)
+API(links_ring,    211, 5, 5, VAL,  0, CELLS,  LISTEN, 1)
+
+/* Systems: the outlines points meet */
+API_NS(segs)
+API(segs_make,     208, 3, 5, VAL,  0, CELLS,  LISTEN, 1)
+API(segs_move,     209, 3, 3, VOID, 0, CELLS,  LISTEN, 1)
+API(segs_draw,     210, 2, 2, VOID, 0, PIXELS, LISTEN, 1)
 
 /* Systems: a voxel landscape, from the plane's camera */
 API_NS(land)

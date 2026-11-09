@@ -3,14 +3,16 @@
 Two kinds of physics a game can afford on the iPod: **cells**, a field of
 materials -- sand, water, fire, smoke -- that move and react a pixel at a
 time, and Life and its cousins; and **links**, points held together --
-ropes, chains, bridges and cloth.
+ropes, chains, bridges, cloth, and soft bodies that meet outlines.
 
 - Cells: [how a field works](#how-a-field-works), [cells.rules](#cellsrules),
   [cells.step](#cellsstepfield-w-rules-actors), [cells.life](#cellslifefield-w-birth-survive-born),
   [cells.lift](#cellsliftfield-rules-x-y-r-pool-speed), [actors and particles in a field](#actors-and-particles-in-a-field)
 - Links: [how links work](#how-links-work), [links.pool](#linkspoolpoints-links),
   [links.point](#linkspointp-x-y-pin), [links.link](#linkslinkp-i-j-len),
-  [links.step](#linksstepp-solid), [links.draw](#linksdrawp-colour),
+  [links.step](#linksstepp-solid-out), [links.ring](#linksringp-first-n-area-stiffness),
+  [segs.make](#segsmakexs-ys-n-mats-ends), [segs.move](#segsmoves-dx-dy),
+  [segs.draw](#segsdraws-colour), [links.draw](#linksdrawp-colour),
   [links.cloth](#linksclothp-x-y-cols-rows-gap-pin), [links.fill](#linksfillp-ramp)
 
 ## How a field works
@@ -367,6 +369,13 @@ A pool's fields, plain arrays you read and write:
 | `pin` | whether a point is held in place |
 | `a`, `b`, `len` | each link's two points and its length; `a` is -1 for a broken link |
 | `gravity`, `drag` | for every point: gravity in pixels a tick, drag a fraction of the speed |
+| `gx` | gravity across, in pixels a tick: with `gravity`, a pull in any direction, as when a world tilts |
+| `damp` | a share of each point's speed drawn toward the whole pool's: a soft body that does not wobble, and still moves as a whole |
+| `slack` | when true, links pull but never push: a skin that can sag and fold but never stretch |
+| `segs` | a segment set (`segs.make`) the points are kept out of |
+| `radius` | how far each point keeps from the set's lines, in pixels |
+| `friction` | each material's friction against the lines, 0 (ice) to 1 (glue): an array indexed by material, or one number for all |
+| `bounce` | how much of a point's speed into a line it keeps, bounced back: 0 none |
 | `passes` | how many times a step pulls the links straight: 4; more is stiffer |
 | `tear` | above 0, a link stretched more than this share past its length breaks |
 | `points`, `links`, `broken` | how many points and links are used, and how many broke |
@@ -436,11 +445,122 @@ function draw() {
   gives slack.
 - About 850 units a tick for a rope of ten links.
 
-## links.step(p, solid)
+## links.step(p, solid, [out])
 
-A tick of every point and link, then points pushed out of map cells whose
-sprite shares a bit with `solid` (0 for none) -- a rope that lies over a
-ledge.
+A tick of every point and link, then points kept out of the lines of the
+pool's segment set (`segs`), and pushed out of map cells whose sprite
+shares a bit with `solid` (0 for none) -- a rope that lies over a ledge.
+
+| Argument | |
+|---|---|
+| `out` | an array of three numbers a point, written with what each touched: the line's material plus one (0 for nothing), then the way out of it, `nx` and `ny` -- `ny` below 0 is ground underneath. In an `Int32Array` the way out is only whole numbers |
+
+**Returns** how many points the pool uses.
+
+- A point never passes through a line, however fast it goes: its path
+  from where it was is stopped short of the first line it crosses.
+- Where it touches, its speed along the line loses the material's share
+  of friction, and its speed into the line is bounced by `bounce`.
+
+## links.ring(p, first, n, area, stiffness)
+
+Points `first` to `first + n - 1` as a closed ring, sped toward holding
+`area` square pixels -- a bag of liquid, a balloon, a body that keeps its
+size however it is squashed.
+
+| Argument | |
+|---|---|
+| `area` | the area to hold, in square pixels |
+| `stiffness` | how much of the way there by the next step: 1 all of it, 0.1 a soft body |
+
+**Returns** the area the ring holds now.
+
+- Call it each tick, before `links.step`: it gives each point speed,
+  rather than moving it, so the step carries the points out and keeps
+  them out of the lines as they go.
+- An area a little under the ring's own -- 0.8 of a circle's -- makes a
+  body that slumps under its own weight.
+- About 20 units a point.
+
+A soft body: a ring of slack links, under-filled, dropped into a bowl
+with ice up its right side:
+
+```js
+var bag, ground, N = 20, touch = [], bx = [], by = [], full;
+// the ground: a bowl, with ice (material 1) up its right side
+var gx = [0, 40, 60, 100, 120, 159, 159, 0];
+var gy = [60, 80, 100, 100, 80, 60, 119, 119];
+var mat = [0, 0, 0, 0, 1, 0, 0, 0];
+
+function init() {
+    bag = links.pool(N, N);
+    for (var i = 0; i < N; i++) {
+        links.point(bag, 50 + cos(i * 0.05) * 12, 20 + sin(i * 0.05) * 12);
+        touch.push(0, 0, 0);
+    }
+    for (var j = 0; j < N; j++) links.link(bag, j, (j + 1) % N);
+    bag.gravity = 0.15;
+    bag.damp = 0.3;          // no wobble
+    bag.slack = 1;           // a skin: it sags, it never stretches
+    bag.passes = 6;
+    bag.radius = 1.5;
+    bag.friction = [0.6, 0.02];
+    ground = segs.make(gx, gy, 8, mat);
+    bag.segs = ground;
+    full = 3.14 * 12 * 12 * 0.8;     // under-filled, so it slumps
+}
+
+function update() {
+    links.ring(bag, 0, N, full, 0.5);
+    links.step(bag, 0, touch);
+}
+
+function draw() {
+    cls(1);
+    polyfill(gx, gy, 8, 3);
+    for (var i = 0; i < N; i++) { bx[i] = bag.x[i]; by[i] = bag.y[i]; }
+    polyfill(bx, by, N, 14);
+    var down = 0;
+    for (var k = 0; k < N; k++) if (touch[k * 3]) down++;
+    print(down + " TOUCHING", 2, 2, 7);
+}
+```
+
+![A pink blob slumped in the bottom of a green bowl; 9 TOUCHING at the top left](img/sim-bag.png)
+
+- The same points draw the ground and stop the bag: `polyfill` and
+  `segs.make` take outlines the same way.
+- About 4,400 units a tick for the 20-point bag resting on the ground, and
+  2,400 falling; most of a tick's budget on an iPod Video playing FLAC is
+  left for the rest of the game.
+
+## segs.make(xs, ys, n, [mats], [ends])
+
+Outlines, as lines for points to meet: the ground, walls, platforms.
+
+| Argument | |
+|---|---|
+| `xs`, `ys`, `n` | the points, as `polyfill` takes them: each outline closed, its last point joined to its first; an outline of two points is a single line |
+| `mats` | a material for each point, 0 to 255: the line from that point takes it; 0 for all when left out |
+| `ends` | where each outline ends, as for `polyfill` |
+
+**Returns** the set. At most 4,096 points.
+
+- Make sets once, in `init()` or as a level starts: a ragged ground line
+  of 100 points costs about 9,700 units. Moving a set does not make it
+  again.
+
+## segs.move(s, dx, dy)
+
+Moves the set by `dx, dy`: a lift, a gate, a moving platform. Points
+resting on it this tick move with it, as far as their friction holds.
+
+**Returns** nothing. Call it every tick a set moves.
+
+## segs.draw(s, colour)
+
+Draws every line of the set, where it is now: for seeing what the points
+meet while building a level.
 
 **Returns** nothing.
 

@@ -1804,9 +1804,10 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
                       0, 4, p.cy0, p.cy1, p.cy1, p.cy0, 0, 0, 0, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
-                  qx[(k + 1) & 3] + (p.ox << 16), qy[(k + 1) & 3] + (p.oy << 16));
-    p.cost += COST_RECT + 4 * POLY_EDGE +
-              poly_rows(&p, &g, (int32_t *)(void *)(mem + 4 * sizeof(struct pedge)));
+                  qx[(k + 1) & 3] + (p.ox << 16),
+                  qy[(k + 1) & 3] + (p.oy << 16));
+    int32_t *act = (int32_t *)(void *)(mem + 4 * sizeof(struct pedge));
+    p.cost += COST_RECT + 4 * POLY_EDGE + poly_rows(&p, &g, act);
     finish(vm, &p);
     return 1;
 }
@@ -1946,8 +1947,10 @@ static int turned_rect(struct vm *vm, const int64_t b[4], uint32_t c,
         }
         return quad_fill(vm, c, qx, qy);
     }
-    int32_t x[4] = { (int32_t)b[0], (int32_t)b[2], (int32_t)b[2], (int32_t)b[0] };
-    int32_t y[4] = { (int32_t)b[1], (int32_t)b[1], (int32_t)b[3], (int32_t)b[3] };
+    int32_t x[4] = { (int32_t)b[0], (int32_t)b[2], (int32_t)b[2],
+                     (int32_t)b[0] };
+    int32_t y[4] = { (int32_t)b[1], (int32_t)b[1], (int32_t)b[3],
+                     (int32_t)b[3] };
     for (int k = 0; k < 4; k++)
         turn_px(d, &x[k], &y[k]);
     struct pen p;
@@ -3399,7 +3402,8 @@ NATIVE(camera)
     struct draw *d = &vm->d;
     d->cam_x = x;
     d->cam_y = y;
-    d->cam_turn = argc > 2 && is_num(a[2]) ? (int32_t)(wrap32(scaled(a[2])) & 0xffff) : 0;
+    d->cam_turn = argc > 2 && is_num(a[2])
+                  ? (int32_t)(wrap32(scaled(a[2])) & 0xffff) : 0;
     struct surf s;
     surf_of(vm, d->target, &s, "camera");
     d->cam_px = argc > 3 && is_num(a[3]) ? wrap32(scaled(a[3])) : s.w << 15;
@@ -3797,8 +3801,11 @@ void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
     p.per16 = PER16_DOT;
     for (uint32_t i = 0; i < n; i++, seg += 4) {
         p.cost += 18;               /* a line's setup, measured on the rig */
-        walk_line(&p, seg[0], seg[1], seg[2], seg[3], plot_dot,
-                  p.pat ? NULL : run_dots, NULL);
+        int32_t x0 = seg[0], y0 = seg[1], x1 = seg[2], y1 = seg[3];
+        turn_px(&vm->d, &x0, &y0);
+        turn_px(&vm->d, &x1, &y1);
+        walk_line(&p, x0, y0, x1, y1, plot_dot, p.pat ? NULL : run_dots,
+                  NULL);
     }
     finish(vm, &p);
 }
@@ -3814,11 +3821,17 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
         int64_t t[6];
         p.c = p.d->dpal[c[i]];
         p.cost += 80;               /* two triangles' setup, measured */
+        int32_t w[8];
+        for (int k = 0; k < 8; k += 2) {
+            w[k] = q[k];
+            w[k + 1] = q[k + 1];
+            turn_px(&vm->d, &w[k], &w[k + 1]);
+        }
         for (int k = 0; k < 6; k++)
-            t[k] = clampc(q[k]);
+            t[k] = clampc(w[k]);
         fill_triangle(&p, t);
-        t[2] = clampc(q[6]);
-        t[3] = clampc(q[7]);
+        t[2] = clampc(w[6]);
+        t[3] = clampc(w[7]);
         fill_triangle(&p, t);
     }
     finish(vm, &p);
@@ -5313,7 +5326,8 @@ NATIVE(light_draw)
     uint32_t reach = 0;
     for (int32_t i = 0; i < n; i++) {
         struct lamp *m = &lamps[nl];
-        int64_t lx = column_fix(&cx, (uint32_t)i), ly = column_fix(&cy, (uint32_t)i);
+        int64_t lx = column_fix(&cx, (uint32_t)i);
+        int64_t ly = column_fix(&cy, (uint32_t)i);
         if (vm->d.cam_turn) {
             turn_fix(&vm->d, &lx, &ly);
             /* a light turned far off cannot reach the clip */

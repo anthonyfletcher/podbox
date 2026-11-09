@@ -392,6 +392,7 @@ struct vm
     struct planeview plane;
     uint32_t rules_shape;                   /* what makes a record rules */
     uint32_t links_shape;                   /* ... and links */
+    uint32_t segs_shape;                    /* ... and segment sets */
     struct cellsleep sleep[2];
     uint32_t sleep_clock;
     uint32_t frame;

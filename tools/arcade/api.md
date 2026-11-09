@@ -483,8 +483,11 @@ A point at `x, y`, pinned in place if `pin`. Returns its index, or -1 when the p
 ### links.link(p, i, j, [len])
 Holds points `i` and `j` `len` apart (as far as they are now by default). Returns its index, or -1.
 
-### links.step(p, solid)
-A tick of every point and link, kept out of map cells whose flags share a bit with `solid`.
+### links.step(p, solid, [out])
+A tick of every point and link, kept out of map cells whose flags share a bit with `solid`, and out of the lines of the segment set in the pool's `segs`. With `out`, three numbers a point: the material it touched plus one (0 none), and the way out, `nx`, `ny`.
+
+### links.ring(p, first, n, area, stiffness)
+Speeds points `first` to `first + n - 1`, a closed ring, toward holding `area` square pixels: all the way by the next step at `stiffness` 1. Returns the area it holds.
 
 ### links.draw(p, colour)
 Draws every link as a line.
@@ -494,6 +497,17 @@ A sheet of cloth, `cols` by `rows` points `gap` apart; `pin` 1 pins its top row,
 
 ### links.fill(p, ramp)
 Draws the cloth filled, each cell shaded from `ramp` by how it faces the light. Returns the cells drawn.
+
+## Segment sets
+
+### segs.make(xs, ys, n, [mats], [ends])
+The outlines through the n points, as polyfill takes them, as lines points meet: each line takes the material of the point it starts from. Set it in a links pool's `segs`. At most 4096 points.
+
+### segs.move(s, dx, dy)
+Moves the set by `dx, dy`; points resting on it are carried this tick.
+
+### segs.draw(s, colour)
+Draws every line, where the set is now.
 
 ## The plane, landscapes and walls
 

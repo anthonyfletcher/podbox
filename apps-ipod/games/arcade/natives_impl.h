@@ -143,6 +143,10 @@ IMPL(links_step)
 IMPL(links_draw)
 IMPL(links_cloth)
 IMPL(links_fill)
+IMPL(links_ring)
+IMPL(segs_make)
+IMPL(segs_move)
+IMPL(segs_draw)
 
 /* sys_land.c */
 IMPL(land_draw)
