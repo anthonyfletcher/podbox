@@ -147,6 +147,7 @@ IMPL(links_ring)
 IMPL(segs_make)
 IMPL(segs_move)
 IMPL(segs_draw)
+IMPL(segs_trace)
 
 /* sys_land.c */
 IMPL(land_draw)

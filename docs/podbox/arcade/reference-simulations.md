@@ -12,7 +12,8 @@ ropes, chains, bridges, cloth, and soft bodies that meet outlines.
   [links.point](#linkspointp-x-y-pin), [links.link](#linkslinkp-i-j-len),
   [links.step](#linksstepp-solid-out), [links.ring](#linksringp-first-n-area-stiffness),
   [segs.make](#segsmakexs-ys-n-mats-ends), [segs.move](#segsmoves-dx-dy),
-  [segs.draw](#segsdraws-colour), [links.draw](#linksdrawp-colour),
+  [segs.draw](#segsdraws-colour), [segs.trace](#segstracesolid-sharp-smooth-cx-cy-cw-ch),
+  [links.draw](#linksdrawp-colour),
   [links.cloth](#linksclothp-x-y-cols-rows-gap-pin), [links.fill](#linksfillp-ramp)
 
 ## How a field works
@@ -556,6 +557,42 @@ Moves the set by `dx, dy`: a lift, a gate, a moving platform. Points
 resting on it this tick move with it, as far as their friction holds.
 
 **Returns** nothing. Call it every tick a set moves.
+
+## segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch])
+
+A level drawn on the map, as outlines: the edges of its solid cells
+joined round each solid region and each hole in one, ready for
+`polyfill` to draw and `segs.make` to stand on.
+
+| Argument | |
+|---|---|
+| `solid` | the flags of solid cells: a cell whose sprite shares a bit with it is solid |
+| `sharp` | the flags of cells whose corners stay square; the rest are cut by half a cell, at 45 degrees |
+| `smooth` | 0 to 3 passes that round the outlines further, each doubling their points |
+| `cx`, `cy`, `cw`, `ch` | the cells to trace; the whole map when left out |
+
+**Returns** a record: `x` and `y`, arrays of the points in world
+pixels; `ends`, where each outline ends; and `n`, how many points.
+
+```js
+fset(1, 1); fset(2, 3);          // sprite 1 solid; sprite 2 solid and sharp
+// ... the level drawn into the map with mset ...
+var o = segs.trace(1, 2, 2);     // two passes of rounding
+var ground = segs.make(o.x, o.y, o.n, null, o.ends);
+
+function draw() {
+    cls(1);
+    polyfill(o.x, o.y, o.n, 11, o.ends);
+    segs.draw(ground, 7);
+}
+```
+
+![Green shapes traced from map cells: rounded blocks, a ring with its hole, two diamonds touching at a corner kept apart, a staircase, an L, and one block left square](img/sim-trace.png)
+
+- Two cells meeting only at a corner are kept as two outlines.
+- Trace once, as a level starts: a 64 by 64 map of hills is about 37,000
+  units, and 66,000 rounded twice -- well inside what `init()` may use.
+  A large map can be traced a part at a time.
 
 ## segs.draw(s, colour)
 

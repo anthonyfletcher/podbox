@@ -509,6 +509,9 @@ Moves the set by `dx, dy`; points resting on it are carried this tick.
 ### segs.draw(s, colour)
 Draws every line, where the set is now.
 
+### segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch])
+The outlines of the map cells whose flags share a bit with `solid`, as a record of `x`, `y`, `ends` and `n` for polyfill and segs.make: each corner cut by half a cell, but square where a cell has `sharp`; `smooth` (0 to 3) passes round them. Within cells `cx, cy`, `cw` by `ch`, the whole map when left out. At most 4096 points.
+
 ## The plane, landscapes and walls
 
 ### plane.view(x, y, z, angle, horizon, fov)

@@ -150,3 +150,37 @@ test('a bag dropped on ragged ground never ends a step inside it', () => {
         assert.equal(r.stdout.replace(/\r/g, '').trim(), 'leaks 0', 'seed ' + seed);
     }
 });
+
+const MAP = (rows) => `function init() {
+    fset(1, 1); fset(2, 3);
+    var rows = ${JSON.stringify(rows)};
+    for (var r = 0; r < rows.length; r++)
+        for (var c = 0; c < rows[r].length; c++) {
+            var ch = rows[r].charCodeAt(c);
+            mset(c, r, ch == 35 ? 1 : ch == 36 ? 2 : 0);
+        }
+    var o = segs.trace(1, 2, SMOOTH, 0, 0, 8, ${rows.length});
+    printh(o.n + " " + o.ends.length + " " + o.x[0] + "," + o.y[0]);
+}
+function update() {}`;
+
+test('segs.trace: a block\'s corners cut by half a cell, or kept square where sharp', () => {
+    const block = run(MAP(['....', '.##.', '.##.', '....']).replace('SMOOTH', '0'));
+    assert.equal(block.status, 0, block.err);
+    /* four corners, each cut into two points */
+    assert.equal(block.out[0].split(' ').slice(0, 2).join(' '), '8 1');
+    const sharp = run(MAP(['....', '.$$.', '.$$.', '....']).replace('SMOOTH', '0'));
+    assert.equal(sharp.out[0], '4 1 8,8');
+});
+
+test('segs.trace: a hole is an outline of its own, and cells meeting at a corner stay apart', () => {
+    const ring = run(MAP(['#####', '#...#', '#####']).replace('SMOOTH', '0'));
+    assert.equal(ring.out[0].split(' ')[1], '2');
+    const pinch = run(MAP(['#.', '.#']).replace('SMOOTH', '0'));
+    assert.equal(pinch.out[0].split(' ')[1], '2');
+});
+
+test('segs.trace: each smoothing pass doubles the points, the sharp ones kept', () => {
+    const one = run(MAP(['....', '.##.', '.##.', '....']).replace('SMOOTH', '1'));
+    assert.equal(one.out[0].split(' ')[0], '16');
+});
