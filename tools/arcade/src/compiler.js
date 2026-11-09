@@ -127,6 +127,11 @@ const FUSED_NOT = nullProto({
     '==': 'JNE', '===': 'JNE', '!=': 'JEQ', '!==': 'JEQ'
 });
 
+/* the compare-and-jumps that have a form for a local against a small
+ * integer, LDL, PUSHI8 and the jump in one */
+const FUSED_LOCAL = nullProto({ JLT: 'JLTLI', JLE: 'JLELI', JGT: 'JGTLI',
+                                JGE: 'JGELI' });
+
 const BINARY_REJECTED = nullProto({
     in: 'the in operator is not supported; compare o[key] with null',
     instanceof: 'instanceof is not supported; use typeof',
@@ -279,10 +284,11 @@ class Fn extends Scope {
             internal('stack ' + depth + ' and ' + L.depth + ' meet at a label');
     }
 
-    jump(name, L) {
+    /* the jump's offset is its last operand, after any in front */
+    jump(name, L, front = []) {
         if (!this.live) return;
         const before = this.depth;
-        this.emit(name, [0]);
+        this.emit(name, [...front, 0]);
         /* ANDJ and ORJ keep their operand when they jump; the rest arrive
          * with what they popped gone. */
         this.reach(L, name === 'ANDJ' || name === 'ORJ' ? before
@@ -554,6 +560,13 @@ class Fn extends Scope {
          * that cannot be compared is an error either way. */
         const fused = when ? FUSED[node.operator] : FUSED_NOT[node.operator];
         if (node.type === 'BinaryExpression' && fused) {
+            const l = FUSED_LOCAL[fused] && this.variable(node.left);
+            const k = l && l.kind === 'local'
+                ? this.prog.fold(node.right, this) : undefined;
+            if (typeof k === 'number' && k >= -128 && k <= 127) {
+                this.at(node);
+                return this.jump(FUSED_LOCAL[fused], L, [l.slot, k]);
+            }
             this.value(node.left);
             this.value(node.right);
             this.at(node);
@@ -739,6 +752,15 @@ class Fn extends Scope {
         return null;
     }
 
+    /* The local or global a plain name, or a file's name, is; null for
+     * anything else */
+    variable(node) {
+        let sym = null;
+        if (node.type === 'Identifier') sym = this.resolve(node.name, node);
+        else if (node.type === 'MemberExpression') sym = this.nsMember(node);
+        return sym && (sym.kind === 'local' || sym.kind === 'global') ? sym : null;
+    }
+
     member(node) {
         if (node.optional) unsupported({ type: 'ChainExpression', loc: node.loc });
         const ns = this.nsMember(node);
@@ -752,6 +774,20 @@ class Fn extends Scope {
                      ' is not supported');
         }
         const key = this.propertyKey(node);
+        /* a global's field, and a global indexed by a local, in one */
+        const g = key !== 'length' && this.variable(node.object);
+        if (g && g.kind === 'global') {
+            if (key !== null) {
+                this.at(node);
+                return this.emit('GETGP', [g.slot, this.prog.string(key),
+                                           this.prog.site()]);
+            }
+            const i = this.variable(node.property);
+            if (i && i.kind === 'local') {
+                this.at(node);
+                return this.emit('GETGL', [g.slot, i.slot]);
+            }
+        }
         this.value(node.object);
         this.at(node);
         if (key === 'length') return this.emit('LEN', []);

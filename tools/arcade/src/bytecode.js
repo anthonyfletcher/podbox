@@ -114,7 +114,11 @@ export function decode(isa, code, pc) {
 }
 
 const JUMPS = { JMP: 1, JF: 1, JT: 1, ANDJ: 1, ORJ: 1, JLT: 1, JLE: 1,
-                JGT: 1, JGE: 1, JEQ: 1, JNE: 1 };
+                JGT: 1, JGE: 1, JEQ: 1, JNE: 1, JLTLI: 1, JLELI: 1, JGTLI: 1,
+                JGELI: 1 };
+
+/* where a jump lands: its offset is its last operand */
+const target = (d) => d.next + d.args[d.args.length - 1];
 
 /* Stack effect of one instruction, resolving the operand-dependent ones. */
 function effect(prog, api, ins) {
@@ -189,6 +193,14 @@ function verifyFn(isa, api, prog, f) {
             if (a[0] >= f.nlocals) throw new Error('local ' + a[0] + ' out of range at ' + d.pc); break;
         case 'LDG': case 'STG':
             if (a[0] >= prog.globals.length) throw new Error('global out of range at ' + d.pc); break;
+        case 'GETGL':
+            if (a[0] >= prog.globals.length || a[1] >= f.nlocals)
+                throw new Error('global or local out of range at ' + d.pc); break;
+        case 'GETGP':
+            if (a[0] >= prog.globals.length || a[1] >= prog.strings.length || a[2] >= prog.sites)
+                throw new Error('global or property out of range at ' + d.pc); break;
+        case 'JLTLI': case 'JLELI': case 'JGTLI': case 'JGELI':
+            if (a[0] >= f.nlocals) throw new Error('local ' + a[0] + ' out of range at ' + d.pc); break;
         case 'PUSHS':
             if (a[0] >= prog.strings.length) throw new Error('string out of range at ' + d.pc); break;
         case 'PUSHFN':
@@ -210,7 +222,7 @@ function verifyFn(isa, api, prog, f) {
         }
         }
         if (JUMPS[d.op.name]) {
-            const t = d.next + a[0];
+            const t = target(d);
             if (t < 0 || t >= code.length || !start[t])
                 throw new Error('jump at ' + d.pc + ' lands mid-instruction or outside');
         }
@@ -238,7 +250,7 @@ function verifyFn(isa, api, prog, f) {
         const after = h - pops + pushes;
         if (after > max) max = after;
         if (JUMPS[name]) {
-            const t = d.next + d.args[0];
+            const t = target(d);
             /* ANDJ and ORJ keep their operand when they jump. */
             reach(t, name === 'ANDJ' || name === 'ORJ' ? h : after);
             if (name !== 'JMP') reach(d.next, after);
@@ -267,11 +279,13 @@ export function disassemble(isa, api, prog) {
             case 'PUSHFN': case 'CALL': text += ' ' + names[a[0]]; break;
             case 'NCALL': text += ' ' + (api.bySlot[a[0]] || { name: '?' + a[0] }).name + ' ' + a[1]; break;
             case 'GETPROP': case 'SETPROP': text += ' .' + prog.strings[a[0]]; break;
+            case 'GETGP': text += ' ' + a[0] + ' .' + prog.strings[a[1]]; break;
             case 'METHOD': text += ' .' + isa.methods[a[0]].name + ' ' + a[1]; break;
             case 'INTR': text += ' ' + isa.intrinsics[a[0]].name + ' ' + a[1]; break;
             case 'NEWOBJ': text += ' {' + prog.shapes[a[0]].map((k) => prog.strings[k]).join(',') + '}'; break;
             default:
-                if (JUMPS[d.op.name]) text += ' -> ' + (d.next + a[0]);
+                if (JUMPS[d.op.name])
+                    text += (a.length > 1 ? ' ' + a.slice(0, -1).join(' ') : '') + ' -> ' + target(d);
                 else if (a.length) text += ' ' + a.join(' ');
             }
             const ln = lines.has(pc) ? String(lines.get(pc)).padStart(5) : '     ';

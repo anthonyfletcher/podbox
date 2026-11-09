@@ -597,6 +597,48 @@ static int get_index(struct vm *vm, struct value c, struct value i,
                  vm_typename(i.tag), "");
 }
 
+/* c[i] inline, for the common case: an integer index in range of an
+ * array or a typed array. 0 leaves it to get_index(). */
+static inline int index_fast(struct vm *vm, struct value c, struct value i,
+                             struct value *out)
+{
+    if (i.tag != T_INT)
+        return 0;
+    uint32_t k = (uint32_t)i.v;
+    if (c.tag == T_I32 && k < I32(vm, c)->len) {
+        *out = mk(T_INT, I32(vm, c)->d[k]);
+        return 1;
+    }
+    if (c.tag == T_ARR && k < ARR(vm, c)->len) {
+        *out = BUF(vm, ARR(vm, c)->buf)->v[k];
+        return 1;
+    }
+    if (c.tag == T_U8 && k < U8A(vm, c)->len) {
+        *out = mk(T_INT, U8A(vm, c)->d[k]);
+        return 1;
+    }
+    return 0;
+}
+
+/* c[i] = v inline for an integer index in range of an array, or of an
+ * Int32Array given an integer. 0 leaves it to set_index(). */
+static inline int store_fast(struct vm *vm, struct value c, struct value i,
+                             struct value v)
+{
+    if (i.tag != T_INT)
+        return 0;
+    uint32_t k = (uint32_t)i.v;
+    if (c.tag == T_I32 && v.tag == T_INT && k < I32(vm, c)->len) {
+        I32(vm, c)->d[k] = v.v;
+        return 1;
+    }
+    if (c.tag == T_ARR && k < ARR(vm, c)->len) {
+        BUF(vm, ARR(vm, c)->buf)->v[k] = v;
+        return 1;
+    }
+    return 0;
+}
+
 /* c, i and v stay on the stack, so growth may allocate. */
 static int set_index(struct vm *vm, struct value c, struct value i,
                      struct value v)
@@ -1605,6 +1647,30 @@ JCOMPARE(JLE, <=)
 JCOMPARE(JGT, >)
 JCOMPARE(JGE, >=)
 
+/* A local against a small integer, and jump: LDL, PUSHI8 and a JCOMPARE */
+#define JCOMPARE_LI(name, op) \
+op_##name: { \
+    a = lp[U8()]; \
+    int32_t k = S8(); \
+    int32_t off = S16(); \
+    if (a.tag == T_INT) { \
+        if (a.v op k) \
+            pc += off; \
+        NEXT(); \
+    } \
+    b = mk(T_INT, k); \
+    if (!is_num(a)) \
+        FAIL("a comparison needs two numbers or two strings, not a ", \
+             vm_typename(a.tag == T_STR ? b.tag : a.tag)); \
+    if (scaled(a) op scaled(b)) \
+        pc += off; \
+    NEXT(); \
+}
+JCOMPARE_LI(JLTLI, <)
+JCOMPARE_LI(JLELI, <=)
+JCOMPARE_LI(JGTLI, >)
+JCOMPARE_LI(JGELI, >=)
+
 op_JEQ:
 op_JNE: {
     int ne = pc[-1] == OP_JNE;
@@ -1763,17 +1829,31 @@ op_NEWOBJ: {
 }
 op_GETIDX: {
     struct value got;
-    SYNC();
-    if (!get_index(vm, sp[-2], sp[-1], &got))
-        goto fail;
+    if (!index_fast(vm, sp[-2], sp[-1], &got)) {
+        SYNC();
+        if (!get_index(vm, sp[-2], sp[-1], &got))
+            goto fail;
+    }
     sp[-2] = got;
     sp--;
     NEXT();
 }
+op_GETGL: {
+    struct value got, *c = &vm->globals[U16()], i = lp[U8()];
+    if (!index_fast(vm, *c, i, &got)) {
+        SYNC();
+        if (!get_index(vm, *c, i, &got))
+            goto fail;
+    }
+    *sp++ = got;
+    NEXT();
+}
 op_SETIDX:
-    SYNC();
-    if (!set_index(vm, sp[-3], sp[-2], sp[-1]))
-        goto fail;
+    if (!store_fast(vm, sp[-3], sp[-2], sp[-1])) {
+        SYNC();
+        if (!set_index(vm, sp[-3], sp[-2], sp[-1]))
+            goto fail;
+    }
     sp -= 3;
     NEXT();
 op_GETPROP: {
@@ -1783,6 +1863,16 @@ op_GETPROP: {
         goto fail;
     }
     sp[-1] = obj_get(vm, sp[-1], key, site);
+    NEXT();
+}
+op_GETGP: {
+    struct value o = vm->globals[U16()];
+    uint32_t key = U16(), site = U16();
+    if (o.tag != T_OBJ) {
+        no_field(vm, "can't read .", o, key);
+        goto fail;
+    }
+    *sp++ = obj_get(vm, o, key, site);
     NEXT();
 }
 op_SETPROP: {

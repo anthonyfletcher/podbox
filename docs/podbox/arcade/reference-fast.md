@@ -108,20 +108,27 @@ a loop adds about 4 units a turn around them.
 
 | Script | Units |
 |---|---|
-| a turn of a `for` loop | 4 |
+| a turn of a `for` loop | 4; 2 up to a whole number from -128 to 127 |
 | `a = a + 1`, a comparison, reading a variable | about 4 |
 | a fraction multiplied | about 4 |
 | a record field: `o.x += 1` | about 6 |
-| an element of an array or typed array, read | about 6 |
+| an element of an array or typed array, read | about 6; 2 for a global array at a local index |
 | calling a function of your own | about 7 |
 | calling a simple API function: `abs`, `rnd`, `Math.abs` | about 5 |
 | `sin(t)` | about 7 |
 | `push` and `pop` | about 7 the pair |
 | making a record `{ x: i, y: i }` | about 4 |
-| `o[k]` with a string key | about 6, against 5 for `o.name` |
+| `o[k]` with a string key | about 6, against 5 for `o.name` (2 when `o` is a global) |
 | joining two strings | about 24 |
 | `splice(0, 1)` of a 100-long array, then a `push` | about 60 |
 | sorting 100 numbers | about 2,000 |
+
+Three common patterns cost one step each rather than two or three: a
+local variable compared with a whole number from -128 to 127 (`i < 8`,
+`x >= 0`), a global array read at a local index (`grid[i]`), and a
+global record's field read (`player.x`). Code written the ordinary way
+gets this without trying; in a hot loop, copy a value used against a
+local into a local, and keep the arrays it reads global.
 
 | Drawing (see **Drawing**) | Units |
 |---|---|
