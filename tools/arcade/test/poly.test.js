@@ -1,0 +1,82 @@
+/* polyfill: outlines filled by the even-odd rule, through pbgvm's --dump
+ * (one hex digit a pixel, a row a line). */
+
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { compileFiles } from '../src/node.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const host = path.join(here, '..', 'host');
+const exe = path.join(host, process.platform === 'win32' ? 'pbgvm.exe' : 'pbgvm');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arcade-poly-'));
+
+before(() => {
+    const r = spawnSync('sh', [path.join(host, 'build.sh')], { encoding: 'utf8' });
+    assert.equal(r.status, 0, 'building pbgvm failed:\n' + r.stdout + r.stderr);
+});
+
+let n = 0;
+function run(draw, dump, extra = []) {
+    const res = compileFiles({
+        'cart.json': JSON.stringify({ id: '0000000000901f11', name: 'Poly' }),
+        'main.js': `function init() {}
+function update() {}
+function draw() { cls(0); ${draw} }` });
+    if (res.errors.length) return { errors: res.errors };
+    const file = path.join(tmp, 'p' + n++ + '.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '1', '--dump', dump].concat(extra),
+                        { encoding: 'utf8' });
+    return { out: r.stdout.replace(/\r/g, ''), err: r.stderr, status: r.status };
+}
+
+test('a square fills the pixels whose middles are inside it', () => {
+    const r = run('polyfill([1, 5, 5, 1], [1, 1, 4, 4], 4, 7);', '0,0,7,6');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, '0000000\n0777700\n0777700\n0777700\n0000000\n0000000\n');
+});
+
+test('a star that crosses itself leaves its middle empty, and an outline inside another is a hole', () => {
+    const star = run('polyfill([30, 38, 15, 45, 22], [5, 35, 15, 15, 35], 5, 7);', '30,19,1,1');
+    assert.equal(star.out.trim(), '0');
+    const holed = run('polyfill([0, 20, 20, 0, 5, 15, 15, 5], [0, 0, 20, 20, 5, 5, 15, 15], 8, 7, [4, 8]);',
+                      '0,10,20,1');
+    assert.equal(holed.out.trim(), '77777000000000077777');
+});
+
+test('curve points bend the outline: four make a rounded square, inside the corners', () => {
+    const r = run('polyfill([0, 40, 40, 0], [0, 0, 40, 40], 4, 7, null, [1, 1, 1, 1]);', '0,0,40,40');
+    assert.equal(r.status, 0, r.err);
+    const rows = r.out.trim().split('\n');
+    assert.equal(rows[0][0], '0');               /* the corner is cut */
+    assert.equal(rows[20][1], '7');              /* the sides bulge out to it */
+    assert.equal(rows[20][20], '7');
+});
+
+test('the camera moves it, the clip holds, and fillp patterns it', () => {
+    const r = run('camera(-10, 0); clip(10, 0, 4, 4); polyfill([0, 8, 8, 0], [0, 0, 8, 8], 4, 7);',
+                  '8,0,8,1');
+    assert.equal(r.out.trim(), '0077770000'.slice(0, 8));
+    const p = run('fillp(0x5a5a); polyfill([0, 8, 8, 0], [0, 0, 8, 8], 4, 7);', '0,0,4,1');
+    assert.notEqual(p.out.trim(), '7777');
+});
+
+test('wrong arguments stop the cart', () => {
+    assert.match(run('polyfill([1, 2], [1, 2], 3, 7);', '0,0,1,1').err, /fewer x or y than points/);
+    assert.match(run('polyfill(1, 2, 3, 7);', '0,0,1,1').err, /arrays of x and y/);
+    assert.match(run('polyfill([0, 9, 9, 0], [0, 0, 9, 9], 4, 7, [3, 2]);', '0,0,1,1').err, /ends must rise/);
+    assert.match(run('var a = []; for (var i = 0; i < 9000; i++) a.push(0); polyfill(a, a, 9000, 7);',
+                     '0,0,1,1').err, /at most 8192 points/);
+});
+
+test('an outline off the screen costs its edges, not the screen\'s rows', () => {
+    const r = run('prof("t"); polyfill([300, 400, 400, 300], [0, 0, 119, 119], 4, 7); prof();', '0,0,1,1',
+                  ['--units']);
+    const units = Number(/prof t (\d+)/.exec(r.err)[1]);
+    assert.ok(units < 200, String(units));
+});

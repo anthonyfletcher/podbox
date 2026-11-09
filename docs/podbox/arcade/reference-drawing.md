@@ -9,7 +9,7 @@ this page.
 - Clearing and pixels: [cls](#clsc), [pset](#psetx-y-c), [pget](#pgetx-y)
 - Lines and shapes: [line](#linex0-y0-x1-y1-c), [rect and rectfill](#rectx0-y0-x1-y1-c),
   [circ and circfill](#circx-y-r-c), [oval and ovalfill](#ovalx0-y0-x1-y1-c),
-  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c)
+  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend)
 - The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y),
   [clip](#clipx-y-w-h), [target](#targett)
 
@@ -284,6 +284,53 @@ tri(80, 20, 150, 60, 90, 110, 7);
 - Triangles make any flat shape: a ship, an arrow, a polygon in pieces. A
   large one costs more than a rectangle of the same area -- about 1,600
   units for one across half the screen.
+
+---
+
+## polyfill(xs, ys, n, [c], [ends], [bend])
+
+Any flat shape from a list of points: a hill, a cave, a ship, a blob. The
+points are joined in order and back to the first, and the inside filled.
+
+| Argument | |
+|---|---|
+| `xs`, `ys` | arrays (or typed arrays) of the points' x and y; fractions are kept |
+| `n` | how many points to use, from the first; at most 8,192 |
+| `c` | its colour; the pen colour when left out |
+| `ends` | to draw several outlines at once: an array of where each ends, the index after its last point |
+| `bend` | an array, one number a point: where it is not 0, the point bends the line through it into a curve rather than lying on it |
+
+**Returns** nothing.
+
+```js
+cls(12);
+// a hill with a cave through it: two outlines, the second a hole
+var hx = [0, 40, 80, 120, 160, 160, 0,   60, 100, 100, 60];
+var hy = [80, 50, 40, 55, 75, 120, 120,  75, 75, 100, 100];
+polyfill(hx, hy, 11, 3, [7, 11]);
+// a round bush: every point bends the outline
+polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
+```
+
+![A green hill against a blue sky with a rectangular cave through it, and a round green bush](img/d-poly.png)
+
+- **Inside** is decided row by row: a pixel is filled when a line from it
+  to the left edge crosses the outlines an odd number of times. So an
+  outline inside another is a hole, and a shape that crosses itself -- a
+  five-pointed star drawn in one stroke -- has its middle left empty.
+- A pixel is filled when its middle is inside, so a square from (0, 0) to
+  (10, 10) fills 10 by 10 pixels -- one fewer each way than `rectfill`
+  with the same corners.
+- **Curves**: a point with `bend` set pulls the line toward it, as a
+  font's outline does. Two bending points together curve through the
+  point halfway between them, so four bending points at a square's
+  corners make a rounded square, and a ring of them a smooth blob.
+- `fillp` patterns it, and the camera and clip apply as to any shape.
+- **What it costs.** The hill above is about 2,000 units, and the bush
+  about 740; a full-screen shape about 2,700. The cost grows with the
+  edges each row crosses: a ragged ground line of 100 points across the
+  screen is about 8,900. One `polyfill` is much cheaper than the same
+  shape cut into `trifill` triangles, each of which pays for its rows.
 
 ---
 

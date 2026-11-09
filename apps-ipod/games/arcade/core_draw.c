@@ -1430,6 +1430,354 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
 NATIVE(tri) { (void)out; return triangle(vm, a, argc, 1, "tri"); }
 NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 
+/* ---- polygons ------------------------------------------------------------ *
+ * polyfill(): outlines filled by the even-odd rule, a row at a time. Each
+ * outline's lines, and its curves cut into lines, become edges; a row's
+ * pixels are those whose middles lie between the 1st and 2nd edge it
+ * crosses, the 3rd and 4th, and so on, so an outline inside another is a
+ * hole. */
+
+#define POLY_POINTS 8192    /* the most points one call takes */
+#define POLY_PIECES 16      /* the most lines a curve is cut into */
+
+/* units, measured on the ARM rig (polyprobe): the call's set-up beyond
+ * any call's, each point, each edge (a 64-bit division), each row the
+ * edges cover, each edge a row crosses, each step of putting a row's
+ * crossings in order, and each curve -- besides the spans filled */
+#define POLY_CALL  70
+#define POLY_POINT 6
+#define POLY_EDGE  12
+#define POLY_ROW   1
+#define POLY_CROSS 4
+#define POLY_SHIFT 2
+#define POLY_CURVE 30
+
+/* An edge: where it crosses the middle of its next row, and its step a
+ * row, both 16.16; the row after its last; and the next edge to start on
+ * its first row, plus one */
+struct pedge
+{
+    int64_t x, dx;
+    int32_t y1;
+    int32_t next;
+};
+
+struct poly
+{
+    struct pedge *e;
+    int32_t *starts;            /* the first edge on each row, plus one */
+    uint32_t n, max;
+    int32_t y0, y1;             /* the clip's rows */
+    int32_t lo, hi;             /* the rows the edges cover */
+    int counting;               /* only count the edges, for the memory */
+    uint32_t curves;
+    int64_t xmin, xmax;         /* how far the edges reach, 16.16 */
+};
+
+/* The line a to b, 16.16 on the surface, as an edge over the rows whose
+ * middles it spans; 0 when there are more edges than counted */
+static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
+                     int64_t by)
+{
+    if (g->counting) {
+        g->n++;
+        if (ax < g->xmin) g->xmin = ax;
+        if (ax > g->xmax) g->xmax = ax;
+        if (bx < g->xmin) g->xmin = bx;
+        if (bx > g->xmax) g->xmax = bx;
+        return 1;
+    }
+    if (ay == by)
+        return 1;
+    if (ay > by) {
+        int64_t t = ax; ax = bx; bx = t;
+        t = ay; ay = by; by = t;
+    }
+    /* rows whose middle, y + 1/2, is at least ay and below by */
+    int64_t r0 = (ay - 32768 + 65535) >> 16;
+    int64_t r1 = (by - 32768 + 65535) >> 16;
+    if (r0 < g->y0)
+        r0 = g->y0;
+    if (r1 > g->y1)
+        r1 = g->y1;
+    if (r0 >= r1)
+        return 1;
+    if (g->n >= g->max)
+        return 0;
+    struct pedge *e = &g->e[g->n];
+    e->dx = ((bx - ax) << 16) / (by - ay);
+    e->x = ax + (((r0 << 16) + 32768 - ay) * e->dx >> 16);
+    e->y1 = (int32_t)r1;
+    if (r0 < g->lo)
+        g->lo = (int32_t)r0;
+    if (r1 > g->hi)
+        g->hi = (int32_t)r1;
+    e->next = g->starts[r0 - g->y0];
+    g->starts[r0 - g->y0] = (int32_t)++g->n;
+    return 1;
+}
+
+/* How many lines the curve from a by c to b is cut into: enough that
+ * none strays a quarter pixel from it */
+static int32_t poly_pieces(int64_t ax, int64_t ay, int64_t cx, int64_t cy,
+                           int64_t bx, int64_t by)
+{
+    int64_t dx = ax - 2 * cx + bx, dy = ay - 2 * cy + by;
+    uint64_t bend = (uint64_t)((dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy)) >> 16;
+    int32_t k = 1 + (int32_t)isqrt64(bend / 2);
+    return k > POLY_PIECES ? POLY_PIECES : k;
+}
+
+/* The curve from a, drawn toward c, to b, as lines */
+static int poly_curve(struct poly *g, int64_t ax, int64_t ay, int64_t cx,
+                      int64_t cy, int64_t bx, int64_t by)
+{
+    int32_t k = poly_pieces(ax, ay, cx, cy, bx, by);
+    if (!g->counting)
+        g->curves++;
+    /* a + 2t (c - a) + t^2 (a - 2c + b), t in sixteenths of 1/65536 */
+    int64_t ux = 2 * (cx - ax), uy = 2 * (cy - ay);
+    int64_t vx = ax - 2 * cx + bx, vy = ay - 2 * cy + by;
+    int64_t px = ax, py = ay, dt = 65536 / k;
+    for (int32_t i = 1; i <= k; i++) {
+        int64_t t = i * dt, tt = t * t >> 16, qx = bx, qy = by;
+        if (i < k) {
+            qx = ax + (ux * t >> 16) + (vx * tt >> 16);
+            qy = ay + (uy * t >> 16) + (vy * tt >> 16);
+        }
+        if (!poly_line(g, px, py, qx, qy))
+            return 0;
+        px = qx;
+        py = qy;
+    }
+    return 1;
+}
+
+/* Point i of the outline, 16.16 on the surface */
+static void poly_point(const struct pen *p, const struct column *xs,
+                       const struct column *ys, uint32_t i, int64_t *x,
+                       int64_t *y)
+{
+    *x = (int64_t)column_fix(xs, i) + (p->ox << 16);
+    *y = (int64_t)column_fix(ys, i) + (p->oy << 16);
+}
+
+/* Walking an outline: the point last on it, and the curve point waiting
+ * to bend the next stretch, if any */
+struct walk
+{
+    struct poly *g;
+    int64_t ox, oy, cx, cy;
+    int ctl;
+};
+
+/* The outline on to q: a curve point bends the line through it, and two
+ * curve points together have a point on the outline halfway between */
+static int walk_to(struct walk *w, int64_t qx, int64_t qy, int curve)
+{
+    if (curve) {
+        if (w->ctl) {
+            int64_t mx = (w->cx + qx) / 2, my = (w->cy + qy) / 2;
+            if (!poly_curve(w->g, w->ox, w->oy, w->cx, w->cy, mx, my))
+                return 0;
+            w->ox = mx;
+            w->oy = my;
+        }
+        w->cx = qx;
+        w->cy = qy;
+        w->ctl = 1;
+        return 1;
+    }
+    if (!(w->ctl ? poly_curve(w->g, w->ox, w->oy, w->cx, w->cy, qx, qy)
+                 : poly_line(w->g, w->ox, w->oy, qx, qy)))
+        return 0;
+    w->ox = qx;
+    w->oy = qy;
+    w->ctl = 0;
+    return 1;
+}
+
+/* One outline, points s to e - 1 and back to s, as a TrueType outline:
+ * lines from point to point, but a point with bend non-zero bends the
+ * line through it */
+static int poly_outline(struct poly *g, const struct pen *p,
+                        const struct column *xs, const struct column *ys,
+                        const struct column *bend, uint32_t s, uint32_t e)
+{
+    if (e - s < 2)
+        return 1;
+    uint32_t n = e - s, j = 0;
+    while (j < n && column_at(bend, s + j, 0))
+        j++;
+    struct walk w = { g, 0, 0, 0, 0, 0 };
+    int64_t qx, qy;
+    if (j < n) {
+        /* from the first point on the outline, round to it again */
+        poly_point(p, xs, ys, s + j, &w.ox, &w.oy);
+        int64_t sx = w.ox, sy = w.oy;
+        for (uint32_t k = 1; k < n; k++) {
+            uint32_t i = s + (j + k) % n;
+            poly_point(p, xs, ys, i, &qx, &qy);
+            if (!walk_to(&w, qx, qy, column_at(bend, i, 0) != 0))
+                return 0;
+        }
+        return walk_to(&w, sx, sy, 0);
+    }
+    /* every point a curve point: from halfway between the first two */
+    int64_t ax, ay;
+    poly_point(p, xs, ys, s, &ax, &ay);
+    poly_point(p, xs, ys, s + 1, &w.cx, &w.cy);
+    w.ox = (ax + w.cx) / 2;
+    w.oy = (ay + w.cy) / 2;
+    w.ctl = 1;
+    int64_t sx = w.ox, sy = w.oy;
+    for (uint32_t k = 2; k <= n; k++) {
+        poly_point(p, xs, ys, s + k % n, &qx, &qy);
+        if (!walk_to(&w, qx, qy, 1))
+            return 0;
+    }
+    return walk_to(&w, sx, sy, 0);
+}
+
+/* Each outline in turn: ends[k] is the point after outline k's last */
+static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
+                      const struct column *xs, const struct column *ys,
+                      const struct column *ends, uint32_t nends,
+                      const struct column *bend, uint32_t n)
+{
+    uint32_t s = 0;
+    for (uint32_t k = 0; k <= nends && s < n; k++) {
+        uint32_t e = n;
+        if (k < nends) {
+            int32_t v = column_at(ends, k, 0);
+            if (v <= (int32_t)s || (uint32_t)v > n)
+                return vm_fail(vm, "polyfill()'s ends must rise, each past "
+                               "the last and none past n", "", "");
+            e = (uint32_t)v;
+        }
+        if (!poly_outline(g, p, xs, ys, bend, s, e))
+            return vm_fail(vm, "polyfill() has more edges than it counted",
+                           "", "");
+        s = e;
+    }
+    return 1;
+}
+
+/* polyfill(xs, ys, n, [c], [ends], [bend]): the n points as outlines,
+ * filled by the even-odd rule. ends, when given, is where each outline
+ * ends (the index after its last point); bend, where non-zero, makes a
+ * point bend the line through it rather than be on it. */
+NATIVE(polyfill)
+{
+    (void)out;
+    struct column xs, ys, ends, bend;
+    if (!column_of(vm, a[0], &xs) || !column_of(vm, a[1], &ys) ||
+        xs.tag == T_INT || ys.tag == T_INT || !is_num(a[2]))
+        return vm_fail(vm, "polyfill() needs arrays of x and y, then how "
+                       "many points", "", "");
+    int32_t n = floor_int(a[2]);
+    if (n < 0)
+        n = 0;
+    if (n > POLY_POINTS)
+        return vm_fail(vm, "polyfill() takes at most 8192 points", "", "");
+    if ((uint32_t)n > xs.len || (uint32_t)n > ys.len)
+        return vm_fail(vm, "polyfill() has fewer x or y than points", "", "");
+    COLOUR(3, c, "polyfill");
+    uint32_t nends = 0;
+    ends.tag = bend.tag = T_INT;
+    ends.k = bend.k = 0;
+    ends.len = bend.len = 0xffffffffu;
+    ends.p = bend.p = NULL;
+    if (argc > 4 && a[4].tag != T_NULL) {
+        if (!column_of(vm, a[4], &ends) || ends.tag == T_INT)
+            return vm_fail(vm, "polyfill()'s ends is an array", "", "");
+        nends = ends.len;
+    }
+    if (argc > 5 && a[5].tag != T_NULL &&
+        (!column_of(vm, a[5], &bend) || bend.tag == T_INT ||
+         bend.len < (uint32_t)n))
+        return vm_fail(vm, "polyfill()'s bend is an array, one for each "
+                       "point", "", "");
+    struct pen p;
+    begin(vm, &p, c, 1);
+    struct poly g = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0, 1, 0,
+                      (int64_t)1 << 62, -((int64_t)1 << 62) };
+    if (n < 3 || p.cy0 >= p.cy1 || p.cx0 >= p.cx1) {
+        finish(vm, &p);
+        return 1;
+    }
+    /* counted first, for the memory the edges take */
+    if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend, (uint32_t)n))
+        return 0;
+    /* wholly left or right of the clip: no row is walked */
+    if (g.xmax < ((int64_t)p.cx0 << 16) || g.xmin >= ((int64_t)p.cx1 << 16)) {
+        p.cost += POLY_CALL + (uint32_t)n * POLY_POINT;
+        finish(vm, &p);
+        return 1;
+    }
+    uint32_t max = g.n, rows = (uint32_t)(p.cy1 - p.cy0);
+    uint32_t at_act = max * sizeof(struct pedge);
+    uint32_t at_starts = at_act + max * 4;
+    uint8_t *mem = scratch(vm, at_starts + rows * 4);
+    if (!mem)
+        return 0;
+    /* scratch may have collected: the arrays and surface found again */
+    column_of(vm, a[0], &xs);
+    column_of(vm, a[1], &ys);
+    if (nends)
+        column_of(vm, a[4], &ends);
+    if (argc > 5 && a[5].tag != T_NULL)
+        column_of(vm, a[5], &bend);
+    begin(vm, &p, c, 1);
+    g.e = (struct pedge *)(void *)mem;
+    g.starts = (int32_t *)(void *)(mem + at_starts);
+    g.n = 0;
+    g.max = max;
+    g.counting = 0;
+    if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend, (uint32_t)n))
+        return 0;
+    /* the edges crossing the row, kept in order of where they cross: a
+     * row's order is nearly the last's, so putting it right is cheap */
+    int32_t *act = (int32_t *)(void *)(mem + at_act);
+    uint32_t nact = 0, crossings = 0, shifts = 0;
+    for (int32_t y = g.lo; y < g.hi; y++) {
+        uint32_t m = 0;
+        for (uint32_t k = 0; k < nact; k++)
+            if (y < g.e[act[k]].y1)
+                act[m++] = act[k];
+        for (int32_t i = g.starts[y - p.cy0]; i; i = g.e[i - 1].next)
+            act[m++] = i - 1;
+        nact = m;
+        for (uint32_t k = 1; k < m; k++) {
+            int32_t i = act[k];
+            int64_t x = g.e[i].x;
+            uint32_t at = k;
+            while (at && g.e[act[at - 1]].x > x) {
+                act[at] = act[at - 1];
+                at--;
+                shifts++;
+            }
+            act[at] = i;
+        }
+        crossings += m;
+        /* the pixels whose middles lie from one crossing to the next */
+        for (uint32_t k = 0; k + 1 < m; k += 2) {
+            int64_t l = (g.e[act[k]].x - 32768 + 65535) >> 16;
+            int64_t r = ((g.e[act[k + 1]].x - 32768 + 65535) >> 16) - 1;
+            if (l <= r)
+                span(&p, y, l, r);
+        }
+        for (uint32_t k = 0; k < m; k++)
+            g.e[act[k]].x += g.e[act[k]].dx;
+    }
+    p.cost += POLY_CALL + (uint32_t)n * POLY_POINT + max * POLY_EDGE +
+              (uint32_t)(g.hi > g.lo ? g.hi - g.lo : 0) * POLY_ROW +
+              crossings * POLY_CROSS + shifts * POLY_SHIFT +
+              g.curves * POLY_CURVE;
+    finish(vm, &p);
+    return 1;
+}
+
 /* Rows from..to (inside the clip) of an unpatterned rectangle x0..x1:
  * filled, each row whole; hollow, its two edge columns. */
 static void rows(struct pen *p, int32_t from, int32_t to, int64_t x0,
