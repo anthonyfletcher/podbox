@@ -49,8 +49,8 @@ does the same floor for about 11,800, and `coarse` brings it to about
 | `plane.draw`, 80 rows | about 11,800 (coarse: 8,900) |
 | `plane.billboards`, 40 trees | about 4,300 |
 | `land.draw`, 128x128, 400 far | about 29,000 (coarse: 16,900) |
-| `walls.draw`, a maze | about 21,900 |
-| a maze with floor and ceiling too | about 38,400 (coarse: 34,400) |
+| `walls.draw`, a maze | about 11,300 |
+| a maze with floor and ceiling too | about 27,800 (coarse: 23,800) |
 | `light.draw`, two lights | about 11,000 |
 
 A tick on an iPod Video playing FLAC has about 12,500 units at 33 ticks

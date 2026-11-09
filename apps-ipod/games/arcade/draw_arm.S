@@ -18,6 +18,7 @@
  *                    levels' tables, four a word
  *   light_dark_arm   light_dark(): pixels through the darkest table
  *   light_span_arm   light_span(): a span of a light's levels
+ *   wall_column_arm  wall_column(): a wall's column, a table a dither row
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -673,3 +674,43 @@ light_span_arm:
     lspan   r7, 2
 9:  ldmfd   sp!, {r4-r11, pc}
     .size   light_span_arm, . - light_span_arm
+
+/* One pixel of a wall's column: the texel row ty's whole part picks from
+ * the dither row's table in \tab, stored, and px and ty step on */
+.macro  wpix tab
+    and     r12, r3, #0x70000
+    ldrb    r12, [\tab, r12, lsr #16]
+    add     r3, r3, r4
+    strb    r12, [r0], r1
+.endm
+
+/* wall_column_arm(px, w, n, ty, ts, tab): wall_column(), four rows at a
+ * time, a dither row's table each.
+ *
+ * r0 px, r1 w, r2 rows left, r3 ty, r4 ts, r5-r8 the tables */
+    .global wall_column_arm
+    .type   wall_column_arm, %function
+wall_column_arm:
+    stmfd   sp!, {r4-r8, lr}
+    ldr     r4, [sp, #24]
+    ldr     r12, [sp, #28]
+    ldmia   r12, {r5-r8}
+    subs    r2, r2, #4
+    blt     5f
+1:  wpix    r5
+    wpix    r6
+    wpix    r7
+    wpix    r8
+    subs    r2, r2, #4
+    bge     1b
+5:  adds    r2, r2, #4
+    beq     9f
+    wpix    r5
+    subs    r2, r2, #1
+    beq     9f
+    wpix    r6
+    subs    r2, r2, #1
+    beq     9f
+    wpix    r7
+9:  ldmfd   sp!, {r4-r8, pc}
+    .size   wall_column_arm, . - wall_column_arm

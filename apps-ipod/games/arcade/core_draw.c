@@ -4268,6 +4268,28 @@ static int door_hit(const struct planeview *v, const struct wallspec *ws,
     return 1;
 }
 
+/* a wall column's texel that is see-through, beside the 256 colours */
+#define WALL_CLEAR 0x100
+
+#ifdef ARCADE_ASM
+void wall_column_arm(uint8_t *px, int32_t w, int32_t n, uint32_t ty,
+                     uint32_t ts, const uint8_t *const *tab);
+#endif
+
+/* n pixels down a wall's column from px, w apart, none see-through: row y's
+ * texel is ty's whole part, ty stepping by ts, and its colour from tab[y &
+ * 3], the four tables in the order of the rows from px */
+static void wall_column(uint8_t *px, int32_t w, int32_t n, uint32_t ty,
+                        uint32_t ts, const uint8_t *const *tab)
+{
+#ifdef ARCADE_ASM
+    wall_column_arm(px, w, n, ty, ts, tab);
+#else
+    for (int32_t y = 0; y < n; y++, ty += ts, px += w)
+        *px = tab[y & 3][(ty >> 16) & 7];
+#endif
+}
+
 /* door i of the list's openness, 16.16 (0 shut), or -1 when cell mx, my
  * is not a door */
 static int32_t door_open(const struct wallspec *ws, int32_t mx, int32_t my)
@@ -4400,27 +4422,47 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
         const uint8_t *col = sheet + (m >> 4) * 8 * SHEET_W + (m & 15) * 8 + tx;
         const uint8_t *dark = side == 1 ? ws->dark : NULL;
         int32_t fog = core_fog_level(v, d);
-        uint8_t *px = p.s.px + y0 * w + x;
-        for (int32_t y = y0; y < y1; y++, ty += ts, px += w) {
-            uint8_t s = col[((ty >> 16) & 7) * SHEET_W];
+        /* the column's eight texels as drawn, translated and darkened
+         * here rather than at every pixel; WALL_CLEAR where see-through */
+        uint16_t base[8];
+        int clear = 0;
+        for (int32_t r = 0; r < 8; r++) {
+            uint8_t s = col[r * SHEET_W];
             uint32_t c = xl[s];
             if (c & XLAT_CLEAR)
-                continue;
-            if (fog && bayer[y & 3][x & 3] < fog)
-                *px = fogc;
+                clear = 1;
             else if (dark && !(xl[dark[s]] & XLAT_CLEAR))
-                *px = (uint8_t)xl[dark[s]];
-            else
-                *px = (uint8_t)c;
+                c = xl[dark[s]];
+            base[r] = (uint16_t)(c & XLAT_CLEAR ? WALL_CLEAR : (uint8_t)c);
         }
+        uint8_t *px = p.s.px + y0 * w + x;
+        if (!clear) {
+            /* a table for each row of the dither, the same four times
+             * where there is no fog */
+            uint8_t tab[4][8];
+            const uint8_t *rows[4];
+            for (int32_t k = 0; k < (fog ? 4 : 1); k++)
+                for (int32_t r = 0; r < 8; r++)
+                    tab[k][r] = fog && bayer[k][x & 3] < fog
+                                ? fogc : (uint8_t)base[r];
+            for (int32_t k = 0; k < 4; k++)
+                rows[k] = tab[fog ? (y0 + k) & 3 : 0];
+            wall_column(px, w, y1 - y0, ty, ts, rows);
+        } else
+            for (int32_t y = y0; y < y1; y++, ty += ts, px += w) {
+                uint32_t c = base[(ty >> 16) & 7];
+                if (c == WALL_CLEAR)
+                    continue;
+                *px = fog && bayer[y & 3][x & 3] < fog ? fogc : (uint8_t)c;
+            }
         drawn += (uint32_t)(y1 - y0);
         row_touched(&p, y0);
         row_touched(&p, y1 - 1);
     }
     v->depth_set = 1;
-    /* the parts as weighed, a third more: measured on the ARM rig
-     * (drawprobe) */
-    p.cost += (steps * 2 + hit * 40 + drawn * PER16_FLOOR / 16) * 4 / 3;
+    /* measured on the ARM rig (drawprobe): the rays and each column's
+     * set-up, its divisions most of it; the pixels about 8 cycles each */
+    p.cost += (steps * 2 + hit * 40) * 4 / 3 + drawn * 3 / 16;
     finish(vm, &p);
     return hit;
 }
