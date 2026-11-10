@@ -100,6 +100,17 @@ test('polyline draws what line() draws, a colour a line, closed and turned alike
     assert.equal(rows[10][10], '0');
 });
 
+test('an outline reaching past both sides fills between them, and keeps its hole', () => {
+    const r = run('polyfill([-100, 300, 300, -100, 60, 100, 100, 60], [10, 10, 30, 30, 15, 15, 25, 25], 8, 7, [4, 8]);',
+                  '0,20,160,1');
+    assert.equal(r.out.trim(), '7'.repeat(60) + '0'.repeat(40) + '7'.repeat(60));
+    const all = run('polyfill([-500, 700, 700, -500], [-500, -500, 700, 700], 4, 7);', '0,0,160,1');
+    assert.equal(all.out.trim(), '7'.repeat(160));
+    const turned = run('camera(0, 0, 0.1); polyfill([-300, 460, 460, -300], [-300, -300, 420, 420], 4, 7);',
+                       '0,60,160,1');
+    assert.equal(turned.out.trim(), '7'.repeat(160));
+});
+
 test('a nearly level edge crosses its row where it should', () => {
     /* from (0, 10.5 - e) to (300, 10.5 + e): it crosses row 10's middle
      * halfway, at x 150, so pixels 0 to 149 of that row are inside */

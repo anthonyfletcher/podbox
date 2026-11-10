@@ -8,7 +8,8 @@
  *
  * Parts, in order:
  *   link_run_arm     link_run(): links pulled toward their lengths the
- *                    short way, until one that needs the exact way
+ *                    short way, until one that needs the exact way; and
+ *                    link_share, its table past a quarter's stretch
  ****************************************************************************/
     .syntax unified
     .section .text
@@ -31,17 +32,17 @@
 .endm
 
 /* const struct qlink *link_run_arm(int32_t *P, const struct qlink *q,
- *                                  const struct qlink *end, int slack)
+ *                                  const struct qlink *end, int ways)
  *
  * r0 P, r1 the link, r2 end, r3 its ij, r4-r6 scratch, r7 and r11 its
  * ends' places, r8-r10 its difference in 1/256 pixels and then the move,
  * r12 scratch, lr bit 31 set when the pool is slack (a squashed link of
- * a slack pool is let be) */
+ * a slack pool is let be); ways (RUN_SLACK 1, RUN_NARROW 2) kept at [sp] */
     .global link_run_arm
     .type   link_run_arm, %function
 link_run_arm:
-    stmfd   sp!, {r4-r11, lr}
-    movs    lr, r3
+    stmfd   sp!, {r3-r11, lr}
+    ands    lr, r3, #1
     movne   lr, #0x80000000
     cmp     r1, r2
     bhs     9f
@@ -85,7 +86,7 @@ link_run_arm:
     orr     r6, r12, r5, lsr #31    @ e, the stretch of the square
     add     r4, r6, #16384          @ within a quarter
     cmp     r4, #32768
-    bhs     7f
+    bhs     5f
     tst     r6, lr
     bne     8f
     mul     r4, r6, r6
@@ -98,7 +99,7 @@ link_run_arm:
     sub     r6, r6, r4, asr #3
     add     r5, r5, r5, lsl #2
     add     r6, r6, r5, asr #4      @ the share
-    mul     r8, r6, r8
+6:  mul     r8, r6, r8
     mul     r9, r6, r9
     mul     r10, r6, r10
     tst     r3, #1
@@ -115,7 +116,35 @@ link_run_arm:
     cmp     r1, r2
     blo     1b
 9:  mov     r0, r2
-    ldmfd   sp!, {r4-r11, pc}
+    ldmfd   sp!, {r3-r11, pc}
 7:  mov     r0, r1                  @ the exact way for this one
-    ldmfd   sp!, {r4-r11, pc}
+    ldmfd   sp!, {r3-r11, pc}
+5:  ldr     r4, [sp]                @ past a quarter: narrow takes the
+    tst     r4, #2                  @ exact way
+    bne     7b
+    add     r4, r6, #32768          @ e + 1/2, within 2 1/2
+    cmp     r4, #163840
+    bhs     7b
+    tst     r6, lr
+    bne     8b
+    mov     r5, r4, lsr #12         @ the entry
+    mov     r12, r4, lsl #20
+    mov     r12, r12, lsr #20       @ and on from it, in 1/4096s
+    adr     r4, link_share
+    add     r4, r4, r5, lsl #2
+    ldmia   r4, {r5, r6}
+    sub     r6, r6, r5
+    mul     r6, r12, r6
+    add     r6, r5, r6, asr #12     @ the share, between the two
+    b       6b
+
+/* sys_links.c's link_share: 1 - (1 + e)^-1/2, 16.16, for e from -1/2 by
+ * sixteenths to 2 */
+    .align  2
+link_share:
+    .word   -27146, -21845, -17361, -13503, -10138, -7170, -4525, -2149
+    .word   0, 1957, 3748, 5396, 6919, 8331, 9647, 10875, 12026, 13107
+    .word   14125, 15086, 15995, 16857, 17675, 18454, 19195, 19903, 20579
+    .word   21226, 21845, 22440, 23011, 23559, 24087, 24596, 25086, 25559
+    .word   26016, 26458, 26885, 27298, 27699
     .size   link_run_arm, . - link_run_arm

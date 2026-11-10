@@ -444,7 +444,7 @@ function draw() {
 
 - A link longer than the gap -- the bridge's 5.3 for points 5 apart --
   gives slack.
-- About 1,500 units a tick for `links.step` on the rope and the bridge.
+- About 1,100 units a tick for `links.step` on the rope and the bridge.
 
 ## links.step(p, solid, [out])
 
@@ -532,7 +532,7 @@ function draw() {
 - The same points draw the ground and stop the bag: `polyfill` and
   `segs.make` take outlines the same way.
 - About 3,000 units a tick for the 20-point bag resting on the ground, and
-  1,500 falling; most of a tick's budget on an iPod Video playing FLAC is
+  1,750 falling; most of a tick's budget on an iPod Video playing FLAC is
   left for the rest of the game.
 
 ## segs.make(xs, ys, n, [mats], [ends])
@@ -737,7 +737,7 @@ function draw() {
 ![A red curtain hanging from a grey rail, folded and shaded by the light](img/sim-cloth.png)
 
 - **Cloth is costly.** A 12x10 cloth has 120 points and about 400 links:
-  `links.step` about 10,500 units a tick and `links.fill` about 19,300 --
+  `links.step` about 10,100 units a tick and `links.fill` about 19,300 --
   together over two ticks' worth on an iPod Video playing FLAC. Use a
   smaller cloth, fewer `passes`, or `links.draw` (about 10,500) where the
   shading is not needed.

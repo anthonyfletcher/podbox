@@ -402,14 +402,25 @@ static int cell_solid(const struct cellworld *w, int32_t fx0, int32_t fy0,
 #define SEG_CELLS 16384             /* the grid's cells, at most */
 #define SEG_LONG  2048              /* a line too long to size the grid */
 
-/* units: each free point looked at, each line it is tested against, and
- * each point that touches one -- its push, a root and a divide among it;
- * and the grid cells and filed lines its search passes over, a unit each
- * SEG_SEEN, so a wide search is paid for though it finds few lines */
-#define SEG_POINT 26
-#define SEG_TEST  50
-#define SEG_TOUCH 60
+/* units, measured on the ARM rig (linkprice, linkcontact): each free
+ * point looked at, each line found near it, each of those whose box
+ * reaches its path and is tested in full, each point that touches one --
+ * its push, roots and 64-bit divides among it -- and each of those that
+ * slides along it, two roots and two divides more; and the grid cells and
+ * filed lines its search passes over, a unit each SEG_SEEN, so a wide
+ * search is paid for though it finds few lines */
+#define SEG_POINT 36
+#define SEG_TEST  5
+#define SEG_KEPT  17
+#define SEG_TOUCH 98
+#define SEG_SLIDE 39
 #define SEG_SEEN  4
+
+/* what the points' meetings with the lines did, for the charge */
+struct seg_counts
+{
+    uint32_t tests, kept, slid, seen;
+};
 
 enum { S_X0, S_Y0, S_X1, S_Y1, S_MAT, S_START, S_ITEMS, S_COUNT, S_OX, S_OY,
        S_MX, S_MY, S_MOVED, S_CELL, S_GX, S_GY, S_GW, S_GH, S_FIELDS };
@@ -1331,20 +1342,69 @@ static int64_t seg_cross(const struct segs *s, int32_t k, int64_t ox,
 
 #define NEAR_SEGS 64                /* the lines a point looks at, at most */
 
-/* The first of the n lines in near that the path o to p crosses: its
- * share of the path (as seg_cross gives it) and in *k the line, or -1 and
- * -1 when it crosses none */
-static int64_t seg_first(const struct segs *s, const int32_t *near,
-                         uint32_t n, int64_t ox, int64_t oy, int64_t px,
-                         int64_t py, int32_t *k)
+/* A point's lines, each marked when its box reaches within r of the box
+ * round the point's path. While the point stays in that box (in), a line
+ * left unmarked fails seg_push's and seg_cross's own box tests, so it is
+ * skipped; once a move carries the point out, every line is tested */
+struct nearby
+{
+    int32_t k[NEAR_SEGS];
+    uint8_t keep[NEAR_SEGS];
+    uint32_t n;
+    int64_t x0, y0, x1, y1;         /* the box, 1/256 pixels */
+    int in;
+};
+
+/* whether p is still in the box, the marks then holding */
+static void near_check(struct nearby *nb, int64_t px, int64_t py)
+{
+    if (nb->in && (px < nb->x0 || px > nb->x1 || py < nb->y0 ||
+                   py > nb->y1))
+        nb->in = 0;
+}
+
+/* The box round the path o to p, m beyond it, and each line marked that
+ * reaches within r of it: how many are marked */
+static uint32_t near_mark(const struct segs *s, struct nearby *nb,
+                          int64_t ox, int64_t oy, int64_t px, int64_t py,
+                          int64_t m, int64_t r)
+{
+    nb->x0 = (px < ox ? px : ox) - m;
+    nb->y0 = (py < oy ? py : oy) - m;
+    nb->x1 = (px > ox ? px : ox) + m;
+    nb->y1 = (py > oy ? py : oy) + m;
+    nb->in = 1;
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < nb->n; i++) {
+        int32_t k = nb->k[i];
+        int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
+        int64_t bx = (int64_t)s->x1[k] >> 8, by = (int64_t)s->y1[k] >> 8;
+        int keep = !(nb->x1 + r < (ax < bx ? ax : bx) ||
+                     nb->x0 - r > (ax > bx ? ax : bx) ||
+                     nb->y1 + r < (ay < by ? ay : by) ||
+                     nb->y0 - r > (ay > by ? ay : by));
+        nb->keep[i] = (uint8_t)keep;
+        kept += (uint32_t)keep;
+    }
+    return kept;
+}
+
+/* The first of the lines that the path o to p crosses: its share of the
+ * path (as seg_cross gives it) and in *k the line, or -1 and -1 when it
+ * crosses none */
+static int64_t seg_first(const struct segs *s, const struct nearby *nb,
+                         int64_t ox, int64_t oy, int64_t px, int64_t py,
+                         int32_t *k)
 {
     int64_t first = -1;
     *k = -1;
-    for (uint32_t i = 0; i < n; i++) {
-        int64_t c = seg_cross(s, near[i], ox, oy, px, py);
+    for (uint32_t i = 0; i < nb->n; i++) {
+        if (nb->in && !nb->keep[i])
+            continue;
+        int64_t c = seg_cross(s, nb->k[i], ox, oy, px, py);
         if (c >= 0 && (first < 0 || c < first)) {
             first = c;
-            *k = near[i];
+            *k = nb->k[i];
         }
     }
     return first;
@@ -1357,8 +1417,7 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                         const int32_t *gravity,
                         const int32_t *friction, uint32_t nfriction,
                         int32_t bounce, uint32_t *stamp, uint32_t *mark,
-                        int32_t *nx, int32_t *ny, uint32_t *tests,
-                        uint32_t *seen)
+                        int32_t *nx, int32_t *ny, struct seg_counts *cnt)
 {
     /* in the set's own place: p against where it is, o against where it
      * was before this tick's move */
@@ -1373,21 +1432,22 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
      * speed is lost to rounding at each touch */
     const int64_t px0 = px, py0 = py;
     int32_t gx = gravity[0], gy = gravity[1];
-    int32_t near[NEAR_SEGS];
+    struct nearby nb;
     /* round the path, as far as a push can carry it */
-    uint32_t n = seg_near(s, (px < ox ? px : ox) - 3 * r,
-                          (py < oy ? py : oy) - 3 * r,
-                          (px > ox ? px : ox) + 3 * r,
-                          (py > oy ? py : oy) + 3 * r,
-                          near, NEAR_SEGS, stamp, ++*mark, seen);
-    *tests += n;
+    nb.n = seg_near(s, (px < ox ? px : ox) - 3 * r,
+                    (py < oy ? py : oy) - 3 * r,
+                    (px > ox ? px : ox) + 3 * r,
+                    (py > oy ? py : oy) + 3 * r,
+                    nb.k, NEAR_SEGS, stamp, ++*mark, &cnt->seen);
+    uint32_t n = nb.n, k_in = near_mark(s, &nb, ox, oy, px, py, 2 * r, r);
+    cnt->tests += n;
     struct touch t = { -1, 0, 0 };
     /* the path across the first line it crosses: slid back out along
      * that line's normal to r on the side it came from, keeping all of
      * its move along the line -- stopping it at the crossing would lose
      * that, every tick, on a curve */
     int32_t fk;
-    seg_first(s, near, n, ox, oy, px, py, &fk);
+    seg_first(s, &nb, ox, oy, px, py, &fk);
     if (fk >= 0) {
         seg_side(s, fk, ox, oy, &t);
         int64_t ax = (int64_t)s->x0[fk] >> 8, ay = (int64_t)s->y0[fk] >> 8;
@@ -1395,26 +1455,34 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
         if (side < r) {
             px += (int64_t)t.nx * (r - side) >> 16;
             py += (int64_t)t.ny * (r - side) >> 16;
+            near_check(&nb, px, py);
         }
     }
     /* then nothing within r, twice over for corners */
     for (int pass = 0; pass < 2; pass++)
-        for (uint32_t i = 0; i < n; i++)
-            seg_push(s, near[i], &px, &py, ox, oy, r, &t);
+        for (uint32_t i = 0; i < n; i++) {
+            if (nb.in && !nb.keep[i])
+                continue;
+            if (seg_push(s, nb.k[i], &px, &py, ox, oy, r, &t))
+                near_check(&nb, px, py);
+        }
     /* last, the path again: a push out of one side of a V can cross the
      * other, and a point is never let through a line -- back along its
      * path to just short of the first it crosses */
     for (int again = 0; again < 3; again++) {
         int32_t ck;
-        int64_t c = seg_first(s, near, n, ox, oy, px, py, &ck);
+        int64_t c = seg_first(s, &nb, ox, oy, px, py, &ck);
         if (ck < 0)
             break;
         c = c > 4096 ? c - 4096 : 0;
         px = ox + ((px - ox) * c >> 16);
         py = oy + ((py - oy) * c >> 16);
+        near_check(&nb, px, py);
         if (t.k < 0)
             seg_side(s, ck, ox, oy, &t);
     }
+    /* the lines tested in full: those marked, or all once it left */
+    cnt->kept += nb.in ? k_in : n;
     if (t.k < 0) {
         *nx = *ny = 0;
         return 0;
@@ -1458,6 +1526,7 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                 ty = ty * speed / tl;
                 vn = 0;
             }
+            cnt->slid++;
         }
     }
     uint8_t m = s->mat[t.k];
@@ -1575,25 +1644,47 @@ struct qlink
 _Static_assert(sizeof(struct qlink) == 12 && MAX_POINTS * 12 <= 65536,
                "links_arm.S's link, and a point's place in 16 bits");
 
+/* link_run()'s ways: a slack pool's squashed links are let be; narrow,
+ * only a link stretched within a quarter goes the short way */
+#define RUN_SLACK  1
+#define RUN_NARROW 2
+
 #ifdef ARCADE_ASM
 const struct qlink *link_run_arm(int32_t *P, const struct qlink *q,
-                                 const struct qlink *end, int slack);
+                                 const struct qlink *end, int ways);
+#endif
+
+/* 1 - (1 + e)^-1/2, 16.16, for e from -1/2 by sixteenths to 2: the share
+ * of a link's vector its ends move past a quarter's stretch, between two
+ * entries by the straight line, within 0.2 per cent. links_arm.S has the
+ * same. */
+#ifndef ARCADE_ASM
+static const int32_t link_share[41] = {
+    -27146, -21845, -17361, -13503, -10138, -7170, -4525, -2149, 0, 1957,
+    3748, 5396, 6919, 8331, 9647, 10875, 12026, 13107, 14125, 15086,
+    15995, 16857, 17675, 18454, 19195, 19903, 20579, 21226, 21845, 22440,
+    23011, 23559, 24087, 24596, 25086, 25559, 26016, 26458, 26885, 27298,
+    27699,
+};
 #endif
 
 /* One pass of links q up to end the short way, until a link that needs
  * the exact way, which is returned (end when there is none). With e the
  * stretch of a link's square, (d^2 - L^2) / L^2, the share of the vector
  * its ends move, (d - L) / d, is 1 - (1 + e)^-1/2: to the third order
- * e/2 - 3e^2/8 + 5e^3/16, within 1 per cent while e is within a quarter.
- * No root, no divide, all in 32 bits, the differences wrapped as the
- * positions are. The exact way takes a link too long or short for inv,
- * more than 64 pixels across, or stretched or squashed past a quarter. */
+ * e/2 - 3e^2/8 + 5e^3/16, within 1 per cent while e is within a quarter,
+ * and link_share beyond it to a stretch of 2 (a link 1.73 times its
+ * length) and a squash of a half. No root, no divide, all in 32 bits, the
+ * differences wrapped as the positions are. The exact way takes a link
+ * too long or short for inv, more than 64 pixels across, or stretched or
+ * squashed past those -- past a quarter when RUN_NARROW. */
 static const struct qlink *link_run(int32_t *P, const struct qlink *q,
-                                    const struct qlink *end, int slack)
+                                    const struct qlink *end, int ways)
 {
 #ifdef ARCADE_ASM
-    return link_run_arm(P, q, end, slack);
+    return link_run_arm(P, q, end, ways);
 #else
+    int slack = ways & RUN_SLACK;
     for (; q < end; q++) {
         uint32_t ij = q->ij;
         if (ij == QLINK_NONE)
@@ -1611,12 +1702,21 @@ static const struct qlink *link_run(int32_t *P, const struct qlink *q,
             return q;
         int32_t d2 = ax * ax + ay * ay + az * az;
         int32_t e = (int32_t)((int64_t)(d2 - q->l2) * q->inv >> 31);
-        if ((uint32_t)(e + 16384) >= 32768)
-            return q;
-        if (slack && e < 0)
-            continue;
-        int32_t e2 = (e * e) >> 16, e3 = (e2 * e) >> 16;
-        int32_t sh = e / 2 - (3 * e2 >> 3) + (5 * e3 >> 4);
+        int32_t sh;
+        if ((uint32_t)(e + 16384) < 32768) {
+            if (slack && e < 0)
+                continue;
+            int32_t e2 = (e * e) >> 16, e3 = (e2 * e) >> 16;
+            sh = e / 2 - (3 * e2 >> 3) + (5 * e3 >> 4);
+        } else {
+            uint32_t v = (uint32_t)(e + 32768);
+            if ((ways & RUN_NARROW) || v >= 163840)
+                return q;
+            if (slack && e < 0)
+                continue;
+            const int32_t *t = &link_share[v >> 12];
+            sh = t[0] + ((t[1] - t[0]) * (int32_t)(v & 4095) >> 12);
+        }
         /* the move in 16.16 is (a * sh) >> 8, all of it to the free end
          * when the other is pinned, else >> 9 to each */
         ax *= sh;
@@ -1768,14 +1868,16 @@ NATIVE(links_step)
     }
     const struct qlink *qend = Q + nl;
     for (int32_t p = 0; p < passes; p++) {
-        /* the first pass measures each link for its tear: the short way
-         * only takes a link stretched under 12 per cent, so with a tear
-         * of an eighth or more what it takes cannot tear; under that, the
-         * first pass goes the exact way */
+        /* the first pass measures each link for its tear, the exact way:
+         * taking only links stretched under 12 per cent the short way, so
+         * with a tear of an eighth or more what it takes cannot tear;
+         * under that, the first pass goes the exact way */
         int quick = !(p == 0 && tear > 0 && tear < 8192);
+        int ways = (slack ? RUN_SLACK : 0) |
+                   (p == 0 && tear > 0 ? RUN_NARROW : 0);
         for (uint32_t k = 0; k < nl; k++) {
             if (quick) {
-                const struct qlink *q = link_run(P, Q + k, qend, slack);
+                const struct qlink *q = link_run(P, Q + k, qend, ways);
                 if (q == qend)
                     break;
                 k = (uint32_t)(q - Q);
@@ -1856,7 +1958,8 @@ NATIVE(links_step)
             z[i] = mk(T_FIX, P[i * 3 + 2]);
         }
     /* out of the segment set's lines, and what each point touched */
-    uint32_t tests = 0, touched = 0, segpts = 0, seen = 0;
+    struct seg_counts sc = { 0, 0, 0, 0 };
+    uint32_t touched = 0, segpts = 0;
     if (l.f[L_SEGS].tag == T_OBJ) {
         struct segs sg;
         if (!segs_of(vm, l.f[L_SEGS], "links.step", &sg))
@@ -1890,8 +1993,7 @@ NATIVE(links_step)
                 int32_t X = fx(x[i]), Y = fx(y[i]), OX = fx(ox[i]);
                 int32_t OY = fx(oy[i]);
                 m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, grav, fr, nfr,
-                             bounce, stamp, &mark, &NX, &NY, &tests,
-                             &seen);
+                             bounce, stamp, &mark, &NX, &NY, &sc);
                 if (m) {
                     x[i] = mk(T_FIX, X);
                     y[i] = mk(T_FIX, Y);
@@ -1942,13 +2044,15 @@ NATIVE(links_step)
     if (broken)
         set_used(vm, a[0], L_BROKEN,
                  (uint32_t)whole(l.f[L_BROKEN], 0) + broken);
-    /* measured on the ARM rig (.build/arcade-rig, linkprobe and
-     * bagprobe): a link a pass 3.25 units the short way, 15 more the
-     * exact way, its root and divide */
-    vm_charge(vm, 10 + np * 18 + nl * 3 + nl * (uint32_t)passes * 13 / 4 +
-                  exact * 15 + (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
-                  segpts * SEG_POINT + tests * SEG_TEST + touched * SEG_TOUCH +
-                  seen / SEG_SEEN);
+    /* measured on the ARM rig (.build/arcade-rig, linkprobe, bagprobe
+     * and linkbase): a link a pass 3.75 units the short way, 15 more the
+     * exact way, its root and divide; a point 4 more damped or dragged */
+    vm_charge(vm, 10 + np * 18 + nl * 3 + nl * (uint32_t)passes * 15 / 4 +
+                  exact * 15 + (damp || drag ? np * 4 : 0) +
+                  (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
+                  segpts * SEG_POINT + sc.tests * SEG_TEST +
+                  sc.kept * SEG_KEPT + touched * SEG_TOUCH +
+                  sc.slid * SEG_SLIDE + sc.seen / SEG_SEEN);
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }

@@ -125,6 +125,25 @@ function update() {
     assert.equal(r.out[0], '100 100');
 });
 
+test('a link stretched or squashed far past its length comes back to it in one pass', () => {
+    const r = run(`var p;
+function init() {
+    p = links.pool(2, 1);
+    links.point(p, 0, 50, 1);
+    links.point(p, 16, 50);
+    links.link(p, 0, 1, 10);
+    p.passes = 1;
+}
+function update() {
+    links.step(p, 0);
+    printh(flr(p.x[1] * 100));
+    p.x[1] = 8; p.ox[1] = 8;
+}`, 2);
+    /* 1.6 and 0.8 of its length: the short way's table, within 0.2 per cent */
+    for (const v of r.out.map(Number))
+        assert.ok(Math.abs(v - 1000) <= 2, String(v));
+});
+
 test('wrong arguments stop the cart', () => {
     assert.match(run('function init() { segs.make([1], [1, 2], 2); }\nfunction update() {}').err,
                  /fewer x or y than points/);

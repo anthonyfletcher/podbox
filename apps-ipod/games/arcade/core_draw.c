@@ -1540,6 +1540,15 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 #define POLY_SHIFT 1
 #define POLY_CURVE 29
 #define POLY_TURN  7    /* each point walked, when the camera turns */
+#define POLY_ASIDE 2    /* each edge wholly left or right of the clip */
+
+/* A row's first edge in starts[], plus one, with this bit flipped where an
+ * edge wholly left of the clip starts or ends: such an edge is kept only
+ * as the rows where an odd number of them lie left, whose fill then starts
+ * at the clip's left. One wholly right is dropped: a row's edges always
+ * come in pairs, so an odd number left on it means its fill runs on past
+ * the clip's right. */
+#define POLY_LEFT  0x80000000u
 
 /* An edge: where it crosses the middle of its next row, and its step a
  * row, both 16.16; the row after its last; and the next edge to start on
@@ -1577,6 +1586,8 @@ struct poly
     uint32_t curves;
     int64_t xmin, xmax;         /* how far the edges reach, 16.16 */
     int full;                   /* more edges than max */
+    int64_t xl, xr;             /* edges past these are aside, 16.16 */
+    uint32_t aside;             /* edges wholly left or right */
 };
 
 /* (n << 16) / d, d above 0, toward 0: the 64-bit divide, but a byte at a
@@ -1620,6 +1631,23 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
     if (ax > g->xmax) g->xmax = ax;
     if (bx < g->xmin) g->xmin = bx;
     if (bx > g->xmax) g->xmax = bx;
+    /* a pixel clear of the clip either side, wherever its rows cross */
+    int left = (ax > bx ? ax : bx) < g->xl;
+    if (left || (ax < bx ? ax : bx) > g->xr) {
+        g->aside++;
+        if (g->counting)
+            return 1;
+        if (left) {
+            g->starts[r0 - g->y0] ^= (int32_t)POLY_LEFT;
+            if (r1 < g->y1)
+                g->starts[r1 - g->y0] ^= (int32_t)POLY_LEFT;
+            if (r0 < g->lo)
+                g->lo = (int32_t)r0;
+            if (r1 > g->hi)
+                g->hi = (int32_t)r1;
+        }
+        return 1;
+    }
     if (g->counting) {
         g->n++;
         return 1;
@@ -1636,8 +1664,9 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
         g->lo = (int32_t)r0;
     if (r1 > g->hi)
         g->hi = (int32_t)r1;
-    e->next = g->starts[r0 - g->y0];
-    g->starts[r0 - g->y0] = (int32_t)++g->n;
+    int32_t *st = &g->starts[r0 - g->y0];
+    e->next = (int32_t)((uint32_t)*st & ~POLY_LEFT);
+    *st = (int32_t)(((uint32_t)*st & POLY_LEFT) | ++g->n);
     return 1;
 }
 
@@ -1799,7 +1828,12 @@ static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
      * row's order is nearly the last's, so putting it right is cheap */
     uint32_t nact = 0, crossings = 0, shifts = 0;
     struct pedge *e0 = g->e;
+    /* whether an odd number of edges lie left of the clip on the row */
+    uint32_t left = 0;
+    for (int32_t y = p->cy0; y < g->lo; y++)
+        left ^= (uint32_t)g->starts[y - p->cy0];
     for (int32_t y = g->lo; y < g->hi; y++) {
+        left ^= (uint32_t)g->starts[y - p->cy0];
         /* the last row's edges stepped on to this one, less those ended,
          * then those starting on it */
         uint32_t m = 0;
@@ -1810,7 +1844,8 @@ static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
                 act[m++] = e;
             }
         }
-        for (int32_t i = g->starts[y - p->cy0]; i; i = e0[i - 1].next)
+        for (int32_t i = (int32_t)((uint32_t)g->starts[y - p->cy0] &
+                                   ~POLY_LEFT); i; i = e0[i - 1].next)
             act[m++] = &e0[i - 1];
         nact = m;
         for (uint32_t k = 1; k < m; k++) {
@@ -1825,15 +1860,27 @@ static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
             act[at] = e;
         }
         crossings += m;
-        /* the pixels whose middles lie from one crossing to the next */
-        for (uint32_t k = 0; k + 1 < m; k += 2) {
-            int64_t l = (act[k]->x + 32767) >> 16;
-            int64_t r = ((act[k + 1]->x + 32767) >> 16) - 1;
+        /* the pixels whose middles lie from one crossing to the next,
+         * from the clip's left when one lies left, and on to its right
+         * when one is left over */
+        uint32_t k = 0;
+        int64_t l = p->cx0;
+        if (left & POLY_LEFT) {
+            int64_t r = m ? ((act[0]->x + 32767) >> 16) - 1 : p->cx1 - 1;
+            if (l <= r)
+                span(p, y, l, r);
+            k = 1;
+        }
+        for (; k < m; k += 2) {
+            l = (act[k]->x + 32767) >> 16;
+            int64_t r = k + 1 < m ? ((act[k + 1]->x + 32767) >> 16) - 1
+                                  : p->cx1 - 1;
             if (l <= r)
                 span(p, y, l, r);
         }
     }
-    return crossings * POLY_CROSS + shifts * POLY_SHIFT;
+    return crossings * POLY_CROSS + shifts * POLY_SHIFT +
+           g->aside * POLY_ASIDE;
 }
 
 /* A quadrilateral, its corners 16.16 before the camera's offset, filled
@@ -1855,7 +1902,8 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
     } else
         memset(held_starts, 0, rows * 4);
     struct poly g = { held_edges, starts, 0, 4, p.cy0, p.cy1, p.cy1, p.cy0,
-                      0, 0, 0, 0, 0 };
+                      0, 0, 0, 0, 0, ((int64_t)p.cx0 - 1) << 16,
+                      ((int64_t)p.cx1 + 1) << 16, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
                   qx[(k + 1) & 3] + (p.ox << 16),
@@ -1909,9 +1957,10 @@ NATIVE(polyfill)
     /* Built in one pass into the held edges when they fit, which is
      * nearly always; otherwise counted, then built again into scratch */
     uint32_t rows = (uint32_t)(p.cy1 - p.cy0), walks = 1;
+    int64_t xl = ((int64_t)p.cx0 - 1) << 16, xr = ((int64_t)p.cx1 + 1) << 16;
     struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
                       p.cy1, p.cy0, 0, 0, (int64_t)1 << 62,
-                      -((int64_t)1 << 62), 0 };
+                      -((int64_t)1 << 62), 0, xl, xr, 0 };
     struct pedge **act = held_act;
     if (rows <= POLY_HELD_ROWS) {
         memset(held_starts, 0, rows * 4);
@@ -1923,13 +1972,13 @@ NATIVE(polyfill)
         walks += rows <= POLY_HELD_ROWS;
         struct poly count = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0,
                               1, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
-                              0 };
+                              0, xl, xr, 0 };
         g = count;
         if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
                         (uint32_t)n))
             return 0;
         uint32_t max = g.n;
-        if (g.n && g.xmax >= ((int64_t)p.cx0 << 16) &&
+        if ((g.n || g.aside) && g.xmax >= ((int64_t)p.cx0 << 16) &&
             g.xmin < ((int64_t)p.cx1 << 16)) {
             uint32_t at_act = max * sizeof(struct pedge);
             uint32_t at_starts = at_act + max * sizeof(struct pedge *);
@@ -1948,6 +1997,7 @@ NATIVE(polyfill)
             g.e = (struct pedge *)(void *)mem;
             g.starts = (int32_t *)(void *)(mem + at_starts);
             g.n = 0;
+            g.aside = 0;
             g.max = max;
             g.counting = 0;
             act = (struct pedge **)(void *)(mem + at_act);
@@ -1966,7 +2016,8 @@ NATIVE(polyfill)
         p.cost += (uint32_t)n * walks * POLY_TURN;
     /* wholly left or right of the clip, or above or below it: no row is
      * walked */
-    if (!g.counting && g.n && g.xmax >= ((int64_t)p.cx0 << 16) &&
+    if (!g.counting && (g.n || g.aside) &&
+        g.xmax >= ((int64_t)p.cx0 << 16) &&
         g.xmin < ((int64_t)p.cx1 << 16))
         p.cost += poly_rows(&p, &g, act);
     finish(vm, &p);
