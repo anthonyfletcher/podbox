@@ -46,6 +46,9 @@ A filled triangle.
 ### polyfill(xs, ys, n, [c], [ends], [bend])
 The first n points of xs and ys as a filled outline, concave or crossing itself, by the even-odd rule. ends, an array, cuts it into several outlines, each ending before the index given; one inside another is a hole. Where bend is non-zero, that point bends the line through it into a curve rather than lying on it, as in a TrueType outline. At most 8192 points.
 
+### polyline(xs, ys, n, [c], [ends], [closed])
+Lines from each of the first n points of xs and ys to the next, in one call. c is a colour, or an array of one for each line (line i from point i). ends, an array, cuts the points into runs, each ending before the index given; closed joins each run's last point back to its first. At most 8192 points.
+
 ### fillp([p])
 A 4x4 pattern for fills, 16 bits from the top left; set bits draw the colour's high byte (`c + 256 * c2`), or nothing when it is 0. `fillp()` turns it off.
 

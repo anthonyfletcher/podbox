@@ -80,3 +80,22 @@ test('an outline off the screen costs its edges, not the screen\'s rows', () => 
     const units = Number(/prof t (\d+)/.exec(r.err)[1]);
     assert.ok(units < 200, String(units));
 });
+
+test('polyline draws what line() draws, a colour a line, closed and turned alike', () => {
+    const xs = '[10, 70, 130, 90, 20, 40, 60, 50]', ys = '[10, 30, 15, 100, 90, 50, 50, 70]';
+    const cs = '[7, 8, 9, 10, 11, 12, 13, 14]';
+    for (const cam of ['', 'camera(0, 0, 0.07, 80, 60);']) {
+        const one = run(`${cam} polyline(${xs}, ${ys}, 8, ${cs}, [5, 8], true);`, '0,0,160,120');
+        const many = run(`${cam} var x = ${xs}, y = ${ys}, c = ${cs};
+            for (var i = 0; i < 5; i++) line(x[i], y[i], x[(i + 1) % 5], y[(i + 1) % 5], c[i]);
+            for (var j = 5; j < 8; j++) line(x[j], y[j], x[j < 7 ? j + 1 : 5], y[j < 7 ? j + 1 : 5], c[j]);`,
+                         '0,0,160,120');
+        assert.equal(one.status, 0, one.err);
+        assert.ok(/[789abcde]/.test(one.out), 'something drawn');
+        assert.equal(one.out, many.out, cam || 'unturned');
+    }
+    /* open by default: no line back to the start */
+    const open = run('polyline([10, 30, 30], [10, 10, 30], 3, 7);', '10,10,21,21');
+    const rows = open.out.trim().split('\n');
+    assert.equal(rows[10][10], '0');
+});

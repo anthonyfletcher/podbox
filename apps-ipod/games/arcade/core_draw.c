@@ -1958,6 +1958,87 @@ NATIVE(polyfill)
     return 1;
 }
 
+/* polyline(xs, ys, n, [c], [ends], [closed]): a line from each point to
+ * the next. ends, when given, is where each run of points ends (the
+ * index after its last), as polyfill takes outlines; closed joins each
+ * run's last point back to its first. c is a colour, or an array of one
+ * for each line -- line i's from point i. */
+NATIVE(polyline)
+{
+    (void)out;
+    struct column xs, ys, ends, cols;
+    if (!column_of(vm, a[0], &xs) || !column_of(vm, a[1], &ys) ||
+        xs.tag == T_INT || ys.tag == T_INT || !is_num(a[2]))
+        return vm_fail(vm, "polyline() needs arrays of x and y, then how "
+                       "many points", "", "");
+    int32_t n = floor_int(a[2]);
+    if (n < 0)
+        n = 0;
+    if (n > POLY_POINTS)
+        return vm_fail(vm, "polyline() takes at most 8192 points", "", "");
+    if ((uint32_t)n > xs.len || (uint32_t)n > ys.len)
+        return vm_fail(vm, "polyline() has fewer x or y than points", "", "");
+    uint32_t c = vm->d.pen;
+    cols.tag = T_NULL;
+    if (argc > 3 && (a[3].tag == T_ARR || a[3].tag == T_I32 ||
+                     a[3].tag == T_U8)) {
+        column_of(vm, a[3], &cols);
+        if (cols.len < (uint32_t)n)
+            return vm_fail(vm, "polyline()'s colours are one for each "
+                           "point", "", "");
+    } else if (!colour(vm, a, argc, 3, "polyline", &c))
+        return 0;
+    uint32_t nends = 0;
+    if (argc > 4 && a[4].tag != T_NULL) {
+        if (!column_of(vm, a[4], &ends) || ends.tag == T_INT)
+            return vm_fail(vm, "polyline()'s ends is an array", "", "");
+        nends = ends.len;
+    }
+    int closed = argc > 5 && vm_truthy(vm, a[5]);
+    const struct draw *d = &vm->d;
+    struct pen p;
+    begin(vm, &p, c, 1);
+    p.per16 = PER16_DOT;
+    uint32_t s = 0;
+    for (uint32_t k = 0; k <= nends && s < (uint32_t)n; k++) {
+        uint32_t e = (uint32_t)n;
+        if (k < nends) {
+            int32_t v = column_at(&ends, k, 0);
+            if (v <= (int32_t)s || v > n)
+                return vm_fail(vm, "polyline()'s ends must rise, each past "
+                               "the last and none past n", "", "");
+            e = (uint32_t)v;
+        }
+        /* each point turned once, the line's end the next one's start */
+        int32_t fx0 = column_at(&xs, s, 0), fy0 = column_at(&ys, s, 0);
+        turn_px(d, &fx0, &fy0);
+        int32_t x0 = fx0, y0 = fy0;
+        for (uint32_t i = s; i < e; i++) {
+            int32_t x1 = fx0, y1 = fy0;
+            if (i + 1 < e) {
+                x1 = column_at(&xs, i + 1, 0);
+                y1 = column_at(&ys, i + 1, 0);
+                turn_px(d, &x1, &y1);
+            } else if (!closed || e - s < 3)
+                break;
+            if (cols.tag != T_NULL) {
+                uint32_t ci = (uint32_t)column_at(&cols, i, 0);
+                p.c = d->dpal[ci & 0xff];
+                p.alt_on = p.pat && ((ci >> 8) & 0xff);
+                p.alt = d->dpal[(ci >> 8) & 0xff];
+            }
+            p.cost += 18;           /* a line's setup, as core_draw_lines */
+            walk_line(&p, x0, y0, x1, y1, plot_dot,
+                      p.pat ? NULL : run_dots, NULL);
+            x0 = x1;
+            y0 = y1;
+        }
+        s = e;
+    }
+    finish(vm, &p);
+    return 1;
+}
+
 /* Rows from..to (inside the clip) of an unpatterned rectangle x0..x1:
  * filled, each row whole; hollow, its two edge columns. */
 static void rows(struct pen *p, int32_t from, int32_t to, int64_t x0,

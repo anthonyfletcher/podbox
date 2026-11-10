@@ -9,7 +9,8 @@ this page.
 - Clearing and pixels: [cls](#clsc), [pset](#psetx-y-c), [pget](#pgetx-y)
 - Lines and shapes: [line](#linex0-y0-x1-y1-c), [rect and rectfill](#rectx0-y0-x1-y1-c),
   [circ and circfill](#circx-y-r-c), [oval and ovalfill](#ovalx0-y0-x1-y1-c),
-  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend)
+  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend),
+  [polyline](#polylinexs-ys-n-c-ends-closed)
 - The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py),
   [clip](#clipx-y-w-h), [target](#targett)
 
@@ -332,6 +333,39 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   screen is about 6,600. Points outside the clip cost about 8 units
   each, so a large outline mostly off screen stays cheap. One `polyfill` is much cheaper than the same
   shape cut into `trifill` triangles, each of which pays for its rows.
+
+## polyline(xs, ys, n, [c], [ends], [closed])
+
+Lines from point to point: a shape's edge, a track, a graph, a ship
+drawn in outline -- the same points `polyfill` takes, in one call.
+
+| Argument | |
+|---|---|
+| `xs`, `ys` | arrays (or typed arrays) of the points' x and y |
+| `n` | how many points to use, from the first; at most 8,192 |
+| `c` | its colour, or an array of one colour for each line: line `i` runs from point `i` to the next; the pen colour when left out |
+| `ends` | to draw several runs at once: an array of where each ends, the index after its last point, as `polyfill`'s outlines |
+| `closed` | `true` to join each run's last point back to its first |
+
+**Returns** nothing.
+
+```js
+cls(12);
+var hx = [0, 40, 80, 120, 160, 160, 0,   60, 100, 100, 60];
+var hy = [80, 50, 40, 55, 75, 120, 120,  75, 75, 100, 100];
+polyfill(hx, hy, 11, 3, [7, 11]);
+// the hill's grassy top light green, the rest of its edges dark
+var edge = [11, 11, 11, 11, 5, 5, 5,  5, 5, 5, 5];
+polyline(hx, hy, 11, edge, [7, 11], true);
+```
+
+![The green hill with its cave from polyfill's example, its top edged in light green and its other edges and the cave's in dark grey](img/d-polyline.png)
+
+- The lines are those `line` draws between the same points, a whole
+  pixel each end; the camera, its turn, the clip and `fillp` apply.
+- **What it costs.** The edges above are about 600 units: about 18 a
+  line besides its pixels, where the same lines drawn by `line` one at a
+  time cost several times that.
 
 ---
 
