@@ -2605,6 +2605,11 @@ static int hotkey_go_to_album(void)
     return leave(GO_TO_DBBROWSER);
 }
 
+static int hotkey_main_menu(void)
+{
+    return leave(GO_TO_ROOT);
+}
+
 static int hotkey_music(void)
 {
     return leave(GO_TO_DBBROWSER);
@@ -2738,6 +2743,12 @@ static const struct hotkey_assignment hotkey_items[] = {
     { .action = HOTKEY_GO_TO_ALBUM,
       .lang_id = LANG_GO_TO_ALBUM,
       .func = HOTKEY_FUNC(hotkey_go_to_album, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_MAIN_MENU,
+      .lang_id = LANG_MAIN_MENU,
+      .func = HOTKEY_FUNC(hotkey_main_menu, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
@@ -2929,6 +2940,15 @@ int wps_select_do_setting(void *param)
                                   false);
 }
 
+/* Not offered Off, so Menu always leaves Now Playing */
+int wps_menu_do_setting(void *param)
+{
+    (void)param;
+    return hotkey_menu_do_setting(&global_settings.wps_menu_action,
+                                  HOTKEY_FLAG_WPS, LANG_WPS_MENU_ACTION,
+                                  false);
+}
+
 int wps_context_menu_do_setting(void *param)
 {
     (void)param;
@@ -2963,6 +2983,8 @@ static const struct
     { "database",           HOTKEY_MUSIC },
     { "coverflow",          HOTKEY_ALBUM_COVERS },
     { "queue",              HOTKEY_VIEW_PLAYLIST },
+    { "previous",           HOTKEY_PREVIOUS_SCREEN }, /* wps menu action */
+    { "root",               HOTKEY_MAIN_MENU },       /* wps menu action */
 };
 
 /* Whole names only: "Play Later" is also the start of "Play Later Shuffled" */
