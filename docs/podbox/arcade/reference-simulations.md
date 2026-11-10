@@ -595,6 +595,11 @@ function draw() {
 - Trace once, as a level starts: a 64 by 64 map of hills is about 44,000
   units, and 66,000 rounded twice -- well inside what `init()` may use.
   A large map can be traced a part at a time.
+- What points meet need not be what is drawn: trace the ground rounded
+  twice for `polyfill` and once for `segs.make`. The second has half the
+  lines, so meeting it costs less, and the two are never more than
+  about 0.8 pixels apart. Unrounded, the corners stand 4 pixels out,
+  and that shows.
 
 ### Slopes
 
