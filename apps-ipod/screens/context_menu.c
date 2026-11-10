@@ -2614,6 +2614,19 @@ static int hotkey_stop(void)
     return leave(GO_TO_PREVIOUS);
 }
 
+/* The now-playing menu's Add to Playlist... submenu, for the playing track */
+static int hotkey_add_to_playlist(void)
+{
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    hiding_begin();
+    int ret = do_menu(&cat_playlist_menu, NULL, NULL, false);
+    hiding_end();
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+    return ret == GO_TO_ROOT || ret == GO_TO_MAINMENU ? ONPLAY_MAINMENU
+                                                      : ONPLAY_RELOAD_DIR;
+}
+
 static int hotkey_main_menu(void)
 {
     return leave(GO_TO_ROOT);
@@ -2761,6 +2774,12 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
+    { .action = HOTKEY_ADD_TO_PLAYLIST,
+      .lang_id = LANG_ADD_TO_PL,
+      .func = HOTKEY_FUNC(hotkey_add_to_playlist, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_Playlist },
     { .action = HOTKEY_MAIN_MENU,
       .lang_id = LANG_MAIN_MENU,
       .func = HOTKEY_FUNC(hotkey_main_menu, NULL),
