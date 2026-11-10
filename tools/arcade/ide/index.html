@@ -191,6 +191,11 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
 #editor .cm-panels { background: var(--panel); color: var(--ink); border: none; }
 .tb.find input[type=text] { width: 200px; font: 13px ui-monospace, Consolas, monospace; height: 26px; }
 #editor p { margin: 0 24px; color: var(--dim); }
+#editor iframe.cart-editor { flex: 1; min-height: 0; border: 0; background: var(--panel); }
+#editor .cart-editor-ask { padding: 24px 0; display: flex; flex-direction: column; gap: 10px;
+                           align-items: flex-start; }
+#editor .cart-editor-ask button { margin-left: 24px; }
+#editor .cart-editor-ask p { max-width: 560px; color: var(--ink); }
 
 /* ---- the player ---- */
 #player-body { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center;

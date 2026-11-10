@@ -2093,7 +2093,8 @@ export function compile(input) {
     const a = input.assets || {};
     const kinds = [['palettes', 'palettes/', '.gpl'], ['maps', 'maps/', '.json'],
                    ['sounds', 'sounds/', '.json'], ['data', 'data/', '.json'],
-                   ['texts', 'data/', '.txt'], ['fonts', 'fonts/', '.bdf']];
+                   ['texts', 'data/', '.txt'], ['fonts', 'fonts/', '.bdf'],
+                   ['editors', 'editors/', '.html']];
     for (const [kind, dir, ext] of kinds)
         for (const n in a[kind] || {}) srcFiles[dir + n + ext] = a[kind][n];
     if (a.flags !== undefined) srcFiles['flags.json'] = a.flags;

@@ -111,6 +111,7 @@ A cart's art goes in the same folder:
 | `images/<name>.png` | any other picture, up to 1024 pixels a side; after `sheet(IMG.<name>)` the sprite calls draw its 8x8 cells as sprites |
 | `data/<name>.json` | data the code reads: levels, waves, dialogue |
 | `data/<name>.txt` | text the code reads as one string |
+| `editors/<name>.html` | an editor of the cart's own for `data/<name>.json` or `.txt`, run in the IDE: see [A cart's own editor](#a-carts-own-editor) |
 | `fonts/<name>.bdf` | a font in BDF, the bitmap font format FontForge and other font editors save: up to 16 a cart, glyphs up to 32 pixels a side, 64 KB of glyphs in all |
 
 Save every PNG as an **indexed** (palette) PNG: each pixel's palette number
@@ -340,6 +341,41 @@ show as `?`.
   `store` files are kept in the browser.
 - **About ArcadeIDE** (Help menu) credits the open-source projects the IDE
   is built with.
+
+## A cart's own editor
+
+A cart can carry a page that edits its data -- a level editor, a phrase
+table, a dialogue tree -- and the IDE runs it in place of the text when
+that file is opened. `editors/levels.html` edits `data/levels.json` (or
+`data/levels.txt`); **Edit as text** switches back, and opening the
+`.html` itself shows its HTML, with **Run this editor**. File > New file
+makes one to start from: the data shown as text, saved back by a button.
+
+The page is ordinary HTML with its scripts inline, and reaches the cart
+through `window.cart`:
+
+| | |
+|---|---|
+| `cart.file` | the file it was opened for, or `null` |
+| `cart.read(name)` | a Promise of a file's text, or a `Uint8Array` for a picture; `undefined` when there is none |
+| `cart.write(name, value)` | a Promise, kept once the file is written: any file a cart holds, but never an editor |
+| `cart.list()` | a Promise of every file's name |
+
+```js
+cart.read(cart.file).then(function (text) { show(JSON.parse(text)); });
+// ... and when the owner changes something:
+cart.write(cart.file, JSON.stringify(levels, null, 1));
+```
+
+- The editor travels inside the `.pbg` with the cart's sources, so anyone
+  who opens the cart has it. The player never runs it.
+- It runs walled off: it cannot reach the network, the IDE's storage or
+  the IDE's page, only the cart's files through `cart`. Fetch nothing:
+  put fonts and pictures in the page as `data:` URLs.
+- The first time a cart's editor would run, the IDE asks. A page changed
+  since asks again, except one you changed in the IDE yourself.
+- The cart reads what it writes with `data.read(DATA.levels)`, as any
+  data file.
 
 ## A cart as a web page
 

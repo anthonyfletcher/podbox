@@ -43,7 +43,7 @@ function firstPalette(pals) {
 const SOURCE_NAME = new RegExp('^(cart\\.json|sheet\\.png|logo\\.png|flags\\.json|' +
     '[^/\\\\:*?"<>|\\x00-\\x1f.][^/\\\\:*?"<>|\\x00-\\x1f]*\\.js|' +
     '(palettes/[A-Za-z_]\\w*\\.gpl|(maps|sounds|data)/[A-Za-z_]\\w*\\.json|' +
-    'data/[A-Za-z_]\\w*\\.txt|fonts/[A-Za-z_]\\w*\\.bdf|' +
+    'data/[A-Za-z_]\\w*\\.txt|fonts/[A-Za-z_]\\w*\\.bdf|editors/[A-Za-z_]\\w*\\.html|' +
     'images/[A-Za-z_]\\w*\\.png))$');
 
 /* The cart's logo as { width, height, rgb }, each pixel 0xRRGGBB in the

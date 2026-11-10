@@ -39,7 +39,7 @@ if (cartDir && !pbg) {
     const a = readAssets(cartDir);
     for (const [k, dir, ext] of [['palettes', 'palettes/', '.gpl'], ['maps', 'maps/', '.json'],
         ['sounds', 'sounds/', '.json'], ['data', 'data/', '.json'], ['texts', 'data/', '.txt'],
-        ['fonts', 'fonts/', '.bdf'], ['images', 'images/', '.png']])
+        ['fonts', 'fonts/', '.bdf'], ['images', 'images/', '.png'], ['editors', 'editors/', '.html']])
         for (const [n, v] of Object.entries(a[k] || {})) folder[dir + n + ext] = v;
     if (a.flags) folder['flags.json'] = a.flags;
     if (a.sheet) folder['sheet.png'] = a.sheet;
@@ -53,7 +53,7 @@ const script = `<script>
 (async function () {
     while (!window.arcadeIde) await new Promise((r) => setTimeout(r, 20));
     await new Promise((r) => setTimeout(r, 1200));
-    const enc = ${JSON.stringify(enc)};
+    const enc = ${JSON.stringify(enc).replace(/</g, '\\u003c')};
     const pbg = ${JSON.stringify(pbg)};
     if (pbg) window.arcadeIde.openBytes(Uint8Array.from(atob(pbg), (c) => c.charCodeAt(0)), null);
     else if (Object.keys(enc).length) {

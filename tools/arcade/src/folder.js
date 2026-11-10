@@ -5,7 +5,8 @@
 const KINDS = [
     ['palettes', 'palettes/', '.gpl'], ['maps', 'maps/', '.json'],
     ['images', 'images/', '.png'], ['sounds', 'sounds/', '.json'],
-    ['data', 'data/', '.json'], ['texts', 'data/', '.txt'], ['fonts', 'fonts/', '.bdf']
+    ['data', 'data/', '.json'], ['texts', 'data/', '.txt'], ['fonts', 'fonts/', '.bdf'],
+    ['editors', 'editors/', '.html']
 ];
 
 const asText = (v) => (typeof v === 'string' ? v : new TextDecoder().decode(v));

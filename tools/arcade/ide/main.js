@@ -38,6 +38,7 @@ import { missing, dither, medianCut } from './colours.js';
 import { parseGpl } from '../src/assets.js';
 import { hints, about } from './hints.js';
 import { ask } from './ask.js';
+import { CartEditor, CART_FILE, editorOf, isEditor, approved, approve, starterEditor } from './editors.js';
 import { icon, iconButton } from './icons.js';
 import capsBdf from '../fonts/caps.bdf';
 import wasmBytes from '../wasm/arcade.wasm';
@@ -203,6 +204,7 @@ function stateFor(file) {
                      EditorView.updateListener.of((u) => {
                          if (!u.docChanged) return;
                          folder[current] = u.state.doc.toString();
+                         if (isEditor(current)) authored.add(current);
                          changed();
                      })]
     });
@@ -228,17 +230,24 @@ function show(file) {
     const gplFile = /^palettes\/\w+\.gpl$/.test(file), bdfFile = /^fonts\/\w+\.bdf$/.test(file);
     const mapFile = /^maps\/\w+\.json$/.test(file), sfxFile = /^sounds\/\w+\.json$/.test(file);
     const cfgFile = file === 'cart.json';
-    const visual = gplFile || bdfFile || mapFile || sfxFile || cfgFile;
-    if (isBinary(file) || (visual && !asText[file])) {
+    const custom = editorOf(folder, file);
+    const visual = gplFile || bdfFile || mapFile || sfxFile || cfgFile || !!custom;
+    const runEditor = isEditor(file) && runEditors[file];
+    if (isBinary(file) || (visual && !asText[file]) || runEditor) {
         if (view) { view.destroy(); view = null; }
         pane.innerHTML = '';
-        if (gplFile) showPalette(pane, file);
+        if (runEditor) {
+            showCartEditor(pane, null, file, at);
+            editorMode = iconButton('text', 'Edit its HTML', () => { delete runEditors[file]; show(file); });
+        } else if (custom) showCartEditor(pane, file, custom, at);
+        else if (gplFile) showPalette(pane, file);
         else if (bdfFile) showFont(pane, file);
         else if (mapFile) showMap(pane, file);
         else if (sfxFile) showSound(pane, file);
         else if (cfgFile) showSettings(pane, file);
         else showPicture(pane, file);
-        if (visual) editorMode = iconButton('text', 'Edit as text', () => { asText[file] = true; show(file); });
+        if (visual && !runEditor)
+            editorMode = iconButton('text', 'Edit as text', () => { asText[file] = true; show(file); });
     } else {
         if (view && view.dom.parentElement !== pane) { view.destroy(); view = null; }
         if (!view) {
@@ -249,9 +258,11 @@ function show(file) {
         if (visual) {
             const [ic, label] = gplFile ? ['swatches', 'Edit as swatches'] : bdfFile ? ['glyphs', 'Edit as glyphs']
                 : mapFile ? ['grid', 'Edit as a map'] : sfxFile ? ['waveSine', 'Edit as a sound']
-                : ['settings', 'Edit as a form'];
+                : custom ? ['settings', 'Edit with ' + custom.slice(8)] : ['settings', 'Edit as a form'];
             editorMode = iconButton(ic, label, () => { delete asText[file]; check(); show(file); });
         }
+        if (isEditor(file))
+            editorMode = iconButton('play', 'Run this editor', () => { runEditors[file] = true; show(file); });
     }
     /* an editor that could not open shows its text instead, from within */
     if (at !== showing) return;
@@ -276,6 +287,46 @@ function setAsSprites(file, on) {
 
 /* files with editors of their own, shown as text */
 const asText = {};
+
+/* the cart's editors (editors/*.html) shown running rather than as
+ * their HTML, and those the owner wrote in the IDE, which run unasked */
+const runEditors = {};
+const authored = new Set();
+
+/* An editor of the cart's own, in its frame, for file (null when it is
+ * run as itself) -- once the owner has said it may run */
+async function showCartEditor(pane, file, editor, at) {
+    const html = String(folder[editor]);
+    if (!authored.has(editor) && !(await approved(html))) {
+        if (at !== showing) return;
+        const p = document.createElement('div');
+        p.className = 'cart-editor-ask';
+        const say1 = document.createElement('p');
+        say1.textContent = 'This cart has an editor of its own, ' + editor + '. It runs inside the IDE, ' +
+            'walled off from the IDE and the network, and can change this cart\'s files. Run it?';
+        const go = document.createElement('button');
+        go.textContent = 'Run it';
+        go.onclick = async () => { await approve(html); show(current); };
+        const text = document.createElement('button');
+        text.textContent = 'Show it as text';
+        text.onclick = () => {
+            if (file) asText[file] = true; else delete runEditors[editor];
+            show(current);
+        };
+        p.append(say1, go, text);
+        pane.append(p);
+        return;
+    }
+    if (at !== showing) return;
+    pixels = new CartEditor(pane, {
+        folder: folder, file: file, html: html,
+        written: (name, isNew) => {
+            delete states[name];
+            if (isNew) showFiles();
+            changed();
+        }
+    });
+}
 
 /* a font in the font editor */
 function showFont(pane, file) {
@@ -1347,9 +1398,9 @@ async function openFolder() {
     async function walk(d, prefix, depth) {
         for await (const [name, h] of d.entries()) {
             if (h.kind === 'directory' && depth === 0 &&
-                ['palettes', 'maps', 'images', 'sounds', 'data', 'fonts'].includes(name))
+                ['palettes', 'maps', 'images', 'sounds', 'data', 'fonts', 'editors'].includes(name))
                 await walk(h, name + '/', 1);
-            else if (h.kind === 'file' && /\.(js|json|png|gpl|txt|bdf)$/.test(name)) {
+            else if (h.kind === 'file' && (CART_FILE.test(prefix + name) || isEditor(prefix + name))) {
                 const f = await h.getFile();
                 files[prefix + name] = isBinary(name) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
             }
@@ -1363,8 +1414,6 @@ async function openFolder() {
     say('print', 'Opened the folder ' + dir.name + ': Save writes its files back.');
 }
 
-const CART_FILE = /^((palettes|maps|images|sounds|data|fonts)\/)?[^/]+\.(js|json|png|gpl|txt|bdf)$/;
-
 function openFolderPlain() {
     const i = document.createElement('input');
     i.type = 'file';
@@ -1374,7 +1423,7 @@ function openFolderPlain() {
         for (const f of i.files) {
             /* the path below the folder chosen */
             const rel = f.webkitRelativePath.split('/').slice(1).join('/');
-            if (CART_FILE.test(rel))
+            if (CART_FILE.test(rel) || isEditor(rel))
                 files[rel] = isBinary(rel) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
         }
         if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
@@ -1570,7 +1619,8 @@ const KINDS = {
     data: { label: 'Data', path: (n) => 'data/' + n + '.json' },
     text: { label: 'Text', path: (n) => 'data/' + n + '.txt' },
     font: { label: 'A font', path: (n) => 'fonts/' + n + '.bdf' },
-    caps: { label: 'A font, a copy of CAPS', path: (n) => 'fonts/' + n + '.bdf' }
+    caps: { label: 'A font, a copy of CAPS', path: (n) => 'fonts/' + n + '.bdf' },
+    editor: { label: 'An editor for data/<name>.json', path: (n) => 'editors/' + n + '.html' }
 };
 
 /* a font with no characters but the space, 7 pixels over the baseline and
@@ -1603,6 +1653,7 @@ function fresh(kind, name, a) {
     case 'text': return '';
     case 'font': return EMPTY_BDF;
     case 'caps': return capsBdf;
+    case 'editor': return starterEditor(name);
     }
     return '';
 }
@@ -1632,6 +1683,7 @@ async function newFile() {
     const name = a.kind === 'sheet' || a.kind === 'logo' ? a.kind : a.name.trim();
     const path = KINDS[a.kind].path(name);
     folder[path] = fresh(a.kind, name, a);
+    if (a.kind === 'editor') authored.add(path);
     showFiles();
     show(path);
     changed();
@@ -1646,6 +1698,7 @@ function placeFor(file, text) {
     case 'gpl': return 'palettes/' + base + '.gpl';
     case 'bdf': return 'fonts/' + base + '.bdf';
     case 'txt': return 'data/' + base + '.txt';
+    case 'html': return 'editors/' + base + '.html';
     case 'png': case 'gif': case 'jpg': case 'jpeg':
         return base === 'sheet' || base === 'logo' ? base + '.png' : 'images/' + base + '.png';
     case 'json': {
@@ -1666,7 +1719,7 @@ function addFiles() {
     const i = document.createElement('input');
     i.type = 'file';
     i.multiple = true;
-    i.accept = '.js,.json,.png,.gif,.jpg,.jpeg,.gpl,.bdf,.txt';
+    i.accept = '.js,.json,.png,.gif,.jpg,.jpeg,.gpl,.bdf,.txt,.html';
     i.onchange = async () => {
         for (const f of i.files) {
             const picture = /^image\//.test(f.type);
