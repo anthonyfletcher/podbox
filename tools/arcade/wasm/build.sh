@@ -19,7 +19,7 @@ if [ ! -x "$WASI_SDK/bin/clang" ] || [ ! -x "$BINARYEN/bin/wasm-opt" ]; then
 fi
 
 srcs="$here/web.c $here/../host/fakemusic.c $engine/vm.c $engine/gc.c $engine/loader.c
-      $engine/verify.c $engine/natives.c $engine/core_math.c
+      $engine/verify.c $engine/natives.c $engine/core_math.c $engine/core_colour.c
       $engine/core_draw.c $engine/core_input.c $engine/present.c
       $engine/core_sound.c $engine/sys_actors.c $engine/sys_plane.c
       $engine/sys_grid.c $engine/sys_path.c $engine/sys_noise.c

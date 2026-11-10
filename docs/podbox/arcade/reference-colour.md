@@ -8,6 +8,7 @@ own palettes.
 - Drawing in other colours: [pal](#palc0-c1-p), [palt](#paltc-t)
 - What the colours look like: [setpal](#setpali-rgb), [getpal](#getpali),
   [loadpal](#loadpalpalname)
+- Colours made at run time: [the player's colours, and shades of any colour](#the-players-colours-and-shades-of-any-colour)
 - [Fades, flashes and cycling](#fades-flashes-and-cycling)
 
 ## How colour works
@@ -265,6 +266,93 @@ function init() {
   files so the one you want first sorts first (`a_day`, `b_night`).
 - A cart with no palette files starts with the sixteen above.
 - It sends the whole screen on the iPod that frame.
+
+## The player's colours, and shades of any colour
+
+`playback.colours` gives the colours the player is showing, and the
+`colour` calls make more from them -- so a cart can dress itself in the
+playing album's colours, as the player's own screens do under **Dynamic
+Colours**, or in the theme's.
+
+| Call | Returns |
+|---|---|
+| `playback.colours(out)` | the background, the text and the most vivid colour into `out`, an `Int32Array` of 3; 1 when they are the playing album's, 0 when they are the theme's |
+| `colour.tone(c)` | how light `c` reads, 0 black to 100 white |
+| `colour.toned(c, tone)` | `c` at that tone, its hue kept |
+| `colour.turn(c, t)` | `c`'s hue turned by `t` turns, its tone kept: 0.5 is the opposite hue |
+| `colour.mix(a, b, t)` | `a` moved toward `b`, `t` from 0 to 1.0 |
+| `colour.contrast(a, b)` | how well two colours stand apart, 1.0 to 21.0 |
+
+Every colour is `0xRRGGBB`, as `setpal` takes. Tone is the measure to
+build shades with: two colours read apart by the gap between their tones,
+whatever their hues, so shades a few tones apart look evenly spaced in
+any colour. Here three shades of the album's background make the sky and
+the hills, three of its text colour the ground, and the vivid colour the
+sun; when the track changes, so does the scene:
+
+```js
+var c = new Int32Array(3);
+var far = [], near = [], hx = [];
+
+// The album's colours made into a palette: three shades of its
+// background, three of its text, and its vivid colour
+function shades() {
+    playback.colours(c);
+    var paper = c[0], ink = c[1], t = colour.tone(paper), k = colour.tone(ink);
+    var away = t < k ? 8 : -8;            // toward the text, so shades show
+    for (var i = 0; i < 3; i++) {
+        setpal(16 + i, colour.toned(paper, t + away * i));
+        setpal(19 + i, colour.toned(ink, k - away * i));
+    }
+    setpal(22, c[2]);
+}
+
+function init() {
+    shades();
+    for (var x = 0; x <= 160; x += 8) {
+        hx.push(x);
+        far.push(70 - flr(14 * sin(x / 90.0)));
+        near.push(88 - flr(9 * sin(x / 55.0 + 0.3)));
+    }
+    hx.push(160, 0);
+    far.push(119, 119);
+    near.push(119, 119);
+}
+
+function update() {
+    if (playback.changed()) shades();
+}
+
+function draw() {
+    cls(16);
+    polyfill(hx, far, hx.length, 17);
+    polyfill(hx, near, hx.length, 18);
+    rectfill(0, 100, 159, 119, 21);
+    line(0, 100, 159, 100, 19);
+    for (var i = 0; i < 5; i++) rect(20 + 26 * i, 84, 38 + 26 * i, 89, 20);
+    circfill(130, 26, 8, 22);
+    print(playback.title(), 4, 4, 19);
+}
+```
+
+![A navy sky over two hills in lighter navy, pale ground, and a green sun](img/c-shades.png)
+
+- The colours change with the album, so ask again on
+  `playback.changed()`; the palette change sends the whole screen that
+  frame, and nothing else costs anything afterwards.
+- With **Dynamic Colours** off, or no music, they are the theme's
+  background and text, and the vivid colour is the text's.
+- `colour.toned` costs about 950 units and `colour.turn` about 1,450,
+  so build the palette when it changes, not every frame: the example's
+  six shades are some 5,700 units, once a track. The other calls cost
+  next to nothing.
+- A colour whose hue cannot be shown at the tone asked loses some of its
+  strength rather than its hue; a grey has no hue to turn.
+- `colour.contrast` says whether text will read: 4.5 or more against its
+  background. Where it is short, `colour.toned` the text further from the
+  background's tone.
+- In the IDE and `pbgvm`, each made-up album has colours of its own while
+  its music plays. An exported web page gets black and white.
 
 ---
 

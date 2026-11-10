@@ -256,3 +256,11 @@ IMPL(store_read)
 IMPL(store_write)
 IMPL(store_remove)
 IMPL(store_list)
+
+/* core_colour.c */
+IMPL(playback_colours)
+IMPL(colour_mix)
+IMPL(colour_tone)
+IMPL(colour_toned)
+IMPL(colour_turn)
+IMPL(colour_contrast)

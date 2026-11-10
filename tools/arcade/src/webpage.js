@@ -21,7 +21,9 @@ export const SOURCE = 'https://github.com/anthonyfletcher/podbox#credits-and-lic
 export const WHEELS = ['touch', 'always', 'never'];
 export const SCALES = ['fit', 'whole', '1', '2', '3', '4'];
 
+/* playback.colours() is not one: a page gets the theme's */
 const MUSIC = /^(playback|beat|tracks)\./;
+const NOT_MUSIC = new Set(['playback.colours']);
 
 export function musicCalls(cart, isa, api) {
     const prog = load(cart);
@@ -31,7 +33,7 @@ export function musicCalls(cart, isa, api) {
             const d = decode(isa, f.code, pc);
             if (d.op.name === 'NCALL') {
                 const n = api.bySlot[d.args[0]];
-                if (n && MUSIC.test(n.label || '')) found.add(n.label + '()');
+                if (n && MUSIC.test(n.label || '') && !NOT_MUSIC.has(n.label)) found.add(n.label + '()');
             }
             pc = d.next;
         }

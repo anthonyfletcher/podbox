@@ -178,6 +178,10 @@ struct arcade_tracks
     /* the tracks the last count(), pick() or near() looked at, which
      * the call is charged for */
     int32_t (*walked)(void *ctx);
+    /* playback.colours(): the background, text and most vivid colours
+     * the player shows, 0xRRGGBB, into out; 1 when they are the playing
+     * album's (dynamic colours), 0 the theme's. NULL for none */
+    int (*colours)(void *ctx, uint32_t out[3]);
 };
 
 /* tracks.field()'s fields: TRACK.* in arcade_api.def */

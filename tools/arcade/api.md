@@ -73,6 +73,21 @@ Palette entry `i` as `0xRRGGBB`.
 ### loadpal(PAL.name)
 Loads one of the cart's palettes whole.
 
+### colour.mix(a, b, t)
+Colour `a` (0xRRGGBB, as `setpal` takes) moved toward `b`, from 0 to 1.0.
+
+### colour.tone(c)
+How light colour `c` reads, from 0 for black to 100 for white. Two colours read apart by the gap between their tones, whatever their hues.
+
+### colour.toned(c, tone)
+Colour `c` at that tone, its hue kept: shades of one colour for a palette.
+
+### colour.turn(c, t)
+Colour `c` with its hue turned by `t` turns, its tone kept: 0.5 is the opposite hue.
+
+### colour.contrast(a, b)
+How well colours `a` and `b` stand apart, from 1.0 to 21.0. Text wants 4.5 against its background.
+
 ### camera([x, y], [turn], [px], [py])
 Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out: shapes turn whole, pictures and text stay upright at their turned places, and map, tline and the 3D systems are not turned. `camera()` resets it.
 
@@ -608,6 +623,9 @@ Whether the track asked for can be heard yet: a round's timer starts on this.
 
 ### playback.sound(out)
 The playing track's Sound Index (`SOUND.*`) into `out`. Returns 0 when it has none.
+
+### playback.colours(out)
+The colours the player is showing, each 0xRRGGBB, into `out`, an Int32Array of 3: the background, the text and the most vivid. Returns 1 when they are the playing album's (dynamic colours), 0 when they are the theme's.
 
 ### tracks.count([filter])
 How many of the owner's tracks match `filter`: `{ minlen, maxlen, genre, decade, music }`, any field left out.

@@ -18,7 +18,7 @@
  *   - the playing track, seeking and ducking
  *   - owning the music
  *   - the library: count, pick, field, near, sound
- *   - the queue
+ *   - the queue, and the album's colours
  *   - a cart starting, ticking and ending
  ****************************************************************************/
 #include <stdbool.h>
@@ -37,6 +37,8 @@
 #include "database/path_key.h"
 #include "database/sound_index.h"
 #include "metadata/book_resume.h"
+#include "settings/settings.h"         /* global_settings */
+#include "skin/skin_albumart_color.h"
 #include "games/arcade/shell_tracks.h"
 
 /* ---- tracks and their ids ------------------------------------------------ */
@@ -450,11 +452,36 @@ static int music_enqueue(void *ctx, int32_t id, int next)
                                  false, true) >= 0;
 }
 
+/* What dynamic colours makes of the playing album, as Spike takes it: the
+ * theme's background and text through the resolver, and the vivid colour,
+ * which without an album palette is the text's */
+static uint32_t rgb_of(unsigned c)
+{
+    return (uint32_t)RGB_UNPACK_RED(c) << 16 |
+           (uint32_t)RGB_UNPACK_GREEN(c) << 8 | (uint32_t)RGB_UNPACK_BLUE(c);
+}
+
+static int music_colours(void *ctx, uint32_t out[3])
+{
+    (void)ctx;
+    unsigned dominant, vivid, ink;
+    dynamic_colors_check_extraction(-1);
+    ink = dynamic_colors_resolve(global_settings.fg_color);
+    out[0] = rgb_of(dynamic_colors_resolve(global_settings.bg_color));
+    out[1] = rgb_of(ink);
+    if (!dynamic_colors_roles(&dominant, &vivid)) {
+        out[2] = out[1];
+        return 0;
+    }
+    out[2] = rgb_of(vivid);
+    return 1;
+}
+
 const struct arcade_tracks shell_tracks = {
     music_current, music_position, music_text, music_seek, music_duck,
     music_play, music_stop, music_started, music_count, music_pick,
     music_field, music_near, music_sound, music_queued, music_queue_at,
-    music_enqueue, music_walked
+    music_enqueue, music_walked, music_colours
 };
 
 /* ---- a cart starting, ticking and ending --------------------------------- */

@@ -13,7 +13,7 @@
  * hat between.
  *
  * Parts: the library; the queue and its clock; the beat; playback and
- * tracks for the engine. */
+ * tracks for the engine, with each album's colours. */
 
 
 #include <string.h>
@@ -533,9 +533,35 @@ static int32_t fake_walked(void *ctx)
     return LIB;
 }
 
+/* Each album's cover colours, as dynamic colours would take them: the
+ * background, the text and the most vivid; the theme's while the music is
+ * stopped */
+static const uint32_t album_colours[6][3] = {
+    { 0x14283c, 0xe8f0f8, 0x3cc8a0 },   /* Northern Lights */
+    { 0x1c2440, 0xd8c8a0, 0x4878d0 },   /* Blue Hours */
+    { 0xffa4bc, 0x301f17, 0xe0306a },   /* Paper Planes */
+    { 0x2a1a12, 0xf0c890, 0xe06020 },   /* Engine Room */
+    { 0xe8ece8, 0x203030, 0x30a0b0 },   /* Quiet Machines */
+    { 0xf4ecd8, 0x3a2e20, 0xc08030 },   /* A Short History of Lighthouses */
+};
+
+static int fake_colours(void *ctx, uint32_t out[3])
+{
+    (void)ctx;
+    int32_t id = current();
+    if (!m.playing || id < 0) {
+        out[0] = 0x000000;
+        out[1] = out[2] = 0xffffff;
+        return 0;
+    }
+    memcpy(out, album_colours[id < 16 ? id / 4 : id < 19 ? 4 : 5],
+           3 * sizeof(uint32_t));
+    return 1;
+}
+
 const struct arcade_tracks fake_tracks = {
     fake_current, fake_position, fake_text, fake_seek, fake_duck,
     fake_play, fake_stop, fake_started, fake_count, fake_pick, fake_field,
     fake_near, fake_track_sound, fake_queued, fake_queue_at, fake_enqueue,
-    fake_walked
+    fake_walked, fake_colours
 };

@@ -10,6 +10,7 @@ choose tracks from the owner's library, or take over the music entirely.
 - Owning it: [play, stop, started](#owning-it)
 - The library and the queue: [tracks.*](#the-library-and-the-queue)
 - The sound of it: [playback.bands](#playbackbandsout-n), [playback.sound and tracks.sound](#playbacksoundout)
+- Its colours: [playback.colours](reference-colour.md#the-players-colours-and-shades-of-any-colour), in Colour and palettes
 - The beat: [listening](#the-beat), [beat.listen](#beatlistenon), [beat.state](#beatstateout),
   [beat.next and beat.inbar](#beatnextfrom-n), [beat.downbeat](#beatdownbeat),
   [the clock](#beatclock), [beat.press](#beatpressi), [beat.jumped](#beatjumped),

@@ -219,6 +219,7 @@ games/arcade/loader.c
 games/arcade/verify.c
 games/arcade/natives.c
 games/arcade/core_math.c
+games/arcade/core_colour.c
 games/arcade/core_draw.c
 games/arcade/core_input.c
 games/arcade/present.c
