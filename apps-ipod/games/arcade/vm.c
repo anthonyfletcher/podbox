@@ -598,23 +598,34 @@ static int get_index(struct vm *vm, struct value c, struct value i,
 }
 
 /* c[i] inline, for the common case: an integer index in range of an
- * array or a typed array. 0 leaves it to get_index(). */
-static inline int index_fast(struct vm *vm, struct value c, struct value i,
-                             struct value *out)
+ * array or a typed array. 0 leaves it to get_index(). The values are
+ * read where they lie, and out may be c itself: whole values copied
+ * into locals cost the interpreter a trip through its stack frame. */
+static inline int index_fast(struct vm *vm, const struct value *c,
+                             const struct value *i, struct value *out)
 {
-    if (i.tag != T_INT)
+    if (i->tag != T_INT)
         return 0;
-    uint32_t k = (uint32_t)i.v;
-    if (c.tag == T_I32 && k < I32(vm, c)->len) {
-        *out = mk(T_INT, I32(vm, c)->d[k]);
+    uint32_t k = (uint32_t)i->v, t = c->tag;
+    void *o = MEM(vm, (uint32_t)c->v);
+    if (t == T_ARR && k < ((struct arr *)o)->len) {
+        const struct value *e = &BUF(vm, ((struct arr *)o)->buf)->v[k];
+        uint32_t et = e->tag;
+        int32_t ev = e->v;
+        out->tag = et;
+        out->v = ev;
         return 1;
     }
-    if (c.tag == T_ARR && k < ARR(vm, c)->len) {
-        *out = BUF(vm, ARR(vm, c)->buf)->v[k];
+    if (t == T_I32 && k < ((struct i32 *)o)->len) {
+        int32_t ev = ((struct i32 *)o)->d[k];
+        out->tag = T_INT;
+        out->v = ev;
         return 1;
     }
-    if (c.tag == T_U8 && k < U8A(vm, c)->len) {
-        *out = mk(T_INT, U8A(vm, c)->d[k]);
+    if (t == T_U8 && k < ((struct u8a *)o)->len) {
+        int32_t ev = ((struct u8a *)o)->d[k];
+        out->tag = T_INT;
+        out->v = ev;
         return 1;
     }
     return 0;
@@ -622,21 +633,50 @@ static inline int index_fast(struct vm *vm, struct value c, struct value i,
 
 /* c[i] = v inline for an integer index in range of an array, or of an
  * Int32Array given an integer. 0 leaves it to set_index(). */
-static inline int store_fast(struct vm *vm, struct value c, struct value i,
-                             struct value v)
+static inline int store_fast(struct vm *vm, const struct value *c,
+                             const struct value *i, const struct value *v)
 {
-    if (i.tag != T_INT)
+    if (i->tag != T_INT)
         return 0;
-    uint32_t k = (uint32_t)i.v;
-    if (c.tag == T_I32 && v.tag == T_INT && k < I32(vm, c)->len) {
-        I32(vm, c)->d[k] = v.v;
+    uint32_t k = (uint32_t)i->v, t = c->tag;
+    void *o = MEM(vm, (uint32_t)c->v);
+    if (t == T_I32 && v->tag == T_INT && k < ((struct i32 *)o)->len) {
+        ((struct i32 *)o)->d[k] = v->v;
         return 1;
     }
-    if (c.tag == T_ARR && k < ARR(vm, c)->len) {
-        BUF(vm, ARR(vm, c)->buf)->v[k] = v;
+    if (t == T_ARR && k < ((struct arr *)o)->len) {
+        struct value *e = &BUF(vm, ((struct arr *)o)->buf)->v[k];
+        e->tag = v->tag;
+        e->v = v->v;
         return 1;
     }
     return 0;
+}
+
+/* a < b and the rest for anything but two integers, kept out of the
+ * interpreter's loop so its fast path takes no copies: 1 or 0, or -1
+ * with the error set */
+static int compare_slow(struct vm *vm, const struct value *pa,
+                        const struct value *pb, int op)
+{
+    struct value a = *pa, b = *pb;
+    int c;
+    if (is_num(a) && is_num(b)) {
+        int64_t x = scaled(a), y = scaled(b);
+        c = x < y ? -1 : x > y;
+    } else if (a.tag == T_STR && b.tag == T_STR)
+        c = str_cmp(vm, a, b);
+    else {
+        vm_fail(vm, "a comparison needs two numbers or two strings, not a ",
+                vm_typename(is_num(a) || a.tag == T_STR ? b.tag : a.tag), "");
+        return -1;
+    }
+    switch (op) {
+    case 0: return c < 0;
+    case 1: return c <= 0;
+    case 2: return c > 0;
+    default: return c >= 0;
+    }
 }
 
 /* c, i and v stay on the stack, so growth may allocate. */
@@ -1618,7 +1658,7 @@ COMPARE(GT, >, ">")
 COMPARE(GE, >=, ">=")
 
 /* Compare and jump: integers inline, then fractions, then strings. */
-#define JCOMPARE(name, op) \
+#define JCOMPARE(name, op, k) \
 op_##name: { \
     int32_t off = S16(); \
     sp -= 2; \
@@ -1627,25 +1667,19 @@ op_##name: { \
             pc += off; \
         NEXT(); \
     } \
-    a = sp[0]; b = sp[1]; \
-    int hold; \
-    if (is_num(a) && is_num(b)) \
-        hold = scaled(a) op scaled(b); \
-    else if (a.tag == T_STR && b.tag == T_STR) { \
-        SYNC(); \
-        hold = str_cmp(vm, a, b) op 0; \
-        RELOAD(); \
-    } else \
-        FAIL("a comparison needs two numbers or two strings, not a ", \
-             vm_typename(is_num(a) || a.tag == T_STR ? b.tag : a.tag)); \
+    SYNC(); \
+    int hold = compare_slow(vm, &sp[0], &sp[1], k); \
+    RELOAD(); \
+    if (hold < 0) \
+        goto fail; \
     if (hold) \
         pc += off; \
     NEXT(); \
 }
-JCOMPARE(JLT, <)
-JCOMPARE(JLE, <=)
-JCOMPARE(JGT, >)
-JCOMPARE(JGE, >=)
+JCOMPARE(JLT, <, 0)
+JCOMPARE(JLE, <=, 1)
+JCOMPARE(JGT, >, 2)
+JCOMPARE(JGE, >=, 3)
 
 /* A local against a small integer, and jump: LDL, PUSHI8 and a JCOMPARE */
 #define JCOMPARE_LI(name, op) \
@@ -1829,7 +1863,7 @@ op_NEWOBJ: {
 }
 op_GETIDX: {
     struct value got;
-    if (!index_fast(vm, sp[-2], sp[-1], &got)) {
+    if (!index_fast(vm, &sp[-2], &sp[-1], &got)) {
         SYNC();
         if (!get_index(vm, sp[-2], sp[-1], &got))
             goto fail;
@@ -1840,7 +1874,7 @@ op_GETIDX: {
 }
 op_GETGL: {
     struct value got, *c = &vm->globals[U16()], i = lp[U8()];
-    if (!index_fast(vm, *c, i, &got)) {
+    if (!index_fast(vm, c, &i, &got)) {
         SYNC();
         if (!get_index(vm, *c, i, &got))
             goto fail;
@@ -1849,7 +1883,7 @@ op_GETGL: {
     NEXT();
 }
 op_SETIDX:
-    if (!store_fast(vm, sp[-3], sp[-2], sp[-1])) {
+    if (!store_fast(vm, &sp[-3], &sp[-2], &sp[-1])) {
         SYNC();
         if (!set_index(vm, sp[-3], sp[-2], sp[-1]))
             goto fail;
