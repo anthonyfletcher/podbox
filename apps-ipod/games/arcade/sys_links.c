@@ -417,6 +417,7 @@ static uint64_t root64(uint64_t v)
 
 #define MAX_SEGS  4096
 #define SEG_CELLS 16384             /* the grid's cells, at most */
+#define SEG_LONG  2048              /* a line too long to size the grid */
 
 /* units: each free point looked at, each line it is tested against, and
  * each point that touches one -- its push, a root and a divide among it */
@@ -514,12 +515,19 @@ static void seg_cells(const struct segs *s, int32_t ax, int32_t ay,
         int64_t t = x0; x0 = x1; x1 = t;
         t = y0; y0 = y1; y1 = t;
     }
-    int32_t r0 = (int32_t)((y0 - s->gy) / s->cell);
-    int32_t r1 = (int32_t)((y1 - s->gy) / s->cell);
-    for (int32_t r = r0; r <= r1; r++) {
-        /* the line's x where it enters and leaves this row of cells */
-        int64_t ya = (int64_t)s->gy + (int64_t)r * s->cell;
-        int64_t yb = ya + s->cell;
+    /* a line beyond the grid filed in the cells along its edge, where a
+     * point beyond it looks */
+    int64_t r0 = (y0 - s->gy) / s->cell, r1 = (y1 - s->gy) / s->cell;
+    if (r0 < 0) r0 = 0;
+    if (r1 < 0) r1 = 0;
+    if (r0 > s->gh - 1) r0 = s->gh - 1;
+    if (r1 > s->gh - 1) r1 = s->gh - 1;
+    for (int32_t r = (int32_t)r0; r <= r1; r++) {
+        /* the line's x where it enters and leaves this row of cells, the
+         * edge rows reaching as far as the line does */
+        int64_t ya = r == 0 ? y0 : (int64_t)s->gy + (int64_t)r * s->cell;
+        int64_t yb = r == s->gh - 1 ? y1
+                     : (int64_t)s->gy + (int64_t)(r + 1) * s->cell;
         if (ya < y0) ya = y0;
         if (yb > y1) yb = y1;
         int64_t xa = x0, xb = x1;
@@ -528,9 +536,12 @@ static void seg_cells(const struct segs *s, int32_t ax, int32_t ay,
             xb = x0 + (x1 - x0) * (yb - y0) / (y1 - y0);
         }
         if (xa > xb) { int64_t t = xa; xa = xb; xb = t; }
-        int32_t c0 = (int32_t)((xa - s->gx) / s->cell);
-        int32_t c1 = (int32_t)((xb - s->gx) / s->cell);
-        for (int32_t c = c0; c <= c1; c++) {
+        int64_t c0 = (xa - s->gx) / s->cell, c1 = (xb - s->gx) / s->cell;
+        if (c0 < 0) c0 = 0;
+        if (c1 < 0) c1 = 0;
+        if (c0 > s->gw - 1) c0 = s->gw - 1;
+        if (c1 > s->gw - 1) c1 = s->gw - 1;
+        for (int32_t c = (int32_t)c0; c <= c1; c++) {
             int32_t i = r * s->gw + c;
             if (count)
                 count[i]++;
@@ -595,21 +606,31 @@ NATIVE(segs_make)
         }
         s0 = e;
     }
-    /* the grid over them all: cells of 16 pixels, larger to keep it small */
+    /* The grid over the lines a level is made of: cells of 16 pixels,
+     * larger to keep it small. A line longer than SEG_LONG -- a wall
+     * reaching far beyond the level, as segs.trace's outside makes -- is
+     * left out of its size, so it cannot spread the cells thin, and is
+     * filed in the grid's edge cells; all of them when every line is. */
     int32_t lx = 0, ly = 0, hx = 0, hy = 0;
-    for (uint32_t k = 0; k < count; k++) {
-        int32_t ax = X0[k] >> 16, ay = Y0[k] >> 16, bx = X1[k] >> 16;
-        int32_t by = Y1[k] >> 16;
-        if (!k) { lx = hx = ax; ly = hy = ay; }
-        if (ax < lx) lx = ax;
-        if (bx < lx) lx = bx;
-        if (ax > hx) hx = ax;
-        if (bx > hx) hx = bx;
-        if (ay < ly) ly = ay;
-        if (by < ly) ly = by;
-        if (ay > hy) hy = ay;
-        if (by > hy) hy = by;
-    }
+    int any = 0;
+    for (int pass = 0; pass < 2 && !any; pass++)
+        for (uint32_t k = 0; k < count; k++) {
+            int32_t ax = X0[k] >> 16, ay = Y0[k] >> 16, bx = X1[k] >> 16;
+            int32_t by = Y1[k] >> 16;
+            int64_t span = (int64_t)(bx > ax ? bx - ax : ax - bx) +
+                           (by > ay ? by - ay : ay - by);
+            if (!pass && span > SEG_LONG)
+                continue;
+            if (!any) { lx = hx = ax; ly = hy = ay; any = 1; }
+            if (ax < lx) lx = ax;
+            if (bx < lx) lx = bx;
+            if (ax > hx) hx = ax;
+            if (bx > hx) hx = bx;
+            if (ay < ly) ly = ay;
+            if (by < ly) ly = by;
+            if (ay > hy) hy = ay;
+            if (by > hy) hy = by;
+        }
     struct segs s;
     s.cell = 16;
     for (;;) {
