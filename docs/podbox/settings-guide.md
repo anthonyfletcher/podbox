@@ -194,7 +194,7 @@ Settings
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Default Browser | Which browser the root and the now-playing screen return to: Music, Files or Playlists. | Music |  |
-| Select Action | What a press of Select does on the now-playing screen: go back to the previous screen as Menu Action does, or to the browser last used, to Music, Album Covers or Files, open the lyrics, the queue or Theme Options, or one of the now-playing menu's other actions. Theme Options says Unavailable when the theme has none. Holding Select always opens the now-playing menu. | Previous Browser | **Adv** |
+| Select Action | What a press of Select does on the now-playing screen: go back to the previous screen as Menu Action does, or to the browser last used, to Music, Album Covers or Files, open the lyrics, the queue or Theme Options, or one of the now-playing menu's other actions. Go to Album opens the playing track's album inside Music, on that track, so Menu climbs back to the main menu; a podcast or book kept apart opens in its own menu. Theme Options says Unavailable when the theme has none. Holding Select always opens the now-playing menu. | Previous Browser | **Adv** |
 | Select + Play Action | What pressing Select and Play together does on the now-playing screen: any of the actions Select offers, or the whole now-playing menu, or nothing. | Lyrics |  |
 | Menu Action | Where Menu goes from the now-playing screen. Previous Screen goes back to the list the music was started from, in the same place -- a Music list, Files, Playlists, Podcasts, the queue, Album Covers or Artist Portraits -- and Menu from there reaches the main menu. Music started anywhere else goes back to the main menu. Main Menu goes straight there. | Previous Screen |  |
 
