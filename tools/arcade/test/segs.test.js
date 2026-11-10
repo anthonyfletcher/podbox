@@ -185,6 +185,22 @@ test('segs.trace: each smoothing pass doubles the points, the sharp ones kept', 
     assert.equal(one.out[0].split(' ')[0], '16');
 });
 
+test('segs.trace of a small area needs little memory, however full the heap', () => {
+    /* 360 KB of the 512 KB held: a working block sized for the most points
+     * any trace can make would not fit beside it */
+    const r = run(`var big;
+function init() {
+    fset(1, 1);
+    mset(1, 1, 1);
+    big = new Int32Array(90000);
+    var o = segs.trace(1, 0, 2, 0, 0, 3, 3);
+    printh("n " + o.n);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], 'n 32');
+});
+
 test('a frictionless curve of lines keeps a sliding point\'s height, and a pressed bag never gains', () => {
     /* a round bowl of 48 lines; tops of each swing, after the first landing */
     const r = run(`var one, bag, ground, gx = [], gy = [], N = 20, top = 999.0, btop = 999.0, side = 0, bside = 0;

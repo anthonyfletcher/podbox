@@ -803,21 +803,46 @@ NATIVE(segs_trace)
     /* every edge between a solid cell and one not, solid on its right as
      * it runs: out of each corner of the grid, at most two */
     uint32_t vw = (uint32_t)w + 1, verts = vw * ((uint32_t)h + 1);
+    /* The points it can make, for the memory: a corner at most each side
+     * between a solid cell and another, two for each cut corner, and twice
+     * as many each pass. Sized to that rather than to TRACE_POINTS, as a
+     * block of that size each call soon finds no room between what the
+     * cart keeps. */
+    uint32_t sides = 0, cap;
+    {
+        const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
+        for (int32_t r = 0; r < h; r++)
+            for (int32_t c = 0; c < w; c++) {
+                const uint8_t *m = map + (r0 + r) * vm->map_w + c0 + c;
+                if (!(flags[*m] & mask))
+                    continue;
+                sides += (c == 0 || !(flags[m[-1]] & mask)) +
+                         (c == w - 1 || !(flags[m[1]] & mask)) +
+                         (r == 0 || !(flags[m[-vm->map_w]] & mask)) +
+                         (r == h - 1 || !(flags[m[vm->map_w]] & mask));
+            }
+    }
+    cap = sides > TRACE_POINTS ? TRACE_POINTS
+                               : (uint32_t)(sides * 2) << passes;
+    if (cap > TRACE_POINTS)
+        cap = TRACE_POINTS;
+    if (cap < 1)
+        cap = 1;
     /* the working memory, held through the allocations at the end: per
      * point x, y, a second x and y for cutting, the ends, and sharp twice;
      * then per corner of the grid the ways out (low bits) and walked */
     struct value work;
-    uint32_t at_v = TRACE_POINTS * 22, gw = (uint32_t)w + 2;
+    uint32_t at_v = cap * 22, gw = (uint32_t)w + 2;
     uint32_t at_g = at_v + verts;
     if (!new_ints(vm, at_g + gw * ((uint32_t)h + 2), 1, &work) ||
         !vm_root(vm, work))
         return 0;
     uint8_t *mem = U8A(vm, work)->d;
-    int32_t *px = (int32_t *)(void *)mem, *py = px + TRACE_POINTS;
-    int32_t *tx = py + TRACE_POINTS, *ty = tx + TRACE_POINTS;
-    int32_t *ends = ty + TRACE_POINTS;
-    uint8_t *ps = (uint8_t *)(ends + TRACE_POINTS);
-    uint8_t *tsh = ps + TRACE_POINTS;
+    int32_t *px = (int32_t *)(void *)mem, *py = px + cap;
+    int32_t *tx = py + cap, *ty = tx + cap;
+    int32_t *ends = ty + cap;
+    uint8_t *ps = (uint8_t *)(ends + cap);
+    uint8_t *tsh = ps + cap;
     uint8_t *outs = mem + at_v;          /* bits 0-3 out, 4-7 walked */
     /* each cell read once: 1 solid, 2 sharp too, with a border of none
      * round the area so its edges close the outlines */
@@ -861,7 +886,7 @@ NATIVE(segs_trace)
                 edges++;
                 if (d != last) {
                     /* a corner: a point */
-                    if (n >= TRACE_POINTS)
+                    if (n >= cap)
                         return trace_fail(vm, "segs.trace() finds more than "
                                        "4096 corners; trace part of the "
                                        "map at a time", "", "");
@@ -905,7 +930,7 @@ NATIVE(segs_trace)
                     tx[k] = px[b]; ty[k] = py[b]; tsh[k++] = 1;
                     continue;
                 }
-                if (k + 2 > TRACE_POINTS)
+                if (k + 2 > cap)
                     return trace_fail(vm, "segs.trace() finds more than 4096 "
                                    "corners; trace part of the map at a "
                                    "time", "", "");
@@ -926,7 +951,7 @@ NATIVE(segs_trace)
                 ty[k] = (int32_t)(py[b] + (lc ? cy2 * cut / lc : 0));
                 tsh[k++] = 0;
             }
-            if (start + k > TRACE_POINTS)
+            if (start + k > cap)
                 return trace_fail(vm, "segs.trace() finds more than 4096 "
                                "corners; trace part of the map at a time",
                                "", "");
@@ -934,7 +959,7 @@ NATIVE(segs_trace)
             memcpy(py + start, ty, k * 4);
             memcpy(ps + start, tsh, k);
             for (int32_t p = 0; p < passes; p++) {
-                uint32_t room = TRACE_POINTS - start;
+                uint32_t room = cap - start;
                 uint32_t got = trace_cut(px + start, py + start, ps + start,
                                          k, room, tx, ty, tsh);
                 if (!got)
