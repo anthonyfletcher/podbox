@@ -360,9 +360,10 @@ second, as on the player.
 
 A cart that uses the owner's music -- `playback`, `beat` or `tracks` --
 cannot be exported: a web page has no music library to play from. The
-page links to the engine's source and licences, and carries the text
-font's licences (`fonts/LICENSE-world.txt`) in full; leave both in when
-you share it.
+page links to the engine's source and licences, and carries in full the
+licences of the text font (`fonts/LICENSE-world.txt`) and of the C
+library routines the engine links (`wasm/LICENSE-libc.txt`); leave both
+in when you share it.
 
 ## Running a cart's script
 

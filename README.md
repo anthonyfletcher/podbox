@@ -893,6 +893,13 @@ licences of all the code it takes in are kept in full in the built file.
 - [sfxr](https://www.drpetter.se/project_sfxr.html), the sound generators
   - Copyright 2007 Tomas Pettersson
   - Licensed under the MIT License
+- [wasi-libc](https://github.com/WebAssembly/wasi-libc), a few C library routines
+  in the engine the editor and exported web pages run
+  - Copyright the wasi-libc contributors, with parts from musl (Rich Felker, et al.)
+    and cloudlibc (Nuxi)
+  - Licensed under the MIT License, musl's parts under the MIT License and
+    cloudlibc's under the BSD 2-Clause License —
+    [full text](tools/arcade/wasm/LICENSE-libc.txt)
 - [esbuild](https://esbuild.github.io), which builds the editor
   - Copyright Evan Wallace
   - Licensed under the MIT License

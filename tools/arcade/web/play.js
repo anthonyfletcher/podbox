@@ -126,7 +126,10 @@ function cost(e, drawn) {
     return ms + (SCREEN * 4) / 120;
 }
 
-const host = {
+/* the engine's calls on the page, for the run gen: a run that has been
+ * replaced (Restart) is answered as if nothing were there, so a dialog it
+ * opens backs out and it keeps nothing */
+const hostFor = (gen) => ({
     print: (s) => console.log(s),
     date: () => {
         const d = new Date();
@@ -134,13 +137,16 @@ const host = {
     },
     click: (beep) => click(beep),
     glyph: (cp) => (glyph ? glyph(cp) : undefined),
-    storeRead: store.read, storeWrite: store.write, storeRemove: store.remove, storeList: store.list,
+    storeRead: store.read, storeList: store.list,
+    storeWrite: (name, b) => gen === generation && store.write(name, b),
+    storeRemove: (name) => gen === generation && store.remove(name),
     /* a dialog's frame: shown, then the next tick's input a tick later */
     frame: (open) => {
+        if (gen !== generation) return null;
         inDialog = open;
         if (!open) return null;
         dialogShown = true;
-        const e = engine, gen = generation;
+        const e = engine;
         return (async () => {
             present(e);
             await sleep(1000 / e.rate());
@@ -150,7 +156,7 @@ const host = {
             return { held: i.held, wheel: i.clicks };
         })();
     }
-};
+});
 
 async function run() {
     const gen = ++generation, live = () => generation === gen;
@@ -159,7 +165,8 @@ async function run() {
     inDialog = false;
     closePause();
     cover(null);
-    const e = engine = new Engine(wasm, host);
+    pauseDue = false;
+    const e = engine = new Engine(wasm, hostFor(gen));
     e.music({ playingFn: false, beat: false, playing: false, bpm: 0 });
     let seed = 0n;
     for (const v of crypto.getRandomValues(new Uint32Array(2))) seed = (seed << 32n) | BigInt(v);
@@ -193,6 +200,7 @@ async function run() {
             if (!live()) return;
             clock.emu += cost(e, false);
             if (after(e)) return quit();
+            pauseNow();
             clock.frame++;
             if (late >= 2 * p) clock.start = clock.emu - clock.frame * p;
         }
@@ -203,6 +211,7 @@ async function run() {
         if (dialogShown) rebase(e);
         else clock.emu += cost(e, true);
         if (after(e)) return quit();
+        pauseNow();
         if (e.rate() !== rate) {
             rate = e.rate();
             clock.start = clock.emu - clock.frame * (1000 / rate);
@@ -308,11 +317,21 @@ function cover(title, text, bad) {
     $('cover-text').hidden = !text;
     $('cover-text').classList.toggle('bad', !!bad);
     coverAction = () => {
-        if (!audio) audio = new AudioContext({ sampleRate: 44100 });
-        audio.resume();
+        wake();
         run();
     };
 }
+
+/* The sound let start: the browser allows it only from a click, a tap
+ * let go or a key -- not every browser counts a finger put down -- so it
+ * is asked again at each until it runs */
+function wake() {
+    if (!audio) audio = new AudioContext({ sampleRate: 44100 });
+    if (audio.state !== 'running') audio.resume().catch(() => {});
+}
+
+for (const type of ['click', 'pointerup', 'keydown'])
+    window.addEventListener(type, () => { if (audio && audio.state !== 'running') wake(); }, true);
 
 $('cover').addEventListener('pointerdown', (e) => { e.preventDefault(); if (coverAction) coverAction(); });
 
@@ -375,7 +394,7 @@ function mainPanel() {
         const label = e.menuItem(i);
         if (!label) continue;
         if (!items++) panel.append(document.createElement('hr'));
-        row(label, () => choose(i));
+        row(label, () => { if (!inDialog) choose(i); });
     }
     panel.append(document.createElement('hr'));
     if (data.options.length && !inDialog) row('Options', optionsPanel);
@@ -498,6 +517,15 @@ let keys = 0, wheelHeld = 0, clicksOwed = 0, wheelPos = -1;
 /* a cart that takes MENU as a button gets it as it is let go, unless it
  * was held a second, which opens the pause menu, as on the player */
 let menuSince = 0, menuUsed = false;
+/* a pause asked for while working out a tick's input, opened once the
+ * tick is over: the engine is not to be called into during one */
+let pauseDue = false;
+
+function pauseNow() {
+    if (!pauseDue) return;
+    pauseDue = false;
+    openPause();
+}
 
 function input(dialog) {
     const down = keys | wheelHeld;
@@ -506,7 +534,7 @@ function input(dialog) {
     else if (engine && engine.menuIsGame()) {
         if (down & MENU) {
             if (!menuSince) { menuSince = performance.now(); menuUsed = false; }
-            else if (!menuUsed && performance.now() - menuSince >= 1000) { menuUsed = true; openPause(); }
+            else if (!menuUsed && performance.now() - menuSince >= 1000) { menuUsed = true; pauseDue = true; }
         } else if (menuSince) {
             if (!menuUsed) held |= MENU;
             menuSince = 0;
@@ -527,12 +555,22 @@ function press(b) {
     return true;
 }
 
+/* the key held since it started the game, until it is let go */
+let starter = null;
+
 const KEYS = { ArrowLeft: PREV, ArrowRight: NEXT, Escape: MENU, ' ': PLAY, Enter: SELECT };
 
 window.addEventListener('keydown', (e) => {
-    if (coverAction && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); coverAction(); return; }
+    /* the key that started the game is not also a press in it */
+    if (e.key === starter) { e.preventDefault(); return; }
+    if (coverAction && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        starter = e.key;
+        coverAction();
+        return;
+    }
     if (paused && !choosing) {
-        if (e.key === 'Escape') { e.preventDefault(); closePause(); }
+        if (e.key === 'Escape') { e.preventDefault(); if (!e.repeat) closePause(); }
         else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             const all = [...panel.querySelectorAll('button, select, input')];
             const at = all.indexOf(document.activeElement);
@@ -553,8 +591,12 @@ window.addEventListener('keydown', (e) => {
     if (!e.repeat && !press(b)) return;
     keys |= b;
 });
-window.addEventListener('keyup', (e) => { const b = KEYS[e.key]; if (b) keys &= ~b; });
-window.addEventListener('blur', () => { keys = 0; });
+window.addEventListener('keyup', (e) => {
+    if (e.key === starter) starter = null;
+    const b = KEYS[e.key];
+    if (b) keys &= ~b;
+});
+window.addEventListener('blur', () => { keys = 0; starter = null; });
 document.addEventListener('visibilitychange', () => { if (document.hidden && running && !paused) openPause(); });
 
 /* The wheel: dragging round the ring turns it, 96 clicks a turn, and its
@@ -575,7 +617,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && run
         setTimeout(() => { if (wheelHeld === b) wheelHeld = 0; }, 120);
     };
     svg.addEventListener('pointerdown', (e) => {
-        if (!running || paused) return;
+        if (!running || (paused && !choosing)) return;
         const p = at(e);
         try { svg.setPointerCapture(e.pointerId); } catch (x) { /* a pointer already gone */ }
         e.preventDefault();

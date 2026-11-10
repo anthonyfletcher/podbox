@@ -55,8 +55,9 @@ const font = f > 0 ? '<script>window.ARCADE_FONT = "' +
     fs.readFileSync(process.argv[f + 1]).toString('base64') + '";</script>' : '';
 
 /* The licence of every package the bundle took code from, each text once
- * with the packages it covers, then sfxr's and the text font's: in the
- * page as text, since minifying drops most of their notices. */
+ * with the packages it covers, then sfxr's, the text font's and the
+ * engine's C library's: in the page as text, since minifying drops most
+ * of their notices. */
 const modules = path.join(here, '..', 'node_modules');
 const byText = new Map();
 for (const input of Object.keys(out.metafile.inputs)) {
@@ -74,7 +75,8 @@ let licences = 'The open-source code inside ArcadeIDE, and its licences.\n';
 for (const [text, names] of byText)
     licences += '\n' + rule + '\n' + [...names].sort().join(', ') + '\n' + rule + '\n\n' + text + '\n';
 for (const file of [path.join(here, '..', 'src', 'LICENSE-sfxr.txt'),
-                    path.join(here, '..', 'fonts', 'LICENSE-world.txt')])
+                    path.join(here, '..', 'fonts', 'LICENSE-world.txt'),
+                    path.join(here, '..', 'wasm', 'LICENSE-libc.txt')])
     licences += '\n' + rule + '\n\n' + fs.readFileSync(file, 'utf8').replace(/\r/g, '');
 
 const page = fs.readFileSync(path.join(here, 'index.html'), 'utf8')

@@ -4,6 +4,7 @@
  *
  *   musicCalls(cart, isa, api)  the owner's-music calls a cart makes, by
  *                               name: a cart with any is not exported
+ *   musicRefusal(name, calls)   the message saying so
  *   needsWorld(files)           whether a cart's text has characters only
  *                               font.bin draws (kana, Hangul, ideographs)
  *   webPage(o)                  the page, as text
@@ -36,6 +37,13 @@ export function musicCalls(cart, isa, api) {
         }
     }
     return [...found].sort();
+}
+
+/* why a cart with these music calls is not exported, for pbgc and the IDE */
+export function musicRefusal(name, calls) {
+    return name + ' cannot be exported as a web page: it uses the owner\'s music (' +
+        calls.slice(0, 3).join(', ') + (calls.length > 3 ? ' and ' + (calls.length - 3) + ' more' : '') +
+        '), and a web page has none';
 }
 
 /* files: { name: text or bytes }; only the text files are looked at */

@@ -18,7 +18,7 @@ import zlib from 'node:zlib';
 import { compileFiles, readFolder, readAssets, loadDefs } from './src/node.js';
 import { unpackCart } from './src/unpack.js';
 import { load, verify, disassemble } from './src/bytecode.js';
-import { webPage, musicCalls, needsWorld, WHEELS, SCALES } from './src/webpage.js';
+import { webPage, musicCalls, musicRefusal, needsWorld, WHEELS, SCALES } from './src/webpage.js';
 
 function usage() {
     console.error('usage: pbgc new <folder> <name>\n' +
@@ -132,9 +132,7 @@ async function cmdHtml(src, out, wheel, scale, fontFile) {
     verify(d.isa, d.api, load(cart));
     const music = musicCalls(cart, d.isa, d.api);
     if (music.length) {
-        console.error('pbgc: ' + src + ' cannot be exported as a web page: it uses the owner\'s music (' +
-                      music.slice(0, 3).join(', ') + (music.length > 3 ? ' and ' + (music.length - 3) + ' more' : '') +
-                      '), and a web page has none');
+        console.error('pbgc: ' + musicRefusal(src, music));
         process.exit(1);
     }
     if (!WHEELS.includes(wheel)) usage();

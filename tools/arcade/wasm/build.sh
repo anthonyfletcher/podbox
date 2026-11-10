@@ -5,7 +5,8 @@
 # ~/wasm-tools/wasi-sdk-* and ~/wasm-tools/binaryen-*).
 #
 # wasm-opt's Asyncify lets env.frame, a dialog's wait for the next tick,
-# pause the module and resume it, which a browser needs.
+# pause the module and resume it, which a browser needs. The C library's
+# debug sections are stripped: every exported page would carry them.
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 apps="$here/../../../apps-ipod"
@@ -31,7 +32,7 @@ srcs="$here/web.c $here/../host/fakemusic.c $engine/vm.c $engine/gc.c $engine/lo
     -I"$apps" -I"$here/../host" \
     -nostartfiles -Wl,--no-entry -Wl,-z,stack-size=1048576 \
     -o "$here/arcade.raw.wasm" $srcs
-"$BINARYEN/bin/wasm-opt" -O2 --asyncify \
+"$BINARYEN/bin/wasm-opt" -O2 --asyncify --strip-debug \
     --pass-arg=asyncify-imports@env.frame \
     -o "$here/arcade.wasm" "$here/arcade.raw.wasm"
 rm -f "$here/arcade.raw.wasm"

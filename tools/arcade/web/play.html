@@ -1,9 +1,10 @@
 <!doctype html>
 <!-- This game runs on the PodBox Arcade engine, free software under the GNU
      General Public License version 2. Its source and licences are at
-     https://github.com/anthonyfletcher/podbox. The engine's text font is
-     Fusion Pixel and the fonts it draws on: their notices and licences are
-     in full in the element "font-licences" below. -->
+     https://github.com/anthonyfletcher/podbox. The engine's text font
+     (Fusion Pixel and the fonts it draws on) and the C library routines
+     it links have their own notices and licences: in full in the element
+     "licences" below. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -16,6 +17,7 @@
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
        display: flex; flex-direction: column; align-items: center; justify-content: center;
+       align-items: safe center; justify-content: safe center;
        gap: 16px; padding: 16px; min-height: 100%; overflow: auto;
        -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
 #stage { position: relative; flex: none; }
@@ -74,7 +76,7 @@ body { background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -appl
 <a id="source" target="_blank" rel="noopener">Licence and source</a>
 <div id="pause" hidden><div id="panel"></div></div>
 <div id="toast"></div>
-<script id="font-licences" type="text/plain"></script>
+<script id="licences" type="text/plain"></script>
 <script id="cart-data" type="application/json"></script>
 <script>/*SCRIPT*/</script>
 </body>

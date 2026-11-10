@@ -87,7 +87,7 @@ test('pbgc html writes a page from a folder or a .pbg, and refuses a music cart'
     assert.match(page, /"scale":"whole"/);
     assert.match(page, /"wheel":"touch"/);
     assert.match(page, /DecompressionStream/);
-    assert.match(page, /<script id="font-licences" type="text\/plain">[^<]*SIL OPEN FONT LICENSE/);
+    assert.match(page, /<script id="licences" type="text\/plain">[^<]*SIL OPEN FONT LICENSE[^<]*cloudlibc/);
 
     const pbg = path.join(tmp, 'plain.pbg');
     fs.writeFileSync(pbg, cart(''));

@@ -20,7 +20,7 @@ import { findPanel } from './search.js';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture, functions, apiName, musicUsed } from './cart.js';
-import { webPage, needsWorld } from '../src/webpage.js';
+import { webPage, musicRefusal, needsWorld } from '../src/webpage.js';
 import { gzipSync } from 'fflate';
 import player from 'arcade:player';
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
@@ -1492,9 +1492,7 @@ async function exportWeb() {
     if (lastBuild.errors.length) { say('error', 'Fix the errors before exporting: the cart would not build.'); return; }
     const music = musicUsed(lastBuild.cart);
     if (music.length) {
-        say('error', cartName() + ' cannot be exported as a web page: it uses the owner\'s music (' +
-            music.slice(0, 3).join(', ') + (music.length > 3 ? ' and ' + (music.length - 3) + ' more' : '') +
-            '), and a web page has none.');
+        say('error', musicRefusal(cartName(), music) + '.');
         return;
     }
     let last = {};
