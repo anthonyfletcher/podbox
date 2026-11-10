@@ -1862,7 +1862,12 @@ op_GETPROP: {
         no_field(vm, "can't read .", sp[-1], key);
         goto fail;
     }
-    sp[-1] = obj_get(vm, sp[-1], key, site);
+    /* the cache's hit here, without the call */
+    struct obj *ob = OBJ(vm, sp[-1]);
+    if (vm->ic[site].shape == ob->shape)
+        sp[-1] = BUF(vm, ob->buf)->v[vm->ic[site].slot];
+    else
+        sp[-1] = obj_get(vm, sp[-1], key, site);
     NEXT();
 }
 op_GETGP: {
@@ -1872,7 +1877,11 @@ op_GETGP: {
         no_field(vm, "can't read .", o, key);
         goto fail;
     }
-    *sp++ = obj_get(vm, o, key, site);
+    struct obj *ob = OBJ(vm, o);
+    if (vm->ic[site].shape == ob->shape)
+        *sp++ = BUF(vm, ob->buf)->v[vm->ic[site].slot];
+    else
+        *sp++ = obj_get(vm, o, key, site);
     NEXT();
 }
 op_SETPROP: {
