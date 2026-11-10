@@ -807,14 +807,24 @@ long gui_wps_show(void)
 
         switch(button)
         {
+            /* The buttons set from one list of actions */
             case ACTION_WPS_BROWSE:
+            case ACTION_WPS_MENU:
             case ACTION_WPS_HOTKEY:
             {
                 int act = HK_CTX_GET(0, button == ACTION_WPS_BROWSE
                                         ? global_settings.wps_select_action
+                                      : button == ACTION_WPS_MENU
+                                        ? global_settings.wps_menu_action
                                         : global_settings.context_wps);
                 long go_to;
 
+                /* Menu leaves even when a config has set it to nothing */
+                if (act == HOTKEY_OFF && button == ACTION_WPS_MENU)
+                {
+                    gwps_leave_wps(true);
+                    return GO_TO_PREVIOUS;
+                }
                 if (act == HOTKEY_OFF)
                     break;
                 /* A NOSBS action's screen owns the display and turns the
@@ -987,13 +997,6 @@ long gui_wps_show(void)
                 change_album(-1);
                 break;
             /* menu key functions */
-            case ACTION_WPS_MENU:
-                gwps_leave_wps(true);
-                return global_settings.wps_menu_action == WPS_MENU_PREVIOUS
-                       ? GO_TO_PREVIOUS : GO_TO_ROOT;
-                break;
-
-
             case ACTION_WPS_QUICKSCREEN:
             {
                 gwps_leave_wps(true);

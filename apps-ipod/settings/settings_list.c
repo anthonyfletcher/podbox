@@ -570,6 +570,7 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
    of the WPS context menu. */
 static const int wps_context_menu_default = HK_CTX_SET(0, HOTKEY_LYRICS);
 static const int wps_select_default = HK_CTX_SET(0, HOTKEY_PREVIOUS_BROWSER);
+static const int wps_menu_default = HK_CTX_SET(0, HOTKEY_PREVIOUS_SCREEN);
 
 static const int tree_hotkey_default = HOTKEY_OFF;
 static const uint32_t context_hidden_default = 0;
@@ -1959,9 +1960,10 @@ const struct settings_list settings[] = {
                    &wps_select_default, "wps select action",
                    wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
                    wps_context_menu_is_changed, wps_context_menu_set_default),
-    CHOICE_SETTING(0, wps_menu_action, LANG_WPS_MENU_ACTION, WPS_MENU_PREVIOUS,
-                   "wps menu action", "previous,root", NULL, 2,
-                   ID2P(LANG_BACK_PREVIOUS_SCREEN), ID2P(LANG_MAIN_MENU)),
+    CUSTOM_SETTING(0, wps_menu_action, LANG_WPS_MENU_ACTION,
+                   &wps_menu_default, "wps menu action",
+                   wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
+                   wps_context_menu_is_changed, wps_context_menu_set_default),
 
     /* Customizable icons */
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, icon_file, "iconset", DEFAULT_ICONSET,
