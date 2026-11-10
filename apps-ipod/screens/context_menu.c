@@ -2605,6 +2605,15 @@ static int hotkey_go_to_album(void)
     return leave(GO_TO_DBBROWSER);
 }
 
+/* Now Playing stops through its own exit instead (see wps.c); this serves
+   the rest of the list's callers */
+static int hotkey_stop(void)
+{
+    book_resume_save();
+    audio_stop();
+    return leave(GO_TO_PREVIOUS);
+}
+
 static int hotkey_main_menu(void)
 {
     return leave(GO_TO_ROOT);
@@ -2743,6 +2752,12 @@ static const struct hotkey_assignment hotkey_items[] = {
     { .action = HOTKEY_GO_TO_ALBUM,
       .lang_id = LANG_GO_TO_ALBUM,
       .func = HOTKEY_FUNC(hotkey_go_to_album, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_STOP,
+      .lang_id = LANG_STOP_PLAYBACK,
+      .func = HOTKEY_FUNC(hotkey_stop, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
@@ -2947,6 +2962,15 @@ int wps_menu_do_setting(void *param)
     return hotkey_menu_do_setting(&global_settings.wps_menu_action,
                                   HOTKEY_FLAG_WPS, LANG_WPS_MENU_ACTION,
                                   false);
+}
+
+/* Not offered Off: a long press that did nothing would look like a fault */
+int wps_long_press_play_do_setting(void *param)
+{
+    (void)param;
+    return hotkey_menu_do_setting(&global_settings.wps_long_press_play_action,
+                                  HOTKEY_FLAG_WPS,
+                                  LANG_WPS_LONG_PRESS_PLAY_ACTION, false);
 }
 
 int wps_context_menu_do_setting(void *param)

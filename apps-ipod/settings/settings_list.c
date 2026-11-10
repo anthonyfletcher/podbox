@@ -571,6 +571,7 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
 static const int wps_context_menu_default = HK_CTX_SET(0, HOTKEY_LYRICS);
 static const int wps_select_default = HK_CTX_SET(0, HOTKEY_PREVIOUS_BROWSER);
 static const int wps_menu_default = HK_CTX_SET(0, HOTKEY_PREVIOUS_SCREEN);
+static const int wps_long_press_play_default = HK_CTX_SET(0, HOTKEY_ALBUM_COVERS);
 
 static const int tree_hotkey_default = HOTKEY_OFF;
 static const uint32_t context_hidden_default = 0;
@@ -1962,6 +1963,11 @@ const struct settings_list settings[] = {
                    wps_context_menu_is_changed, wps_context_menu_set_default),
     CUSTOM_SETTING(0, wps_menu_action, LANG_WPS_MENU_ACTION,
                    &wps_menu_default, "wps menu action",
+                   wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
+                   wps_context_menu_is_changed, wps_context_menu_set_default),
+    CUSTOM_SETTING(0, wps_long_press_play_action,
+                   LANG_WPS_LONG_PRESS_PLAY_ACTION,
+                   &wps_long_press_play_default, "wps long press play action",
                    wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
                    wps_context_menu_is_changed, wps_context_menu_set_default),
 

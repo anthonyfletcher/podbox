@@ -27999,6 +27999,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_WPS_LONG_PRESS_PLAY_ACTION
+  desc: in settings_menu: what a long press of PLAY does on the now-playing screen
+  user: core
+  <source>
+    *: "Long Press Play Action"
+  </source>
+  <dest>
+    *: "Long Press Play Action"
+  </dest>
+  <voice>
+    *: "Long Press Play Action"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_PREVIOUS_BROWSER
   desc: a now-playing button's action: back to the browser last used
   user: core
