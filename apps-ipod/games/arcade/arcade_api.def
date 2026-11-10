@@ -228,7 +228,7 @@ API_NS(segs)
 API(segs_make,     208, 3, 5, VAL,  0, CELLS,  LISTEN, 1)
 API(segs_move,     209, 3, 3, VOID, 0, CELLS,  LISTEN, 1)
 API(segs_draw,     210, 2, 2, VOID, 0, PIXELS, LISTEN, 1)
-API(segs_trace,    212, 1, 7, VAL,  0, CELLS,  LISTEN, 1)
+API(segs_trace,    212, 1, 9, VAL,  0, CELLS,  LISTEN, 1)
 
 /* Systems: a voxel landscape, from the plane's camera */
 API_NS(land)

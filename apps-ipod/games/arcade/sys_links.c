@@ -719,16 +719,89 @@ NATIVE(segs_draw)
 
 /* ---- tracing the map ------------------------------------------------------ *
  * segs.trace: the edges of the map's solid cells joined into closed
- * outlines -- one round each solid region, and one round each hole in it
- * -- each corner then cut by half a cell, as marching squares would, but
- * where a cell is sharp, and rounded by passes that cut every corner
- * again. The outlines come back as polyfill and segs.make take them. */
+ * outlines -- one round each solid region, and one round each hole in it.
+ * A cell is a full square, or by a table of shapes a slope: half of it cut
+ * corner to corner, or a shallow slope rising half a cell across it. Each
+ * shape is an outline on a lattice of half cells; where two cells' sides
+ * meet, a half cell at a time, they cancel, and what is left is walked.
+ * A corner between two square sides is cut by half a cell, as marching
+ * squares would, but where a cell is sharp; a slope's line is kept whole;
+ * then passes round every corner again. */
 
 #define TRACE_POINTS 4096           /* the most points it gives */
+#define TRACE_SHAPES 14             /* the shapes, 0 for none */
+#define TRACE_FAR    4096           /* the far outline beyond the area */
 
 enum { T_XS, T_YS, T_ENDS, T_N, T_FIELDS };
 static const char *const trace_keys[T_FIELDS] = { "x", "y", "ends", "n" };
 
+/* Each shape's corners in half cells, solid on the right as they run --
+ * clockwise on the screen: the count, then x, y pairs */
+static const int8_t trace_shape[TRACE_SHAPES][9] = {
+    { 0 },
+    { 4, 0, 0, 2, 0, 2, 2, 0, 2 },  /* 1 full */
+    { 3, 0, 2, 2, 0, 2, 2 },        /* 2 floor rising right */
+    { 3, 0, 0, 2, 2, 0, 2 },        /* 3 floor rising left */
+    { 3, 0, 0, 2, 0, 2, 2 },        /* 4 ceiling falling right */
+    { 3, 0, 0, 2, 0, 0, 2 },        /* 5 ceiling falling left */
+    { 3, 0, 2, 2, 1, 2, 2 },        /* 6 shallow floor right, low half */
+    { 4, 0, 1, 2, 0, 2, 2, 0, 2 },  /* 7 shallow floor right, high half */
+    { 4, 0, 0, 2, 1, 2, 2, 0, 2 },  /* 8 shallow floor left, high half */
+    { 3, 0, 1, 2, 2, 0, 2 },        /* 9 shallow floor left, low half */
+    { 3, 0, 0, 2, 0, 2, 1 },        /* 10-13: 6-9 upside down */
+    { 4, 0, 0, 2, 0, 2, 2, 0, 1 },
+    { 4, 0, 0, 2, 0, 2, 1, 0, 2 },
+    { 3, 0, 0, 2, 0, 0, 1 },
+};
+
+/* The ways an edge runs, in half cells, clockwise on the screen from
+ * right; the opposite way is six on. A square side runs a half cell at a
+ * time, a slope's line whole. */
+#define TRACE_WAYS 12
+static const int8_t way_x[TRACE_WAYS] = { 1, 2, 2, 0, -2, -2,
+                                          -1, -2, -2, 0, 2, 2 };
+static const int8_t way_y[TRACE_WAYS] = { 0, 1, 2, 1, 2, 1,
+                                          0, -1, -2, -1, -2, -1 };
+static const int16_t way_deg[TRACE_WAYS] = { 0, 27, 45, 90, 135, 153,
+                                             180, 207, 225, 270, 315, 333 };
+#define WAY_SQUARE(d) ((d) % 3 == 0)
+
+static int trace_way(int dx, int dy)
+{
+    for (int d = 0; d < TRACE_WAYS; d++)
+        if (way_x[d] == dx && way_y[d] == dy)
+            return d;
+    return -1;
+}
+
+/* An edge of len steps the way d from v laid on the lattice, cancelling
+ * the edge beside it that runs the other way: the edges left, counted */
+static void trace_lay(uint16_t *outs, uint32_t v, int d, int len,
+                      uint32_t lw, uint32_t *edges)
+{
+    int32_t step = way_y[d] * (int32_t)lw + way_x[d];
+    int back = d < TRACE_WAYS / 2 ? d + TRACE_WAYS / 2 : d - TRACE_WAYS / 2;
+    for (int k = 0; k < len; k++) {
+        uint32_t to = (uint32_t)((int32_t)v + step);
+        if (outs[to] & (1u << back)) {
+            outs[to] &= (uint16_t)~(1u << back);
+            (*edges)--;
+        } else {
+            outs[v] |= (uint16_t)(1u << d);
+            (*edges)++;
+        }
+        v = to;
+    }
+}
+
+/* The first point of the lattice from v with a way out, or verts: kept
+ * apart from the walk, so its loop has registers to itself */
+static uint32_t trace_next(const uint16_t *outs, uint32_t v, uint32_t verts)
+{
+    while (v < verts && !outs[v])
+        v++;
+    return v;
+}
 
 /* Chaikin's cut of one outline in place, n points to 2n, a point marked
  * sharp kept where it is: returns the new count, or 0 when it would not
@@ -766,19 +839,22 @@ static uint32_t trace_cut(int32_t *x, int32_t *y, uint8_t *sharp, uint32_t n,
 }
 
 /* the working memory let go, and the cart stopped with why */
-static int trace_fail(struct vm *vm, const char *why, const char *a,
-                      const char *b)
+static int trace_fail(struct vm *vm, int held, const char *why)
 {
-    vm_unroot(vm);
-    return vm_fail(vm, why, a, b);
+    while (held-- > 0)
+        vm_unroot(vm);
+    return vm_fail(vm, why, "", "");
 }
 
-/* segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch]): the outlines of
- * the map cells whose flags share a bit with solid, in world pixels; a
- * corner of a cell whose flags share a bit with sharp is kept square, the
- * rest cut by half a cell; smooth (0 to 3) passes round them. Within the
- * cells cx, cy, cw by ch, the whole map when left out. Returns a record:
- * x, y and ends, as polyfill and segs.make take them, and n, the points. */
+/* segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch], [shapes],
+ * [outside]): the outlines of the map cells whose flags share a bit with
+ * solid, in world pixels; a corner of a cell whose flags share a bit with
+ * sharp is kept square; smooth (0 to 3) passes round them. Within the
+ * cells cx, cy, cw by ch, the whole map when left out. shapes, by sprite,
+ * gives a cell's shape (0 or missing, full). With outside true, every
+ * cell beyond the area is solid, and the first outline is a rectangle
+ * far beyond it. Returns a record: x, y and ends, as polyfill and
+ * segs.make take them, and n, the points. */
 NATIVE(segs_trace)
 {
     int32_t mask = whole(a[0], 0);
@@ -787,12 +863,19 @@ NATIVE(segs_trace)
     if (passes < 0) passes = 0;
     if (passes > 3) passes = 3;
     int32_t c0 = 0, r0 = 0, w = vm->map_w, h = vm->map_h;
-    if (argc > 3) {
+    if (argc > 3 && a[3].tag != T_NULL) {
         c0 = whole(a[3], 0);
         r0 = argc > 4 ? whole(a[4], 0) : 0;
         w = argc > 5 ? whole(a[5], w) : w;
         h = argc > 6 ? whole(a[6], h) : h;
     }
+    struct column shapes;
+    shapes.tag = T_NULL;
+    if (argc > 7 && a[7].tag != T_NULL &&
+        (!column_of(vm, a[7], &shapes) || shapes.tag == T_INT))
+        return vm_fail(vm, "segs.trace()'s shapes is an array, a shape for "
+                       "each sprite", "", "");
+    int outside = argc > 8 && vm_truthy(vm, a[8]);
     /* within the map */
     if (c0 < 0) { w += c0; c0 = 0; }
     if (r0 < 0) { h += r0; r0 = 0; }
@@ -800,116 +883,157 @@ NATIVE(segs_trace)
     if (r0 + h > vm->map_h) h = vm->map_h - r0;
     if (w < 0) w = 0;
     if (h < 0) h = 0;
-    /* every edge between a solid cell and one not, solid on its right as
-     * it runs: out of each corner of the grid, at most two */
-    uint32_t vw = (uint32_t)w + 1, verts = vw * ((uint32_t)h + 1);
-    /* The points it can make, for the memory: a corner at most each side
-     * between a solid cell and another, two for each cut corner, and twice
-     * as many each pass. Sized to that rather than to TRACE_POINTS, as a
-     * block of that size each call soon finds no room between what the
-     * cart keeps. */
-    uint32_t sides = 0, cap;
+    /* the cells traced: the area, and with outside a ring of solid cells
+     * round it, kept square; and round those a border of none */
+    int32_t ring = outside ? 1 : 0;
+    uint32_t cw = (uint32_t)(w + 2 * ring), ch = (uint32_t)(h + 2 * ring);
+    uint32_t gw = cw + 2, lw = 2 * cw + 1, lh = 2 * ch + 1;
+    uint32_t verts = lw * lh;
+    /* first the cells -- each its shape, and 16 when sharp -- and per
+     * point of the lattice the ways out of it */
+    struct value grid_v;
+    if (!new_ints(vm, gw * (ch + 2) + 1 + verts * 2, 1, &grid_v) ||
+        !vm_root(vm, grid_v))
+        return 0;
+    uint8_t *grid = U8A(vm, grid_v)->d;
+    uint16_t *outs = (uint16_t *)(void *)(grid + ((gw * (ch + 2) + 1) & ~1u));
     {
         const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
-        for (int32_t r = 0; r < h; r++)
-            for (int32_t c = 0; c < w; c++) {
-                const uint8_t *m = map + (r0 + r) * vm->map_w + c0 + c;
-                if (!(flags[*m] & mask))
-                    continue;
-                sides += (c == 0 || !(flags[m[-1]] & mask)) +
-                         (c == w - 1 || !(flags[m[1]] & mask)) +
-                         (r == 0 || !(flags[m[-vm->map_w]] & mask)) +
-                         (r == h - 1 || !(flags[m[vm->map_w]] & mask));
+        for (uint32_t r = 0; r < ch; r++)
+            for (uint32_t c = 0; c < cw; c++) {
+                uint8_t g;
+                if (ring && (r == 0 || c == 0 || r == ch - 1 || c == cw - 1))
+                    g = 1 | 16;
+                else {
+                    uint8_t sp = map[(uint32_t)(r0 + (int32_t)r - ring) *
+                                     (uint32_t)vm->map_w +
+                                     (uint32_t)(c0 + (int32_t)c - ring)];
+                    uint8_t f = flags[sp];
+                    g = 0;
+                    if (f & mask) {
+                        int32_t s = shapes.tag == T_NULL ? 1
+                                    : sp < shapes.len
+                                    ? column_at(&shapes, sp, 1) : 1;
+                        g = (uint8_t)(s >= 1 && s < TRACE_SHAPES ? s : 1);
+                        if (f & sharpm)
+                            g |= 16;
+                    }
+                }
+                grid[(r + 1) * gw + c + 1] = g;
             }
     }
-    cap = sides > TRACE_POINTS ? TRACE_POINTS
-                               : (uint32_t)(sides * 2) << passes;
+    /* each cell's outline laid on the lattice, a side cancelling the side
+     * of the cell beside it that runs the other way; a full cell's side
+     * against another full cell is left out, as the two would cancel */
+    uint32_t edges = 0;
+    for (uint32_t r = 0; r < ch; r++)
+        for (uint32_t c = 0; c < cw; c++) {
+            const uint8_t *gc = grid + (r + 1) * gw + c + 1;
+            int shape = *gc & 15;
+            uint32_t v = 2 * r * lw + 2 * c;
+            if (!shape)
+                continue;
+            if (shape == 1) {
+                if ((gc[-(int32_t)gw] & 15) != 1)
+                    trace_lay(outs, v, 0, 2, lw, &edges);
+                if ((gc[1] & 15) != 1)
+                    trace_lay(outs, v + 2, 3, 2, lw, &edges);
+                if ((gc[gw] & 15) != 1)
+                    trace_lay(outs, v + 2 * lw + 2, 6, 2, lw, &edges);
+                if ((gc[-1] & 15) != 1)
+                    trace_lay(outs, v + 2 * lw, 9, 2, lw, &edges);
+                continue;
+            }
+            const int8_t *sh = trace_shape[shape];
+            for (int i = 0; i < sh[0]; i++) {
+                int j = i + 1 < sh[0] ? i + 1 : 0;
+                int x = sh[1 + 2 * i], y = sh[2 + 2 * i];
+                int dx = sh[1 + 2 * j] - x, dy = sh[2 + 2 * j] - y;
+                int len = 1, d;
+                if (dx == 0 || dy == 0) {
+                    len = dx + dy < 0 ? -(dx + dy) : dx + dy;
+                    d = trace_way(dx / len, dy / len);
+                } else
+                    d = trace_way(dx, dy);
+                trace_lay(outs, v + (uint32_t)y * lw + (uint32_t)x, d, len, lw,
+                          &edges);
+            }
+        }
+    /* The points: a corner at most each edge, two for each cut corner,
+     * and twice as many each pass. The memory is sized to that, as one
+     * sized for TRACE_POINTS each call soon finds no room between what
+     * the cart keeps. Per point x, y, a second x and y for cutting, the
+     * ends, sharp twice and the way out. */
+    uint32_t cap = edges > TRACE_POINTS ? TRACE_POINTS
+                                        : (edges * 2) << passes;
     if (cap > TRACE_POINTS)
         cap = TRACE_POINTS;
-    if (cap < 1)
-        cap = 1;
-    /* the working memory, held through the allocations at the end: per
-     * point x, y, a second x and y for cutting, the ends, and sharp twice;
-     * then per corner of the grid the ways out (low bits) and walked */
+    if (cap < 4)
+        cap = 4;
     struct value work;
-    uint32_t at_v = cap * 22, gw = (uint32_t)w + 2;
-    uint32_t at_g = at_v + verts;
-    if (!new_ints(vm, at_g + gw * ((uint32_t)h + 2), 1, &work) ||
-        !vm_root(vm, work))
+    if (!new_ints(vm, cap * 23, 1, &work) || !vm_root(vm, work)) {
+        vm_unroot(vm);
         return 0;
+    }
+    grid = U8A(vm, grid_v)->d;
+    outs = (uint16_t *)(void *)(grid + ((gw * (ch + 2) + 1) & ~1u));
     uint8_t *mem = U8A(vm, work)->d;
     int32_t *px = (int32_t *)(void *)mem, *py = px + cap;
     int32_t *tx = py + cap, *ty = tx + cap;
     int32_t *ends = ty + cap;
     uint8_t *ps = (uint8_t *)(ends + cap);
-    uint8_t *tsh = ps + cap;
-    uint8_t *outs = mem + at_v;          /* bits 0-3 out, 4-7 walked */
-    /* each cell read once: 1 solid, 2 sharp too, with a border of none
-     * round the area so its edges close the outlines */
-    uint8_t *grid = mem + at_g;
-    {
-        const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
-        for (int32_t r = 0; r < h; r++)
-            for (int32_t c = 0; c < w; c++) {
-                uint8_t f = flags[map[(r0 + r) * vm->map_w + c0 + c]];
-                grid[(uint32_t)(r + 1) * gw + (uint32_t)(c + 1)] =
-                    (uint8_t)((f & mask) ? 1 | ((f & sharpm) ? 2 : 0) : 0);
-            }
-    }
-    /* the ways: 1 right, 2 down, 4 left, 8 up */
-    static const int32_t step_x[4] = { 1, 0, -1, 0 };
-    static const int32_t step_y[4] = { 0, 1, 0, -1 };
-    uint32_t edges = 0;
-    for (int32_t r = 0; r <= h; r++)
-        for (int32_t c = 0; c <= w; c++) {
-            uint32_t v = (uint32_t)r * vw + (uint32_t)c;
-            /* the four cells round corner c, r */
-            const uint8_t *g = grid + (uint32_t)r * gw + (uint32_t)c;
-            int ul = g[0] & 1, ur = g[1] & 1;
-            int dl = g[gw] & 1, dr = g[gw + 1] & 1;
-            if (dr && !ur) outs[v] |= 1;     /* right, solid below */
-            if (dl && !dr) outs[v] |= 2;     /* down, solid to the left */
-            if (ul && !dl) outs[v] |= 4;     /* left, solid above */
-            if (ur && !ul) outs[v] |= 8;     /* up, solid to the right */
-        }
-    /* walked into outlines: at a corner with two ways out, the one turning
-     * right, so regions that touch at a corner stay apart */
-    uint32_t n = 0, nends = 0, cells = (uint32_t)(w * h);
-    for (uint32_t v0 = 0; v0 < verts; v0++)
-        for (int d0 = 0; d0 < 4; d0++) {
-            if (!(outs[v0] & (1 << d0)) || (outs[v0] & (16 << d0)))
+    uint8_t *tsh = ps + cap, *pd = tsh + cap;
+    /* the lattice's origin in half cells of the world, and 16.16 a half
+     * cell */
+    int32_t ox = 2 * (c0 - ring), oy = 2 * (r0 - ring);
+    const char *too_many = "segs.trace() finds more than 4096 points; "
+                           "smooth less, or trace part of the map at a time";
+    /* walked into outlines: at a point with more than one way out, the
+     * one turning furthest right, so regions that touch at a corner stay
+     * apart */
+    uint32_t n = 0, nends = 0, cells = cw * ch;
+    for (uint32_t v0 = trace_next(outs, 0, verts); v0 < verts;
+         v0 = trace_next(outs, v0 + 1, verts)) {
+        for (int d0 = 0; outs[v0] && d0 < TRACE_WAYS; d0++) {
+            if (!(outs[v0] & (1u << d0)))
                 continue;
             uint32_t start = n, v = v0;
+            int32_t lx = (int32_t)(v0 % lw), ly = (int32_t)(v0 / lw);
             int d = d0, last = -1;
             for (;;) {
-                outs[v] |= (uint8_t)(16 << d);
-                edges++;
+                outs[v] &= (uint16_t)~(1u << d);
                 if (d != last) {
-                    /* a corner: a point */
+                    /* a corner: a point, sharp when a sharp solid cell
+                     * touches it */
                     if (n >= cap)
-                        return trace_fail(vm, "segs.trace() finds more than "
-                                       "4096 corners; trace part of the "
-                                       "map at a time", "", "");
-                    int32_t c = (int32_t)(v % vw), r = (int32_t)(v / vw);
-                    px[n] = (c0 + c) << 19;
-                    py[n] = (r0 + r) << 19;
-                    /* sharp when a solid cell touching it is */
-                    ps[n] = 0;
-                    const uint8_t *g = grid + (uint32_t)r * gw + (uint32_t)c;
-                    ps[n] = (uint8_t)(((g[0] | g[1] | g[gw] | g[gw + 1]) &
-                                       2) != 0);
-                    n++;
+                        return trace_fail(vm, 2, too_many);
+                    px[n] = (ox + lx) << 18;
+                    py[n] = (oy + ly) << 18;
+                    pd[n] = (uint8_t)d;
+                    uint8_t touch = 0;
+                    int32_t cx0 = (lx + 1) >> 1, cx1 = (lx >> 1) + 1;
+                    int32_t cy0 = (ly + 1) >> 1, cy1 = (ly >> 1) + 1;
+                    for (int32_t cy = cy0; cy <= cy1; cy++)
+                        for (int32_t cx = cx0; cx <= cx1; cx++)
+                            touch |= grid[(uint32_t)cy * gw + (uint32_t)cx];
+                    ps[n++] = (touch & 16) != 0;
                     last = d;
                 }
-                v = (uint32_t)((int32_t)v + step_y[d] * (int32_t)vw +
-                               step_x[d]);
-                /* on: turning right first, then straight, then left */
-                int nd = -1;
-                static const int turn[3] = { 1, 0, 3 };
-                for (int k = 0; k < 3 && nd < 0; k++) {
-                    int t = (d + turn[k]) & 3;
-                    if ((outs[v] & (1 << t)) && !(outs[v] & (16 << t)))
+                v = (uint32_t)((int32_t)v + way_y[d] * (int32_t)lw +
+                               way_x[d]);
+                lx += way_x[d];
+                ly += way_y[d];
+                int nd = -1, best = -180;
+                for (int t = 0; outs[v] >> t; t++) {
+                    if (!(outs[v] & (1u << t)))
+                        continue;
+                    int rel = way_deg[t] - way_deg[d];
+                    if (rel >= 180) rel -= 360;
+                    if (rel < -180) rel += 360;
+                    if (rel > best) {
+                        best = rel;
                         nd = t;
+                    }
                 }
                 if (nd < 0)
                     break;
@@ -921,58 +1045,67 @@ NATIVE(segs_trace)
                 n = start;
                 continue;
             }
-            /* its corners cut by half a cell, but the sharp ones */
             uint32_t m = n - start, k = 0;
-            for (uint32_t i = 0; i < m; i++) {
-                uint32_t a = start + (i + m - 1) % m, b = start + i;
-                uint32_t c = start + (i + 1) % m;
-                if (ps[b]) {
-                    tx[k] = px[b]; ty[k] = py[b]; tsh[k++] = 1;
-                    continue;
+            if (ring && nends == 0) {
+                /* the ring's outside: a rectangle far beyond the area */
+                int32_t x0 = c0 * 8 - TRACE_FAR, x1 = (c0 + w) * 8 + TRACE_FAR;
+                int32_t y0 = r0 * 8 - TRACE_FAR, y1 = (r0 + h) * 8 + TRACE_FAR;
+                const int32_t fx[4] = { x0, x1, x1, x0 };
+                const int32_t fy[4] = { y0, y0, y1, y1 };
+                for (k = 0; k < 4; k++) {
+                    tx[k] = fx[k] << 16;
+                    ty[k] = fy[k] << 16;
+                    tsh[k] = 1;
                 }
-                if (k + 2 > cap)
-                    return trace_fail(vm, "segs.trace() finds more than 4096 "
-                                   "corners; trace part of the map at a "
-                                   "time", "", "");
-                /* half a cell, or half the side when shorter */
-                int64_t ax = (int64_t)px[a] - px[b];
-                int64_t ay = (int64_t)py[a] - py[b];
-                int64_t cx2 = (int64_t)px[c] - px[b];
-                int64_t cy2 = (int64_t)py[c] - py[b];
-                int64_t la = (ax < 0 ? -ax : ax) + (ay < 0 ? -ay : ay);
-                int64_t lc = (cx2 < 0 ? -cx2 : cx2) + (cy2 < 0 ? -cy2 : cy2);
-                int64_t cut = 4 << 16;
-                if (la / 2 < cut) cut = la / 2;
-                if (lc / 2 < cut) cut = lc / 2;
-                tx[k] = (int32_t)(px[b] + (la ? ax * cut / la : 0));
-                ty[k] = (int32_t)(py[b] + (la ? ay * cut / la : 0));
-                tsh[k++] = 0;
-                tx[k] = (int32_t)(px[b] + (lc ? cx2 * cut / lc : 0));
-                ty[k] = (int32_t)(py[b] + (lc ? cy2 * cut / lc : 0));
-                tsh[k++] = 0;
-            }
+            } else
+                /* each corner between two square sides cut by half a
+                 * cell, but the sharp ones; a slope's ends kept */
+                for (uint32_t i = 0; i < m; i++) {
+                    uint32_t a = start + (i + m - 1) % m, b = start + i;
+                    uint32_t c = start + (i + 1) % m;
+                    if (k + 2 > cap)
+                        return trace_fail(vm, 2, too_many);
+                    if (ps[b] || !WAY_SQUARE(pd[a]) || !WAY_SQUARE(pd[b])) {
+                        tx[k] = px[b]; ty[k] = py[b]; tsh[k++] = ps[b];
+                        continue;
+                    }
+                    /* half a cell, or half the side when shorter */
+                    int64_t ax = (int64_t)px[a] - px[b];
+                    int64_t ay = (int64_t)py[a] - py[b];
+                    int64_t cx2 = (int64_t)px[c] - px[b];
+                    int64_t cy2 = (int64_t)py[c] - py[b];
+                    int64_t la = (ax < 0 ? -ax : ax) + (ay < 0 ? -ay : ay);
+                    int64_t lc = (cx2 < 0 ? -cx2 : cx2) +
+                                 (cy2 < 0 ? -cy2 : cy2);
+                    int64_t cut = 4 << 16;
+                    if (la / 2 < cut) cut = la / 2;
+                    if (lc / 2 < cut) cut = lc / 2;
+                    tx[k] = (int32_t)(px[b] + (la ? ax * cut / la : 0));
+                    ty[k] = (int32_t)(py[b] + (la ? ay * cut / la : 0));
+                    tsh[k++] = 0;
+                    tx[k] = (int32_t)(px[b] + (lc ? cx2 * cut / lc : 0));
+                    ty[k] = (int32_t)(py[b] + (lc ? cy2 * cut / lc : 0));
+                    tsh[k++] = 0;
+                }
             if (start + k > cap)
-                return trace_fail(vm, "segs.trace() finds more than 4096 "
-                               "corners; trace part of the map at a time",
-                               "", "");
+                return trace_fail(vm, 2, too_many);
             memcpy(px + start, tx, k * 4);
             memcpy(py + start, ty, k * 4);
             memcpy(ps + start, tsh, k);
             for (int32_t p = 0; p < passes; p++) {
-                uint32_t room = cap - start;
                 uint32_t got = trace_cut(px + start, py + start, ps + start,
-                                         k, room, tx, ty, tsh);
+                                         k, cap - start, tx, ty, tsh);
                 if (!got)
-                    return trace_fail(vm, "segs.trace() finds more than 4096 "
-                                   "points; smooth less, or trace part of "
-                                   "the map at a time", "", "");
+                    return trace_fail(vm, 2, too_many);
                 k = got;
             }
             n = start + k;
             ends[nends++] = (int32_t)n;
         }
+    }
     /* the record: plain arrays of the points and the ends */
     if (!vm_new_record(vm, trace_keys, T_FIELDS, out) || !vm_root(vm, *out)) {
+        vm_unroot(vm);
         vm_unroot(vm);
         return 0;
     }
@@ -982,8 +1115,13 @@ NATIVE(segs_trace)
         if (!vm_new_array(vm, lens[f] ? lens[f] : 1, &arr)) {
             vm_unroot(vm);
             vm_unroot(vm);
+            vm_unroot(vm);
             return 0;
         }
+        mem = U8A(vm, work)->d;
+        px = (int32_t *)(void *)mem;
+        py = px + cap;
+        ends = py + 3 * cap;
         struct value *e = BUF(vm, ARR(vm, arr)->buf)->v;
         for (uint32_t i = 0; i < lens[f]; i++)
             e[i] = f == T_ENDS ? mk(T_INT, ends[i])
@@ -993,10 +1131,11 @@ NATIVE(segs_trace)
     }
     vm_unroot(vm);
     vm_unroot(vm);
+    vm_unroot(vm);
     BUF(vm, OBJ(vm, *out)->buf)->v[T_N] = mk(T_INT, (int32_t)n);
-    /* measured on the ARM rig (traceprobe): the grid, its corners walked,
+    /* measured on the ARM rig (traceprobe): the grid, its lattice walked,
      * the edges, and the points given */
-    vm_charge(vm, 30 + cells * 2 + verts * 4 + edges * 3 + n * 12);
+    vm_charge(vm, 30 + cells * 2 + verts * 3 / 2 + edges * 3 + n * 9);
     return 1;
 }
 

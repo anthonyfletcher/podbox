@@ -185,6 +185,38 @@ test('segs.trace: each smoothing pass doubles the points, the sharp ones kept', 
     assert.equal(one.out[0].split(' ')[0], '16');
 });
 
+test('segs.trace with shapes: a shallow slope run is one line, its ends not cut', () => {
+    /* a 6 then a 7 on two full cells: the slope from (0,8) to (16,0) whole,
+     * the two square corners below each cut into two */
+    const r = run(`function init() {
+    for (var k = 1; k < 14; k++) fset(k, 1);
+    mset(0, 0, 6); mset(1, 0, 7); mset(0, 1, 1); mset(1, 1, 1);
+    var o = segs.trace(1, 0, 0, 0, 0, 2, 2, [0, 1, 2, 3, 4, 5, 6, 7]);
+    var s = "";
+    for (var i = 0; i < o.n; i++) s += " " + o.x[i] + "," + o.y[i];
+    printh(o.n + s);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '6 16,0 16,12 12,16 4,16 0,12 0,8');
+});
+
+test('segs.trace with outside: the air\'s edges, inside a far rectangle', () => {
+    /* an empty 4 by 3 area: the far rectangle, then the air, square where
+     * it meets the solid beyond */
+    const r = run(`function init() {
+    fset(1, 1);
+    var o = segs.trace(1, 0, 2, 0, 0, 4, 3, null, true);
+    var s = "";
+    for (var i = 0; i < o.n; i++) s += " " + o.x[i] + "," + o.y[i];
+    printh(o.n + " " + o.ends.join(",") + s);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '8 4,8 -4096,-4096 4128,-4096 4128,4120 -4096,4120 ' +
+                 '0,0 0,24 32,24 32,0');
+});
+
 test('segs.trace of a small area needs little memory, however full the heap', () => {
     /* 360 KB of the 512 KB held: a working block sized for the most points
      * any trace can make would not fit beside it */

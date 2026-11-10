@@ -12,7 +12,7 @@ ropes, chains, bridges, cloth, and soft bodies that meet outlines.
   [links.point](#linkspointp-x-y-pin), [links.link](#linkslinkp-i-j-len),
   [links.step](#linksstepp-solid-out), [links.ring](#linksringp-first-n-area-stiffness),
   [segs.make](#segsmakexs-ys-n-mats-ends), [segs.move](#segsmoves-dx-dy),
-  [segs.draw](#segsdraws-colour), [segs.trace](#segstracesolid-sharp-smooth-cx-cy-cw-ch),
+  [segs.draw](#segsdraws-colour), [segs.trace](#segstracesolid-sharp-smooth-cx-cy-cw-ch-shapes-outside),
   [links.draw](#linksdrawp-colour),
   [links.cloth](#linksclothp-x-y-cols-rows-gap-pin), [links.fill](#linksfillp-ramp)
 
@@ -558,7 +558,7 @@ resting on it this tick move with it, as far as their friction holds.
 
 **Returns** nothing. Call it every tick a set moves.
 
-## segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch])
+## segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch], [shapes], [outside])
 
 A level drawn on the map, as outlines: the edges of its solid cells
 joined round each solid region and each hole in one, ready for
@@ -569,7 +569,9 @@ joined round each solid region and each hole in one, ready for
 | `solid` | the flags of solid cells: a cell whose sprite shares a bit with it is solid |
 | `sharp` | the flags of cells whose corners stay square; the rest are cut by half a cell, at 45 degrees |
 | `smooth` | 0 to 3 passes that round the outlines further, each doubling their points |
-| `cx`, `cy`, `cw`, `ch` | the cells to trace; the whole map when left out |
+| `cx`, `cy`, `cw`, `ch` | the cells to trace; the whole map when left out (`null` to leave them out and give what follows) |
+| `shapes` | an array by sprite: the shape of a solid cell drawn with it, from the table below; 0 or missing is a full cell |
+| `outside` | `true` to count every cell beyond the area as solid |
 
 **Returns** a record: `x` and `y`, arrays of the points in world
 pixels; `ends`, where each outline ends; and `n`, how many points.
@@ -590,9 +592,71 @@ function draw() {
 ![Green shapes traced from map cells: rounded blocks, a ring with its hole, two diamonds touching at a corner kept apart, a staircase, an L, and one block left square](img/sim-trace.png)
 
 - Two cells meeting only at a corner are kept as two outlines.
-- Trace once, as a level starts: a 64 by 64 map of hills is about 37,000
+- Trace once, as a level starts: a 64 by 64 map of hills is about 44,000
   units, and 66,000 rounded twice -- well inside what `init()` may use.
   A large map can be traced a part at a time.
+
+### Slopes
+
+Square cells traced and rounded still show their steps. A cell can be a
+slope instead: `shapes[sprite]` gives its shape, in an 8 by 8 cell.
+
+| Shape | |
+|---|---|
+| 1 | full |
+| 2, 3 | the lower half of the cell cut corner to corner: a floor rising to the right, and rising to the left |
+| 4, 5 | the upper half: a ceiling falling to the right, and falling to the left |
+| 6, 7 | a shallow floor rising to the right, half a cell across the cell: its low half, then its high half |
+| 8, 9 | a shallow floor falling to the right: its high half, then its low half |
+| 10 to 13 | 6 to 9 upside down, as ceilings |
+
+```js
+var SHAPE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];   // sprite k is shape k
+var LEVEL = [
+    "....................",
+    "......4######5......",
+    "........abcd........",
+    "....................",
+    "##3..............2##",
+    "###3............2###",
+    "####89........67####",
+    "######89....67######",
+    "####################",
+    "####################",
+    "####################"];
+var o, ground;
+
+function init() {
+    for (var k = 1; k < 14; k++) fset(k, 1);
+    for (var r = 0; r < LEVEL.length; r++)
+        for (var c = 0; c < 20; c++)
+            mset(c, r, "#23456789abcd".indexOf(LEVEL[r][c]) + 1);
+    o = segs.trace(1, 0, 2, 0, 0, 20, 11, SHAPE, true);  // all beyond is solid
+    ground = segs.make(o.x, o.y, o.n, null, o.ends);
+}
+
+function update() {}
+
+function draw() {
+    cls(1);
+    polyfill(o.x, o.y, o.n, 3, o.ends);
+    segs.draw(ground, 7);
+}
+```
+
+![A round green bowl of ground under a blue sky, its sides made of slope cells, with a green ledge hanging from the top](img/sim-trace-slopes.png)
+
+- A slope's line is kept straight, not cut, and joins the cells beside
+  it: a 6 then a 7 is one slope of 1 in 2. Rounding then smooths each
+  place where the slope changes, so a bowl laid in slopes comes out
+  round. A `sharp` cell keeps its corners.
+- A slope's half-height side meets a full cell beside it in one outline.
+- With `outside`, the map's edge is a wall, and the outlines are the
+  edges of the air. The first is a rectangle 4,096 pixels beyond the
+  area, so `polyfill(o.x, o.y, o.n, c, o.ends)` fills everything that is
+  not air, wherever the camera looks. `segs.make` takes it too, and
+  nothing ever reaches it.
+- The bowl above is about 3,700 units.
 
 ## segs.draw(s, colour)
 
