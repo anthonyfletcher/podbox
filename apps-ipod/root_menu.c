@@ -337,6 +337,16 @@ static int browser(void* param)
                 return GO_TO_PREVIOUS;
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
+            /* Go to Album walks in from Music's root, not the resume point */
+            if (browser_db_walk_pending())
+            {
+                tc->dirlevel = 0;
+                tc->currtable = 0;
+                tc->selected_item = 0;
+                browser_db_clear_shortcut_base();
+                push_current_activity(ACTIVITY_DATABASEBROWSER);
+                break;
+            }
             tc->dirlevel = last_db_dirlevel;
             tc->selected_item = last_db_selection;
             /* dirlevel and currtable have to agree, and this entry restores

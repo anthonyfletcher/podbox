@@ -4229,6 +4229,7 @@ static int loaded_row_for_label(struct browser_context *c, int rows,
 static long pending_album_seek = -1;
 static long pending_album_artist_seek = -1;
 static char pending_album_title[MENUENTRY_MAX_NAME];
+static bool pending_album_select_playing = false;
 
 /* Arms a direct jump straight from the root into a specific album's own
  * track list -- skipping the intermediate "Album" grouping listing (all
@@ -4250,6 +4251,7 @@ static char pending_album_title[MENUENTRY_MAX_NAME];
 void browser_db_enter_album_tracks_on_next_load(long album_seek,
                                              const char *album_title)
 {
+    pending_album_select_playing = false;
     pending_album_seek = album_seek;
     pending_album_artist_seek = -1;
     browse_picked_by_name = true;
@@ -4266,6 +4268,31 @@ void browser_db_enter_artist_album_tracks_on_next_load(long album_seek,
 {
     browser_db_enter_album_tracks_on_next_load(album_seek, album_title);
     pending_album_artist_seek = albumartist_seek;
+}
+
+void browser_db_select_playing_on_next_album_load(void)
+{
+    pending_album_select_playing = true;
+}
+
+/* Set by browser_db_walk_to_album_on_next_load(); consumed on the next fresh
+ * root load. -1 means none armed. */
+static long walk_album_seek = -1;
+static long walk_artist_seek = -1;
+static char walk_album_title[MENUENTRY_MAX_NAME];
+
+void browser_db_walk_to_album_on_next_load(long album_seek, long artist_seek,
+                                           const char *album_title)
+{
+    walk_album_seek = album_seek;
+    walk_artist_seek = artist_seek;
+    strlcpy(walk_album_title, album_title ? album_title : "",
+            sizeof(walk_album_title));
+}
+
+bool browser_db_walk_pending(void)
+{
+    return walk_album_seek != -1;
 }
 
 /* Set by browser_db_enter_artist_albums_on_next_load(); consumed on the next fresh
@@ -4692,6 +4719,60 @@ static bool enter_row_value(struct browser_context *c, int idx, long seek)
     return true;
 }
 
+/* Puts the cursor on the playing track, where the list has it */
+static void select_playing_row(struct browser_context *c, int rows)
+{
+    for (int i = 0; i < rows; i++)
+    {
+        if (browser_db_entry_is_playing(c, i))
+        {
+            c->selected_item = i;
+            return;
+        }
+    }
+}
+
+/* The row of a loaded list whose value is 'seek', or -1. The head rows are
+ * passed over: a grouping's seek is into another tag's file. */
+static int loaded_row_for_seek(struct browser_context *c, int rows, long seek)
+{
+    for (int i = MAX(c->special_entry_count, head_rows); i < rows; i++)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+
+        if (e && e->newtable == TABLE_NAVIBROWSE && e->extraseek == seek)
+            return i;
+    }
+    return -1;
+}
+
+/* Enters a row as Select does, so BACK returns to it */
+static int walk_into(struct browser_context *c, int row)
+{
+    c->selected_item = row;
+    browser_db_enter(c, true);
+    return browser_db_load(c);
+}
+
+/* Album Artist, the artist, the album, the playing track; stops at the
+ * deepest level found */
+static int walk_rows(struct browser_context *c, int root_row,
+                     long artist_seek, long album_seek)
+{
+    int rows = walk_into(c, root_row);
+    int row = loaded_row_for_seek(c, rows, artist_seek);
+
+    if (row < 0)
+        return rows;
+    rows = walk_into(c, row);
+    row = loaded_row_for_seek(c, rows, album_seek);
+    if (row < 0)
+        return rows;
+    rows = walk_into(c, row);
+    select_playing_row(c, rows);
+    return rows;
+}
+
 int browser_db_load(struct browser_context* c)
 {
     logf( "%s", __func__);
@@ -4789,6 +4870,24 @@ int browser_db_load(struct browser_context* c)
          * the root menu rather than a dead end, as the other two forms do. */
     }
 
+    if (walk_album_seek != -1 && table == TABLE_ROOT && c->dirlevel == 0)
+    {
+        long album_seek = walk_album_seek;
+        long artist_seek = walk_artist_seek;
+        int rows, row;
+
+        walk_album_seek = walk_artist_seek = -1;
+        rows = load_root(c);
+        row = loaded_row_for_tag(c, rows, tag_albumartist);
+        if (row >= 0 && artist_seek >= 0)
+            return walk_rows(c, row, artist_seek, album_seek);
+        /* No Album Artist row to walk through: the album on its own */
+        browser_db_enter_artist_album_tracks_on_next_load(album_seek,
+                                                  artist_seek, walk_album_title);
+        browser_db_select_playing_on_next_album_load();
+        return browser_db_load(c);
+    }
+
     if (pending_root_shortcut_tag != -1 && table == TABLE_ROOT && c->dirlevel == 0)
     {
         int target_tag = pending_root_shortcut_tag;
@@ -4810,9 +4909,18 @@ int browser_db_load(struct browser_context* c)
             pending_album_seek = -1;
             pending_album_artist_seek = -1;
 
+            bool select_playing = pending_album_select_playing;
+            pending_album_select_playing = false;
+
             if (enter_album_tracks_directly(c, album_seek, artist_seek,
                                             album_title))
-                return browser_db_load(c);
+            {
+                int rows = browser_db_load(c);
+
+                if (select_playing)
+                    select_playing_row(c, rows);
+                return rows;
+            }
             /* Root has no plain tag_album row to anchor on (e.g. tagnavi
              * customized away from the shipped shape) -- fall through to
              * the root menu instead of a dead end. */

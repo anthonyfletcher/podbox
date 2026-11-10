@@ -69,6 +69,7 @@ enum hotkey_action {
     HOTKEY_FILES,
     HOTKEY_THEME_OPTIONS,
     HOTKEY_PREVIOUS_SCREEN,
+    HOTKEY_GO_TO_ALBUM,
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
        time into the saved hotkey integers, so renumbering one repoints every
        hotkey the user has already configured. */

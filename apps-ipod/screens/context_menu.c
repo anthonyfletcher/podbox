@@ -1552,6 +1552,7 @@ static int go_to_album(void)
 
     browser_db_enter_artist_album_tracks_on_next_load(album.album_seek,
                                                       album.artist_seek, name);
+    browser_db_select_playing_on_next_album_load();
     context_menu_result = ONPLAY_GO_TO_LIBRARY;
     return 0;
 }
@@ -2572,6 +2573,38 @@ static int hotkey_previous_screen(void)
     return leave(GO_TO_PREVIOUS);
 }
 
+/* The playing track's album inside Music, so BACK climbs through the artist
+   and Album Artist to the main menu. A podcast or book kept apart from Music
+   opens in its own menu; a track the database does not hold goes back to the
+   browser it was started from. */
+static int hotkey_go_to_album(void)
+{
+    struct tagcache_album album;
+    char name[MAX_PATH];
+    int kind;
+
+    if (!selected_track_album(&album))
+        return leave(GO_TO_PREVIOUS_BROWSER);
+
+    kind = db_spoken_album_kind(&album);
+    if (db_spoken_kind_apart(kind))
+    {
+        context_menu_result = ONPLAY_OK;
+        if (kind == 2)
+            go_to_podcast();
+        else
+            go_to_audiobook();
+        return context_menu_result == ONPLAY_GO_TO_LIBRARY
+               ? ONPLAY_GO_TO_LIBRARY : leave(GO_TO_PREVIOUS_BROWSER);
+    }
+
+    if (!tagcache_seek_string(tag_album, album.album_seek, name, sizeof(name)))
+        name[0] = '\0';
+    browser_db_walk_to_album_on_next_load(album.album_seek, album.artist_seek,
+                                          name);
+    return leave(GO_TO_DBBROWSER);
+}
+
 static int hotkey_music(void)
 {
     return leave(GO_TO_DBBROWSER);
@@ -2699,6 +2732,12 @@ static const struct hotkey_assignment hotkey_items[] = {
     { .action = HOTKEY_PREVIOUS_BROWSER,
       .lang_id = LANG_PREVIOUS_BROWSER,
       .func = HOTKEY_FUNC(hotkey_previous_browser, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_GO_TO_ALBUM,
+      .lang_id = LANG_GO_TO_ALBUM,
+      .func = HOTKEY_FUNC(hotkey_go_to_album, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
