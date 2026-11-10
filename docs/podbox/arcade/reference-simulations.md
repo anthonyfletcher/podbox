@@ -571,7 +571,7 @@ joined round each solid region and each hole in one, ready for
 | `smooth` | 0 to 3 passes that round the outlines further, each doubling their points |
 | `cx`, `cy`, `cw`, `ch` | the cells to trace; the whole map when left out (`null` to leave them out and give what follows) |
 | `shapes` | an array by sprite: the shape of a solid cell drawn with it, from the table below; 0 or missing is a full cell |
-| `outside` | `true` to count every cell beyond the area as solid |
+| `outside` | `true` to count every cell beyond the area as solid; or the sides to make solid, added: 2 left, 4 right, 8 above, 16 below |
 
 **Returns** a record: `x` and `y`, arrays of the points in world
 pixels; `ends`, where each outline ends; and `n`, how many points.
@@ -652,10 +652,13 @@ function draw() {
   round. A `sharp` cell keeps its corners.
 - A slope's half-height side meets a full cell beside it in one outline.
 - With `outside`, the map's edge is a wall, and the outlines are the
-  edges of the air. The first is a rectangle 4,096 pixels beyond the
-  area, so `polyfill(o.x, o.y, o.n, c, o.ends)` fills everything that is
-  not air, wherever the camera looks. `segs.make` takes it too, and
-  nothing ever reaches it.
+  edges of the air. What lies beyond the area reaches 4,096 pixels out,
+  so `polyfill(o.x, o.y, o.n, c, o.ends)` fills everything that is not
+  air, wherever the camera looks. With all four sides the first outline
+  is that far rectangle; with some, the solid beyond them joins the
+  level's own -- 2 + 4 + 16 makes walls left and right and ground below,
+  with the sky open above. `segs.make` takes the whole record: the far
+  lines are out of reach.
 - The bowl above is about 3,700 units.
 
 ## segs.draw(s, colour)

@@ -215,6 +215,17 @@ function update() {}`);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out[0], '8 4,8 -4096,-4096 4128,-4096 4128,4120 -4096,4120 ' +
                  '0,0 0,24 32,24 32,0');
+    /* left, right and below only (2 + 4 + 16): one outline, open above */
+    const u = run(`function init() {
+    fset(1, 1);
+    var o = segs.trace(1, 0, 2, 0, 0, 4, 3, null, 22);
+    var s = "";
+    for (var i = 0; i < o.n; i++) s += " " + o.x[i] + "," + o.y[i];
+    printh(o.n + " " + o.ends.join(",") + s);
+}
+function update() {}`);
+    assert.equal(u.out[0], '8 8 -4096,-4096 0,-4096 0,24 32,24 32,-4096 ' +
+                 '4128,-4096 4128,4120 -4096,4120');
 });
 
 test('segs.trace of a small area needs little memory, however full the heap', () => {

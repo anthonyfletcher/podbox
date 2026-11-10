@@ -851,9 +851,9 @@ static int trace_fail(struct vm *vm, int held, const char *why)
  * solid, in world pixels; a corner of a cell whose flags share a bit with
  * sharp is kept square; smooth (0 to 3) passes round them. Within the
  * cells cx, cy, cw by ch, the whole map when left out. shapes, by sprite,
- * gives a cell's shape (0 or missing, full). With outside true, every
- * cell beyond the area is solid, and the first outline is a rectangle
- * far beyond it. Returns a record: x, y and ends, as polyfill and
+ * gives a cell's shape (0 or missing, full). outside makes the cells
+ * beyond the area solid -- true, all of them, else beyond the sides it
+ * names -- a ring of cells whose own outside is taken far out. Returns a record: x, y and ends, as polyfill and
  * segs.make take them, and n, the points. */
 NATIVE(segs_trace)
 {
@@ -875,7 +875,10 @@ NATIVE(segs_trace)
         (!column_of(vm, a[7], &shapes) || shapes.tag == T_INT))
         return vm_fail(vm, "segs.trace()'s shapes is an array, a shape for "
                        "each sprite", "", "");
-    int outside = argc > 8 && vm_truthy(vm, a[8]);
+    /* the sides beyond which all is solid: 1 (true) all four, else 2
+     * left, 4 right, 8 above and 16 below, kept as bits 0-3 */
+    int32_t outside = argc < 9 ? 0 : whole(a[8], 0);
+    outside = outside & 1 ? 15 : (outside >> 1) & 15;
     /* within the map */
     if (c0 < 0) { w += c0; c0 = 0; }
     if (r0 < 0) { h += r0; r0 = 0; }
@@ -902,8 +905,13 @@ NATIVE(segs_trace)
         for (uint32_t r = 0; r < ch; r++)
             for (uint32_t c = 0; c < cw; c++) {
                 uint8_t g;
-                if (ring && (r == 0 || c == 0 || r == ch - 1 || c == cw - 1))
-                    g = 1 | 16;
+                int beyond = ring && (r == 0 || c == 0 || r == ch - 1 ||
+                                      c == cw - 1);
+                if (beyond)
+                    g = ((c == 0 && (outside & 1)) ||
+                         (c == cw - 1 && (outside & 2)) ||
+                         (r == 0 && (outside & 4)) ||
+                         (r == ch - 1 && (outside & 8))) ? 1 | 16 : 0;
                 else {
                     uint8_t sp = map[(uint32_t)(r0 + (int32_t)r - ring) *
                                      (uint32_t)vm->map_w +
@@ -1009,6 +1017,18 @@ NATIVE(segs_trace)
                         return trace_fail(vm, 2, too_many);
                     px[n] = (ox + lx) << 18;
                     py[n] = (oy + ly) << 18;
+                    /* the ring's own outside stands for all beyond the
+                     * area: taken far out */
+                    if (ring) {
+                        if (lx == 0)
+                            px[n] = (c0 * 8 - TRACE_FAR) << 16;
+                        if (lx == (int32_t)lw - 1)
+                            px[n] = ((c0 + w) * 8 + TRACE_FAR) << 16;
+                        if (ly == 0)
+                            py[n] = (r0 * 8 - TRACE_FAR) << 16;
+                        if (ly == (int32_t)lh - 1)
+                            py[n] = ((r0 + h) * 8 + TRACE_FAR) << 16;
+                    }
                     pd[n] = (uint8_t)d;
                     uint8_t touch = 0;
                     int32_t cx0 = (lx + 1) >> 1, cx1 = (lx >> 1) + 1;
@@ -1046,47 +1066,35 @@ NATIVE(segs_trace)
                 continue;
             }
             uint32_t m = n - start, k = 0;
-            if (ring && nends == 0) {
-                /* the ring's outside: a rectangle far beyond the area */
-                int32_t x0 = c0 * 8 - TRACE_FAR, x1 = (c0 + w) * 8 + TRACE_FAR;
-                int32_t y0 = r0 * 8 - TRACE_FAR, y1 = (r0 + h) * 8 + TRACE_FAR;
-                const int32_t fx[4] = { x0, x1, x1, x0 };
-                const int32_t fy[4] = { y0, y0, y1, y1 };
-                for (k = 0; k < 4; k++) {
-                    tx[k] = fx[k] << 16;
-                    ty[k] = fy[k] << 16;
-                    tsh[k] = 1;
+            /* each corner between two square sides cut by half a
+             * cell, but the sharp ones; a slope's ends kept */
+            for (uint32_t i = 0; i < m; i++) {
+                uint32_t a = start + (i + m - 1) % m, b = start + i;
+                uint32_t c = start + (i + 1) % m;
+                if (k + 2 > cap)
+                    return trace_fail(vm, 2, too_many);
+                if (ps[b] || !WAY_SQUARE(pd[a]) || !WAY_SQUARE(pd[b])) {
+                    tx[k] = px[b]; ty[k] = py[b]; tsh[k++] = ps[b];
+                    continue;
                 }
-            } else
-                /* each corner between two square sides cut by half a
-                 * cell, but the sharp ones; a slope's ends kept */
-                for (uint32_t i = 0; i < m; i++) {
-                    uint32_t a = start + (i + m - 1) % m, b = start + i;
-                    uint32_t c = start + (i + 1) % m;
-                    if (k + 2 > cap)
-                        return trace_fail(vm, 2, too_many);
-                    if (ps[b] || !WAY_SQUARE(pd[a]) || !WAY_SQUARE(pd[b])) {
-                        tx[k] = px[b]; ty[k] = py[b]; tsh[k++] = ps[b];
-                        continue;
-                    }
-                    /* half a cell, or half the side when shorter */
-                    int64_t ax = (int64_t)px[a] - px[b];
-                    int64_t ay = (int64_t)py[a] - py[b];
-                    int64_t cx2 = (int64_t)px[c] - px[b];
-                    int64_t cy2 = (int64_t)py[c] - py[b];
-                    int64_t la = (ax < 0 ? -ax : ax) + (ay < 0 ? -ay : ay);
-                    int64_t lc = (cx2 < 0 ? -cx2 : cx2) +
-                                 (cy2 < 0 ? -cy2 : cy2);
-                    int64_t cut = 4 << 16;
-                    if (la / 2 < cut) cut = la / 2;
-                    if (lc / 2 < cut) cut = lc / 2;
-                    tx[k] = (int32_t)(px[b] + (la ? ax * cut / la : 0));
-                    ty[k] = (int32_t)(py[b] + (la ? ay * cut / la : 0));
-                    tsh[k++] = 0;
-                    tx[k] = (int32_t)(px[b] + (lc ? cx2 * cut / lc : 0));
-                    ty[k] = (int32_t)(py[b] + (lc ? cy2 * cut / lc : 0));
-                    tsh[k++] = 0;
-                }
+                /* half a cell, or half the side when shorter */
+                int64_t ax = (int64_t)px[a] - px[b];
+                int64_t ay = (int64_t)py[a] - py[b];
+                int64_t cx2 = (int64_t)px[c] - px[b];
+                int64_t cy2 = (int64_t)py[c] - py[b];
+                int64_t la = (ax < 0 ? -ax : ax) + (ay < 0 ? -ay : ay);
+                int64_t lc = (cx2 < 0 ? -cx2 : cx2) +
+                             (cy2 < 0 ? -cy2 : cy2);
+                int64_t cut = 4 << 16;
+                if (la / 2 < cut) cut = la / 2;
+                if (lc / 2 < cut) cut = lc / 2;
+                tx[k] = (int32_t)(px[b] + (la ? ax * cut / la : 0));
+                ty[k] = (int32_t)(py[b] + (la ? ay * cut / la : 0));
+                tsh[k++] = 0;
+                tx[k] = (int32_t)(px[b] + (lc ? cx2 * cut / lc : 0));
+                ty[k] = (int32_t)(py[b] + (lc ? cy2 * cut / lc : 0));
+                tsh[k++] = 0;
+            }
             if (start + k > cap)
                 return trace_fail(vm, 2, too_many);
             memcpy(px + start, tx, k * 4);
