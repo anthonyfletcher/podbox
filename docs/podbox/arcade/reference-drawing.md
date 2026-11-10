@@ -445,7 +445,7 @@ is also turned, as if the window were tilted.
 |---|---|
 | `x`, `y` | where the screen's top left is in the world; both 0 when left out |
 | `turn` | how far to turn the picture, in turns, clockwise: 0.25 is a quarter; 0 when left out |
-| `px`, `py` | the point on the screen it turns about; the middle of the screen (or of the image drawn into) when left out |
+| `px`, `py` | the point on the screen it turns about; the middle of the screen when left out -- or of the image being drawn into when `camera()` is called; a `target()` after it keeps the turning point |
 
 **Returns** nothing.
 

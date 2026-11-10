@@ -99,3 +99,31 @@ test('polyline draws what line() draws, a colour a line, closed and turned alike
     const rows = open.out.trim().split('\n');
     assert.equal(rows[10][10], '0');
 });
+
+test('a nearly level edge crosses its row where it should', () => {
+    /* from (0, 10.5 - e) to (300, 10.5 + e): it crosses row 10's middle
+     * halfway, at x 150, so pixels 0 to 149 of that row are inside */
+    const e = 100 / 65536;
+    const r = run(`polyfill([0, 300, 0], [${10.5 - e}, ${10.5 + e}, 50], 3, 7);`, '0,10,160,1');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out.trim(), '7'.repeat(150) + '0'.repeat(10));
+});
+
+test('a turned rectangle in an image taller than 256 rows fills as in a short one', () => {
+    /* the tall image takes its rows from scratch memory, the short one
+     * from the held tables: the same pixels either way */
+    const count = (h) => {
+        const r = run(`target(img(64, ${h}));
+camera(0, 0, 0.05, 32, 60);
+rectfill(10, 20, 50, 120, 7);
+camera();
+var n = 0;
+for (var y = 0; y < ${h}; y++) for (var x = 0; x < 64; x++) if (pget(x, y) == 7) n++;
+target(SCREEN);
+printh(n);`, '0,0,1,1');
+        assert.equal(r.status, 0, r.err);
+        return r.out.trim().split('\n')[0];
+    };
+    assert.equal(count(300), count(200));
+    assert.ok(Number(count(300)) > 3000);
+});

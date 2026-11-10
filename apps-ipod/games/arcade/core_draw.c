@@ -1551,6 +1551,21 @@ struct pedge
     int32_t next;
 };
 
+/* The edges built in one pass, their places in a row's order, and the
+ * first edge on each row: polyfill's, and a turned rectangle's */
+static struct pedge held_edges[POLY_HELD];
+static struct pedge *held_act[POLY_HELD];
+static int32_t held_starts[POLY_HELD_ROWS];
+
+/* scratch() memory for edges, on an 8-byte boundary: the 6G's compiler
+ * moves an edge's 64-bit fields with ldrd and strd, whose result ARMv5
+ * leaves undefined off one, and scratch() gives 4 */
+static uint8_t *edge_scratch(struct vm *vm, uint32_t bytes)
+{
+    uint8_t *mem = scratch(vm, bytes + 7);
+    return mem ? mem + ((-(uintptr_t)mem) & 7) : NULL;
+}
+
 struct poly
 {
     struct pedge *e;
@@ -1570,7 +1585,8 @@ struct poly
 static int64_t slope(int64_t n, int64_t d)
 {
     uint64_t u = n < 0 ? -(uint64_t)n : (uint64_t)n;
-    if (u >= 0x80000000u || d >= (1 << 24))
+    /* the 32-bit way only while its whole part fits in 16 bits */
+    if (u >= 0x80000000u || d >= (1 << 24) || (u >> 16) >= (uint64_t)d)
         return (n << 16) / d;
     uint32_t ud = (uint32_t)d, r = (uint32_t)u % ud;
     uint32_t q = (uint32_t)u / ud << 16;
@@ -1828,21 +1844,23 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
     struct pen p;
     begin(vm, &p, c, 1);
     uint32_t rows = (uint32_t)(p.cy1 > p.cy0 ? p.cy1 - p.cy0 : 0);
-    uint32_t at_starts = 4 * sizeof(struct pedge) + 4 * sizeof(struct pedge *);
-    uint8_t *mem = scratch(vm, at_starts + rows * 4);
-    if (!mem)
-        return 0;
-    begin(vm, &p, c, 1);
-    struct poly g = { (struct pedge *)(void *)mem,
-                      (int32_t *)(void *)(mem + at_starts),
-                      0, 4, p.cy0, p.cy1, p.cy1, p.cy0, 0, 0, 0, 0, 0 };
+    /* the four edges held; the rows' starts too, but for an image taller
+     * than those take */
+    int32_t *starts = held_starts;
+    if (rows > POLY_HELD_ROWS) {
+        starts = scratch(vm, rows * 4);
+        if (!starts)
+            return 0;
+        begin(vm, &p, c, 1);
+    } else
+        memset(held_starts, 0, rows * 4);
+    struct poly g = { held_edges, starts, 0, 4, p.cy0, p.cy1, p.cy1, p.cy0,
+                      0, 0, 0, 0, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
                   qx[(k + 1) & 3] + (p.ox << 16),
                   qy[(k + 1) & 3] + (p.oy << 16));
-    struct pedge **act = (struct pedge **)(void *)(mem +
-                                                    4 * sizeof(struct pedge));
-    p.cost += COST_RECT + 4 * POLY_EDGE + poly_rows(&p, &g, act);
+    p.cost += COST_RECT + 4 * POLY_EDGE + poly_rows(&p, &g, held_act);
     finish(vm, &p);
     return 1;
 }
@@ -1890,9 +1908,6 @@ NATIVE(polyfill)
     }
     /* Built in one pass into the held edges when they fit, which is
      * nearly always; otherwise counted, then built again into scratch */
-    static struct pedge held_edges[POLY_HELD];
-    static struct pedge *held_act[POLY_HELD];
-    static int32_t held_starts[POLY_HELD_ROWS];
     uint32_t rows = (uint32_t)(p.cy1 - p.cy0), walks = 1;
     struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
                       p.cy1, p.cy0, 0, 0, (int64_t)1 << 62,
@@ -1918,7 +1933,7 @@ NATIVE(polyfill)
             g.xmin < ((int64_t)p.cx1 << 16)) {
             uint32_t at_act = max * sizeof(struct pedge);
             uint32_t at_starts = at_act + max * sizeof(struct pedge *);
-            uint8_t *mem = scratch(vm, at_starts + rows * 4);
+            uint8_t *mem = edge_scratch(vm, at_starts + rows * 4);
             if (!mem)
                 return 0;
             /* scratch may have collected: the arrays and surface found

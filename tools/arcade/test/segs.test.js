@@ -22,14 +22,14 @@ before(() => {
 });
 
 let n = 0;
-function run(main, ticks = 1) {
+function run(main, ticks = 1, extra = []) {
     const res = compileFiles({
         'cart.json': JSON.stringify({ id: '0000000000005e65', name: 'Segs' }),
         'main.js': main + '\nfunction draw() {}\n' });
     if (res.errors.length) return { errors: res.errors };
     const file = path.join(tmp, 's' + n++ + '.pbg');
     fs.writeFileSync(file, res.cart);
-    const r = spawnSync(exe, [file, '--ticks', String(ticks)], { encoding: 'utf8' });
+    const r = spawnSync(exe, [file, '--ticks', String(ticks)].concat(extra), { encoding: 'utf8' });
     return { out: r.stdout.replace(/\r/g, '').trim().split('\n'), err: r.stderr, status: r.status };
 }
 
@@ -281,4 +281,106 @@ function update() {
     for (const y of p.slice(2)) assert.ok(Math.abs(y - p[1]) < 1.5, p.join(' '));
     /* the bag: each top no higher than the last but one, on its side */
     for (let i = 3; i < b.length; i++) assert.ok(b[i] >= b[i - 2] - 0.5, b.join(' '));
+});
+
+test('a cart cannot widen a set\'s grid past its arrays, nor trace past the map', () => {
+    /* 65536 by 65536 cells make 0 in 32 bits: refused, not read */
+    assert.match(run(FLOOR + `
+function update() {
+    s.gw = 65536; s.gh = 65536; s.cell = 1; s.start = new Int32Array(1);
+    links.step(p, 0);
+}`).err, /needs a set whose arrays are as segs.make\(\) made them/);
+    /* areas whose corner and size overflow 32 bits: clipped to the map */
+    const r = run(`function init() {
+    fset(1, 1);
+    mset(0, 0, 1);
+    printh(segs.trace(1, 0, 0, 2147483647, 0, 8, 8).n + " " +
+           segs.trace(1, 0, 0, 2100000000, 0, 130150525, 1, null, true).n + " " +
+           segs.trace(1, 0, 0, -2147483647, 0, -5, 8).n + " " +
+           segs.trace(1, 0, 0, 0, 0, 4, 4).n);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '0 4 0 8');
+});
+
+test('lines too long to size the grid still stop points beyond it', () => {
+    /* a ground 6000 px wide under two short ledges: the grid is the
+     * ledges', and a point landing far out of it still meets the ground */
+    const r = run(`var p, s;
+function init() {
+    p = links.pool(2, 0);
+    links.point(p, 50, 10);
+    links.point(p, 1000, 10);
+    p.gravity = 0.5; p.radius = 2;
+    s = segs.make([-3000, 3000, 0, 100, 0], [50, 50, 20, 20, 30], 5, null, [2, 5]);
+    p.segs = s;
+}
+function update() {
+    links.step(p, 0);
+    if (frame() == 60) printh(flr(p.y[0]) + " " + flr(p.y[1]));
+}`, 60);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '18 48');
+    /* walls traced with the sky open above (2 + 4 + 16): their lines are
+     * far longer than the floor's, and points inside and above the area
+     * moving left both stop at the left wall */
+    const w = run(`var p, s;
+function init() {
+    fset(1, 1);
+    for (var c = 0; c < 20; c++) mset(c, 10, 1);
+    var o = segs.trace(1, 0, 0, 0, 0, 20, 11, null, 22);
+    s = segs.make(o.x, o.y, o.n, null, o.ends);
+    p = links.pool(2, 0);
+    links.point(p, 20, 40); p.ox[0] = 22;
+    links.point(p, 20, -40); p.ox[1] = 22;
+    p.gravity = 0; p.radius = 2; p.segs = s;
+}
+function update() {
+    links.step(p, 0);
+    if (frame() == 30) printh(flr(p.x[0]) + " " + flr(p.x[1]));
+}`, 30);
+    assert.equal(w.status, 0, w.err);
+    assert.equal(w.out[0], '2 2');
+});
+
+test('a wide search is paid for, though it finds few lines', () => {
+    /* 300 points among 128 long diagonals: a radius that makes each point
+     * search the whole grid costs more than four times a small one */
+    const units = (radius) => {
+        const r = run(`var p, s;
+function init() {
+    var xs = [], ys = [], ends = [];
+    for (var i = 0; i < 128; i++) {
+        xs.push(i % 64); ys.push(0); xs.push(2000 - i % 64); ys.push(1990); ends.push(2 * i + 2);
+    }
+    s = segs.make(xs, ys, 256, null, ends);
+    p = links.pool(300, 0);
+    for (var i = 0; i < 300; i++) links.point(p, 1000 + i % 32, 1000 + (i >> 5));
+    p.radius = ${radius}; p.segs = s; p.gravity = 0;
+}
+function update() { links.step(p, 0); }`, 3, ['--units']);
+        assert.equal(r.status, 0, r.err);
+        return Number(/tick 3 (\d+)/.exec(r.err)[1]);
+    };
+    assert.ok(units(1900) > 4 * units(2));
+});
+
+test('links.ring pushes a crushed ring outward, however large the area asked', () => {
+    const push = (area) => {
+        const r = run(`var p;
+function init() {
+    p = links.pool(3, 0);
+    var d = 0.0078125;
+    links.point(p, 100, 100); links.point(p, 100 + d, 100); links.point(p, 100, 100 + d);
+    links.ring(p, 0, 3, ${area}, 1);
+    printh(flr((p.ox[0] - 100) * 65536));
+}
+function update() {}`);
+        assert.equal(r.status, 0, r.err);
+        return Number(r.out[0]);
+    };
+    /* point 0, the corner, moves away from the others, up and left: its
+     * speed x - ox goes negative, so ox rises */
+    for (const area of [100, 10000, 1000000, 3000000]) assert.ok(push(area) > 0, String(area));
 });

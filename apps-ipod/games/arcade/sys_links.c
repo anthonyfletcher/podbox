@@ -391,23 +391,6 @@ static int cell_solid(const struct cellworld *w, int32_t fx0, int32_t fy0,
     return m >= 0 && (w->flags[m] & CELL_SOLID);
 }
 
-/* The square root of v, rounded down */
-static uint64_t root64(uint64_t v)
-{
-    uint64_t r = 0, b = (uint64_t)1 << 62;
-    while (b > v)
-        b >>= 2;
-    while (b) {
-        if (v >= r + b) {
-            v -= r + b;
-            r = (r >> 1) + b;
-        } else
-            r >>= 1;
-        b >>= 2;
-    }
-    return r;
-}
-
 /* ---- segment sets --------------------------------------------------------- *
  * The outlines points meet, as polyfill draws them: each outline's lines,
  * each with a material, filed by the grid cells it crosses so a point
@@ -420,10 +403,13 @@ static uint64_t root64(uint64_t v)
 #define SEG_LONG  2048              /* a line too long to size the grid */
 
 /* units: each free point looked at, each line it is tested against, and
- * each point that touches one -- its push, a root and a divide among it */
+ * each point that touches one -- its push, a root and a divide among it;
+ * and the grid cells and filed lines its search passes over, a unit each
+ * SEG_SEEN, so a wide search is paid for though it finds few lines */
 #define SEG_POINT 26
 #define SEG_TEST  50
 #define SEG_TOUCH 60
+#define SEG_SEEN  4
 
 enum { S_X0, S_Y0, S_X1, S_Y1, S_MAT, S_START, S_ITEMS, S_COUNT, S_OX, S_OY,
        S_MX, S_MY, S_MOVED, S_CELL, S_GX, S_GY, S_GW, S_GH, S_FIELDS };
@@ -487,8 +473,9 @@ static int segs_of(struct vm *vm, struct value v, const char *fn,
     s->gy = whole(f[S_GY], 0);
     s->gw = whole(f[S_GW], 0);
     s->gh = whole(f[S_GH], 0);
-    /* the arrays as long as the counts say, or the set is not one made */
-    uint32_t cells = (uint32_t)s->gw * (uint32_t)s->gh;
+    /* the arrays as long as the counts say, or the set is not one made;
+     * the cells in 64 bits, since a cart can write any width and height */
+    uint64_t cells = (uint64_t)(uint32_t)s->gw * (uint32_t)s->gh;
     if (s->count > MAX_SEGS || s->cell < 1 || s->gw < 1 || s->gh < 1 ||
         cells > SEG_CELLS || I32(vm, f[S_X0])->len < s->count ||
         I32(vm, f[S_Y0])->len < s->count || I32(vm, f[S_X1])->len < s->count ||
@@ -901,13 +888,17 @@ NATIVE(segs_trace)
      * left, 4 right, 8 above and 16 below, kept as bits 0-3 */
     int32_t outside = argc < 9 ? 0 : whole(a[8], 0);
     outside = outside & 1 ? 15 : (outside >> 1) & 15;
-    /* within the map */
-    if (c0 < 0) { w += c0; c0 = 0; }
-    if (r0 < 0) { h += r0; r0 = 0; }
-    if (c0 + w > vm->map_w) w = vm->map_w - c0;
-    if (r0 + h > vm->map_h) h = vm->map_h - r0;
-    if (w < 0) w = 0;
-    if (h < 0) h = 0;
+    /* within the map, its edges worked in 64 bits: a cart may pass any
+     * 32-bit corner and size */
+    int64_t ex = (int64_t)c0 + w, ey = (int64_t)r0 + h;
+    int64_t sx = c0 < 0 ? 0 : c0 > vm->map_w ? vm->map_w : c0;
+    int64_t sy = r0 < 0 ? 0 : r0 > vm->map_h ? vm->map_h : r0;
+    if (ex > vm->map_w) ex = vm->map_w;
+    if (ey > vm->map_h) ey = vm->map_h;
+    c0 = (int32_t)sx;
+    r0 = (int32_t)sy;
+    w = ex > sx ? (int32_t)(ex - sx) : 0;
+    h = ey > sy ? (int32_t)(ey - sy) : 0;
     /* the cells traced: the area, and with outside a ring of solid cells
      * round it, kept square; and round those a border of none */
     int32_t ring = outside ? 1 : 0;
@@ -1185,30 +1176,39 @@ struct touch
 };
 
 /* The lines filed in the cells round x0..x1, y0..y1 (1/256 pixels, the
- * set's own), each once: their indices into out, how many given */
+ * set's own), each once: their indices into out, how many given; the
+ * cells and filed lines passed over added to *seen */
 static uint32_t seg_near(const struct segs *s, int64_t x0, int64_t y0,
                          int64_t x1, int64_t y1, int32_t *out, uint32_t room,
-                         uint32_t *stamp, uint32_t mark)
+                         uint32_t *stamp, uint32_t mark, uint32_t *seen)
 {
     /* in whole pixels from the grid's corner, and its cells by a 32-bit
      * divide once inside it: a 64-bit one costs a point more than all the
      * rest of its search */
     int64_t xa = (x0 >> 8) - s->gx, xb = (x1 >> 8) - s->gx;
     int64_t ya = (y0 >> 8) - s->gy, yb = (y1 >> 8) - s->gy;
-    if (xb < 0 || yb < 0)
-        return 0;
+    /* beyond the grid, its edge cells: segs.make files there the long
+     * lines that do not size it */
     uint32_t cell = (uint32_t)s->cell;
     int64_t wide = (int64_t)s->gw * cell, high = (int64_t)s->gh * cell;
-    int32_t a = xa <= 0 ? 0 : xa >= wide ? s->gw
+    int32_t a = xa <= 0 ? 0 : xa >= wide ? s->gw - 1
               : (int32_t)((uint32_t)xa / cell);
-    int32_t b = xb >= wide ? s->gw - 1 : (int32_t)((uint32_t)xb / cell);
-    int32_t c = ya <= 0 ? 0 : ya >= high ? s->gh
+    int32_t b = xb <= 0 ? 0 : xb >= wide ? s->gw - 1
+              : (int32_t)((uint32_t)xb / cell);
+    int32_t c = ya <= 0 ? 0 : ya >= high ? s->gh - 1
               : (int32_t)((uint32_t)ya / cell);
-    int32_t d = yb >= high ? s->gh - 1 : (int32_t)((uint32_t)yb / cell);
+    int32_t d = yb <= 0 ? 0 : yb >= high ? s->gh - 1
+              : (int32_t)((uint32_t)yb / cell);
     uint32_t n = 0;
+    *seen += (uint32_t)((d - c + 1) * (b - a + 1));
     for (int32_t r = c; r <= d; r++)
         for (int32_t q = a; q <= b; q++) {
             int32_t i = r * s->gw + q;
+            /* held under 2^30, far past what stops a cart, so the sum
+             * charged cannot wrap */
+            *seen += (uint32_t)(s->start[i + 1] - s->start[i]);
+            if (*seen > 1u << 30)
+                *seen = 1u << 30;
             for (int32_t t = s->start[i]; t < s->start[i + 1]; t++) {
                 int32_t k = s->items[t];
                 if ((uint32_t)k >= s->count || stamp[k] == mark)
@@ -1240,7 +1240,7 @@ static int seg_push(const struct segs *s, int32_t k, int64_t *px, int64_t *py,
         /* beside the line's middle: out along its normal, the distance by
          * the cross product -- the nearest point's rounding would point
          * the way out along the line */
-        int64_t el = (int64_t)root64((uint64_t)ee);
+        int64_t el = (int64_t)root((uint64_t)ee);
         if (el <= 0)
             return 0;
         nx = (-ey << 16) / el;
@@ -1262,7 +1262,7 @@ static int seg_push(const struct segs *s, int32_t k, int64_t *px, int64_t *py,
         int64_t dd = dx * dx + dy * dy;
         if (dd >= r * r)
             return 0;
-        int64_t d = (int64_t)root64((uint64_t)dd);
+        int64_t d = (int64_t)root((uint64_t)dd);
         if (d <= 0)
             return 0;
         nx = (dx << 16) / d;
@@ -1283,7 +1283,7 @@ static void seg_side(const struct segs *s, int32_t k, int64_t ox, int64_t oy,
     int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
     int64_t ex = ((int64_t)s->x1[k] >> 8) - ax;
     int64_t ey = ((int64_t)s->y1[k] >> 8) - ay;
-    int64_t el = (int64_t)root64((uint64_t)(ex * ex + ey * ey));
+    int64_t el = (int64_t)root((uint64_t)(ex * ex + ey * ey));
     int64_t nx = el ? (-ey << 16) / el : 0, ny = el ? (ex << 16) / el : 0;
     if ((ox - ax) * nx + (oy - ay) * ny < 0) {
         nx = -nx;
@@ -1331,6 +1331,25 @@ static int64_t seg_cross(const struct segs *s, int32_t k, int64_t ox,
 
 #define NEAR_SEGS 64                /* the lines a point looks at, at most */
 
+/* The first of the n lines in near that the path o to p crosses: its
+ * share of the path (as seg_cross gives it) and in *k the line, or -1 and
+ * -1 when it crosses none */
+static int64_t seg_first(const struct segs *s, const int32_t *near,
+                         uint32_t n, int64_t ox, int64_t oy, int64_t px,
+                         int64_t py, int32_t *k)
+{
+    int64_t first = -1;
+    *k = -1;
+    for (uint32_t i = 0; i < n; i++) {
+        int64_t c = seg_cross(s, near[i], ox, oy, px, py);
+        if (c >= 0 && (first < 0 || c < first)) {
+            first = c;
+            *k = near[i];
+        }
+    }
+    return first;
+}
+
 /* One point against the set: p and o (16.16, world) changed in place.
  * Returns the material plus one it touched, 0 none, with the way out. */
 static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
@@ -1338,7 +1357,8 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                         const int32_t *gravity,
                         const int32_t *friction, uint32_t nfriction,
                         int32_t bounce, uint32_t *stamp, uint32_t *mark,
-                        int32_t *nx, int32_t *ny, uint32_t *tests)
+                        int32_t *nx, int32_t *ny, uint32_t *tests,
+                        uint32_t *seen)
 {
     /* in the set's own place: p against where it is, o against where it
      * was before this tick's move */
@@ -1359,22 +1379,15 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
                           (py < oy ? py : oy) - 3 * r,
                           (px > ox ? px : ox) + 3 * r,
                           (py > oy ? py : oy) + 3 * r,
-                          near, NEAR_SEGS, stamp, ++*mark);
+                          near, NEAR_SEGS, stamp, ++*mark, seen);
     *tests += n;
     struct touch t = { -1, 0, 0 };
     /* the path across the first line it crosses: slid back out along
      * that line's normal to r on the side it came from, keeping all of
      * its move along the line -- stopping it at the crossing would lose
      * that, every tick, on a curve */
-    int64_t first = -1;
-    int32_t fk = -1;
-    for (uint32_t i = 0; i < n; i++) {
-        int64_t c = seg_cross(s, near[i], ox, oy, px, py);
-        if (c >= 0 && (first < 0 || c < first)) {
-            first = c;
-            fk = near[i];
-        }
-    }
+    int32_t fk;
+    seg_first(s, near, n, ox, oy, px, py, &fk);
     if (fk >= 0) {
         seg_side(s, fk, ox, oy, &t);
         int64_t ax = (int64_t)s->x0[fk] >> 8, ay = (int64_t)s->y0[fk] >> 8;
@@ -1392,15 +1405,8 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
      * other, and a point is never let through a line -- back along its
      * path to just short of the first it crosses */
     for (int again = 0; again < 3; again++) {
-        int64_t c = -1;
-        int32_t ck = -1;
-        for (uint32_t i = 0; i < n; i++) {
-            int64_t cc = seg_cross(s, near[i], ox, oy, px, py);
-            if (cc >= 0 && (c < 0 || cc < c)) {
-                c = cc;
-                ck = near[i];
-            }
-        }
+        int32_t ck;
+        int64_t c = seg_first(s, near, n, ox, oy, px, py, &ck);
         if (ck < 0)
             break;
         c = c > 4096 ? c - 4096 : 0;
@@ -1432,7 +1438,7 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
     if (qx > -(1 << 26) && qx < (1 << 26) && qy > -(1 << 26) &&
         qy < (1 << 26)) {
         int64_t qq = qx * qx + qy * qy;
-        int64_t tl = (int64_t)root64((uint64_t)(tx * tx + ty * ty));
+        int64_t tl = (int64_t)root((uint64_t)(tx * tx + ty * ty));
         if (qn * qn * 16 < qq && tl > 0) {
             int64_t dx = X1 - *OX - s->mx, dy = Y1 - *OY - s->my;
             if (dx < -(1 << 26) || dx > (1 << 26) || dy < -(1 << 26) ||
@@ -1446,7 +1452,7 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
             int64_t keep = qn * qn < qq / 32 ? qn * qn : qq / 32;
             int64_t e = qq - qn * qn + keep +
                         2 * ((int64_t)gx * dx + (int64_t)gy * dy);
-            int64_t speed = e > 0 ? (int64_t)root64((uint64_t)e) : 0;
+            int64_t speed = e > 0 ? (int64_t)root((uint64_t)e) : 0;
             if (speed > 0) {
                 tx = tx * speed / tl;
                 ty = ty * speed / tl;
@@ -1527,7 +1533,15 @@ NATIVE(links_ring)
         return 1;
     /* the share of each point's way to move, 16.16, at most half a pixel
      * a tick for each pixel of its way */
-    int64_t lambda = ((want - have) << 16) / grow;
+    /* each product held inside 64 bits, its sign kept: a ring crushed to
+     * under a pixel has a tiny grow, and a huge area or stiffness after it
+     * would otherwise wrap */
+    int64_t gap = want - have;
+    if (gap > (int64_t)1 << 46) gap = (int64_t)1 << 46;
+    if (gap < -((int64_t)1 << 46)) gap = -((int64_t)1 << 46);
+    int64_t lambda = (gap << 16) / grow;
+    if (lambda > INT32_MAX) lambda = INT32_MAX;
+    if (lambda < -INT32_MAX) lambda = -INT32_MAX;
     lambda = lambda * stiff >> 16;
     if (lambda > 32768) lambda = 32768;
     if (lambda < -32768) lambda = -32768;
@@ -1842,7 +1856,7 @@ NATIVE(links_step)
             z[i] = mk(T_FIX, P[i * 3 + 2]);
         }
     /* out of the segment set's lines, and what each point touched */
-    uint32_t tests = 0, touched = 0, segpts = 0;
+    uint32_t tests = 0, touched = 0, segpts = 0, seen = 0;
     if (l.f[L_SEGS].tag == T_OBJ) {
         struct segs sg;
         if (!segs_of(vm, l.f[L_SEGS], "links.step", &sg))
@@ -1876,7 +1890,8 @@ NATIVE(links_step)
                 int32_t X = fx(x[i]), Y = fx(y[i]), OX = fx(ox[i]);
                 int32_t OY = fx(oy[i]);
                 m = seg_meet(&sg, &X, &Y, &OX, &OY, radius, grav, fr, nfr,
-                             bounce, stamp, &mark, &NX, &NY, &tests);
+                             bounce, stamp, &mark, &NX, &NY, &tests,
+                             &seen);
                 if (m) {
                     x[i] = mk(T_FIX, X);
                     y[i] = mk(T_FIX, Y);
@@ -1932,7 +1947,8 @@ NATIVE(links_step)
      * exact way, its root and divide */
     vm_charge(vm, 10 + np * 18 + nl * 3 + nl * (uint32_t)passes * 13 / 4 +
                   exact * 15 + (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
-                  segpts * SEG_POINT + tests * SEG_TEST + touched * SEG_TOUCH);
+                  segpts * SEG_POINT + tests * SEG_TEST + touched * SEG_TOUCH +
+                  seen / SEG_SEEN);
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }
