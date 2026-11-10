@@ -653,6 +653,30 @@ static inline int store_fast(struct vm *vm, const struct value *c,
     return 0;
 }
 
+/* a + b, a - b or a * b in place of a, for two numbers not both
+ * integers, as vm_fix_op() works them but without the call; 0 for any
+ * other op or value, left to it */
+static inline int fix_fast(struct value *a, const struct value *b, int op)
+{
+    uint32_t ta = a->tag, tb = b->tag;
+    if ((ta != T_FIX && ta != T_INT) || (tb != T_FIX && tb != T_INT))
+        return 0;
+    int32_t x = a->v, y = b->v;
+    if (op == OP_MUL) {
+        if (ta == T_INT || tb == T_INT)
+            a->v = (int32_t)((uint32_t)x * (uint32_t)y);
+        else
+            a->v = (int32_t)(((int64_t)x * y) >> 16);
+    } else if (op == OP_ADD || op == OP_SUB) {
+        uint32_t ux = ta == T_FIX ? (uint32_t)x : (uint32_t)x << 16;
+        uint32_t uy = tb == T_FIX ? (uint32_t)y : (uint32_t)y << 16;
+        a->v = (int32_t)(op == OP_ADD ? ux + uy : ux - uy);
+    } else
+        return 0;
+    a->tag = T_FIX;
+    return 1;
+}
+
 /* a < b and the rest for anything but two integers, kept out of the
  * interpreter's loop so its fast path takes no copies: 1 or 0, or -1
  * with the error set */
@@ -1534,6 +1558,10 @@ op_ADD:
         sp--;
         NEXT();
     }
+    if (fix_fast(&sp[-2], &sp[-1], OP_ADD)) {
+        sp--;
+        NEXT();
+    }
     a = sp[-2]; b = sp[-1];
     if (is_num(a) && is_num(b)) {
         vm_fix_op(vm, OP_ADD, a, b, &sp[-2]);
@@ -1557,6 +1585,10 @@ op_##name: \
     if (sp[-2].tag == T_INT && sp[-1].tag == T_INT) { \
         const int32_t av = sp[-2].v, bv = sp[-1].v; \
         expr; \
+        sp--; \
+        NEXT(); \
+    } \
+    if (fix_fast(&sp[-2], &sp[-1], OP_##name)) { \
         sp--; \
         NEXT(); \
     } \
@@ -1862,24 +1894,26 @@ op_NEWOBJ: {
     NEXT();
 }
 op_GETIDX: {
-    struct value got;
-    if (!index_fast(vm, &sp[-2], &sp[-1], &got)) {
+    if (!index_fast(vm, &sp[-2], &sp[-1], &sp[-2])) {
+        struct value got;
         SYNC();
         if (!get_index(vm, sp[-2], sp[-1], &got))
             goto fail;
+        sp[-2] = got;
     }
-    sp[-2] = got;
     sp--;
     NEXT();
 }
 op_GETGL: {
-    struct value got, *c = &vm->globals[U16()], i = lp[U8()];
-    if (!index_fast(vm, c, &i, &got)) {
+    const struct value *c = &vm->globals[U16()], *i = &lp[U8()];
+    if (!index_fast(vm, c, i, sp)) {
+        struct value got;
         SYNC();
-        if (!get_index(vm, *c, i, &got))
+        if (!get_index(vm, *c, *i, &got))
             goto fail;
+        *sp = got;
     }
-    *sp++ = got;
+    sp++;
     NEXT();
 }
 op_SETIDX:
@@ -1923,6 +1957,15 @@ op_SETPROP: {
     if (sp[-2].tag != T_OBJ) {
         no_field(vm, "can't set .", sp[-2], key);
         goto fail;
+    }
+    /* the cache's hit here, without the call */
+    struct obj *ob = OBJ(vm, sp[-2]);
+    if (vm->ic[site].shape == ob->shape) {
+        struct value *e = &BUF(vm, ob->buf)->v[vm->ic[site].slot];
+        e->tag = sp[-1].tag;
+        e->v = sp[-1].v;
+        sp -= 2;
+        NEXT();
     }
     SYNC();
     if (!obj_set(vm, sp[-2], key, site, sp[-1]))
