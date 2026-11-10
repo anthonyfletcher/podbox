@@ -497,6 +497,15 @@ static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
     int64_t ox = ((int64_t)d->cam_x << 16) + d->cam_px;
     int64_t oy = ((int64_t)d->cam_y << 16) + d->cam_py;
     int64_t sx = *x - ox, sy = *y - oy;
+    if (sx == (int32_t)sx && sy == (int32_t)sy) {
+        /* the same products as below, from 32-bit multiplies */
+        int32_t x32 = (int32_t)sx, y32 = (int32_t)sy;
+        *x = ox + (((int64_t)x32 * d->cam_cos - (int64_t)y32 * d->cam_sin)
+                   >> 16);
+        *y = oy + (((int64_t)x32 * d->cam_sin + (int64_t)y32 * d->cam_cos)
+                   >> 16);
+        return;
+    }
     /* far beyond any target, kept where the multiply cannot overflow */
     const int64_t far = (int64_t)1 << 44;
     if (sx > far) sx = far;
@@ -1517,19 +1526,20 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 
 #define POLY_POINTS 8192    /* the most points one call takes */
 #define POLY_PIECES 16      /* the most lines a curve is cut into */
+#define POLY_HELD   512     /* edges built in one pass, in held_edges */
+#define POLY_HELD_ROWS 256  /* and the rows that takes */
 
 /* units, measured on the ARM rig (polyprobe): the call's set-up beyond
- * any call's, each point, each edge (a 64-bit division), each row the
- * edges cover, each edge a row crosses, each step of putting a row's
- * crossings in order, and each curve -- besides the spans filled */
-#define POLY_CALL  70
-#define POLY_POINT 6
-#define POLY_EDGE  12
-#define POLY_ROW   1
-#define POLY_CROSS 4
-#define POLY_SHIFT 2
-#define POLY_CURVE 30
-#define POLY_TURN  2    /* each point, when the camera turns */
+ * any call's, each point each time the outlines are walked, each edge
+ * kept (a division), each edge a row crosses, each step of putting a
+ * row's crossings in order, and each curve -- besides the spans filled */
+#define POLY_CALL  30
+#define POLY_POINT 8
+#define POLY_EDGE  8
+#define POLY_CROSS 3
+#define POLY_SHIFT 1
+#define POLY_CURVE 29
+#define POLY_TURN  7    /* each point walked, when the camera turns */
 
 /* An edge: where it crosses the middle of its next row, and its step a
  * row, both 16.16; the row after its last; and the next edge to start on
@@ -1551,21 +1561,30 @@ struct poly
     int counting;               /* only count the edges, for the memory */
     uint32_t curves;
     int64_t xmin, xmax;         /* how far the edges reach, 16.16 */
+    int full;                   /* more edges than max */
 };
+
+/* (n << 16) / d, d above 0, toward 0: the 64-bit divide, but a byte at a
+ * time in 32-bit ones while n and d allow -- on the player a 64-bit divide
+ * costs several of those */
+static int64_t slope(int64_t n, int64_t d)
+{
+    uint64_t u = n < 0 ? -(uint64_t)n : (uint64_t)n;
+    if (u >= 0x80000000u || d >= (1 << 24))
+        return (n << 16) / d;
+    uint32_t ud = (uint32_t)d, r = (uint32_t)u % ud;
+    uint32_t q = (uint32_t)u / ud << 16;
+    q |= (r << 8) / ud << 8;
+    r = (r << 8) % ud;
+    q |= (r << 8) / ud;
+    return n < 0 ? -(int64_t)q : (int64_t)q;
+}
 
 /* The line a to b, 16.16 on the surface, as an edge over the rows whose
  * middles it spans; 0 when there are more edges than counted */
 static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
                      int64_t by)
 {
-    if (g->counting) {
-        g->n++;
-        if (ax < g->xmin) g->xmin = ax;
-        if (ax > g->xmax) g->xmax = ax;
-        if (bx < g->xmin) g->xmin = bx;
-        if (bx > g->xmax) g->xmax = bx;
-        return 1;
-    }
     if (ay == by)
         return 1;
     if (ay > by) {
@@ -1581,10 +1600,20 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
         r1 = g->y1;
     if (r0 >= r1)
         return 1;
-    if (g->n >= g->max)
+    if (ax < g->xmin) g->xmin = ax;
+    if (ax > g->xmax) g->xmax = ax;
+    if (bx < g->xmin) g->xmin = bx;
+    if (bx > g->xmax) g->xmax = bx;
+    if (g->counting) {
+        g->n++;
+        return 1;
+    }
+    if (g->n >= g->max) {
+        g->full = 1;
         return 0;
+    }
     struct pedge *e = &g->e[g->n];
-    e->dx = ((bx - ax) << 16) / (by - ay);
+    e->dx = slope(bx - ax, by - ay);
     e->x = ax + (((r0 << 16) + 32768 - ay) * e->dx >> 16);
     e->y1 = (int32_t)r1;
     if (r0 < g->lo)
@@ -1722,7 +1751,8 @@ static int poly_outline(struct poly *g, const struct pen *p,
     return walk_to(&w, sx, sy, 0);
 }
 
-/* Each outline in turn: ends[k] is the point after outline k's last */
+/* Each outline in turn: ends[k] is the point after outline k's last.
+ * 0 with the error set for ends out of order; stops at g full. */
 static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
                       const struct column *xs, const struct column *ys,
                       const struct column *ends, uint32_t nends,
@@ -1739,8 +1769,7 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
             e = (uint32_t)v;
         }
         if (!poly_outline(g, p, xs, ys, bend, s, e))
-            return vm_fail(vm, "polyfill() has more edges than it counted",
-                           "", "");
+            return 1;               /* g is full */
         s = e;
     }
     return 1;
@@ -1748,43 +1777,47 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
 
 /* The rows the edges in g cover, filled by the even-odd rule; the units
  * the walking cost, besides the spans */
-static uint32_t poly_rows(struct pen *p, struct poly *g, int32_t *act)
+static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
 {
     /* the edges crossing the row, kept in order of where they cross: a
      * row's order is nearly the last's, so putting it right is cheap */
     uint32_t nact = 0, crossings = 0, shifts = 0;
+    struct pedge *e0 = g->e;
     for (int32_t y = g->lo; y < g->hi; y++) {
+        /* the last row's edges stepped on to this one, less those ended,
+         * then those starting on it */
         uint32_t m = 0;
-        for (uint32_t k = 0; k < nact; k++)
-            if (y < g->e[act[k]].y1)
-                act[m++] = act[k];
-        for (int32_t i = g->starts[y - p->cy0]; i; i = g->e[i - 1].next)
-            act[m++] = i - 1;
+        for (uint32_t k = 0; k < nact; k++) {
+            struct pedge *e = act[k];
+            if (y < e->y1) {
+                e->x += e->dx;
+                act[m++] = e;
+            }
+        }
+        for (int32_t i = g->starts[y - p->cy0]; i; i = e0[i - 1].next)
+            act[m++] = &e0[i - 1];
         nact = m;
         for (uint32_t k = 1; k < m; k++) {
-            int32_t i = act[k];
-            int64_t x = g->e[i].x;
+            struct pedge *e = act[k];
+            int64_t x = e->x;
             uint32_t at = k;
-            while (at && g->e[act[at - 1]].x > x) {
+            while (at && act[at - 1]->x > x) {
                 act[at] = act[at - 1];
                 at--;
                 shifts++;
             }
-            act[at] = i;
+            act[at] = e;
         }
         crossings += m;
         /* the pixels whose middles lie from one crossing to the next */
         for (uint32_t k = 0; k + 1 < m; k += 2) {
-            int64_t l = (g->e[act[k]].x - 32768 + 65535) >> 16;
-            int64_t r = ((g->e[act[k + 1]].x - 32768 + 65535) >> 16) - 1;
+            int64_t l = (act[k]->x + 32767) >> 16;
+            int64_t r = ((act[k + 1]->x + 32767) >> 16) - 1;
             if (l <= r)
                 span(p, y, l, r);
         }
-        for (uint32_t k = 0; k < m; k++)
-            g->e[act[k]].x += g->e[act[k]].dx;
     }
-    return (uint32_t)(g->hi > g->lo ? g->hi - g->lo : 0) * POLY_ROW +
-           crossings * POLY_CROSS + shifts * POLY_SHIFT;
+    return crossings * POLY_CROSS + shifts * POLY_SHIFT;
 }
 
 /* A quadrilateral, its corners 16.16 before the camera's offset, filled
@@ -1795,18 +1828,20 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
     struct pen p;
     begin(vm, &p, c, 1);
     uint32_t rows = (uint32_t)(p.cy1 > p.cy0 ? p.cy1 - p.cy0 : 0);
-    uint8_t *mem = scratch(vm, 4 * sizeof(struct pedge) + 4 * 4 + rows * 4);
+    uint32_t at_starts = 4 * sizeof(struct pedge) + 4 * sizeof(struct pedge *);
+    uint8_t *mem = scratch(vm, at_starts + rows * 4);
     if (!mem)
         return 0;
     begin(vm, &p, c, 1);
     struct poly g = { (struct pedge *)(void *)mem,
-                      (int32_t *)(void *)(mem + 4 * sizeof(struct pedge) + 16),
-                      0, 4, p.cy0, p.cy1, p.cy1, p.cy0, 0, 0, 0, 0 };
+                      (int32_t *)(void *)(mem + at_starts),
+                      0, 4, p.cy0, p.cy1, p.cy1, p.cy0, 0, 0, 0, 0, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
                   qx[(k + 1) & 3] + (p.ox << 16),
                   qy[(k + 1) & 3] + (p.oy << 16));
-    int32_t *act = (int32_t *)(void *)(mem + 4 * sizeof(struct pedge));
+    struct pedge **act = (struct pedge **)(void *)(mem +
+                                                    4 * sizeof(struct pedge));
     p.cost += COST_RECT + 4 * POLY_EDGE + poly_rows(&p, &g, act);
     finish(vm, &p);
     return 1;
@@ -1849,49 +1884,76 @@ NATIVE(polyfill)
                        "point", "", "");
     struct pen p;
     begin(vm, &p, c, 1);
-    struct poly g = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0, 1, 0,
-                      (int64_t)1 << 62, -((int64_t)1 << 62) };
     if (n < 3 || p.cy0 >= p.cy1 || p.cx0 >= p.cx1) {
         finish(vm, &p);
         return 1;
     }
-    /* counted first, for the memory the edges take */
-    if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend, (uint32_t)n))
-        return 0;
-    /* wholly left or right of the clip: no row is walked */
-    if (g.xmax < ((int64_t)p.cx0 << 16) || g.xmin >= ((int64_t)p.cx1 << 16)) {
-        p.cost += POLY_CALL + (uint32_t)n * POLY_POINT;
-        if (vm->d.cam_turn)
-            p.cost += (uint32_t)n * POLY_TURN;
-        finish(vm, &p);
-        return 1;
+    /* Built in one pass into the held edges when they fit, which is
+     * nearly always; otherwise counted, then built again into scratch */
+    static struct pedge held_edges[POLY_HELD];
+    static struct pedge *held_act[POLY_HELD];
+    static int32_t held_starts[POLY_HELD_ROWS];
+    uint32_t rows = (uint32_t)(p.cy1 - p.cy0), walks = 1;
+    struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
+                      p.cy1, p.cy0, 0, 0, (int64_t)1 << 62,
+                      -((int64_t)1 << 62), 0 };
+    struct pedge **act = held_act;
+    if (rows <= POLY_HELD_ROWS) {
+        memset(held_starts, 0, rows * 4);
+        if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
+                        (uint32_t)n))
+            return 0;
     }
-    uint32_t max = g.n, rows = (uint32_t)(p.cy1 - p.cy0);
-    uint32_t at_act = max * sizeof(struct pedge);
-    uint32_t at_starts = at_act + max * 4;
-    uint8_t *mem = scratch(vm, at_starts + rows * 4);
-    if (!mem)
-        return 0;
-    /* scratch may have collected: the arrays and surface found again */
-    column_of(vm, a[0], &xs);
-    column_of(vm, a[1], &ys);
-    if (nends)
-        column_of(vm, a[4], &ends);
-    if (argc > 5 && a[5].tag != T_NULL)
-        column_of(vm, a[5], &bend);
-    begin(vm, &p, c, 1);
-    g.e = (struct pedge *)(void *)mem;
-    g.starts = (int32_t *)(void *)(mem + at_starts);
-    g.n = 0;
-    g.max = max;
-    g.counting = 0;
-    if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend, (uint32_t)n))
-        return 0;
-    uint32_t units = poly_rows(&p, &g, (int32_t *)(void *)(mem + at_act));
-    p.cost += POLY_CALL + (uint32_t)n * POLY_POINT + max * POLY_EDGE +
-              g.curves * POLY_CURVE + units;
+    if (rows > POLY_HELD_ROWS || g.full) {
+        walks += rows <= POLY_HELD_ROWS;
+        struct poly count = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0,
+                              1, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
+                              0 };
+        g = count;
+        if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
+                        (uint32_t)n))
+            return 0;
+        uint32_t max = g.n;
+        if (g.n && g.xmax >= ((int64_t)p.cx0 << 16) &&
+            g.xmin < ((int64_t)p.cx1 << 16)) {
+            uint32_t at_act = max * sizeof(struct pedge);
+            uint32_t at_starts = at_act + max * sizeof(struct pedge *);
+            uint8_t *mem = scratch(vm, at_starts + rows * 4);
+            if (!mem)
+                return 0;
+            /* scratch may have collected: the arrays and surface found
+             * again */
+            column_of(vm, a[0], &xs);
+            column_of(vm, a[1], &ys);
+            if (nends)
+                column_of(vm, a[4], &ends);
+            if (argc > 5 && a[5].tag != T_NULL)
+                column_of(vm, a[5], &bend);
+            begin(vm, &p, c, 1);
+            g.e = (struct pedge *)(void *)mem;
+            g.starts = (int32_t *)(void *)(mem + at_starts);
+            g.n = 0;
+            g.max = max;
+            g.counting = 0;
+            act = (struct pedge **)(void *)(mem + at_act);
+            walks++;
+            if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
+                            (uint32_t)n))
+                return 0;
+            if (g.full)
+                return vm_fail(vm, "polyfill() has more edges than it "
+                               "counted", "", "");
+        }
+    }
+    p.cost += POLY_CALL + (uint32_t)n * walks * POLY_POINT +
+              (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE);
     if (vm->d.cam_turn)
-        p.cost += (uint32_t)n * POLY_TURN;
+        p.cost += (uint32_t)n * walks * POLY_TURN;
+    /* wholly left or right of the clip, or above or below it: no row is
+     * walked */
+    if (!g.counting && g.n && g.xmax >= ((int64_t)p.cx0 << 16) &&
+        g.xmin < ((int64_t)p.cx1 << 16))
+        p.cost += poly_rows(&p, &g, act);
     finish(vm, &p);
     return 1;
 }

@@ -326,10 +326,11 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   point halfway between them, so four bending points at a square's
   corners make a rounded square, and a ring of them a smooth blob.
 - `fillp` patterns it, and the camera and clip apply as to any shape.
-- **What it costs.** The hill above is about 2,000 units, and the bush
-  about 740; a full-screen shape about 2,700. The cost grows with the
+- **What it costs.** The hill above is about 1,600 units, and the bush
+  about 570; a full-screen shape about 2,300. The cost grows with the
   edges each row crosses: a ragged ground line of 100 points across the
-  screen is about 8,900. One `polyfill` is much cheaper than the same
+  screen is about 6,600. Points outside the clip cost about 8 units
+  each, so a large outline mostly off screen stays cheap. One `polyfill` is much cheaper than the same
   shape cut into `trifill` triangles, each of which pays for its rows.
 
 ---
@@ -477,7 +478,7 @@ print("TILT " + tilt, 2, 2, 7);
 - **Not turned**: `map` and `tline`, the 3D systems (they have their own
   camera), and the clip. For a turning world drawn from a map, draw its
   outlines with `polyfill`.
-- Turning costs little: about 2 units a point for `polyfill`, and nothing
+- Turning costs little: about 7 units a point for `polyfill`, and nothing
   that shows for the other calls.
 
 ## clip([x, y, w, h])
