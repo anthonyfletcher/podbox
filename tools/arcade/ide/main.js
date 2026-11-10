@@ -19,7 +19,10 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { findPanel } from './search.js';
 import { Engine, fontGlyphs } from '../src/runner.js';
 import { isBinary } from '../src/folder.js';
-import { build, open, names, NEW_CART, palette, readPicture, writePicture, functions, apiName } from './cart.js';
+import { build, open, names, NEW_CART, palette, readPicture, writePicture, functions, apiName, musicUsed } from './cart.js';
+import { webPage, needsWorld } from '../src/webpage.js';
+import { gzipSync } from 'fflate';
+import player from 'arcade:player';
 import { PixelEditor, SheetEditor, toPalette } from './pixels.js';
 import { PaletteEditor } from './palette.js';
 import { FontEditor } from './font.js';
@@ -48,8 +51,9 @@ window.addEventListener('error', (e) => say('error', 'The IDE: ' + e.message));
 window.addEventListener('unhandledrejection', (e) => say('error', 'The IDE: ' + (e.reason && e.reason.message || e.reason)));
 const wasm = new WebAssembly.Module(wasmBytes);
 /* FONT.WORLD's glyphs beyond the engine's, when the IDE was built with them */
-const glyph = window.ARCADE_FONT
-    ? fontGlyphs(Uint8Array.from(atob(window.ARCADE_FONT), (c) => c.charCodeAt(0))) : undefined;
+const fontBytes = window.ARCADE_FONT
+    ? Uint8Array.from(atob(window.ARCADE_FONT), (c) => c.charCodeAt(0)) : null;
+const glyph = fontBytes ? fontGlyphs(fontBytes) : undefined;
 
 /* Button bits, as the engine takes them */
 const PREV = 1, NEXT = 2, MENU = 4, PLAY = 8, SELECT = 16;
@@ -1478,6 +1482,56 @@ async function saveAs() {
     say('print', 'Downloaded ' + file + '.');
 }
 
+/* Export as web page: the cart in one HTML file that plays it, as an iPod
+ * Classic runs it, with the wheel and size asked for. A cart that uses
+ * the owner's music has none on the web, so it is refused. */
+const EXPORT_KEY = 'arcade-web-export';
+
+async function exportWeb() {
+    check();
+    if (lastBuild.errors.length) { say('error', 'Fix the errors before exporting: the cart would not build.'); return; }
+    const music = musicUsed(lastBuild.cart);
+    if (music.length) {
+        say('error', cartName() + ' cannot be exported as a web page: it uses the owner\'s music (' +
+            music.slice(0, 3).join(', ') + (music.length > 3 ? ' and ' + (music.length - 3) + ' more' : '') +
+            '), and a web page has none.');
+        return;
+    }
+    let last = {};
+    try { last = JSON.parse(localStorage.getItem(EXPORT_KEY)) || {}; } catch (e) { /* none kept */ }
+    const world = needsWorld(folder);
+    const fields = [
+        { name: 'wheel', label: 'Wheel', value: last.wheel || 'touch',
+          options: [['touch', 'On touch screens'], ['always', 'Always'], ['never', 'Never: keys only']],
+          note: 'The click wheel drawn under the screen. The keys work either way.' },
+        { name: 'scale', label: 'Size', value: last.scale || 'fit',
+          options: [['fit', 'Fit the window'], ['whole', 'Fit the window, in whole pixels'],
+                    ['1', '1×: 160 by 120'], ['2', '2×: 320 by 240'], ['3', '3×: 480 by 360'],
+                    ['4', '4×: 640 by 480']] }
+    ];
+    if (fontBytes)
+        fields.push({ name: 'font', label: 'Text font', value: world ? 'yes' : 'no',
+                      options: [['yes', 'Kana, Hangul and ideographs too'], ['no', 'Leave them out']],
+                      note: world ? 'The cart has them in its text.' : 'About 170 KB more.' });
+    else if (world)
+        fields.push({ text: 'The cart has kana, Hangul or ideographs, which this IDE was built without: ' +
+                            'they will show as ?.' });
+    const a = await ask('Export as a web page', fields, 'Export');
+    if (!a) return;
+    try { localStorage.setItem(EXPORT_KEY, JSON.stringify({ wheel: a.wheel, scale: a.scale })); } catch (e) { /* not kept */ }
+    let meta = {};
+    try { meta = JSON.parse(folder['cart.json']); } catch (e) { /* the build checked it */ }
+    const page = webPage({
+        template: player.template, script: player.script, cart: lastBuild.cart,
+        wasmGz: gzipSync(wasmBytes, { level: 9 }),
+        fontGz: a.font === 'yes' ? gzipSync(fontBytes, { level: 9 }) : null,
+        meta: meta, wheel: a.wheel, scale: a.scale
+    });
+    const file = cartStem() + '.html';
+    download(new Blob([page], { type: 'text/html' }), file);
+    say('print', 'Downloaded ' + file + ', ' + Math.round(page.length / 1024) + ' KB: open it in a browser to play.');
+}
+
 /* ---- the cart's files: made, added from disk, renamed, deleted ----------- */
 
 const NAME = /^[A-Za-z_]\w*$/;
@@ -1676,6 +1730,7 @@ const ACTIONS = {
     'open-folder': openFolder,
     save: save,
     export: saveAs,
+    'export-web': exportWeb,
     replay: () => {
         const t = tape && tape.steps.length ? tape : lastTape;
         if (!t) { say('error', 'Run the cart first: each run is recorded to play again.'); return; }
@@ -1706,6 +1761,7 @@ const ACTIONS = {
     stop: stop,
     speech: () => $('speech').classList.toggle('on'),
     keys: () => $('help-keys').showModal(),
+    about: () => $('about').showModal(),
     manual: () => window.open(MANUAL + 'README.md', '_blank', 'noopener'),
     tutorial: () => window.open(MANUAL + 'tutorial-1-ball-and-bat.md', '_blank', 'noopener'),
     'manual-fast': () => window.open(MANUAL + 'reference-fast.md', '_blank', 'noopener'),

@@ -6,6 +6,9 @@
  *   pbgc pack <folder> [-o file]    the same: build is unpack's inverse
  *   pbgc unpack <file.pbg> <folder> the cart's folder again, from its sources
  *   pbgc dis <file.pbg>             verify a cart and list its bytecode
+ *   pbgc html <folder|file.pbg> [-o file.html] [--wheel touch|always|never]
+ *             [--scale fit|whole|1|2|3|4] [--font font.bin]
+ *                                   the cart as a web page to play it in
  */
 
 import fs from 'node:fs';
@@ -15,13 +18,16 @@ import zlib from 'node:zlib';
 import { compileFiles, readFolder, readAssets, loadDefs } from './src/node.js';
 import { unpackCart } from './src/unpack.js';
 import { load, verify, disassemble } from './src/bytecode.js';
+import { webPage, musicCalls, needsWorld, WHEELS, SCALES } from './src/webpage.js';
 
 function usage() {
     console.error('usage: pbgc new <folder> <name>\n' +
                   '       pbgc build <folder> [-o file.pbg]\n' +
                   '       pbgc pack <folder> [-o file.pbg]\n' +
                   '       pbgc unpack <file.pbg> <folder>\n' +
-                  '       pbgc dis <file.pbg>');
+                  '       pbgc dis <file.pbg>\n' +
+                  '       pbgc html <folder|file.pbg> [-o file.html] [--wheel touch|always|never]\n' +
+                  '                 [--scale fit|whole|1|2|3|4] [--font font.bin]');
     process.exit(2);
 }
 
@@ -103,6 +109,55 @@ function cmdDis(file) {
     console.log(disassemble(d.isa, d.api, prog));
 }
 
+/* A cart, from its folder or its .pbg, as one HTML page that plays it.
+ * A cart that uses the owner's music has none on the web, so it is refused. */
+async function cmdHtml(src, out, wheel, scale, fontFile) {
+    if (!src) usage();
+    let cart, files;
+    if (/\.pbg$/i.test(src)) {
+        cart = new Uint8Array(fs.readFileSync(src));
+        files = unpackCart(cart, (b) => new Uint8Array(zlib.inflateRawSync(b)),
+                           (b) => new Uint8Array(zlib.deflateSync(b, { level: 9 })));
+    } else {
+        files = readFolder(src);
+        const res = compileFiles(files, readAssets(src));
+        if (res.errors.length) {
+            for (const e of res.errors)
+                console.error(path.join(src, e.file) + ':' + e.line + ':' + e.column + ': ' + e.message);
+            process.exit(1);
+        }
+        cart = res.cart;
+    }
+    const d = loadDefs();
+    verify(d.isa, d.api, load(cart));
+    const music = musicCalls(cart, d.isa, d.api);
+    if (music.length) {
+        console.error('pbgc: ' + src + ' cannot be exported as a web page: it uses the owner\'s music (' +
+                      music.slice(0, 3).join(', ') + (music.length > 3 ? ' and ' + (music.length - 3) + ' more' : '') +
+                      '), and a web page has none');
+        process.exit(1);
+    }
+    if (!WHEELS.includes(wheel)) usage();
+    if (!SCALES.includes(scale)) usage();
+    const meta = JSON.parse(typeof files['cart.json'] === 'string'
+        ? files['cart.json'] : new TextDecoder().decode(files['cart.json']));
+    if (!fontFile && needsWorld(files))
+        console.error('pbgc: warning: the cart has kana, Hangul or ideographs, which draw as ? ' +
+                      'without --font font.bin');
+    const { playerParts } = await import('./web/bundle.js');
+    const parts = await playerParts();
+    const wasm = fs.readFileSync(new URL('./wasm/arcade.wasm', import.meta.url));
+    const page = webPage({
+        template: parts.template, script: parts.script, cart: cart,
+        wasmGz: zlib.gzipSync(wasm, { level: 9 }),
+        fontGz: fontFile ? zlib.gzipSync(fs.readFileSync(fontFile), { level: 9 }) : null,
+        meta: meta, wheel: wheel, scale: scale
+    });
+    const file = out || src.replace(/[\\/]+$/, '').replace(/\.pbg$/i, '') + '.html';
+    fs.writeFileSync(file, page);
+    console.log(file + ': ' + Math.round(page.length / 1024) + ' KB');
+}
+
 const argv = process.argv.slice(2);
 try {
     switch (argv[0]) {
@@ -115,6 +170,12 @@ try {
     }
     case 'unpack': cmdUnpack(argv[1], argv[2]); break;
     case 'dis': cmdDis(argv[1]); break;
+    case 'html': {
+        const opt = (k, v) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : v; };
+        await cmdHtml(argv[1], opt('-o', null), opt('--wheel', 'touch'), opt('--scale', 'fit'),
+                      opt('--font', null));
+        break;
+    }
     default: usage();
     }
 } catch (e) {

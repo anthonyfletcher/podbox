@@ -10,6 +10,7 @@ import { unpackCart, DEFAULT_RGB } from '../src/unpack.js';
 import { parseGpl } from '../src/assets.js';
 import { decodeIndexedPng, encodeIndexedPng } from '../src/png.js';
 import { compileInput, isBinary } from '../src/folder.js';
+import { musicCalls } from '../src/webpage.js';
 import opcodesText from '../../../apps-ipod/games/arcade/opcodes.def';
 import apiText from '../../../apps-ipod/games/arcade/arcade_api.def';
 
@@ -26,6 +27,11 @@ export function functions(cart) {
 export function apiName(slot) {
     const n = api.bySlot[slot];
     return n ? (n.label || n.name) + '()' : 'call ' + slot;
+}
+
+/* the owner's-music calls a built cart makes, which keep it off the web */
+export function musicUsed(cart) {
+    return musicCalls(cart, isa, api);
 }
 
 /* { cart, errors, stats } from the folder's files */

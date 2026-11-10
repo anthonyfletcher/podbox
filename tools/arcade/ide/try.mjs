@@ -202,7 +202,11 @@ const script = `<script>
     }
 })();
 </script></body>`;
-const page = fs.readFileSync(path.join(here, 'dist', 'arcade-ide.html'), 'utf8').replace('</body>', () => script);
+/* at the page's own </body>, the last: the web page template inside the
+ * IDE's script has one too */
+const ide = fs.readFileSync(path.join(here, 'dist', 'arcade-ide.html'), 'utf8');
+const end = ide.lastIndexOf('</body>');
+const page = ide.slice(0, end) + script + ide.slice(end + '</body>'.length);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arcade-try-'));
 const file = path.join(tmp, 'try.html');
 fs.writeFileSync(file, page);

@@ -89,6 +89,11 @@ errors give file, line and what to write instead; a runtime error goes to
 stderr as `file:line: message (in function)`, exit status 1. `printh()`
 prints to stdout -- use it to check state.
 
+`node pbgc.js html mygame` writes `mygame.html`, the cart as a web page
+anyone can play (`--wheel touch|always|never`, `--scale
+fit|whole|1|2|3|4`). A cart that calls `playback`, `beat` or `tracks` is
+refused: the web has no music library.
+
 **Driving it** -- every input is scripted by tick:
 
 | Option | |

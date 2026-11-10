@@ -21,6 +21,7 @@ node pbgc.js build mygame            # writes mygame.pbg
 node pbgc.js dis mygame.pbg          # checks a cart and lists its bytecode
 node pbgc.js unpack game.pbg game    # the cart's folder, from the cart alone
 node pbgc.js pack game               # the same as build
+node pbgc.js html mygame             # mygame.html: the cart as a web page
 ```
 
 A cart carries its own sources, so `unpack` gives back every file as it
@@ -326,8 +327,42 @@ show as `?`.
   opens it too. **Save as .pbg** writes the cart. In Chrome and Edge, Save
   writes back to the file you opened, and **Open folder** edits a cart
   folder in place, Save writing its files back.
+- **Export as web page** (Cart menu) saves the cart as a web page to play
+  it in: see below.
 - The cart open when you close the page is there when you come back.
   `store` files are kept in the browser.
+- **About ArcadeIDE** (Help menu) credits the open-source projects the IDE
+  is built with.
+
+## A cart as a web page
+
+```sh
+node pbgc.js html mygame --wheel touch --scale fit   # writes mygame.html
+```
+
+`pbgc html` (or **Export as web page** in the IDE) writes one HTML file
+that plays the cart in a browser, from a website or opened from disk: the
+engine, the cart and its runner all inside it, about 300 KB with a small
+cart. It runs the cart as an iPod Classic would, each tick taking what it
+takes there, so a cart too slow for the player drops frames here too.
+Scores, option values, saved numbers and `store` files are kept in the
+browser. Click the screen, or press Enter, to start; Esc or Menu opens the
+pause menu: the cart's menu items, its options, high scores and help, and
+Restart. A cart that takes Menu as a button pauses when it is held a
+second, as on the player.
+
+| Option | Values |
+|---|---|
+| `--wheel` | where the click wheel is drawn under the screen: `touch` (the default) on touch screens only, `always`, or `never`. The keys are as in the IDE either way |
+| `--scale` | `fit` (the default) fills the window; `whole` fills it in whole pixels; `1` to `4` a fixed size, 160 by 120 times that |
+| `--font` | `font.bin` (the file `bundle-font.sh` makes), for Japanese, Chinese and Korean text; without it they show as `?`, and `pbgc` warns when the cart has them |
+| `-o` | the file to write: the cart's name with `.html` by default |
+
+A cart that uses the owner's music -- `playback`, `beat` or `tracks` --
+cannot be exported: a web page has no music library to play from. The
+page links to the engine's source and licences, and carries the text
+font's licences (`fonts/LICENSE-world.txt`) in full; leave both in when
+you share it.
 
 ## Running a cart's script
 

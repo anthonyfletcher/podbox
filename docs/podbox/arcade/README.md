@@ -19,7 +19,7 @@ reference for whatever your own game needs.
 5. [High scores and the pause menu](tutorial-5-high-scores.md) -- a board
    the player keeps, an option, and the pause menu
 6. [On your iPod](tutorial-6-on-the-ipod.md) -- putting it on the iPod,
-   and making sure it keeps up there
+   making sure it keeps up there, and sharing it as a web page
 
 ## Reference
 

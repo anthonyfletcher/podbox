@@ -395,6 +395,8 @@ body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
          border-radius: 10px; max-width: 520px; }
 dialog h2 { margin-top: 0; font-size: 16px; }
+dialog a { color: var(--accent); }
+.credits { padding-left: 20px; line-height: 1.5; }
 dialog.ask { min-width: 340px; }
 .ask-row { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 4px 10px;
            margin: 8px 0; }
@@ -421,6 +423,7 @@ dialog.ask { min-width: 340px; }
       <hr>
       <button data-do="save">Save<kbd>Ctrl+S</kbd></button>
       <button data-do="export">Save as .pbg&hellip;</button>
+      <button data-do="export-web">Export as web page&hellip;</button>
       <hr>
       <button data-do="settings">Settings&hellip;</button>
     </div></div>
@@ -474,6 +477,8 @@ dialog.ask { min-width: 340px; }
       <button data-do="manual-fast">Making it fast</button>
       <hr>
       <button data-do="keys">Keys and the wheel</button>
+      <hr>
+      <button data-do="about">About ArcadeIDE</button>
     </div></div>
   </nav>
   <span id="cart-name"></span>
@@ -530,6 +535,33 @@ Menu, which pauses unless the game takes Menu as a button.</p>
 <p>On the drawn wheel, drag round the ring to turn it. Click the ring for
 Menu, Prev, Next or Play by where you click, or hold it half a second to
 hold that button. The middle is Select.</p>
+<form method="dialog"><button>Close</button></form></dialog>
+<dialog id="about"><h2>ArcadeIDE</h2>
+<p>Makes games for the Arcade in
+<a href="https://github.com/anthonyfletcher/podbox" target="_blank" rel="noopener">PodBox</a>,
+and is part of it: free software under the
+<a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noopener">GNU
+General Public License, version 2</a>.</p>
+<p>It is built with these open-source projects:</p>
+<ul class="credits">
+<li><a href="https://codemirror.net" target="_blank" rel="noopener">CodeMirror</a> and Lezer, the editor
+(MIT, Marijn Haverbeke and others)</li>
+<li><a href="https://github.com/acornjs/acorn" target="_blank" rel="noopener">Acorn</a>, which reads the
+code (MIT)</li>
+<li><a href="https://dockview.dev" target="_blank" rel="noopener">dockview</a>, the panels (MIT)</li>
+<li><a href="https://github.com/101arrowz/fflate" target="_blank" rel="noopener">fflate</a>, compression
+(MIT, Arjun Barrett)</li>
+<li><a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, the icons (ISC)</li>
+<li><a href="https://www.drpetter.se/project_sfxr.html" target="_blank" rel="noopener">sfxr</a>'s sound
+generators (MIT, Tomas Pettersson)</li>
+<li><a href="https://github.com/TakWolf/fusion-pixel-font" target="_blank" rel="noopener">Fusion Pixel</a>,
+the text font beyond ASCII (SIL Open Font License 1.1, TakWolf)</li>
+<li><a href="https://esbuild.github.io" target="_blank" rel="noopener">esbuild</a>, which builds it
+(MIT)</li>
+</ul>
+<p>Their licences are in full inside this file, and with every other
+PodBox credit <a href="https://github.com/anthonyfletcher/podbox#credits-and-licence" target="_blank"
+rel="noopener">in its README</a>.</p>
 <form method="dialog"><button>Close</button></form></dialog>
 <script>/*SCRIPT*/</script>
 </body>

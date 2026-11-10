@@ -145,6 +145,27 @@ Replays are for two things:
 **Run > Save the last run as a replay** keeps it as a file, and **Open a
 replay** plays one again later, on the same cart.
 
+## Share it on the web
+
+**Cart > Export as web page** saves the game as one HTML file, about
+300 KB, that anyone can play in a browser: put it on a website, or send
+it and open it from disk. It runs the game as an iPod Classic would, and
+keeps its high scores and settings in that browser.
+
+The export asks two things. **Wheel**: whether to draw the click wheel
+under the screen -- on touch screens only, always, or never, for keys
+alone. **Size**: whether the screen fills the window, fills it in whole
+pixels so every pixel is the same size, or stays at a fixed 1 to 4 times
+the iPod's 160 by 120.
+
+On the page, click the screen or press Enter to start. The keys are the
+IDE's: Left and Right are Prev and Next, Up and Down turn the wheel,
+Enter is Select, Space is Play, and Esc is Menu, which opens the pause
+menu.
+
+A game that uses your music -- `playback`, `beat` or `tracks` -- cannot
+be exported: a web page has no music library to play from.
+
 ## What you learned
 
 - **Cart > Save as .pbg** saves the whole cart, its source included, as
@@ -156,6 +177,7 @@ replay** plays one again later, on the same cart.
 - A game's work is counted in units: about 12,500 a tick on an iPod Video
   playing FLAC for a game that redraws the whole screen.
 - Every run is recorded; **Replay the last run** plays it again exactly.
+- **Cart > Export as web page** makes a page anyone can play the game in.
 
 That is the whole game, made and on the iPod. The reference has every
 part of the Arcade in full: start with **Sprites**, **Maps and objects**

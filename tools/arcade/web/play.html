@@ -1,0 +1,81 @@
+<!doctype html>
+<!-- This game runs on the PodBox Arcade engine, free software under the GNU
+     General Public License version 2. Its source and licences are at
+     https://github.com/anthonyfletcher/podbox. The engine's text font is
+     Fusion Pixel and the fonts it draws on: their notices and licences are
+     in full in the element "font-licences" below. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title></title>
+<style>
+:root { --bg: #111114; --panel: #1f1f25; --ink: #ecebe6; --dim: #9c9aa4; --line: #393941;
+        --accent: #6ea0ff; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+       display: flex; flex-direction: column; align-items: center; justify-content: center;
+       gap: 16px; padding: 16px; min-height: 100%; overflow: auto;
+       -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#stage { position: relative; flex: none; }
+#screen { display: block; width: 320px; height: 240px; image-rendering: pixelated; image-rendering: crisp-edges;
+          background: #000; }
+#wheel { flex: none; width: 200px; height: 200px; touch-action: none; cursor: grab; }
+#wheel[hidden] { display: none; }
+#wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+#wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+#wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
+              dominant-baseline: middle; pointer-events: none; }
+#source { flex: none; font-size: 12px; color: var(--dim); }
+#cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+         justify-content: center; gap: 10px; background: rgba(0, 0, 0, 0.72); text-align: center;
+         padding: 12px; cursor: pointer; }
+#cover[hidden] { display: none; }
+#cover b { font-size: 18px; }
+#cover p { margin: 0; color: var(--dim); font-size: 13px; max-width: 280px; }
+#cover p.bad { color: #ff7b8b; }
+#toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: var(--panel);
+         border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; font-size: 14px;
+         transition: opacity 0.4s; opacity: 0; pointer-events: none; max-width: calc(100% - 32px); }
+#toast.on { opacity: 1; }
+#pause { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+         background: rgba(0, 0, 0, 0.55); padding: 16px; }
+#pause[hidden] { display: none; }
+#panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px;
+         width: 100%; max-width: 360px; max-height: 100%; overflow: auto; display: flex;
+         flex-direction: column; gap: 4px; }
+#panel h2 { margin: 0 0 6px; font-size: 16px; }
+#panel button { font: inherit; text-align: left; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+                border: 1px solid transparent; background: none; color: var(--ink); }
+#panel button:hover, #panel button:focus { background: var(--accent); color: #fff; outline: none; }
+#panel hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; width: 100%; }
+#panel p { margin: 0 0 8px; color: var(--dim); white-space: pre-wrap; }
+#panel pre { margin: 0 0 8px; font: 12px/1.5 ui-monospace, Consolas, monospace; overflow-x: auto; }
+#panel label { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; color: var(--dim);
+               font-size: 13px; }
+#panel select, #panel input { font: inherit; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line);
+                              background: var(--bg); color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="160" height="120"></canvas>
+  <div id="cover"><b id="cover-title"></b><p id="cover-text">Loading&hellip;</p></div>
+</div>
+<svg id="wheel" viewBox="-100 -100 200 200" hidden>
+  <circle class="ring" r="98"/>
+  <circle class="hub" r="36"/>
+  <text y="-72">MENU</text>
+  <text x="72">&#x25B6;&#x25B6;|</text>
+  <text x="-72">|&#x25C0;&#x25C0;</text>
+  <text y="74">&#x25B6; ||</text>
+</svg>
+<a id="source" target="_blank" rel="noopener">Licence and source</a>
+<div id="pause" hidden><div id="panel"></div></div>
+<div id="toast"></div>
+<script id="font-licences" type="text/plain"></script>
+<script id="cart-data" type="application/json"></script>
+<script>/*SCRIPT*/</script>
+</body>
+</html>
