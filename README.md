@@ -862,6 +862,40 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Copyright 2014 Andrew Welch, Carl R. Osterwald, Stephen C. Gilardi
   - Licensed under the MIT License —
     [full text](themes/bony/.rockbox/fonts/LICENSE-ProFont.txt)
+- Fusion Pixel Font, the games' text font
+  - Copyright 2022 TakWolf (https://github.com/TakWolf/fusion-pixel-font)
+  - Drawn with Galmuri (Lee Minseo), Miseki Bitmap (Mark Li), BoutiqueBitmap7x7
+    (Luke Liu) and Misaki (Num Kadoma)
+  - Licensed under the SIL Open Font License, Version 1.1, and Misaki under its
+    own free licence — [full text](tools/arcade/fonts/LICENSE-world.txt)
+
+### The Arcade IDE
+
+The Arcade's game editor, in `tools/arcade/`, is built with these projects. The
+licences of all the code it takes in are kept in full in the built file.
+
+- [CodeMirror](https://codemirror.net) and [Lezer](https://lezer.codemirror.net),
+  the code editor
+  - Copyright Marijn Haverbeke and others; Lezer's JSON grammar Arun Srinivasan
+  - Licensed under the MIT License
+- [Acorn](https://github.com/acornjs/acorn), which reads a game's code
+  - Copyright its contributors
+  - Licensed under the MIT License
+- [dockview](https://dockview.dev), the panels
+  - Copyright mathuo
+  - Licensed under the MIT License
+- [fflate](https://github.com/101arrowz/fflate), compression
+  - Copyright Arjun Barrett
+  - Licensed under the MIT License
+- [Lucide](https://lucide.dev), the icons
+  - Copyright Lucide Contributors, and Cole Bemis for the Feather icons it began from
+  - Licensed under the ISC License
+- [sfxr](https://www.drpetter.se/project_sfxr.html), the sound generators
+  - Copyright 2007 Tomas Pettersson
+  - Licensed under the MIT License
+- [esbuild](https://esbuild.github.io), which builds the editor
+  - Copyright Evan Wallace
+  - Licensed under the MIT License
 
 ### Docks, receivers and remotes (iAP)
 
