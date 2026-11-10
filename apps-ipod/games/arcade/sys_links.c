@@ -1106,8 +1106,14 @@ static int64_t seg_cross(const struct segs *s, int32_t k, int64_t ox,
                          int64_t oy, int64_t px, int64_t py)
 {
     int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
-    int64_t ex = ((int64_t)s->x1[k] >> 8) - ax;
-    int64_t ey = ((int64_t)s->y1[k] >> 8) - ay;
+    int64_t bx = (int64_t)s->x1[k] >> 8, by = (int64_t)s->y1[k] >> 8;
+    /* boxes apart: no crossing, without the products */
+    if ((ox > px ? ox : px) < (ax < bx ? ax : bx) ||
+        (ox < px ? ox : px) > (ax > bx ? ax : bx) ||
+        (oy > py ? oy : py) < (ay < by ? ay : by) ||
+        (oy < py ? oy : py) > (ay > by ? ay : by))
+        return -1;
+    int64_t ex = bx - ax, ey = by - ay;
     int64_t vx = px - ox, vy = py - oy;
     int64_t den = vx * ey - vy * ex;
     if (!den)
