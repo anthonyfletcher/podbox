@@ -81,9 +81,11 @@ function rewrite(src) {
                 (n.prefix ? 1 : 0) + ')';
         }
         case 'MemberExpression':
+            /* the VM stops at a property or index of a number or null, where
+             * JavaScript would give undefined */
             if (n.computed)
-                return gen(n.object) + '[$k(' + gen(n.property) + ')]';
-            return splice(n);
+                return '$o(' + gen(n.object) + ')[$k(' + gen(n.property) + ')]';
+            return '$o(' + gen(n.object) + ').' + n.property.name;
         case 'IfStatement': case 'WhileStatement': case 'DoWhileStatement':
         case 'ForStatement': case 'ConditionalExpression':
             return splice(n, (c) => (c === n.test ? test(c) : undefined));
@@ -167,6 +169,11 @@ function makeContext(out) {
         $and: (a, b) => (num.truthy(a) ? b() : a),
         $or: (a, b) => (num.truthy(a) ? a : b()),
         $k: (i) => (num.isFix(i) ? num.floor(i) : i),
+        $o: (v) => {
+            if (v === null || v === undefined || num.isNum(v))
+                throw new Error('a property or index of a ' + (num.isNum(v) ? 'number' : 'null'));
+            return v;
+        },
         $typeof: (v) => (num.isNum(v) ? 'number' : typeof v === 'string' ? 'string'
                          : typeof v === 'function' ? 'function' : 'object'),
         $upd: (get, set, d, prefix) => {

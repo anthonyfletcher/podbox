@@ -65,6 +65,14 @@ test('runtime errors name the file, line and function', () => {
     assert.match(s.error, /^main\.js:4: can't set \.x of null \(in update\)$/);
 });
 
+test('a property of a number stops the cart, in the reference as in the VM', () => {
+    /* through a parameter, so the compiler cannot see it is a number */
+    const got = same('function rx(o) { return o.x; }\nfunction init() {\n  printh("before");\n' +
+                     '  printh(rx(3));\n}\nfunction update() {}', 0, 'propnum');
+    assert.equal(got.out[0], 'before');
+    assert.ok(got.error, 'the VM stops');
+});
+
 test('deep recursion stops cleanly', () => {
     const r = runVm('function f(n) { return f(n + 1) + 1; }\n' +
                     'function init() { f(0); }\nfunction update() {}', 0, 'deep');
