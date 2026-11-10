@@ -853,8 +853,9 @@ static int trace_fail(struct vm *vm, int held, const char *why)
  * cells cx, cy, cw by ch, the whole map when left out. shapes, by sprite,
  * gives a cell's shape (0 or missing, full). outside makes the cells
  * beyond the area solid -- true, all of them, else beyond the sides it
- * names -- a ring of cells whose own outside is taken far out. Returns a record: x, y and ends, as polyfill and
- * segs.make take them, and n, the points. */
+ * names -- a ring of cells whose own outside is taken far out. Returns
+ * a record: x, y and ends, as polyfill and segs.make take them, and n,
+ * the points. */
 NATIVE(segs_trace)
 {
     int32_t mask = whole(a[0], 0);
