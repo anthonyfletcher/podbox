@@ -40,11 +40,23 @@ function firstPalette(pals) {
 
 /* The names compile() writes into SRC_; any other is refused, so no name
  * reaches outside the folder */
-const SOURCE_NAME = new RegExp('^(cart\\.json|sheet\\.png|flags\\.json|' +
+const SOURCE_NAME = new RegExp('^(cart\\.json|sheet\\.png|logo\\.png|flags\\.json|' +
     '[^/\\\\:*?"<>|\\x00-\\x1f.][^/\\\\:*?"<>|\\x00-\\x1f]*\\.js|' +
     '(palettes/[A-Za-z_]\\w*\\.gpl|(maps|sounds|data)/[A-Za-z_]\\w*\\.json|' +
     'data/[A-Za-z_]\\w*\\.txt|fonts/[A-Za-z_]\\w*\\.bdf|' +
     'images/[A-Za-z_]\\w*\\.png))$');
+
+/* The cart's logo as { width, height, rgb }, each pixel 0xRRGGBB in the
+ * cart's first palette; null when it has none */
+export function cartLogo(bytes) {
+    const { chunks } = readCart(bytes);
+    if (!chunks.LOGO) return null;
+    const r = reader(chunks.LOGO), w = r.u16(), h = r.u16();
+    const px = lz4Decompress(r.bytes(r.u32()), w * h), pal = firstPalette(chunks.PALS);
+    const rgb = new Uint32Array(w * h);
+    for (let i = 0; i < px.length; i++) rgb[i] = pal[px[i]] || 0;
+    return { width: w, height: h, rgb: rgb };
+}
 
 /* { path: Uint8Array } for every file of the cart's folder */
 export function unpackCart(bytes, inflateRaw, deflate) {
@@ -75,6 +87,10 @@ export function unpackCart(bytes, inflateRaw, deflate) {
     if ('sheet.png' in files) {
         if (!chunks.SHET) throw new Error('the cart names a sheet it lacks');
         files['sheet.png'] = picture(reader(chunks.SHET));
+    }
+    if ('logo.png' in files) {
+        if (!chunks.LOGO) throw new Error('the cart names a logo it lacks');
+        files['logo.png'] = picture(reader(chunks.LOGO));
     }
     const images = Object.keys(files).filter((f) => /^images\/.*\.png$/.test(f)).sort();
     if (images.length) {

@@ -13,7 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import { newCartId, asNewGame } from './src/folder.js';
 import zlib from 'node:zlib';
 import { compileFiles, readFolder, readAssets, loadDefs } from './src/node.js';
 import { unpackCart } from './src/unpack.js';
@@ -25,6 +25,7 @@ function usage() {
                   '       pbgc build <folder> [-o file.pbg]\n' +
                   '       pbgc pack <folder> [-o file.pbg]\n' +
                   '       pbgc unpack <file.pbg> <folder>\n' +
+                  '       pbgc copy <folder|file.pbg> <folder> [name]\n' +
                   '       pbgc dis <file.pbg>\n' +
                   '       pbgc html <folder|file.pbg> [-o file.html] [--wheel touch|always|never]\n' +
                   '                 [--scale fit|whole|1|2|3|4] [--font font.bin]');
@@ -50,7 +51,7 @@ function cmdNew(dir, name) {
         process.exit(1);
     }
     fs.mkdirSync(dir, { recursive: true });
-    const cart = { id: crypto.randomBytes(8).toString('hex'), name: name,
+    const cart = { id: newCartId(), name: name,
                    author: '', version: '1', rate: 33 };
     fs.writeFileSync(path.join(dir, 'cart.json'), JSON.stringify(cart, null, 2) + '\n');
     fs.writeFileSync(path.join(dir, 'main.js'), MAIN);
@@ -76,12 +77,17 @@ function cmdBuild(dir, out) {
                 s.globals + ' globals, API ' + s.api);
 }
 
-function cmdUnpack(file, dir) {
-    if (!file || !dir) usage();
+/* dir, which must be empty or not there */
+function freshDir(dir) {
     if (fs.existsSync(dir) && fs.readdirSync(dir).length) {
         console.error(dir + ' is not empty');
         process.exit(1);
     }
+}
+
+function cmdUnpack(file, dir) {
+    if (!file || !dir) usage();
+    freshDir(dir);
     const files = unpackCart(new Uint8Array(fs.readFileSync(file)),
                              (b) => new Uint8Array(zlib.inflateRawSync(b)),
                              (b) => new Uint8Array(zlib.deflateSync(b, { level: 9 })));
@@ -99,6 +105,26 @@ function cmdUnpack(file, dir) {
         fs.writeFileSync(paths[i], files[name]);
     });
     console.log(dir + ': ' + Object.keys(files).length + ' files');
+}
+
+/* A new game made from a cart: its folder, or a .pbg unpacked, with a new
+ * id, so its saves and high scores start empty, and the name given */
+function cmdCopy(src, dir, name) {
+    if (!src || !dir) usage();
+    freshDir(dir);
+    if (fs.statSync(src).isDirectory()) {
+        if (!fs.existsSync(path.join(src, 'cart.json'))) {
+            console.error(src + ' has no cart.json');
+            process.exit(1);
+        }
+        fs.cpSync(src, dir, { recursive: true });
+    } else
+        cmdUnpack(src, dir);
+    const at = path.join(dir, 'cart.json');
+    const text = asNewGame(fs.readFileSync(at, 'utf8'), name);
+    fs.writeFileSync(at, text);
+    const c = JSON.parse(text);
+    console.log(dir + ': ' + c.name + ', a new game, id ' + c.id);
 }
 
 function cmdDis(file) {
@@ -167,6 +193,7 @@ try {
         break;
     }
     case 'unpack': cmdUnpack(argv[1], argv[2]); break;
+    case 'copy': cmdCopy(argv[1], argv[2], argv[3]); break;
     case 'dis': cmdDis(argv[1]); break;
     case 'html': {
         const opt = (k, v) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : v; };

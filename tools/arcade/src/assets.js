@@ -41,6 +41,8 @@ const FIRST_FONT = 3, ENGINE_FONTS = ['CAPS', 'WORLD'];
 const NAME = /^[A-Za-z_][\w]*$/;
 const MAX_MAP = 256;
 const MAX_IMAGE = 1024;
+/* a logo's side: the player's small album art */
+const LOGO = 44;
 /* the most image bytes a cart with nothing else can load, measured */
 const IMAGE_BYTES = 345000;
 
@@ -153,6 +155,21 @@ export function buildAssets(assets, inflate, string, errors) {
         w.u16(128); w.u16(128); w.u32(z.length); w.bytes(z);
         w.bytes(flags);
         out.chunks.push({ tag: 'SHET', data: w.done() });
+    }
+
+    /* the logo: what a list of games shows for the cart, the size of the
+     * player's small album art */
+    if (assets.logo) {
+        try {
+            const img = decodeIndexedPng(assets.logo, inflate);
+            if (img.width !== LOGO || img.height !== LOGO)
+                throw new Error('the logo is ' + LOGO + 'x' + LOGO + ', not ' + img.width + 'x' +
+                                img.height);
+            const w = new Writer(), z = lz4Compress(img.px);
+            w.u16(LOGO); w.u16(LOGO); w.u32(z.length); w.bytes(z);
+            out.chunks.push({ tag: 'LOGO', data: w.done() });
+            out.logo = true;
+        } catch (e) { err('logo.png', e.message); }
     }
 
     /* maps */

@@ -20,6 +20,7 @@ node pbgc.js new mygame "My Game"    # a folder with cart.json and main.js
 node pbgc.js build mygame            # writes mygame.pbg
 node pbgc.js dis mygame.pbg          # checks a cart and lists its bytecode
 node pbgc.js unpack game.pbg game    # the cart's folder, from the cart alone
+node pbgc.js copy game newgame "New Game"  # a new game made from game (a folder or a .pbg)
 node pbgc.js pack game               # the same as build
 node pbgc.js html mygame             # mygame.html: the cart as a web page
 ```
@@ -29,6 +30,10 @@ was written. Pictures come back as indexed PNGs in the cart's first
 palette, with colour 0 transparent: the same palette numbers, though not
 the same file if it was saved with other colours. `pack` then makes the
 same cart, byte for byte.
+
+A game made from another needs an id of its own, or the two share saves
+and high scores on the player. `copy` gives it one, and the name given;
+the IDE's **Save as a new game** does the same.
 
 A cart is a folder:
 
@@ -40,7 +45,7 @@ A cart is a folder:
 
 | Key | Value |
 |---|---|
-| `id` | 16 hex digits, made by `pbgc new`. Saves and scores are kept under it, so never change it |
+| `id` | 16 hex digits, made by `pbgc new`. Saves and scores are kept under it: never change it by hand, but make a game from another with `pbgc copy` or **Save as a new game** |
 | `name` | shown in the Games menu |
 | `author`, `version`, `help` | text, optional |
 | `rate` | ticks a second: 20, 25, 33 (the default) or 50 |
@@ -100,6 +105,7 @@ A cart's art goes in the same folder:
 |---|---|
 | `sheet.png` | the 128x128 sprite sheet |
 | `flags.json` | the 256 sprite flags: an array, or `{ "12": 3 }` for just some |
+| `logo.png` | the cart's logo, 44x44 in its palette's colours: what a list of games shows for it, and an exported page's icon |
 | `palettes/<name>.gpl` | a palette in GIMP's format; the first, by name, is loaded when the cart starts |
 | `maps/<name>.json` | a map: `width` and `height` (up to 256), `rows` of two hex digits a cell, and `objects`, each with a `kind`, `x`, `y`, `w`, `h` in pixels and `props` of whole numbers or strings |
 | `images/<name>.png` | any other picture, up to 1024 pixels a side; after `sheet(IMG.<name>)` the sprite calls draw its 8x8 cells as sprites |
@@ -324,7 +330,8 @@ show as `?`.
   adds files from disk (each goes where its kind belongs, and a picture is
   matched to the palette), and renames or deletes the one open.
 - **Open** (Cart menu) takes a `.pbg`, and dropping one on the page
-  opens it too. **Save as .pbg** writes the cart. In Chrome and Edge, Save
+  opens it too. **Save as .pbg** writes the cart, and **Save as a new game**
+  writes it as a game of its own, with a new id and name. In Chrome and Edge, Save
   writes back to the file you opened, and **Open folder** edits a cart
   folder in place, Save writing its files back.
 - **Export as web page** (Cart menu) saves the cart as a web page to play

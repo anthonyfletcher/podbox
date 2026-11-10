@@ -9,7 +9,7 @@ import { load } from '../src/bytecode.js';
 import { unpackCart, DEFAULT_RGB } from '../src/unpack.js';
 import { parseGpl } from '../src/assets.js';
 import { decodeIndexedPng, encodeIndexedPng } from '../src/png.js';
-import { compileInput, isBinary } from '../src/folder.js';
+import { compileInput, isBinary, newCartId } from '../src/folder.js';
 import { musicCalls } from '../src/webpage.js';
 import opcodesText from '../../../apps-ipod/games/arcade/opcodes.def';
 import apiText from '../../../apps-ipod/games/arcade/arcade_api.def';
@@ -85,8 +85,7 @@ export function names(built) {
 }
 
 export const NEW_CART = () => {
-    const id = Array.from(crypto.getRandomValues(new Uint8Array(8)),
-                          (b) => b.toString(16).padStart(2, '0')).join('');
+    const id = newCartId();
     return {
         'cart.json': JSON.stringify({ id: id, name: 'New Game', author: '', version: '1', rate: 33 },
                                     null, 2) + '\n',

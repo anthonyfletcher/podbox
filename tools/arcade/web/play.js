@@ -7,6 +7,7 @@
  * drawn wheel); the screen's size. */
 
 import { Engine, fontGlyphs } from '../src/runner.js';
+import { cartLogo } from '../src/unpack.js';
 
 const $ = (id) => document.getElementById(id);
 const data = JSON.parse($('cart-data').textContent);
@@ -678,12 +679,32 @@ touch.addEventListener('change', layout);
 
 /* ---- starting ----------------------------------------------------------- */
 
+/* the cart's logo, if it has one, on the cover and as the page's icon */
+function showLogo() {
+    const logo = cartLogo(cart);
+    if (!logo) return;
+    const c = document.createElement('canvas');
+    c.width = logo.width;
+    c.height = logo.height;
+    const g = c.getContext('2d'), im = g.createImageData(logo.width, logo.height);
+    logo.rgb.forEach((v, i) => im.data.set([v >> 16, v >> 8 & 255, v & 255, 255], i * 4));
+    g.putImageData(im, 0, 0);
+    const url = c.toDataURL('image/png');
+    $('cover-logo').src = url;
+    $('cover-logo').hidden = false;
+    const icon = document.createElement('link');
+    icon.rel = 'icon';
+    icon.href = url;
+    document.head.append(icon);
+}
+
 (async function start() {
     layout();
     $('cover-title').textContent = data.name;
     try {
         wasm = await WebAssembly.compile(await gunzip(data.wasm));
         cart = bytes(data.cart);
+        try { showLogo(); } catch (e) { /* the game plays without it */ }
         if (data.font) glyph = fontGlyphs(await gunzip(data.font));
     } catch (e) {
         cover(data.name, 'This browser cannot run the game: ' + (e && e.message || e), true);

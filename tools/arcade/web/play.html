@@ -35,6 +35,8 @@ body { background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -appl
          padding: 12px; cursor: pointer; }
 #cover[hidden] { display: none; }
 #cover b { font-size: 18px; }
+#cover-logo { width: 88px; height: 88px; image-rendering: pixelated; image-rendering: crisp-edges; }
+#cover-logo[hidden] { display: none; }
 #cover p { margin: 0; color: var(--dim); font-size: 13px; max-width: 280px; }
 #cover p.bad { color: #ff7b8b; }
 #toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: var(--panel);
@@ -63,7 +65,7 @@ body { background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -appl
 <body>
 <div id="stage">
   <canvas id="screen" width="160" height="120"></canvas>
-  <div id="cover"><b id="cover-title"></b><p id="cover-text">Loading&hellip;</p></div>
+  <div id="cover"><img id="cover-logo" alt="" hidden><b id="cover-title"></b><p id="cover-text">Loading&hellip;</p></div>
 </div>
 <svg id="wheel" viewBox="-100 -100 200 200" hidden>
   <circle class="ring" r="98"/>

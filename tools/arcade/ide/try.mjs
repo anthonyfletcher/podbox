@@ -43,6 +43,7 @@ if (cartDir && !pbg) {
         for (const [n, v] of Object.entries(a[k] || {})) folder[dir + n + ext] = v;
     if (a.flags) folder['flags.json'] = a.flags;
     if (a.sheet) folder['sheet.png'] = a.sheet;
+    if (a.logo) folder['logo.png'] = a.logo;
 }
 const enc = {};
 for (const [k, v] of Object.entries(folder))

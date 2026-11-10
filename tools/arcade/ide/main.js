@@ -18,7 +18,7 @@ import { setDiagnostics, lintGutter } from '@codemirror/lint';
 import { autocompletion } from '@codemirror/autocomplete';
 import { findPanel } from './search.js';
 import { Engine, fontGlyphs } from '../src/runner.js';
-import { isBinary } from '../src/folder.js';
+import { isBinary, asNewGame } from '../src/folder.js';
 import { build, open, names, NEW_CART, palette, readPicture, writePicture, functions, apiName, musicUsed } from './cart.js';
 import { webPage, musicRefusal, needsWorld } from '../src/webpage.js';
 import { gzipSync } from 'fflate';
@@ -1482,6 +1482,30 @@ async function saveAs() {
     say('print', 'Downloaded ' + file + '.');
 }
 
+/* Save as a new game: the cart made a game of its own -- a new id, so its
+ * saves and high scores start empty, and the name asked for -- and saved
+ * as a new .pbg, the one it came from left as it was */
+async function saveNewGame() {
+    const a = await ask('Save as a new game', [{ name: 'name', label: 'Name', value: cartName() + ' 2',
+        note: 'The new game starts with none of this one\'s saves or high scores',
+        check: (n) => n.trim() ? null : 'A name to show in the Games menu' }], 'Make it');
+    if (!a) return;
+    try {
+        folder['cart.json'] = asNewGame(folder['cart.json'], a.name.trim());
+    } catch (e) {
+        say('error', 'cart.json is not readable, so the cart cannot be made a new game: ' + e.message);
+        return;
+    }
+    delete states['cart.json'];
+    saveTo = null;
+    gone.clear();
+    showFiles();
+    if (current === 'cart.json') show('cart.json');
+    changed();
+    say('print', 'This is now a new game, ' + cartName() + '.');
+    return saveAs();
+}
+
 /* Export as web page: the cart in one HTML file that plays it, as an iPod
  * Classic runs it, with the wheel and size asked for. A cart that uses
  * the owner's music has none on the web, so it is refused. */
@@ -1538,6 +1562,7 @@ const NAME = /^[A-Za-z_]\w*$/;
 const KINDS = {
     code: { label: 'Code', path: (n) => n + '.js' },
     sheet: { label: 'The sprite sheet', path: () => 'sheet.png' },
+    logo: { label: 'The logo, 44x44, for lists of games', path: () => 'logo.png' },
     image: { label: 'An image', path: (n) => 'images/' + n + '.png' },
     palette: { label: 'A palette', path: (n) => 'palettes/' + n + '.gpl' },
     map: { label: 'A map', path: (n) => 'maps/' + n + '.json' },
@@ -1567,6 +1592,7 @@ function fresh(kind, name, a) {
     switch (kind) {
     case 'code': return '// ' + name + '.js: its functions are ' + name + '.name() elsewhere\n';
     case 'sheet': return writePicture(128, 128, new Uint8Array(128 * 128), rgb);
+    case 'logo': return writePicture(44, 44, new Uint8Array(44 * 44), rgb);
     case 'image': return writePicture(+a.w, +a.h, new Uint8Array(a.w * a.h), rgb);
     case 'palette': return gpl(name, rgb);
     case 'map': return JSON.stringify({ width: +a.mw, height: +a.mh,
@@ -1582,10 +1608,11 @@ function fresh(kind, name, a) {
 }
 
 async function newFile() {
-    const kinds = Object.entries(KINDS).filter(([k]) => k !== 'sheet' || folder['sheet.png'] === undefined);
+    const kinds = Object.entries(KINDS).filter(([k, v]) =>
+        (k !== 'sheet' && k !== 'logo') || folder[v.path()] === undefined);
     const a = await ask('New file', [
         { name: 'kind', label: 'What', options: kinds.map(([k, v]) => [k, v.label]) },
-        { name: 'name', label: 'Name', value: '', when: (v) => v.kind !== 'sheet',
+        { name: 'name', label: 'Name', value: '', when: (v) => v.kind !== 'sheet' && v.kind !== 'logo',
           note: 'Letters, digits and _: the name the code calls it by',
           check: (n, v) => !NAME.test(n.trim()) ? 'Letters, digits and _, not starting with a digit'
               : folder[KINDS[v.kind].path(n.trim())] !== undefined ? KINDS[v.kind].path(n.trim()) + ' is there already'
@@ -1602,7 +1629,7 @@ async function newFile() {
           check: (n) => n >= 1 && n <= 256 && Number.isInteger(+n) ? null : '1 to 256' }
     ], 'Make it');
     if (!a) return;
-    const name = a.kind === 'sheet' ? 'sheet' : a.name.trim();
+    const name = a.kind === 'sheet' || a.kind === 'logo' ? a.kind : a.name.trim();
     const path = KINDS[a.kind].path(name);
     folder[path] = fresh(a.kind, name, a);
     showFiles();
@@ -1620,7 +1647,7 @@ function placeFor(file, text) {
     case 'bdf': return 'fonts/' + base + '.bdf';
     case 'txt': return 'data/' + base + '.txt';
     case 'png': case 'gif': case 'jpg': case 'jpeg':
-        return base === 'sheet' ? 'sheet.png' : 'images/' + base + '.png';
+        return base === 'sheet' || base === 'logo' ? base + '.png' : 'images/' + base + '.png';
     case 'json': {
         let v = null;
         try { v = JSON.parse(text); } catch (e) { /* data, to show its error */ }
@@ -1680,7 +1707,7 @@ const KEPT = ['main.js', 'cart.json'];
 
 async function renameFile() {
     const f = current;
-    if (KEPT.includes(f) || f === 'sheet.png' || f === 'flags.json') {
+    if (KEPT.includes(f) || f === 'sheet.png' || f === 'logo.png' || f === 'flags.json') {
         say('error', f + ' keeps its name: the engine looks for it by it.');
         return;
     }
@@ -1728,6 +1755,7 @@ const ACTIONS = {
     'open-folder': openFolder,
     save: save,
     export: saveAs,
+    'save-new': saveNewGame,
     'export-web': exportWeb,
     replay: () => {
         const t = tape && tape.steps.length ? tape : lastTape;

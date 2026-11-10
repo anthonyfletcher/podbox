@@ -2098,6 +2098,7 @@ export function compile(input) {
         for (const n in a[kind] || {}) srcFiles[dir + n + ext] = a[kind][n];
     if (a.flags !== undefined) srcFiles['flags.json'] = a.flags;
     if (a.sheet) srcFiles['sheet.png'] = '';
+    if (built.logo) srcFiles['logo.png'] = '';
     for (const n of built.images) srcFiles['images/' + n + '.png'] = '';
 
     const bytes = writeCart([

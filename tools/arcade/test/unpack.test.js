@@ -4,10 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import zlib from 'node:zlib';
 import { compileFiles } from '../src/node.js';
-import { unpackCart } from '../src/unpack.js';
+import { unpackCart, cartLogo } from '../src/unpack.js';
 import { encodeIndexedPng, decodeIndexedPng } from '../src/png.js';
 import { readCart, writeCart } from '../src/cart.js';
-import { compileInput } from '../src/folder.js';
+import { compileInput, asNewGame } from '../src/folder.js';
 
 const deflate = (b) => new Uint8Array(zlib.deflateSync(b));
 const inflate = (b) => new Uint8Array(zlib.inflateSync(b));
@@ -28,6 +28,7 @@ const CODE = {
 };
 const ASSETS = {
     sheet: encodeIndexedPng(128, 128, picture(128, 128, 1), [0x102030], deflate),
+    logo: encodeIndexedPng(44, 44, picture(44, 44, 4), [0x102030], deflate),
     flags: '{ "1": 3, "9": 128 }\n',
     palettes: { day: 'GIMP Palette\nName: day\n#\n  0   0   0 black\n255 255 255 white\n',
                 night: 'GIMP Palette\n10 10 40\n200 200 255\n' },
@@ -54,7 +55,7 @@ test('unpack gives back every file as written, and pack the same cart', () => {
     const files = unpackCart(cart, inflateRaw, deflate);
     assert.deepEqual(Object.keys(files).sort(), [
         'cart.json', 'data/story.txt', 'data/waves.json', 'enemy.js', 'flags.json',
-        'fonts/tiny.bdf', 'images/hud.png', 'images/title.png', 'main.js', 'maps/level1.json',
+        'fonts/tiny.bdf', 'images/hud.png', 'images/title.png', 'logo.png', 'main.js', 'maps/level1.json',
         'palettes/day.gpl', 'palettes/night.gpl', 'sheet.png', 'sounds/coin.json']);
     for (const [name, want] of Object.entries(CODE)) assert.equal(text(files[name]), want, name);
     assert.equal(text(files['flags.json']), ASSETS.flags);
@@ -63,6 +64,7 @@ test('unpack gives back every file as written, and pack the same cart', () => {
     assert.equal(text(files['palettes/day.gpl']), ASSETS.palettes.day);
     /* the pictures: the same indices, in the cart's first palette, 0 clear */
     assert.deepEqual(decodeIndexedPng(files['sheet.png'], inflate).px, picture(128, 128, 1));
+    assert.deepEqual(decodeIndexedPng(files['logo.png'], inflate).px, picture(44, 44, 4));
     const hud = decodeIndexedPng(files['images/hud.png'], inflate);
     assert.deepEqual([hud.width, hud.height], [5, 300]);
     assert.deepEqual(hud.px, picture(5, 300, 3));
@@ -116,4 +118,24 @@ test('a source named outside the folder\'s shapes is refused, never written', ()
                       /names a file no cart folder holds/, name);
     assert.deepEqual(Object.keys(unpackCart(withName('my-lib.js'), inflateRaw, deflate)),
                      ['my-lib.js']);
+});
+
+test('a logo is 44x44, and comes out in the cart\'s first palette', () => {
+    const wrong = compileFiles(CODE, { logo: encodeIndexedPng(40, 44, picture(40, 44, 1), [], deflate) });
+    assert.ok(wrong.errors.some((e) => e.file === 'logo.png' && /44x44, not 40x44/.test(e.message)));
+    const logo = cartLogo(build(CODE, { logo: ASSETS.logo, palettes: ASSETS.palettes }));
+    assert.deepEqual([logo.width, logo.height], [44, 44]);
+    /* palettes/day, the first by name: index 1 is white */
+    assert.equal(logo.rgb[picture(44, 44, 4).indexOf(1)], 0xffffff);
+    assert.equal(cartLogo(build(CODE, {})), null);
+});
+
+test('a new game made from a cart: a new id, the name given, the rest kept', () => {
+    const was = JSON.parse(CODE['cart.json']);
+    const made = JSON.parse(asNewGame(CODE['cart.json'], 'Every File 2'));
+    assert.match(made.id, /^[0-9a-f]{16}$/);
+    assert.notEqual(made.id, was.id);
+    assert.equal(made.name, 'Every File 2');
+    assert.equal(JSON.parse(asNewGame(CODE['cart.json'])).name, 'Every File');
+    assert.deepEqual(Object.keys(made), Object.keys(was));
 });
