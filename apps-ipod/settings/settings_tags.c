@@ -407,6 +407,7 @@ static const struct tag_row tag_rows[] = {
 { "default browser",     TAG_LIBRARY|TAG_APPEARANCE,             "browser default" },
 { "wps select action",   TAG_ADVANCED|TAG_APPEARANCE,            "select action" },
 { "wps menu action",     TAG_APPEARANCE,                         "menu button back previous screen" },
+{ "wps long press play action", TAG_APPEARANCE,                  "play button long press hold album covers stop" },
 { "shortcuts instead of quickscreen", TAG_SYSTEM|TAG_APPEARANCE, "quickscreen shortcuts" },
 { "keyclick",            TAG_ADVANCED|TAG_SYSTEM,                "keyclick click" },
 { "hardware keyclick",   TAG_ADVANCED|TAG_SYSTEM,                "keyclick click speaker" },

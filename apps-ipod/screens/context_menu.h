@@ -71,6 +71,7 @@ enum hotkey_action {
     HOTKEY_PREVIOUS_SCREEN,
     HOTKEY_GO_TO_ALBUM,
     HOTKEY_MAIN_MENU,
+    HOTKEY_STOP,
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
        time into the saved hotkey integers, so renumbering one repoints every
        hotkey the user has already configured. */
@@ -138,6 +139,7 @@ void context_hidden_set_default(void *setting, void *defaultval);
 /* Assign a hotkey's action, driven from the settings menu. */
 int wps_select_do_setting(void *param);
 int wps_menu_do_setting(void *param);
+int wps_long_press_play_do_setting(void *param);
 int wps_context_menu_do_setting(void *param);
 int tree_context_menu_do_setting(void *param);
 

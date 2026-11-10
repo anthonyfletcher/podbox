@@ -810,14 +810,34 @@ long gui_wps_show(void)
             /* The buttons set from one list of actions */
             case ACTION_WPS_BROWSE:
             case ACTION_WPS_MENU:
+            case ACTION_WPS_STOP:   /* a long press of Play */
             case ACTION_WPS_HOTKEY:
             {
                 int act = HK_CTX_GET(0, button == ACTION_WPS_BROWSE
                                         ? global_settings.wps_select_action
                                       : button == ACTION_WPS_MENU
                                         ? global_settings.wps_menu_action
+                                      : button == ACTION_WPS_STOP
+                                        ? global_settings.wps_long_press_play_action
                                         : global_settings.context_wps);
                 long go_to;
+
+                /* Stop leaves through this screen's exit, which saves a
+                 * book's place and the resume point */
+                if (act == HOTKEY_STOP)
+                {
+                    exit = true;
+                    break;
+                }
+                /* Album Covers opens over this screen, so BACK returns here */
+                if (act == HOTKEY_ALBUM_COVERS && button == ACTION_WPS_STOP)
+                {
+                    theme_enabled = false;
+                    if (show_album_covers(&go_to))
+                        return go_to;
+                    restore = true;
+                    break;
+                }
 
                 /* Menu leaves even when a config has set it to nothing */
                 if (act == HOTKEY_OFF && button == ACTION_WPS_MENU)
@@ -1032,16 +1052,6 @@ long gui_wps_show(void)
                 }
                 break;
 
-                /* iPod Classic 6G custom: open Album covers instead of stopping */
-            case ACTION_WPS_STOP:
-                {
-                    long go_to;
-                    theme_enabled = false;
-                    if (show_album_covers(&go_to))
-                        return go_to;
-                    restore = true;
-                }
-                break;
 
             /* Bound only by a keymap file of the user's own */
             case ACTION_WPS_LIST_BOOKMARKS:
