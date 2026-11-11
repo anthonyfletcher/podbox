@@ -23,7 +23,7 @@ const WAVES = {
 };
 
 const ICONS = {
-    pencil: Pencil, line: Slash, rect: Square, oval: Circle, fill: PaintBucket, pick: Pipette,
+    pencil: Pencil, line: Slash, rect: Square, oval: Circle, fill: PaintBucket, pick: Pipette, recolour: Replace,
     select: SquareDashed, mirror: SquareSplitHorizontal, flipH: FlipHorizontal2,
     flipV: FlipVertical2, turn: RotateCw, invert: Contrast, tile: Grid3x3, onion: Ghost,
     zoomIn: ZoomIn, zoomOut: ZoomOut, play: Play, pause: Pause, stop: Square, plus: Plus,

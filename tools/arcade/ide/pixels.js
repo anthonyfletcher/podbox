@@ -110,7 +110,10 @@ export class PixelEditor {
         const tools = [['select', 'select', 'Select (S): drag to choose, drag inside to move'],
                        ['pencil', 'pencil', 'Pencil (P)'], ['line', 'line', 'Line (L)'],
                        ['rect', 'rect', 'Rectangle (R); Shift fills it'], ['oval', 'oval', 'Oval (O); Shift fills it'],
-                       ['fill', 'fill', 'Fill (F)'], ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool']];
+                       ['fill', 'fill', 'Fill (F)'],
+                       ['replace', 'recolour', 'Replace (C): click a colour to make all of it, in the selection or ' +
+                        'the whole picture, the drawing colour; right click for the second colour'],
+                       ['pick', 'pick', 'Colour picker (I); Alt+click picks with any tool']];
         const bar = this.bar = document.createElement('div');
         bar.className = 'tb';
         this.toolButtons = {};
@@ -413,6 +416,17 @@ export class PixelEditor {
         return out;
     }
 
+    /* every pixel of colour from, in the selection or else the whole
+     * picture, made colour to; how many */
+    replace(from, to) {
+        const b = this.sel || { x: 0, y: 0, w: this.w, h: this.h };
+        let n = 0;
+        for (let y = b.y; y < b.y + b.h; y++)
+            for (let x = b.x; x < b.x + b.w; x++)
+                if (this.px[y * this.w + x] === from) { this.px[y * this.w + x] = to; n++; }
+        return n;
+    }
+
     flood(x, y, c) {
         if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
         const from = this.px[y * this.w + x];
@@ -668,6 +682,16 @@ export class PixelEditor {
                 this.flood(q.x, q.y, c);
                 this.changed();
                 down = null;
+            } else if (tool === 'replace') {
+                const from = this.px[q.y * this.w + q.x];
+                if (from !== undefined && from !== c) {
+                    this.keep();
+                    const n = this.replace(from, c);
+                    this.changed();
+                    this.o.say('Colour ' + from + ' made colour ' + c + ': ' + n + (n === 1 ? ' pixel' : ' pixels') +
+                               (this.sel ? ' in the selection.' : '.'));
+                }
+                down = null;
             } else if (tool === 'pencil') {
                 this.keep();
                 this.put(p.x, p.y, c);
@@ -775,7 +799,7 @@ export class PixelEditor {
             if (ctrl && k === 'x') { done(); this.cut(); return; }
             if (ctrl && k === 'a') { done(); this.drop(); this.use('select'); this.sel = { x: 0, y: 0, w: this.w, h: this.h }; this.overlay(); return; }
             if (ctrl) return;   /* Ctrl+V arrives as the paste event */
-            const keys = { p: 'pencil', l: 'line', r: 'rect', o: 'oval', f: 'fill', i: 'pick', s: 'select' };
+            const keys = { p: 'pencil', l: 'line', r: 'rect', o: 'oval', f: 'fill', c: 'replace', i: 'pick', s: 'select' };
             if (keys[k]) { done(); this.use(keys[k]); return; }
             if (k === 'm') { done(); this.toggleMirror(); return; }
             if (k === 'h') { done(); this.flip(true); return; }
