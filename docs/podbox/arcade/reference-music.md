@@ -6,7 +6,7 @@ choose tracks from the owner's library, or take over the music entirely.
 
 - [How it works](#how-it-works) -- the three music levels
 - What is playing: [playback.playing, title, artist, album, track, elapsed, length, changed](#what-is-playing)
-- Controlling it: [toggle, next, prev, seek, duck](#controlling-it)
+- Controlling it: [toggle, next, prev, seek, duck, volume, adjust](#controlling-it)
 - Owning it: [play, stop, started](#owning-it)
 - The library and the queue: [tracks.*](#the-library-and-the-queue)
 - The sound of it: [playback.bands](#playbackbandsout-n), [playback.sound and tracks.sound](#playbacksoundout)
@@ -92,9 +92,15 @@ At `control` level.
 | `playback.next()`, `playback.prev()` | the next track; back a track |
 | `playback.seek(ms)` | moves to `ms` into the track |
 | `playback.duck(level, [ticks])` | turns the music down to `level`/256 of the owner's volume, over `ticks` (at once when left out) -- for a moment of speech or a big effect; `duck(256)` brings it back. Never louder than the owner set it, and undone when the cart ends |
+| `playback.adjust(n)` | turns the owner's volume up `n` of the player's own steps, or down for a negative `n`, as the wheel does on the player's screens. It stays where it is put when the cart ends. Returns the volume then, 0 to 100 |
 | `tracks.enqueue(id, [next])` | adds a track to the queue: after the playing one with `next` true, else at the end. Returns whether it was added |
 
-None of these return anything but `enqueue`.
+None of these return anything but `adjust` and `enqueue`. `playback.volume()`
+reads the volume, 0 to 100, at any level.
+
+- A game that uses the wheel for itself takes the volume from the owner:
+  give it back on the wheel, `playback.adjust(wheel())`, while nothing else
+  wants it, and show the level for a moment after it moves.
 
 - The pause menu's **Now Playing** always offers play, pause and skip, so
   a game that takes Prev, Next and Play for itself does not need

@@ -354,6 +354,10 @@ API(colour_toned,     217, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 API(colour_turn,      218, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 API(colour_contrast,  219, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 
+/* The owner's volume: read, and turned a step at a time */
+API(playback_volume,  220, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(playback_adjust,  221, 1, 1, VAL,  0, FLAT, CONTROL, 1)
+
 API_ALIAS(time, t)
 
 /* The drawing target that is the screen; img() makes the others */

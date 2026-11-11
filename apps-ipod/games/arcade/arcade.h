@@ -182,6 +182,10 @@ struct arcade_tracks
      * the player shows, 0xRRGGBB, into out; 1 when they are the playing
      * album's (dynamic colours), 0 the theme's. NULL for none */
     int (*colours)(void *ctx, uint32_t out[3]);
+    /* playback.volume() and adjust(): the owner's volume turned up or down
+     * steps of the player's own (0 leaves it), and then where it is, 0 to
+     * 100 of its range. NULL for none */
+    int32_t (*volume)(void *ctx, int32_t steps);
 };
 
 /* tracks.field()'s fields: TRACK.* in arcade_api.def */

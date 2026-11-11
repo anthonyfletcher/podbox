@@ -18,7 +18,7 @@
  *   - the playing track, seeking and ducking
  *   - owning the music
  *   - the library: count, pick, field, near, sound
- *   - the queue, and the album's colours
+ *   - the queue, the album's colours, and the volume
  *   - a cart starting, ticking and ending
  ****************************************************************************/
 #include <stdbool.h>
@@ -39,6 +39,8 @@
 #include "metadata/book_resume.h"
 #include "settings/settings.h"         /* global_settings */
 #include "skin/skin_albumart_color.h"
+#include "sound.h"                     /* sound_min, sound_max */
+#include "system/volume.h"             /* adjust_volume */
 #include "games/arcade/shell_tracks.h"
 
 /* ---- tracks and their ids ------------------------------------------------ */
@@ -477,11 +479,24 @@ static int music_colours(void *ctx, uint32_t out[3])
     return 1;
 }
 
+/* The volume a step at a time, in the owner's own adjust mode, as the
+ * wheel turns it on the player's screens */
+static int32_t music_volume(void *ctx, int32_t steps)
+{
+    (void)ctx;
+    int lo = sound_min(SOUND_VOLUME), hi = sound_max(SOUND_VOLUME);
+    if (steps)
+        adjust_volume((int)steps);
+    if (hi <= lo)
+        return 0;
+    return (int32_t)((global_status.volume - lo) * 100 / (hi - lo));
+}
+
 const struct arcade_tracks shell_tracks = {
     music_current, music_position, music_text, music_seek, music_duck,
     music_play, music_stop, music_started, music_count, music_pick,
     music_field, music_near, music_sound, music_queued, music_queue_at,
-    music_enqueue, music_walked, music_colours
+    music_enqueue, music_walked, music_colours, music_volume
 };
 
 /* ---- a cart starting, ticking and ending --------------------------------- */

@@ -1073,3 +1073,25 @@ function draw() {}`, 1, ['--units']);
     assert.ok(cost('trifill(-600,0, -200,0, -200,119, 8)') < 60);
     assert.ok(cost('camera(300, 0); trifill(200,0, 600,0, 600,119, 8)') > 600);
 });
+
+test('playback.volume() reads the volume, playback.adjust() turns it a step at a time, within 0 to 100', () => {
+    const main = `function init() {
+    // pbgvm's volume (host/fakemusic.c) starts at 60, two a step
+    printh(playback.volume() + " " + playback.adjust(3) + " " + playback.volume());
+    printh(playback.adjust(-100) + " " + playback.adjust(80) + " " + playback.adjust(-1));
+}
+function update() {}`;
+    const res = compileFiles({ 'cart.json': JSON.stringify({ id: '0000000000007ac6', name: 'Volume', music: 'control' }),
+                               'main.js': main });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'volume.pbg');
+    fs.writeFileSync(file, res.cart);
+    const r = spawnSync(exe, [file, '--ticks', '1'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.stdout.replace(/\r/g, '').trim().split('\n').slice(0, 2), ['60 66 66', '0 100 98']);
+    /* turning it is control's; reading it is anyone's */
+    const listen = compileFiles({ 'cart.json': JSON.stringify({ id: '0000000000007ac7', name: 'Listen' }),
+                                  'main.js': 'function init() { printh(playback.volume()); playback.adjust(1); }\nfunction update() {}' });
+    assert.equal(listen.errors.length, 1);
+    assert.match(listen.errors[0].message, /control/);
+});

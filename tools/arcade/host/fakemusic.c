@@ -559,9 +559,20 @@ static int fake_colours(void *ctx, uint32_t out[3])
     return 1;
 }
 
+/* The volume, 0 to 100, two a step */
+static int32_t fake_vol = 60;
+
+static int32_t fake_volume(void *ctx, int32_t steps)
+{
+    (void)ctx;
+    fake_vol += steps * 2;
+    fake_vol = fake_vol < 0 ? 0 : fake_vol > 100 ? 100 : fake_vol;
+    return fake_vol;
+}
+
 const struct arcade_tracks fake_tracks = {
     fake_current, fake_position, fake_text, fake_seek, fake_duck,
     fake_play, fake_stop, fake_started, fake_count, fake_pick, fake_field,
     fake_near, fake_track_sound, fake_queued, fake_queue_at, fake_enqueue,
-    fake_walked, fake_colours
+    fake_walked, fake_colours, fake_volume
 };

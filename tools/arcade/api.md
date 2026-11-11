@@ -609,6 +609,12 @@ Moves to `ms` into the track. Needs `"music": "control"`.
 ### playback.duck(level, [ticks])
 Turns the music down to `level`/256 of the owner's volume, over `ticks`; undone when the cart ends. Needs `"music": "control"`.
 
+### playback.volume()
+The owner's volume, 0 to 100 of the player's range.
+
+### playback.adjust(n)
+Turns the owner's volume up `n` of the player's own steps, or down for a negative `n`, as the wheel does on the player's screens; it stays where it is put when the cart ends. Returns the volume then, 0 to 100. Needs `"music": "control"`.
+
 ### playback.play(id, [ms])
 Plays track `id`, from `ms` in. Returns whether it started. Needs `"music": "own"`.
 

@@ -274,6 +274,29 @@ NATIVE(playback_duck)
     return 1;
 }
 
+/* playback.volume(): the owner's volume, 0 to 100 of its range */
+NATIVE(playback_volume)
+{
+    (void)a; (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    vm_charge(vm, 10);
+    return RET_INT(t && t->volume ? t->volume(vm->host->ctx, 0) : 0);
+}
+
+/* playback.adjust(n): the volume turned up (or, negative, down) n of the
+ * player's own steps, as the wheel turns it; where it is then, 0 to 100 */
+NATIVE(playback_adjust)
+{
+    (void)argc;
+    const struct arcade_tracks *t = music_of(vm);
+    if (!is_num(a[0]))
+        return vm_fail(vm, "playback.adjust() needs a number of steps", "", "");
+    int32_t n = floor_int(a[0]);
+    n = n < -100 ? -100 : n > 100 ? 100 : n;
+    vm_charge(vm, 10);
+    return RET_INT(t && t->volume ? t->volume(vm->host->ctx, n) : 0);
+}
+
 NATIVE(playback_play)
 {
     const struct arcade_tracks *t = music_of(vm);
