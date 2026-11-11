@@ -950,6 +950,7 @@ static bool dialog_shown, dialog_to_root, dialog_open, dialog_took;
 static void remote_key(struct vm *vm, long b);
 static int event(struct vm *vm, long button);
 static int hold_pause(struct vm *vm, bool idle);
+static void pause_begin(struct vm *vm);
 static long dialog_touched;       /* the last input in a dialog */
 
 /* A frame of a dialog the engine drew on the game's screen (ui.*): shown,
@@ -999,10 +1000,12 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
     /* held or left alone, a dialog rests as the game does */
     bool idle = TIME_AFTER(current_tick, dialog_touched + IDLE_PAUSE);
     if (button_hold() || idle) {
+        pause_begin(vm);
         if (hold_pause(vm, idle && !button_hold()) == USB) {
             dialog_to_root = true;
             return 0;
         }
+        shell_tracks_hold(false);
         /* the press that woke it is not also an answer */
         while (button_status())
             button_get_w_tmo(HZ / 20);
@@ -1244,6 +1247,14 @@ static void remote_key(struct vm *vm, long b)
     present(vm, true);
 }
 
+/* A pause, by the menu or the hold switch: the cart told, and music it
+ * owns held still until the game plays on */
+static void pause_begin(struct vm *vm)
+{
+    arcade_paused(vm);
+    shell_tracks_hold(true);
+}
+
 /* The hold switch: the game waits, the screen shows it, until released;
  * meanwhile the CPU and the backlight go back to their settings. Idle,
  * the same until a button or the wheel is touched. */
@@ -1409,7 +1420,10 @@ static int run(const char *path, void *mem, size_t size)
         } else if (TIME_AFTER(current_tick, touched + IDLE_PAUSE))
             menu_pressed = true;
         if (menu_pressed) {
+            pause_begin(vm);
             status = pause_menu(vm, &vp);
+            if (status == PLAYING)
+                shell_tracks_hold(false);
             suspend = status == QUIT;
             shell_scores_run(true);
             spk_clock_resume();
@@ -1418,7 +1432,10 @@ static int run(const char *path, void *mem, size_t size)
             continue;
         }
         if (button_hold()) {
+            pause_begin(vm);
             status = hold_pause(vm, false);
+            if (status == PLAYING)
+                shell_tracks_hold(false);
             shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);

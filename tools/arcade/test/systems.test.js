@@ -421,6 +421,15 @@ function update() { n++; if (n == 3 || n == 8 || n == 9) printh(n + " " + skippe
     assert.equal(r.out, '3 2\n8 4\n9 0\n');
 });
 
+test('resumed tells of a pause once', () => {
+    const r = run(`var n = 0;
+function init() {}
+function update() { n++; if (n == 3 || n == 5 || n == 6) printh(n + " " + resumed()); }`,
+        6, ['--pause', '1,4']);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, 'paused\n3 1\npaused\n5 1\n6 0\n');
+});
+
 test('sprites.draw draws from arrays of any kind, as spr would', () => {
     const SHEET = `for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) { sset(8 + x, y, 1 + x); sset(16 + x, y, 9); }`;
     const batch = run(`function init() {
@@ -873,6 +882,8 @@ function init() {
     printh(tracks.field(4, TRACK.TITLE) + "|" + tracks.field(4, TRACK.GENRE) + "|" + tracks.field(4, TRACK.YEAR) + "|" + tracks.field(4, TRACK.LENGTH) + "|" + tracks.field(99, TRACK.TITLE));
     printh(tracks.near(6, 3, near) + " " + near.join(",") + " " + tracks.count({ artist: "Mira Vale" }));
     printh(tracks.near(6, 3, near, true) + " " + near.join(",") + " " + tracks.near(19, 3, near, true));
+    var many = new Int32Array(6);
+    printh(tracks.near([6, 19], 3, many, true) + " " + many.join(","));
     printh(tracks.sound(3, snd) + " " + snd[0]);
     printh(tracks.queued() + " " + tracks.place() + " " + tracks.queue(2) + " " + tracks.queue(40));
     printh(tracks.enqueue(15, true) + " " + tracks.queued() + " " + tracks.queue(1));
@@ -905,6 +916,8 @@ function update() {
         /* by sound, the nearest tempo to 6's 64 bpm: 72, 84, 88; the
          * spoken chapter has none */
         '3 4,3,5 0',
+        /* a list: 6's three, then -1 for the chapter's none */
+        '3 4,3,5,-1,-1,-1',
         /* track 3 at 84 bpm: a beat every 714 ms */
         '1 714',
         '10 0 2 -1',

@@ -268,6 +268,9 @@ Ticks a second now.
 ### skipped()
 Frames that ran late and were not drawn since the last call.
 
+### resumed()
+Whether the game was paused -- the pause menu, the hold switch -- since the last call.
+
 ### dget(i)
 Saved number `i`, 0 to 255; kept between plays.
 
@@ -643,7 +646,7 @@ How many of the owner's tracks match `filter`: `{ minlen, maxlen, genre, decade,
 One thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as a string, `YEAR` or `LENGTH` as a number.
 
 ### tracks.near(id, n, out, [sound])
-Up to `n` tracks most like `id`, into `out`: the same genre and decade first, or with `sound` true the nearest by Sound Index first. Returns how many.
+Up to `n` tracks most like `id`, into `out`: the same genre and decade first, or with `sound` true the nearest by Sound Index first. `id` can be a list of up to 10 tracks, `out` then holding `n` for each in turn, -1 after the last of each. Returns how many in all.
 
 ### tracks.sound(id, out)
 Any track's Sound Index, as `playback.sound` gives it.

@@ -481,11 +481,10 @@ static int32_t fake_pick(void *ctx, int32_t n, const struct arcade_filter *f,
 
 /* the same genre, nearest in the library first; by sound, the nearest
  * tempo first, the earlier of two as near */
-static int32_t fake_near(void *ctx, int32_t id, int32_t n, int sound,
-                         int32_t *out)
+static int32_t fake_near_one(int32_t id, int32_t n, int sound,
+                             int32_t *out)
 {
     int32_t k = 0;
-    (void)ctx;
     if (id < 0 || id >= LIB)
         return 0;
     if (sound) {
@@ -506,6 +505,21 @@ static int32_t fake_near(void *ctx, int32_t id, int32_t n, int sound,
                 out[k++] = j;
         }
     return k;
+}
+
+/* each of ids in turn, n a track, -1 after the last of each */
+static int32_t fake_near(void *ctx, const int32_t *ids, int32_t count,
+                         int32_t n, int sound, int32_t *out)
+{
+    int32_t found = 0;
+    (void)ctx;
+    for (int32_t t = 0; t < count; t++) {
+        int32_t k = fake_near_one(ids[t], n, sound, out + t * n);
+        for (int32_t i = k; i < n; i++)
+            out[t * n + i] = -1;
+        found += k;
+    }
+    return found;
 }
 
 static int fake_track_sound(void *ctx, int32_t id,

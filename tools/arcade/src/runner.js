@@ -238,6 +238,8 @@ export class Engine {
     }
     ceiling(u) { this.x.web_ceiling(u); }
     skipped(n) { this.x.web_skipped(n); }
+    /* the game paused, as resumed() reports */
+    paused() { this.x.web_paused(); }
     error() { return this.cstr(this.x.web_error()); }
     dialog() { return this.cstr(this.x.web_dialog()); }
     dirty() { const d = this.x.web_dirty(); return [d >> 16, (d << 16) >> 16]; }

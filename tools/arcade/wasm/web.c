@@ -230,6 +230,7 @@ EXPORT("web_ceiling") void web_ceiling(uint32_t u)
     arcade_set_ceiling(vm, u);
 }
 EXPORT("web_skipped") void web_skipped(unsigned n) { arcade_skipped(vm, n); }
+EXPORT("web_paused") void web_paused(void) { arcade_paused(vm); }
 
 /* One tick, as the player runs it: the input, the music ms on and its
  * state, each new press stamped with its clock, the last frame presented,

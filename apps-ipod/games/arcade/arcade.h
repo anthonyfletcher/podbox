@@ -19,6 +19,11 @@
 /* playback.sound()'s record: SOUND.SIZE in arcade_api.def */
 #define ARCADE_SOUND_FIELDS 31
 
+/* tracks.near(): the most it gives for a track, and the most tracks a
+ * call takes */
+#define ARCADE_NEAR_MAX 64
+#define ARCADE_NEAR_IDS 10
+
 struct arcade_host
 {
     void *ctx;
@@ -166,10 +171,12 @@ struct arcade_tracks
      * cap bytes with its end, 0 when there is none (ARCADE_TRACK_* below) */
     int (*field)(void *ctx, int32_t id, int f, int32_t *num, char *buf,
                  int cap);
-    /* tracks.near(): up to n tracks most like id, into out, the count;
-     * by how they sound, nearest first, when sound is set */
-    int32_t (*near)(void *ctx, int32_t id, int32_t n, int sound,
-                    int32_t *out);
+    /* tracks.near(): for each of count ids, up to n tracks most like it
+     * into out, n a track, -1 after the last of each; the count found in
+     * all. By how they sound, nearest first, when sound is set. n is at
+     * most ARCADE_NEAR_MAX, count ARCADE_NEAR_IDS. */
+    int32_t (*near)(void *ctx, const int32_t *ids, int32_t count,
+                    int32_t n, int sound, int32_t *out);
     /* tracks.sound(): id's Sound Index record, as playback.sound() */
     int (*sound)(void *ctx, int32_t id, int32_t out[ARCADE_SOUND_FIELDS]);
     /* the queue: its length and the playing place (0 first, -1 none),
@@ -267,6 +274,9 @@ int arcade_menu_is_game(const struct vm *vm);
  * skipped() reports. The rate can change at any tick (setrate()), so the
  * host reads arcade_rate() after each. */
 void arcade_skipped(struct vm *vm, unsigned frames);
+/* The game was paused, by the pause menu or the hold switch: what
+ * resumed() reports. */
+void arcade_paused(struct vm *vm);
 const uint8_t *arcade_id(const struct vm *vm);
 
 /* The buttons for btn(): one bit each, in btn()'s numbering. */

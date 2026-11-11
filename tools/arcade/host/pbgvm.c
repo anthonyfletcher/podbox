@@ -9,6 +9,7 @@
  *                  [--scores file] [--options file] [--opt t:i:v,...]
  *                  [--ui answer,...] [--speech] [--suspend-at t]
  *                  [--store dir] [--saves file] [--font font.bin]
+ *                  [--pause t,...]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -55,6 +56,8 @@
  * --suspend-at t suspends the cart before tick t as the player's Quit
  * does, overwrites the arena, and resumes it from the copy, printing
  * "resumed" -- the run's output is then the same as one never suspended.
+ * --pause pauses the game before each tick given, as the pause menu or
+ * the hold switch does, for resumed(), printing "paused".
  * --store keeps store.* files in dir, as name.json, within the player's
  * bounds; without it nothing is kept. --saves keeps dset()'s numbers in
  * file, read before the start and written after the last tick. quit()
@@ -819,6 +822,7 @@ int main(int argc, char **argv)
     const char *scores_path = NULL, *options_path = NULL, *opt_sets = NULL;
     const char *saves_path = NULL;
     long suspend_at = -1;
+    const char *pauses = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
             ticks = atol(argv[++i]);
@@ -860,6 +864,8 @@ int main(int argc, char **argv)
             ui_answers = argv[++i];
         else if (!strcmp(argv[i], "--speech"))
             speech_flag = 1;
+        else if (!strcmp(argv[i], "--pause") && i + 1 < argc)
+            pauses = argv[++i];
         else if (!strcmp(argv[i], "--suspend-at") && i + 1 < argc)
             suspend_at = atol(argv[++i]);
         else if (!strcmp(argv[i], "--store") && i + 1 < argc)
@@ -948,6 +954,15 @@ int main(int argc, char **argv)
                 b++;
             else
                 break;
+        }
+        for (const char *p = pauses; p && *p;) {
+            if (strtol(p, (char **)&p, 10) == t) {
+                arcade_paused(vm);
+                printf("paused\n");
+            }
+            if (*p != ',')
+                break;
+            p++;
         }
         if (t == suspend_at) {
             static uint64_t copy[sizeof(arena) / 8];

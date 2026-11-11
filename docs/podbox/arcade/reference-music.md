@@ -116,6 +116,10 @@ At `own` level.
 | `playback.stop()` | stops the music |
 | `playback.started()` | whether the track asked for can be heard yet |
 
+The music pauses with the game -- the pause menu, the hold switch -- and
+plays on after; [`resumed()`](reference-time.md#resumed) tells the cart
+it happened.
+
 - On an iPod Video a track can take seconds to start, while its disk
   spins up. A round timed against the music -- "name this song" -- starts
   its clock when `playback.started()` turns true, not when `play` was
@@ -133,7 +137,7 @@ level but `enqueue`, above.
 | `tracks.count([filter])` | how many tracks match |
 | `tracks.pick(n, filter, out)` | `n` tracks at random that match, their ids into `out` (an `Int32Array` or a list); how many it found |
 | `tracks.field(id, f)` | one thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as text, `TRACK.YEAR` or `LENGTH` (ms) as a number |
-| `tracks.near(id, n, out, [sound])` | up to `n` tracks most like `id` -- the same genre and decade first -- into `out`; how many. With `sound` true, those that sound most like it, nearest first, by the Sound Index; none when `id` has not been measured |
+| `tracks.near(id, n, out, [sound])` | up to `n` tracks (64 at most) most like `id` -- the same genre and decade first -- into `out`; how many. With `sound` true, those that sound most like it, nearest first, by the Sound Index; none when `id` has not been measured. `id` can be a list of up to 10 tracks: `out` then holds `n` for each in turn, -1 after the last of each |
 | `tracks.sound(id, out)` | a track's Sound Index (below) |
 | `tracks.queued()` | how many tracks the queue holds |
 | `tracks.place()` | the playing track's place in the queue, 0 first, or -1 |
@@ -169,6 +173,9 @@ function newRound() {
   track in the library and cost 200 units and 4 a track -- about 40,000
   for a library of 10,000, over three ticks' worth on an iPod Video
   playing FLAC.
+- `tracks.near` by sound reads the whole Sound Index instead, at the same
+  cost. Given a list of tracks, it reads it once for them all: ask about
+  every track a game needs in one call, not one call a track.
 - In the IDE, `tracks.count()` is 20 and the queue holds 10, and
   `tracks.near` by sound takes the nearest tempo for the nearest sound.
 

@@ -812,6 +812,7 @@ async function call(p) {
 /* fn() run with the run held, the clock started again after */
 async function hold(fn) {
     dialogs++;
+    if (engine) engine.paused();
     try { return await fn(); } finally {
         dialogs--;
         if (running && engine) rebase(engine);
@@ -1210,6 +1211,7 @@ $('screen').addEventListener('keydown', (e) => {
     e.preventDefault();
     if (b === MENU && engine && !engine.menuIsGame() && !e.repeat) {
         paused = !paused;
+        if (paused) engine.paused();
         document.body.classList.toggle('paused', paused);
     }
     keys |= b;

@@ -7,6 +7,7 @@
 #ifndef SHELL_TRACKS_H
 #define SHELL_TRACKS_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "games/arcade/arcade.h"
 
@@ -20,6 +21,10 @@ extern const struct arcade_tracks shell_tracks;
 void shell_tracks_start(void);
 int shell_tracks_tick(void);
 void shell_tracks_end(void);
+
+/* The game paused (true) and playing on: music the cart owns held still
+ * meanwhile, so a round timed against it loses nothing */
+void shell_tracks_hold(bool hold);
 
 /* A Sound Index record as playback.sound() and tracks.sound() hand it over,
  * in the order of SOUND.* */

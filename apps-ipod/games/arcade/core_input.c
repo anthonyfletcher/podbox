@@ -446,17 +446,38 @@ NATIVE(tracks_field)
     return 1;
 }
 
-/* tracks.near(id, n, out, [sound]): up to n tracks most like id, into out */
+/* tracks.near(id, n, out, [sound]): up to n tracks most like id, into out;
+ * id a list of tracks, n for each in turn, -1 after the last of each */
 NATIVE(tracks_near)
 {
     const struct arcade_tracks *t = music_of(vm);
     int32_t n = is_num(a[1]) ? floor_int(a[1]) : -1, *ids;
+    int32_t ask[ARCADE_NEAR_IDS], count = 1;
     int sound = argc > 3 && vm_truthy(vm, a[3]);
-    if (!is_num(a[0]) || !ids_out(vm, a[2], n, &ids, "tracks.near"))
+    if (is_num(a[0])) {
+        ask[0] = floor_int(a[0]);
+    } else if (a[0].tag == T_I32 || a[0].tag == T_ARR) {
+        count = a[0].tag == T_I32 ? (int32_t)I32(vm, a[0])->len
+                                  : (int32_t)ARR(vm, a[0])->len;
+        if (count < 1 || count > ARCADE_NEAR_IDS)
+            return vm_fail(vm, "tracks.near() takes 1 to 10 tracks", "", "");
+        for (int32_t i = 0; i < count; i++) {
+            struct value v = a[0].tag == T_I32
+                ? mk(T_INT, I32(vm, a[0])->d[i])
+                : BUF(vm, ARR(vm, a[0])->buf)->v[i];
+            ask[i] = is_num(v) ? floor_int(v) : -1;
+        }
+    } else {
+        return vm_fail(vm, "tracks.near() needs a track, or a list of them",
+                       "", "");
+    }
+    if (n > ARCADE_NEAR_MAX)
+        n = ARCADE_NEAR_MAX;
+    if (!ids_out(vm, a[2], n < 0 ? -1 : n * count, &ids, "tracks.near"))
         return 0;
-    int32_t k = t && t->near && n ? t->near(vm->host->ctx, floor_int(a[0]),
-                                            n, sound, ids) : 0;
-    ids_store(vm, a[2], ids, k);
+    int32_t k = t && t->near && n ? t->near(vm->host->ctx, ask, count, n,
+                                            sound, ids) : 0;
+    ids_store(vm, a[2], ids, count > 1 ? n * count : k);
     if (!vm_spend(vm, walk_cost(vm, t) + (uint32_t)k * 4))
         return 0;
     return RET_INT(k);
@@ -783,6 +804,21 @@ NATIVE(skipped)
     (void)a; (void)argc;
     *out = mk(T_INT, (int32_t)vm->skipped);
     vm->skipped = 0;
+    return 1;
+}
+
+void arcade_paused(struct vm *vm)
+{
+    vm->paused = 1;
+}
+
+/* resumed(): whether the game was paused -- the pause menu, the hold
+ * switch -- since the last call */
+NATIVE(resumed)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, vm->paused);
+    vm->paused = 0;
     return 1;
 }
 

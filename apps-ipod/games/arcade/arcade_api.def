@@ -114,6 +114,7 @@ API(prof,      73, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(rate,      92, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(setrate,   93, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(skipped,   94, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(resumed,  222, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 
 /* The owner's music, read-only: the first of the playback service (6.4) */
 API_NS(playback)

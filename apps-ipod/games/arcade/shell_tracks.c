@@ -332,137 +332,174 @@ static int music_field(void *ctx, int32_t id, int f, int32_t *num, char *buf,
     return 0;
 }
 
-/* The most near() hands over at once */
-#define NEAR_MAX 64
+/* The most near() hands over for a track, and the most tracks at once */
+#define NEAR_MAX ARCADE_NEAR_MAX
+#define NEAR_IDS ARCADE_NEAR_IDS
 
 /* Closer than this by sound, and this near in length, two records are one
  * recording encoded twice: sound_mix.c's MIX_SEED_EPSILON */
 #define SAME_RECORDING_D  15
 #define SAME_LENGTH_MS    2000
 
-/* By sound: the nearest records in the Sound Index, nearest first, and the
- * length each turns out to have */
-static struct { uint64_t key; int d; int32_t id; long len; } nearest[NEAR_MAX];
-static int nearest_ct;
+/* By sound: for each track asked about, the nearest records in the Sound
+ * Index, nearest first, and the track and length each turns out to be */
+struct near_entry { uint64_t key; int d; int32_t id; long len; };
+static struct near_entry near_tab[NEAR_IDS][NEAR_MAX];
+static int near_ct[NEAR_IDS];
 
-static void keep_nearest(uint64_t key, int d)
+static void keep_nearest(int t, uint64_t key, int d)
 {
+    struct near_entry *e = near_tab[t];
     int i;
-    if (nearest_ct == NEAR_MAX && d >= nearest[NEAR_MAX - 1].d)
+    if (near_ct[t] == NEAR_MAX && d >= e[NEAR_MAX - 1].d)
         return;
-    i = nearest_ct < NEAR_MAX ? nearest_ct++ : NEAR_MAX - 1;
-    for (; i > 0 && nearest[i - 1].d > d; i--)
-        nearest[i] = nearest[i - 1];
-    nearest[i].key = key;
-    nearest[i].d = d;
-    nearest[i].id = -1;
+    i = near_ct[t] < NEAR_MAX ? near_ct[t]++ : NEAR_MAX - 1;
+    for (; i > 0 && e[i - 1].d > d; i--)
+        e[i] = e[i - 1];
+    e[i].key = key;
+    e[i].d = d;
+    e[i].id = -1;
+}
+
+/* Every kept entry, in key order, for the walk below to look a path up in */
+static struct near_entry *by_key[NEAR_IDS * NEAR_MAX];
+static int by_key_ct;
+
+static int compare_key(const void *a, const void *b)
+{
+    uint64_t ka = (*(struct near_entry *const *)a)->key;
+    uint64_t kb = (*(struct near_entry *const *)b)->key;
+    return ka < kb ? -1 : ka > kb;
 }
 
 /* Each kept key's track, music only: from the path index while the
  * database is in RAM, else by one walk of it, since a record has no path */
-static void resolve_nearest(void)
+static void resolve_nearest(int count)
 {
     struct tagcache_search tcs;
     char path[MAX_PATH];
     long spoken;
     int32_t seen = 0;
     if (tagcache_is_in_ram()) {
-        for (int i = 0; i < nearest_ct; i++) {
-            int id = tagcache_find_key(nearest[i].key);
-            if (id >= 0 &&
-                tagcache_entry_numeric(id, tag_virt_spoken, &spoken) &&
-                !spoken &&
-                tagcache_entry_numeric(id, tag_length, &nearest[i].len))
-                nearest[i].id = id;
-        }
+        for (int t = 0; t < count; t++)
+            for (int i = 0; i < near_ct[t]; i++) {
+                struct near_entry *e = &near_tab[t][i];
+                int id = tagcache_find_key(e->key);
+                if (id >= 0 &&
+                    tagcache_entry_numeric(id, tag_virt_spoken, &spoken) &&
+                    !spoken && tagcache_entry_numeric(id, tag_length, &e->len))
+                    e->id = id;
+            }
         return;
     }
-    if (!tagcache_search(&tcs, tag_filename))
+    by_key_ct = 0;
+    for (int t = 0; t < count; t++)
+        for (int i = 0; i < near_ct[t]; i++)
+            by_key[by_key_ct++] = &near_tab[t][i];
+    qsort(by_key, by_key_ct, sizeof(by_key[0]), compare_key);
+    if (by_key_ct == 0 || !tagcache_search(&tcs, tag_filename))
         return;
     tagcache_search_add_clause(&tcs, &music_clause);
     while (tagcache_get_next(&tcs, path, sizeof(path))) {
         uint64_t key = path_key(path);
+        int lo = 0, hi = by_key_ct;
         if ((++seen & 15) == 0)
             yield();
-        for (int i = 0; i < nearest_ct; i++)
-            if (nearest[i].key == key) {
-                nearest[i].id = tcs.idx_id;
-                nearest[i].len = tagcache_get_numeric(&tcs, tag_length);
-            }
+        while (lo < hi) {
+            int mid = (lo + hi) / 2;
+            if (by_key[mid]->key < key)
+                lo = mid + 1;
+            else
+                hi = mid;
+        }
+        /* two tracks asked about can share a neighbour */
+        for (; lo < by_key_ct && by_key[lo]->key == key; lo++) {
+            by_key[lo]->id = tcs.idx_id;
+            by_key[lo]->len = tagcache_get_numeric(&tcs, tag_length);
+        }
     }
     tagcache_search_finish(&tcs);
     walked += seen;
 }
 
-/* The tracks that sound most like id, nearest first, by Play Similar's
- * distance with its genre and era terms off; a second copy of id's own
- * recording left out. None when id has no Sound Index record. */
-static int32_t near_by_sound(int32_t id, int32_t n, int32_t *out)
+/* For each of ids, the tracks that sound most like it, nearest first, by
+ * Play Similar's distance with its genre and era terms off; a second copy
+ * of its own recording left out. One walk of the index answers them all.
+ * out holds n for each in turn, -1 after the last; none for a track the
+ * index has not measured. The count found in all. */
+static int32_t near_by_sound(const int32_t *ids, int count, int32_t n,
+                             int32_t *out)
 {
+    static struct sound_axes self[NEAR_IDS];
+    static uint64_t self_key[NEAR_IDS];
     struct sound_index_reader r;
     struct sound_record rec;
-    struct sound_axes self, ax;
+    struct sound_axes ax;
     char path[MAX_PATH];
-    long len = 0;
-    int32_t k = 0;
-    uint64_t key = tagcache_entry_key(id);
-    if (!key && path_of_id(id, path, sizeof(path)))
-        key = path_key(path);
-    if (!key || sound_index_reader_open(&r) != SOUND_OK)
+    int32_t found = 0;
+    int measured = 0;
+    for (int t = 0; t < count * n; t++)
+        out[t] = -1;
+    if (sound_index_reader_open(&r) != SOUND_OK)
         return 0;
-    if (!sound_index_find(&r, key, &rec) || !sound_record_usable(&rec)) {
-        sound_index_reader_close(&r);
-        return 0;
+    for (int t = 0; t < count; t++) {
+        uint64_t key = ids[t] >= 0 ? tagcache_entry_key(ids[t]) : 0;
+        if (!key && path_of_id(ids[t], path, sizeof(path)))
+            key = path_key(path);
+        near_ct[t] = 0;
+        self_key[t] = 0;
+        if (key && sound_index_find(&r, key, &rec) &&
+            sound_record_usable(&rec)) {
+            sound_mix_axes(&rec, &self[t]);
+            self[t].genre = self[t].year = 0;
+            self_key[t] = key;
+            measured++;
+        }
     }
-    sound_mix_axes(&rec, &self);
-    self.genre = self.year = 0;
-    nearest_ct = 0;
-    for (int i = 0; i < r.count; i++) {
+    for (int i = 0; measured && i < r.count; i++) {
         if ((i & 63) == 0)
             yield();
-        if (!sound_index_read(&r, i, &rec) || !sound_record_usable(&rec) ||
-            rec.key == key)
+        if (!sound_index_read(&r, i, &rec) || !sound_record_usable(&rec))
             continue;
         sound_mix_axes(&rec, &ax);
         ax.genre = ax.year = 0;
-        keep_nearest(rec.key, sound_mix_distance(&self, &ax));
+        for (int t = 0; t < count; t++)
+            if (self_key[t] && rec.key != self_key[t])
+                keep_nearest(t, rec.key, sound_mix_distance(&self[t], &ax));
     }
-    walked = r.count;
+    walked = measured ? r.count : 0;
     sound_index_reader_close(&r);
-    resolve_nearest();
-    tagcache_entry_numeric(id, tag_length, &len);
-    for (int i = 0; i < nearest_ct && k < n; i++) {
-        long gap = nearest[i].len - len;
-        if (nearest[i].id < 0 || nearest[i].id == id ||
-            (nearest[i].d < SAME_RECORDING_D &&
-             gap > -SAME_LENGTH_MS && gap < SAME_LENGTH_MS))
-            continue;
-        out[k++] = nearest[i].id;
+    resolve_nearest(count);
+    for (int t = 0; t < count; t++) {
+        long len = 0;
+        int32_t k = 0;
+        tagcache_entry_numeric(ids[t], tag_length, &len);
+        for (int i = 0; i < near_ct[t] && k < n; i++) {
+            const struct near_entry *e = &near_tab[t][i];
+            long gap = e->len - len;
+            if (e->id < 0 || e->id == ids[t] ||
+                (e->d < SAME_RECORDING_D &&
+                 gap > -SAME_LENGTH_MS && gap < SAME_LENGTH_MS))
+                continue;
+            out[t * n + k++] = e->id;
+        }
+        found += k;
     }
-    return k;
+    return found;
 }
 
 /* The tracks most like id: the same genre and decade, then the same genre,
  * then the same decade, each tier taken at random (a reservoir a tier);
- * music only, id itself left out. By sound instead, see above. */
-static int32_t music_near(void *ctx, int32_t id, int32_t n, int sound,
-                          int32_t *out)
+ * music only, id itself left out */
+static int32_t near_by_tags(int32_t id, int32_t n, int32_t *out)
 {
-    (void)ctx;
     static int32_t tier[3][NEAR_MAX];
     struct tagcache_search tcs;
     char genre[64], g[64], title[8];
     long year = 0;
     int32_t found[3] = { 0, 0, 0 }, seen = 0, k = 0;
     struct arcade_filter music = { 0, 0, NULL, 0, 1, NULL };
-    if (n > NEAR_MAX)
-        n = NEAR_MAX;
-    walked = 0;
-    if (n <= 0 || id < 0)
-        return 0;
-    if (sound)
-        return near_by_sound(id, n, out);
-    if (!walk_begin(&tcs, &music))
+    if (id < 0 || !walk_begin(&tcs, &music))
         return 0;
     bool has_genre = tagcache_entry_string(id, tag_genre, genre,
                                            sizeof(genre));
@@ -487,12 +524,34 @@ static int32_t music_near(void *ctx, int32_t id, int32_t n, int sound,
         found[t]++;
     }
     tagcache_search_finish(&tcs);
-    walked = seen;
+    walked += seen;
     for (int t = 0; t < 3; t++)
         for (int32_t i = 0; i < found[t] && i < n && k < n; i++)
             out[k++] = tier[t][i];
     return k;
 }
+
+/* By tags, a walk of the library for each track; by sound, one walk of
+ * the Sound Index for them all */
+static int32_t music_near(void *ctx, const int32_t *ids, int32_t count,
+                          int32_t n, int sound, int32_t *out)
+{
+    (void)ctx;
+    int32_t found = 0;
+    walked = 0;
+    if (n <= 0 || count <= 0 || n > NEAR_MAX || count > NEAR_IDS)
+        return 0;
+    if (sound)
+        return near_by_sound(ids, count, n, out);
+    for (int32_t t = 0; t < count; t++) {
+        int32_t k = near_by_tags(ids[t], n, out + t * n);
+        for (int32_t i = k; i < n; i++)
+            out[t * n + i] = -1;
+        found += k;
+    }
+    return found;
+}
+
 
 static int music_sound(void *ctx, int32_t id, int32_t out[ARCADE_SOUND_FIELDS])
 {
@@ -623,6 +682,9 @@ const struct arcade_tracks shell_tracks = {
 
 static char ticked_path[MAX_PATH];
 
+/* the cart's own music, paused by the pause */
+static bool held;
+
 void shell_tracks_start(void)
 {
     struct mp3entry *id3 = audio_current_track();
@@ -631,6 +693,7 @@ void shell_tracks_start(void)
     playing_id = -1;
     duck_now = duck_to = MIX_AMP_UNITY;
     owned = false;
+    held = false;
     seek_ms = -1;
 }
 
@@ -646,6 +709,19 @@ int shell_tracks_tick(void)
     seek_ms = -1;
     duck_tick();
     return changed;
+}
+
+void shell_tracks_hold(bool hold)
+{
+    int status = audio_status() & (AUDIO_STATUS_PLAY | AUDIO_STATUS_PAUSE);
+    if (hold && owned && status == AUDIO_STATUS_PLAY) {
+        audio_pause();
+        held = true;
+    } else if (!hold && held) {
+        held = false;
+        if (status & AUDIO_STATUS_PAUSE)
+            audio_resume();
+    }
 }
 
 void shell_tracks_end(void)

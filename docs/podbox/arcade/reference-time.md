@@ -6,7 +6,7 @@ cannot keep up, and the clock and calendar.
 - [How time works](#how-time-works): [ticks](#ticks), [when the player falls behind](#when-the-player-falls-behind),
   [pausing](#pausing)
 - [rate](#rate), [setrate](#setraten), [t and time](#t-time), [frame](#frame),
-  [skipped](#skipped), [date](#dateout)
+  [skipped](#skipped), [resumed](#resumed), [date](#dateout)
 - [Speeds that do not depend on the rate](#speeds-that-do-not-depend-on-the-rate)
 - [Stepping the rate down](#stepping-the-rate-down)
 
@@ -58,8 +58,10 @@ each second.
 Pressing Menu pauses the cart and shows the pause menu, unless the cart
 takes Menu as a button (`"menu_button": "game"` in `cart.json`). On the
 iPod, a cart left untouched for five minutes pauses too, so the player
-can turn its backlight off. No ticks run while paused, and a dialog (`ui.*`) holds the
-ticks the same way while it is open.
+can turn its backlight off. The hold switch pauses it as well. No ticks
+run while paused, and a dialog (`ui.*`) holds the ticks the same way
+while it is open. [`resumed()`](#resumed) tells the cart it was paused,
+and music the cart plays itself (`playback.play`) pauses with it.
 
 ---
 
@@ -163,6 +165,24 @@ function update() {
 - In `pbgvm`, `--skip 5:1,10:3` makes ticks 5 and 10 late, as a slow
   player would: tick 5 reports one frame skipped and tick 10 three, and
   both run `update()` without `draw()`.
+
+## resumed()
+
+Whether the game was paused -- by the pause menu or the hold switch --
+since the last call.
+
+**Returns** true once after a pause, then false until the next.
+
+```js
+function update() {
+    // a round timed against the music is lost to a pause
+    if (resumed() && playingRound) loseRound();
+}
+```
+
+- The cart's own dialogs (`ui.*`) do not count: the cart opened them.
+- In `pbgvm`, `--pause 40` pauses the game before tick 40. In the IDE,
+  pausing with Menu (Esc) and the Game menu's dialogs count.
 
 ## date(out)
 
