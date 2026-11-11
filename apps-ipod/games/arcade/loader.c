@@ -227,6 +227,7 @@ static int load_header(struct vm *vm, const uint8_t *p, uint32_t n)
     vm->rate = p[4];
     vm->menu_button = p[5];
     vm->music = p[6];
+    vm->no_suspend = p[7] & 1;
     if (vm->rate != 20 && vm->rate != 25 && vm->rate != 33 && vm->rate != 50)
         return bad(vm, "rate");
     memcpy(vm->id, p + 12, 8);

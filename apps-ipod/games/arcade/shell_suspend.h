@@ -12,7 +12,7 @@
 #include "games/arcade/arcade.h"
 
 /* Quit from the pause menu: the game written out, unless it owns the
- * music */
+ * music or its cart.json says "suspend": false */
 void shell_suspend_write(struct vm *vm);
 
 /* A cart just loaded into mem: when it was suspended in this build, it is

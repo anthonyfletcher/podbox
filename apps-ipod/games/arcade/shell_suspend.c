@@ -56,7 +56,7 @@ void shell_suspend_write(struct vm *vm)
     uint32_t size;
     const void *mem = arcade_snapshot(vm, &size);
     struct head h;
-    if (arcade_owns_music(vm))
+    if (arcade_owns_music(vm) || !arcade_suspends(vm))
         return;
     head_of(vm, mem, size, &h);
     suspend_path(vm, path, sizeof(path));

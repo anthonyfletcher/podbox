@@ -287,6 +287,7 @@ struct vm
 
     /* The cart, as loaded */
     uint8_t rate, menu_button, music;
+    uint8_t no_suspend;         /* Quit keeps nothing to resume */
     uint16_t api;
     uint8_t id[8];
     const uint8_t *meta;

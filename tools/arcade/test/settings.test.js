@@ -34,3 +34,19 @@ test('the compiler takes what the form writes', () => {
     const r = compileFiles({ 'main.js': MAIN, 'cart.json': text }, {});
     assert.deepEqual(r.errors, []);
 });
+
+test('"suspend": false is kept in the header, and anything but true or false refused', () => {
+    const cart = (s) => JSON.stringify(Object.assign({ id: '0123456789abcdef', name: 'T' }, s));
+    const flag = (s) => {
+        const r = compileFiles({ 'main.js': MAIN, 'cart.json': cart(s) }, {});
+        assert.deepEqual(r.errors, []);
+        const b = Buffer.from(r.cart), at = b.indexOf('PBG1') + 8;    /* the header's chunk, past its tag and length */
+        return b[at + 7];
+    };
+    assert.equal(flag({}), 0);
+    assert.equal(flag({ suspend: true }), 0);
+    assert.equal(flag({ suspend: false }), 1);
+    const bad = compileFiles({ 'main.js': MAIN, 'cart.json': cart({ suspend: 'no' }) }, {});
+    assert.match(bad.errors.map((e) => e.message).join('\n'), /suspend must be true or false/);
+    assert.equal(JSON.parse(writeSettings({ id: '0123456789abcdef', name: 'T', suspend: false })).suspend, false);
+});

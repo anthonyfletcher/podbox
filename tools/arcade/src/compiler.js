@@ -1605,7 +1605,7 @@ function header(cart, prog) {
     w.u8(cart.rate);
     w.u8(cart.menu_button === 'game' ? 1 : 0);
     w.u8(prog.level);
-    w.u8(0);
+    w.u8(cart.suspend === false ? 1 : 0);   /* 1: Quit keeps nothing to resume */
     w.u32(0);                      /* memory required: all of it, for now */
     for (let i = 0; i < 16; i += 2) w.u8(parseInt(cart.id.substr(i, 2), 16));
     return w.done();
@@ -1760,7 +1760,7 @@ function achievements(list) {
 /* ---- the cart's settings ----------------------------------------------- */
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
-                   'menu_button', 'music', 'boards', 'options',
+                   'menu_button', 'music', 'suspend', 'boards', 'options',
                    'achievements', 'flags'];
 const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
 
@@ -1937,6 +1937,8 @@ function checkCart(cart, errors) {
     if (c.menu_button !== 'pause' && c.menu_button !== 'game')
         bad('menu_button must be "pause" or "game"');
     if (MUSIC.indexOf(c.music) < 0) bad('music must be one of ' + MUSIC.join(', '));
+    if (c.suspend !== undefined && typeof c.suspend !== 'boolean')
+        bad('suspend must be true or false');
     c.boards = checkBoards(cart.boards, bad);
     c.options = checkOptions(cart.options, bad);
     c.achievements = checkAchievements(cart.achievements, bad);

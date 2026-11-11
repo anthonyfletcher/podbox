@@ -372,6 +372,8 @@ void arcade_restore(struct vm *vm, const int32_t save[256],
 const void *arcade_snapshot(const struct vm *vm, uint32_t *size);
 uint32_t arcade_cart_hash(const struct vm *vm);
 int arcade_owns_music(const struct vm *vm);
+/* whether Quit keeps the game to resume: not where cart.json says "suspend": false */
+int arcade_suspends(const struct vm *vm);
 /* mem holds a snapshot read back to where it was taken: the cart, ready
  * for its next tick, or NULL when mem is not one */
 struct vm *arcade_resume(void *mem, uint32_t size,

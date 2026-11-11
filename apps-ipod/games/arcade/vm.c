@@ -2178,6 +2178,11 @@ int arcade_owns_music(const struct vm *vm)
     return vm->music == 2;
 }
 
+int arcade_suspends(const struct vm *vm)
+{
+    return !vm->no_suspend;
+}
+
 struct vm *arcade_resume(void *mem, uint32_t size,
                          const struct arcade_host *host)
 {

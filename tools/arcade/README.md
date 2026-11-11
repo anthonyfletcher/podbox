@@ -51,6 +51,7 @@ A cart is a folder:
 | `rate` | ticks a second: 20, 25, 33 (the default) or 50 |
 | `menu_button` | `pause` (the default) or `game`, to have MENU as button 2 |
 | `music` | `listen` (the default), `control` or `own` |
+| `suspend` | `true` (the default): Quit from the pause menu keeps the game, and the player offers to carry on next time; `false` ends it, for a game played against the music, which cannot be picked up again |
 | `boards` | the high-score tables, up to 8, below |
 | `options` | the settings the pause menu shows, up to 8, below |
 | `achievements` | up to 32 records: `name`, used in code as `ACH.<name>`; `title`, 1 to 31 bytes (the name when left out); and `text`, up to 95 bytes |

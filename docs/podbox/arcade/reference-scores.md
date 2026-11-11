@@ -271,7 +271,9 @@ rows, top to bottom:
 6. **Now Playing**: play, pause and skip the owner's music -- the way to
    reach them in a game that uses those buttons itself
 7. **Restart**: the cart from the beginning
-8. **Quit**
+8. **Quit**: kept as it is, and offered to carry on the next time the cart
+   starts -- unless the cart owns the music, or has `"suspend": false`
+   in `cart.json`, for a game that cannot be picked up again later
 
 The saved numbers and scores are written to the disk as the menu opens.
 

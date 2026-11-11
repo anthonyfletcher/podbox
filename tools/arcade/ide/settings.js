@@ -9,7 +9,7 @@
 import { iconButton } from './icons.js';
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const ORDER = ['id', 'name', 'author', 'version', 'help', 'rate', 'menu_button', 'music',
+const ORDER = ['id', 'name', 'author', 'version', 'help', 'rate', 'menu_button', 'music', 'suspend',
                'flags', 'boards', 'options', 'achievements'];
 
 /* cart.json as text: settings in a fixed order, empty texts and lists left
@@ -181,6 +181,9 @@ export class CartSettings {
         this.row(sec, 'Music', this.choose(c, 'music',
             [['listen', 'Listen: what is playing'], ['control', 'Control: pause, skip, volume'],
              ['own', 'Own: plays tracks itself']], 'listen'), 'What the cart may do with the owner\'s music');
+        this.row(sec, 'On Quit', this.choose(c, 'suspend',
+            [[true, 'Keeps the game, to carry on next time'], [false, 'Ends the game']], true),
+            'Whether the player offers the game as it was left');
 
         sec = this.section('Sprite flags');
         const flags = Array.isArray(c.flags) ? c.flags : (c.flags = []);
