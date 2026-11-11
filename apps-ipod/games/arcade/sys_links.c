@@ -1453,20 +1453,22 @@ static int64_t seg_first(const struct segs *s, const struct nearby *nb,
     return first;
 }
 
-/* One point against the set: p and o (16.16, world) changed in place.
- * Returns the material plus one it touched, 0 none, with the way out. */
+/* One point against the set: p and o (16.16, world) changed in place, o
+ * carrying its speed; its path and the side it is on are from start,
+ * where it was as the tick began. Returns the material plus one it
+ * touched, 0 none, with the way out. */
 static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
-                        int32_t *OX, int32_t *OY, int32_t radius,
-                        const int32_t *gravity,
+                        int32_t *OX, int32_t *OY, int32_t SX, int32_t SY,
+                        int32_t radius, const int32_t *gravity,
                         const int32_t *friction, uint32_t nfriction,
                         int32_t bounce, uint32_t *stamp, uint32_t *mark,
                         int32_t *nx, int32_t *ny, struct seg_counts *cnt)
 {
-    /* in the set's own place: p against where it is, o against where it
-     * was before this tick's move */
+    /* in the set's own place: p against where it is, the start against
+     * where the set was before this tick's move */
     int64_t px = ((int64_t)*X - s->ox) >> 8, py = ((int64_t)*Y - s->oy) >> 8;
-    int64_t ox = ((int64_t)*OX - s->ox + s->mx) >> 8;
-    int64_t oy = ((int64_t)*OY - s->oy + s->my) >> 8;
+    int64_t ox = ((int64_t)SX - s->ox + s->mx) >> 8;
+    int64_t oy = ((int64_t)SY - s->oy + s->my) >> 8;
     int64_t r = radius >> 8;
     if (r < 64)
         r = 64;                     /* a quarter pixel */
@@ -2078,20 +2080,20 @@ NATIVE(links_step)
                     segpts++;
                     /* each set judges the side a point is on from where it
                      * was as the tick began, not from where a set met
-                     * before it put its speed: a bounce off the ground
-                     * would put that below the point, and the lift above
-                     * it would take it for coming up from inside */
-                    int32_t nx, ny, ox_s = OX0, oy_s = OY0;
-                    int32_t k = seg_meet(sg, &X, &Y, &ox_s, &oy_s, radius,
-                                         grav, fr, nfr, bounce, stamp, &mark,
-                                         &nx, &ny, &sc);
+                     * before it put its speed -- a bounce off the ground
+                     * puts that below the point, and the lift above it
+                     * would take it for coming up from inside -- but takes
+                     * its speed as that set left it, or a push out of one
+                     * set would become speed off the next */
+                    int32_t nx, ny;
+                    int32_t k = seg_meet(sg, &X, &Y, &OX, &OY, OX0, OY0,
+                                         radius, grav, fr, nfr, bounce,
+                                         stamp, &mark, &nx, &ny, &sc);
                     if (k) {
                         m = k;
                         NX = nx;
                         NY = ny;
                         met = (int32_t)s;
-                        OX = ox_s;
-                        OY = oy_s;
                     }
                 }
                 if (m) {
