@@ -271,7 +271,10 @@ show as `?`.
   to draw on them, and set the chosen sprites' flags from the Flags list on
   the toolbar. Tile mode shows a
   picture repeated round itself, drawing wrapping at its edges, for tiles
-  that join; invert turns each colour to the one nearest its opposite. Choose
+  that join; invert turns each colour to the one nearest its opposite. An
+  image changes size with Canvas size, which keeps the picture at the corner,
+  edge or middle you choose, or with Crop to cut it to the selection; a drag
+  past the edge of the view scrolls it. Choose
   several sprites in a row and press Animate to make them an animation: it
   plays under the picker at the speed you set, with the line of code that
   plays it. The onion button shows the sprites before the ones you are

@@ -521,6 +521,25 @@ function exportPicture() {
     download(new Blob([folder[current]], { type: 'image/png' }), current.split('/').pop());
 }
 
+/* A picture's new canvas: its size, and where the picture sits in it.
+ * Promise of { w, h, ax, ay }, or null */
+const ANCHORS = [['0,0', 'Top left'], ['1,0', 'Top'], ['2,0', 'Top right'],
+                 ['0,1', 'Left'], ['1,1', 'Middle'], ['2,1', 'Right'],
+                 ['0,2', 'Bottom left'], ['1,2', 'Bottom'], ['2,2', 'Bottom right']];
+
+async function askCanvas(w, h) {
+    const side = (v) => /^\d+$/.test(String(v).trim()) && +v >= 1 && +v <= 1024 ? null : '1 to 1,024 pixels';
+    const a = await ask('Canvas size', [
+        { text: 'Now ' + w + 'x' + h + '. Made smaller, what falls outside is cut off; made bigger, the ' +
+                'new room is colour 0, which is see-through.' },
+        { name: 'w', label: 'Width', value: String(w), type: 'number', check: side },
+        { name: 'h', label: 'Height', value: String(h), type: 'number', check: side },
+        { name: 'at', label: 'The picture at the', options: ANCHORS, value: '0,0' }], 'Resize');
+    if (!a) return null;
+    const [ax, ay] = String(a.at).split(',').map(Number);
+    return { w: +a.w, h: +a.h, ax, ay };
+}
+
 /* the sheet or an image in the pixel editor; a PNG that is not indexed is
  * offered for converting to the palette */
 function showPicture(pane, file) {
@@ -559,8 +578,18 @@ function showPicture(pane, file) {
     /* an image a cell or more each way can be edited as sprites, for sheet() */
     const cells = pic.width >= 8 && pic.height >= 8;
     if (!sheet && !(cells && asSprites[file])) {
-        pixels = new PixelEditor(pane, { width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
-                                         changed: write, fitColours: fitPicture, say: say_ });
+        /* an image can change size; the logo is the size lists of games show */
+        const sized = file !== 'logo.png' ? {
+            resize: (w, h, px) => {
+                folder[file] = writePicture(w, h, px, palette(folder));
+                changed();
+                show(file);
+                say('print', file + ' is now ' + w + 'x' + h + '.');
+            },
+            askSize: askCanvas
+        } : {};
+        pixels = new PixelEditor(pane, Object.assign({ width: pic.width, height: pic.height, px: pic.px, rgb: rgb,
+                                                       changed: write, fitColours: fitPicture, say: say_ }, sized));
         if (cells) editorMode = iconButton('sprites', 'Edit as sprites: 8x8 cells, drawn after sheet(IMG.' +
             file.slice(7, -4) + ')', () => { setAsSprites(file, true); show(file); });
         pixels.root.focus();

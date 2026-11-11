@@ -5,8 +5,10 @@
  *
  * Parts: the picture and its palette; drawing it, zoomed, with the grids,
  * the selection and anything floating; the tools; the selection, and
- * copying and pasting, within the IDE and with other programs; the keys;
- * the sheet, its picker and its sprites' flags.
+ * copying and pasting, within the IDE and with other programs; a new size,
+ * by the canvas or by cropping; the pointer, scrolling the view while a
+ * drag runs past its edge, and the keys; the sheet, its picker and its
+ * sprites' flags.
  *
  * A picture pasted from another program has its colours matched to the
  * palette: exactly where a colour is in it, else to the nearest, and the
@@ -71,7 +73,11 @@ export class PixelEditor {
      * pasted picture wider or taller than this one: true when handled),
      * fitColours(rgba, w, h) (a picture from elsewhere as palette numbers, asking
      * how where its colours are not in the palette; a Promise, of null if
-     * not wanted), say(text, error) */
+     * not wanted), say(text, error); for a picture that can change size,
+     * resize(w, h, px) (the picture made again at that size) and askSize(w,
+     * h) (a Promise of { w, h, ax, ay }: the new size, and where the picture
+     * sits in it across and down, 0 the start, 1 the middle, 2 the end; or
+     * null) */
     constructor(parent, opts) {
         this.o = opts;
         this.w = opts.width;
@@ -129,6 +135,12 @@ export class PixelEditor {
         this.tileButton = act('tile', 'Tile: shown repeated round itself, drawing wrapping at the edges (W)',
                               () => this.toggleTile());
         sep();
+        if (this.o.resize) {
+            act('canvas', 'Canvas size: make the picture bigger or smaller, keeping what is drawn',
+                () => this.canvasSize());
+            act('crop', 'Crop to the selection', () => this.crop());
+            sep();
+        }
         act('zoomOut', 'Zoom out (-)', () => this.setZoom(this.zoom - 1));
         act('zoomIn', 'Zoom in (+)', () => this.setZoom(this.zoom + 1));
         root.append(bar);
@@ -604,6 +616,36 @@ export class PixelEditor {
         this.render();
     }
 
+    /* ---- a new size -------------------------------------------------- */
+
+    /* the canvas made a new size, the picture placed in it where asked:
+     * what falls outside is cut off, and new room is colour 0 */
+    async canvasSize() {
+        const a = await this.o.askSize(this.w, this.h);
+        if (!a) return;
+        this.drop();
+        const ox = [0, (a.w - this.w) >> 1, a.w - this.w][a.ax];
+        const oy = [0, (a.h - this.h) >> 1, a.h - this.h][a.ay];
+        const out = new Uint8Array(a.w * a.h);
+        for (let y = 0; y < this.h; y++)
+            for (let x = 0; x < this.w; x++) {
+                const tx = x + ox, ty = y + oy;
+                if (tx >= 0 && ty >= 0 && tx < a.w && ty < a.h) out[ty * a.w + tx] = this.px[y * this.w + x];
+            }
+        this.o.resize(a.w, a.h, out);
+    }
+
+    /* the picture cut down to the selection */
+    crop() {
+        this.drop();
+        if (!this.sel) {
+            this.o.say('Select the part to keep, then crop.', true);
+            return;
+        }
+        const s = this.sel;
+        this.o.resize(s.w, s.h, this.grab(s));
+    }
+
     /* ---- the pointer and the keys ------------------------------------ */
 
     listen() {
@@ -642,7 +684,27 @@ export class PixelEditor {
                 }
             }
         });
-        this.over.addEventListener('pointermove', (e) => {
+        /* A drag past the view's edge scrolls it, faster the further out,
+         * and the drag goes on from where the pointer now is over the
+         * picture: the browser does not scroll a view whose pointer is
+         * captured. */
+        const EDGE = 24;
+        let held = null, scrolling = 0;
+        const scroll = () => {
+            scrolling = 0;
+            if (!down || !held) return;
+            const r = this.area.getBoundingClientRect();
+            const push = (v, lo, hi) => v < lo + EDGE ? -Math.ceil((lo + EDGE - v) / 4)
+                                       : v > hi - EDGE ? Math.ceil((v - hi + EDGE) / 4) : 0;
+            const dx = push(held.clientX, r.left, r.right), dy = push(held.clientY, r.top, r.bottom);
+            const x0 = this.area.scrollLeft, y0 = this.area.scrollTop;
+            this.area.scrollLeft += dx;
+            this.area.scrollTop += dy;
+            if (this.area.scrollLeft === x0 && this.area.scrollTop === y0) return;
+            move(held);
+            scrolling = requestAnimationFrame(scroll);
+        };
+        const move = (e) => {
             const p = this.at(e);
             this.status.textContent = this.where(p);
             if (!down) { this.cursor(p, e.altKey); return; }
@@ -669,8 +731,15 @@ export class PixelEditor {
                 }
                 this.overlay();
             }
+        };
+        this.over.addEventListener('pointermove', (e) => {
+            move(e);
+            if (!down) return;
+            held = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey };
+            if (!scrolling) scrolling = requestAnimationFrame(scroll);
         });
         const up = (e) => {
+            held = null;
             if (!down) return;
             const p = this.at(e), tool = this.tool;
             if (tool === 'pencil') this.o.changed(this.px);
