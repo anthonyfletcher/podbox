@@ -546,8 +546,8 @@ A point at `x, y`, pinned in place if `pin`. Returns its index, or -1 when the p
 ### links.link(p, i, j, [len])
 Holds points `i` and `j` `len` apart (as far as they are now by default). Returns its index, or -1.
 
-### links.step(p, solid, [out])
-A tick of every point and link, kept out of map cells whose flags share a bit with `solid`, and out of the lines of the segment set in the pool's `segs`. With `out`, three numbers a point: the material it touched plus one (0 none), and the way out, `nx`, `ny`.
+### links.step(p, solid, [out], [which])
+A tick of every point and link, kept out of map cells whose flags share a bit with `solid`, and out of the lines of the pool's `segs`: one segment set, or an array of up to 16. With `out`, three numbers a point: the material it touched plus one (0 none), and the way out, `nx`, `ny`; with `which`, one a point: the index in `segs` of the set it met, -1 none.
 
 ### links.ring(p, first, n, area, stiffness)
 Speeds points `first` to `first + n - 1`, a closed ring, toward holding `area` square pixels: all the way by the next step at `stiffness` 1. Returns the area it holds.

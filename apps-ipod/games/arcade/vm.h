@@ -641,6 +641,8 @@ int vm_field(struct vm *vm, struct value o, uint32_t i, struct value *name,
 /* gc.c */
 void gc_init(struct vm *vm);
 uint32_t gc_alloc(struct vm *vm, uint32_t type, uint32_t bytes);
+uint32_t gc_scratch(struct vm *vm, uint32_t bytes);
+void gc_scratch_end(struct vm *vm, uint32_t bytes);
 void gc_collect(struct vm *vm);
 
 /* loader.c */

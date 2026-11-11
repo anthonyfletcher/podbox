@@ -9,7 +9,10 @@
  * roots are the globals, the value stack, vm->tmp, the drawing target, the
  * sprites' sheet and the pause menu's labels.
  * Marking uses a fixed stack; when it overflows, the heap is rescanned for
- * marked objects until nothing new is marked.
+ * marked objects until nothing new is marked. A native's working memory
+ * (gc_scratch) is taken from the top of the free tail above bump and
+ * given back before it returns, so it never leaves a hole among what the
+ * cart keeps.
  ***************************************************************************/
 #include <string.h>
 #include "games/arcade/vm.h"
@@ -94,6 +97,30 @@ uint32_t gc_alloc(struct vm *vm, uint32_t type, uint32_t bytes)
     HDR(vm, off)->size = size;
     vm->since_gc += size;
     return off;
+}
+
+/* bytes of zeroed working memory, from the top of the free tail, or 0
+ * with the error set; the heap ends below it until gc_scratch_end gives it
+ * back, so allocations meanwhile come from under it. May collect. */
+uint32_t gc_scratch(struct vm *vm, uint32_t bytes)
+{
+    bytes = (bytes + 7) & ~7u;
+    if (vm->heap_hi - vm->bump < bytes)
+        gc_collect(vm);
+    if (bytes > vm->heap_hi - vm->heap_lo ||
+        vm->heap_hi - vm->bump < bytes) {
+        vm_fail(vm, "out of memory", "", "");
+        return 0;
+    }
+    vm->heap_hi -= bytes;
+    memset(MEM(vm, vm->heap_hi), 0, bytes);
+    return vm->heap_hi;
+}
+
+/* working memory of bytes given back: all of gc_scratch's, latest first */
+void gc_scratch_end(struct vm *vm, uint32_t bytes)
+{
+    vm->heap_hi += (bytes + 7) & ~7u;
 }
 
 static int in_heap(struct vm *vm, uint32_t off)

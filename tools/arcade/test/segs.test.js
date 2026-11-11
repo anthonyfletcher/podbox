@@ -75,6 +75,81 @@ function update() {
     assert.ok(Number(carry(0)) <= 55, carry(0));
 });
 
+/* the floor at y 50, and a platform: a box from 40 to 60 across, its top
+ * at y 30, its material 5 */
+const PARTS = FLOOR.replace('p.segs = s;', `plat = segs.make([40, 60, 60, 40], [30, 30, 40, 40], 4, [5, 5, 5, 5]);
+    far = segs.make([4000, 4100], [50, 50], 2);
+    p.segs = [s, plat];`).replace('var p, s,', 'var p, s, plat, far, which = [0],');
+
+test('a long level traced in strips, the results kept, leaves room for a whole trace', () => {
+    /* 49 strip traces of about 23 points each kept, then the whole 140 by
+     * 30 level, beside 240 KB held: working memory taken among the kept
+     * results would leave holes no later trace could use */
+    const r = run(`var keep = [], big;
+function init() {
+    fset(1, 1); fset(2, 2);
+    for (var c = 0; c < 140; c++) {
+        for (var r = 26; r < 30; r++) mset(c, r, 1);
+        if (c % 20 < 4) mset(c, 24, 2);
+        if (c % 20 >= 10 && c % 20 < 12) mset(c, 18, 1);
+    }
+    big = new Int32Array(60000);
+    for (var s = 0; s < 7; s++)
+        for (var k = 0; k < 7; k++) keep.push(segs.trace(k % 2 + 1, 0, 1, s * 20, 0, 20, 30));
+    printh("n " + segs.trace(1, 0, 1).n);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], 'n 112');
+});
+
+test('a pool meets an array of sets: the one under it, and says which', () => {
+    const at = (x) => run(PARTS.replace('links.point(p, 50, 10);', 'links.point(p, ' + x + ', 10);') + `
+function update() {
+    links.step(p, 0, out, which);
+    if (frame() == 60) printh(flr(p.y[0]) + " " + out[0] + " " + which[0]);
+}`, 60).out[0];
+    /* on the platform's top, material 5 plus one, set 1; beside it, the
+     * floor, material 3 plus one, set 0 */
+    assert.equal(at(50), '28 6 1');
+    assert.equal(at(20), '48 4 0');
+});
+
+test('a set in the array carries what rests on it; one far off changes nothing', () => {
+    const lift = run(PARTS + `
+function update() {
+    if (frame() > 40) segs.move(plat, 0, -0.5);
+    links.step(p, 0, out, which);
+    if (frame() == 80) printh(flr(p.y[0]) + " " + which[0]);
+}`, 80);
+    assert.equal(lift.status, 0, lift.err);
+    /* the platform's top 20 up after 40 ticks: the point 2 above it */
+    assert.equal(lift.out[0], '8 1');
+    const fall = (segs) => run(PARTS.replace('p.segs = [s, plat];', 'p.segs = ' + segs + ';') + `
+function update() {
+    links.step(p, 0, out);
+    if (frame() == 30) printh(p.y[0] + " " + p.oy[0]);
+}`, 30).out[0];
+    assert.equal(fall('[s, plat, far]'), fall('[s, plat]'));
+    assert.equal(fall('[s]'), fall('s'));
+    /* a set taken out of the array is gone: through where the platform was */
+    assert.equal(run(PARTS.replace('p.segs = [s, plat];', 'p.segs = [s];') + `
+function update() {
+    links.step(p, 0, out, which);
+    if (frame() == 60) printh(flr(p.y[0]) + " " + which[0]);
+}`, 60).out[0], '48 0');
+});
+
+test('more than 16 sets, or something else in the array, stops the cart', () => {
+    const many = run(PARTS.replace('p.segs = [s, plat];',
+        'p.segs = []; for (var i = 0; i < 17; i++) p.segs.push(s);') + `
+function update() { links.step(p, 0); }`);
+    assert.match(many.err, /at most 16 sets/);
+    const odd = run(PARTS.replace('p.segs = [s, plat];', 'p.segs = [s, 3];') + `
+function update() { links.step(p, 0); }`);
+    assert.match(odd.err, /needs a set from segs\.make/);
+});
+
 test('links.ring speeds a squashed ring back toward its area, by the next step', () => {
     const r = run(`var p;
 function init() {

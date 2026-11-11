@@ -10,7 +10,7 @@ ropes, chains, bridges, cloth, and soft bodies that meet outlines.
   [cells.lift](#cellsliftfield-rules-x-y-r-pool-speed), [actors and particles in a field](#actors-and-particles-in-a-field)
 - Links: [how links work](#how-links-work), [links.pool](#linkspoolpoints-links),
   [links.point](#linkspointp-x-y-pin), [links.link](#linkslinkp-i-j-len),
-  [links.step](#linksstepp-solid-out), [links.ring](#linksringp-first-n-area-stiffness),
+  [links.step](#linksstepp-solid-out-which), [links.ring](#linksringp-first-n-area-stiffness),
   [segs.make](#segsmakexs-ys-n-mats-ends), [segs.move](#segsmoves-dx-dy),
   [segs.draw](#segsdraws-colour), [segs.trace](#segstracesolid-sharp-smooth-cx-cy-cw-ch-shapes-outside),
   [links.draw](#linksdrawp-colour),
@@ -373,7 +373,7 @@ A pool's fields, plain arrays you read and write:
 | `gx` | gravity across, in pixels a tick: with `gravity`, a pull in any direction, as when a world tilts |
 | `damp` | a share of each point's speed drawn toward the whole pool's: a soft body that does not wobble, and still moves as a whole |
 | `slack` | when true, links pull but never push: a skin that can sag and fold but never stretch |
-| `segs` | a segment set (`segs.make`) the points are kept out of |
+| `segs` | a segment set (`segs.make`) the points are kept out of, or an array of up to 16: the level, and its gates and lifts |
 | `radius` | how far each point keeps from the set's lines, in pixels |
 | `friction` | each material's friction against the lines, 0 (ice) to 1 (glue): an array indexed by material, or one number for all |
 | `bounce` | how much of a point's speed into a line it keeps, bounced back: 0 none |
@@ -446,15 +446,16 @@ function draw() {
   gives slack.
 - About 1,100 units a tick for `links.step` on the rope and the bridge.
 
-## links.step(p, solid, [out])
+## links.step(p, solid, [out], [which])
 
 A tick of every point and link, then points kept out of the lines of the
-pool's segment set (`segs`), and pushed out of map cells whose sprite
+pool's segment sets (`segs`), and pushed out of map cells whose sprite
 shares a bit with `solid` (0 for none) -- a rope that lies over a ledge.
 
 | Argument | |
 |---|---|
 | `out` | an array of three numbers a point, written with what each touched: the line's material plus one (0 for nothing), then the way out of it, `nx` and `ny` -- `ny` below 0 is ground underneath. In an `Int32Array` the way out is only whole numbers |
+| `which` | an array of one number a point: the index in `segs` of the set it met -- 0 when `segs` is one set -- or -1 for none |
 
 **Returns** how many points the pool uses.
 
@@ -462,6 +463,10 @@ shares a bit with `solid` (0 for none) -- a rope that lies over a ledge.
   from where it was is stopped short of the first line it crosses.
 - Where it touches, its speed along the line loses the material's share
   of friction, and its speed into the line is bounced by `bounce`.
+- **Moving parts**: make each gate, lift or platform a set of its own and
+  give the pool them all, `p.segs = [level, gate, lift]`. A set costs
+  only where a point comes near it; `which` tells a sinking platform it
+  is stood on. To break a floor, take its set out of the array.
 
 ## links.ring(p, first, n, area, stiffness)
 
@@ -554,7 +559,8 @@ Outlines, as lines for points to meet: the ground, walls, platforms.
 ## segs.move(s, dx, dy)
 
 Moves the set by `dx, dy`: a lift, a gate, a moving platform. Points
-resting on it this tick move with it, as far as their friction holds.
+resting on it this tick move with it, as far as their friction holds --
+in an array of sets as alone.
 
 **Returns** nothing. Call it every tick a set moves.
 
