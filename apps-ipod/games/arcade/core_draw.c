@@ -2690,6 +2690,22 @@ NATIVE(textw)
     return 1;
 }
 
+/* imgw(i), imgh(i): an image's width and height */
+static int img_side(struct vm *vm, struct value v, int height,
+                    struct value *out)
+{
+    if (v.tag != T_IMG)
+        return vm_fail(vm, height ? "imgh" : "imgw",
+                       "() needs an image, IMG.name or one img() made", "");
+    struct img *im = MEM(vm, (uint32_t)v.v);
+    vm_charge(vm, 2);
+    *out = mk(T_INT, height ? im->height : im->width);
+    return 1;
+}
+
+NATIVE(imgw) { (void)argc; return img_side(vm, a[0], 0, out); }
+NATIVE(imgh) { (void)argc; return img_side(vm, a[0], 1, out); }
+
 /* textfit(s, w, [more]): s whole when it fits w pixels in the font set,
  * else cut before a character, spaces at the cut dropped, with more
  * ("..." when left out) after it, so the two fit. */

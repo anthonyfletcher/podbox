@@ -499,6 +499,48 @@ function update() {}`, 1);
     assert.match(bad.err, /rng\.rnd\(\) needs an Int32Array of 2/);
 });
 
+test('particles: bounds as drawn, cull off the screen, 16-pixel sprites, and a negative drag speeds up', () => {
+    const r = run(`var p = particles.pool(8), box = new Int32Array(4);
+function init() {
+    printh(particles.bounds(p, box) + " " + box.join(","));
+    particles.emit(p, 1, 10, 20, 0, 0, 0, 50, 7);
+    particles.emit(p, 1, 40, 5, 0, 0, 0, 50, 7, 1);
+    p.w = 16; p.h = 16;
+    camera(5, 0);
+    printh(particles.bounds(p, box) + " " + box.join(","));
+    camera();
+    p.cull = true; p.drag = -0.5;
+    particles.emit(p, 1, 150, 60, 2, 0, 0, 50, 7);
+}
+function update() {
+    particles.step(p);
+    var x = 0;
+    for (var i = 0; i < 8; i++) if (p.life[i] > 0 && p.x[i] > 100) x = p.x[i];
+    printh(frame() + " " + x);
+}`, 3);
+    assert.equal(r.status, 0, r.err);
+    const lines = r.out.trim().split('\n');
+    /* none live: 0, the box untouched; then a dot at 10,20 and a 16x16
+     * sprite at 40,5, both moved 5 left by the camera */
+    assert.equal(lines[0], '0 0,0,0,0');
+    assert.equal(lines[1], '2 5,5,50,20');
+    /* moving 3 (2 less a drag of -0.5), then 4.5, then 6.75: past 160 on
+     * the third step, it is culled */
+    assert.equal(lines[2], '1 153');
+    assert.equal(lines[3], '2 157.5');
+    assert.equal(lines[4], '3 0');
+});
+
+test('btnr, imgw and imgh, unitsnow', () => {
+    const r = run(`var i = img(12, 7);
+function init() { printh(imgw(i) + " " + imgh(i)); }
+function update() { printh(frame() + " " + btnr(4) + " " + (unitsnow() > 0)); }`, 5, ['--buttons', '2:16,4:0']);
+    assert.equal(r.status, 0, r.err);
+    /* --buttons counts ticks from 0: Select held for frames 3 and 4, let
+     * go for 5 */
+    assert.equal(r.out, '12 7\n1 0 1\n2 0 1\n3 0 1\n4 0 1\n5 1 1\n');
+});
+
 test('resumed tells of a pause once', () => {
     const r = run(`var n = 0;
 function init() {}

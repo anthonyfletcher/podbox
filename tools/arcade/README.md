@@ -507,11 +507,11 @@ built as WebAssembly, which the IDE runs too, and prints the same lines,
 units and pixels -- `watch` and `prof` lines among them. It takes
 `--ticks`, `--seed`, `--ceiling`, `--units`, `--shot`, `--dump`,
 `--dirty`, `--buttons`, `--wheel`, `--skip`, `--setting`, `--speech`,
-`--font`, `--playing` and `--beat`, and refuses any other. So it has no
-`--menu`, `--wav`, `--ui`, `--scores`, `--saves`, `--options`, `--opt`,
-`--store` or `--suspend-at`: its dialogs are worked from `--buttons` and
-`--wheel`, nothing is kept between runs, and it prints no `show` or
-`achieved` lines for `score.show()` and achievements:
+`--font`, `--playing`, `--beat` and `--store`, and refuses any other. So
+it has no `--menu`, `--wav`, `--ui`, `--scores`, `--saves`, `--options`,
+`--opt` or `--suspend-at`: its dialogs are worked from `--buttons` and
+`--wheel`, only the store is kept between runs, and it prints no `show`
+or `achieved` lines for `score.show()` and achievements:
 
 ```sh
 sh wasm/build.sh                      # needs wasi-sdk and binaryen

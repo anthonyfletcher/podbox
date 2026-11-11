@@ -11,6 +11,7 @@ drawn many at a time.
 - Balls: [actors.bounce](#actorsbouncea-b-out-give), [actors.bounce_map](#actorsbounce_mapp-flags-out-give)
 - Particles: [particles.pool](#particlespooln), [particles.emit](#particlesemitp-count-x-y-dx-dy-spread-life-c-sp),
   [particles.step](#particlesstepp), [particles.draw](#particlesdrawp),
+  [particles.bounds](#particlesboundsp-out),
   [Sprite particles](#sprite-particles)
 - [sprites.draw](#spritesdrawsp-xs-ys-n-flips)
 
@@ -628,8 +629,9 @@ and for the whole pool:
 
 | Field | |
 |---|---|
-| `gravity`, `drag` | added to `dy` each tick; speed lost each tick, a fraction |
-| `w`, `h` | how much of a sprite particle's sprite to draw, from its top left: 1 to 8 pixels, 8 if not set |
+| `gravity`, `drag` | added to `dy` each tick; speed lost each tick, a fraction -- negative, speed gained: a rocket's exhaust, a spray that bursts outward |
+| `cull` | true: a particle wholly off the screen, as the camera has it, is gone |
+| `w`, `h` | how much of a sprite particle's sprite to draw, from its top left: 1 to 16 pixels -- 16 is a 2x2 block of the sheet -- 8 if not set |
 | `shade` | how many of the sprite's colours, from 1, take the particle's colour ramp (see [Sprite particles](#sprite-particles)); 0 draws the sprite as it is |
 | `floor`, `bounce` | a particle falling through y `floor` turns back up at `bounce` of its speed -- unless that is under a quarter pixel a tick, when it falls on through; 0 is no floor |
 | `spin` | a sprite particle turns a quarter every `spin` ticks; 0 not at all |
@@ -700,6 +702,20 @@ moved; bounced off the pool's `floor`, and a sprite particle turned every
 | `p` | the pool |
 
 **Returns** nothing.
+
+## particles.bounds(p, out)
+
+The box the live particles cover on the screen, for a game that keeps the
+screen between frames and puts back only what was drawn over.
+
+| Argument | |
+|---|---|
+| `p` | the pool |
+| `out` | an `Int32Array` of 4 |
+
+**Returns** how many particles are live; `out` holds the box, `x0, y0,
+x1, y1`, inclusive, as drawn -- the camera's offset taken off, a sprite
+particle its `w` by `h`. With none live, `out` is left as it was.
 
 ## particles.draw(p)
 

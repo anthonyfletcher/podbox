@@ -141,6 +141,12 @@ A line textured from the map, starting at map position `mx, my` (in cells, fract
 ### img(w, h)
 A new image, all colour 0, to draw into with `target` and onto the screen with `blit`.
 
+### imgw(i)
+An image's width.
+
+### imgh(i)
+An image's height.
+
 ### blit(i, x, y, [flip_x], [flip_y])
 Draws a whole image.
 
@@ -186,6 +192,9 @@ Whether button `i` is held (0 Prev, 1 Next, 2 Menu when the cart takes it, 3 Pla
 
 ### btnp([i])
 Whether button `i` was pressed this tick, and again while it is held (after 15 ticks, every 4).
+
+### btnr([i])
+Whether button `i` was let go this tick: down last tick, up this one.
 
 ### wheel()
 The clicks the wheel turned this tick, 96 to a turn, clockwise positive.
@@ -282,6 +291,9 @@ Ticks a second now.
 
 ### skipped()
 Frames that ran late and were not drawn since the last call.
+
+### unitsnow()
+The units this tick has spent so far, to leave out an effect before the tick runs late.
 
 ### resumed()
 Whether the game was paused -- the pause menu, the hold switch, the question a short press of Menu asks -- since the last call.
@@ -432,7 +444,7 @@ Actors as circles, pushed apart and bounced off one another. Returns the pairs t
 Actors as circles, moved and bounced off map cells whose flags meet `flags`. Returns the cells struck.
 
 ### particles.pool(n)
-A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, `sp` and `flip`, with `gravity` and `drag`, and for sprite particles `w`, `h`, `shade`, `floor`, `bounce` and `spin`.
+A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, `sp` and `flip`, with `gravity`, `drag` (negative speeds them up) and `cull` (gone once off the screen), and for sprite particles `w`, `h` (up to 16), `shade`, `floor`, `bounce` and `spin`.
 
 ### particles.emit(p, count, x, y, dx, dy, spread, life, c, [sp])
 Up to `count` particles at `x, y`, moving `dx, dy` plus up to `spread` either way, living about `life` ticks; with `sp`, each is that sprite, flipped at random. Returns how many.
@@ -442,6 +454,9 @@ A tick of every live particle: gravity, drag and moving; bouncing off the pool's
 
 ### particles.draw(p)
 Every live particle as a pixel of its colour, or as its sprite's top left `w` by `h`, its colours 1 to `shade` taken from the particle's colour onward.
+
+### particles.bounds(p, out)
+The box the live particles cover as drawn -- after the camera, a sprite its size -- into an `Int32Array` of 4, `x0, y0, x1, y1` inclusive. Returns how many are live; with none, `out` is left as it was.
 
 ### sprites.draw(sp, xs, ys, n, [flips])
 `n` sprites at once, from the cart's arrays; `sp` may be one number for all.

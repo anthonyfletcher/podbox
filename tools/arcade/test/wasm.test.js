@@ -76,6 +76,23 @@ test('the language programs: the same lines and units', () => {
     }
 });
 
+test('--store keeps a cart\'s files between runs, the same through both', () => {
+    const file = build('store', { 'cart.json': CART, 'main.js': `function init() {
+    var n = store.read("runs");
+    store.write("runs", n == null ? 1 : n + 1);
+    printh("run " + (n == null ? 0 : n) + " " + store.list().join(","));
+}
+function update() {}` });
+    for (const d of ['sa', 'sb']) fs.rmSync(path.join(tmp, d), { recursive: true, force: true });
+    for (let k = 0; k < 2; k++) {
+        const vm = spawnSync(exe, [file, '--ticks', '1', '--store', path.join(tmp, 'sa')], { encoding: 'utf8' });
+        const run = spawnSync(process.execPath, [path.join(root, 'pbgrun.js'), file, '--ticks', '1',
+                                                 '--store', path.join(tmp, 'sb')], { encoding: 'utf8' });
+        assert.equal(lf(run.stdout), lf(vm.stdout));
+        assert.equal(lf(vm.stdout), k === 0 ? 'run 0 runs\n' : 'run 1 runs\n');
+    }
+});
+
 test('a drawing cart, with input, the wheel and skipped frames', () => {
     const dir = path.join(here, 'carts', 'drawdemo');
     const file = build('drawdemo', readFolder(dir), readAssets(dir));

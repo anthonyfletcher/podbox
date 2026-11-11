@@ -410,6 +410,7 @@ struct vm
     uint32_t skipped;           /* frames not drawn since skipped() */
     uint8_t paused;             /* paused since resumed() */
     uint8_t held, pressed;      /* btn() and btnp() bits */
+    uint8_t released;           /* btnr()'s: down last tick, up this one */
     uint16_t held_ticks[5];
     int32_t wheel, wheelpos;
     struct arcade_music heard;  /* this tick's, from arcade_music() */

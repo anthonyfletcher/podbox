@@ -34,6 +34,7 @@ void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos)
         if (t == 1 || (t >= 16 && (t - 16) % 4 == 0))
             pressed |= (uint8_t)(1u << i);
     }
+    vm->released = (uint8_t)(vm->held & ~held);
     vm->held = (uint8_t)held;
     vm->pressed = pressed;
     vm->wheel = wheel;
@@ -68,6 +69,16 @@ static int button_arg(struct vm *vm, struct value *a, int argc, uint8_t bits,
 
 NATIVE(btn) { return button_arg(vm, a, argc, vm->held, "btn", out); }
 NATIVE(btnp) { return button_arg(vm, a, argc, vm->pressed, "btnp", out); }
+NATIVE(btnr) { return button_arg(vm, a, argc, vm->released, "btnr", out); }
+
+/* unitsnow(): the units this tick has spent so far, to scale an effect down
+ * on a slower player before it makes the tick late */
+NATIVE(unitsnow)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, (int32_t)arcade_units_now(vm));
+    return 1;
+}
 
 NATIVE(wheel)
 {

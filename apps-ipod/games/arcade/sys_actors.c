@@ -43,16 +43,18 @@ static const char *const actor_keys[A_FIELDS] = {
  * colours 1 to shade taken from c's ramp: colour k drawn as c + k - 1.
  * floor and bounce: one falling through floor turns back up at bounce of
  * its speed, unless that is under a quarter pixel a tick. spin: a sprite
- * turns a quarter (flip 0, 1, 3, 2) every spin ticks. */
+ * turns a quarter (flip 0, 1, 3, 2) every spin ticks. cull: one wholly off
+ * the screen, as the camera has it, is gone. A negative drag speeds them
+ * up. */
 enum { P_LIFE, P_X, P_Y, P_DX, P_DY, P_C, P_SP, P_FLIP,
        P_ARRAYS,                    /* PARTICLE_ARRAYS, in vm.h */
        P_GRAVITY = P_ARRAYS, P_DRAG, P_FIELD, P_FIELD_X, P_FIELD_Y,
-       P_W, P_H, P_SHADE, P_FLOOR, P_BOUNCE, P_SPIN, P_FIELDS };
+       P_W, P_H, P_SHADE, P_FLOOR, P_BOUNCE, P_SPIN, P_CULL, P_FIELDS };
 _Static_assert(P_ARRAYS == PARTICLE_ARRAYS, "cells.lift's arrays");
 static const char *const particle_keys[P_FIELDS] = {
     "life", "x", "y", "dx", "dy", "c", "sp", "flip", "gravity", "drag",
     "field", "field_x", "field_y", "w", "h", "shade", "floor", "bounce",
-    "spin"
+    "spin", "cull"
 };
 
 /* always inlined: -Os would call it, and the pool systems read several
@@ -1276,6 +1278,60 @@ static int particles(struct vm *vm, struct value p, struct value *f,
                    "particles.pool()");
 }
 
+/* A sprite particle's size: the pool's w and h, 1 to 16, 8 when unset */
+static void sprite_size(const struct value *f, int32_t *w, int32_t *h)
+{
+    *w = is_num(f[P_W]) ? floor_int(f[P_W]) : 0;
+    *h = is_num(f[P_H]) ? floor_int(f[P_H]) : 0;
+    if (*w < 1 || *w > 16)
+        *w = 8;
+    if (*h < 1 || *h > 16)
+        *h = 8;
+}
+
+/* particles.bounds(p, out): the box the live particles cover as drawn --
+ * the camera's offset taken off, a sprite its size -- into out, x0 y0 x1
+ * y1 inclusive; how many are live, out untouched when none */
+NATIVE(particles_bounds)
+{
+    (void)argc;
+    struct value f[P_FIELDS];
+    uint32_t n, live = 0;
+    if (!particles(vm, a[0], f, &n, "particles.bounds"))
+        return 0;
+    if (a[1].tag != T_I32 || I32(vm, a[1])->len < 4)
+        return vm_fail(vm, "particles.bounds() needs an Int32Array of 4",
+                       "", "");
+    int32_t w, h;
+    sprite_size(f, &w, &h);
+    struct value *lf = ELEMS(vm, f[P_LIFE]), *x = ELEMS(vm, f[P_X]);
+    struct value *y = ELEMS(vm, f[P_Y]), *sp = ELEMS(vm, f[P_SP]);
+    int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        if (floor_int(lf[i]) <= 0)
+            continue;
+        int sprite = is_num(sp[i]) && floor_int(sp[i]) > 0;
+        int32_t px = floor_int(x[i]) - vm->d.cam_x;
+        int32_t py = floor_int(y[i]) - vm->d.cam_y;
+        int32_t qx = px + (sprite ? w - 1 : 0), qy = py + (sprite ? h - 1 : 0);
+        if (!live++) {
+            x0 = px; y0 = py; x1 = qx; y1 = qy;
+        } else {
+            if (px < x0) x0 = px;
+            if (py < y0) y0 = py;
+            if (qx > x1) x1 = qx;
+            if (qy > y1) y1 = qy;
+        }
+    }
+    if (live) {
+        int32_t *d = I32(vm, a[1])->d;
+        d[0] = x0; d[1] = y0; d[2] = x1; d[3] = y1;
+    }
+    vm_charge(vm, 10 + n / 4);
+    *out = mk(T_INT, (int32_t)live);
+    return 1;
+}
+
 /* A random amount from -range to range, 16.16 */
 static int32_t spread(struct vm *vm, int32_t range)
 {
@@ -1459,6 +1515,9 @@ NATIVE(particles_step)
     int32_t g = fx(f[P_GRAVITY]), drag = fx(f[P_DRAG]);
     int32_t floor_y = fx(f[P_FLOOR]), bounce = fx(f[P_BOUNCE]);
     int32_t spin = is_num(f[P_SPIN]) ? floor_int(f[P_SPIN]) : 0;
+    int cull = vm_truthy(vm, f[P_CULL]);
+    int32_t sw, sh;
+    sprite_size(f, &sw, &sh);
     /* a quarter turn: flip 0, 1, 3, 2, round again */
     static const uint8_t turned[4] = { 1, 3, 0, 2 };
     struct value *lf = ELEMS(vm, f[P_LIFE]), *x = ELEMS(vm, f[P_X]);
@@ -1502,6 +1561,15 @@ NATIVE(particles_step)
         int32_t NX = wrap32((int64_t)ox + DX);
         x[i] = mk(T_FIX, NX);
         y[i] = mk(T_FIX, NY);
+        if (cull) {
+            int sprite = is_num(sp[i]) && floor_int(sp[i]) > 0;
+            int32_t sx = (NX >> 16) - vm->d.cam_x, sy = (NY >> 16) - vm->d.cam_y;
+            if (sx + (sprite ? sw : 1) <= 0 || sx >= SCREEN_W ||
+                sy + (sprite ? sh : 1) <= 0 || sy >= SCREEN_H) {
+                lf[i] = mk(T_INT, 0);
+                continue;
+            }
+        }
         if (spin > 0 && is_num(sp[i]) && floor_int(sp[i]) > 0 &&
             (vm->frame + i) % (uint32_t)spin == 0)
             flip[i] = mk(T_INT, turned[floor_int(flip[i]) & 3]);
@@ -1520,16 +1588,12 @@ NATIVE(particles_draw)
     uint32_t n;
     if (!particles(vm, a[0], f, &n, "particles.draw"))
         return 0;
-    int32_t w = is_num(f[P_W]) ? floor_int(f[P_W]) : 0;
-    int32_t h = is_num(f[P_H]) ? floor_int(f[P_H]) : 0;
+    int32_t w, h;
+    sprite_size(f, &w, &h);
     int32_t shade = is_num(f[P_SHADE]) ? floor_int(f[P_SHADE]) : 0;
     struct value *arr[P_ARRAYS];
     for (int i = 0; i < P_ARRAYS; i++)
         arr[i] = ELEMS(vm, f[i]);
-    if (w < 1 || w > 8)
-        w = 8;
-    if (h < 1 || h > 8)
-        h = 8;
     if (shade < 0)
         shade = 0;
     if (shade > 16)

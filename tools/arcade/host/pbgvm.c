@@ -70,6 +70,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#ifdef _WIN32
+#include <direct.h>
+#define make_dir(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define make_dir(p) mkdir((p), 0777)
+#endif
 #include "fakemusic.h"
 #include "games/arcade/arcade.h"
 
@@ -506,6 +513,8 @@ static int st_write(void *ctx, const char *name, const void *buf, int32_t n)
     }
     if (total > ARCADE_STORE_BYTES || (!there && count >= ARCADE_STORE_FILES))
         return 0;
+    /* made at the first write, as the player makes its own */
+    make_dir(store_dir);
     store_path(name, path, sizeof(path));
     FILE *f = fopen(path, "wb");
     if (!f)

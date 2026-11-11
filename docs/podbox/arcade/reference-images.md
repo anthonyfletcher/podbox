@@ -79,6 +79,11 @@ after its file: `images/title.png` is `IMG.title`.
 - An image can also be a sprite sheet of its own, for more than 256
   sprites: see [sheet](reference-sprites.md#sheeti).
 
+## imgw(i), imgh(i)
+
+**Returns** an image's width or height: one of the cart's own (`IMG.name`)
+or one `img()` made.
+
 ## img(w, h)
 
 Makes a new image, every pixel colour 0.

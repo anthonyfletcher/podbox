@@ -6,7 +6,7 @@ cannot keep up, and the clock and calendar.
 - [How time works](#how-time-works): [ticks](#ticks), [when the player falls behind](#when-the-player-falls-behind),
   [pausing](#pausing)
 - [rate](#rate), [setrate](#setraten), [t and time](#t-time), [frame](#frame),
-  [skipped](#skipped), [resumed](#resumed), [date](#dateout)
+  [skipped](#skipped), [unitsnow](#unitsnow), [resumed](#resumed), [date](#dateout)
 - [Speeds that do not depend on the rate](#speeds-that-do-not-depend-on-the-rate)
 - [Stepping the rate down](#stepping-the-rate-down)
 
@@ -166,6 +166,19 @@ function update() {
 - In `pbgvm`, `--skip 5:1,10:3` makes ticks 5 and 10 late, as a slow
   player would: tick 5 reports one frame skipped and tick 10 three, and
   both run `update()` without `draw()`.
+
+## unitsnow()
+
+**Returns** the units this tick has spent so far: a cart that measures
+itself can leave out an effect before the tick runs late, rather than
+learn from `skipped()` after.
+
+```js
+if (unitsnow() < 9000) particles.draw(smoke);   // smoke only with room
+```
+
+- The budget differs by player and by what it plays: about 13,000 a tick
+  at 33 ticks a second on an iPod Video playing FLAC.
 
 ## resumed()
 

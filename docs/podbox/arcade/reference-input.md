@@ -5,7 +5,7 @@ wheel itself, and where a finger rests on it. Plus two script libraries
 that turn the wheel into the controls games usually want.
 
 - [How input works](#how-input-works), and [in the IDE](#in-the-ide)
-- Buttons: [btn](#btni), [btnp](#btnpi), [the Menu button](#the-menu-button)
+- Buttons: [btn](#btni), [btnp](#btnpi), [btnr](#btnri), [the Menu button](#the-menu-button)
 - The wheel: [wheel](#wheel), [wheelpos](#wheelpos), [click](#clickbeep)
 - [The dial library](#the-dial-library): steps, angle, speed, paddle
 - [The menu library](#the-menu-library)
@@ -98,6 +98,13 @@ function update() {
 - A button number other than 0 to 4 stops the cart with an error.
 - Several buttons can be held at once; test each.
 - `btn(2)`, Menu, is false unless the cart takes the Menu button.
+
+## btnr([i])
+
+Whether a button was **let go** this tick: down last tick, up this one.
+With no argument, whether any was. A charge-and-release -- hold Select to
+wind up a throw, let go to throw -- is `btn` while held and `btnr` on the
+release.
 
 ## btnp([i])
 

@@ -7,6 +7,7 @@
  *                   [--buttons t:mask,...] [--wheel t:clicks[:pos],...]
  *                   [--skip t:n,...] [--setting name=value]... [--speech]
  *                   [--font font.bin] [--playing] [--beat bpm]
+ *                   [--store dir]
  *
  * printh() lines go to stdout; a runtime error to stderr as file:line:
  * message (in function), with exit status 1; --units prints each call's
@@ -14,7 +15,8 @@
  * watch() prints "watch name value" as a value changes. Each ui.* dialog
  * prints what it showed, and is worked a tick at a time from --buttons
  * and --wheel, backed out of when the ticks run out (--shot then shows
- * it). An option not listed here is refused. See pbgvm.c for the rest. */
+ * it). --store keeps store.* files in dir, as name.json, as pbgvm does.
+ * An option not listed here is refused. See pbgvm.c for the rest. */
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +44,7 @@ function args(argv) {
         else if (a === '--playing') o.playing = true;
         else if (a === '--beat') { o.beat = true; o.bpm = +v(); }
         else if (a === '--font') o.font = fs.readFileSync(v());
+        else if (a === '--store') o.store = v();
         else if (a === '--setting') {
             const [k, ...rest] = v().split('=');
             const s = rest.join('=');
@@ -135,6 +138,27 @@ function main() {
             }
         },
         print: (s) => out.push(s + '\n'),
+        /* store.*: name.json files in --store's folder, none without it */
+        storeRead: (name) => {
+            if (!o.store) return undefined;
+            const f = path.join(o.store, name + '.json');
+            return fs.existsSync(f) ? new Uint8Array(fs.readFileSync(f)) : undefined;
+        },
+        storeWrite: (name, bytes) => {
+            if (!o.store) return false;
+            fs.mkdirSync(o.store, { recursive: true });
+            fs.writeFileSync(path.join(o.store, name + '.json'), bytes);
+            return true;
+        },
+        storeRemove: (name) => {
+            const f = o.store && path.join(o.store, name + '.json');
+            if (!f || !fs.existsSync(f)) return false;
+            fs.unlinkSync(f);
+            return true;
+        },
+        storeList: () => !o.store || !fs.existsSync(o.store) ? [] :
+            fs.readdirSync(o.store).filter((n) => n.endsWith('.json'))
+                .map((n) => n.slice(0, -5)).sort(),
         click: (beep) => out.push('click ' + beep + '\n'),
         setting: (name) => o.settings[name],
         musicSay: (line) => out.push(line + '\n'),

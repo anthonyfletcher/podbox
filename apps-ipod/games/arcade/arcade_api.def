@@ -50,6 +50,8 @@ API(clip,      21, 0, 4, VOID, 0,     FLAT,   LISTEN, 1)
 API(print,     22, 1, 4, VAL,  PARTS, PIXELS, LISTEN, 1)
 API(textw,     23, 1, 1, VAL,  PARTS, FLAT,   LISTEN, 1)
 API(textfit,  225, 2, 3, VAL,  0,     FLAT,   LISTEN, 1)
+API(imgw,     231, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(imgh,     232, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(font,      24, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)
 API(target,    25, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 
@@ -78,6 +80,7 @@ API(mapprop,   43, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
 /* Input */
 API(btn,       44, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(btnp,      45, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
+API(btnr,     230, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(wheel,     46, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(wheelpos,  47, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 
@@ -116,6 +119,7 @@ API(prof,      73, 0, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(rate,      92, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(setrate,   93, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(skipped,   94, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(unitsnow, 233, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(resumed,  222, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(sfxat,    223, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 
@@ -178,6 +182,7 @@ API(particles_pool,  83, 1, 1, VAL,  0, CELLS, LISTEN, 1)
 API(particles_emit,  84, 9, 10, VAL, 0, CELLS, LISTEN, 1)
 API(particles_step,  85, 1, 1, VOID, 0, CELLS, LISTEN, 1)
 API(particles_draw,  86, 1, 1, VOID, 0, PIXELS, LISTEN, 1)
+API(particles_bounds, 229, 2, 2, VAL, 0, FLAT, LISTEN, 1)
 API(actors_zones,   117, 4, 4, VAL,  0, CELLS, LISTEN, 1)
 
 /* Systems: sprite batches, many sprites from the cart's arrays at once */
