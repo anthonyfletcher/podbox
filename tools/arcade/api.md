@@ -634,7 +634,7 @@ The playing track's Sound Index (`SOUND.*`) into `out`. Returns 0 when it has no
 The colours the player is showing, each 0xRRGGBB, into `out`, an Int32Array of 3: the background, the text and the most vivid. Returns 1 when they are the playing album's (dynamic colours), 0 when they are the theme's.
 
 ### tracks.count([filter])
-How many of the owner's tracks match `filter`: `{ minlen, maxlen, genre, decade, music }`, any field left out.
+How many of the owner's tracks match `filter`: `{ minlen, maxlen, genre, decade, music, artist }`, any field left out.
 
 ### tracks.pick(n, filter, out)
 `n` tracks at random, their ids into `out`. Returns how many.
@@ -642,8 +642,8 @@ How many of the owner's tracks match `filter`: `{ minlen, maxlen, genre, decade,
 ### tracks.field(id, f)
 One thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as a string, `YEAR` or `LENGTH` as a number.
 
-### tracks.near(id, n, out)
-Up to `n` tracks most like `id`, into `out`. Returns how many.
+### tracks.near(id, n, out, [sound])
+Up to `n` tracks most like `id`, into `out`: the same genre and decade first, or with `sound` true the nearest by Sound Index first. Returns how many.
 
 ### tracks.sound(id, out)
 Any track's Sound Index, as `playback.sound` gives it.

@@ -871,7 +871,8 @@ function init() {
     var k = tracks.pick(3, { genre: "Pop" }, ids);
     printh(k + " " + ids[0] + " " + ids[1] + " " + ids[2]);
     printh(tracks.field(4, TRACK.TITLE) + "|" + tracks.field(4, TRACK.GENRE) + "|" + tracks.field(4, TRACK.YEAR) + "|" + tracks.field(4, TRACK.LENGTH) + "|" + tracks.field(99, TRACK.TITLE));
-    printh(tracks.near(6, 3, near) + " " + near.join(","));
+    printh(tracks.near(6, 3, near) + " " + near.join(",") + " " + tracks.count({ artist: "Mira Vale" }));
+    printh(tracks.near(6, 3, near, true) + " " + near.join(",") + " " + tracks.near(19, 3, near, true));
     printh(tracks.sound(3, snd) + " " + snd[0]);
     printh(tracks.queued() + " " + tracks.place() + " " + tracks.queue(2) + " " + tracks.queue(40));
     printh(tracks.enqueue(15, true) + " " + tracks.queued() + " " + tracks.queue(1));
@@ -899,8 +900,11 @@ function update() {
         '20 19 4 4 16',
         '3 8 9 10',
         'Half Past Midnight|Jazz|1962|326000|null',
-        /* the Jazz nearest track 6 */
-        '3 5,7,4',
+        /* the Jazz nearest track 6; Mira Vale's four are Paper Planes */
+        '3 5,7,4 4',
+        /* by sound, the nearest tempo to 6's 64 bpm: 72, 84, 88; the
+         * spoken chapter has none */
+        '3 4,3,5 0',
         /* track 3 at 84 bpm: a beat every 714 ms */
         '1 714',
         '10 0 2 -1',

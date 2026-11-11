@@ -134,6 +134,7 @@ struct arcade_filter
     const char *genre;          /* the genre's name, case aside */
     int32_t decade;             /* 1980 for the 80s */
     int music;                  /* spoken word left out */
+    const char *artist;         /* the artist's name, case aside */
 };
 
 /* The owner's music and library. A track is its id, the database's number
@@ -165,8 +166,10 @@ struct arcade_tracks
      * cap bytes with its end, 0 when there is none (ARCADE_TRACK_* below) */
     int (*field)(void *ctx, int32_t id, int f, int32_t *num, char *buf,
                  int cap);
-    /* tracks.near(): up to n tracks most like id, into out, the count */
-    int32_t (*near)(void *ctx, int32_t id, int32_t n, int32_t *out);
+    /* tracks.near(): up to n tracks most like id, into out, the count;
+     * by how they sound, nearest first, when sound is set */
+    int32_t (*near)(void *ctx, int32_t id, int32_t n, int sound,
+                    int32_t *out);
     /* tracks.sound(): id's Sound Index record, as playback.sound() */
     int (*sound)(void *ctx, int32_t id, int32_t out[ARCADE_SOUND_FIELDS]);
     /* the queue: its length and the playing place (0 first, -1 none),

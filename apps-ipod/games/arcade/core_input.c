@@ -325,17 +325,19 @@ NATIVE(playback_started)
     return RET_INT(t && t->started && t->started(vm->host->ctx));
 }
 
-/* A filter record ({ minlen, maxlen, genre, decade, music }, any field
- * left out) as the host takes it; genre's text in buf */
+/* A filter record ({ minlen, maxlen, genre, decade, music, artist }, any
+ * field left out) as the host takes it; genre's and artist's text in buf,
+ * half each */
 static int filter_of(struct vm *vm, struct value v, struct arcade_filter *f,
                      char *buf, uint32_t cap, const char *fn)
 {
+    uint32_t half = cap / 2;
     memset(f, 0, sizeof(*f));
     if (v.tag == T_NULL)
         return 1;
     if (v.tag != T_OBJ)
         return vm_fail(vm, fn, "() takes a filter record: { minlen, maxlen, "
-                       "genre, decade, music }", "");
+                       "genre, decade, music, artist }", "");
     struct value x;
     if (is_num(x = vm_get(vm, v, "minlen")))
         f->minlen = floor_int(x);
@@ -345,8 +347,13 @@ static int filter_of(struct vm *vm, struct value v, struct arcade_filter *f,
         f->decade = floor_int(x) / 10 * 10;
     f->music = vm_truthy(vm, vm_get(vm, v, "music"));
     if ((x = vm_get(vm, v, "genre")).tag == T_STR) {
-        buf[vm_text(vm, x, buf, cap - 1)] = '\0';
+        buf[vm_text(vm, x, buf, half - 1)] = '\0';
         f->genre = buf;
+    }
+    if ((x = vm_get(vm, v, "artist")).tag == T_STR) {
+        char *s = buf + half;
+        s[vm_text(vm, x, s, half - 1)] = '\0';
+        f->artist = s;
     }
     return 1;
 }
@@ -386,9 +393,9 @@ NATIVE(tracks_count)
 {
     const struct arcade_tracks *t = music_of(vm);
     struct arcade_filter f;
-    char genre[64];
-    if (!filter_of(vm, argc > 0 ? a[0] : mk(T_NULL, 0), &f, genre,
-                   sizeof(genre), "tracks.count"))
+    char text[128];
+    if (!filter_of(vm, argc > 0 ? a[0] : mk(T_NULL, 0), &f, text,
+                   sizeof(text), "tracks.count"))
         return 0;
     int32_t n = t && t->count ? t->count(vm->host->ctx, &f) : 0;
     if (!vm_spend(vm, walk_cost(vm, t)))
@@ -402,9 +409,9 @@ NATIVE(tracks_pick)
     (void)argc;
     const struct arcade_tracks *t = music_of(vm);
     struct arcade_filter f;
-    char genre[64];
+    char text[128];
     int32_t n = is_num(a[0]) ? floor_int(a[0]) : -1, *ids;
-    if (!filter_of(vm, a[1], &f, genre, sizeof(genre), "tracks.pick") ||
+    if (!filter_of(vm, a[1], &f, text, sizeof(text), "tracks.pick") ||
         !ids_out(vm, a[2], n, &ids, "tracks.pick"))
         return 0;
     int32_t k = t && t->pick && n ? t->pick(vm->host->ctx, n, &f, ids) : 0;
@@ -439,16 +446,16 @@ NATIVE(tracks_field)
     return 1;
 }
 
-/* tracks.near(id, n, out): up to n tracks most like id, into out */
+/* tracks.near(id, n, out, [sound]): up to n tracks most like id, into out */
 NATIVE(tracks_near)
 {
-    (void)argc;
     const struct arcade_tracks *t = music_of(vm);
     int32_t n = is_num(a[1]) ? floor_int(a[1]) : -1, *ids;
+    int sound = argc > 3 && vm_truthy(vm, a[3]);
     if (!is_num(a[0]) || !ids_out(vm, a[2], n, &ids, "tracks.near"))
         return 0;
     int32_t k = t && t->near && n ? t->near(vm->host->ctx, floor_int(a[0]),
-                                            n, ids) : 0;
+                                            n, sound, ids) : 0;
     ids_store(vm, a[2], ids, k);
     if (!vm_spend(vm, walk_cost(vm, t) + (uint32_t)k * 4))
         return 0;

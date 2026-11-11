@@ -36,6 +36,7 @@
 #include "database/tagcache.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
+#include "database/sound_mix.h"
 #include "metadata/book_resume.h"
 #include "settings/settings.h"         /* global_settings */
 #include "skin/skin_albumart_color.h"
@@ -243,6 +244,13 @@ static bool walk_passes(struct tagcache_search *tcs,
             strcasecmp(genre, f->genre))
             return false;
     }
+    if (f->artist) {
+        char artist[64];
+        if (!tagcache_entry_string(tcs->idx_id, tag_artist, artist,
+                                   sizeof(artist)) ||
+            strcasecmp(artist, f->artist))
+            return false;
+    }
     return true;
 }
 
@@ -327,10 +335,118 @@ static int music_field(void *ctx, int32_t id, int f, int32_t *num, char *buf,
 /* The most near() hands over at once */
 #define NEAR_MAX 64
 
+/* Closer than this by sound, and this near in length, two records are one
+ * recording encoded twice: sound_mix.c's MIX_SEED_EPSILON */
+#define SAME_RECORDING_D  15
+#define SAME_LENGTH_MS    2000
+
+/* By sound: the nearest records in the Sound Index, nearest first, and the
+ * length each turns out to have */
+static struct { uint64_t key; int d; int32_t id; long len; } nearest[NEAR_MAX];
+static int nearest_ct;
+
+static void keep_nearest(uint64_t key, int d)
+{
+    int i;
+    if (nearest_ct == NEAR_MAX && d >= nearest[NEAR_MAX - 1].d)
+        return;
+    i = nearest_ct < NEAR_MAX ? nearest_ct++ : NEAR_MAX - 1;
+    for (; i > 0 && nearest[i - 1].d > d; i--)
+        nearest[i] = nearest[i - 1];
+    nearest[i].key = key;
+    nearest[i].d = d;
+    nearest[i].id = -1;
+}
+
+/* Each kept key's track, music only: from the path index while the
+ * database is in RAM, else by one walk of it, since a record has no path */
+static void resolve_nearest(void)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    long spoken;
+    int32_t seen = 0;
+    if (tagcache_is_in_ram()) {
+        for (int i = 0; i < nearest_ct; i++) {
+            int id = tagcache_find_key(nearest[i].key);
+            if (id >= 0 &&
+                tagcache_entry_numeric(id, tag_virt_spoken, &spoken) &&
+                !spoken &&
+                tagcache_entry_numeric(id, tag_length, &nearest[i].len))
+                nearest[i].id = id;
+        }
+        return;
+    }
+    if (!tagcache_search(&tcs, tag_filename))
+        return;
+    tagcache_search_add_clause(&tcs, &music_clause);
+    while (tagcache_get_next(&tcs, path, sizeof(path))) {
+        uint64_t key = path_key(path);
+        if ((++seen & 15) == 0)
+            yield();
+        for (int i = 0; i < nearest_ct; i++)
+            if (nearest[i].key == key) {
+                nearest[i].id = tcs.idx_id;
+                nearest[i].len = tagcache_get_numeric(&tcs, tag_length);
+            }
+    }
+    tagcache_search_finish(&tcs);
+    walked += seen;
+}
+
+/* The tracks that sound most like id, nearest first, by Play Similar's
+ * distance with its genre and era terms off; a second copy of id's own
+ * recording left out. None when id has no Sound Index record. */
+static int32_t near_by_sound(int32_t id, int32_t n, int32_t *out)
+{
+    struct sound_index_reader r;
+    struct sound_record rec;
+    struct sound_axes self, ax;
+    char path[MAX_PATH];
+    long len = 0;
+    int32_t k = 0;
+    uint64_t key = tagcache_entry_key(id);
+    if (!key && path_of_id(id, path, sizeof(path)))
+        key = path_key(path);
+    if (!key || sound_index_reader_open(&r) != SOUND_OK)
+        return 0;
+    if (!sound_index_find(&r, key, &rec) || !sound_record_usable(&rec)) {
+        sound_index_reader_close(&r);
+        return 0;
+    }
+    sound_mix_axes(&rec, &self);
+    self.genre = self.year = 0;
+    nearest_ct = 0;
+    for (int i = 0; i < r.count; i++) {
+        if ((i & 63) == 0)
+            yield();
+        if (!sound_index_read(&r, i, &rec) || !sound_record_usable(&rec) ||
+            rec.key == key)
+            continue;
+        sound_mix_axes(&rec, &ax);
+        ax.genre = ax.year = 0;
+        keep_nearest(rec.key, sound_mix_distance(&self, &ax));
+    }
+    walked = r.count;
+    sound_index_reader_close(&r);
+    resolve_nearest();
+    tagcache_entry_numeric(id, tag_length, &len);
+    for (int i = 0; i < nearest_ct && k < n; i++) {
+        long gap = nearest[i].len - len;
+        if (nearest[i].id < 0 || nearest[i].id == id ||
+            (nearest[i].d < SAME_RECORDING_D &&
+             gap > -SAME_LENGTH_MS && gap < SAME_LENGTH_MS))
+            continue;
+        out[k++] = nearest[i].id;
+    }
+    return k;
+}
+
 /* The tracks most like id: the same genre and decade, then the same genre,
  * then the same decade, each tier taken at random (a reservoir a tier);
- * music only, id itself left out */
-static int32_t music_near(void *ctx, int32_t id, int32_t n, int32_t *out)
+ * music only, id itself left out. By sound instead, see above. */
+static int32_t music_near(void *ctx, int32_t id, int32_t n, int sound,
+                          int32_t *out)
 {
     (void)ctx;
     static int32_t tier[3][NEAR_MAX];
@@ -338,11 +454,15 @@ static int32_t music_near(void *ctx, int32_t id, int32_t n, int32_t *out)
     char genre[64], g[64], title[8];
     long year = 0;
     int32_t found[3] = { 0, 0, 0 }, seen = 0, k = 0;
-    struct arcade_filter music = { 0, 0, NULL, 0, 1 };
+    struct arcade_filter music = { 0, 0, NULL, 0, 1, NULL };
     if (n > NEAR_MAX)
         n = NEAR_MAX;
     walked = 0;
-    if (n <= 0 || id < 0 || !walk_begin(&tcs, &music))
+    if (n <= 0 || id < 0)
+        return 0;
+    if (sound)
+        return near_by_sound(id, n, out);
+    if (!walk_begin(&tcs, &music))
         return 0;
     bool has_genre = tagcache_entry_string(id, tag_genre, genre,
                                            sizeof(genre));

@@ -16,6 +16,7 @@
  * tracks for the engine, with each album's colours. */
 
 
+#include <stdlib.h>
 #include <string.h>
 #include "fakemusic.h"
 
@@ -450,6 +451,8 @@ static int fake_matches(int32_t id, const struct arcade_filter *f)
         return 0;
     if (f->genre && strcmp(f->genre, t->genre))
         return 0;
+    if (f->artist && strcmp(f->artist, t->artist))
+        return 0;
     if (f->decade && t->year / 10 * 10 != f->decade)
         return 0;
     return 1;
@@ -476,13 +479,25 @@ static int32_t fake_pick(void *ctx, int32_t n, const struct arcade_filter *f,
     return k;
 }
 
-/* the same genre, nearest in the library first */
-static int32_t fake_near(void *ctx, int32_t id, int32_t n, int32_t *out)
+/* the same genre, nearest in the library first; by sound, the nearest
+ * tempo first, the earlier of two as near */
+static int32_t fake_near(void *ctx, int32_t id, int32_t n, int sound,
+                         int32_t *out)
 {
     int32_t k = 0;
     (void)ctx;
     if (id < 0 || id >= LIB)
         return 0;
+    if (sound) {
+        if (lib_spoken(id))
+            return 0;
+        for (int32_t gap = 0; gap < 200 && k < n; gap++)
+            for (int32_t j = 0; j < LIB && k < n; j++)
+                if (j != id && !lib_spoken(j) &&
+                    abs(lib_tracks[j].bpm - lib_tracks[id].bpm) == gap)
+                    out[k++] = j;
+        return k;
+    }
     for (int32_t d = 1; d < LIB && k < n; d++)
         for (int s = -1; s <= 1 && k < n; s += 2) {
             int32_t j = id + s * d;

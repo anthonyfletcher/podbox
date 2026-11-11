@@ -133,7 +133,7 @@ level but `enqueue`, above.
 | `tracks.count([filter])` | how many tracks match |
 | `tracks.pick(n, filter, out)` | `n` tracks at random that match, their ids into `out` (an `Int32Array` or a list); how many it found |
 | `tracks.field(id, f)` | one thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as text, `TRACK.YEAR` or `LENGTH` (ms) as a number |
-| `tracks.near(id, n, out)` | up to `n` tracks most like `id` -- the same genre and decade first -- into `out`; how many |
+| `tracks.near(id, n, out, [sound])` | up to `n` tracks most like `id` -- the same genre and decade first -- into `out`; how many. With `sound` true, those that sound most like it, nearest first, by the Sound Index; none when `id` has not been measured |
 | `tracks.sound(id, out)` | a track's Sound Index (below) |
 | `tracks.queued()` | how many tracks the queue holds |
 | `tracks.place()` | the playing track's place in the queue, 0 first, or -1 |
@@ -147,6 +147,7 @@ A **filter** is a record of any of:
 | `genre` | tracks of this genre, as text: `"Rock"` |
 | `decade` | tracks from this decade: `1970` |
 | `music` | `true` leaves out spoken word: audiobooks and podcasts |
+| `artist` | tracks by this artist, as text |
 
 ```js
 var ids = new Int32Array(4);
@@ -168,7 +169,8 @@ function newRound() {
   track in the library and cost 200 units and 4 a track -- about 40,000
   for a library of 10,000, over three ticks' worth on an iPod Video
   playing FLAC.
-- In the IDE, `tracks.count()` is 20 and the queue holds 10.
+- In the IDE, `tracks.count()` is 20 and the queue holds 10, and
+  `tracks.near` by sound takes the nearest tempo for the nearest sound.
 
 ---
 
