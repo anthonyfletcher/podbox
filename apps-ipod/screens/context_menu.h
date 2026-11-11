@@ -31,6 +31,7 @@ enum {
     ONPLAY_FUNC_RETURN, /* for use in hotkey_assignment only */
     ONPLAY_SELECT,      /* Select...: the list turns into a selecting one */
     ONPLAY_LEAVE,       /* Now Playing leaves for context_menu_leave_for() */
+    ONPLAY_STOP,        /* Now Playing stops playback, through its own exit */
 };
 
 /* Runs Now Playing's button action 'act' on the playing 'file': the
@@ -84,6 +85,7 @@ enum hotkey_flags {
     HOTKEY_FLAG_WPS = 0x1,
     HOTKEY_FLAG_TREE = 0x2,
     HOTKEY_FLAG_NOSBS = 0x4,
+    HOTKEY_FLAG_LEAVES = 0x8,   /* leaves Now Playing: Menu offers only these */
 };
 
 struct hotkey_assignment {
@@ -95,8 +97,9 @@ struct hotkey_assignment {
     uint8_t icon;           /* themable_icons value shown beside the entry */
 };                          /* (Pick ONPLAY_FUNC_RETURN to use function's return value) */
 
-/* The hotkey settings -- Now Playing's Select and Select + Play, and the
-   file browser's hotkey -- hold their action as item 0 of an int. */
+/* The hotkey settings -- Now Playing's Select, Select + Play, Menu and long
+   press of Play, and the file browser's hotkey -- hold their action as item 0
+   of an int. */
 #define HK_CTX_MASK  (0x3F)
 #define HK_CTX_BITS  (6) /* 6 bits, enough for 62 hotkey actions */
 #define HK_CTX_SET(item, hotkey) ((hotkey & HK_CTX_MASK) << (item * HK_CTX_BITS))

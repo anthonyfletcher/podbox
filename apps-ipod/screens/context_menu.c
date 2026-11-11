@@ -2605,13 +2605,11 @@ static int hotkey_go_to_album(void)
     return leave(GO_TO_DBBROWSER);
 }
 
-/* Now Playing stops through its own exit instead (see wps.c); this serves
-   the rest of the list's callers */
+/* Now Playing stops through its own exit, which saves a book's place and the
+   resume point */
 static int hotkey_stop(void)
 {
-    book_resume_save();
-    audio_stop();
-    return leave(GO_TO_PREVIOUS);
+    return ONPLAY_STOP;
 }
 
 /* The now-playing menu's Add to Playlist... submenu, for the playing track */
@@ -2742,7 +2740,7 @@ static const struct hotkey_assignment hotkey_items[] = {
       .lang_id = LANG_SHOW_IN_FILES,
       .func = HOTKEY_FUNC(reveal, NULL),
       .return_code = ONPLAY_REVEAL_FILE,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_file_view_menu },
     { .action = HOTKEY_LYRICS,
       .lang_id = LANG_LYRICS,
@@ -2754,25 +2752,25 @@ static const struct hotkey_assignment hotkey_items[] = {
       .lang_id = LANG_BACK_PREVIOUS_SCREEN,
       .func = HOTKEY_FUNC(hotkey_previous_screen, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_PREVIOUS_BROWSER,
       .lang_id = LANG_PREVIOUS_BROWSER,
       .func = HOTKEY_FUNC(hotkey_previous_browser, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_GO_TO_ALBUM,
       .lang_id = LANG_GO_TO_ALBUM,
       .func = HOTKEY_FUNC(hotkey_go_to_album, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_STOP,
       .lang_id = LANG_STOP_PLAYBACK,
       .func = HOTKEY_FUNC(hotkey_stop, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_ADD_TO_PLAYLIST,
       .lang_id = LANG_ADD_TO_PL,
@@ -2784,13 +2782,13 @@ static const struct hotkey_assignment hotkey_items[] = {
       .lang_id = LANG_MAIN_MENU,
       .func = HOTKEY_FUNC(hotkey_main_menu, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_MUSIC,
       .lang_id = LANG_MUSIC_BROWSER,
       .func = HOTKEY_FUNC(hotkey_music, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_NOICON },
     { .action = HOTKEY_ALBUM_COVERS,
       .lang_id = LANG_ALBUM_COVERS,
@@ -2802,7 +2800,7 @@ static const struct hotkey_assignment hotkey_items[] = {
       .lang_id = LANG_DIR_BROWSER,
       .func = HOTKEY_FUNC(hotkey_files, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_WPS,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
       .icon = Icon_file_view_menu },
     { .action = HOTKEY_THEME_OPTIONS,
       .lang_id = LANG_THEME_OPTIONS,
@@ -2974,13 +2972,13 @@ int wps_select_do_setting(void *param)
                                   false);
 }
 
-/* Not offered Off, so Menu always leaves Now Playing */
+/* Only the actions that leave Now Playing, as Menu does everywhere else */
 int wps_menu_do_setting(void *param)
 {
     (void)param;
     return hotkey_menu_do_setting(&global_settings.wps_menu_action,
-                                  HOTKEY_FLAG_WPS, LANG_WPS_MENU_ACTION,
-                                  false);
+                                  HOTKEY_FLAG_WPS | HOTKEY_FLAG_LEAVES,
+                                  LANG_WPS_MENU_ACTION, false);
 }
 
 /* Not offered Off: a long press that did nothing would look like a fault */

@@ -821,12 +821,18 @@ long gui_wps_show(void)
                                         ? global_settings.wps_long_press_play_action
                                         : global_settings.context_wps);
                 long go_to;
+                int ret;
 
+                /* The remote's long press repeats while held */
+                if (button == ACTION_WPS_STOP)
+                    action_wait_for_release();
                 /* Stop leaves through this screen's exit, which saves a
-                 * book's place and the resume point */
+                 * book's place and the resume point. Party mode refuses it,
+                 * as it refuses every way of stopping. */
                 if (act == HOTKEY_STOP)
                 {
-                    exit = true;
+                    if (!global_settings.party_mode)
+                        exit = true;
                     break;
                 }
                 /* Album Covers opens over this screen, so BACK returns here */
@@ -839,8 +845,10 @@ long gui_wps_show(void)
                     break;
                 }
 
-                /* Menu leaves even when a config has set it to nothing */
-                if (act == HOTKEY_OFF && button == ACTION_WPS_MENU)
+                /* Menu leaves even when a config has set it to an action
+                 * that stays */
+                if (button == ACTION_WPS_MENU
+                    && !(get_hotkey(act)->flags & HOTKEY_FLAG_LEAVES))
                 {
                     gwps_leave_wps(true);
                     return GO_TO_PREVIOUS;
@@ -851,8 +859,13 @@ long gui_wps_show(void)
                  * theme off itself, so leave without re-enabling it */
                 theme_enabled = !(get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS);
                 gwps_leave_wps(theme_enabled);
-                if (context_go_to(context_menu_wps_hotkey(state->id3->path,
-                                                          act), &go_to))
+                ret = context_menu_wps_hotkey(state->id3->path, act);
+                if (ret == ONPLAY_STOP)   /* Stop, from the actions' menu */
+                {
+                    if (!global_settings.party_mode)
+                        exit = true;
+                }
+                else if (context_go_to(ret, &go_to))
                 {
                     if (!theme_enabled)
                         gwps_leave_wps(true);   /* returning to the SBS */
