@@ -138,6 +138,7 @@ static int play(struct vm *vm, struct value *a, int argc, int ch_arg,
     pitch = oct >= 0 ? pitch << oct : pitch >> -oct;
     memset(v, 0, sizeof(*v));
     v->kind = VOICE_SFX;
+    v->id = (int16_t)n;
     v->data = s->data;
     v->n = s->n;
     v->scale = s->scale;
@@ -183,6 +184,7 @@ NATIVE(tone)
     if (vol > 255) vol = 255;
     if (ticks > 60 * 50) ticks = 60 * 50;
     v->kind = VOICE_TONE;
+    v->id = -2;
     v->wave = (uint8_t)wave;
     v->hz = (uint32_t)hz;
     v->vol = vol;
@@ -191,6 +193,31 @@ NATIVE(tone)
     v->left = (uint64_t)ticks * SOURCE_RATE / (uint32_t)vm->rate << 16;
     vm_charge(vm, 8);
     return 1;
+}
+
+#define RET_INT(v) (*out = mk(T_INT, (int32_t)(v)), 1)
+
+/* sfxat(channel): the effect playing on it, -2 for a tone, -1 nothing */
+NATIVE(sfxat)
+{
+    int32_t ch;
+    if (!whole_arg(vm, a, argc, 0, 0, "sfxat", &ch))
+        return 0;
+    if (ch < 0 || ch > 3)
+        return vm_fail(vm, "sfxat() takes a channel from 0 to 3", "", "");
+    const struct voice *v = &vm->voices[ch];
+    vm_charge(vm, 4);
+    return RET_INT(v->kind == VOICE_OFF ? -1 : v->id);
+}
+
+void arcade_mute(struct vm *vm, int on)
+{
+    vm->muted = on ? 1 : 0;
+}
+
+int arcade_muted(const struct vm *vm)
+{
+    return vm->muted;
 }
 
 /* click([beep]): the wheel's tick, or its beep */
@@ -283,5 +310,8 @@ int arcade_audio(struct vm *vm, int16_t *out, int frames, int rate)
         if (sum < -32768) sum = -32768;
         out[f * 2] = out[f * 2 + 1] = (int16_t)sum;
     }
+    /* muted, mixed all the same, so every effect ends when it would */
+    if (vm->muted)
+        memset(out, 0, (size_t)frames * 4);
     return 1;
 }

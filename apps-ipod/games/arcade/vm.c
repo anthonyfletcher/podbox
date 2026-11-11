@@ -2095,7 +2095,9 @@ int arcade_tick(struct vm *vm, int draw)
 {
     begin(vm);
     vm->frame++;
-    vm->opt_changed = vm->opt_pending;
+    /* the first tick reports the options as changed, so a cart reads them
+     * where it reads a change */
+    vm->opt_changed = vm->opt_pending || vm->frame == 1;
     vm->opt_pending = 0;
     int ok = call_entry(vm, 2) && (!draw || call_entry(vm, 3));
     vm->opt_changed = 0;

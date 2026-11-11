@@ -175,6 +175,7 @@ IMPL(rate)
 IMPL(setrate)
 IMPL(skipped)
 IMPL(resumed)
+IMPL(sfxat)
 IMPL(playback_playing)
 IMPL(beat_listen)
 IMPL(beat_state)
@@ -237,6 +238,7 @@ IMPL(ach_has)
 /* sys_opt.c */
 IMPL(opt_get)
 IMPL(opt_changed)
+IMPL(opt_set)
 
 /* sys_ui.c */
 IMPL(ui_choose)

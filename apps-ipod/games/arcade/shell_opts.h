@@ -26,6 +26,11 @@ int shell_option_range(struct vm *vm, int i);
 /* Chosen: an on/off flips, the others open the player's picker; a change
  * is kept at once. True when the owner went out to the root. */
 bool shell_option_edit(struct vm *vm, int i);
+/* The values the game set itself with opt.set(), written where the saves
+ * are, so the disk is not woken mid-game for them */
+void shell_options_keep(struct vm *vm);
+/* Game Sound: the game's own sound muted or not, kept with its options */
+void shell_mute_toggle(struct vm *vm);
 
 /* Whether the cart has any help, and showing it; true for out to the root */
 bool shell_has_help(struct vm *vm);

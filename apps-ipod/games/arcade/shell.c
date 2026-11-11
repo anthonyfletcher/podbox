@@ -1038,6 +1038,7 @@ static int event(struct vm *vm, long button)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_options_keep(vm);
     shell_scores_write(vm, false);
     /* the screen an event shows reads the wheel: the USB screen's wheel
      * is the volume while the player is a sound card */
@@ -1055,8 +1056,8 @@ static int event(struct vm *vm, long button)
 /* The pause menu's rows: Resume, the cart's own (menuitem), its options,
  * High Scores when it has boards, Help when it has any, Now Playing,
  * Restart, Quit. An option row is a setting, the rest plain. */
-enum { ROW_RESUME, ROW_ITEM, ROW_OPTION, ROW_SCORES, ROW_HELP, ROW_MUSIC,
-       ROW_RESTART, ROW_QUIT };
+enum { ROW_RESUME, ROW_ITEM, ROW_OPTION, ROW_SOUND, ROW_SCORES, ROW_HELP,
+       ROW_MUSIC, ROW_RESTART, ROW_QUIT };
 static char item_label[5][32];
 static int item_index[5];
 static int row_kind[1 + 5 + ARCADE_OPTIONS + 5], row_item[ARRAYLEN(row_kind)];
@@ -1069,6 +1070,7 @@ static const char *menu_row(int row, void *data, char *buf, size_t len)
     case ROW_RESUME:  return str(LANG_CHESSBOX_MENU_RESUME_GAME);
     case ROW_ITEM:    return item_label[row_item[row]];
     case ROW_OPTION:  return shell_option_title(data, row_item[row]);
+    case ROW_SOUND:   return str(LANG_ARCADE_GAME_SOUND);
     case ROW_SCORES:  return str(LANG_HIGH_SCORES);
     case ROW_HELP:    return str(LANG_GAME_HELP);
     case ROW_MUSIC:   return str(LANG_NOW_PLAYING);
@@ -1079,12 +1081,16 @@ static const char *menu_row(int row, void *data, char *buf, size_t len)
 
 static enum list_row_kind menu_kind(int row, void *data)
 {
+    if (row_kind[row] == ROW_SOUND)
+        return LIST_ROW_TOGGLE;
     return row_kind[row] == ROW_OPTION
         ? shell_option_kind(data, row_item[row]) : LIST_ROW_PLAIN;
 }
 
 static const char *menu_value(int row, void *data, char *buf, size_t len)
 {
+    if (row_kind[row] == ROW_SOUND)
+        return str(arcade_muted(data) ? LANG_OFF : LANG_ON);
     return row_kind[row] == ROW_OPTION
         ? shell_option_value(data, row_item[row], buf, len) : NULL;
 }
@@ -1158,6 +1164,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_options_keep(vm);
     shell_scores_run(false);
     shell_scores_write(vm, false);
     give_screen();
@@ -1173,6 +1180,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
             }
         for (int i = 0; i < arcade_options(vm)->count; i++)
             add_row(ROW_OPTION, i);
+        add_row(ROW_SOUND, 0);
         if (arcade_scores(vm, NULL)->count || arcade_scores(vm, NULL)->nach)
             add_row(ROW_SCORES, 0);
         if (shell_has_help(vm))
@@ -1193,6 +1201,10 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         if (kind == ROW_OPTION) {
             if (shell_option_edit(vm, row_item[selection]))
                 return menu_out();
+            continue;
+        }
+        if (kind == ROW_SOUND) {
+            shell_mute_toggle(vm);
             continue;
         }
         if (kind == ROW_HELP) {
@@ -1274,6 +1286,7 @@ static int hold_pause(struct vm *vm, bool idle)
     sound_stop();
     present_wait();
     save_write(vm);
+    shell_options_keep(vm);
     shell_scores_run(false);
     shell_scores_write(vm, false);
     cpu_boost(false);
@@ -1552,6 +1565,7 @@ static int run(const char *path, void *mem, size_t size)
         status = QUIT;
     }
     save_write(vm);
+    shell_options_keep(vm);
     shell_scores_run(false);
     shell_scores_write(vm, true);
     if (suspend)

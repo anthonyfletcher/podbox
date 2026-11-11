@@ -121,6 +121,22 @@ test('sfx plays the effect exactly as built, and sfxp an octave up takes half as
     assert.deepEqual(Array.from(up.left), Array.from(model(zap, 131072, up.left.length)));
 });
 
+test('sfxat tells what each channel plays, and a muted game mixes silence that ends on time', () => {
+    const main = 'var tk = 0;\nfunction init() { sfx(SFX.blip, 2); tone(1, 300, 4, 100, WAVE.SINE); }\n' +
+                 'function update() { tk++; printh(tk + " " + sfxat(0) + " " + sfxat(1) + " " + sfxat(2)); }';
+    const r = cart({ blip: BLIP }, main, 8);
+    const lines = r.out.trim().split('\n');
+    /* the effect is SFX.blip, 0; the tone -2 until its 4 ticks are mixed */
+    assert.equal(lines[0], '1 -1 -2 0');
+    assert.match(lines[7], /^8 -1 -1 /);
+    assert.ok(r.left.some((v) => v !== 0));
+    const opts = path.join(tmp, 'muted.opt');
+    fs.writeFileSync(opts, Buffer.from('PBOP\x01\x00\x01\x00', 'latin1'));
+    const muted = cart({ blip: BLIP }, main, 8, ['--options', opts]);
+    assert.ok(muted.left.every((v) => v === 0), 'a muted game sounded');
+    assert.deepEqual(muted.out, r.out);
+});
+
 test('four voices mix, sfx(-1) stops one, and tone plays its note for its ticks', () => {
     const r = cart({}, 'var tk = 0;\nfunction init() { tone(0, 441, 5, 255, WAVE.SQUARE); }\n' +
                    'function update() {}', 10);

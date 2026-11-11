@@ -115,6 +115,7 @@ API(rate,      92, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(setrate,   93, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(skipped,   94, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(resumed,  222, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(sfxat,    223, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 
 /* The owner's music, read-only: the first of the playback service (6.4) */
 API_NS(playback)
@@ -294,6 +295,7 @@ API(score_show,       180, 1, 1, VOID, 0, FLAT, LISTEN, 1)
 API_NS(opt)
 API(opt_get,          181, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(opt_changed,      182, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(opt_set,          224, 2, 2, VOID, 0, FLAT, LISTEN, 1)
 
 /* Dialogs: the player's own, over the game */
 API_NS(ui)

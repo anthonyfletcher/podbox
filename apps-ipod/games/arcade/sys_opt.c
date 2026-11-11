@@ -8,7 +8,7 @@
  * Parts, in order:
  *   the values    setting one, the host's record of them
  *   the help      the cart's help text, from META
- *   natives       opt.get, opt.changed
+ *   natives       opt.get, opt.set, opt.changed
  ***************************************************************************/
 #include <string.h>
 #include "games/arcade/vm.h"
@@ -56,7 +56,8 @@ int arcade_options_pack(const struct vm *vm, uint8_t *buf, int cap)
     memcpy(buf, "PBOP", 4);
     buf[4] = 1;
     buf[5] = (uint8_t)s->count;
-    buf[6] = buf[7] = 0;
+    buf[6] = vm->muted;             /* the owner's mute */
+    buf[7] = 0;
     for (int i = 0; i < s->count; i++) {
         wr_le32(buf + 8 + i * 8, s->o[i].key);
         wr_le32(buf + 12 + i * 8, (uint32_t)s->o[i].value);
@@ -69,6 +70,7 @@ int arcade_options_unpack(struct vm *vm, const uint8_t *buf, int n)
     if (n < 8 || memcmp(buf, "PBOP", 4) || buf[4] != 1 ||
         n < 8 + buf[5] * 8)
         return 0;
+    vm->muted = buf[6] & 1;
     for (int k = 0; k < buf[5]; k++) {
         uint32_t key = rd_le32(buf + 8 + k * 8);
         int32_t value = (int32_t)rd_le32(buf + 12 + k * 8);
@@ -109,6 +111,32 @@ NATIVE(opt_get)
                        "OPT.<name>", "", "");
     vm_charge(vm, 10);
     return RET_INT(vm->opts.o[a[0].v].value);
+}
+
+/* opt.set(OPT.name, value): an option set from the game -- a title
+ * screen's own settings page -- fitted to its range and kept as the pause
+ * menu keeps it; not a change opt.changed() reports */
+NATIVE(opt_set)
+{
+    (void)argc; (void)out;
+    if (a[0].tag != T_INT || a[0].v < 0 || a[0].v >= vm->opts.count ||
+        !is_num(a[1]))
+        return vm_fail(vm, "opt.set() needs one of the cart's options, "
+                       "OPT.<name>, and a value", "", "");
+    struct arcade_option *o = &vm->opts.o[a[0].v];
+    int32_t v = fit(o, floor_int(a[1]));
+    if (v != o->value)
+        vm->opt_set = 1;
+    o->value = v;
+    vm_charge(vm, 10);
+    return 1;
+}
+
+int arcade_options_set(struct vm *vm)
+{
+    int was = vm->opt_set;
+    vm->opt_set = 0;
+    return was;
 }
 
 /* opt.changed(): whether the owner changed any since the last tick */

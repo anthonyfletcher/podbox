@@ -7,7 +7,7 @@ playing all the while -- there is no music player of a cart's own (see
 
 - [How sound works](#how-sound-works)
 - [Making effects in the IDE](#making-effects-in-the-ide), and [the file](#the-effect-file)
-- [sfx](#sfxn-channel), [sfxp](#sfxpn-semitones-channel), [tone](#tonechannel-hz-ticks-vol-wave)
+- [sfx](#sfxn-channel), [sfxat](#sfxatchannel), [sfxp](#sfxpn-semitones-channel), [tone](#tonechannel-hz-ticks-vol-wave)
 - The wheel's click is in **Input**: [click](reference-input.md#clickbeep)
 
 ## How sound works
@@ -31,8 +31,15 @@ So:
 
 **Where it is heard.** Effects go to the headphones or dock, mixed over
 the owner's music, at the player's volume. (The wheel's click, `click()`,
-is the separate little speaker inside the iPod.) A cart cannot change the
-volume -- each effect has its own loudness, set when it is made.
+is the separate little speaker inside the iPod.) Each effect has its own
+loudness, set when it is made; the owner's volume is the music's, which a
+cart with `"music": "control"` can turn with
+[`playback.adjust`](reference-music.md#controlling-it).
+
+**Game Sound.** The pause menu's **Game Sound** row mutes a game's own
+effects and tones -- not the owner's music, not speech -- and the player
+remembers it for that game. A muted game plays on as before: each effect
+still lasts as long, and `sfxat` still reports it; only silence is heard.
 
 **What it costs**: about 11 units to start an effect, 14 a tone. The
 mixing is done by the player, not counted against the cart.
@@ -115,6 +122,26 @@ function update() {
 - `sfx(-1, channel)` stops that channel.
 - A number that is not one of the cart's effects, or a channel other than
   0 to 3, stops the cart with an error.
+
+## sfxat(channel)
+
+What a channel is playing.
+
+| Argument | |
+|---|---|
+| `channel` | 0 to 3 |
+
+**Returns** the effect's number -- the same as `SFX.<name>` -- or -2 for a
+`tone`, or -1 when the channel is silent.
+
+```js
+// a jingle that waits for the last one to end
+if (sfxat(3) == -1) sfx(SFX.coin, 3);
+```
+
+- The sound is mixed a little ahead of the speaker, so a channel can
+  report silence a few hundredths of a second before its sound has been
+  heard to the end.
 
 ## sfxp(n, semitones, [channel])
 

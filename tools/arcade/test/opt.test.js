@@ -79,9 +79,27 @@ test('a change shows for the next tick only, kept within the range and steps', (
 function update() { printh(frame() + " " + opt.changed() + " " + opt.get(OPT.level) + " " + opt.get(OPT.lives)); }`,
                   { ticks: 4, set: '1:0:9,1:2:8,2:2:7,3:0:0' });
     assert.equal(r.status, 0, r.err);
-    /* tick 2: level 9 is brought down to Hard, lives 8 lands on 7 (1 + 3
+    /* tick 1 reports the options as changed, so a cart reads them there;
+     * tick 2: level 9 is brought down to Hard, lives 8 lands on 7 (1 + 3
      * steps of 2); tick 3: 7 again is no change; tick 4: Easy */
-    assert.equal(r.out, '1 0 1 3\n2 1 2 7\n3 0 2 7\n4 1 0 7\n');
+    assert.equal(r.out, '1 1 1 3\n2 1 2 7\n3 0 2 7\n4 1 0 7\n');
+});
+
+test('opt.set changes an option from the game, fitted, kept, and not reported as the owner\'s change', () => {
+    const file = path.join(tmp, 'set.opt');
+    const r = run(`function init() {}
+function update() {
+    if (frame() == 2) { opt.set(OPT.level, 0); opt.set(OPT.lives, 6); }
+    printh(frame() + " " + opt.changed() + " " + opt.get(OPT.level) + " " + opt.get(OPT.lives));
+}`, { ticks: 3, file });
+    assert.equal(r.status, 0, r.err);
+    /* 6 lands on 5, between 1 + 2 steps of 2 and 7 */
+    assert.equal(r.out, '1 1 1 3\n2 0 0 5\n3 0 0 5\n');
+    assert.equal(run('function init() { printh(opt.get(OPT.level) + " " + opt.get(OPT.lives)); }\nfunction update() {}',
+                     { file }).out, '0 5\n');
+    const bad = run('function init() { opt.set(9, 1); }\nfunction update() {}');
+    assert.equal(bad.status, 1);
+    assert.match(bad.err, /opt\.set\(\) needs one of the cart's options/);
 });
 
 test('an unknown option stops the cart', () => {

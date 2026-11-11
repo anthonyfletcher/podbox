@@ -11,7 +11,7 @@ style as its own menus, and saves them.
   [score.best](#scorebestboard), [score.get, score.name, score.count](#scoregetboard-rank),
   [score.show](#scoreshowboard)
 - Options: [declaring options](#declaring-options), [opt.get](#optgetoptname),
-  [opt.changed](#optchanged)
+  [opt.set](#optsetoptname-value), [opt.changed](#optchanged)
 - Achievements: [declaring achievements](#declaring-achievements),
   [ach.earn](#achearnachname), [ach.has](#achhasachname)
 - The pause menu: [what it holds](#the-pause-menu), [menuitem](#menuitemi-label-fn),
@@ -202,10 +202,35 @@ function start() {
 }
 ```
 
+## opt.set(OPT.name, value)
+
+Sets an option from the game: for a settings page of the game's own, on
+its title screen, that shows the same options as the pause menu.
+
+| Argument | |
+|---|---|
+| `OPT.name` | the option |
+| `value` | its new value: a choice's index, 1 or 0 for on/off, or the number |
+
+**Returns** nothing. The value is brought within the option's range and
+onto its steps, and kept as the pause menu keeps the owner's -- written
+when the game next pauses or ends, so the disk is not woken mid-game. It
+is not a change `opt.changed()` reports: the game made it.
+
+```js
+function settingsPage() {
+    var lives = opt.get(OPT.lives);
+    lives = mid(1, lives + dial.steps(16), 9);
+    opt.set(OPT.lives, lives);
+    print("LIVES " + lives, 40, 60, 7);
+}
+```
+
 ## opt.changed()
 
 **Returns** true for the one tick after the owner changes any option in
-the pause menu.
+the pause menu, and on the first tick, so a game reads its options in one
+place.
 
 ```js
 function update() {
@@ -269,7 +294,8 @@ short press asks whether to quit, or with `"menu_button": "game"` in
 
 1. **Resume**
 2. the cart's own items, from `menuitem`
-3. the cart's options, each showing its value
+3. the cart's options, each showing its value, then **Game Sound**, which
+   mutes the game's own effects ([Sound](reference-sound.md#how-sound-works))
 4. **High Scores**, when the cart has boards or achievements
 5. **Help**, when the cart has `help` text or options with help
 6. **Now Playing**: play, pause and skip the owner's music -- the way to

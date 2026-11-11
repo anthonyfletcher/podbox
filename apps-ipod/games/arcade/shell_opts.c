@@ -68,6 +68,18 @@ static void options_write(struct vm *vm)
 
 /* ---- the rows ------------------------------------------------------------ */
 
+void shell_options_keep(struct vm *vm)
+{
+    if (arcade_options_set(vm))
+        options_write(vm);
+}
+
+void shell_mute_toggle(struct vm *vm)
+{
+    arcade_mute(vm, !arcade_muted(vm));
+    options_write(vm);
+}
+
 const char *shell_option_title(struct vm *vm, int i)
 {
     return arcade_options(vm)->o[i].title;

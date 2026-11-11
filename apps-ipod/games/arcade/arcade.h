@@ -287,6 +287,10 @@ void arcade_skipped(struct vm *vm, unsigned frames);
 /* The game was paused, by the pause menu or the hold switch: what
  * resumed() reports. */
 void arcade_paused(struct vm *vm);
+/* The owner's mute of the game's own sound (sfx and tone), kept with the
+ * options: arcade_audio() then mixes silence, its effects ending on time */
+void arcade_mute(struct vm *vm, int on);
+int arcade_muted(const struct vm *vm);
 const uint8_t *arcade_id(const struct vm *vm);
 
 /* The buttons for btn(): one bit each, in btn()'s numbering. */
@@ -508,6 +512,9 @@ void arcade_option_set(struct vm *vm, int i, int32_t value);
 #define ARCADE_OPTIONS_MAX (8 + ARCADE_OPTIONS * 8)
 int arcade_options_pack(const struct vm *vm, uint8_t *buf, int cap);
 int arcade_options_unpack(struct vm *vm, const uint8_t *buf, int n);
+/* Whether opt.set() changed an option since the last call: the host then
+ * keeps the values, as it does the pause menu's */
+int arcade_options_set(struct vm *vm);
 /* The cart's help text, not ended: its length, 0 for none */
 int arcade_help(const struct vm *vm, const char **text);
 

@@ -193,6 +193,9 @@ Where the finger is on the wheel, 0 to 95 clockwise from the top, or -1 when it 
 ### click([beep])
 The wheel's own tick, or with `beep` its short beep, from the player's little speaker.
 
+### sfxat(channel)
+The effect a channel is playing, `SFX.<name>`'s number; -2 for a `tone`, -1 when it is silent.
+
 ## Sound
 
 ### sfx(n, [channel])
@@ -361,8 +364,11 @@ Shows the player's table for the board after this tick, the latest score marked.
 ### opt.get(OPT.name)
 An option's value: a choice's index, 0 or 1, or the number.
 
+### opt.set(OPT.name, value)
+Sets an option from the game -- its own settings page -- fitted to the option's range, and kept as the pause menu keeps it.
+
 ### opt.changed()
-Whether the owner changed an option since the last tick.
+Whether the owner changed an option since the last tick; true on the first tick, so a cart reads its options where it reads a change.
 
 ### ach.earn(ACH.name)
 Earns an achievement. Returns true the first time, when the player announces it.

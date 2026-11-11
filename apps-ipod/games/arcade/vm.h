@@ -260,6 +260,7 @@ enum { VOICE_OFF, VOICE_SFX, VOICE_TONE };
 struct voice
 {
     uint8_t kind, wave, done;
+    int16_t id;                 /* the effect playing, -2 a tone */
     int32_t s0, s1;             /* an effect's samples either side of frac */
     int32_t scale;
     const int8_t *data;
@@ -304,6 +305,7 @@ struct vm
      * opt.changed() is true during it */
     struct arcade_options opts;
     uint8_t opt_pending, opt_changed;
+    uint8_t opt_set;            /* opt.set() since the host last asked */
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
     uint8_t listening;          /* beat.listen(true): the analyser runs */
     /* Dialogs (sys_ui.c): ui.style()'s colours -- the box, its text and
@@ -391,6 +393,7 @@ struct vm
     struct cartfont fonts[MAX_CART_FONTS];
     uint32_t nfonts;
     struct voice voices[4];
+    uint8_t muted;              /* the owner muted the game's sound */
     uint32_t actor_shape, particle_shape;   /* what makes a record a pool */
     struct planeview plane;
     uint32_t rules_shape;                   /* what makes a record rules */
