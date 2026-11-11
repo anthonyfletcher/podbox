@@ -75,6 +75,21 @@ test('field counts steps from its start round the walls, next walks it back', ()
     assert.equal(out[2], 'RRUULLUU 0,0 -1');
 });
 
+test('field on a 128 by 128 board fits beside a heap mostly held', () => {
+    /* 64 KB of answer and 240 KB held: the queue, two bytes a cell, is
+     * the 32 KB left */
+    const r = run(`var b, f, big;
+function init() {
+    b = new Uint8Array(128 * 128);
+    f = new Int32Array(128 * 128);
+    big = new Int32Array(60000);
+    printh(path.field(b, 128, 0, 0, 0, f) + " " + f[128 * 128 - 1]);
+}
+function update() {}`);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out.trim(), '16384 254');
+});
+
 test('find gives a shortest route, sight sees down open lines only', () => {
     const out = paths(MAZE + `
     var o = new Int32Array(20);

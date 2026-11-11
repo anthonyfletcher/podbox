@@ -87,22 +87,34 @@ NATIVE(path_field)
         return vm_fail(vm, "path.field() works on boards of up to 65535 "
                        "across and down", "", "");
     int32_t x = whole(a[3], -1), y = whole(a[4], -1);
-    uint32_t *queue = scratch(vm, cells * 4);
-    if (!queue)
+    /* the queue holds each cell as its row and column, so none is divided
+     * to find them: y << 8 | x in two bytes on a board up to 256 across
+     * and down, else y << 16 | x in four. It is working memory from the
+     * heap's top, given back, so it leaves no hole. */
+    int small = w.b.w <= 256 && w.b.h <= 256;
+    uint32_t shift = small ? 8 : 16, low = (1u << shift) - 1;
+    uint32_t bytes = cells * (small ? 2 : 4);
+    uint32_t qoff = gc_scratch(vm, bytes);
+    if (!qoff)
         return 0;
+    uint16_t *q16 = MEM(vm, qoff);
+    uint32_t *q32 = MEM(vm, qoff);
     int32_t *d = I32(vm, a[5])->d;
     for (uint32_t i = 0; i < cells; i++)
         d[i] = -1;
-    /* the queue holds each cell as its row and column, y << 16 | x, so
-     * none is divided to find them */
     uint32_t head = 0, tail = 0;
     if (!wall(&w, x, y)) {
         d[y * w.b.w + x] = 0;
-        queue[tail++] = (uint32_t)y << 16 | (uint32_t)x;
+        uint32_t c = (uint32_t)y << shift | (uint32_t)x;
+        if (small)
+            q16[tail++] = (uint16_t)c;
+        else
+            q32[tail++] = c;
     }
     while (head < tail) {
-        uint32_t q = queue[head++];
-        int32_t cx = (int32_t)(q & 0xffff), cy = (int32_t)(q >> 16);
+        uint32_t q = small ? q16[head] : q32[head];
+        head++;
+        int32_t cx = (int32_t)(q & low), cy = (int32_t)(q >> shift);
         int32_t i = cy * w.b.w + cx;
         for (int k = 0; k < 4; k++) {
             int32_t nx = cx + step_x[k], ny = cy + step_y[k];
@@ -110,9 +122,14 @@ NATIVE(path_field)
             if (wall(&w, nx, ny) || d[j] >= 0)
                 continue;
             d[j] = d[i] + 1;
-            queue[tail++] = (uint32_t)ny << 16 | (uint32_t)nx;
+            uint32_t c = (uint32_t)ny << shift | (uint32_t)nx;
+            if (small)
+                q16[tail++] = (uint16_t)c;
+            else
+                q32[tail++] = c;
         }
     }
+    gc_scratch_end(vm, bytes);
     /* measured on the ARM rig (.build/arcade-rig, sysprobe3) */
     vm_charge(vm, 10 + cells + tail * 13 / 2);
     *out = mk(T_INT, (int32_t)tail);

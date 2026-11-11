@@ -342,6 +342,15 @@ test('one flip number everywhere: 1 across, 2 up and down, 3 both', () => {
     }
 });
 
+test('a FixArray serves wherever an array of numbers does', () => {
+    const SHEET = `for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, 1 + (x + y * 3) % 15);`;
+    const draw = (kind) => runCart(`function init() { ${SHEET} cls();
+        var xs = new ${kind}(3), ys = new ${kind}(3), fl = new ${kind}(3);
+        for (var i = 0; i < 3; i++) { xs[i] = 4 + i * 12; ys[i] = 2 + i; fl[i] = i; }
+        sprites.draw(1, xs, ys, 3, fl); }\nfunction update() {}`, ['--dump', '0,0,40,16']);
+    assert.equal(draw('FixArray'), draw('Int32Array'));
+});
+
 test('clip takes two corners, both inside, as rect does', () => {
     const r = runCart(`function init() { cls(); clip(10, 20, 12, 21); rectfill(0, 0, 159, 119, 7); clip(); var n = 0;
         for (var y = 0; y < 120; y++) for (var x = 0; x < 160; x++) if (pget(x, y) == 7) n++;

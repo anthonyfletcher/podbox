@@ -4034,6 +4034,7 @@ int column_of(struct vm *vm, struct value v, struct column *c)
         c->len = ARR(vm, v)->len;
         return 1;
     case T_I32:
+    case T_FXA:
         c->p = I32(vm, v)->d;
         c->len = I32(vm, v)->len;
         return 1;
@@ -4062,6 +4063,8 @@ int32_t column_at(const struct column *c, uint32_t i, int32_t none)
     }
     case T_I32:
         return ((const int32_t *)c->p)[i];
+    case T_FXA:
+        return ((const int32_t *)c->p)[i] >> 16;
     case T_U8:
         return ((const uint8_t *)c->p)[i];
     case T_INT:
@@ -4077,6 +4080,8 @@ int32_t column_fix(const struct column *c, uint32_t i)
         struct value v = ((const struct value *)c->p)[i];
         return is_num(v) ? wrap32(scaled(v)) : 0;
     }
+    if (c->tag == T_FXA)
+        return ((const int32_t *)c->p)[i];
     return (int32_t)((uint32_t)column_at(c, i, 0) << 16);
 }
 
@@ -4088,6 +4093,8 @@ int column_true(struct vm *vm, const struct column *c, uint32_t i,
         return dflt;
     if (c->tag == T_ARR)
         return vm_truthy(vm, ((const struct value *)c->p)[i]);
+    if (c->tag == T_FXA)
+        return ((const int32_t *)c->p)[i] != 0;
     return column_at(c, i, 0) != 0;
 }
 
