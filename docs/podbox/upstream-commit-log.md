@@ -337,7 +337,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-09-09 | `2476968a20` `3b226dd23e`, and the nano 4G, S5L8720, 3DS and x1600 commits | other targets | **N/A** | |
 | 2026-10-27 | `b9002ac186` `f3ffe789ef` `8e4a103eb0` | mikmod, plugin splash, radio | **N/A** | |
 
-Complete through `127dff1016` (2026-11-10), merged as `MERGE_COMMIT`.
+Complete through `127dff1016` (2026-11-10), merged as `d65129f47e`.
 
 ---
 
