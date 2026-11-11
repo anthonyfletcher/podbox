@@ -48,3 +48,14 @@ if [ "$stale" = 1 ]; then
     mv -f "$out.$$.tmp" "$out"
 fi
 echo "$out"
+
+# pbgide, the IDE served from this computer: on Windows it needs the
+# sockets and the shell's opener
+ide="$here/pbgide"
+libs=
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) ide="$ide.exe"; libs="-lws2_32 -lshell32" ;; esac
+if [ ! -f "$ide" ] || [ "$here/pbgide.c" -nt "$ide" ]; then
+    "$cc" -std=gnu11 -O2 -W -Wall -Wextra -Wundef -Wstrict-prototypes \
+        ${EXTRA_CFLAGS:-} -o "$ide.$$.tmp" "$here/pbgide.c" $libs
+    mv -f "$ide.$$.tmp" "$ide"
+fi

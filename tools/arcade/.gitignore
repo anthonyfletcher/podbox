@@ -1,6 +1,8 @@
 node_modules/
 host/pbgvm
 host/pbgvm.exe
+host/pbgide
+host/pbgide.exe
 host/*.tmp
 wasm/arcade.wasm
 wasm/*.raw.wasm

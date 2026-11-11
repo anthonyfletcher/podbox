@@ -340,13 +340,37 @@ show as `?`.
   opens it too. **Save as .pbg** writes the cart, and **Save as a new game**
   writes it as a game of its own, with a new id and name. In Chrome and Edge, Save
   writes back to the file you opened, and **Open folder** edits a cart
-  folder in place, Save writing its files back.
+  folder in place, Save writing its files back. Where the browser will not
+  write to files -- other browsers, or one whose owner has turned it off --
+  use `pbgide` instead, below.
 - **Export as web page** (Cart menu) saves the cart as a web page to play
   it in: see below.
 - The cart open when you close the page is there when you come back.
   `store` files are kept in the browser.
 - **About ArcadeIDE** (Help menu) credits the open-source projects the IDE
   is built with.
+
+### The IDE on a cart folder: pbgide
+
+```sh
+host/pbgide mygame          # opens the IDE in the browser, on the folder mygame
+```
+
+`pbgide` serves the IDE from your own computer and opens it in your
+default browser, already editing the cart folder you give it: Save writes
+its files straight back there. The browser never writes a file itself, so
+it works in any browser, including one set never to let pages write files.
+
+- It answers this computer only (`127.0.0.1`), and only the page it opened
+  can read or write the folder: the address carries a key made each time
+  it starts. It reads and writes the cart's own files and nothing else.
+- It runs until you stop it (Ctrl+C). Close the page and open the address
+  it printed to come back; a new IDE built with `node ide/build.js` is
+  served at the next reload.
+- `--port n` picks the port (8484, or the next free one, by default),
+  `--no-browser` only prints the address, and `--ide file.html` serves an
+  IDE page from elsewhere. Without a folder it serves the IDE alone.
+- `sh host/build.sh` builds it, beside `pbgvm`.
 
 ## A cart's own editor
 

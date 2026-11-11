@@ -1475,9 +1475,72 @@ async function canWrite(handle) {
     } catch (e) { return false; }
 }
 
+/* ---- served by pbgide ---------------------------------------------------- *
+ * pbgide serves this page from the computer it runs on, with a cart folder
+ * it reads and writes on the page's behalf: the page's address carries the
+ * token every request about the folder has to send back. */
+
+const SERVED = new URLSearchParams(location.search).get('token');
+
+function fromServer(path, init) {
+    const o = Object.assign({}, init);
+    o.headers = Object.assign({ 'X-Arcade-Token': SERVED }, o.headers);
+    return fetch(path, o).then((r) => {
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        return r;
+    });
+}
+
+/* The folder pbgide was started with, opened; false where there is none */
+async function openServed() {
+    if (!SERVED || !/^http/.test(location.protocol)) return false;
+    let list;
+    try { list = await (await fromServer('/cart/list')).json(); } catch (e) { return false; }
+    const files = {};
+    try {
+        for (const name of list.files) {
+            if (!CART_FILE.test(name) && !isEditor(name)) continue;
+            const r = await fromServer('/cart/file?path=' + encodeURIComponent(name));
+            files[name] = isBinary(name) ? new Uint8Array(await r.arrayBuffer()) : await r.text();
+        }
+    } catch (e) {
+        say('error', 'Could not read the folder pbgide serves: ' + e.message);
+        return false;
+    }
+    if (!files['cart.json']) return false;
+    load(files);
+    saveTo = { served: list.name };
+    say('print', 'Opened the folder ' + list.name + ' through pbgide: Save writes its files back.');
+    return true;
+}
+
+/* Save through pbgide: each file written, and the ones renamed or deleted
+ * removed */
+async function saveServed() {
+    try {
+        for (const [name, v] of Object.entries(folder))
+            await fromServer('/cart/file?path=' + encodeURIComponent(name), { method: 'PUT', body: v });
+        for (const name of gone)
+            if (folder[name] === undefined)
+                await fromServer('/cart/file?path=' + encodeURIComponent(name), { method: 'DELETE' });
+    } catch (e) {
+        say('error', 'Could not save through pbgide (' + e.message + '): is it still running? ' +
+            'The cart is kept here; Save as .pbg writes it out instead.');
+        return;
+    }
+    gone.clear();
+    saved();
+    say('print', 'Saved the folder ' + saveTo.served + '.');
+}
+
 /* Save: back to the folder or the .pbg the cart came from, or else as a
  * new .pbg. Where the browser will not write there, a new .pbg instead. */
 async function save() {
+    if (saveTo && saveTo.served) {
+        check();
+        if (lastBuild.errors.length) { say('error', 'Fix the errors before saving: the cart would not build.'); return; }
+        return saveServed();
+    }
     const target = saveTo && (saveTo.dir || saveTo.file);
     const allowed = target ? await canWrite(target) : false;
     check();
@@ -1994,6 +2057,8 @@ document.addEventListener('drop', async (e) => {
 });
 
 (async function start() {
+    /* the folder pbgide serves, when it serves one */
+    if (await openServed()) return;
     /* the cart kept from last time, unless the browser's storage is slow
      * to answer or does not */
     const was = await Promise.race([kept(), sleep(1000).then(() => null)]);
