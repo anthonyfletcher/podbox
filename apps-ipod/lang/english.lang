@@ -28013,6 +28013,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_GO_TO_ALBUM_VIA
+  desc: in settings_menu: which Music list the now-playing screen's Go to Album opens the album under
+  user: core
+  <source>
+    *: "Go to Album Via"
+  </source>
+  <dest>
+    *: "Go to Album Via"
+  </dest>
+  <voice>
+    *: "Go to Album Via"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_PREVIOUS_BROWSER
   desc: a now-playing button's action: back to the browser last used
   user: core

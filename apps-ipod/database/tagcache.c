@@ -3099,6 +3099,16 @@ bool tagcache_entry_numeric(int idx_id, int tag, long *value)
     return true;
 }
 
+long tagcache_entry_seek(int idx_id, int tag)
+{
+    const struct index_entry *entry = ram_entry(idx_id);
+
+    if (!entry || tag < 0 || tag >= TAG_COUNT || TAGCACHE_IS_NUMERIC(tag)
+        || tag == tag_filename)
+        return -1;
+    return entry->tag_seek[tag];
+}
+
 bool tagcache_path_index_info(int *slots, int *found, int *missed)
 {
     *found = path_found;

@@ -1032,6 +1032,7 @@ MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_long_press_play_action, 0,
                                   wps_button_speak_item,
                                   (void*)LANG_WPS_LONG_PRESS_PLAY_ACTION, NULL,
                                   Icon_NOICON);
+MENUITEM_SETTING(go_to_album_via, &global_settings.go_to_album_via, NULL);
 
 
 /* Which picture the screen shows, and where its album cover is looked for
@@ -1055,6 +1056,7 @@ MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&hotkey_wps_item
             ,&wps_menu_action
             ,&wps_long_press_play_action
+            ,&go_to_album_via
             ,&wps_appearance_link
             );
 

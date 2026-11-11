@@ -339,14 +339,7 @@ static int browser(void* param)
             last_ft_dirlevel = tc->dirlevel;
             /* Go to Album walks in from Music's root, not the resume point */
             if (browser_db_walk_pending())
-            {
-                tc->dirlevel = 0;
-                tc->currtable = 0;
-                tc->selected_item = 0;
-                browser_db_clear_shortcut_base();
-                push_current_activity(ACTIVITY_DATABASEBROWSER);
-                break;
-            }
+                last_db_dirlevel = last_db_selection = 0;
             tc->dirlevel = last_db_dirlevel;
             tc->selected_item = last_db_selection;
             /* dirlevel and currtable have to agree, and this entry restores
@@ -495,6 +488,10 @@ static int browser(void* param)
             last_db_dirlevel = tc->dirlevel;
             last_db_selection = tc->selected_item;
             tc->dirlevel = last_ft_dirlevel;
+            /* Go to Album's album on its own goes back as Direct's does, for
+             * the same reason as GO_TO_ALBUM_COVERS_TRACKS below */
+            if (browser_db_take_walk_fallback() && ret_val == GO_TO_ROOT)
+                ret_val = GO_TO_PREVIOUS;
         break;
 
 #define TAGNAVI_CASE(n) case GO_TO_TAGNAVI_FIRST + (n):

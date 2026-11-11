@@ -1538,18 +1538,41 @@ static int go_to_callback(int action,
                           const struct menu_item_ex *this_item,
                           struct gui_synclist *this_list);
 
+static int leave(long go_to);
+
+/* The Music row Go to Album Via names, by its first tag */
+static const int album_via_tag[] = {
+    [ALBUM_VIA_ALBUM]       = tag_album,
+    [ALBUM_VIA_ALBUMARTIST] = tag_albumartist,
+    [ALBUM_VIA_ARTIST]      = tag_virt_canonicalartist,
+    [ALBUM_VIA_GENRE]       = tag_genre,
+};
+
 /* Both leave for the database browser, opened on the album or the album
- * artist, as a cover chosen in Album Covers does */
+ * artist, as a cover chosen in Album Covers does. From Now Playing, Go to
+ * Album Via can open the album under a Music list instead, for Left to climb
+ * it. */
 static int go_to_album(void)
 {
     struct tagcache_album album;
     char name[MAX_PATH];
+    int via = global_settings.go_to_album_via;
 
     if (!selected_track_album(&album))
         return 0;
     if (!tagcache_seek_string(tag_album, album.album_seek, name, sizeof(name)))
         name[0] = '\0';
 
+    if (selected_file.context == CONTEXT_WPS && via != ALBUM_VIA_DIRECT
+        && via < (int)ARRAYLEN(album_via_tag))
+    {
+        browser_db_walk_to_album_on_next_load(album_via_tag[via],
+                                              selected_track_idx(),
+                                              album.album_seek,
+                                              album.artist_seek, name);
+        context_menu_result = leave(GO_TO_DBBROWSER);
+        return 0;
+    }
     browser_db_enter_artist_album_tracks_on_next_load(album.album_seek,
                                                       album.artist_seek, name);
     browser_db_select_playing_on_next_album_load();
@@ -2573,36 +2596,27 @@ static int hotkey_previous_screen(void)
     return leave(GO_TO_PREVIOUS);
 }
 
-/* The playing track's album inside Music, so BACK climbs through the artist
-   and Album Artist to the main menu. A podcast or book kept apart from Music
-   opens in its own menu; a track the database does not hold goes back to the
-   browser it was started from. */
+/* The now-playing menu's Go to Album, or for a podcast or book kept apart
+   from Music the Go to Podcast or Go to Audiobook it shows in its place. A
+   track the database does not hold goes back to the browser it was started
+   from. */
 static int hotkey_go_to_album(void)
 {
     struct tagcache_album album;
-    char name[MAX_PATH];
     int kind;
 
     if (!selected_track_album(&album))
         return leave(GO_TO_PREVIOUS_BROWSER);
 
+    context_menu_result = ONPLAY_OK;
     kind = db_spoken_album_kind(&album);
-    if (db_spoken_kind_apart(kind))
-    {
-        context_menu_result = ONPLAY_OK;
-        if (kind == 2)
-            go_to_podcast();
-        else
-            go_to_audiobook();
-        return context_menu_result == ONPLAY_GO_TO_LIBRARY
-               ? ONPLAY_GO_TO_LIBRARY : leave(GO_TO_PREVIOUS_BROWSER);
-    }
-
-    if (!tagcache_seek_string(tag_album, album.album_seek, name, sizeof(name)))
-        name[0] = '\0';
-    browser_db_walk_to_album_on_next_load(album.album_seek, album.artist_seek,
-                                          name);
-    return leave(GO_TO_DBBROWSER);
+    if (!db_spoken_kind_apart(kind))
+        go_to_album();
+    else if (kind == 2)
+        go_to_podcast();
+    else
+        go_to_audiobook();
+    return context_menu_result;
 }
 
 /* Now Playing stops through its own exit, which saves a book's place and the

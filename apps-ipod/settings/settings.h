@@ -307,6 +307,10 @@ enum { SCROLLBAR_OFF = 0, SCROLLBAR_LEFT, SCROLLBAR_RIGHT };
 enum { AUTORESUME_NEXTTRACK_NEVER = 0, AUTORESUME_NEXTTRACK_ALWAYS,
        AUTORESUME_NEXTTRACK_CUSTOM};
 
+/* Go to Album Via: the Music list Now Playing's Go to Album opens under */
+enum { ALBUM_VIA_DIRECT = 0, ALBUM_VIA_ALBUM, ALBUM_VIA_ALBUMARTIST,
+       ALBUM_VIA_ARTIST, ALBUM_VIA_GENRE };
+
 /* Keyclick stuff */
 
  /* Not really a setting but several files should stay synced */
@@ -596,6 +600,7 @@ struct user_settings
     int wps_select_action; /* a hotkey action, as item 0 -- see HK_CTX_SET */
     int wps_menu_action;   /* a hotkey action, as item 0 -- see HK_CTX_SET */
     int wps_long_press_play_action; /* the same, for a long press of PLAY */
+    int go_to_album_via;   /* ALBUM_VIA_ */
     int ff_rewind_min_step; /* FF/Rewind minimum step size */
     int ff_rewind_accel; /* FF/Rewind acceleration (in seconds per doubling) */
 

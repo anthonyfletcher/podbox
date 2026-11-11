@@ -1415,9 +1415,9 @@ What a press of Select does on the now-playing screen: go back to the
 previous screen as Menu Action does, or to the browser last used, to Music,
 Album Covers or Files, open the lyrics, the queue or Theme Options, or one
 of the now-playing menu's other actions. Go to Album opens the playing
-track's album inside Music, on that track, so Menu climbs back to the main
-menu; a podcast or book kept apart opens in its own menu. Theme Options says Unavailable when
-the theme has none. Holding Select always opens the now-playing menu.
+track's album on that track, where Go to Album Via says; a podcast or book
+kept apart opens in its own menu. Theme Options says Unavailable when the
+theme has none. Holding Select always opens the now-playing menu.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: any
@@ -1434,6 +1434,14 @@ anywhere else Select can -- Music, Files, Go to Album -- or stop playback.
 [wps long press play action]
 What a long press of Play does on the now-playing screen: open Album Covers
 over it, stop playback, or any of the actions Select offers.
+
+[go to album via]
+Where Go to Album on the now-playing screen opens the album. Direct opens it
+on its own, and Left goes back to the now-playing screen. Album, Album
+Artist, Artist and Genre open it inside Music under that list, as though
+browsed to, and Left climbs back up it. Under Artist or Genre the album
+shows only that artist's or that genre's tracks. Where the list is hidden
+or does not reach the album, it opens on its own.
 
 [shortcuts instead of quickscreen]
 Whether a long press opens the quick screen or the shortcuts menu.

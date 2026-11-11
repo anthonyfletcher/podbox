@@ -4276,14 +4276,19 @@ void browser_db_select_playing_on_next_album_load(void)
 }
 
 /* Set by browser_db_walk_to_album_on_next_load(); consumed on the next fresh
- * root load. -1 means none armed. */
+ * root load. A walk_root_tag of -1 means none armed. */
+static int walk_root_tag = -1;
+static int walk_track = -1;
 static long walk_album_seek = -1;
 static long walk_artist_seek = -1;
 static char walk_album_title[MENUENTRY_MAX_NAME];
 
-void browser_db_walk_to_album_on_next_load(long album_seek, long artist_seek,
+void browser_db_walk_to_album_on_next_load(int root_tag, int track_idx,
+                                           long album_seek, long artist_seek,
                                            const char *album_title)
 {
+    walk_root_tag = root_tag;
+    walk_track = track_idx;
     walk_album_seek = album_seek;
     walk_artist_seek = artist_seek;
     strlcpy(walk_album_title, album_title ? album_title : "",
@@ -4292,7 +4297,18 @@ void browser_db_walk_to_album_on_next_load(long album_seek, long artist_seek,
 
 bool browser_db_walk_pending(void)
 {
-    return walk_album_seek != -1;
+    return walk_root_tag != -1;
+}
+
+/* Set where the walk opened the album on its own instead */
+static bool walk_fell_back;
+
+bool browser_db_take_walk_fallback(void)
+{
+    bool fell_back = walk_fell_back;
+
+    walk_fell_back = false;
+    return fell_back;
 }
 
 /* Set by browser_db_enter_artist_albums_on_next_load(); consumed on the next fresh
@@ -4754,23 +4770,37 @@ static int walk_into(struct browser_context *c, int row)
     return browser_db_load(c);
 }
 
-/* Album Artist, the artist, the album, the playing track; stops at the
- * deepest level found */
-static int walk_rows(struct browser_context *c, int root_row,
-                     long artist_seek, long album_seek)
+/* The root's 'root_row', then at each level the row of track's own value,
+ * down to the tracks with that one selected. False, back at the root, where
+ * a level has no row for it: whole or not at all, never part of the way. */
+static bool walk_to_track(struct browser_context *c, int root_row, int track,
+                          int *rows)
 {
-    int rows = walk_into(c, root_row);
-    int row = loaded_row_for_seek(c, rows, artist_seek);
+    int depth;
 
-    if (row < 0)
-        return rows;
-    rows = walk_into(c, row);
-    row = loaded_row_for_seek(c, rows, album_seek);
-    if (row < 0)
-        return rows;
-    rows = walk_into(c, row);
-    select_playing_row(c, rows);
-    return rows;
+    *rows = walk_into(c, root_row);
+    for (depth = 0; depth < MAX_TAGS && c->currtable == TABLE_NAVIBROWSE;
+         depth++)
+    {
+        long seek;
+        int row;
+
+        if (browser_db_get_attr(c) == FILE_ATTR_AUDIO)
+        {
+            select_playing_row(c, *rows);
+            return true;
+        }
+        seek = tagcache_entry_seek(track,
+                                   csi->tagorder[shown_level(c->currextra)]);
+        row = seek < 0 ? -1 : loaded_row_for_seek(c, *rows, seek);
+        if (row < 0)
+            break;
+        *rows = walk_into(c, row);
+    }
+
+    while (c->dirlevel > 0)
+        browser_db_exit(c, false);
+    return false;
 }
 
 int browser_db_load(struct browser_context* c)
@@ -4870,20 +4900,20 @@ int browser_db_load(struct browser_context* c)
          * the root menu rather than a dead end, as the other two forms do. */
     }
 
-    if (walk_album_seek != -1 && table == TABLE_ROOT && c->dirlevel == 0)
+    if (walk_root_tag != -1 && table == TABLE_ROOT && c->dirlevel == 0)
     {
-        long album_seek = walk_album_seek;
-        long artist_seek = walk_artist_seek;
-        int rows, row;
+        int rows = load_root(c);
+        int row = loaded_row_for_tag(c, rows, walk_root_tag);
 
-        walk_album_seek = walk_artist_seek = -1;
-        rows = load_root(c);
-        row = loaded_row_for_tag(c, rows, tag_albumartist);
-        if (row >= 0 && artist_seek >= 0)
-            return walk_rows(c, row, artist_seek, album_seek);
-        /* No Album Artist row to walk through: the album on its own */
-        browser_db_enter_artist_album_tracks_on_next_load(album_seek,
-                                                  artist_seek, walk_album_title);
+        walk_root_tag = -1;
+        if (row >= 0 && walk_to_track(c, row, walk_track, &rows))
+            return rows;
+        /* That list hidden, or not leading to this track: the album on its
+         * own */
+        walk_fell_back = true;
+        browser_db_enter_artist_album_tracks_on_next_load(walk_album_seek,
+                                                          walk_artist_seek,
+                                                          walk_album_title);
         browser_db_select_playing_on_next_album_load();
         return browser_db_load(c);
     }
