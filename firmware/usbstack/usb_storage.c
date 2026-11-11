@@ -357,13 +357,14 @@ bool usb_storage_host_wrote(void)
 static bool set_transfer_range(uint64_t usb_lba, uint32_t usb_count,
                                unsigned int multiplier, sector_t hw_sector_cnt)
 {
+    /* Tested before the multiply: a 64-bit LBA times the multiplier wraps,
+     * and a wrapped one passes as an access near sector 0 */
+    if(multiplier == 0 || usb_lba > hw_sector_cnt / multiplier)
+        return false;
     usb_lba *= multiplier;
 
-    if(usb_lba > hw_sector_cnt)
-        return false;
-
     uint64_t blocks = (uint64_t)usb_count * multiplier;
-    if(usb_lba > hw_sector_cnt || blocks > hw_sector_cnt - usb_lba)
+    if(blocks > hw_sector_cnt - usb_lba)
         return false;
 
     cur_cmd.sector = usb_lba;

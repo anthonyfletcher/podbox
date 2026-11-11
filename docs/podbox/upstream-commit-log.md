@@ -304,7 +304,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-20 | `3f9b8fc997` `e3b1d0c2f5` `4584b4ef02` `92ff5b292f` `299f69f56b` `c97aa2e641` `96e37a26a4` `5ba7999490` | hwstub, beastpatcher, rbutil, skinshots | **N/A** | `utils/`. |
 | 2026-10-22 | `8ea6f00d6f` `4b2d55842f` `6a0cbd8212` `96fa1f9a94` `6982a638e4` `6d2b2b7bc5` `64f1b245eb` `9c5ec176d9` `aad17bb83e` `f7d31808ff` `ac867479d9` `6d8094b2a5` `7be0ce3655` `1eecf5f62f` `e0d723fdfb` `25b755a21c` `8054a1dcd0` `0098ba6023` `9377ad18c7` | imx31, Fuze v2, iPod Nano 3G, rk27xx, YP-CP3, Ingenic, AXP PMU, HM-60x | **N/A** | Other targets. |
 | 2026-10-26 | `bb370f9504` `c2ade1451f` `f85b43398e` | mp4, id3: chapters as an embedded cuesheet | **Adopted (in part)** | The metadata half, but not for Nero lists: `mp4.c`'s `chpl` case is ours. `look_for_cuesheet_file()` ignores the chapter encodings, so `chapters.c` keeps reading every chapter format; upstream's chapter readers are linked and never called. |
-| 2026-10-31 | `bda08c8671` | mp4: trim only an encoder-delay-sized first chapter | **Superseded** | Ours trims only from a single record. |
+| 2026-10-31 | `bda08c8671` | mp4: trim only an encoder-delay-sized first chapter | **Adopted** | The under-a-second test, in our bounds-checked `chpl` case. |
 | 2026-10-22 | `decc6181c3` | playback: preserve USB disconnect while stopping playback | **Adopted** | |
 | 2026-10-26 | `ba96040021` | codec_thread: read_filebuf of 0 bytes reads nothing | **Adopted** | |
 | 2026-10-27 | `dacd53c781` | diskinfo: repaint only when requested | **Adopted (in part)** | The ATA screen; the other has no home here. |

@@ -970,15 +970,17 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                 }
                 size -= rest;
 
-                /* A lone record is the encoder delay, used as the lead_trim.
-                 * More than one is a chapter list, whose first chapter can
-                 * start after 0:00 without any audio being trimmed. A record
-                 * is a timestamp and a length byte, so nine bytes. */
-                if (chapters == 1) {
+                /* The first record's start, in 100 ns units, is Nero's
+                 * encoder delay when it is short enough to be one: a chapter
+                 * list's first chapter can start seconds in without any
+                 * audio being trimmed. A record is a timestamp and a length
+                 * byte, so nine bytes. */
+                if (chapters >= 1) {
                     if (size < 9 || read_uint64be(fd, &timestamp) != 8) {
                         break;
                     }
-                    id3->lead_trim = (timestamp * id3->frequency) / 10000000;
+                    if (timestamp < 10000000) /* 1 s */
+                        id3->lead_trim = (timestamp * id3->frequency) / 10000000;
                     size -= 8;
                 }
             }

@@ -2527,9 +2527,15 @@ int playlist_get_track_info(struct playlist_info* playlist, int index,
     if (!playlist)
         playlist = &current_playlist;
 
-    playlist_read_lock(playlist);
+    /* Before the lock: on an error it shows a splash, and the lock would
+     * keep the audio thread waiting through it. */
     if (get_track_filename(playlist, index,
                            info->filename, sizeof(info->filename)) != 0)
+        return -1;
+
+    playlist_read_lock(playlist);
+    /* The playlist may have shrunk since */
+    if (index >= playlist->amount)
         goto out;
 
     info->attr = 0;
@@ -2832,7 +2838,8 @@ int playlist_insert_track(struct playlist_info* playlist, const char *filename,
     {
         notify_control_access_error();
         playlist_write_unlock(playlist);
-        dc_thread_start(playlist, true);
+        /* nothing was inserted, so the dircache scan has nothing new */
+        dc_thread_start(playlist, false);
         return -1;
     }
 
@@ -3903,11 +3910,11 @@ int playlist_resume(void)
                  * a command that never finished being written. It is dropped,
                  * and cut from the file so the next append starts a line. A
                  * chunk can begin on the torn line itself, with no newline of
-                 * its own to keep. */
-                if (!newline && !exit_loop && pl_cmd == &pl_cmds_run)
+                 * its own to keep. A file that cannot be cut is refused. */
+                if (!newline && !exit_loop && pl_cmd == &pl_cmds_run
+                    && ftruncate(playlist->control_fd, total_read +
+                                 (seen_newline ? last_newline + 1 : 0)) == 0)
                 {
-                    ftruncate(playlist->control_fd, total_read +
-                              (seen_newline ? last_newline + 1 : 0));
                     break;
                 }
 
