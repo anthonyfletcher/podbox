@@ -11,9 +11,9 @@
 #
 # Needs Piper (piper1-gpl, the piper-tts Python package) in the Python named
 # by $PIPER_PYTHON (default ~/piper/bin/python), with pyopenjtalk for
-# Japanese -- without that, Japanese is left out and said so. voice.pl drives
-# it through tools/speech/piper_json.py, which speaks the JSON protocol of
-# the older C++ Piper. The models are fetched into $PIPER_MODEL_DIR (default
+# Japanese -- without that, Japanese is left out and said so. voice.pl runs
+# Piper's HTTP server as `python3 -m piper.http_server` and asks it with
+# curl. The models are fetched into $PIPER_MODEL_DIR (default
 # ~/piper-models) the first time each is wanted. Clips are kept in $POOL
 # (default ~/.cache/podbox-voice-pool) and reused by every build, so only a
 # string that changed is synthesised again: the first run takes about five
@@ -85,11 +85,14 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox/langs" "$POOL"
 
-# Piper as voice.pl runs it: a `piper` on PATH with a JSON input mode
+# Piper as voice.pl runs it: python3 has to be the one with piper-tts
+if ! command -v curl >/dev/null; then
+    echo "build-voices.sh: voice.pl needs curl" >&2
+    exit 1
+fi
 mkdir "$STAGE/bin"
-printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$PIPER_PYTHON" \
-    "$ROOT/tools/speech/piper_json.py" > "$STAGE/bin/piper"
-chmod +x "$STAGE/bin/piper"
+printf '#!/bin/sh\nexec "%s" "$@"\n' "$PIPER_PYTHON" > "$STAGE/bin/python3"
+chmod +x "$STAGE/bin/python3"
 PATH="$STAGE/bin:$PATH"
 
 made=""
@@ -119,7 +122,7 @@ for lang in $LANGUAGES; do
     # target until these are given on its command line.
     make -C "$BUILDDIR" voice \
         VOICELANGUAGE="$lang" TTS_ENGINE=piper \
-        TTS_OPTS="--model $PIPER_MODEL_DIR/$model.onnx" \
+        TTS_OPTS="-m $model" \
         ENCODER=rbspeexenc ENC_OPTS="-q 7 -c 10" \
         > "$BUILDDIR/voice-$lang.log" 2>&1 || {
         echo "build-voices.sh: make voice failed for $lang; see $BUILDDIR/voice-$lang.log" >&2
