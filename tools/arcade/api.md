@@ -269,6 +269,12 @@ The cosine of `t` turns.
 ### atan2(dx, dy)
 The angle of a direction, in turns from 0 to just under 1, matching `sin` and `cos`.
 
+### deg(degrees)
+An angle in degrees as turns, worked out when the cart is built: `deg(90)` is 0.25. Only a number written in the code.
+
+### rgb(hex)
+The colour of the cart's starting palette nearest to `0xRRGGBB`, worked out when the cart is built: `rgb(0xff0000)` is 8 in the standard palette. Only a number written in the code.
+
 ## Time, saving and the system
 
 ### t()

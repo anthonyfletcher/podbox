@@ -12,10 +12,11 @@ import { parseReference } from '../src/reference.js';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ref = parseReference(fs.readFileSync(path.join(root, 'api.md'), 'utf8'));
 
-/* every function a cart can call, as it calls it */
+/* every function a cart can call, as it calls it: the engine's, and the two
+ * the compiler works out when building */
 function functions() {
     const { api } = loadDefs();
-    const all = {};
+    const all = { deg: { min: 1, max: 1 }, rgb: { min: 1, max: 1 } };
     for (const [name, def] of Object.entries(api.natives)) all[name] = def;
     for (const [ns, fns] of Object.entries(api.namespaces))
         for (const [name, def] of Object.entries(fns)) all[ns + '.' + name] = def;
