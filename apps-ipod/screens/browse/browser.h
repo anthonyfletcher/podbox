@@ -119,6 +119,9 @@ char *getcwd(char *buf, getcwd_size_t size);
 void reload_directory(void);
 bool check_rockboxdir(void);
 struct browser_context* browser_get_context(void);
+/* Whether the last browse was left by Menu, rather than by Left at its top:
+ * both return GO_TO_ROOT */
+bool browser_left_by_menu(void);
 void browser_flush(void);
 void browser_restore(void);
 

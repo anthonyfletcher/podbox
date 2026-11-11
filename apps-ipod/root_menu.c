@@ -490,7 +490,8 @@ static int browser(void* param)
             tc->dirlevel = last_ft_dirlevel;
             /* Go to Album's album on its own goes back as Direct's does, for
              * the same reason as GO_TO_ALBUM_COVERS_TRACKS below */
-            if (browser_db_take_walk_fallback() && ret_val == GO_TO_ROOT)
+            if (browser_db_take_walk_fallback() && ret_val == GO_TO_ROOT
+                && !browser_left_by_menu())
                 ret_val = GO_TO_PREVIOUS;
         break;
 
@@ -609,8 +610,9 @@ static int browser(void* param)
              * load_screen()'s own bookkeeping do this correctly: it was
              * called with old_previous already equal to GO_TO_ALBUM_COVERS
              * (Album covers is the only caller of this entry point), so
-             * returning GO_TO_PREVIOUS resolves back to exactly that. */
-            if (ret_val == GO_TO_ROOT)
+             * returning GO_TO_PREVIOUS resolves back to exactly that. Menu
+             * is not redirected: it goes to the main menu, as in any list. */
+            if (ret_val == GO_TO_ROOT && !browser_left_by_menu())
                 ret_val = GO_TO_PREVIOUS;
 
             /* Both the ways back to Album covers are GO_TO_PREVIOUS by now,

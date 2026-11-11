@@ -12,3 +12,6 @@
 - Choosing a track while your queue plays now asks **Play Now** or **New
   Queue**, with Play Now selected. Play Now plays the track at once and keeps
   the rest of the queue; to replace the queue as before, choose New Queue.
+- **Menu now goes to the main menu from an album opened from Album Covers,
+  Artist Portraits or Go to Album**, as it does in every other list. Left
+  still goes back to the covers, or to Now Playing.

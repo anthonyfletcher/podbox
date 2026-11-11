@@ -1300,6 +1300,14 @@ static int exit_to_new_screen(int screen)
     return screen;
 }
 
+/* Left and Menu both leave as GO_TO_ROOT; this tells them apart */
+static bool left_by_menu;
+
+bool browser_left_by_menu(void)
+{
+    return left_by_menu;
+}
+
 /* A Music menu row's long press. Hide is all it has: the row is not music. */
 static int music_row_menu(void)
 {
@@ -1595,6 +1603,7 @@ static int dirbrowse(void)
     char* currdir = tc.currdir; /* just a shortcut */
     bool id3db = *tc.dirfilter == SHOW_ID3DB;
 
+    left_by_menu = false;
     if (id3db)
         curr_context=CONTEXT_ID3DB;
     else
@@ -1755,6 +1764,7 @@ static int dirbrowse(void)
                 break;
 
             case ACTION_STD_MENU:
+                left_by_menu = true;
                 return exit_to_new_screen(GO_TO_ROOT);
                 break;
 
