@@ -2,14 +2,21 @@
 // font and size.
 //
 //   text.pad(n, width)          n with noughts in front to width digits
-//   text.clock(seconds)         as m:ss.t
+//   text.clock(seconds, [whole])
+//                               as m:ss.t, or m:ss when whole is true
+//   text.lap(ms)                as m:ss.hh: a time board's milliseconds
 //   text.width(s)               s's width in pixels
-//   text.centre(s, x, y, c)     s centred on x
+//   text.centre(s, x, y, c)     s centred on x; on the screen when x is null
 //   text.right(s, x, y, c)      s ending at x
 //   text.outline(s, x, y, c, edge)
 //                               s in c with a one-pixel edge round it
+//   text.shadow(s, x, y, c, under)
+//                               s in c over itself in under, a pixel down
+//                               and right
 //   text.box(s, x, y, w, c)     s wrapped at spaces to lines w pixels wide;
 //                               returns the height
+//
+// Cutting a line short to fit, with "...", is textfit(): the engine's.
 
 function pad(n, width) {
     var s = "" + n;
@@ -17,10 +24,15 @@ function pad(n, width) {
     return s;
 }
 
-function clock(seconds) {
-    var whole = flr(seconds), m = flr(whole / 60), s = whole % 60;
-    var tenth = flr((seconds - whole) * 10);
-    return m + ":" + pad(s, 2) + "." + tenth;
+function clock(seconds, whole) {
+    var all = flr(seconds), m = flr(all / 60), s = all % 60;
+    if (whole) return m + ":" + pad(s, 2);
+    return m + ":" + pad(s, 2) + "." + flr((seconds - all) * 10);
+}
+
+function lap(ms) {
+    var cs = flr(ms / 10), s = flr(cs / 100);
+    return flr(s / 60) + ":" + pad(s % 60, 2) + "." + pad(cs % 100, 2);
 }
 
 function width(s) {
@@ -28,11 +40,17 @@ function width(s) {
 }
 
 function centre(s, x, y, c) {
+    if (x == null) x = 80;
     print(s, x - flr(width(s) / 2), y, c);
 }
 
 function right(s, x, y, c) {
     print(s, x - width(s), y, c);
+}
+
+function shadow(s, x, y, c, under) {
+    print(s, x + 1, y + 1, under);
+    print(s, x, y, c);
 }
 
 function outline(s, x, y, c, edge) {

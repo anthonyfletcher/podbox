@@ -201,7 +201,9 @@ reference.
 |---|---|
 | `dial.js` | the wheel as a control: detents, angle, smoothed speed, a paddle |
 | `tween.js` | easing curves; any array slot moved along one over ticks |
-| `text.js` | padded numbers, clocks, centred and right-aligned, outlined, wrapped text |
+| `text.js` | padded numbers, clocks and times, centred, right-aligned, outlined, shadowed and wrapped text |
+| `fx.js` | screen shake, hit-stop, timers that count ticks down |
+| `rand.js` | shuffles, weighted picks, ranges, from `rnd()` or a generator |
 | `palfx.js` | palette fades, flashes and colour cycling |
 | `menu.js` | an in-game menu on the wheel (needs `dial.js`) |
 | `gui.js` | panels, buttons, lists and text fields in the dialogs' style |

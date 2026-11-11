@@ -339,8 +339,8 @@ buttons. It needs `dial.js` in the cart too.
 | Function | |
 |---|---|
 | `menu.open(items)` | starts a menu of `items`, an array of text, with the first chosen |
-| `menu.update()` | call once a tick while it is open: the wheel moves the choice a line a step (16 to a turn), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
-| `menu.draw(x, y, c, bar)` | draws the lines from `x, y`, 6 pixels apart, in colour `c`, the chosen one on a bar of colour `bar` |
+| `menu.update()` | call once a tick while it is open: the wheel moves the choice a line a step (12 to a turn, as the player's dialogs and `gui.list` do), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
+| `menu.draw(x, y, c, bar)` | draws the lines from `x, y`, a line of the current font apart, in colour `c`, the chosen one on a bar of colour `bar` |
 | `menu.choice()` | the line chosen now, 0 first |
 
 ```js

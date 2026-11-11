@@ -58,6 +58,8 @@ example and what it costs.
 
 **The player's services**
 
+- [cart.json](reference-cart.md) -- every setting a cart declares, and
+  what Quit keeps to carry on
 - [Saving](reference-saving.md) -- saved numbers, stored values and data
   files
 - [Scores, options and the pause menu](reference-scores.md) --
@@ -77,6 +79,12 @@ example and what it costs.
   and cloth
 - [3D views](reference-3d.md) -- a map as a floor in perspective,
   landscapes, walls and light
+
+**Libraries**
+
+- [Script libraries](reference-libraries.md) -- text, screen shake and
+  timers, shuffles, easing, palette effects, menus and panels, ready to
+  copy into a cart
 
 **Making it fast**
 

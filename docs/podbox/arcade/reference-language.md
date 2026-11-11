@@ -28,6 +28,7 @@ and does something other than what JavaScript would.
 - [Functions](#functions): [functions as values](#functions-as-values),
   [no closures](#no-closures), [sorting](#sorting)
 - [What is not here, and what to write instead](#what-is-not-here-and-what-to-write-instead)
+- [Memory](#memory)
 - [When a cart stops](#when-a-cart-stops)
 
 ## A cart's files
@@ -813,6 +814,31 @@ list.sort(function (a, b) { return a.y - b.y; });     // records by y: draw far 
 | `try`, `throw`, labels, `delete`, `void`, getters and setters, regular expressions, `arguments`, `JSON`, `eval` | -- |
 | `NaN`, `Infinity` | every number is finite |
 
+## Memory
+
+A cart has 512 KB, the same on both iPods and in the IDE. Its code, the
+sprite sheet, its maps and its pictures come out of that first; what is
+left -- about 340 KB for a small cart -- holds everything it makes:
+strings, arrays, records, typed arrays, images made in code, pools. When
+that is full the cart stops with `out of memory`.
+
+| Made | Takes |
+|---|---|
+| a string | 12 bytes and its length: `"SCORE 1234"` is 24 |
+| an array or record | 24 bytes, and 8 for each element or field it has room for |
+| an `Int32Array`, `FixArray` | 12 bytes and 4 an element |
+| a `Uint8Array` | 12 bytes and 1 an element |
+| an image made in code | a byte a pixel |
+
+Each is rounded up to a whole number of 8 bytes, and takes at least 16.
+
+- Memory nothing refers to any more is cleared up between ticks and used
+  again, so a cart runs out only with what it keeps -- a list that only
+  ever grows, say.
+- Clearing up takes time the units do not show. Making nothing new in
+  `update()` and `draw()` keeps it away: see
+  [Making it cheaper](reference-fast.md#making-it-cheaper).
+
 ## When a cart stops
 
 A mistake the compiler cannot see stops the cart when it happens. The IDE
@@ -828,4 +854,5 @@ the editor on the line; on the iPod, the player shows it.
 | `.length of a record` | `length` asked of a record, not an array or string |
 | `copy() needs two arrays of one kind` | `copy` between an `Int32Array` and a `Uint8Array`, say |
 | `too much recursion` | a function calling itself without end |
+| `out of memory` | more kept than fits: see [Memory](#memory) |
 | `The game stopped responding` | one call ran far too long -- a loop that never ends |

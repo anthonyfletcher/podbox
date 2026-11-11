@@ -89,7 +89,7 @@ Colour `c` with its hue turned by `t` turns, its tone kept: 0.5 is the opposite 
 How well colours `a` and `b` stand apart, from 1.0 to 21.0. Text wants 4.5 against its background.
 
 ### camera([x, y], [turn], [px], [py], [zoom])
-Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out, and with `zoom` (1 as it is, from 1/16 to 16) it grows about the same point: shapes turn and grow whole, their lines a pixel wide; `rspr` and `rblit` turn and grow too; other pictures, text and particles stay upright and their own size at their moved places; and map, tline and the 3D systems are not moved. `camera()` resets it.
+Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out, and with `zoom` (1 as it is, from 1/16 to 16) it grows about the same point: shapes turn and grow whole, their lines a pixel wide; `rspr` and `rblit` turn and grow too; other pictures, text and particles stay upright and their own size at their moved places; and map and tline are moved but not turned or grown, nor are the 3D systems' pictures, which have a camera of their own. `camera()` resets it.
 
 ### clip([x, y, w, h])
 Draws only inside the rectangle. `clip()` resets it to the whole target.
@@ -308,7 +308,7 @@ Sets saved number `i`; written when the cart ends or pauses.
 Item `i` (1 to 5) of the pause menu, calling `fn` when chosen; without `label`, removes it.
 
 ### quit()
-Back to the player's menu once this tick ends.
+Back to the player's menu once this tick ends; unlike the pause menu's Quit, the game is not kept to carry on.
 
 ### printh(str)
 A line in the IDE's console; nothing on the player.
@@ -420,7 +420,7 @@ The names stored, sorted.
 ## Actors and particles
 
 ### actors.pool(n)
-A pool of `n` actors: a record of arrays `on`, `x`, `y`, `dx`, `dy`, `w`, `h`, `sp`, `flip`, `cell`, with `gravity` and `drag` for the whole pool, and `slope_up`, `slope_down` and `ladders`: the flags of ramps and ladders on the map.
+A pool of `n` actors: a record of arrays `on`, `x`, `y`, `dx`, `dy`, `w`, `h`, `sp`, `flip`, `frames`, `speed`, `cell`, `zone` and `mat`, with for the whole pool `gravity`, `drag`, `platforms` (another pool, solid, that carries those standing on it), `oneway`, `slope_up`, `slope_down` and `ladders` (flags of one-way cells, ramps and ladders on the map), and `field`, `rules`, `field_x`, `field_y`, `density` and `splash` for a cells field.
 
 ### actors.spawn(p)
 Turns on the first free actor, its speed cleared. Returns its index, or -1 when all are in use.

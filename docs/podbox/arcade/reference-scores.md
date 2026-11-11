@@ -128,8 +128,9 @@ for (var r = 1; r <= score.count(BOARD.points); r++) {
 ![A cart's own table of five named scores](img/sc-table.png)
 
 - A cart's own table shows the raw numbers; for a `time` board, turn
-  milliseconds into minutes and seconds yourself (`lib/text.js` has
-  `text.clock`).
+  milliseconds into minutes and seconds yourself: `text.lap(ms)` in the
+  [text library](reference-libraries.md#text) shows them as the board
+  does, `1:23.45`.
 
 ## score.show(board)
 
@@ -303,7 +304,8 @@ short press asks whether to quit, or with `"menu_button": "game"` in
 7. **Restart**: the cart from the beginning
 8. **Quit**: kept as it is, and offered to carry on the next time the cart
    starts -- unless the cart owns the music, or has `"suspend": false`
-   in `cart.json`, for a game that cannot be picked up again later
+   in `cart.json`, for a game that cannot be picked up again later (see
+   [Keeping a game to carry on](reference-cart.md#keeping-a-game-to-carry-on))
 
 The saved numbers and scores are written to the disk as the menu opens.
 
@@ -360,7 +362,8 @@ Leaves the game, back to the player's menu, at the end of this tick.
 
 **Returns** nothing.
 
-- The saves and scores are written first, as on Quit from the pause menu.
+- The saves and scores are written first, as on Quit from the pause menu,
+  but the game is not kept to carry on: the next start is a fresh one.
 - A game rarely needs it: Quit is always in the pause menu. It is for a
   "Quit" on the cart's own title screen.
 - In the IDE the cart stops, and the output says "The cart quit."

@@ -478,3 +478,8 @@ function draw() {
   `actors.move(pool, FLAG.solid, ...)` (see **Moving many things**).
 - Flags combine with `|`: `FLAG.solid | FLAG.water` is both, for `map`'s
   `layers` and the systems.
+- A ladder is a flag like any other: test it as `solid` tests
+  `FLAG.solid`, and while the player's middle is on one, let them climb
+  and leave out the gravity. `actors.move` does this for a pool given its
+  `ladders` flags, and ramps too (see
+  [Ramps and ladders](reference-actors.md#ramps-and-ladders)).

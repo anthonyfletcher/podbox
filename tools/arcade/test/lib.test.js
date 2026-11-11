@@ -37,10 +37,55 @@ function run(libs, main, ticks = 1, extra = []) {
 }
 
 test('every library compiles alone and all together', () => {
-    for (const l of ['dial', 'tween', 'text', 'palfx', 'gui'])
+    for (const l of ['dial', 'tween', 'text', 'palfx', 'gui', 'fx', 'rand'])
         run([l], 'function init() {}\nfunction update() {}');
     run(['dial', 'menu'], 'function init() {}\nfunction update() {}');
-    run(['dial', 'tween', 'text', 'palfx', 'menu'], 'function init() {}\nfunction update() {}');
+    run(['dial', 'tween', 'text', 'palfx', 'menu', 'fx', 'rand'], 'function init() {}\nfunction update() {}');
+});
+
+test('text: a whole-seconds clock, a time board\'s ms, a shadow, centring on the screen', () => {
+    const out = run(['text'], `function init() {
+    printh(text.clock(83.5, true) + " " + text.clock(83.5) + " " + text.lap(83456));
+    cls(0); text.shadow("A", 10, 10, 7, 1);
+    printh(pget(10, 10) + " " + pget(13, 14));
+    cls(0); text.centre("AB", null, 0, 7);
+    printh(pget(78, 0));
+}
+function update() {}`);
+    /* CAPS's A starts with ink at its top left; its shadow ends a pixel
+     * further right and down; "AB" is 7 wide, centred from 77 */
+    assert.equal(out[0], '1:23 1:23.5 1:23.45');
+    assert.equal(out[1], '7 1');
+    assert.equal(out[2], '7');
+});
+
+test('fx: a shake for its ticks, a hit-stop, and timers coming due', () => {
+    const out = run(['fx'], `function init() { fx.shake(2, 2); fx.stop(1); fx.after(3, 7); fx.after(3, 8); fx.after(1, 9); }
+function update() {
+    fx.step();
+    var due = "";
+    for (var id = fx.due(); id >= 0; id = fx.due()) due += id;
+    printh(frame() + " " + fx.stopped() + " " + (abs(fx.x) <= 2) + " " + due);
+}`, 5);
+    /* tick 1 stands still and counts nothing down; then 9 is due, then
+     * 7 and 8 together, the shake over by tick 4 */
+    assert.deepEqual(out, ['1 1 1 ', '2 0 1 9', '3 0 1 ', '4 0 1 87', '5 0 1']);
+});
+
+test('rand: int within its bounds, a shuffle that keeps every element, weights and a generator', () => {
+    const out = run(['rand'], `var a = [1, 2, 3, 4, 5], g = new Int32Array(2), h = new Int32Array(2);
+function init() {
+    var lo = 99, hi = -99, picks = [0, 0];
+    for (var i = 0; i < 400; i++) { var v = rand.int(3, 6); lo = min(lo, v); hi = max(hi, v); }
+    for (var k = 0; k < 600; k++) picks[rand.weighted([5, 1])]++;
+    rand.shuffle(a);
+    var sum = 0;
+    for (var j = 0; j < 5; j++) sum += a[j];
+    rng.seed(g, 3); rng.seed(h, 3);
+    printh(lo + " " + hi + " " + sum + " " + (picks[0] > picks[1] * 3) + " " + (rand.int(1, 1000, g) == rand.int(1, 1000, h)));
+}
+function update() {}`);
+    assert.equal(out[0], '3 6 15 1 1');
 });
 
 test('dial: detents with the rest carried, the angle turned, the finger on an arc', () => {
@@ -150,8 +195,8 @@ function update() {
     if (chose >= 0) printh(tk + " chose " + chose);
     if (tk == 3) printh("at " + menu.choice());
 }
-function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:12', '--buttons', '4:2,5:0,7:16']);
-    /* 12 clicks is two detents: QUIT; NEXT wraps to PLAY; SELECT takes it */
+function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:16', '--buttons', '4:2,5:0,7:16']);
+    /* 16 clicks is two detents, 8 each: QUIT; NEXT wraps to PLAY; SELECT takes it */
     assert.deepEqual(out, ['at 2', '8 chose 0']);
 });
 
