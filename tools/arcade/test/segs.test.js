@@ -140,6 +140,20 @@ function update() {
 }`, 60).out[0], '48 0');
 });
 
+test('a point bounced off one set is not pushed into another whose line lies on it', () => {
+    /* the floor at y 50, and a box whose top lies on the same line: a
+     * point dropped on it bounces off the floor, and must not then be
+     * taken by the box for coming up from inside it */
+    const r = run(FLOOR.replace('p.segs = s;', `box = segs.make([40, 60, 60, 40], [50, 50, 70, 70], 4);
+    p.segs = [s, box]; p.bounce = 0.5;`).replace('var p, s,', 'var p, s, box,') + `
+function update() {
+    links.step(p, 0, out);
+    if (frame() == 60) printh(flr(p.y[0]) + " " + out[2]);
+}`, 60);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '48 -1');
+});
+
 test('more than 16 sets, or something else in the array, stops the cart', () => {
     const many = run(PARTS.replace('p.segs = [s, plat];',
         'p.segs = []; for (var i = 0; i < 17; i++) p.segs.push(s);') + `

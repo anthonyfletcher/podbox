@@ -213,6 +213,8 @@ struct cellsleep
 {
     uint32_t id, used;
     int32_t w, h;
+    int32_t box[4];                 /* changed since the last step, x0 > x1
+                                     * when nothing has */
     uint8_t awake[256];
     uint32_t sum[256];
     uint8_t dir[256 * 256 / 8];     /* a bit a cell: a liquid's way */
@@ -764,6 +766,8 @@ struct cellworld
 };
 int cells_world(struct vm *vm, struct value field, struct value rules,
                 struct cellworld *w);
+void cells_touched(struct vm *vm, uint32_t id, int32_t w, int32_t h,
+                   const int32_t box[4]);
 enum { CELL_SOLID = 1, CELL_LIQUID = 2, CELL_HARM = 4 };
 
 /* sys_actors.c, for cells: actors' boxes as obstacles, and a particle

@@ -6,7 +6,7 @@ time, and Life and its cousins; and **links**, points held together --
 ropes, chains, bridges, cloth, and soft bodies that meet outlines.
 
 - Cells: [how a field works](#how-a-field-works), [cells.rules](#cellsrules),
-  [cells.step](#cellsstepfield-w-rules-actors), [cells.life](#cellslifefield-w-birth-survive-born),
+  [cells.step](#cellsstepfield-w-rules-actors-box), [cells.life](#cellslifefield-w-birth-survive-born),
   [cells.lift](#cellsliftfield-rules-x-y-r-pool-speed), [actors and particles in a field](#actors-and-particles-in-a-field)
 - Links: [how links work](#how-links-work), [links.pool](#linkspoolpoints-links),
   [links.point](#linkspointp-x-y-pin), [links.link](#linkslinkp-i-j-len),
@@ -97,7 +97,7 @@ R.move[STONE] = MOVE.STATIC;  R.density[STONE] = 255;
   steam (it puts it out); a drain beside water makes drain and air (it
   swallows it).
 
-## cells.step(field, w, rules, [actors])
+## cells.step(field, w, rules, [actors], [box])
 
 One tick of the field.
 
@@ -106,7 +106,8 @@ One tick of the field.
 | `field` | an image, or a `Uint8Array` board up to 256x256 |
 | `w` | the board's width; ignored for an image -- pass 0 |
 | `rules` | a record from `cells.rules()` |
-| `actors` | a pool, or an array of pools, whose actors are obstacles while it steps |
+| `actors` | a pool, or an array of pools, whose actors are obstacles while it steps; `null` to leave out and give `box` |
+| `box` | an `Int32Array` of 4, written with x0, y0, x1, y1, both corners inside, round every cell that changed since the last step: moved by it, drawn on, or settled into by particles. In 16-cell chunks, but for particles; the whole field the first time; untouched when nothing changed |
 
 **Returns** how many cells moved.
 
@@ -149,6 +150,32 @@ function draw() {
 ```
 
 ![Sand piled on a ramp on the left, water running off a ramp on the right and pooling on the floor](img/sim-sand.png)
+
+**Drawing only what changed.** A whole field blitted each frame costs by
+its every pixel, though most of it stands still. With `box`, draw just
+that part, over its own background, and leave the rest of the screen:
+
+```js
+var box = new Int32Array(4);
+
+function update() {
+    fill(box, -1);
+    cells.step(field, 0, R, null, box);
+}
+
+function draw() {
+    if (box[0] < 0) return;             // nothing changed: the screen stands
+    rectfill(box[0], box[1], box[2], box[3], 1);    // the sky behind it
+    blitpart(field, box[0], box[1], box[2] - box[0] + 1,
+             box[3] - box[1] + 1, box[0], box[1]);
+}
+```
+
+- Fill the box before the copy: air is clear, so a grain that has moved
+  on would otherwise stay on the screen.
+- It suits a screen that is the field alone. Anything drawn over the
+  field each frame -- a character, a score -- needs its own part redrawn
+  too.
 
 A wooden frame set alight -- reactions spread the fire, and life spans
 turn flames to smoke and smoke to air:
@@ -563,6 +590,10 @@ resting on it this tick move with it, as far as their friction holds --
 in an array of sets as alone.
 
 **Returns** nothing. Call it every tick a set moves.
+
+- **Call it before `links.step`, in the same tick.** The step carries
+  what rests on the set by this tick's move; called after the step,
+  nothing is carried, and a lift rises through the bag on it.
 
 ## segs.trace(solid, [sharp], [smooth], [cx, cy, cw, ch], [shapes], [outside])
 

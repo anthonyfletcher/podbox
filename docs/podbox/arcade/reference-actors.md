@@ -653,7 +653,7 @@ and for the whole pool:
 | Field | |
 |---|---|
 | `gravity`, `drag` | added to `dy` each tick; speed lost each tick, a fraction -- negative, speed gained: a rocket's exhaust, a spray that bursts outward |
-| `cull` | true: a particle wholly off the screen, as the camera has it, is gone |
+| `cull` | true: a particle that `particles.draw` finds wholly off the screen, through the camera it draws by, is gone; not under a turned or zoomed camera |
 | `w`, `h` | how much of a sprite particle's sprite to draw, from its top left: 1 to 16 pixels -- 16 is a 2x2 block of the sheet -- 8 if not set |
 | `shade` | how many of the sprite's colours, from 1, take the particle's colour ramp (see [Sprite particles](#sprite-particles)); 0 draws the sprite as it is |
 | `floor`, `bounce` | a particle falling through y `floor` turns back up at `bounce` of its speed -- unless that is under a quarter pixel a tick, when it falls on through; 0 is no floor |

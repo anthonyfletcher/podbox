@@ -189,9 +189,47 @@ static struct cellsleep *sleep_for(struct vm *vm, const struct field *f)
     old->w = f->w;
     old->h = f->h;
     old->used = ++vm->sleep_clock;
+    old->box[0] = 0;
+    old->box[1] = 0;
+    old->box[2] = f->w - 1;
+    old->box[3] = f->h - 1;
     memset(old->awake, 1, sizeof(old->awake));
     memset(old->dir, 0, sizeof(old->dir));
     return old;
+}
+
+/* sl's box of changed cells grown to take in x0..x1, y0..y1 */
+static void grow(struct cellsleep *sl, int32_t x0, int32_t y0, int32_t x1,
+                 int32_t y1)
+{
+    if (sl->box[0] > sl->box[2]) {
+        sl->box[0] = x0; sl->box[1] = y0; sl->box[2] = x1; sl->box[3] = y1;
+        return;
+    }
+    if (x0 < sl->box[0]) sl->box[0] = x0;
+    if (y0 < sl->box[1]) sl->box[1] = y0;
+    if (x1 > sl->box[2]) sl->box[2] = x1;
+    if (y1 > sl->box[3]) sl->box[3] = y1;
+}
+
+/* Cells x0..x1, y0..y1 of field id, w by h, written outside cells.step --
+ * particles settling into it -- for the box the next step gives */
+void cells_touched(struct vm *vm, uint32_t id, int32_t w, int32_t h,
+                   const int32_t box[4])
+{
+    for (int i = 0; i < 2; i++) {
+        struct cellsleep *sl = &vm->sleep[i];
+        if (sl->id == id && sl->w == w && sl->h == h)
+            grow(sl, box[0], box[1], box[2], box[3]);
+    }
+}
+
+/* chunk k of a field cw chunks across, as cells, into sl's box */
+static void grow_chunk(struct cellsleep *sl, int32_t k, int32_t cw)
+{
+    int32_t x = (k % cw) * CHUNK, y = (k / cw) * CHUNK;
+    grow(sl, x, y, x + CHUNK - 1 < sl->w - 1 ? x + CHUNK - 1 : sl->w - 1,
+         y + CHUNK - 1 < sl->h - 1 ? y + CHUNK - 1 : sl->h - 1);
 }
 
 /* A field and its rules, for actors to move in: 0, with the error set,
@@ -586,10 +624,12 @@ static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
  * an array of pools, are obstacles while it steps: their boxes are marked
  * as cells already moved, which nothing moves into, so water flows round
  * a character and sand piles on a moving platform; the chunks under them
- * are woken. Returns the cells that moved. */
+ * are woken. With out, an Int32Array of 4: the box x0, y0, x1, y1 round
+ * what changed since the last step -- whole chunks, drawn on or stepped,
+ * and cells particles settled into -- left as it was when nothing did.
+ * Returns the cells that moved. */
 NATIVE(cells_step)
 {
-    (void)argc;
     static struct stepper s;
     if (!field_of(vm, a[0], a[1], "cells.step", &s.f) ||
         !rules_of(vm, a[2], &s.r))
@@ -647,9 +687,10 @@ NATIVE(cells_step)
         s.slept[k] = 0;
         if (!sl->awake[k]) {
             summed++;
-            if (chunk_sum(&s.f, k % s.cw, k / s.cw) != sl->sum[k])
+            if (chunk_sum(&s.f, k % s.cw, k / s.cw) != sl->sum[k]) {
                 sl->awake[k] = 1;
-            else
+                grow_chunk(sl, k, s.cw);
+            } else
                 s.slept[k] = 1;
         }
     }
@@ -659,11 +700,31 @@ NATIVE(cells_step)
              cy <= (boxes[b * 4 + 3] >> CHUNK_SHIFT) + 1; cy++)
             for (int32_t cx = (boxes[b * 4] >> CHUNK_SHIFT) - 1;
                  cx <= (boxes[b * 4 + 2] >> CHUNK_SHIFT) + 1; cx++)
-                if (cx >= 0 && cy >= 0 && cx < s.cw && cy < chh) {
+                if (cx >= 0 && cy >= 0 && cx < s.cw && cy < chh)
                     sl->awake[cy * s.cw + cx] = 1;
-                    s.changed[cy * s.cw + cx] = 1;
-                }
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
+    /* the box of what changed: the chunks this step changed, those drawn
+     * on since, and cells particles settled into; given, and begun again */
+    for (int32_t k = 0; k < s.cw * chh; k++)
+        if (s.changed[k])
+            grow_chunk(sl, k, s.cw);
+    if (argc > 4 && a[4].tag != T_NULL) {
+        if (a[4].tag != T_I32 || I32(vm, a[4])->len < 4)
+            return vm_fail(vm, "cells.step() writes its box to an Int32Array "
+                           "of 4", "", "");
+        if (sl->box[0] <= sl->box[2])
+            memcpy(I32(vm, a[4])->d, sl->box, sizeof(sl->box));
+    }
+    sl->box[0] = 1;
+    sl->box[2] = 0;
+    /* and next tick the chunks round each actor, as changed */
+    for (int32_t b = 0; b < nbox; b++)
+        for (int32_t cy = (boxes[b * 4 + 1] >> CHUNK_SHIFT) - 1;
+             cy <= (boxes[b * 4 + 3] >> CHUNK_SHIFT) + 1; cy++)
+            for (int32_t cx = (boxes[b * 4] >> CHUNK_SHIFT) - 1;
+                 cx <= (boxes[b * 4 + 2] >> CHUNK_SHIFT) + 1; cx++)
+                if (cx >= 0 && cy >= 0 && cx < s.cw && cy < chh)
+                    s.changed[cy * s.cw + cx] = 1;
     /* Next tick: the chunks that changed and those near them; the rest
      * sleep with their sums. Near is a chunk up or down, and sideways as
      * far as a liquid runs in a tick. */

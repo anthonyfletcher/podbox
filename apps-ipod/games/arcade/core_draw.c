@@ -1689,6 +1689,7 @@ struct poly
     int full;                   /* more edges than max */
     int64_t xl, xr;             /* edges past these are aside, 16.16 */
     uint32_t aside;             /* edges wholly left or right */
+    uint32_t measured;          /* edges cut to the clip's rows to test */
 };
 
 /* (n << 16) / d, d above 0, toward 0: the 64-bit divide, but a byte at a
@@ -1722,6 +1723,7 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
     /* rows whose middle, y + 1/2, is at least ay and below by */
     int64_t r0 = (ay - 32768 + 65535) >> 16;
     int64_t r1 = (by - 32768 + 65535) >> 16;
+    int cut = r0 < g->y0 || r1 > g->y1;
     if (r0 < g->y0)
         r0 = g->y0;
     if (r1 > g->y1)
@@ -1732,9 +1734,24 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
     if (ax > g->xmax) g->xmax = ax;
     if (bx < g->xmin) g->xmin = bx;
     if (bx > g->xmax) g->xmax = bx;
-    /* a pixel clear of the clip either side, wherever its rows cross */
-    int left = (ax > bx ? ax : bx) < g->xl;
-    if (left || (ax < bx ? ax : bx) > g->xr) {
+    /* a pixel clear of the clip either side, wherever its rows cross; an
+     * edge reaching past the clip's rows -- a tall wall the camera turns
+     * -- by where it crosses the first and last of them, as it can lie
+     * clear across those though not across its length */
+    int64_t lx = ax < bx ? ax : bx, hx = ax > bx ? ax : bx, dx = 0;
+    int sloped = 0;
+    if (cut && lx <= g->xr && hx >= g->xl) {
+        dx = slope(bx - ax, by - ay);
+        sloped = 1;
+        if (!g->counting)
+            g->measured++;
+        int64_t xa = ax + (((r0 << 16) + 32768 - ay) * dx >> 16);
+        int64_t xb = xa + (r1 - 1 - r0) * dx;
+        lx = xa < xb ? xa : xb;
+        hx = xa > xb ? xa : xb;
+    }
+    int left = hx < g->xl;
+    if (left || lx > g->xr) {
         g->aside++;
         if (g->counting)
             return 1;
@@ -1758,7 +1775,7 @@ static int poly_line(struct poly *g, int64_t ax, int64_t ay, int64_t bx,
         return 0;
     }
     struct pedge *e = &g->e[g->n];
-    e->dx = slope(bx - ax, by - ay);
+    e->dx = sloped ? dx : slope(bx - ax, by - ay);
     e->x = ax + (((r0 << 16) + 32768 - ay) * e->dx >> 16);
     e->y1 = (int32_t)r1;
     if (r0 < g->lo)
@@ -2004,7 +2021,7 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
         memset(held_starts, 0, rows * 4);
     struct poly g = { held_edges, starts, 0, 4, p.cy0, p.cy1, p.cy1, p.cy0,
                       0, 0, 0, 0, 0, ((int64_t)p.cx0 - 1) << 16,
-                      ((int64_t)p.cx1 + 1) << 16, 0 };
+                      ((int64_t)p.cx1 + 1) << 16, 0, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
                   qx[(k + 1) & 3] + (p.ox << 16),
@@ -2061,7 +2078,7 @@ NATIVE(polyfill)
     int64_t xl = ((int64_t)p.cx0 - 1) << 16, xr = ((int64_t)p.cx1 + 1) << 16;
     struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
                       p.cy1, p.cy0, 0, 0, (int64_t)1 << 62,
-                      -((int64_t)1 << 62), 0, xl, xr, 0 };
+                      -((int64_t)1 << 62), 0, xl, xr, 0, 0 };
     struct pedge **act = held_act;
     if (rows <= POLY_HELD_ROWS) {
         memset(held_starts, 0, rows * 4);
@@ -2073,7 +2090,7 @@ NATIVE(polyfill)
         walks += rows <= POLY_HELD_ROWS;
         struct poly count = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0,
                               1, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
-                              0, xl, xr, 0 };
+                              0, xl, xr, 0, 0 };
         g = count;
         if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
                         (uint32_t)n))
@@ -2099,6 +2116,7 @@ NATIVE(polyfill)
             g.starts = (int32_t *)(void *)(mem + at_starts);
             g.n = 0;
             g.aside = 0;
+            g.measured = 0;
             g.max = max;
             g.counting = 0;
             act = (struct pedge **)(void *)(mem + at_act);
@@ -2112,7 +2130,8 @@ NATIVE(polyfill)
         }
     }
     p.cost += POLY_CALL + (uint32_t)n * walks * POLY_POINT +
-              (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE);
+              (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE +
+                                g.measured * POLY_EDGE);
     if (vm->d.cam_moved)
         p.cost += (uint32_t)n * walks * POLY_TURN;
     /* wholly left or right of the clip, or above or below it: no row is

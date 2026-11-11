@@ -456,7 +456,7 @@ Actors as circles, pushed apart and bounced off one another. Returns the pairs t
 Actors as circles, moved and bounced off map cells whose flags meet `flags`. Returns the cells struck.
 
 ### particles.pool(n)
-A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, `sp` and `flip`, with `gravity`, `drag` (negative speeds them up) and `cull` (gone once off the screen), and for sprite particles `w`, `h` (up to 16), `shade`, `floor`, `bounce` and `spin`.
+A pool of `n` particles: arrays `life`, `x`, `y`, `dx`, `dy`, `c`, `sp` and `flip`, with `gravity`, `drag` (negative speeds them up) and `cull` (gone once `particles.draw` finds it off the screen, through the camera it draws by), and for sprite particles `w`, `h` (up to 16), `shade`, `floor`, `bounce` and `spin`.
 
 ### particles.emit(p, count, x, y, dx, dy, spread, life, c, [sp])
 Up to `count` particles at `x, y`, moving `dx, dy` plus up to `spread` either way, living about `life` ticks; with `sp`, each is that sprite, flipped at random. Returns how many.
@@ -534,8 +534,8 @@ Fills a board or an image from the noise, each value one of `ramp`'s. Returns th
 ### cells.rules()
 A record of tables for the cart to fill: each material's movement, spread, density, flags, decay and what it becomes, and the reactions between them.
 
-### cells.step(field, w, rules, [actors])
-One tick of a field of materials by the rules, flowing round any actors. Returns the cells that moved.
+### cells.step(field, w, rules, [actors], [box])
+One tick of a field of materials by the rules, flowing round any actors. With `box`, an `Int32Array` of 4: x0, y0, x1, y1 round what changed since the last step, left as it was when nothing did. Returns the cells that moved.
 
 ### cells.life(field, w, birth, survive, [born])
 One generation of a Life-like rule: birth 8, survive 12 is Life. Returns the cells changed.
@@ -573,7 +573,7 @@ Draws the cloth filled, each cell shaded from `ramp` by how it faces the light. 
 The outlines through the n points, as polyfill takes them, as lines points meet: each line takes the material of the point it starts from. Set it in a links pool's `segs`. At most 4096 points.
 
 ### segs.move(s, dx, dy)
-Moves the set by `dx, dy`; points resting on it are carried this tick.
+Moves the set by `dx, dy`; points resting on it are carried by the `links.step` that follows in the same tick. Called after the step, nothing is carried: a lift rises through what stands on it.
 
 ### segs.draw(s, colour)
 Draws every line, where the set is now.

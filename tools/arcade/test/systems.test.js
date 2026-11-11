@@ -500,7 +500,7 @@ function update() {}`, 1);
 });
 
 test('particles: bounds as drawn, cull off the screen, 16-pixel sprites, and a negative drag speeds up', () => {
-    const r = run(`var p = particles.pool(8), box = new Int32Array(4);
+    const r = run(`var p = particles.pool(8), q = particles.pool(2), box = new Int32Array(4);
 function init() {
     printh(particles.bounds(p, box) + " " + box.join(","));
     particles.emit(p, 1, 10, 20, 0, 0, 0, 50, 7);
@@ -511,13 +511,22 @@ function init() {
     camera();
     p.cull = true; p.drag = -0.5;
     particles.emit(p, 1, 150, 60, 2, 0, 0, 50, 7);
+    q.cull = true;
+    particles.emit(q, 1, 300, 60, 0, 0, 0, 50, 7);
 }
 function update() {
     particles.step(p);
+    particles.step(q);
     var x = 0;
     for (var i = 0; i < 8; i++) if (p.life[i] > 0 && p.x[i] > 100) x = p.x[i];
-    printh(frame() + " " + x);
-}`, 3);
+    printh(frame() + " " + x + " " + (q.life[0] > 0));
+}
+function draw() {
+    particles.draw(p);
+    camera(250, 0);              /* q is in the world, seen through this */
+    particles.draw(q);
+    camera();                    /* and the HUD drawn without it */
+}`, 4);
     assert.equal(r.status, 0, r.err);
     const lines = r.out.trim().split('\n');
     /* none live: 0, the box untouched; then a dot at 10,20 and a 16x16
@@ -525,10 +534,12 @@ function update() {
     assert.equal(lines[0], '0 0,0,0,0');
     assert.equal(lines[1], '2 5,5,50,20');
     /* moving 3 (2 less a drag of -0.5), then 4.5, then 6.75: past 160 on
-     * the third step, it is culled */
-    assert.equal(lines[2], '1 153');
-    assert.equal(lines[3], '2 157.5');
-    assert.equal(lines[4], '3 0');
+     * the third step, it is culled as it is drawn; q, on the screen through
+     * the camera it is drawn by, lives on though update() has none */
+    assert.equal(lines[2], '1 153 1');
+    assert.equal(lines[3], '2 157.5 1');
+    assert.equal(lines[4], '3 164.25 1');
+    assert.equal(lines[5], '4 0 1');
 });
 
 test('btnr, imgw and imgh, unitsnow', () => {

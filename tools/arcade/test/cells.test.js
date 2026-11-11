@@ -225,6 +225,46 @@ function update() {
     assert.equal(film('rectfill(40, 107, 69, 109, WATER);'), '0 90 0');
 });
 
+test('cells.step gives the box round what changed: stepped, drawn on, or settled into', () => {
+    const r = run(`const STONE = 5, SAND = 15;
+var R, field, box = new Int32Array(4), p = particles.pool(4);
+function init() {
+    R = cells.rules();
+    R.move[STONE] = MOVE.STATIC; R.density[STONE] = 255;
+    R.move[SAND] = MOVE.POWDER; R.density[SAND] = 200;
+    field = img(128, 64);
+    target(field);
+    rectfill(0, 60, 127, 63, STONE);
+    rectfill(70, 10, 73, 13, SAND);
+    target(SCREEN);
+    p.field = field;
+}
+function show(t) { printh(t + " " + box.join(",")); }
+function update() {
+    var f = frame();
+    fill(box, -1);
+    cells.step(field, 0, R, null, box);
+    if (f == 1 || f == 5 || f == 199) show(f);
+    if (f == 200) { target(field); pset(20, 20, STONE); target(SCREEN); }
+    if (f == 201) show(f);
+    if (f == 202) particles.emit(p, 1, 100.5, 40, 0, 4, 0, 50, SAND);
+    if (f > 202) { particles.step(p); }
+    if (f == 210) show(f);
+}`, 210);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), [
+        /* a field first stepped: all of it */
+        '1 0,0,127,63',
+        /* the sand falling, in its chunks */
+        '5 64,0,79,31',
+        /* settled: nothing changed, the box left as it was */
+        '199 -1,-1,-1,-1',
+        /* drawn into a sleeping chunk */
+        '201 16,16,31,31',
+        /* a grain settled on the floor at x 100, then that chunk awake */
+        '210 96,48,111,63']);
+});
+
 /* Materials for the layers: 0 air, 5 stone, 12 water, 15 sand */
 const LAYERS = `
 function rules2() {

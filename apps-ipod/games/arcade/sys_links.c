@@ -2057,6 +2057,7 @@ NATIVE(links_step)
             if (!pinned[i]) {
                 int32_t X = fx(x[i]), Y = fx(y[i]), OX = fx(ox[i]);
                 int32_t OY = fx(oy[i]);
+                const int32_t OX0 = OX, OY0 = OY;
                 for (uint32_t s = 0; s < nsets; s++) {
                     const struct segs *sg = &sets[s];
                     /* the path's box in the set's place, wide enough for
@@ -2075,15 +2076,22 @@ NATIVE(links_step)
                         continue;
                     }
                     segpts++;
-                    int32_t nx, ny;
-                    int32_t k = seg_meet(sg, &X, &Y, &OX, &OY, radius, grav,
-                                         fr, nfr, bounce, stamp, &mark, &nx,
-                                         &ny, &sc);
+                    /* each set judges the side a point is on from where it
+                     * was as the tick began, not from where a set met
+                     * before it put its speed: a bounce off the ground
+                     * would put that below the point, and the lift above
+                     * it would take it for coming up from inside */
+                    int32_t nx, ny, ox_s = OX0, oy_s = OY0;
+                    int32_t k = seg_meet(sg, &X, &Y, &ox_s, &oy_s, radius,
+                                         grav, fr, nfr, bounce, stamp, &mark,
+                                         &nx, &ny, &sc);
                     if (k) {
                         m = k;
                         NX = nx;
                         NY = ny;
                         met = (int32_t)s;
+                        OX = ox_s;
+                        OY = oy_s;
                     }
                 }
                 if (m) {
