@@ -178,7 +178,11 @@ extern long iap_connected_tick;
  * seconds the specification gives, so a slow one is not failed */
 #define IAP_AUTH_STEP_TIMEOUT (5 * HZ)
 
-#define DEVICE_AUTHENTICATED (device.auth.state == AUST_AUTH)
+/* Provisional authentication: every lingo-authenticated command is open
+ * once AckDevAuthenticationInfo has acked the certificate, which is when
+ * the state reaches AUST_CERTDONE, through the background challenge that
+ * follows. */
+#define DEVICE_AUTHENTICATED (device.auth.state >= AUST_CERTDONE)
 #define DEVICE_AUTH_RUNNING ((device.auth.state != AUST_NONE) && (device.auth.state != AUST_AUTH))
 #define DEVICE_LINGO_SUPPORTED(x) (device.lingoes & BIT_N((x)&0x1f))
 
@@ -282,6 +286,8 @@ void iap_set_remote_volume(void);
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
 bool iap_play_or_resume(void);
+void iap_set_shuffle(bool shuffle, bool restore);
+void iap_set_repeat(int mode, bool restore);
 /* index below playlist_amount(): audio_skip() locks up past the end */
 bool iap_skip_to(uint32_t index);
 

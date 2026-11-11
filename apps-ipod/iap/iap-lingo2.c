@@ -260,6 +260,13 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
             }
             else
             {
+                /* The release edge arms the delay too, so the button
+                 * driver sees BUTTON_NONE: handled back to back, a release
+                 * and the next press post no BUTTON_REL, and two taps
+                 * merge into a held press that seeks. A release is one
+                 * event, so this stalls nothing the way a repeat would. */
+                if (iap_remotebtn != BUTTON_NONE)
+                    iap_repeatbtn = 2;
                 iap_remotebtn = BUTTON_NONE;
                 iap_timeoutbtn = (iap_btnstop || iap_btnshuffle || iap_btnrepeat
                                   || iap_btnchapter) ? 3 : 0;

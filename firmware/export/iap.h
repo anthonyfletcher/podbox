@@ -55,6 +55,9 @@ void iap_reset_state(IF_IAP_MP_NONVOID(int port) ); /* 0 is dock, 1 is headphone
 /* USB power went: the session resets, as for an accessory that has gone,
  * but playback carries on */
 void iap_power_reset(void);
+/* Shutdown, after playback stopped: puts back shuffle and repeat set with
+ * Restore on Exit before the settings are written */
+void iap_prepare_shutdown(bool save_playlist);
 /* The player set the codec's volume, which ends an accessory's mute */
 void iap_volume_set(void);
 #ifdef HAVE_IAP_ACCESSORY_POLL

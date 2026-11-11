@@ -124,6 +124,14 @@ unsigned long iap_remotebtn = 0;
  * Counted down by remote_control_rx()
  */
 int iap_repeatbtn = 0;
+/* The shuffle and repeat modes to put back when the accessory detaches,
+ * or -1, see iap_set_shuffle() and iap_set_repeat() */
+static int iap_saved_shuffle = -1;
+static int iap_saved_repeat = -1;
+/* Set when a session ends with saved modes to restore */
+static bool iap_restore_pending = false;
+/* Set once the modes are final for this power cycle */
+static bool iap_modes_final = false;
 /* Used to time out button down events in case we miss the button up event
  * from the device somehow.
  * If a device sends a button down event it's required to repeat that event
@@ -323,7 +331,10 @@ void put_u32(unsigned char *buf, const uint32_t data)
 
 uint32_t get_u32(const unsigned char *buf)
 {
-    return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+    /* Widen before shifting: buf[0] promotes to int, and shifting a
+     * value of 0x80 or more left by 24 overflows it */
+    return ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+           ((uint32_t)buf[2] << 8) | buf[3];
 }
 
 uint16_t get_u16(const unsigned char *buf)
@@ -490,9 +501,12 @@ void iap_reset_device(struct device_t* device)
     device->changed_notifications = 0;
     device->do_notify = false;
     /* An accessory that muted the player does not leave it silent. Every
-     * caller is on the iAP thread but iap_start(), before any could mute. */
+     * caller is on the iAP thread but iap_setup(), before any could mute. */
     if (device->mute)
         iap_set_mute(false);
+    /* Nor with the shuffle and repeat it set with Restore on Exit */
+    if (iap_saved_shuffle >= 0 || iap_saved_repeat >= 0)
+        iap_restore_pending = true;
     device->pb_notifications = 0;
     device->pb_track_changed = false;
     device->pb_play_status = 0;
@@ -553,6 +567,7 @@ static void iap_tick_stop_if_idle(void)
     if ((!last_frame_tick
          || TIME_AFTER(current_tick, last_frame_tick + 60 * HZ))
         && !reset_pending && !iap_shutdown && departure_deadline == 0
+        && !iap_restore_pending
         && device.lingoes == 0 && device.auth.state == AUST_NONE
         && !device.do_notify && device.notifications == 0
         && device.pb_notifications == 0
@@ -683,7 +698,10 @@ static void iap_thread(void)
             case SYS_POWEROFF:
             case SYS_REBOOT:
             {
-                iap_shutdown = true;
+                /* iap_periodic() runs only once IAP is running, so the
+                 * flag is not left for a later accessory */
+                if (iap_running)
+                    iap_shutdown = true;
                 break;
             }
 
@@ -706,47 +724,47 @@ static void iap_track_changed(unsigned short id, void *ignored)
     device.pb_track_changed = true;
 }
 
-/* Do general setup of the needed infrastructure.
- *
- * Please note that a lot of additional work is done by iap_start()
- */
+/* At boot, in thread context: the message queue and the iAP thread. The
+ * buffers and the tick follow from iap_malloc(), on the iAP thread, after
+ * the first sync byte. */
 void iap_setup(const int ratenum)
 {
     iap_bitrate_set(ratenum);
     iap_remotebtn = BUTTON_NONE;
-    iap_setupflag = true;
-    iap_started = false;
     iap_running = false;
+
+    if (!iap_started)
+    {
+        unsigned int tid;
+
+        iap_reset_device(&device);
+        queue_init(&iap_queue, true);
+        tid = create_thread(iap_thread, thread_stack, sizeof(thread_stack),
+                0, "iap"
+                IF_PRIO(, PRIORITY_SYSTEM)
+                IF_COP(, CPU));
+        if (!tid)
+            panicf("Could not create iap thread");
+        add_event(PLAYBACK_EVENT_TRACK_CHANGE, iap_track_changed);
+        iap_started = true;
+    }
+
+    /* The receive interrupt posts to the queue only from here on */
+    iap_setupflag = true;
 }
 
-/* Actually bring up the message queue, message handler thread and
- * notification timer
- *
- * NOTE: This is running in interrupt context
- */
+/* Interrupt context: every sync byte until iap_malloc() has run. Neither a
+ * thread nor memory can be made here, so the iAP thread is asked to
+ * allocate the buffers, once. */
 static void iap_start(void)
 {
-    unsigned int tid;
+    static bool malloc_posted = false;
 
-    if (iap_started)
+    if (malloc_posted)
         return;
 
-    iap_reset_device(&device);
-    queue_init(&iap_queue, true);
-    tid = create_thread(iap_thread, thread_stack, sizeof(thread_stack),
-            0, "iap"
-            IF_PRIO(, PRIORITY_SYSTEM)
-            IF_COP(, CPU));
-    if (!tid)
-        panicf("Could not create iap thread");
-    timeout_register(&iap_task_tmo, iap_task, MS_TO_TICKS(100), (intptr_t)NULL);
-    add_event(PLAYBACK_EVENT_TRACK_CHANGE, iap_track_changed);
-
-    /* Since we cannot allocate memory while in interrupt context
-     * post a message to our own queue to get that done
-     */
+    malloc_posted = true;
     queue_post(&iap_queue, IAP_EV_MALLOC, 0);
-    iap_started = true;
 }
 
 static void iap_malloc(void)
@@ -769,6 +787,10 @@ static void iap_malloc(void)
 
     iap_reset_buffers();
     iap_running = true;
+
+    /* The tick runs only once an accessory has sent a sync byte */
+    timeout_register(&iap_task_tmo, iap_task, MS_TO_TICKS(100),
+                     (intptr_t)NULL);
 }
 
 /* True while frames are arriving. The USB DAC search asks: a serial dock
@@ -1044,7 +1066,8 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
     if (!iap_setupflag || !iap_enabled)
         return true;
 
-    if (iap_started)
+    /* The tick is registered by iap_malloc() */
+    if (iap_running)
         iap_tick_start();
 
     /* Check the time since the last packet arrived. */
@@ -1242,10 +1265,141 @@ static void iap_send_pb(unsigned char type, int size, uint32_t value)
     iap_send_tx();
 }
 
+static void apply_shuffle(bool shuffle)
+{
+    if (global_settings.playlist_shuffle == shuffle)
+        return;
+
+    global_settings.playlist_shuffle = shuffle;
+    /* A loaded playlist is saved in its play order, so it is reordered
+     * even while stopped */
+    if (playlist_amount() > 0)
+    {
+        if (shuffle)
+            playlist_randomise(NULL, current_tick, true);
+        else
+            playlist_sort(NULL, true);
+    }
+}
+
+static void apply_repeat(int mode)
+{
+    if (global_settings.repeat_mode == mode)
+        return;
+
+    global_settings.repeat_mode = mode;
+    if (audio_status() & AUDIO_STATUS_PLAY)
+        audio_flush_and_reload_tracks();
+}
+
+/* iAP thread: put back the shuffle and repeat modes an accessory changed
+ * with Restore on Exit, once it has gone */
+static void iap_restore_modes(void)
+{
+    if (!iap_restore_pending)
+        return;
+
+    iap_restore_pending = false;
+    if (iap_saved_shuffle < 0 && iap_saved_repeat < 0)
+        return;
+    if (iap_saved_shuffle >= 0)
+        apply_shuffle(iap_saved_shuffle);
+    if (iap_saved_repeat >= 0)
+        apply_repeat(iap_saved_repeat);
+    iap_saved_shuffle = -1;
+    iap_saved_repeat = -1;
+    /* Anything that saved the settings meanwhile wrote the accessory's
+     * modes to disk */
+    settings_save();
+}
+
+/* At shutdown, after playback has stopped and before the settings and the
+ * playlist are written: the modes an accessory changed with Restore on
+ * Exit stay off disk. With save_playlist false the playlist is not written,
+ * so it is not reordered either. */
+void iap_prepare_shutdown(bool save_playlist)
+{
+    iap_modes_final = true;
+    if (!save_playlist)
+    {
+        if (iap_saved_shuffle >= 0)
+            global_settings.playlist_shuffle = iap_saved_shuffle;
+    }
+    else if (iap_saved_shuffle >= 0 &&
+             iap_saved_shuffle != global_settings.playlist_shuffle)
+    {
+        apply_shuffle(iap_saved_shuffle);
+        /* resume from the track's place in the new order */
+        if (global_status.resume_index != -1 && playlist_amount() > 0)
+            global_status.resume_index = playlist_get_current()->index;
+    }
+    if (iap_saved_repeat >= 0)
+        global_settings.repeat_mode = iap_saved_repeat;
+    iap_saved_shuffle = -1;
+    iap_saved_repeat = -1;
+}
+
+/* SetShuffle. With restore set the change lasts until the accessory
+ * detaches and is not saved; otherwise it is kept, as a change made on the
+ * player is. */
+void iap_set_shuffle(bool shuffle, bool restore)
+{
+    if (iap_modes_final)
+        return;
+    /* a previous session's restore comes first */
+    iap_restore_modes();
+
+    if (restore)
+    {
+        if (iap_saved_shuffle < 0)
+            iap_saved_shuffle = global_settings.playlist_shuffle;
+        apply_shuffle(shuffle);
+    }
+    else
+    {
+        bool was_temporary = iap_saved_shuffle >= 0;
+
+        iap_saved_shuffle = -1;
+        if (was_temporary || global_settings.playlist_shuffle != shuffle)
+        {
+            apply_shuffle(shuffle);
+            settings_save();
+        }
+    }
+}
+
+/* SetRepeat, as iap_set_shuffle() */
+void iap_set_repeat(int mode, bool restore)
+{
+    if (iap_modes_final)
+        return;
+    iap_restore_modes();
+
+    if (restore)
+    {
+        if (iap_saved_repeat < 0)
+            iap_saved_repeat = global_settings.repeat_mode;
+        apply_repeat(mode);
+    }
+    else
+    {
+        bool was_temporary = iap_saved_repeat >= 0;
+
+        iap_saved_repeat = -1;
+        if (was_temporary || global_settings.repeat_mode != mode)
+        {
+            apply_repeat(mode);
+            settings_save();
+        }
+    }
+}
+
 void iap_periodic(void)
 {
     static int count;
     static bool docked;
+
+    iap_restore_modes();
     bool present = last_frame_tick
                    && TIME_BEFORE(current_tick, last_frame_tick + 60 * HZ);
 
@@ -1341,20 +1495,24 @@ void iap_periodic(void)
         iap_btnchapter = false;
     }
 
-    /* Handle power down messages. */
-    if (iap_shutdown && device.do_power_notify)
+    /* Handle power down messages, once: a shutdown can be called off,
+     * and a latched flag would tell the next accessory we are going down */
+    if (iap_shutdown)
     {
-        /* NotifyiPodStateChange */
-        IAP_TX_INIT(0x00, 0x23);
-        IAP_TX_PUT(0x01);
-
-        iap_send_tx();
-
-        /* No further actions, we're going down. Once: a shutdown that
-         * is called off must not send it again every tick. */
         iap_shutdown = false;
-        iap_reset_device(&device);
-        return;
+
+        if (device.do_power_notify)
+        {
+            /* NotifyiPodStateChange */
+            IAP_TX_INIT(0x00, 0x23);
+            IAP_TX_PUT(0x01);
+
+            iap_send_tx();
+
+            /* No further actions, we're going down */
+            iap_reset_device(&device);
+            return;
+        }
     }
 
     /* Handle GetAccessoryInfo messages */
@@ -1755,7 +1913,13 @@ void iap_periodic(void)
 
         tm = get_time();
 
-        if (memcmp(tm, &(device.datetime), sizeof(struct tm)))
+        /* Only the fields that are sent: the seconds change every
+         * second */
+        if ((tm->tm_year != device.datetime.tm_year) ||
+            (tm->tm_mon != device.datetime.tm_mon) ||
+            (tm->tm_mday != device.datetime.tm_mday) ||
+            (tm->tm_hour != device.datetime.tm_hour) ||
+            (tm->tm_min != device.datetime.tm_min))
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x09);
@@ -1861,6 +2025,12 @@ bool iap_play_or_resume(void)
  * docks, leaves playback alone, as plugging in any other output does. */
 void iap_interface_state_change(const enum interface_state new)
 {
+    /* Modes set with Restore on Exit last until the accessory leaves the
+     * Extended Interface */
+    if (interface_state == IST_EXTENDED && new != IST_EXTENDED &&
+        (iap_saved_shuffle >= 0 || iap_saved_repeat >= 0))
+        iap_restore_pending = true;
+
     if ((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) {
         if (audio_status() == AUDIO_STATUS_PLAY)
             audio_pause();
@@ -1914,6 +2084,19 @@ void iap_handlepkt(void)
         logf("R: %s", hexstring(iap_rxstart+2, (length)));
 #endif
 
+        /* A corrupt length would walk iap_rxpayload past the start of the
+         * buffer: resynchronise instead */
+        if ((length + 2) > (iap_rxpayload - iap_rxstart))
+        {
+            level = disable_irq_save();
+            iap_rxnext = iap_rxstart;
+            iap_rxpayload = iap_rxstart;
+            iap_rxlen = RX_BUFLEN+2;
+            frame_state.state = ST_SYNC;
+            restore_irq(level);
+            return;
+        }
+
         unsigned char *pkt = iap_rxstart+2;
         unsigned int plen = length;
 
@@ -1951,7 +2134,10 @@ void iap_handlepkt(void)
          * cleanly
          */
         level = disable_irq_save();
-        memmove(iap_rxstart, iap_rxstart+(length+2), (RX_BUFLEN+2)-(length+2));
+        /* Only what is buffered, up to iap_rxnext: the packets still to
+         * handle and the frame being received */
+        memmove(iap_rxstart, iap_rxstart+(length+2),
+                (iap_rxnext - iap_rxstart) - (length+2));
         iap_rxnext -= (length+2);
         iap_rxpayload -= (length+2);
         iap_rxlen += (length+2);
