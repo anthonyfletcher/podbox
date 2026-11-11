@@ -545,6 +545,8 @@ struct pen
     uint32_t cost;                  /* units, besides the pixels */
     uint16_t per16;                 /* units per 16 pixels */
     int32_t lo, hi;
+    int32_t xlo, xhi;               /* the columns drawn, as area_touched */
+    int wide;                       /* columns unknown: a row_touched */
     const struct draw *d;
     const uint16_t *xl;
 };
@@ -574,6 +576,9 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->per16 = p->pat ? PER16_PATTERN : PER16_FILL;
     p->lo = 0x7fffffff;
     p->hi = -1;
+    p->xlo = 0x7fffffff;
+    p->xhi = -1;
+    p->wide = 0;
     p->d = d;
     p->xl = xlat_of(d);
 }
@@ -650,12 +655,28 @@ static void turn_turned(const struct draw *d, int64_t *x, int64_t *y,
     *scale = (int32_t)(k < 0x400 ? 0x400 : k > (64 << 16) ? 64 << 16 : k);
 }
 
+/* Row y drawn on; its columns unknown, so a field's box takes the row
+ * whole */
 static void row_touched(struct pen *p, int32_t y)
 {
     if (y < p->lo)
         p->lo = y;
     if (y > p->hi)
         p->hi = y;
+    p->wide = 1;
+}
+
+/* Columns x0..x1 of row y drawn on */
+static void area_touched(struct pen *p, int32_t y, int32_t x0, int32_t x1)
+{
+    if (y < p->lo)
+        p->lo = y;
+    if (y > p->hi)
+        p->hi = y;
+    if (x0 < p->xlo)
+        p->xlo = x0;
+    if (x1 > p->xhi)
+        p->xhi = x1;
 }
 
 static void finish(struct vm *vm, struct pen *p)
@@ -665,7 +686,12 @@ static void finish(struct vm *vm, struct pen *p)
             vm->d.dirty_lo = (int16_t)p->lo;
         if (p->hi > vm->d.dirty_hi)
             vm->d.dirty_hi = (int16_t)p->hi;
-    }
+    } else if (p->hi >= 0 && vm->d.target.tag == T_IMG)
+        /* an image a cells field steps: what was drawn, for cells.step's
+         * box -- whole rows where the columns are not known */
+        cells_drawn(vm, (uint32_t)vm->d.target.v, p->s.w, p->s.h,
+                    p->wide ? 0 : p->xlo, p->lo,
+                    p->wide ? p->s.w - 1 : p->xhi, p->hi);
     vm_charge(vm, p->cost + p->count * p->per16 / 16);
 }
 
@@ -694,7 +720,7 @@ static void span(struct pen *p, int64_t y, int64_t x0, int64_t x1)
         }
     }
     p->count += (uint32_t)(x1 - x0 + 1);
-    row_touched(p, (int32_t)y);
+    area_touched(p, (int32_t)y, (int32_t)x0, (int32_t)x1);
 }
 
 static void dot(struct pen *p, int64_t x, int64_t y)
@@ -847,7 +873,7 @@ static void span32(struct pen *p, int32_t y, int32_t l, int32_t r)
     memset(p->s.px + y * p->s.w + l, p->c, (size_t)(r - l + 1));
     p->count += (uint32_t)(r - l + 1);
     p->cost += COST_ROW;
-    row_touched(p, y);
+    area_touched(p, y, l, r);
 }
 
 /* The integer square root of v, found from w, the last row's */
@@ -1048,7 +1074,7 @@ static void plot_dot(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
     } else
         *px = p->c;
     p->count++;
-    row_touched(p, yi);
+    area_touched(p, yi, xi, xi);
 }
 
 /* plot_dot along a run, unpatterned. visible() put every pixel's major
@@ -1329,7 +1355,7 @@ static void plot_map(struct pen *p, void *ctx, int64_t x, int64_t y, int64_t i)
         return;
     p->s.px[y * p->s.w + x] = p->d->dpal[c];
     p->count++;
-    row_touched(p, (int32_t)y);
+    area_touched(p, (int32_t)y, (int32_t)x, (int32_t)x);
 }
 
 /* plot_map along a run, with the map position in 32 bits */
@@ -3093,7 +3119,8 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
                                                ub - ua, xl);
             if (n) {
                 p->count += n;
-                row_touched(p, (int32_t)dy + v);
+                area_touched(p, (int32_t)dy + v, (int32_t)dx + ua,
+                             (int32_t)dx + ub - 1);
             }
         }
         return;
@@ -3145,7 +3172,8 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             n = scaled_row(drow + u0, srow, col, cols, xl);
             if (n) {
                 p->count += n;
-                row_touched(p, (int32_t)(dy + v));
+                area_touched(p, (int32_t)(dy + v), (int32_t)(dx + u0),
+                             (int32_t)(dx + u1 - 1));
             }
             continue;
         }
@@ -3167,7 +3195,8 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         }
         if (n) {
             p->count += n;
-            row_touched(p, (int32_t)(dy + v));
+            area_touched(p, (int32_t)(dy + v), (int32_t)(dx + u0),
+                         (int32_t)(dx + u1 - 1));
         }
     }
 }
@@ -3200,8 +3229,8 @@ static void tile8(struct pen *p, const uint8_t *src, int32_t stride,
     }
     if (top >= 0) {
         p->count += total;
-        row_touched(p, y + top);
-        row_touched(p, y + bot);
+        area_touched(p, y + top, x, x + 7);
+        area_touched(p, y + bot, x, x + 7);
     }
 }
 

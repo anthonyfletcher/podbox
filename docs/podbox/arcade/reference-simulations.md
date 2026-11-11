@@ -107,7 +107,7 @@ One tick of the field.
 | `w` | the board's width; ignored for an image -- pass 0 |
 | `rules` | a record from `cells.rules()` |
 | `actors` | a pool, or an array of pools, whose actors are obstacles while it steps; `null` to leave out and give `box` |
-| `box` | an `Int32Array` of 4, written with x0, y0, x1, y1, both corners inside, round every cell that changed since the last step: moved by it, drawn on, or settled into by particles. In 16-cell chunks, but for particles; the whole field the first time; untouched when nothing changed |
+| `box` | an `Int32Array` of 4, written with x0, y0, x1, y1, both corners inside, round every cell that changed since the last step: moved by it, drawn on, or settled into by particles. Moves are in 16-cell chunks; shapes, sprites and blits add what they drew, other drawing whole rows; the whole field the first time; untouched when nothing changed |
 
 **Returns** how many cells moved.
 

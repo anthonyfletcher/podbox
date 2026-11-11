@@ -259,7 +259,7 @@ function update() {
         '5 64,0,79,31',
         /* settled: nothing changed, the box left as it was */
         '199 -1,-1,-1,-1',
-        /* drawn into a sleeping chunk */
+        /* drawn into: its chunk, and the cell drawn */
         '201 16,16,31,31',
         /* a grain settled on the floor at x 100, then that chunk awake */
         '210 96,48,111,63']);

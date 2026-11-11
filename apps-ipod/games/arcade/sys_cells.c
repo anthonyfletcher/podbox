@@ -224,6 +224,19 @@ void cells_touched(struct vm *vm, uint32_t id, int32_t w, int32_t h,
     }
 }
 
+/* Cells x0..x1, y0..y1 of field id, w by h, drawn into, for the box the
+ * next step gives: a chunk awake when drawn on is not summed, so nothing
+ * else would see it */
+void cells_drawn(struct vm *vm, uint32_t id, int32_t w, int32_t h, int32_t x0,
+                 int32_t y0, int32_t x1, int32_t y1)
+{
+    for (int i = 0; i < 2; i++) {
+        struct cellsleep *sl = &vm->sleep[i];
+        if (sl->id == id && sl->w == w && sl->h == h)
+            grow(sl, x0, y0, x1, y1);
+    }
+}
+
 /* chunk k of a field cw chunks across, as cells, into sl's box */
 static void grow_chunk(struct cellsleep *sl, int32_t k, int32_t cw)
 {
@@ -625,8 +638,9 @@ static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
  * as cells already moved, which nothing moves into, so water flows round
  * a character and sand piles on a moving platform; the chunks under them
  * are woken. With out, an Int32Array of 4: the box x0, y0, x1, y1 round
- * what changed since the last step -- whole chunks, drawn on or stepped,
- * and cells particles settled into -- left as it was when nothing did.
+ * what changed since the last step -- whole chunks stepped, whole rows
+ * drawn on, and cells particles settled into -- left as it was when
+ * nothing did.
  * Returns the cells that moved. */
 NATIVE(cells_step)
 {
