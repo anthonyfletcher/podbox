@@ -9,7 +9,8 @@ across a maze, plus smooth random noise for making levels.
   [grid.fall](#gridfallb-w), [grid.slide](#gridslideb-w-dir-merged)
 - Shapes: [grid.fits, grid.place and grid.rotate](#gridfitsb-w-s-sw-x-y)
 - Paths: [path.field and path.next](#pathfieldb-w-solid-x-y-out), [path.find](#pathfindb-w-solid-x0-y0-x1-y1-out),
-  [path.sight](#pathsightb-w-solid-x0-y0-x1-y1), [path.ray](#pathrayx-y-dx-dy-solid-out-len)
+  [path.sight](#pathsightb-w-solid-x0-y0-x1-y1), [path.view](#pathviewb-w-solid-x-y-r-out-mark),
+  [path.ray](#pathrayx-y-dx-dy-solid-out-len)
 - Noise: [noise.at](#noiseatx-y-seed-octaves), [noise.fill](#noisefilldst-w-ox-oy-scale-octaves-seed-ramp)
 
 ## How boards work
@@ -580,6 +581,37 @@ function draw() {
 - No seeing through a diagonal gap: where the line passes exactly through
   a corner, both cells beside it must be open.
 - About 25 units across a 20-cell board.
+
+## path.view(b, w, solid, x, y, r, out, [mark])
+
+What a player standing on a cell can see: a roguelike's field of view,
+every cell at once.
+
+| Argument | |
+|---|---|
+| `b`, `w`, `solid` | the board, as for `path.sight` |
+| `x`, `y` | the cell seen from |
+| `r` | how far, in cells |
+| `out` | a `Uint8Array` the board's size |
+| `mark` | left out: `out` is cleared and each seen cell set to 1. Given: only the seen cells are set to it, the rest kept |
+
+**Returns** how many cells are seen.
+
+Each cell within `r` is seen exactly when `path.sight` would see it, so
+the two never disagree. A wall facing the player is seen -- a room shows
+its walls -- and what is behind one is not.
+
+```js
+var seen = new Uint8Array(W * H), known = new Uint8Array(W * H);
+
+function look() {
+    path.view(board, W, 0, px, py, 6, seen);      // in sight now
+    path.view(board, W, 0, px, py, 6, known, 1);  // and kept: the map so far
+}
+```
+
+- About 20 units, and a quarter of a unit for each cell along each line
+  looked down: a radius of 6 costs a few hundred.
 
 ## path.ray(x, y, dx, dy, solid, out, [len])
 

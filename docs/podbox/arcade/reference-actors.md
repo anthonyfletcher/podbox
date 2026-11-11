@@ -67,7 +67,30 @@ and the pool's own, for all its actors:
 | `drag` | 0 | the fraction of the speed lost each tick: 0.02 is air, 0.2 is mud |
 | `platforms` | null | another pool whose actors are solid, and carry those standing on them |
 | `oneway` | 0 | when this pool is someone's platforms: jumped up through, landed on |
+| `slope_up`, `slope_down` | 0 | flags of map cells that are ramps at 45 degrees, rising to the right (`/`) and to the left (`\`) (see **Ramps and ladders**) |
+| `ladders` | 0 | flags of map cells that are ladders: while an actor's middle is on one, gravity lets go |
 | `field`, `rules`, `field_x`, `field_y`, `density`, `splash` | | a cells field the actors move in (see **Simulations**) |
+
+### Ramps and ladders
+
+A ramp is a map cell climbing a pixel a pixel across, at 45 degrees: the
+pool's `slope_up` flags mark those rising to the right, `slope_down`
+those rising to the left. A ramp is not solid -- leave its flag out of
+`move`'s `solid` -- and an actor walking or falling into one is set on
+its surface at the middle of its feet, reported as `HIT.DOWN`, as
+landing on a floor is. It stays on a ramp walking down it, within 4
+pixels, and leaves it by jumping.
+
+A ladder is a cell flagged in the pool's `ladders`: while an actor's
+middle is on one, gravity is not added, so it stays where it is until
+the game moves it -- `dy` from Up and Down while climbing, as the game
+decides. A ladder's top needs a floor the actor can stand on: a
+`oneway` cell above it.
+
+```js
+p.slope_up = 2; p.slope_down = 4; p.ladders = 8;
+actors.move(p, 1, 0, hits, 16);      // 1 walls, 16 one-way floors
+```
 
 ## Why they are native
 

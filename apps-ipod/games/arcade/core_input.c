@@ -663,7 +663,23 @@ NATIVE(beat_press)
     if (!is_num(a[0]))
         return vm_fail(vm, "beat.press() needs a button", "", "");
     int32_t i = floor_int(a[0]);
-    return RET_INT((uint32_t)i < 5 ? vm->heard.press[i] : -1);
+    int32_t t = (uint32_t)i < 5 ? vm->heard.press[i] : -1;
+    return RET_INT(t < 0 ? -1 : t - vm->beat_offset < 0 ? 0
+                                 : t - vm->beat_offset);
+}
+
+/* beat.offset([ms]): the cart's calibration, taken off every press
+ * beat.press() reports -- a player who presses 40 ms late on what they
+ * hear sets 40 -- from -500 to 500; the offset in force */
+NATIVE(beat_offset)
+{
+    if (argc > 0) {
+        if (!is_num(a[0]))
+            return vm_fail(vm, "beat.offset() takes ms", "", "");
+        int32_t ms = floor_int(a[0]);
+        vm->beat_offset = ms < -500 ? -500 : ms > 500 ? 500 : ms;
+    }
+    return RET_INT(vm->beat_offset);
 }
 
 NATIVE(beat_jumped)

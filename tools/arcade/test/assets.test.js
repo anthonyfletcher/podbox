@@ -173,6 +173,14 @@ function init() {
     printh("view " + mem(MEM.MAP).length + " " + mem(MEM.MAP)[199]);
     loadmap(MAP.one);
     printh("back " + mapw() + " " + mget(3, 2));
+    var cells = new Uint8Array(400);
+    printh("cells " + loadmap(MAP.two, cells) + " " + cells[199] + " " + mapw() + " " + mget(3, 2));
+    var row = new Uint8Array(2);
+    row[1] = mget(1, 0);
+    cls(); map(1, 0, 0, 0, 1, 1, 0, row, 2);
+    var a = pget(2, 2) * 1000 + pget(5, 6);
+    cls(); map(1, 0, 0, 0, 1, 1);
+    printh("drawn alike " + (a == pget(2, 2) * 1000 + pget(5, 6)));
 }
 function update() {}
 `
@@ -197,6 +205,9 @@ test('a cart\'s sheet, flags, palettes, maps, objects and images reach the game'
         'map 200x2 42 0 objs 0',
         'view 400 42',
         'back 4 8',
+        /* MAP.two unpacked into cells, 200 wide; the active map still one */
+        'cells 200 42 4 8',
+        'drawn alike 1',
         ''].join('\n'));
 });
 

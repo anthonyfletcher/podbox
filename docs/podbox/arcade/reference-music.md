@@ -13,7 +13,7 @@ choose tracks from the owner's library, or take over the music entirely.
 - Its colours: [playback.colours](reference-colour.md#the-players-colours-and-shades-of-any-colour), in Colour and palettes
 - The beat: [listening](#the-beat), [beat.listen](#beatlistenon), [beat.state](#beatstateout),
   [beat.next and beat.inbar](#beatnextfrom-n), [beat.downbeat](#beatdownbeat),
-  [the clock](#beatclock), [beat.press](#beatpressi), [beat.jumped](#beatjumped),
+  [the clock](#beatclock), [beat.press](#beatpressi), [beat.offset](#beatoffsetms), [beat.jumped](#beatjumped),
   [beat.mood](#beatmoodout), [beat.ahead and beat.horizon](#beataheadout-from-to)
 - [A rhythm game](#a-rhythm-game)
 - [Trying it out](#trying-it-out)
@@ -345,6 +345,27 @@ if (p >= 0) {
     if (off < 110) hit(); else miss();
 }
 ```
+
+### beat.offset([ms])
+
+The cart's timing calibration: `ms` is taken off every press `beat.press`
+reports, from -500 to 500.
+
+**Returns** the offset in force.
+
+Headphones, a dock and a player's own reflexes each put a press a little
+after the beat they heard. A calibration screen -- "press Select on each
+beat" -- measures how late the presses fall, on average, and sets it:
+
+```js
+beat.offset(dget(9));            // kept from the last calibration
+...
+beat.offset(averageLateness);    // after calibrating
+dset(9, averageLateness);
+```
+
+- It moves only the presses, not the beats, so everything a game draws
+  stays on the music.
 
 ### beat.jumped()
 

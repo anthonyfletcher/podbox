@@ -6,9 +6,9 @@ are -- for the code to find.
 
 - [How maps work](#how-maps-work)
 - [Making maps in the IDE](#making-maps-in-the-ide), and [the file](#the-map-file)
-- Drawing: [map](#mapcelx-cely-sx-sy-celw-celh-layers), [tline](#tlinex0-y0-x1-y1-mx-my-mdx-mdy)
+- Drawing: [map](#mapcelx-cely-sx-sy-celw-celh-layers-cells-w), [tline](#tlinex0-y0-x1-y1-mx-my-mdx-mdy)
 - Cells: [mget](#mgetx-y), [mset](#msetx-y-v)
-- Maps: [loadmap](#loadmapmapname), [mapw and maph](#mapw-and-maph)
+- Maps: [loadmap](#loadmapmapname-cells), [layers](#layers-a-second-map-at-once), [mapw and maph](#mapw-and-maph)
 - Objects: [mapobj](#mapobjout-max), [mapprop](#mappropi-name)
 - [Walls, floors and ladders: flags](#walls-floors-and-ladders-flags)
 
@@ -111,7 +111,7 @@ The IDE writes this for you; it is plain text, so other tools can too.
 
 ---
 
-## map([celx, cely, sx, sy, celw, celh], [layers])
+## map([celx, cely, sx, sy, celw, celh], [layers], [cells, w])
 
 Draws part of the active map: a rectangle of its cells, each as its
 sprite.
@@ -240,15 +240,18 @@ function init() {
 - Changes last until `loadmap` loads the map again, which puts it back as
   it was built -- restarting a level is just `loadmap`.
 
-## loadmap(MAP.name)
+## loadmap(MAP.name, [cells])
 
-Makes one of the cart's maps the active one, as it was built.
+Makes one of the cart's maps the active one, as it was built -- or, with
+`cells`, unpacks it into an array of the cart's own, leaving the active
+map as it is.
 
 | Argument | |
 |---|---|
 | `MAP.name` | the map, named after its file: `MAP.level` for `maps/level.json` |
+| `cells` | a `Uint8Array` of at least the map's width times its height |
 
-**Returns** nothing.
+**Returns** the map's width.
 
 ```js
 loadmap(MAP.cave);
@@ -265,6 +268,31 @@ print("CAVE: " + mapw() + " BY " + maph(), 40, 56, 7);
   can be `MAP.level1`, `MAP.level2` and so on, or simply 0, 1, 2 when
   every map is a level.
 
+
+## Layers: a second map at once
+
+The active map is one, but `map` draws any array of cells: give it
+`cells` and their width `w`, after `layers`, and it draws those as it
+draws the map. A backdrop scrolling at half speed under the level, a
+foreground of leaves over it, or a level made in code:
+
+```js
+var back = new Uint8Array(64 * 16), backW = 0;
+
+function init() {
+    loadmap(MAP.level);                   // the active map, for mget and mset
+    backW = loadmap(MAP.hills, back);     // a second, the level untouched
+}
+
+function draw() {
+    cls(1);
+    map(flr(scroll / 16), 0, -(scroll / 2 % 8), 0, 21, 16, 0, back, backW);
+    map(flr(scroll / 8), 0, -(scroll % 8), 0, 21, 16);
+}
+```
+
+- `mget`, `mset`, `mapobj` and the systems read the active map only; a
+  layer of the cart's own is read and written as the array it is.
 ## mapw and maph
 
 ### mapw()

@@ -30,12 +30,12 @@ enum { A_ON, A_X, A_Y, A_DX, A_DY, A_W, A_H, A_SP, A_FLIP, A_CELL,
        A_FRAMES, A_SPEED, A_MAT, A_ZONE,
        A_ARRAYS, A_GRAVITY = A_ARRAYS, A_DRAG, A_PLATFORMS, A_FIELD,
        A_RULES, A_FIELD_X, A_FIELD_Y, A_DENSITY, A_ONEWAY, A_SPLASH,
-       A_FIELDS };
+       A_SLOPE_UP, A_SLOPE_DOWN, A_LADDERS, A_FIELDS };
 static const char *const actor_keys[A_FIELDS] = {
     "on", "x", "y", "dx", "dy", "w", "h", "sp", "flip", "cell",
     "frames", "speed", "mat", "zone",
     "gravity", "drag", "platforms", "field", "rules", "field_x", "field_y",
-    "density", "oneway", "splash"
+    "density", "oneway", "splash", "slope_up", "slope_down", "ladders"
 };
 
 /* A particle is a pixel of colour c, or with sp set, that sprite's top
@@ -653,6 +653,39 @@ static void in_field(const struct world *w, struct contacts *c, uint32_t i,
     }
 }
 
+/* Where an actor's feet rest on a ramp of 45 degrees: the map cells whose
+ * flags share a bit with up rise to the right (/), down's to the left (\).
+ * A ramp is not solid: an actor walks into it, and is set on its surface
+ * at its feet's middle, as it sinks below it or comes within 4 pixels
+ * above it -- so it stays on a ramp walking down -- only while not going
+ * up. 1 with Y and DY set when it was. */
+#define SLOPE_GLUE (4 << 16)
+
+static int on_slope(const struct vm *vm, int32_t X, int32_t *Y, int32_t W,
+                    int32_t H, int32_t *DY, int32_t up, int32_t down,
+                    int32_t *hx, int32_t *hy)
+{
+    int32_t foot = X + W / 2, feet = *Y + H;
+    int32_t cx = foot >> CELL_SHIFT, px = (foot >> 16) - (cx << 3);
+    if ((!up && !down) || *DY < 0)
+        return 0;
+    for (int k = 0; k < 2; k++) {
+        int32_t cy = ((feet - 1) >> CELL_SHIFT) + k;
+        int rising = solid(vm, cx, cy, up);
+        if (!rising && !solid(vm, cx, cy, down))
+            continue;
+        int32_t surf = ((cy << 3) + (rising ? 7 - px : px)) << 16;
+        if (feet >= surf - SLOPE_GLUE) {
+            *Y = surf - H;
+            *DY = 0;
+            *hx = cx;
+            *hy = cy;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* actors.move(p, solid, trigger, out, [oneway]): as well as the map, the
  * pool's platforms (another pool, which moves first) and its cells field,
  * both named in its fields. Map cells whose flags share a bit with oneway
@@ -682,16 +715,24 @@ NATIVE(actors_move)
     struct value *h = ELEMS(vm, f[A_H]), *cell = ELEMS(vm, f[A_CELL]);
     struct value *mat = ELEMS(vm, f[A_MAT]);
     int splashes = vm_truthy(vm, f[A_SPLASH]);
+    int32_t up = is_num(f[A_SLOPE_UP]) ? floor_int(f[A_SLOPE_UP]) : 0;
+    int32_t down = is_num(f[A_SLOPE_DOWN]) ? floor_int(f[A_SLOPE_DOWN]) : 0;
+    int32_t ladders = is_num(f[A_LADDERS]) ? floor_int(f[A_LADDERS]) : 0;
     uint32_t moved = 0, checked = 0;
     for (uint32_t i = 0; i < n; i++) {
         if (!vm_truthy(vm, on[i]))
             continue;
         moved++;
         int32_t X = fx(x[i]), Y = fx(y[i]), W = fx(w[i]), H = fx(h[i]);
-        int32_t DX = dragged(fx(dx[i]), drag), DY = dragged(fx(dy[i]) + g, drag);
         int32_t hx, hy, side, s2, p0;
         if (W < 1) W = 1;
         if (H < 1) H = 1;
+        /* on a ladder, by the actor's middle, gravity lets go: the game
+         * moves it up and down */
+        int32_t gi = ladders && solid(vm, (X + W / 2) >> CELL_SHIFT,
+                                      (Y + H / 2) >> CELL_SHIFT, ladders)
+                     ? 0 : g;
+        int32_t DX = dragged(fx(dx[i]), drag), DY = dragged(fx(dy[i]) + gi, drag);
         if (wd.np) {
             carry(&wd, &X, &Y, W, H);
             push(&wd, &c, i, &X, &Y, W, H, smask, omask, &checked);
@@ -708,6 +749,17 @@ NATIVE(actors_move)
                      &checked);
         if ((s2 = obstacles(&wd, p0, &Y, H, X, W, 0, &hx, &hy, &checked)) >= 0)
             side = s2;
+        /* a ramp the feet meet, where it is no lower than any floor the
+         * sweep stopped them on: HIT.DOWN, on its feet */
+        int32_t sy = Y, sdy = DY, shx, shy;
+        if (on_slope(vm, X, &sy, W, H, &sdy, up, down, &shx, &shy) &&
+            (side < 0 || sy <= Y)) {
+            Y = sy;
+            DY = sdy;
+            hx = shx;
+            hy = shy;
+            side = 3;
+        }
         if (side >= 0)
             contact(&c, i, side, hx, hy);
         if (wd.field) {

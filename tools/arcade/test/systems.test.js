@@ -541,6 +541,60 @@ function update() { printh(frame() + " " + btnr(4) + " " + (unitsnow() > 0)); }`
     assert.equal(r.out, '12 7\n1 0 1\n2 0 1\n3 0 1\n4 0 1\n5 1 1\n');
 });
 
+test('path.view marks what path.sight sees within a radius, and a mark remembers', () => {
+    const r = run(`var b = new Uint8Array(7 * 5), seen = new Uint8Array(7 * 5), known = new Uint8Array(7 * 5);
+function init() {
+    // a wall down column 3, rows 0 to 3; the viewer at 1,2
+    for (var y = 0; y < 4; y++) b[y * 7 + 3] = 1;
+    var n = path.view(b, 7, 0, 1, 2, 9, seen);
+    var row = "";
+    for (var y = 0; y < 5; y++) { for (var x = 0; x < 7; x++) row += seen[y * 7 + x]; row += "/"; }
+    printh(n + " " + row);
+    var agree = 1;
+    for (var y = 0; y < 5; y++) for (var x = 0; x < 7; x++)
+        if (b[y * 7 + x] == 0 && seen[y * 7 + x] != path.sight(b, 7, 0, 1, 2, x, y)) agree = 0;
+    printh("agrees " + agree);
+    known[0] = 9;
+    path.view(b, 7, 0, 1, 2, 1, known, 5);
+    printh(known[0] + " " + known[1 * 7 + 1] + " " + known[2 * 7 + 6]);
+}
+function update() {}`, 1);
+    assert.equal(r.status, 0, r.err);
+    const [first, agree, marks] = r.out.trim().split('\n');
+    /* the wall's face is seen, its ends past a corner not, nor anything
+     * behind it: the corner rule path.sight has */
+    assert.equal(first, '18 1110000/1111000/1111000/1111000/1110000/');
+    assert.equal(agree, 'agrees 1');
+    /* radius 1 marks around 1,2 with 5, leaving the 9 at 0,0 */
+    assert.equal(marks, '9 5 0');
+});
+
+test('actors walk up a ramp and hang on a ladder', () => {
+    const r = run(`var p = actors.pool(2), hits = new Int32Array(16);
+function init() {
+    fset(1, 0, true);           // floor: flag bit 1
+    fset(2, 1, true);           // a ramp rising right: flag bit 2
+    fset(3, 2, true);           // ladder: flag bit 4
+    for (var x = 0; x < 20; x++) mset(x, 10, 1);
+    mset(5, 9, 2);
+    for (var y = 5; y < 10; y++) mset(12, y, 3);
+    p.gravity = 0.5; p.slope_up = 2; p.ladders = 4;
+    actors.spawn(p); p.x[0] = 20; p.y[0] = 72; p.w[0] = 4; p.h[0] = 8; p.dx[0] = 1;
+    actors.spawn(p); p.x[1] = 94; p.y[1] = 48; p.w[1] = 4; p.h[1] = 8;
+}
+function update() {
+    actors.move(p, 1, 0, hits);
+    p.dx[0] = 1;
+    if (p.x[0] == 42) printh("ramp " + p.y[0]);
+    if (frame() == 30) printh("ladder " + p.y[1] + " " + p.dy[1]);
+}`, 30);
+    assert.equal(r.status, 0, r.err);
+    /* x 42: the feet's middle 44, 4 pixels into the ramp's cell at 40, so
+     * the surface 72 + 3 and the actor 8 tall above it; the ladder's actor
+     * where it began, gravity let go */
+    assert.equal(r.out, 'ramp 67\nladder 48 0\n');
+});
+
 test('resumed tells of a pause once', () => {
     const r = run(`var n = 0;
 function init() {}
@@ -776,6 +830,15 @@ test('playback.playing reports the owner music', () => {
     const quiet = run('function init() { printh(playback.playing()); }\nfunction update() {}');
     const loud = run('function init() { printh(playback.playing()); }\nfunction update() {}', 1, ['--playing']);
     assert.deepEqual([quiet.out, loud.out], ['0\n', '1\n']);
+});
+
+test('beat.offset takes its calibration off each press, within -500 to 500', () => {
+    const r = run(`function init() { printh(beat.offset() + " " + beat.offset(45) + " " + beat.offset(900)); beat.offset(45); }
+function update() { if (beat.press(4) >= 0) printh("press " + beat.press(4) + " " + beat.clock()); }`,
+                  60, ['--beat', '120', '--buttons', '50:16,51:0']);
+    assert.equal(r.status, 0, r.err);
+    /* the press the test below sees at 1545, judged 45 ms earlier */
+    assert.equal(r.out, '0 45 500\npress 1500 1545\n');
 });
 
 test('beat: the clock, the lock, the next beat, its bar and a press', () => {

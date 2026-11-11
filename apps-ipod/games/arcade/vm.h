@@ -308,6 +308,7 @@ struct vm
     uint8_t opt_pending, opt_changed;
     uint8_t opt_set;            /* opt.set() since the host last asked */
     uint8_t format;             /* the cart file's: 2 has ending() */
+    int32_t beat_offset;        /* beat.offset(): ms taken off each press */
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
     uint8_t listening;          /* beat.listen(true): the analyser runs */
     /* Dialogs (sys_ui.c): ui.style()'s colours -- the box, its text and

@@ -3501,22 +3501,35 @@ NATIVE(rblit)
 
 /* map(celx, cely, sx, sy, celw, celh, [layers]): each cell's sprite, if
  * not 0 and its flags include all of layers. */
+/* map(celx, cely, sx, sy, celw, celh, [layers], [cells, w]): the active
+ * map's cells, or with cells -- a Uint8Array, w cells a row, a map
+ * loadmap() unpacked into it or any other -- those: a second layer drawn
+ * under or over the first, a backdrop, a level made in code */
 NATIVE(map)
 {
     (void)out;
+    uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
+    int32_t mw = vm->map_w, mh = vm->map_h;
+    if (argc > 7 && a[7].tag != T_NULL) {
+        WHOLE(8, 0, w, "map");
+        if (a[7].tag != T_U8 || w <= 0)
+            return vm_fail(vm, "map() draws cells from a Uint8Array, w a row",
+                           "", "");
+        map = U8A(vm, a[7])->d;
+        mw = w;
+        mh = (int32_t)(U8A(vm, a[7])->len / (uint32_t)w);
+    }
     WHOLE(0, 0, cx, "map");
     WHOLE(1, 0, cy, "map");
     WHOLE(2, 0, sx, "map");
     WHOLE(3, 0, sy, "map");
-    WHOLE(4, vm->map_w, cw, "map");
-    WHOLE(5, vm->map_h, ch, "map");
+    WHOLE(4, mw, cw, "map");
+    WHOLE(5, mh, ch, "map");
     WHOLE(6, 0, layers, "map");
-    uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* tile8 and copy_rect charge */
     int64_t j0 = cy < 0 ? -(int64_t)cy : 0, i0 = cx < 0 ? -(int64_t)cx : 0;
-    const int32_t mw = vm->map_w, mh = vm->map_h;
     int64_t j1 = (int64_t)mh - cy < ch ? (int64_t)mh - cy : ch;
     int64_t i1 = (int64_t)mw - cx < cw ? (int64_t)mw - cx : cw;
     if (j0 >= j1 || i0 >= i1) {
@@ -3611,16 +3624,28 @@ NATIVE(mapw)
     return 1;
 }
 
+/* loadmap(MAP.name, [cells]): the active map, as it was built; or with
+ * cells, a Uint8Array, the map's cells unpacked into it instead, the active
+ * map untouched. The map's width. */
 NATIVE(loadmap)
 {
-    (void)out;
     WHOLE(0, 0, n, "loadmap");
     if (n < 0 || (uint32_t)n >= vm->nmaps)
         return vm_fail(vm, "loadmap() needs one of the cart's maps, MAP.name",
                        "", "");
-    if (!use_map(vm, (uint32_t)n))
+    const struct mapinfo *m = &vm->mapdir[n];
+    uint32_t cells = (uint32_t)m->w * m->h;
+    if (argc > 1) {
+        if (a[1].tag != T_U8 || U8A(vm, a[1])->len < cells)
+            return vm_fail(vm, "loadmap() unpacks into a Uint8Array of the "
+                           "map's width times its height", "", "");
+        if (!lz4_decode(m->z, m->zlen, U8A(vm, a[1])->d, cells))
+            return damaged(vm, "a map");
+    } else if (!use_map(vm, (uint32_t)n)) {
         return 0;
-    vm_charge(vm, COST_CALL + (uint32_t)vm->map_w * vm->map_h / BYTES_PER_UNIT);
+    }
+    vm_charge(vm, COST_CALL + cells / BYTES_PER_UNIT);
+    *out = mk(T_INT, m->w);
     return 1;
 }
 

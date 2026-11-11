@@ -68,10 +68,10 @@ API(blit,      34, 3, 5, VOID, 0,     PIXELS, LISTEN, 1)
 API(blitpart,  35, 7, 9, VOID, 0,     PIXELS, LISTEN, 1)
 
 /* The map */
-API(map,       36, 0, 7, VOID, 0,     PIXELS, LISTEN, 1)
+API(map,       36, 0, 9, VOID, 0,     PIXELS, LISTEN, 1)
 API(mget,      37, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
 API(mset,      38, 3, 3, VOID, 0,     FLAT,   LISTEN, 1)
-API(loadmap,   39, 1, 1, VOID, 0,     CELLS,  LISTEN, 1)
+API(loadmap,   39, 1, 2, VAL,  0,     CELLS,  LISTEN, 1)
 API(mapw,      40, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(maph,      41, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(mapobj,    42, 2, 2, VAL,  0,     CELLS,  LISTEN, 1)
@@ -157,6 +157,7 @@ API(sys_translate, 145, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 /* Listening ahead: the hits in the audio decoded ahead of the speaker */
 API(beat_ahead,    146, 3, 3, VAL,  0, FLAT, LISTEN, 1)
 API(beat_horizon,  147, 0, 0, VAL,  0, FLAT, LISTEN, 1)
+API(beat_offset,   235, 0, 1, VAL,  0, FLAT, LISTEN, 1)
 
 /* Memory: the engine's own arrays, and bulk moves */
 API(mem,       74, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
@@ -208,6 +209,7 @@ API(path_field,    106, 6, 6, VAL, 0, CELLS, LISTEN, 1)
 API(path_next,     107, 4, 4, VAL, 0, CELLS, LISTEN, 1)
 API(path_find,     108, 8, 8, VAL, 0, CELLS, LISTEN, 1)
 API(path_sight,    109, 7, 7, VAL, 0, CELLS, LISTEN, 1)
+API(path_view,     234, 7, 8, VAL, 0, CELLS, LISTEN, 1)
 API(path_ray,      118, 6, 7, VAL, 0, CELLS, LISTEN, 1)
 
 /* Systems: noise, smooth random values */

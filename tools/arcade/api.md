@@ -161,8 +161,8 @@ An image turned and scaled about its centre at `x, y`.
 
 ## The map
 
-### map([celx, cely, sx, sy, celw, celh], [layers])
-Draws map cells from `celx, cely`, `celw` by `celh` of them, at pixel `sx, sy`; with `layers`, only cells whose sprite has all those flags. `map()` draws the whole map.
+### map([celx, cely, sx, sy, celw, celh], [layers], [cells, w])
+Draws map cells from `celx, cely`, `celw` by `celh` of them, at pixel `sx, sy`; with `layers`, only cells whose sprite has all those flags. `map()` draws the whole map. With `cells`, a `Uint8Array` `w` cells a row, draws those instead of the active map: a second layer.
 
 ### mget(x, y)
 The sprite in map cell `x, y`; 0 off the map.
@@ -170,8 +170,8 @@ The sprite in map cell `x, y`; 0 off the map.
 ### mset(x, y, v)
 Sets a map cell.
 
-### loadmap(MAP.name)
-Makes one of the cart's maps the active one, as it was built.
+### loadmap(MAP.name, [cells])
+Makes one of the cart's maps the active one, as it was built; with `cells`, a `Uint8Array`, unpacks it there instead, the active map untouched. Returns the map's width.
 
 ### mapw()
 The active map's width in cells.
@@ -420,7 +420,7 @@ The names stored, sorted.
 ## Actors and particles
 
 ### actors.pool(n)
-A pool of `n` actors: a record of arrays `on`, `x`, `y`, `dx`, `dy`, `w`, `h`, `sp`, `flip`, `cell`, with `gravity` and `drag` for the whole pool.
+A pool of `n` actors: a record of arrays `on`, `x`, `y`, `dx`, `dy`, `w`, `h`, `sp`, `flip`, `cell`, with `gravity` and `drag` for the whole pool, and `slope_up`, `slope_down` and `ladders`: the flags of ramps and ladders on the map.
 
 ### actors.spawn(p)
 Turns on the first free actor, its speed cleared. Returns its index, or -1 when all are in use.
@@ -504,6 +504,9 @@ A shortest way from one cell to another, into `out`. Returns its length in steps
 
 ### path.sight(b, w, solid, x0, y0, x1, y1)
 Whether one cell can see another across open cells.
+
+### path.view(b, w, solid, x, y, r, out, [mark])
+Every cell within `r` of `x, y` that `path.sight` sees, into `out`, a `Uint8Array` the board's size: cleared and each seen cell 1, or with `mark`, only the seen cells set to `mark`. Returns how many are seen.
 
 ### path.ray(x, y, dx, dy, solid, out, [len])
 The first map cell hit going from `x, y` along `dx, dy`, into `out`: the point, the cell and its face. Returns 1 on a hit.
@@ -730,6 +733,9 @@ The track's time at this instant, in ms.
 
 ### beat.press(i)
 When button `i` went down this tick, in the track's ms, or -1: presses are judged by this.
+
+### beat.offset([ms])
+The cart's timing calibration, taken off every press `beat.press` reports: a player who presses 40 ms late on what they hear sets 40. -500 to 500; returns the offset in force.
 
 ### beat.jumped()
 True for the tick after the music jumped: a seek, a skip, a new track.

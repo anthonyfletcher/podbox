@@ -311,18 +311,12 @@ NATIVE(path_find)
 
 /* ---- sight --------------------------------------------------------------- */
 
-/* path.sight(b, w, solid, x0, y0, x1, y1): whether the line between the
- * centres of cells x0, y0 and x1, y1 crosses only open cells, the two
- * ends aside. Through a corner exactly, both cells beside it must be
- * open: no seeing through a diagonal gap. */
-NATIVE(path_sight)
+/* Whether the line between the centres of cells x, y and x1, y1 crosses
+ * only open cells, the two ends aside. Through a corner exactly, both
+ * cells beside it must be open: no seeing through a diagonal gap. */
+static int line_clear(const struct walls *w, int32_t x, int32_t y,
+                      int32_t x1, int32_t y1)
 {
-    (void)argc;
-    struct walls w;
-    if (!walls_of(vm, a, "path.sight", &w))
-        return 0;
-    int32_t x = whole(a[3], 0), y = whole(a[4], 0);
-    int32_t x1 = whole(a[5], 0), y1 = whole(a[6], 0);
     int32_t nx = x1 - x, ny = y1 - y;
     int32_t sx = nx < 0 ? -1 : 1, sy = ny < 0 ? -1 : 1;
     nx = nx < 0 ? -nx : nx;
@@ -332,7 +326,7 @@ NATIVE(path_sight)
         /* which edge the line meets first: the next column's or row's */
         int64_t cmp = (int64_t)(1 + 2 * i) * ny - (int64_t)(1 + 2 * j) * nx;
         if (cmp == 0) {
-            if (wall(&w, x + sx, y) || wall(&w, x, y + sy))
+            if (wall(w, x + sx, y) || wall(w, x, y + sy))
                 clear = 0;
             x += sx; y += sy; i++; j++;
         } else if (cmp < 0) {
@@ -340,11 +334,67 @@ NATIVE(path_sight)
         } else {
             y += sy; j++;
         }
-        if ((x != x1 || y != y1) && wall(&w, x, y))
+        if ((x != x1 || y != y1) && wall(w, x, y))
             clear = 0;
     }
+    return clear;
+}
+
+/* path.sight(b, w, solid, x0, y0, x1, y1): line_clear() between them */
+NATIVE(path_sight)
+{
+    (void)argc;
+    struct walls w;
+    if (!walls_of(vm, a, "path.sight", &w))
+        return 0;
+    int32_t x = whole(a[3], 0), y = whole(a[4], 0);
+    int32_t x1 = whole(a[5], 0), y1 = whole(a[6], 0);
+    int clear = line_clear(&w, x, y, x1, y1);
+    int32_t nx = x1 - x, ny = y1 - y;
+    nx = nx < 0 ? -nx : nx;
+    ny = ny < 0 ? -ny : ny;
     vm_charge(vm, 8 + (uint32_t)(nx + ny) / 4);     /* measured, sysprobe3 */
     *out = mk(T_INT, clear);
+    return 1;
+}
+
+/* path.view(b, w, solid, x, y, r, out, [mark]): every cell within r of
+ * x, y that path.sight sees -- walls included, so a room's walls show --
+ * into out, a Uint8Array the board's size: cleared first and each seen
+ * cell 1; with mark, only the seen cells set to it, the rest kept, for a
+ * map that remembers. How many are seen. */
+NATIVE(path_view)
+{
+    struct walls w;
+    if (!walls_of(vm, a, "path.view", &w))
+        return 0;
+    int32_t x = whole(a[3], 0), y = whole(a[4], 0), r = whole(a[5], 0);
+    int32_t cells = w.b.w * w.b.h;
+    if (a[6].tag != T_U8 || (int32_t)U8A(vm, a[6])->len < cells)
+        return vm_fail(vm, "path.view() needs a Uint8Array the board's "
+                       "size to mark", "", "");
+    int keep = argc > 7 && is_num(a[7]);
+    uint8_t mark = keep ? (uint8_t)floor_int(a[7]) : 1, *o = U8A(vm, a[6])->d;
+    if (!keep)
+        memset(o, 0, (size_t)cells);
+    if (r < 0)
+        r = 0;
+    int32_t seen = 0;
+    uint32_t steps = 0;
+    for (int32_t cy = y - r; cy <= y + r; cy++)
+        for (int32_t cx = x - r; cx <= x + r; cx++) {
+            int32_t dx = cx - x, dy = cy - y;
+            if (cx < 0 || cy < 0 || cx >= w.b.w || cy >= w.b.h ||
+                dx * dx + dy * dy > r * r + r)
+                continue;
+            steps += (uint32_t)((dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy));
+            if (line_clear(&w, x, y, cx, cy)) {
+                o[cy * w.b.w + cx] = mark;
+                seen++;
+            }
+        }
+    vm_charge(vm, 20 + (uint32_t)seen + steps / 4);
+    *out = mk(T_INT, seen);
     return 1;
 }
 
