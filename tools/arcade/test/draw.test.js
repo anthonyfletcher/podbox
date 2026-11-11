@@ -86,7 +86,7 @@ test('lines round evenly and triangles include their corners', () => {
 
 test('a clipped line is exactly the pixels of the whole line', () => {
     const whole = pixels('line(-50,-20,100,40,7);', [0, 0, 40, 30]);
-    const clipped = pixels('clip(5,3,20,15); line(-50,-20,100,40,7); clip();',
+    const clipped = pixels('clip(5,3,24,17); line(-50,-20,100,40,7); clip();',
                            [0, 0, 40, 30]);
     const rows = whole.split('\n'), crows = clipped.split('\n');
     for (let y = 0; y < rows.length; y++)
@@ -110,7 +110,7 @@ test('text, and rectangles thin enough to be all edge', () => {
 test('fill pattern, camera and clip', () => {
     assert.equal(pixels('fillp(0x5a5a); rectfill(0,0,7,3,0x0907); fillp(); ' +
                         'camera(-2,-1); pset(0,0,8); camera(); ' +
-                        'clip(12,0,3,2); rectfill(10,0,20,5,9);', [0, 0, 20, 4]),
+                        'clip(12,0,14,1); rectfill(10,0,20,5,9);', [0, 0, 20, 4]),
     picture([
         '79797979000099900000',
         '97879797000099900000',
@@ -230,7 +230,7 @@ test('unscaled sprites clip and flip exactly at every edge', () => {
     for (const [x, y, fx, fy] of placements) {
         const got = pixels('for (var j = 0; j < 8; j++) for (var i = 0; i < 8; i++) ' +
                            'sset(i, j, 1 + (i * 3 + j * 5) % 15); ' +
-                           'spr(0, ' + x + ', ' + y + ', 1, 1, ' + fx + ', ' + fy + ');',
+                           'spr(0, ' + x + ', ' + y + ', 1, 1, ' + ((fx ? 1 : 0) | (fy ? 2 : 0)) + ');',
                            [x < 0 ? 0 : 150, 0, 10, 8]);
         const want = [];
         for (let row = 0; row < 8; row++) {
@@ -317,6 +317,47 @@ test('rspr at angle 0 and scale 1 is spr, and a quarter turn turns it', () => {
         for (var y = 0; y < 8; y++) s += pget(16 + y, 16) == sget(8 + 7, y) ? "" : "r" + y;
         printh(s == "" ? "turned" : s); }\nfunction update() {}`);
     assert.equal(q, 'turned\n');
+});
+
+test('one flip number everywhere: 1 across, 2 up and down, 3 both', () => {
+    const SHEET = `for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) sset(8 + x, y, 1 + (x + y * 3) % 15);`;
+    /* spr flipped up and down reads the sheet's rows bottom to top */
+    const v = runCart(`function init() { ${SHEET} cls(); spr(1, 0, 0, 1, 1, 2); spr(1, 10, 0, 1, 1, 3); var s = "";
+        for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) {
+            if (pget(x, y) != sget(8 + x, 7 - y)) s += "v";
+            if (pget(10 + x, y) != sget(15 - x, 7 - y)) s += "b";
+        }
+        printh(s == "" ? "flipped" : s); }\nfunction update() {}`);
+    assert.equal(v, 'flipped\n');
+    /* every other call draws the same as spr with that number */
+    for (const f of [1, 2, 3]) {
+        const want = runCart(`function init() { ${SHEET} cls(); spr(1, 4, 4, 1, 1, ${f}); }\nfunction update() {}`, ['--dump', '0,0,16,16']);
+        for (const call of [`sspr(8, 0, 8, 8, 4, 4, 8, 8, ${f})`, `rspr(1, 8, 8, 0, 1, 1, 1, ${f})`,
+                            `var i = img(8, 8); target(i); spr(1, 0, 0); target(SCREEN); blit(i, 4, 4, ${f})`,
+                            `var i = img(8, 8); target(i); spr(1, 0, 0); target(SCREEN); blitpart(i, 0, 0, 8, 8, 4, 4, ${f})`,
+                            `sprites.draw([1], [4], [4], 1, [${f}])`]) {
+            const got = runCart(`function init() { ${SHEET} cls(); ${call}; }\nfunction update() {}`, ['--dump', '0,0,16,16']);
+            assert.equal(got, want, call);
+        }
+    }
+});
+
+test('clip takes two corners, both inside, as rect does', () => {
+    const r = runCart(`function init() { cls(); clip(10, 20, 12, 21); rectfill(0, 0, 159, 119, 7); clip(); var n = 0;
+        for (var y = 0; y < 120; y++) for (var x = 0; x < 160; x++) if (pget(x, y) == 7) n++;
+        printh(n + " " + pget(10, 20) + " " + pget(12, 21) + " " + pget(13, 21) + " " + pget(12, 22)); }\nfunction update() {}`);
+    assert.equal(r, '6 7 7 0 0\n');
+});
+
+test('fset takes the value before the flag, which is optional as in fget', () => {
+    const r = runCart(`function init() { fset(5, true, 3); var a = fget(5) + " " + fget(5, 3);
+        fset(5, false, 3); fset(6, 9); printh(a + " " + fget(5) + " " + fget(6)); }\nfunction update() {}`);
+    assert.equal(r, '8 1 0 9\n');
+});
+
+test('color(c) is the pen, and color.mix() and the rest beside it', () => {
+    const r = runCart(`function init() { cls(); color(9); pset(0, 0); printh(pget(0, 0) + " " + color.mix(0, 0xffffff, 0.5)); }\nfunction update() {}`);
+    assert.equal(r, '9 8421504\n');
 });
 
 test('rspr scales about its centre, rblit turns an image', () => {

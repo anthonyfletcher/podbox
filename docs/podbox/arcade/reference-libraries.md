@@ -12,7 +12,7 @@ lists, screen shake and timers, chance beyond `rnd()`.
 
 A library is a file in the SDK's `tools/arcade/lib/` folder. Copy it into
 the cart -- in the IDE, **File > Add files from disk** -- and it is a
-namespace there: `text.js` gives `text.pad()`, `text.centre()` and the
+namespace there: `text.js` gives `text.pad()`, `text.center()` and the
 rest. Functions a cart never calls are left out when it is built, so a
 library costs nothing for what goes unused.
 
@@ -37,7 +37,7 @@ is for.
 | `text.pad(n, width)` | `n` with noughts in front: `text.pad(42, 6)` is `000042` |
 | `text.clock(seconds, [whole])` | `1:23.4`, or `1:23` with `whole` true |
 | `text.lap(ms)` | `1:23.45`: milliseconds, as a time board shows them |
-| `text.centre(s, x, y, c)` | `s` centred on `x`; on the screen with `x` null |
+| `text.center(s, x, y, c)` | `s` centred on `x`; on the screen with `x` null |
 | `text.right(s, x, y, c)` | `s` ending at `x` |
 | `text.outline(s, x, y, c, edge)`, `text.shadow(s, x, y, c, under)` | `s` with an edge round it, or over its own shadow |
 | `text.box(s, x, y, w, c)` | `s` wrapped at spaces to lines `w` wide; returns the height |
@@ -47,7 +47,7 @@ Cutting a line short to fit, with "...", is the engine's
 
 ```js
 text.shadow("SCORE " + text.pad(points, 6), 4, 4, 7, 1);
-text.centre("GAME OVER", null, 56, 8);
+text.center("GAME OVER", null, 56, 8);
 ```
 
 ## fx

@@ -12,7 +12,7 @@ is drawn in.
 
 `print` draws text into the screen like any other drawing: in a colour,
 moved by the [camera](reference-drawing.md#camerax-y-turn-px-py-zoom), cut off by the
-[clip](reference-drawing.md#clipx-y-w-h) and the screen's edges. It does
+[clip](reference-drawing.md#clipx0-y0-x1-y1) and the screen's edges. It does
 not wrap: a line too long for the screen runs off its edge.
 
 **Positions are the text's top left.** A line of the standard font is 6

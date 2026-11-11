@@ -77,7 +77,7 @@ test('caps.bdf as a cart font draws exactly FONT.CAPS, at both sizes', () => {
     cls(1);
     font(${f}); print("${ascii.slice(0, 40)}\\n${ascii.slice(40)}\\nÉTÉ", 0, 0, 7);
     font(${f}, 2); print("${ascii.slice(0, 20)}\\nWIDE", 0, 30, 8);
-    clip(10, 80, 50, 9); print("CLIPPED AT BOTH ENDS", 6, 82, 9); clip();
+    clip(10, 80, 59, 88); print("CLIPPED AT BOTH ENDS", 6, 82, 9); clip();
     print("OFF THE EDGE", 140, 110, 10);
     printh(textw("Hello") + " " + texth("a\\nb") + " " + print("x", 0, 100));
 }`;

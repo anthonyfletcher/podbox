@@ -21,9 +21,9 @@ export const SOURCE = 'https://github.com/anthonyfletcher/podbox#credits-and-lic
 export const WHEELS = ['touch', 'always', 'never'];
 export const SCALES = ['fit', 'whole', '1', '2', '3', '4'];
 
-/* playback.colours() is not one: a page gets the theme's */
+/* playback.colors() is not one: a page gets the theme's */
 const MUSIC = /^(playback|beat|tracks)\./;
-const NOT_MUSIC = new Set(['playback.colours']);
+const NOT_MUSIC = new Set(['playback.colors']);
 
 export function musicCalls(cart, isa, api) {
     const prog = load(cart);

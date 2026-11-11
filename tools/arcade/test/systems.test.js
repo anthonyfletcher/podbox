@@ -572,9 +572,9 @@ function update() {}`, 1);
 test('actors walk up a ramp and hang on a ladder', () => {
     const r = run(`var p = actors.pool(2), hits = new Int32Array(16);
 function init() {
-    fset(1, 0, true);           // floor: flag bit 1
-    fset(2, 1, true);           // a ramp rising right: flag bit 2
-    fset(3, 2, true);           // ladder: flag bit 4
+    fset(1, true, 0);           // floor: flag bit 1
+    fset(2, true, 1);           // a ramp rising right: flag bit 2
+    fset(3, true, 2);           // ladder: flag bit 4
     for (var x = 0; x < 20; x++) mset(x, 10, 1);
     mset(5, 9, 2);
     for (var y = 5; y < 10; y++) mset(12, y, 3);

@@ -59,7 +59,7 @@ test('curve points bend the outline: four make a rounded square, inside the corn
 });
 
 test('the camera moves it, the clip holds, and fillp patterns it', () => {
-    const r = run('camera(-10, 0); clip(10, 0, 4, 4); polyfill([0, 8, 8, 0], [0, 0, 8, 8], 4, 7);',
+    const r = run('camera(-10, 0); clip(10, 0, 13, 3); polyfill([0, 8, 8, 0], [0, 0, 8, 8], 4, 7);',
                   '8,0,8,1');
     assert.equal(r.out.trim(), '0077770000'.slice(0, 8));
     const p = run('fillp(0x5a5a); polyfill([0, 8, 8, 0], [0, 0, 8, 8], 4, 7);', '0,0,4,1');

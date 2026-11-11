@@ -63,7 +63,7 @@ test('the nearest light wins, the camera moves them, and the clip holds', () => 
     assert.match(r.out.trim().slice(7, 14), /^7+$/);
     assert.match(r.out.trim().slice(25, 40), /^0+$/);
     /* a clip: outside it nothing changes, not even to black */
-    r = run('clip(0, 0, 30, 120); light.draw(100, 60, 10, 1, [black]); clip();', '20,60,20,1');
+    r = run('clip(0, 0, 29, 119); light.draw(100, 60, 10, 1, [black]); clip();', '20,60,20,1');
     assert.equal(r.out.trim(), '0000000000' + '7777777777');
 });
 

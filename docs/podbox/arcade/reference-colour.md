@@ -269,19 +269,19 @@ function init() {
 
 ## The player's colours, and shades of any colour
 
-`playback.colours` gives the colours the player is showing, and the
+`playback.colors` gives the colours the player is showing, and the
 `colour` calls make more from them -- so a cart can dress itself in the
 playing album's colours, as the player's own screens do under **Dynamic
 Colours**, or in the theme's.
 
 | Call | Returns |
 |---|---|
-| `playback.colours(out)` | the background, the text and the most vivid colour into `out`, an `Int32Array` of 3; 1 when they are the playing album's, 0 when they are the theme's |
-| `colour.tone(c)` | how light `c` reads, 0 black to 100 white |
-| `colour.toned(c, tone)` | `c` at that tone, its hue kept |
-| `colour.turn(c, t)` | `c`'s hue turned by `t` turns, its tone kept: 0.5 is the opposite hue |
-| `colour.mix(a, b, t)` | `a` moved toward `b`, `t` from 0 to 1.0 |
-| `colour.contrast(a, b)` | how well two colours stand apart, 1.0 to 21.0 |
+| `playback.colors(out)` | the background, the text and the most vivid colour into `out`, an `Int32Array` of 3; 1 when they are the playing album's, 0 when they are the theme's |
+| `color.tone(c)` | how light `c` reads, 0 black to 100 white |
+| `color.toned(c, tone)` | `c` at that tone, its hue kept |
+| `color.turn(c, t)` | `c`'s hue turned by `t` turns, its tone kept: 0.5 is the opposite hue |
+| `color.mix(a, b, t)` | `a` moved toward `b`, `t` from 0 to 1.0 |
+| `color.contrast(a, b)` | how well two colours stand apart, 1.0 to 21.0 |
 
 Every colour is `0xRRGGBB`, as `setpal` takes. Tone is the measure to
 build shades with: two colours read apart by the gap between their tones,
@@ -297,12 +297,12 @@ var far = [], near = [], hx = [];
 // The album's colours made into a palette: three shades of its
 // background, three of its text, and its vivid colour
 function shades() {
-    playback.colours(c);
-    var paper = c[0], ink = c[1], t = colour.tone(paper), k = colour.tone(ink);
+    playback.colors(c);
+    var paper = c[0], ink = c[1], t = color.tone(paper), k = color.tone(ink);
     var away = t < k ? 8 : -8;            // toward the text, so shades show
     for (var i = 0; i < 3; i++) {
-        setpal(16 + i, colour.toned(paper, t + away * i));
-        setpal(19 + i, colour.toned(ink, k - away * i));
+        setpal(16 + i, color.toned(paper, t + away * i));
+        setpal(19 + i, color.toned(ink, k - away * i));
     }
     setpal(22, c[2]);
 }
@@ -342,14 +342,14 @@ function draw() {
   frame, and nothing else costs anything afterwards.
 - With **Dynamic Colours** off, or no music, they are the theme's
   background and text, and the vivid colour is the text's.
-- `colour.toned` costs about 950 units and `colour.turn` about 1,450,
+- `color.toned` costs about 950 units and `color.turn` about 1,450,
   so build the palette when it changes, not every frame: the example's
   six shades are some 5,700 units, once a track. The other calls cost
   next to nothing.
 - A colour whose hue cannot be shown at the tone asked loses some of its
   strength rather than its hue; a grey has no hue to turn.
-- `colour.contrast` says whether text will read: 4.5 or more against its
-  background. Where it is short, `colour.toned` the text further from the
+- `color.contrast` says whether text will read: 4.5 or more against its
+  background. Where it is short, `color.toned` the text further from the
   background's tone.
 - In the IDE and `pbgvm`, each made-up album has colours of its own while
   its music plays. An exported web page gets black and white.

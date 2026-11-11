@@ -4,10 +4,10 @@ Small pictures drawn from the cart's sprite sheet: characters, tiles,
 items, and the frames that animate them.
 
 - [How sprites work](#how-sprites-work)
-- Drawing: [spr](#sprn-x-y-w-h-flip_x-flip_y), [sspr](#ssprsx-sy-sw-sh-dx-dy-dw-dh-flip_x-flip_y),
+- Drawing: [spr](#sprn-x-y-w-h-flip), [sspr](#ssprsx-sy-sw-sh-dx-dy-dw-dh-flip),
   [rspr](#rsprn-x-y-angle-scale-w-h-flip)
 - [Animation](#animation)
-- Flags: [fget](#fgetn-f), [fset](#fsetn-f-v)
+- Flags: [fget](#fgetn-f), [fset](#fsetn-v-f)
 - The sheet's pixels: [sget](#sgetx-y), [sset](#ssetx-y-c)
 - [More sprites: sheet](#sheeti)
 - [Many sprites at once](#many-sprites-at-once)
@@ -73,7 +73,7 @@ system.
 
 ---
 
-## spr(n, x, y, [w, h], [flip_x], [flip_y])
+## spr(n, x, y, [w, h], [flip])
 
 Draws sprite `n`, or a block of sprites, at a position.
 
@@ -82,8 +82,7 @@ Draws sprite `n`, or a block of sprites, at a position.
 | `n` | the sprite number, 0 to 255: the top left of the block |
 | `x`, `y` | where its top left goes on the screen |
 | `w`, `h` | how many sprites across and down; 1 and 1 when left out |
-| `flip_x` | true to mirror it left to right |
-| `flip_y` | true to turn it upside down |
+| `flip` | 1 to mirror it left to right, 2 to turn it upside down, 3 both; `true` is 1 |
 
 **Returns** nothing.
 
@@ -93,12 +92,14 @@ spr(1, 20, 20);                    // sprite 1: one 8x8
 spr(3, 40, 20);                    // sprite 3
 spr(16, 70, 16, 2, 2);             // the 2x2 block from 16: 16, 17, 32, 33
 spr(6, 110, 20);                   // the key
-spr(6, 130, 20, 1, 1, true);       // flipped across
-spr(6, 130, 40, 1, 1, false, true);// flipped down
+spr(6, 130, 20, 1, 1, 1);          // flipped across
+spr(6, 130, 40, 1, 1, 2);          // flipped down
 ```
 
 ![A smiley, a heart, a robot, and a key three ways: as drawn, flipped across, flipped down](img/s-spr.png)
 
+- Every call that flips takes this one number: `sspr`, `rspr`, `blit`,
+  `blitpart`, and the `flip` of actors, particles and `sprites.draw`.
 - **Flip instead of drawing twice.** A character facing right, flipped,
   faces left: `spr(n, x, y, 1, 1, facing < 0)`. Flipping costs about
   twice as much as drawing straight.
@@ -110,7 +111,7 @@ spr(6, 130, 40, 1, 1, false, true);// flipped down
   sprite, all colour 0 -- sprite 0 is usually left empty, as the map uses
   it to mean "nothing here".
 
-## sspr(sx, sy, sw, sh, dx, dy, [dw, dh], [flip_x], [flip_y])
+## sspr(sx, sy, sw, sh, dx, dy, [dw, dh], [flip])
 
 Draws any rectangle of the sheet, at any size: stretched, shrunk, or as it
 is.
@@ -121,7 +122,7 @@ is.
 | `sw`, `sh` | its width and height on the sheet; 8 and 8 when left out |
 | `dx`, `dy` | where its top left goes on the screen |
 | `dw`, `dh` | its width and height on the screen; the same as `sw`, `sh` when left out |
-| `flip_x`, `flip_y` | as for `spr` |
+| `flip` | as for `spr`: 1 to mirror it left to right, 2 to turn it upside down, 3 both; `true` is 1 |
 
 **Returns** nothing.
 
@@ -156,7 +157,7 @@ Draws a sprite, or a block, turned and scaled about its centre.
 | `angle` | how far to turn it, in turns: 0.25 is a quarter turn, 1.0 all the way round |
 | `scale` | how big to draw it: 1.0 as it is (the default), 2.0 double; from 1/64 to 64 |
 | `w`, `h` | how many sprites across and down; 1 and 1 when left out |
-| `flip` | true to mirror it before turning |
+| `flip` | as for `spr`, before turning: 1 to mirror it left to right, 2 to turn it upside down, 3 both; `true` is 1 |
 
 **Returns** nothing.
 
@@ -245,21 +246,21 @@ function draw() {
   the calls that take a set of flags (`map`, `actors.move`).
 - A sprite number outside 0 to 255 has no flags: 0.
 
-## fset(n, [f], v)
+## fset(n, v, [f])
 
 Sets a sprite's flags.
 
 | Argument | |
 |---|---|
 | `n` | the sprite number, 0 to 255 |
-| `f` | one flag, 0 to 7, to set to `v` |
-| `v` | with `f`, true or false; without it, all eight as one number |
+| `v` | all eight flags as one number; with `f`, true or false |
+| `f` | one flag, 0 to 7, to set to `v`, as `fget(n, f)` reads it |
 
 **Returns** nothing.
 
 ```js
-fset(9, 0, true);                  // sprite 9 is now solid
-fset(9, 0, false);                 // and not
+fset(9, true, 0);                  // sprite 9 is now solid
+fset(9, false, 0);                 // and not
 fset(9, FLAG.solid | FLAG.water);  // all eight at once: just these two on
 ```
 

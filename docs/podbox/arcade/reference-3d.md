@@ -287,7 +287,7 @@ its distance and drawn far to near, so near ones cover far ones.
 | `zs` | how far its feet are above the ground: 0 standing, more for a jump or a bird |
 | `sprites` | each one's sprite |
 | `sizes` | how tall each is, in world pixels |
-| `flips` | whether each is mirrored |
+| `flips` | each one's flip, as `spr` takes it |
 | `n` | how many, up to 256 |
 | `ws`, `hs` | each one's sprites across and down, as `spr` takes them; 1 when left out |
 

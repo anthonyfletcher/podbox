@@ -12,7 +12,7 @@ this page.
   [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend),
   [polyline](#polylinexs-ys-n-c-ends-closed)
 - The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py-zoom),
-  [clip](#clipx-y-w-h), [target](#targett)
+  [clip](#clipx0-y0-x1-y1), [target](#targett)
 
 ## How drawing works
 
@@ -47,7 +47,7 @@ circ(30, 30, 10);           // blue, like the rectangle
 draws both in colour 12. The pen starts as 6, light grey.
 
 **The drawing state lasts.** The pen colour, the [fill pattern](#fillpp),
-the [camera](#camerax-y-turn-px-py-zoom), the [clip](#clipx-y-w-h) and the
+the [camera](#camerax-y-turn-px-py-zoom), the [clip](#clipx0-y0-x1-y1) and the
 [target](#targett) stay as they were set, from one call to the next and
 from one frame to the next, until changed. Set them, draw, and set them
 back.
@@ -94,7 +94,7 @@ function draw() {
 
 ![The screen cleared to colour 12, blue](img/d-cls.png)
 
-- `cls` also puts the [clip](#clipx-y-w-h) and the text cursor back to
+- `cls` also puts the [clip](#clipx0-y0-x1-y1) and the text cursor back to
   the whole screen and its top left. It does **not** reset the
   [camera](#camerax-y-turn-px-py-zoom), and its colour does not become the pen colour.
 - Call it first in `draw()`, unless every pixel is about to be covered
@@ -486,7 +486,7 @@ camera();
   reset it: call `camera()` before drawing anything that should stay put,
   such as a score.
 - It moves the map, sprites, text and shapes alike; not the
-  [clip](#clipx-y-w-h), which stays on the screen.
+  [clip](#clipx0-y0-x1-y1), which stays on the screen.
 
 **Turning.** A game whose world tilts -- a ball rolled by tipping the
 board -- draws the world at its own positions and turns the camera:
@@ -543,15 +543,15 @@ print("ZOOM " + zoom, 2, 2, 7);
 - A zoom costs what a turn does; a picture zoomed in fills more pixels,
   and this one costs 2,821 units a tick against 2,427 at a zoom of 1.
 
-## clip([x, y, w, h])
+## clip([x0, y0, x1, y1])
 
 Limits drawing to a rectangle of the screen: anything outside it is left
 alone.
 
 | Argument | |
 |---|---|
-| `x`, `y` | the rectangle's top left |
-| `w`, `h` | its width and height |
+| `x0`, `y0` | one corner of the rectangle |
+| `x1`, `y1` | the opposite corner; both corners are inside it, as for `rect` |
 
 With no arguments, drawing is allowed over the whole screen again.
 
@@ -560,15 +560,15 @@ With no arguments, drawing is allowed over the whole screen again.
 ```js
 cls(1);
 rect(39, 29, 120, 90, 6);
-clip(40, 30, 80, 60);
+clip(40, 30, 119, 89);
 for (var i = 0; i < 12; i++) circfill(rnd(160), rnd(120), 12, 8 + i % 4);
 clip();
 ```
 
 ![Circles cut off at the edges of a box in the middle of the screen](img/d-clip.png)
 
-- Unlike the shape functions, `clip` takes a **width and height**, not a
-  second corner.
+- `clip(x0, y0, x1, y1)` lets through exactly what
+  `rectfill(x0, y0, x1, y1)` would cover.
 - Use it for a window inside the screen -- a radar, a status panel, a
   playfield beside a score column -- so drawing in it cannot spill out.
 - It is in screen pixels: the [camera](#camerax-y-turn-px-py-zoom) does not move it.

@@ -6,7 +6,7 @@
 //                               as m:ss.t, or m:ss when whole is true
 //   text.lap(ms)                as m:ss.hh: a time board's milliseconds
 //   text.width(s)               s's width in pixels
-//   text.centre(s, x, y, c)     s centred on x; on the screen when x is null
+//   text.center(s, x, y, c)     s centred on x; on the screen when x is null
 //   text.right(s, x, y, c)      s ending at x
 //   text.outline(s, x, y, c, edge)
 //                               s in c with a one-pixel edge round it
@@ -39,7 +39,7 @@ function width(s) {
     return textw(s);
 }
 
-function centre(s, x, y, c) {
+function center(s, x, y, c) {
     if (x == null) x = 80;
     print(s, x - flr(width(s) / 2), y, c);
 }

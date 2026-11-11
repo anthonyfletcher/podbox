@@ -380,7 +380,7 @@ NATIVE(plane_billboards)
         core_draw_billboard(vm, column_at(&c[3], i, 0), px[i], py[i], pw[i],
                             ph[i], column_at(&c[6], i, 1),
                             column_at(&c[7], i, 1),
-                            column_true(vm, &c[5], i, 0), dep[i]);
+                            column_at(&c[5], i, 0) & 3, dep[i]);
     }
     /* each billboard's projection and sizing, its 64-bit divides most of
      * it: about 17 units beside its copy, timed on the 5G */

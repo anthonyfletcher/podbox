@@ -11,7 +11,7 @@ function init() {
             sset(8 + x, y, ch == 97 ? 10 : ch == 48 ? 1 : 0);
             sset(16 + x, y, y == 0 || x == 0 ? 15 : (y == 7 || x == 7 ? 2 : 8));
         }
-    fset(2, 0, 1);
+    fset(2, 1, 0);
     for (x = 0; x < 16; x++) mset(x, 0, x % 2 ? 2 : 1);
     buf = img(24, 16);
     target(buf);
@@ -54,7 +54,7 @@ function draw() {
     camera(-64, -70);
     circ(0, 0, 4, 7);
     camera();
-    clip(80, 66, 20, 12);
+    clip(80, 66, 99, 77);
     circfill(90, 72, 12, 9);
     clip();
     tline(102, 70, 126, 70, 0, 0, 0.125, 0);

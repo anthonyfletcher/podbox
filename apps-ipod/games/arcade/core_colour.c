@@ -3,8 +3,8 @@
  *
  * Arcade core: colours as 0xRRGGBB, for building a palette at run time.
  *
- * playback.colours() hands over the colours the player is showing: the
- * album's, under dynamic colours, or the theme's. The colour.* calls make
+ * playback.colors() hands over the colours the player is showing: the
+ * album's, under dynamic colours, or the theme's. The color.* calls make
  * shades and accents from any colour, the way the player derives its own:
  * tone is CIELAB lightness from a gamma-2 luminance, so two tones say how
  * far apart two colours read; toned() and turn() move a colour through
@@ -218,14 +218,14 @@ static int colour_arg(struct vm *vm, struct value *a, int i, const char *fn,
 #define NUM(i, fn) if (!is_num(a[i])) \
     return vm_fail(vm, fn, "() needs a number, not a ", vm_typename(a[i].tag))
 
-/* playback.colours(out): the background, the text and the most vivid
+/* playback.colors(out): the background, the text and the most vivid
  * colour the player is showing, into an Int32Array of 3; whether they are
  * the album's */
-NATIVE(playback_colours)
+NATIVE(playback_colors)
 {
     (void)argc;
     if (a[0].tag != T_I32 || I32(vm, a[0])->len < 3)
-        return vm_fail(vm, "playback.colours() needs an Int32Array of 3",
+        return vm_fail(vm, "playback.colors() needs an Int32Array of 3",
                        "", "");
     uint32_t c[3] = { 0x000000, 0xffffff, 0xffffff };
     const struct arcade_tracks *t = vm->host ? vm->host->tracks : NULL;
@@ -237,13 +237,13 @@ NATIVE(playback_colours)
     return RET_INT(album ? 1 : 0);
 }
 
-/* colour.mix(a, b, t): a toward b, channel by channel; t from 0 to 1.0 */
-NATIVE(colour_mix)
+/* color.mix(a, b, t): a toward b, channel by channel; t from 0 to 1.0 */
+NATIVE(color_mix)
 {
     (void)argc;
-    COLOUR(0, c1, "colour.mix");
-    COLOUR(1, c2, "colour.mix");
-    NUM(2, "colour.mix");
+    COLOUR(0, c1, "color.mix");
+    COLOUR(1, c2, "color.mix");
+    NUM(2, "color.mix");
     int64_t t = scaled(a[2]);
     t = t < 0 ? 0 : t > 65536 ? 65536 : t;
     int32_t r = CR(c1) + (int32_t)(((CR(c2) - CR(c1)) * t + 32768) >> 16);
@@ -253,21 +253,21 @@ NATIVE(colour_mix)
     return RET_INT(RGB(r, g, b));
 }
 
-/* colour.tone(c): how light c reads, 0 black to 100 white */
-NATIVE(colour_tone)
+/* color.tone(c): how light c reads, 0 black to 100 white */
+NATIVE(color_tone)
 {
     (void)argc;
-    COLOUR(0, c, "colour.tone");
+    COLOUR(0, c, "color.tone");
     vm_charge(vm, 46);
     return RET_INT(tone_of(luminance(c)));
 }
 
-/* colour.toned(c, tone): c at that tone, its hue kept */
-NATIVE(colour_toned)
+/* color.toned(c, tone): c at that tone, its hue kept */
+NATIVE(color_toned)
 {
     (void)argc;
-    COLOUR(0, c, "colour.toned");
-    NUM(1, "colour.toned");
+    COLOUR(0, c, "color.toned");
+    NUM(1, "color.toned");
     int32_t tone = floor_int(a[1]);
     tone = tone < 0 ? 0 : tone > 100 ? 100 : tone;
     if (tone == 0 || tone == 100)
@@ -278,12 +278,12 @@ NATIVE(colour_toned)
     return RET_INT(oklab_toned(&o, tone));
 }
 
-/* colour.turn(c, t): c's hue turned by t turns, its lightness kept */
-NATIVE(colour_turn)
+/* color.turn(c, t): c's hue turned by t turns, its lightness kept */
+NATIVE(color_turn)
 {
     (void)argc;
-    COLOUR(0, c, "colour.turn");
-    NUM(1, "colour.turn");
+    COLOUR(0, c, "color.turn");
+    NUM(1, "color.turn");
     uint32_t t = (uint32_t)scaled(a[1]);
     int64_t cs = core_sine(t + 0x4000), sn = core_sine(t);
     struct oklab o, r;
@@ -301,13 +301,13 @@ NATIVE(colour_turn)
     return RET_INT(oklab_toned(&r, tone));
 }
 
-/* colour.contrast(a, b): the WCAG ratio between them, 1.0 to 21.0: 4.5 is
+/* color.contrast(a, b): the WCAG ratio between them, 1.0 to 21.0: 4.5 is
  * what text wants against its background */
-NATIVE(colour_contrast)
+NATIVE(color_contrast)
 {
     (void)argc;
-    COLOUR(0, c1, "colour.contrast");
-    COLOUR(1, c2, "colour.contrast");
+    COLOUR(0, c1, "color.contrast");
+    COLOUR(1, c2, "color.contrast");
     int64_t la = luminance(c1) + 3251, lb = luminance(c2) + 3251;
     int64_t hi = la > lb ? la : lb, lo = la < lb ? la : lb;
     vm_charge(vm, 16);

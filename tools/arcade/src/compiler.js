@@ -987,6 +987,9 @@ class Fn extends Scope {
             switch (sym.kind) {
             case 'func': return this.userCall(sym.fn, args, node, want);
             case 'native': return this.nativeCall(sym.def, args, node, want);
+            case 'apins':
+                if (sym.def) return this.nativeCall(sym.def, args, node, want);
+                break;
             case 'builtin': return this.builtinCall(callee.name, args, node, want);
             case 'const':
                 return fail(callee, callee.name + ' is a constant, not a function');
@@ -1204,7 +1207,7 @@ function sideEffects(node, scope) {
         case 'CallExpression': {
             const c = n.callee;
             const sym = c.type === 'Identifier' ? scope.resolve(c.name, c) : null;
-            if (!sym || sym.kind !== 'native' ||
+            if (!sym || !(sym.kind === 'native' || (sym.kind === 'apins' && sym.def)) ||
                 WRITES_ARGUMENTS.indexOf(sym.def.name) >= 0) {
                 found = true;
                 return;
@@ -1322,8 +1325,10 @@ class Program {
         if (api.consts[name])
             return { kind: 'const', api: api.consts[name] };
         if (api.groups[name]) return { kind: 'group', name: name };
+        /* color is both: color(c) the pen, color.mix() and the rest a
+         * namespace; called by itself, the native */
         if (api.namespaces && api.namespaces[name])
-            return { kind: 'apins', name: name };
+            return { kind: 'apins', name: name, def: api.natives[name] };
         if (api.natives[name]) return { kind: 'native', def: api.natives[name] };
         if (BUILTINS.indexOf(name) >= 0) return { kind: 'builtin', name: name };
         return null;

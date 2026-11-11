@@ -73,26 +73,26 @@ Palette entry `i` as `0xRRGGBB`.
 ### loadpal(PAL.name)
 Loads one of the cart's palettes whole.
 
-### colour.mix(a, b, t)
+### color.mix(a, b, t)
 Colour `a` (0xRRGGBB, as `setpal` takes) moved toward `b`, from 0 to 1.0.
 
-### colour.tone(c)
+### color.tone(c)
 How light colour `c` reads, from 0 for black to 100 for white. Two colours read apart by the gap between their tones, whatever their hues.
 
-### colour.toned(c, tone)
+### color.toned(c, tone)
 Colour `c` at that tone, its hue kept: shades of one colour for a palette.
 
-### colour.turn(c, t)
+### color.turn(c, t)
 Colour `c` with its hue turned by `t` turns, its tone kept: 0.5 is the opposite hue.
 
-### colour.contrast(a, b)
+### color.contrast(a, b)
 How well colours `a` and `b` stand apart, from 1.0 to 21.0. Text wants 4.5 against its background.
 
 ### camera([x, y], [turn], [px], [py], [zoom])
 Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out, and with `zoom` (1 as it is, from 1/16 to 16) it grows about the same point: shapes turn and grow whole, their lines a pixel wide; `rspr` and `rblit` turn and grow too; other pictures, text and particles stay upright and their own size at their moved places; and map and tline are moved but not turned or grown, nor are the 3D systems' pictures, which have a camera of their own. `camera()` resets it.
 
-### clip([x, y, w, h])
-Draws only inside the rectangle. `clip()` resets it to the whole target.
+### clip([x0, y0, x1, y1])
+Draws only inside the rectangle between two corners, both inside it, as `rect` takes them. `clip()` resets it to the whole target.
 
 ### print(str, [x, y], [c])
 Writes text, at the cursor without a position (moving it down a line). Returns the x after the last character. `print(str, c)` takes just a colour.
@@ -117,10 +117,10 @@ Where drawing goes: `SCREEN`, or an image made by `img`.
 ### sheet([i])
 The sheet sprites come from: an image such as `IMG.hero`, or the cart's sheet again with none. An image's sprites are its whole 8x8 cells, numbered along its rows from 0: a 64x16 image is sprites 0 to 7 across the top and 8 to 15 below. `spr`, `sspr`, `rspr`, `sget`, `sset`, `sprites.draw`, `actors.draw` and `plane.billboards` use it. The map, `tline`, the plane's floor and ceiling, and `fget` and `fset` always use the cart's sheet.
 
-### spr(n, x, y, [w, h], [flip_x], [flip_y])
-Sprite `n` of the sheet, or a block `w` by `h` sprites from it, at `x, y`.
+### spr(n, x, y, [w, h], [flip])
+Sprite `n` of the sheet, or a block `w` by `h` sprites from it, at `x, y`; `flip` 1 mirrors it, 2 turns it upside down, 3 both, as every call that flips takes it.
 
-### sspr(sx, sy, sw, sh, dx, dy, [dw, dh], [flip_x], [flip_y])
+### sspr(sx, sy, sw, sh, dx, dy, [dw, dh], [flip])
 Any rectangle of the sheet, stretched to `dw` by `dh`.
 
 ### sget(x, y)
@@ -132,8 +132,8 @@ Sets a pixel of the sheet.
 ### fget(n, [f])
 Sprite `n`'s flags: all eight as a number, or flag `f` (0 to 7) as true or false. With flags named in `cart.json`, `fget(n) & FLAG.solid` tests one by name.
 
-### fset(n, [f], v)
-Sets sprite `n`'s flags: all eight, or flag `f`.
+### fset(n, v, [f])
+Sets sprite `n`'s flags: all eight to `v`, or with `f` that one flag to `v`, true or false.
 
 ### tline(x0, y0, x1, y1, mx, my, [mdx, mdy])
 A line textured from the map, starting at map position `mx, my` (in cells, fractions allowed) and stepping `mdx, mdy` a pixel: floors and roads in the "mode 7" style.
@@ -147,14 +147,14 @@ An image's width.
 ### imgh(i)
 An image's height.
 
-### blit(i, x, y, [flip_x], [flip_y])
+### blit(i, x, y, [flip])
 Draws a whole image.
 
-### blitpart(i, sx, sy, w, h, x, y, [flip_x], [flip_y])
+### blitpart(i, sx, sy, w, h, x, y, [flip])
 Draws a rectangle of an image.
 
 ### rspr(n, x, y, angle, [scale], [w], [h], [flip])
-Sprite `n`, or a block `w` by `h`, turned by `angle` (in turns) and scaled about its centre at `x, y`.
+Sprite `n`, or a block `w` by `h`, flipped as `spr` flips, then turned by `angle` (in turns) and scaled about its centre at `x, y`.
 
 ### rblit(i, x, y, angle, [scale])
 An image turned and scaled about its centre at `x, y`.
@@ -465,7 +465,7 @@ Every live particle as a pixel of its colour, or as its sprite's top left `w` by
 The box the live particles cover as drawn -- after the camera, a sprite its size -- into an `Int32Array` of 4, `x0, y0, x1, y1` inclusive. Returns how many are live; with none, `out` is left as it was.
 
 ### sprites.draw(sp, xs, ys, n, [flips])
-`n` sprites at once, from the cart's arrays; `sp` may be one number for all.
+`n` sprites at once, from the cart's arrays, each flipped as `spr` flips; `sp` may be one number for all.
 
 ## Boards and paths
 
@@ -675,7 +675,7 @@ Whether the track asked for can be heard yet: a round's timer starts on this.
 ### playback.sound(out)
 The playing track's Sound Index (`SOUND.*`) into `out`. Returns 0 when it has none.
 
-### playback.colours(out)
+### playback.colors(out)
 The colours the player is showing, each 0xRRGGBB, into `out`, an Int32Array of 3: the background, the text and the most vivid. Returns 1 when they are the playing album's (dynamic colours), 0 when they are the theme's.
 
 ### tracks.count([filter])

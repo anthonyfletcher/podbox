@@ -48,7 +48,7 @@ test('text: a whole-seconds clock, a time board\'s ms, a shadow, centring on the
     printh(text.clock(83.5, true) + " " + text.clock(83.5) + " " + text.lap(83456));
     cls(0); text.shadow("A", 10, 10, 7, 1);
     printh(pget(10, 10) + " " + pget(13, 14));
-    cls(0); text.centre("AB", null, 0, 7);
+    cls(0); text.center("AB", null, 0, 7);
     printh(pget(78, 0));
 }
 function update() {}`);
@@ -132,7 +132,7 @@ test('text: padding, a clock, centring and words wrapped in a box', () => {
     for (var y = 0; y < 20; y++) for (var x = 0; x < 40; x++) if (pget(x, y) == 7) { if (top < 0) top = y; bottom = y; }
     printh(top + " " + bottom);
     cls(0);
-    text.centre("AB", 80, 0, 7);
+    text.center("AB", 80, 0, 7);
     var l = 200, r = -1;
     for (x = 0; x < 160; x++) for (y = 0; y < 6; y++) if (pget(x, y) == 7) { l = min(l, x); r = max(r, x); }
     printh(l + " " + r);

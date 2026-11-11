@@ -1,4 +1,4 @@
-/* playback.colours() and the colour.* calls, through pbgvm's printh: the
+/* playback.colors() and the color.* calls, through pbgvm's printh: the
  * made-up album's colours while the music plays and the theme's when it
  * does not, tones that land where asked with the hue kept, a turn that
  * keeps the tone, mixing and contrast. */
@@ -44,37 +44,37 @@ function hue(c) {
     return (h * 60 + 360) % 360;
 }
 
-test('playback.colours: the album\'s while the music plays, the theme\'s when it stops', () => {
-    const body = 'printh(playback.colours(c) + " " + c[0] + " " + c[1] + " " + c[2]);';
+test('playback.colors: the album\'s while the music plays, the theme\'s when it stops', () => {
+    const body = 'printh(playback.colors(c) + " " + c[0] + " " + c[1] + " " + c[2]);';
     assert.deepEqual(run(body).out, ['0 0 16777215 16777215']);
     assert.deepEqual(run(body, ['--playing']).out,
                      ['1 ' + 0x14283c + ' ' + 0xe8f0f8 + ' ' + 0x3cc8a0]);
-    assert.match(run('playback.colours([1, 2]);').err, /Int32Array of 3/);
+    assert.match(run('playback.colors([1, 2]);').err, /Int32Array of 3/);
 });
 
-test('colour.tone: black 0, white 100, mid grey about half', () => {
-    const r = run('printh(colour.tone(0) + " " + colour.tone(0xffffff) + " " + colour.tone(0x777777));');
+test('color.tone: black 0, white 100, mid grey about half', () => {
+    const r = run('printh(color.tone(0) + " " + color.tone(0xffffff) + " " + color.tone(0x777777));');
     const [black, white, grey] = r.out[0].split(' ').map(Number);
     assert.equal(black, 0);
     assert.equal(white, 100);
     assert.ok(grey > 45 && grey < 55, 'grey ' + grey);
 });
 
-test('colour.toned: lands on the tone asked, with the hue kept', () => {
+test('color.toned: lands on the tone asked, with the hue kept', () => {
     const tones = [10, 25, 50, 75, 90];
-    const r = run('var t = [' + tones + '];\nfor (var i = 0; i < 5; i++) { var k = colour.toned(0xe0306a, t[i]); ' +
-                  'printh(k + " " + colour.tone(k)); }');
+    const r = run('var t = [' + tones + '];\nfor (var i = 0; i < 5; i++) { var k = color.toned(0xe0306a, t[i]); ' +
+                  'printh(k + " " + color.tone(k)); }');
     r.out.forEach((line, i) => {
         const [k, tone] = line.split(' ').map(Number);
         assert.ok(Math.abs(tone - tones[i]) <= 1, 'tone ' + tone + ' for ' + tones[i]);
         assert.ok(Math.abs(hue(k) - hue(0xe0306a)) < 12, 'hue ' + hue(k) + ' at tone ' + tones[i]);
     });
-    assert.deepEqual(run('printh(colour.toned(0x336699, 0) + " " + colour.toned(0x336699, 100));').out,
+    assert.deepEqual(run('printh(color.toned(0x336699, 0) + " " + color.toned(0x336699, 100));').out,
                      ['0 16777215']);
 });
 
-test('colour.turn: half a turn moves the hue round and keeps the tone', () => {
-    const r = run('var k = colour.turn(0x3cc8a0, 0.5);\nprinth(k + " " + colour.tone(k) + " " + colour.tone(0x3cc8a0) + " " + colour.turn(0x808080, 0.25));');
+test('color.turn: half a turn moves the hue round and keeps the tone', () => {
+    const r = run('var k = color.turn(0x3cc8a0, 0.5);\nprinth(k + " " + color.tone(k) + " " + color.tone(0x3cc8a0) + " " + color.turn(0x808080, 0.25));');
     const [k, tone, was, grey] = r.out[0].split(' ').map(Number);
     assert.ok(Math.abs(tone - was) <= 2, tone + ' against ' + was);
     const d = Math.abs(hue(k) - hue(0x3cc8a0));
@@ -82,9 +82,9 @@ test('colour.turn: half a turn moves the hue round and keeps the tone', () => {
     assert.equal(grey, 0x808080, 'a grey has no hue to turn');
 });
 
-test('colour.mix and colour.contrast', () => {
-    const r = run('printh(colour.mix(0x000000, 0xffffff, 0.5) + " " + colour.mix(0x102030, 0x405060, 0) + " " + ' +
-                  'colour.mix(0x102030, 0x405060, 1.0) + " " + colour.contrast(0, 0xffffff) + " " + colour.contrast(0x777777, 0x777777));');
+test('color.mix and color.contrast', () => {
+    const r = run('printh(color.mix(0x000000, 0xffffff, 0.5) + " " + color.mix(0x102030, 0x405060, 0) + " " + ' +
+                  'color.mix(0x102030, 0x405060, 1.0) + " " + color.contrast(0, 0xffffff) + " " + color.contrast(0x777777, 0x777777));');
     const v = r.out[0].split(' ').map(Number);
     assert.equal(v[0], 0x808080);
     assert.equal(v[1], 0x102030);

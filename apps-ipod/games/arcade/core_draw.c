@@ -402,10 +402,10 @@ ARG_INLINE int colour(struct vm *vm, struct value *a, int argc, int i,
     return 1;
 }
 
-static int flag(struct vm *vm, struct value *a, int argc, int i)
-{
-    return i < argc && vm_truthy(vm, a[i]);
-}
+/* A flip, as every call takes one: 1 across, 2 up and down, 3 both; true
+ * is 1. */
+#define FLIP_X(f) ((f) & 1)
+#define FLIP_Y(f) (((f) >> 1) & 1)
 
 #define WHOLE(i, def, x, fn) int32_t x; \
     if (!whole(vm, a, argc, i, def, fn, &x)) return 0
@@ -3161,7 +3161,8 @@ NATIVE(spr)
     sheet_of(vm, &sh);
     if (n < 0 || n >= sh.count)
         return 1;
-    int fx = flag(vm, a, argc, 5), fy = flag(vm, a, argc, 6);
+    WHOLE(5, 0, flip, "spr");
+    int fx = FLIP_X(flip), fy = FLIP_Y(flip);
     turn_box(&vm->d, &x, &y, (int32_t)w, (int32_t)h);
     struct pen p;
     int32_t tx, ty;
@@ -3188,6 +3189,7 @@ NATIVE(sspr)
     WHOLE(5, 0, dy, "sspr");
     WHOLE(6, sw, dw, "sspr");
     WHOLE(7, sh, dh, "sspr");
+    WHOLE(8, 0, flip, "sspr");
     struct sheet src;
     sheet_of(vm, &src);
     turn_box(&vm->d, &dx, &dy, dw, dh);
@@ -3195,7 +3197,7 @@ NATIVE(sspr)
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, src.px, src.w, src.h, sx, sy, sw, sh,
-              dx, dy, dw, dh, flag(vm, a, argc, 8), flag(vm, a, argc, 9));
+              dx, dy, dw, dh, FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
     return 1;
 }
@@ -3239,7 +3241,7 @@ NATIVE(fget)
     return 1;
 }
 
-/* fset(n, v) all eight flags; fset(n, f, v) flag f. */
+/* fset(n, v) all eight flags; fset(n, v, f) flag f. */
 NATIVE(fset)
 {
     (void)out;
@@ -3252,9 +3254,9 @@ NATIVE(fset)
         flags[n] = (uint8_t)v;
         return 1;
     }
-    WHOLE(1, 0, f, "fset");
+    WHOLE(2, 0, f, "fset");
     if ((uint32_t)f < 8) {
-        if (vm_truthy(vm, a[2]))
+        if (vm_truthy(vm, a[1]))
             flags[n] |= (uint8_t)(1 << f);
         else
             flags[n] &= (uint8_t)~(1 << f);
@@ -3282,8 +3284,7 @@ NATIVE(img)
     return 1;
 }
 
-/* blit(i, x, y, [fx], [fy]): all of image i, or of the screen or a
- * border. */
+/* blit(i, x, y, [flip]): all of image i, or of the screen or a border. */
 NATIVE(blit)
 {
     (void)out;
@@ -3292,17 +3293,18 @@ NATIVE(blit)
         return 0;
     WHOLE(1, 0, x, "blit");
     WHOLE(2, 0, y, "blit");
+    WHOLE(3, 0, flip, "blit");
     turn_box(&vm->d, &x, &y, s.w, s.h);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, 0, 0, s.w, s.h, x, y, s.w, s.h,
-              flag(vm, a, argc, 3), flag(vm, a, argc, 4));
+              FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
     return 1;
 }
 
-/* blitpart(i, sx, sy, w, h, x, y, [fx], [fy]) */
+/* blitpart(i, sx, sy, w, h, x, y, [flip]) */
 NATIVE(blitpart)
 {
     (void)out;
@@ -3315,12 +3317,13 @@ NATIVE(blitpart)
     WHOLE(4, 0, h, "blitpart");
     WHOLE(5, 0, x, "blitpart");
     WHOLE(6, 0, y, "blitpart");
+    WHOLE(7, 0, flip, "blitpart");
     turn_box(&vm->d, &x, &y, w, h);
     struct pen p;
     begin(vm, &p, 0, 0);
     p.per16 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, sx, sy, w, h, x, y, w, h,
-              flag(vm, a, argc, 7), flag(vm, a, argc, 8));
+              FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
     return 1;
 }
@@ -3430,13 +3433,16 @@ static int scale_arg(struct vm *vm, struct value *a, int argc, int i,
 }
 
 /* rspr(n, x, y, angle, [scale], [w], [h], [flip]): sprite n, w by h
- * sprites as spr takes them, turned about its centre at x, y */
+ * sprites as spr takes them, turned about its centre at x, y. Flipped up
+ * and down is flipped across and turned half round, so the rows need only
+ * the one mirror. */
 NATIVE(rspr)
 {
     (void)out;
     WHOLE(0, 0, n, "rspr");
     WHOLE(5, 1, w, "rspr");
     WHOLE(6, 1, h, "rspr");
+    WHOLE(7, 0, flip, "rspr");
     int64_t x, y, angle;
     int32_t scale;
     if (!real(vm, a, argc, 1, 0, "rspr", &x) ||
@@ -3459,8 +3465,10 @@ NATIVE(rspr)
     t.stride = sh.w;
     t.sw = (uint32_t)w * 8;
     t.sh = (uint32_t)h * 8;
-    t.flip = flag(vm, a, argc, 7);
+    t.flip = FLIP_X(flip) ^ FLIP_Y(flip);
     t.xl = p.xl;
+    if (FLIP_Y(flip))
+        angle += 0x8000;
     turn_turned(&vm->d, &x, &y, &angle, &scale);
     turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
@@ -3770,7 +3778,8 @@ NATIVE(camera)
     return 1;
 }
 
-/* clip(x, y, w, h), in target pixels; clip() the whole target. */
+/* clip(x0, y0, x1, y1), two corners in target pixels, both inside, as
+ * rect takes them; clip() the whole target. */
 NATIVE(clip)
 {
     (void)out;
@@ -3778,14 +3787,14 @@ NATIVE(clip)
         full_clip(vm);
         return 1;
     }
-    WHOLE(0, 0, x, "clip");
-    WHOLE(1, 0, y, "clip");
-    WHOLE(2, 0, w, "clip");
-    WHOLE(3, 0, h, "clip");
-    vm->d.clip_x0 = x;
-    vm->d.clip_y0 = y;
-    vm->d.clip_x1 = (int32_t)clampc((int64_t)x + (w < 0 ? 0 : w));
-    vm->d.clip_y1 = (int32_t)clampc((int64_t)y + (h < 0 ? 0 : h));
+    WHOLE(0, 0, x0, "clip");
+    WHOLE(1, 0, y0, "clip");
+    WHOLE(2, 0, x1, "clip");
+    WHOLE(3, 0, y1, "clip");
+    vm->d.clip_x0 = x0;
+    vm->d.clip_y0 = y0;
+    vm->d.clip_x1 = (int32_t)clampc((int64_t)x1 + 1);
+    vm->d.clip_y1 = (int32_t)clampc((int64_t)y1 + 1);
     return 1;
 }
 
@@ -4111,14 +4120,14 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
         int32_t sx = column_at(x, i, 0), sy = column_at(y, i, 0);
         turn_box(&vm->d, &sx, &sy, 8, 8);
         int64_t xx = sx, yy = sy;
-        int fl = column_true(vm, flip, i, 0);
+        int fl = column_at(flip, i, 0) & 3;
         int32_t tx, ty;
         p.cost += COST_CALL / 2;
         if (!fl && tile_inside(&p, xx, yy, &tx, &ty))
             tile8(&p, cell_px(&sh, s), sh.w, tx, ty);
         else if (!clipped_out(&p, xx, yy, 8, 8))
             copy_rect(&p, sh.px, sh.w, sh.h, cell_x(&sh, s), cell_y(&sh, s),
-                      8, 8, xx, yy, 8, 8, fl, 0);
+                      8, 8, xx, yy, 8, 8, FLIP_X(fl), FLIP_Y(fl));
     }
     finish(vm, &p);
 }
@@ -5003,7 +5012,7 @@ static void billboard_copy(struct pen *p, const struct sheet *sh, int32_t s,
                            uint8_t fogc)
 {
     copy_rect(p, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
-              cw * 8, ch * 8, x, y, w, h, flip, 0);
+              cw * 8, ch * 8, x, y, w, h, FLIP_X(flip), FLIP_Y(flip));
     if (fog <= 0)
         return;
     static uint8_t mask[SCREEN_W * SCREEN_H];
@@ -5021,7 +5030,7 @@ static void billboard_copy(struct pen *p, const struct sheet *sh, int32_t s,
     m.s.w = SCREEN_W;
     m.xl = ones;
     copy_rect(&m, sh->px, sh->w, sh->h, cell_x(sh, s), cell_y(sh, s),
-              cw * 8, ch * 8, x, y, w, h, flip, 0);
+              cw * 8, ch * 8, x, y, w, h, FLIP_X(flip), FLIP_Y(flip));
     /* the table and the second copy: about 141 units a fogged billboard,
      * timed on the 5G */
     p->cost = m.cost + (uint32_t)((x1 - x0) * (y1 - y0)) / 16 + 141;

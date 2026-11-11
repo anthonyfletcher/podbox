@@ -56,16 +56,16 @@ API(font,      24, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)
 API(target,    25, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 
 /* Sprites and images */
-API(spr,       26, 3, 7, VOID, 0,     PIXELS, LISTEN, 1)
-API(sspr,      27, 6, 10, VOID, 0,    PIXELS, LISTEN, 1)
+API(spr,       26, 3, 6, VOID, 0,     PIXELS, LISTEN, 1)
+API(sspr,      27, 6, 9, VOID, 0,    PIXELS, LISTEN, 1)
 API(sget,      28, 2, 2, VAL,  0,     FLAT,   LISTEN, 1)
 API(sset,      29, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
 API(fget,      30, 1, 2, VAL,  0,     FLAT,   LISTEN, 1)
 API(fset,      31, 2, 3, VOID, 0,     FLAT,   LISTEN, 1)
 API(tline,     32, 6, 8, VOID, 0,     PIXELS, LISTEN, 1)
 API(img,       33, 2, 2, VAL,  0,     PIXELS, LISTEN, 1)
-API(blit,      34, 3, 5, VOID, 0,     PIXELS, LISTEN, 1)
-API(blitpart,  35, 7, 9, VOID, 0,     PIXELS, LISTEN, 1)
+API(blit,      34, 3, 4, VOID, 0,     PIXELS, LISTEN, 1)
+API(blitpart,  35, 7, 8, VOID, 0,     PIXELS, LISTEN, 1)
 
 /* The map */
 API(map,       36, 0, 9, VOID, 0,     PIXELS, LISTEN, 1)
@@ -363,13 +363,13 @@ API(sheet,            206, 0, 1, VOID, 0, FLAT, LISTEN, 1)
 
 /* Colours: the ones the player is showing, and shades and accents made
  * from any colour, each 0xRRGGBB */
-API(playback_colours, 214, 1, 1, VAL,  0, FLAT, LISTEN, 1)
-API_NS(colour)
-API(colour_mix,       215, 3, 3, VAL,  0, FLAT, LISTEN, 1)
-API(colour_tone,      216, 1, 1, VAL,  0, FLAT, LISTEN, 1)
-API(colour_toned,     217, 2, 2, VAL,  0, FLAT, LISTEN, 1)
-API(colour_turn,      218, 2, 2, VAL,  0, FLAT, LISTEN, 1)
-API(colour_contrast,  219, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(playback_colors, 214, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API_NS(color)
+API(color_mix,       215, 3, 3, VAL,  0, FLAT, LISTEN, 1)
+API(color_tone,      216, 1, 1, VAL,  0, FLAT, LISTEN, 1)
+API(color_toned,     217, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(color_turn,      218, 2, 2, VAL,  0, FLAT, LISTEN, 1)
+API(color_contrast,  219, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 
 /* The owner's volume: read, and turned a step at a time */
 API(playback_volume,  220, 0, 0, VAL,  0, FLAT, LISTEN, 1)

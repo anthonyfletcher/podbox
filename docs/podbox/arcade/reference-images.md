@@ -5,7 +5,7 @@ Pictures bigger than a sprite -- a title, a background, a strip of frames
 
 - [How images work](#how-images-work)
 - Making one: [img](#imgw-h), and [a cart's own images](#a-carts-own-images)
-- Drawing one: [blit](#bliti-x-y-flip_x-flip_y), [blitpart](#blitparti-sx-sy-w-h-x-y-flip_x-flip_y),
+- Drawing one: [blit](#bliti-x-y-flip), [blitpart](#blitparti-sx-sy-w-h-x-y-flip),
   [rblit](#rbliti-x-y-angle-scale)
 - Drawing into one: [target](reference-drawing.md#targett)
 - [When an image is worth it](#when-an-image-is-worth-it)
@@ -126,7 +126,7 @@ function draw() {
 - Drawing into it uses its own pixels: 0, 0 is its top left, and it cuts
   off at its own edges. `cls` clears it.
 
-## blit(i, x, y, [flip_x], [flip_y])
+## blit(i, x, y, [flip])
 
 Draws a whole image.
 
@@ -134,16 +134,15 @@ Draws a whole image.
 |---|---|
 | `i` | the image: `IMG.<name>`, or one made with `img` |
 | `x`, `y` | where its top left goes |
-| `flip_x` | true to mirror it left to right |
-| `flip_y` | true to turn it upside down |
+| `flip` | 1 to mirror it left to right, 2 to turn it upside down, 3 both; `true` is 1 |
 
 **Returns** nothing.
 
 ```js
 cls(1);
 blit(IMG.title, 32, 10);                 // as it is
-blit(IMG.title, 32, 46, true);           // mirrored
-blit(IMG.title, 32, 82, false, true);    // upside down
+blit(IMG.title, 32, 46, 1);              // mirrored
+blit(IMG.title, 32, 82, 2);              // upside down
 ```
 
 ![An arrow picture three times: pointing right, mirrored to point left, and upside down](img/i-cartimg.png)
@@ -154,7 +153,7 @@ blit(IMG.title, 32, 82, false, true);    // upside down
 - An image partly off the screen copies only the part on it; wholly off,
   it costs about 85 units.
 
-## blitpart(i, sx, sy, w, h, x, y, [flip_x], [flip_y])
+## blitpart(i, sx, sy, w, h, x, y, [flip])
 
 Draws a rectangle of an image.
 
@@ -164,7 +163,7 @@ Draws a rectangle of an image.
 | `sx`, `sy` | the rectangle's top left in the image |
 | `w`, `h` | its width and height |
 | `x`, `y` | where its top left goes on the screen |
-| `flip_x`, `flip_y` | as for `blit` |
+| `flip` | as for `blit` |
 
 **Returns** nothing.
 

@@ -14,7 +14,7 @@ example and its cost.
 | Chapter | For |
 |---|---|
 | `reference-language.md` | numbers, strings, arrays, records, functions; what is refused and what to write instead. **Read first.** |
-| `reference-drawing.md`, `reference-text.md`, `reference-colour.md` | shapes, the drawing state, text and fonts, palettes, and palettes made from the player's colours (`playback.colours`, `colour.*`) |
+| `reference-drawing.md`, `reference-text.md`, `reference-colour.md` | shapes, the drawing state, text and fonts, palettes, and palettes made from the player's colours (`playback.colors`, `color.*`) |
 | `reference-sprites.md`, `reference-images.md`, `reference-maps.md` | the sheet, image sheets, images and targets, maps and objects |
 | `reference-input.md`, `reference-sound.md`, `reference-time.md` | buttons and the wheel, sound effects, ticks and rates |
 | `reference-saving.md`, `reference-scores.md`, `reference-dialogs.md`, `reference-music.md` | saves and data, boards/options/achievements/pause menu, dialogs and speech, the owner's music and the beat |

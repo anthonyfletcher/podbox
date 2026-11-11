@@ -138,7 +138,7 @@ function list_update(l) {
 
 function list_draw(l, x, y, w) {
     var line = texth(""), row = line + 2;
-    clip(x, y, w - 4, l.rows * row);
+    clip(x, y, x + w - 5, y + l.rows * row - 1);
     for (var r = 0; r < l.rows; r++) {
         var i = l.top + r, on = i == l.at, ry = y + r * row;
         if (on) rectfill(x, ry, x + w - 5, ry + line + 1, ink_hi);
@@ -234,7 +234,7 @@ function field_draw(f, x, y, w, lit) {
     if (cx - f.scroll > room) f.scroll = cx - room;
     if (cx < f.scroll) f.scroll = cx;
     var tx = x + 2 - f.scroll;
-    clip(x + 1, y + 1, x1 - x - 1, line + 2);
+    clip(x + 1, y + 1, x1 - 1, y + line + 2);
     print(text, tx, y + 2, ink_text);
     if (lit != 0) {
         if (f.editing) {

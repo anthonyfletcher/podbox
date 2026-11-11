@@ -53,7 +53,7 @@ An actor's fields:
 | `dx`, `dy` | 0 | its speed, pixels a tick |
 | `w`, `h` | 8, 8 | its hitbox's size |
 | `sp` | -1 | its sprite; -1 draws nothing |
-| `flip` | 0 | drawn mirrored |
+| `flip` | 0 | drawn flipped, as `spr` flips: 1 mirrored, 2 upside down, 3 both |
 | `frames`, `speed` | 1, 8 | an animation: `frames` sprites from `sp` in turn, `speed` ticks each |
 | `cell` | -1 | the trigger cell it is in (see `move`) |
 | `zone` | -1 | the map object it is in (see `zones`) |
@@ -831,7 +831,7 @@ anything drawn as many sprites that is not an actor pool.
 | `sp` | the sprites: an array, or one number for all |
 | `xs`, `ys` | their positions |
 | `n` | how many to draw |
-| `flips` | whether each is mirrored: an array, or left out for none |
+| `flips` | each one's flip, as `spr` takes it: an array, or left out for none |
 
 Each array can be a plain array, an `Int32Array` or a `Uint8Array`.
 
