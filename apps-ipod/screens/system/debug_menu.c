@@ -779,7 +779,9 @@ static int disk_callback(int btn, struct gui_synclist *lists)
     char buf[128];
     unsigned short* identify_info = ata_get_identify();
     bool timing_info_present = false;
-    (void)btn;
+
+    if (btn != ACTION_REDRAW)
+        return btn;
 
     simplelist_reset_lines();
 

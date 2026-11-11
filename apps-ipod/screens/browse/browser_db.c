@@ -5256,6 +5256,13 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         int random_item = c->special_entry_count +
                           (rand() % (c->filesindir - c->special_entry_count));
         dptr = browser_db_get_entry(c, random_item);
+        /* NULL when the entry had to be read and the search was refused,
+         * as it is while the database is being committed */
+        if (!dptr)
+        {
+            splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+            return 0;
+        }
         seek = dptr->extraseek;
         /* On a track list the chosen row plays rather than descending, and
          * browser_db_play_folder() reads its start position from
@@ -5787,7 +5794,17 @@ static bool insert_all_playlist(struct browser_context *c,
             }
         }
 
-        if (!tagcache_retrieve(&tcs, browser_db_get_entry(c, i)->extraseek, tcs.type, buf, sizeof buf))
+        struct tagentry *entry = browser_db_get_entry(c, i);
+
+        /* NULL when the entry had to be read and the search was refused,
+         * as it is once a database commit has started */
+        if (!entry)
+        {
+            exit_loop_now = true;
+            break;
+        }
+
+        if (!tagcache_retrieve(&tcs, entry->extraseek, tcs.type, buf, sizeof buf))
             continue;
 
         if (playlist == NULL)

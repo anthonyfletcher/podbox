@@ -3974,7 +3974,9 @@ void audio_playback_handler(struct queue_event *ev)
              * one nobody asked for (the buflib shrink callback), where a
              * caller is blocked waiting on us. */
             audio_stop_playback(ev->id != SYS_USB_CONNECTED && ev->data == 0);
-            if (ev->data != 0)
+            /* Unplug can queue the disconnect while playback stops: leave
+             * it for usb_wait_for_disconnect() to consume. */
+            if (ev->data != 0 && ev->id != SYS_USB_CONNECTED)
                 queue_clear(&audio_queue);
             return; /* no more playback */
 

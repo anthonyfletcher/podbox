@@ -85,7 +85,10 @@ skip:
 bool look_for_cuesheet_file(struct mp3entry *track_id3, struct cuesheet_file *cue_file)
 {
     /* DEBUGF("look for cue file\n"); */
-    if (track_id3->has_embedded_cuesheet)
+    /* An embedded "cuesheet" of chapters (CHAR_ENC_MP4_CHPL and up) is not
+     * text: the chapter readers in chapters.c take those files. */
+    if (track_id3->has_embedded_cuesheet
+        && track_id3->embedded_cuesheet.encoding < CHAR_ENC_MP4_CHPL)
     {
         cue_file->pos = track_id3->embedded_cuesheet.pos;
         cue_file->size = track_id3->embedded_cuesheet.size;
