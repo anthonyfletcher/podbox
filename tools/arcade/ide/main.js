@@ -324,8 +324,38 @@ async function showCartEditor(pane, file, editor, at) {
             delete states[name];
             if (isNew) showFiles();
             changed();
-        }
+        },
+        run: runUnseen
     });
+}
+
+/* The units one call of a run nobody watches may take: an editor's check
+ * works through all of a cart's data at once, not a frame of it */
+const UNSEEN_CEILING = 400000000;
+
+/* A cart's editor's cart.run(): the cart built with the .js files named and
+ * no others (true for the cart's own), any other file named in place of
+ * the cart's, and run unseen for up to ticks ticks or until it prints
+ * "done". Every line printed, and the error that stopped it, if one did. */
+async function runUnseen(files, ticks) {
+    const f = {};
+    for (const [n, v] of Object.entries(folder))
+        if (!/\.js$/.test(n)) f[n] = v;
+    for (const [n, v] of Object.entries(files))
+        f[n] = v === true ? folder[n] : v;
+    const b = build(f);
+    if (b.errors.length)
+        return { lines: [], error: b.errors.map((x) => x.file + ':' + x.line + ': ' + x.message).join('\n') };
+    const lines = [];
+    const e = new Engine(wasm, { print: (s) => lines.push(s) });
+    if (!e.load(b.cart, 1n)) return { lines, error: e.error() };
+    e.ceiling(UNSEEN_CEILING);
+    if (!(await e.start())) return { lines, error: e.error() };
+    for (let i = 0; i < Math.min(ticks, 100000) && lines[lines.length - 1] !== 'done'; i++) {
+        if (!(await e.tick(0, 0, 0, false))) return { lines, error: e.error() };
+        if (i % 20 === 19) await sleep(0);
+    }
+    return { lines };
 }
 
 /* a font in the font editor */
@@ -2163,5 +2193,5 @@ document.addEventListener('drop', async (e) => {
 })();
 
 /* for the tests, which drive the page */
-window.arcadeIde = { load, run, stop, openBytes, folder: () => folder, show, build: () => lastBuild,
+window.arcadeIde = { load, run, stop, openBytes, folder: () => folder, show, build: () => lastBuild, runUnseen,
                     view: () => view };

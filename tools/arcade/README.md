@@ -393,6 +393,7 @@ through `window.cart`:
 | `cart.read(name)` | a Promise of a file's text, or a `Uint8Array` for a picture; `undefined` when there is none |
 | `cart.write(name, value)` | a Promise, kept once the file is written: any file a cart holds, but never an editor |
 | `cart.list()` | a Promise of every file's name |
+| `cart.run(files, ticks)` | a Promise of `{ lines, error }`: the cart built and run unseen, for up to `ticks` ticks or until it prints `done`, with every line it printed. Its code is the `.js` files named in `files` and no others -- each the text to build with, or `true` for the cart's own -- and any other file named is used in place of the cart's |
 
 ```js
 cart.read(cart.file).then(function (text) { show(JSON.parse(text)); });
@@ -409,6 +410,20 @@ cart.write(cart.file, JSON.stringify(levels, null, 1));
   since asks again, except one you changed in the IDE yourself.
 - The cart reads what it writes with `data.read(DATA.levels)`, as any
   data file.
+- **Checking data by the cart's own rules**: put the check in a code file
+  of the cart's that the game never calls -- it is left out of the game's
+  build -- and have the editor run it with `cart.run`, a `main.js` of its
+  own and the data as the editor has it, saved or not:
+
+```js
+cart.run({ "main.js": "function init() { check.all(data.read(DATA.levels)); }\n" +
+                      "function update() {}\n",
+           "rules.js": true, "check.js": true, "data/levels.json": text }, 10)
+    .then(function (r) { show(r.error || r.lines.join("\n")); });
+```
+
+  A run nobody watches may take far longer in one call than a frame
+  could, so a check can work through all the data in `init()`.
 
 ## A cart as a web page
 

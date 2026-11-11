@@ -14,6 +14,15 @@
  *   cart.write(name, v)  a Promise, settled once it is written; refused
  *                        for a name no cart folder holds, or an editor
  *   cart.list()          a Promise of every file's name
+ *   cart.run(files, ticks)
+ *                        a Promise of { lines, error }: the cart built and
+ *                        run unseen, for up to ticks ticks or until it
+ *                        prints "done", and every line it printed. Its code
+ *                        is the .js files named in files and no others --
+ *                        each the text to build with, or true for the
+ *                        cart's own -- and any other file named is used in
+ *                        place of the cart's. How an editor checks its data
+ *                        by the cart's own rules, rather than a copy of them
  *
  * Parts: which editor a file has; leave to run one; the page in its frame;
  * a new editor's starting page. */
@@ -94,7 +103,8 @@ function bridge(file) {
         '  window.cart = Object.freeze({ file: ' + JSON.stringify(file).replace(/</g, '\\u003c') + ',\n' +
         '    read: function (name) { return ask("read", name); },\n' +
         '    write: function (name, value) { return ask("write", name, value); },\n' +
-        '    list: function () { return ask("list"); } });\n' +
+        '    list: function () { return ask("list"); },\n' +
+        '    run: function (files, ticks) { return ask("run", null, { files: files, ticks: ticks }); } });\n' +
         '})();</script>\n';
 }
 
@@ -106,9 +116,9 @@ export function framed(html, file) {
 }
 
 /* An editor's page in a frame in pane. o: folder (the cart's files, read
- * and written in place), file (the file it is for, or null), html, and
- * written(name, isNew) after the page writes one. destroy() takes it
- * away. */
+ * and written in place), file (the file it is for, or null), html,
+ * written(name, isNew) after the page writes one, and run(files, ticks), a
+ * Promise of { lines, error } for cart.run(). destroy() takes it away. */
 export class CartEditor {
     constructor(pane, o) {
         this.o = o;
@@ -131,6 +141,15 @@ export class CartEditor {
         const folder = this.o.folder;
         try {
             if (m.op === 'list') return reply(true, Object.keys(folder).sort());
+            if (m.op === 'run') {
+                const v = m.value || {};
+                if (!v.files || typeof v.files !== 'object') return reply(false, null, 'cart.run() needs the files to run');
+                for (const [n, f] of Object.entries(v.files))
+                    if (!CART_FILE.test(n) || (f !== true && (isBinary(n) ? !(f instanceof Uint8Array) : typeof f !== 'string')))
+                        return reply(false, null, n + ' cannot be run with');
+                this.o.run(v.files, v.ticks | 0).then((r) => reply(true, r), (x) => reply(false, null, String(x && x.message || x)));
+                return;
+            }
             const name = String(m.name);
             if (m.op === 'read') {
                 const v = folder[name];
