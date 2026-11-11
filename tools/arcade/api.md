@@ -88,8 +88,8 @@ Colour `c` with its hue turned by `t` turns, its tone kept: 0.5 is the opposite 
 ### colour.contrast(a, b)
 How well colours `a` and `b` stand apart, from 1.0 to 21.0. Text wants 4.5 against its background.
 
-### camera([x, y], [turn], [px], [py])
-Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out: shapes turn whole, pictures and text stay upright at their turned places, and map, tline and the 3D systems are not turned. `camera()` resets it.
+### camera([x, y], [turn], [px], [py], [zoom])
+Moves everything drawn after by `-x, -y`: scrolling, and screen shake. With `turn` (turns, clockwise) the picture also turns about `px, py`, the middle of the target when left out, and with `zoom` (1 as it is, from 1/16 to 16) it grows about the same point: shapes turn and grow whole, their lines a pixel wide; `rspr` and `rblit` turn and grow too; other pictures, text and particles stay upright and their own size at their moved places; and map, tline and the 3D systems are not moved. `camera()` resets it.
 
 ### clip([x, y, w, h])
 Draws only inside the rectangle. `clip()` resets it to the whole target.

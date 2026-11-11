@@ -18,7 +18,7 @@ are -- for the code to find.
 sheet (see **Sprites**). A cell is 8 pixels square, like a sprite, so a
 map 20 cells across and 15 down exactly fills the screen. Maps can be up
 to 256x256 cells -- 2048 pixels each way -- and bigger than the screen is
-the usual case: the [camera](reference-drawing.md#camerax-y-turn-px-py) scrolls over
+the usual case: the [camera](reference-drawing.md#camerax-y-turn-px-py-zoom) scrolls over
 them.
 
 **Cell 0 is empty.** A cell holding 0 draws nothing, whatever sprite 0

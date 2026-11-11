@@ -11,7 +11,7 @@ this page.
   [circ and circfill](#circx-y-r-c), [oval and ovalfill](#ovalx0-y0-x1-y1-c),
   [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend),
   [polyline](#polylinexs-ys-n-c-ends-closed)
-- The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py),
+- The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py-zoom),
   [clip](#clipx-y-w-h), [target](#targett)
 
 ## How drawing works
@@ -47,7 +47,7 @@ circ(30, 30, 10);           // blue, like the rectangle
 draws both in colour 12. The pen starts as 6, light grey.
 
 **The drawing state lasts.** The pen colour, the [fill pattern](#fillpp),
-the [camera](#camerax-y-turn-px-py), the [clip](#clipx-y-w-h) and the
+the [camera](#camerax-y-turn-px-py-zoom), the [clip](#clipx-y-w-h) and the
 [target](#targett) stay as they were set, from one call to the next and
 from one frame to the next, until changed. Set them, draw, and set them
 back.
@@ -96,7 +96,7 @@ function draw() {
 
 - `cls` also puts the [clip](#clipx-y-w-h) and the text cursor back to
   the whole screen and its top left. It does **not** reset the
-  [camera](#camerax-y-turn-px-py), and its colour does not become the pen colour.
+  [camera](#camerax-y-turn-px-py-zoom), and its colour does not become the pen colour.
 - Call it first in `draw()`, unless every pixel is about to be covered
   anyway -- by a full-screen map or background image -- in which case it
   is about 1,200 units saved.
@@ -435,17 +435,19 @@ fillp();
 - Common patterns: `0x5a5a` checkerboard, `0x0f0f` horizontal stripes,
   `0x8421` diagonals, `0x0505` a light dither, `0x7d7d` a heavy one.
 
-## camera([x, y], [turn], [px], [py])
+## camera([x, y], [turn], [px], [py], [zoom])
 
 Moves everything drawn afterwards by `-x`, `-y`: as if the screen were a
 window onto a larger world, looking at `x, y`. With `turn`, the picture
-is also turned, as if the window were tilted.
+is also turned, as if the window were tilted, and with `zoom` it grows or
+shrinks, as if the window came closer.
 
 | Argument | |
 |---|---|
 | `x`, `y` | where the screen's top left is in the world; both 0 when left out |
 | `turn` | how far to turn the picture, in turns, clockwise: 0.25 is a quarter; 0 when left out |
-| `px`, `py` | the point on the screen it turns about; the middle of the screen when left out -- or of the image being drawn into when `camera()` is called; a `target()` after it keeps the turning point |
+| `px`, `py` | the point on the screen it turns and zooms about; the middle of the screen when left out -- or of the image being drawn into when `camera()` is called; a `target()` after it keeps the point |
+| `zoom` | how much bigger the picture is drawn: 2 is twice the size, 0.5 half; from 1/16 to 16, and 1 when left out |
 
 **Returns** nothing.
 
@@ -515,6 +517,32 @@ print("TILT " + tilt, 2, 2, 7);
 - Turning costs little: about 7 units a point for `polyfill`, and nothing
   that shows for the other calls.
 
+**Zooming.** A camera that comes in close when the player rests and pulls
+back while they move eases `zoom` a little each tick, about the player:
+
+```js
+camera(0, 0, 0, 77, 56, zoom);   // in close, about the ball
+cls(12);
+polyfill([-40, 60, 100, 200, 200, -40], [90, 80, 95, 70, 160, 160], 6, 3);
+rectfill(72, 60, 81, 89, 4);     // the post grows
+rspr(1, 77, 56, 0);              // the ball grows too: spr would keep its size
+camera();
+print("ZOOM " + zoom, 2, 2, 7);
+```
+
+![The hills and post drawn 1.4 times the size about the yellow ball on top of the post; ZOOM 1.4 at its own size at the top left](img/d-camera-zoom.png)
+
+- **Shapes grow whole**, as they turn, and their lines stay a pixel wide.
+  Circles and ovals grow about their middles.
+- **`rspr` and `rblit` grow** with the zoom, on top of their own scale.
+  The other pictures, text, particles and lights **keep their size** and
+  go where their middle moves to: for a picture that should grow, draw it
+  with `rspr` or `rblit`.
+- `map`, `tline` and the 3D systems are not zoomed, as they are not
+  turned.
+- A zoom costs what a turn does; a picture zoomed in fills more pixels,
+  and this one costs 2,821 units a tick against 2,427 at a zoom of 1.
+
 ## clip([x, y, w, h])
 
 Limits drawing to a rectangle of the screen: anything outside it is left
@@ -543,7 +571,7 @@ clip();
   second corner.
 - Use it for a window inside the screen -- a radar, a status panel, a
   playfield beside a score column -- so drawing in it cannot spill out.
-- It is in screen pixels: the [camera](#camerax-y-turn-px-py) does not move it.
+- It is in screen pixels: the [camera](#camerax-y-turn-px-py-zoom) does not move it.
   `cls` resets it.
 
 ## target(t)

@@ -177,6 +177,9 @@ and saves in the browser.
   over];` then `updates[state]()`.
 - **Screen shake**: `camera(rnd(5) - 2, rnd(5) - 2)` for a few ticks,
   `camera()` before the score.
+- **A camera that comes closer**: ease `zoom` each tick, `camera(x, y, 0,
+  px, py, zoom)` about the player; draw what should grow with it with
+  `rspr`, since `spr` keeps its size.
 - **Layers from one map**: background and foreground tiles with different
   flags, each drawn with `map(..., layers)`.
 - **Collision against the map**: name a flag `solid` in `cart.json` and

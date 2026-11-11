@@ -157,9 +157,11 @@ struct draw
     struct value target;        /* 0 the screen, or an img */
     struct value sheet;         /* 0 the cart's sheet, or an img: sheet() */
     int32_t cam_x, cam_y;
-    /* camera()'s turn about its pivot: 16.16 turns (0 none), its cosine
-     * and sine, and the pivot on the target, 16.16 */
-    int32_t cam_turn, cam_cos, cam_sin, cam_px, cam_py;
+    /* camera()'s turn and zoom about its pivot: 16.16 turns (0 none),
+     * the zoom 16.16, its cosine and sine times the zoom, and the pivot
+     * on the target, 16.16; cam_moved when either moves a point */
+    int32_t cam_turn, cam_zoom, cam_cos, cam_sin, cam_px, cam_py;
+    int32_t cam_moved;
     int32_t clip_x0, clip_y0, clip_x1, clip_y1;   /* end exclusive */
     int32_t cur_x, cur_y;
     uint16_t pen;               /* low byte the colour, high byte fillp's */

@@ -484,12 +484,13 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->xl = xlat_of(d);
 }
 
-/* ---- the camera's turn --------------------------------------------------- *
- * A turned camera moves each point drawn about its pivot before the
- * drawing takes the camera's offset off as ever: these give a point back
- * turned but still before that offset. Shapes, lines, points and outlines
- * turn whole; sprites, images, text and particles go where their middle
- * turns to, upright. */
+/* ---- the camera's turn and zoom ------------------------------------------ *
+ * A turned or zoomed camera moves each point drawn about its pivot before
+ * the drawing takes the camera's offset off as ever: these give a point
+ * back moved but still before that offset. Shapes, lines, points and
+ * outlines turn and grow whole, lines staying a pixel wide; sprites,
+ * images, text and particles go where their middle moves to, upright and
+ * their own size, but for rspr and rblit, which turn and grow too. */
 
 /* x, y, 16.16, turned */
 static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
@@ -506,8 +507,9 @@ static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
                    >> 16);
         return;
     }
-    /* far beyond any target, kept where the multiply cannot overflow */
-    const int64_t far = (int64_t)1 << 44;
+    /* far beyond any target, kept where the multiply cannot overflow at
+     * the greatest zoom */
+    const int64_t far = (int64_t)1 << 40;
     if (sx > far) sx = far;
     if (sx < -far) sx = -far;
     if (sy > far) sy = far;
@@ -519,7 +521,7 @@ static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
 /* The pixel x, y turned: its middle, and the pixel that lands in */
 static void turn_px(const struct draw *d, int32_t *x, int32_t *y)
 {
-    if (!d->cam_turn)
+    if (!d->cam_moved)
         return;
     int64_t fx = ((int64_t)*x << 16) + 32768, fy = ((int64_t)*y << 16) + 32768;
     turn_fix(d, &fx, &fy);
@@ -532,7 +534,7 @@ static void turn_px(const struct draw *d, int32_t *x, int32_t *y)
 static void turn_box(const struct draw *d, int32_t *x, int32_t *y, int32_t w,
                      int32_t h)
 {
-    if (!d->cam_turn)
+    if (!d->cam_moved)
         return;
     int64_t fx = ((int64_t)*x << 16) + ((int64_t)w << 15);
     int64_t fy = ((int64_t)*y << 16) + ((int64_t)h << 15);
@@ -541,15 +543,17 @@ static void turn_box(const struct draw *d, int32_t *x, int32_t *y, int32_t w,
     *y = (int32_t)clampc((fy - ((int64_t)h << 15) + 32768) >> 16);
 }
 
-/* rspr's and rblit's middle, 16.16, turned, and their angle with it:
- * their angle turns the other way from the camera's */
+/* rspr's and rblit's middle, 16.16, moved, and their angle and scale with
+ * it: their angle turns the other way from the camera's */
 static void turn_turned(const struct draw *d, int64_t *x, int64_t *y,
-                        int64_t *angle)
+                        int64_t *angle, int32_t *scale)
 {
-    if (!d->cam_turn)
+    if (!d->cam_moved)
         return;
     turn_fix(d, x, y);
     *angle -= d->cam_turn;
+    int64_t k = ((int64_t)*scale * d->cam_zoom) >> 16;
+    *scale = (int32_t)(k < 0x400 ? 0x400 : k > (64 << 16) ? 64 << 16 : k);
 }
 
 static void row_touched(struct pen *p, int32_t y)
@@ -869,15 +873,18 @@ static int oval(struct vm *vm, struct value *a, int argc, int outline,
     if (!box(vm, a, argc, fn, b, 16384))
         return 0;
     COLOUR(4, c, fn);
-    if (vm->d.cam_turn) {
-        /* its middle turned, its axes upright */
-        int32_t x = (int32_t)b[0], y = (int32_t)b[1];
-        turn_box(&vm->d, &x, &y, (int32_t)(b[2] - b[0] + 1),
-                 (int32_t)(b[3] - b[1] + 1));
-        b[2] += x - b[0];
-        b[3] += y - b[1];
-        b[0] = x;
-        b[1] = y;
+    if (vm->d.cam_moved) {
+        /* its middle moved, its axes upright and zoomed */
+        int64_t mx = (b[0] + b[2] + 1) << 15, my = (b[1] + b[3] + 1) << 15;
+        turn_fix(&vm->d, &mx, &my);
+        int64_t hw = ((b[2] - b[0] + 1) * vm->d.cam_zoom) >> 1;
+        int64_t hh = ((b[3] - b[1] + 1) * vm->d.cam_zoom) >> 1;
+        b[0] = clampc((mx - hw + 32768) >> 16);
+        b[1] = clampc((my - hh + 32768) >> 16);
+        b[2] = clampc((mx + hw + 32768) >> 16) - 1;
+        b[3] = clampc((my + hh + 32768) >> 16) - 1;
+        if (b[2] < b[0]) b[2] = b[0];
+        if (b[3] < b[1]) b[3] = b[1];
     }
     struct pen p;
     struct figure s = { oval_row, b[1], b[3], b[0] + b[2], b[1] + b[3],
@@ -1492,7 +1499,7 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
         v[i] = clampc(k);
     }
     COLOUR(6, c, fn);
-    for (int i = 0; i < 6 && vm->d.cam_turn; i += 2) {
+    for (int i = 0; i < 6 && vm->d.cam_moved; i += 2) {
         int32_t x = (int32_t)v[i], y = (int32_t)v[i + 1];
         turn_px(&vm->d, &x, &y);
         v[i] = x;
@@ -1713,7 +1720,7 @@ static void poly_point(const struct pen *p, const struct column *xs,
 {
     *x = column_fix(xs, i);
     *y = column_fix(ys, i);
-    if (p->d->cam_turn)
+    if (p->d->cam_moved)
         turn_fix(p->d, x, y);
     *x += p->ox << 16;
     *y += p->oy << 16;
@@ -2012,7 +2019,7 @@ NATIVE(polyfill)
     }
     p.cost += POLY_CALL + (uint32_t)n * walks * POLY_POINT +
               (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE);
-    if (vm->d.cam_turn)
+    if (vm->d.cam_moved)
         p.cost += (uint32_t)n * walks * POLY_TURN;
     /* wholly left or right of the clip, or above or below it: no row is
      * walked */
@@ -2180,7 +2187,7 @@ static int rectangle(struct vm *vm, struct value *a, int argc, int outline,
     if (!box(vm, a, argc, fn, b, FAR))
         return 0;
     COLOUR(4, c, fn);
-    if (vm->d.cam_turn)
+    if (vm->d.cam_moved)
         return turned_rect(vm, b, c, outline);
     struct pen p;
     begin(vm, &p, c, 1);
@@ -3349,7 +3356,7 @@ NATIVE(rspr)
     t.sh = (uint32_t)h * 8;
     t.flip = flag(vm, a, argc, 7);
     t.xl = p.xl;
-    turn_turned(&vm->d, &x, &y, &angle);
+    turn_turned(&vm->d, &x, &y, &angle, &scale);
     turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
     return 1;
@@ -3379,7 +3386,7 @@ NATIVE(rblit)
     t.sh = (uint32_t)s.h;
     t.flip = 0;
     t.xl = p.xl;
-    turn_turned(&vm->d, &x, &y, &angle);
+    turn_turned(&vm->d, &x, &y, &angle, &scale);
     turned(&p, &t, x, y, wrap32(angle), scale);
     finish(vm, &p);
     return 1;
@@ -3600,9 +3607,10 @@ static void full_clip(struct vm *vm)
     vm->d.clip_y1 = s.h;
 }
 
-/* camera([x, y], [turn], [px], [py]): what is drawn at x, y lands at the
- * target's corner, and with turn (in turns, clockwise) the picture is
- * turned about px, py on the target, its middle when left out */
+/* camera([x, y], [turn], [px], [py], [zoom]): what is drawn at x, y lands
+ * at the target's corner, and with turn (in turns, clockwise) and zoom
+ * the picture is turned and grown about px, py on the target, its middle
+ * when left out */
 NATIVE(camera)
 {
     (void)out;
@@ -3617,8 +3625,18 @@ NATIVE(camera)
     surf_of(vm, d->target, &s, "camera");
     d->cam_px = argc > 3 && is_num(a[3]) ? wrap32(scaled(a[3])) : s.w << 15;
     d->cam_py = argc > 4 && is_num(a[4]) ? wrap32(scaled(a[4])) : s.h << 15;
-    d->cam_cos = core_sine((uint32_t)d->cam_turn + 0x4000);
-    d->cam_sin = core_sine((uint32_t)d->cam_turn);
+    int64_t zoom;
+    if (!real(vm, a, argc, 5, 0x10000, "camera", &zoom))
+        return 0;
+    if (zoom < 0x1000 || zoom > (16 << 16))
+        return vm_fail(vm, "camera", "() takes a zoom from 1/16 to 16",
+                       "");
+    d->cam_zoom = (int32_t)zoom;
+    d->cam_moved = d->cam_turn || zoom != 0x10000;
+    d->cam_cos = (int32_t)(((int64_t)core_sine((uint32_t)d->cam_turn +
+                                               0x4000) * zoom) >> 16);
+    d->cam_sin = (int32_t)(((int64_t)core_sine((uint32_t)d->cam_turn) *
+                            zoom) >> 16);
     return 1;
 }
 
@@ -5537,7 +5555,7 @@ NATIVE(light_draw)
         struct lamp *m = &lamps[nl];
         int64_t lx = column_fix(&cx, (uint32_t)i);
         int64_t ly = column_fix(&cy, (uint32_t)i);
-        if (vm->d.cam_turn) {
+        if (vm->d.cam_moved) {
             turn_fix(&vm->d, &lx, &ly);
             /* a light turned far off cannot reach the clip */
             if (lx > (1 << 30) || lx < -(1 << 30) || ly > (1 << 30) ||

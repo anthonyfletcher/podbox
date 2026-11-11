@@ -1,5 +1,5 @@
-/* camera(x, y, turn, [px], [py]): the picture turned about a pivot,
- * through pbgvm's --dump (one hex digit a pixel, a row a line). */
+/* camera(x, y, turn, [px], [py], [zoom]): the picture turned and grown
+ * about a pivot, through pbgvm's --dump (one hex digit a pixel, a row a line). */
 
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,4 +67,35 @@ test('sprites stay upright at their turned places', () => {
     /* a 1x1 sprite of colour 7 at 90, 60 lands where pset(90, 60) does */
     const r = run('sset(8, 0, 7); camera(0, 0, 0.25); spr(1, 90, 60, 0.125, 0.125);', '79,70,1,1');
     assert.equal(r.out.trim(), '7');
+});
+
+const count = (out, c) => out.split('').filter((d) => d === c).length;
+
+test('a zoom grows shapes about the pivot', () => {
+    /* 20 by 20 about the middle, twice the size: 40 by 40 from 60, 40 */
+    const r = run('camera(0, 0, 0, 80, 60, 2); rectfill(70, 50, 89, 69, 7);', '0,0,160,120');
+    assert.equal(r.status, 0, r.err);
+    assert.equal(count(r.out, '7'), 1600);
+    const edge = run('camera(0, 0, 0, 80, 60, 2); rectfill(70, 50, 89, 69, 7);', '59,40,2,1');
+    assert.equal(edge.out.trim(), '07');
+});
+
+test('a zoom of 1 draws as no zoom does', () => {
+    const a = run('camera(0, 0, 0.07); circfill(60, 50, 20, 7); trifill(10, 10, 90, 20, 40, 90, 8);', '0,0,160,120');
+    const b = run('camera(0, 0, 0.07, 80, 60, 1); circfill(60, 50, 20, 7); trifill(10, 10, 90, 20, 40, 90, 8);', '0,0,160,120');
+    assert.equal(a.out, b.out);
+});
+
+test('rspr grows with the zoom, spr keeps its size', () => {
+    const fill = 'for (var i = 0; i < 8; i++) for (var j = 0; j < 8; j++) sset(8 + i, j, 7);';
+    const r = run(fill + ' camera(0, 0, 0, 80, 60, 2); rspr(1, 80, 60, 0);', '0,0,160,120');
+    assert.equal(count(r.out, '7'), 256);
+    const s = run(fill + ' camera(0, 0, 0, 80, 60, 2); spr(1, 76, 56);', '0,0,160,120');
+    assert.equal(count(s.out, '7'), 64);
+});
+
+test('a zoom past 1/16 to 16 is an error', () => {
+    const r = run('camera(0, 0, 0, 80, 60, 20);', '0,0,1,1');
+    assert.notEqual(r.status, 0);
+    assert.match(r.err, /zoom from 1\/16 to 16/);
 });
