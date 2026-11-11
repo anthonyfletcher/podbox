@@ -21,6 +21,9 @@ struct simplelist_info;
  * simplelist_show_list(): true when the owner went out to the root. */
 bool shell_list(struct simplelist_info *info);
 
+/* Each cart's saved numbers, <id>.sav, and a game left with Quit, <id>.sus */
+#define SAVE_DIR "/.rockbox/games/saves"
+
 /* path as dir/<the cart id's sixteen hex digits><ext> */
 void shell_id_path(char *path, size_t size, const char *dir,
                    const uint8_t *id, const char *ext);

@@ -27810,20 +27810,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_CLEAR_HIGH_SCORES_ASK
-  desc: asked before a game cart's high scores are cleared
-  user: core
-  <source>
-    *: "Every table of this game's scores is emptied."
-  </source>
-  <dest>
-    *: "Se vaciarán todas las tablas de puntuación de este juego."
-  </dest>
-  <voice>
-    *: "Se vaciarán todas las tablas de puntuación de este juego."
-  </voice>
-</phrase>
-<phrase>
   id: LANG_NO_HIGH_SCORES
   desc: a game cart's high-score table with nothing in it yet
   user: core
@@ -27908,20 +27894,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_ACH_COUNT
-  desc: a game cart's High Scores row: achievements earned, of all
-  user: core
-  <source>
-    *: "Achievements: %d of %d"
-  </source>
-  <dest>
-    *: "Logros: %d de %d"
-  </dest>
-  <voice>
-    *: "Logros"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_ACH_EARNED
   desc: the banner over a game when an achievement is earned, and one earned on an unknown date
   user: core
@@ -27933,48 +27905,6 @@
   </dest>
   <voice>
     *: "Logro conseguido"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_EARNED_ON
-  desc: an achievement's box: the date it was earned, year-month-day
-  user: core
-  <source>
-    *: "Earned %04d-%02d-%02d"
-  </source>
-  <dest>
-    *: "Conseguido el %04d-%02d-%02d"
-  </dest>
-  <voice>
-    *: "Conseguido el"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_NOT_YET
-  desc: an achievement's box: not earned yet
-  user: core
-  <source>
-    *: "Not earned yet"
-  </source>
-  <dest>
-    *: "Aún no conseguido"
-  </dest>
-  <voice>
-    *: "Aún no conseguido"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_LOCKED
-  desc: in the list of achievements: one not earned yet
-  user: core
-  <source>
-    *: "%s (not yet)"
-  </source>
-  <dest>
-    *: "%s (aún no)"
-  </dest>
-  <voice>
-    *: "aún no"
   </voice>
 </phrase>
 <phrase>

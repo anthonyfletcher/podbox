@@ -1717,9 +1717,9 @@ Deletes every thumbnail and generates them all again from the original images.
 Slow. Use it after changing Fast Build, which only affects thumbnails made from
 then on, or if the cached images themselves look wrong.
 
-[action: Rescan Books, Documents & Images]
-Rebuilds the Books lists and the flat Documents and Images lists from a walk
-of the disk.
+[action: Rebuild File Index]
+Rebuilds the Books lists, the flat Documents and Images lists and the Games
+shelf from a walk of the disk.
 
 It reruns itself after a USB session, which is when files normally change, so
 this is for when they changed some other way.

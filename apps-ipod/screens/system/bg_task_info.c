@@ -96,15 +96,16 @@ static void add_art_cache_lines(void)
 static void add_file_index_lines(void)
 {
     const char *dir = file_index_activity();
-    int docs, images;
+    int docs, images, games;
 
-    file_index_counts(&docs, &images);
+    file_index_counts(&docs, &images, &games);
 
-    simplelist_addline("Books, Documents & Images: %s", file_index_state());
+    simplelist_addline("File Index: %s", file_index_state());
 
     /* Zero until a pass has run this boot; the lists on disk may be older. */
-    if (docs || images)
-        simplelist_addline("  Found: %d documents, %d images", docs, images);
+    if (docs || images || games)
+        simplelist_addline("  Found: %d documents, %d images, %d games",
+                           docs, images, games);
 
     /* A whole-disk walk has no total to count against, so where it has got to
      * is the whole of the progress there is. */

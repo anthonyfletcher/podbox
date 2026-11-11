@@ -99,14 +99,14 @@
 #   <Random>, <Resume>, <Featured In>, the groupings a
 #   tagnavi %header level puts above an artist's albums) have no track
 #   number, so they take the icon shape, as do the database's top menus, Music
-#   and Audiobooks, and the Books menu (%cs 38). <All Tracks> and <By album> stay bare, in line with the
+#   and Audiobooks, the Books menu (%cs 38) and the Arcade (%cs 40). <All Tracks> and <By album> stay bare, in line with the
 #   album and artist rows they head. A genre called Audiobooks lists
 #   containers (%Lk 6), so it is not one. Custom menu's rows take the icon
 #   shape too, as do the user's own rows wherever they are (%Lk 10 and 11).
 #   A track is numbered only where its list numbers it (%Lp): a podcast's
 #   episodes across its shows go bare.
 %Vl(Rows,0,0,1,1,-)
-%?Lm<%vs(shape,set,1)|%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7),%Lp))<%vs(shape,set,2)|%vs(shape,set,3)>>>
+%?Lm<%vs(shape,set,1)|%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%if(%cs,=,40),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7),%Lp))<%vs(shape,set,2)|%vs(shape,set,3)>>>
 #
 # - Chevron, on rows that open a list: a settings or context submenu, a
 #   folder, a database level above the tracks, a catalogue playlist. A Yes/No
@@ -126,7 +126,7 @@
 #   The user's own rows have names no skin knows, so they go by %Lk: 10 a
 #   view, 11 a menu.
 %Vl(Rows,2,3,24,24,2)
-%?La<|%?Lm<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?if(%Lm,=,m)<×|Ö>|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(By Type))<ª|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,35,Ę,36,ė,-1,-,¨)>>>>|%?if(%Lk,=,10)<ċ|%?if(%Lk,=,11)<Ċ|%?and(%if(%Lk,=,5),%if(%LT,=,Album))<d|%?if(%LT,=,%Sx(Now Playing))<%?mp<A|A|B|A|A>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,%Sx(Resume Playback),C,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Podcasts),Ď,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Books),Č,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(Listening Stats),Ĕ,%Sx(By Series),ģ,%Sx(By Show),ď,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%Sx(Custom menu),Ċ,%sel(%LI,19,Þ,2,m)))>>>>>>>>
+%?La<|%?Lm<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?if(%Lm,=,m)<×|Ö>|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(By Type))<ª|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,9,Ħ,33,¦,34,§,35,Ę,36,ė,-1,-,¨)>>>>|%?if(%Lk,=,10)<ċ|%?if(%Lk,=,11)<Ċ|%?and(%if(%Lk,=,5),%if(%LT,=,Album))<d|%?if(%LT,=,%Sx(Now Playing))<%?mp<A|A|B|A|A>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,%Sx(Resume Playback),C,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Podcasts),Ď,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Books),Č,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(Listening Stats),Ĕ,%Sx(By Series),ģ,%Sx(By Show),ď,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%Sx(Custom menu),Ċ,%Sx(Arcade),Ĥ,%Sx(High Scores),Ĕ,%sel(%LI,19,Þ,2,m,9,ĥ)))>>>>>>>>
 #
 # - Row number
 %Vl(Rows,0,5,30,20,3)
@@ -160,14 +160,16 @@
 #
 # Album/Artist row setup
 #
-# - Special row icon, groupings included
+# - Special row icon, groupings included; in the Arcade, the
+#   cartridge for a game with no logo (%LI 9), which the art below
+#   leaves alone: the art line clears the top of the row when drawn.
 %Vl(Rows,10,12,24,24,2)
-%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Search),®,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d)>
+%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(In Progress),ē,%Sx(Not Started),đ,%Sx(Finished),Ē,%Sx(Reading Stats),Ĕ,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx([In Progress]),ē,%Sx([Not Started]),đ,%Sx([Finished]),Ē,%Sx(Search),®,%Sx(By Title),%sel(%cs,38,č,ë),%Sx(By Author),ì,%Sx(By Subject),l,%Sx(High Scores),Ĕ,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d,%sel(%cs,40,%sel(%LI,9,ĥ)))>
 #
 # - Row art, darkened by a filter when not selected: a rectangle over
 #   the square would darken the sides of a book's narrower cover too.
 %Vl(Rows,0,2,44,44,-)
-%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])))<%?if(%cs,=,38)<%?Lc<%La|%La(0,-,-,darker40)>|%?Lc<%La(0,-,2)|%La(0,-,2,darker40)>>>
+%?and(%La,%if(%Lk,!=,5),%if(%LT,!=,%Sx([Untagged])),%if(%LI,!=,9))<%?or(%if(%cs,=,38),%if(%cs,=,40))<%?Lc<%La|%La(0,-,-,darker40)>|%?Lc<%La(0,-,2)|%La(0,-,2,darker40)>>>
 #
 # - Selection bar
 %Vl(Rows,50,0,3,48,-)

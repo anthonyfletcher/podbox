@@ -27802,20 +27802,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_CLEAR_HIGH_SCORES_ASK
-  desc: asked before a game cart's high scores are cleared
-  user: core
-  <source>
-    *: "Every table of this game's scores is emptied."
-  </source>
-  <dest>
-    *: "Tutte le tabelle dei punteggi di questo gioco verranno svuotate."
-  </dest>
-  <voice>
-    *: "Tutte le tabelle dei punteggi di questo gioco verranno svuotate."
-  </voice>
-</phrase>
-<phrase>
   id: LANG_NO_HIGH_SCORES
   desc: a game cart's high-score table with nothing in it yet
   user: core
@@ -27900,20 +27886,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_ACH_COUNT
-  desc: a game cart's High Scores row: achievements earned, of all
-  user: core
-  <source>
-    *: "Achievements: %d of %d"
-  </source>
-  <dest>
-    *: "Traguardi: %d di %d"
-  </dest>
-  <voice>
-    *: "Traguardi"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_ACH_EARNED
   desc: the banner over a game when an achievement is earned, and one earned on an unknown date
   user: core
@@ -27925,48 +27897,6 @@
   </dest>
   <voice>
     *: "Traguardo ottenuto"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_EARNED_ON
-  desc: an achievement's box: the date it was earned, year-month-day
-  user: core
-  <source>
-    *: "Earned %04d-%02d-%02d"
-  </source>
-  <dest>
-    *: "Ottenuto il %04d-%02d-%02d"
-  </dest>
-  <voice>
-    *: "Ottenuto il"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_NOT_YET
-  desc: an achievement's box: not earned yet
-  user: core
-  <source>
-    *: "Not earned yet"
-  </source>
-  <dest>
-    *: "Non ancora ottenuto"
-  </dest>
-  <voice>
-    *: "Non ancora ottenuto"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_LOCKED
-  desc: in the list of achievements: one not earned yet
-  user: core
-  <source>
-    *: "%s (not yet)"
-  </source>
-  <dest>
-    *: "%s (non ancora)"
-  </dest>
-  <voice>
-    *: "non ancora"
   </voice>
 </phrase>
 <phrase>

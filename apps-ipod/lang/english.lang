@@ -20168,16 +20168,16 @@
 </phrase>
 <phrase>
   id: LANG_RESCAN_FILES
-  desc: maintenance action, rebuild the Books lists and the flat Documents and Images lists
+  desc: maintenance action, rebuild the File Index: the Books lists, the flat Documents and Images lists, and the Arcade
   user: core
   <source>
-    *: "Rescan Books, Documents & Images"
+    *: "Rebuild File Index"
   </source>
   <dest>
-    *: "Rescan Books, Documents & Images"
+    *: "Rebuild File Index"
   </dest>
   <voice>
-    *: "Rescan books, documents and images"
+    *: "Rebuild file index"
   </voice>
 </phrase>
 <phrase>
@@ -27887,20 +27887,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_CLEAR_HIGH_SCORES_ASK
-  desc: asked before a game cart's high scores are cleared
-  user: core
-  <source>
-    *: "Every table of this game's scores is emptied."
-  </source>
-  <dest>
-    *: "Every table of this game's scores is emptied."
-  </dest>
-  <voice>
-    *: "Every table of this game's scores is emptied."
-  </voice>
-</phrase>
-<phrase>
   id: LANG_NO_HIGH_SCORES
   desc: a game cart's high-score table with nothing in it yet
   user: core
@@ -27985,20 +27971,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_ACH_COUNT
-  desc: a game cart's High Scores row: achievements earned, of all
-  user: core
-  <source>
-    *: "Achievements: %d of %d"
-  </source>
-  <dest>
-    *: "Achievements: %d of %d"
-  </dest>
-  <voice>
-    *: "Achievements"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_ACH_EARNED
   desc: the banner over a game when an achievement is earned, and one earned on an unknown date
   user: core
@@ -28010,48 +27982,6 @@
   </dest>
   <voice>
     *: "Achievement Earned"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_EARNED_ON
-  desc: an achievement's box: the date it was earned, year-month-day
-  user: core
-  <source>
-    *: "Earned %04d-%02d-%02d"
-  </source>
-  <dest>
-    *: "Earned %04d-%02d-%02d"
-  </dest>
-  <voice>
-    *: "Earned"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_NOT_YET
-  desc: an achievement's box: not earned yet
-  user: core
-  <source>
-    *: "Not earned yet"
-  </source>
-  <dest>
-    *: "Not earned yet"
-  </dest>
-  <voice>
-    *: "Not earned yet"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_ACH_LOCKED
-  desc: in the list of achievements: one not earned yet
-  user: core
-  <source>
-    *: "%s (not yet)"
-  </source>
-  <dest>
-    *: "%s (not yet)"
-  </dest>
-  <voice>
-    *: "not yet"
   </voice>
 </phrase>
 <phrase>
@@ -28094,5 +28024,103 @@
   </dest>
   <voice>
     *: "Previous Screen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE
+  desc: the main menu row and title of the Arcade, the game carts on the player
+  user: core
+  <source>
+    *: "Arcade"
+  </source>
+  <dest>
+    *: "Arcade"
+  </dest>
+  <voice>
+    *: "Arcade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_NONE
+  desc: the Arcade with no game carts on the player
+  user: core
+  <source>
+    *: "No games. Copy .pbg game files onto the player"
+  </source>
+  <dest>
+    *: "No games. Copy .pbg game files onto the player"
+  </dest>
+  <voice>
+    *: "No games. Copy .pbg game files onto the player"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_PAUSED
+  desc: a game on the Arcade that was left with Quit and starts where it was left: its name, then this
+  user: core
+  <source>
+    *: "%s (Paused)"
+  </source>
+  <dest>
+    *: "%s (Paused)"
+  </dest>
+  <voice>
+    *: "Paused"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME
+  desc: a game's context menu on the Arcade: forget its paused game and the progress it has saved
+  user: core
+  <source>
+    *: "Delete Saved Game"
+  </source>
+  <dest>
+    *: "Delete Saved Game"
+  </dest>
+  <voice>
+    *: "Delete Saved Game"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME_ASK
+  desc: asked before Delete Saved Game
+  user: core
+  <source>
+    *: "Delete the paused game and the progress this game has saved?"
+  </source>
+  <dest>
+    *: "Delete the paused game and the progress this game has saved?"
+  </dest>
+  <voice>
+    *: "Delete the paused game and the progress this game has saved?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_QUIT_ASK
+  desc: asked over a game when Menu is pressed and let go: leave the game, as the pause menu's Quit does
+  user: core
+  <source>
+    *: "Quit this game?"
+  </source>
+  <dest>
+    *: "Quit this game?"
+  </dest>
+  <voice>
+    *: "Quit this game?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_PLAYED
+  desc: a game's high-score tables: the page of how often and how long it was played
+  user: core
+  <source>
+    *: "Played"
+  </source>
+  <dest>
+    *: "Played"
+  </dest>
+  <voice>
+    *: "Played"
   </voice>
 </phrase>

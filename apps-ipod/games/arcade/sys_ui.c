@@ -998,13 +998,14 @@ void arcade_dialog_answer(struct vm *vm, const char *answer)
 }
 
 int arcade_confirm(struct vm *vm, const char *prompt, const char *yes,
-                   const char *no)
+                   const char *no, int no_first)
 {
     static char text[TEXT_BYTES];
     prompt_of(text, sizeof(text), "", prompt);
     dialog_open(&dlg, ARCADE_DIALOG_CONFIRM, text);
     dlg.yes = yes;
     dlg.no = no;
+    dlg.at = no_first ? 1 : 0;
     run(vm, &dlg);
     return dlg.answer;
 }

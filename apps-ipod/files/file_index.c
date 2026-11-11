@@ -1,17 +1,21 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * An index of the documents and images on the player.
+ * The File Index: the documents, images and game carts on the player.
  *
  * Nothing else indexes them. The tag database knows about audio and nothing
  * but audio, so a flat "every document on the device" list has no existing
  * source to read -- which is why this walks the disk itself.
  *
- * One walk produces both lists. Classifying a file is a lookup on its
+ * One walk produces all three lists. Classifying a file is a lookup on its
  * extension (filetype_get_attr()), so having found a file it is as cheap to
- * ask both questions as one; walking twice would double the only expensive
+ * ask every question as one; walking again would repeat the only expensive
  * part. The same walk keeps the book index (book_index.c) current, handing
  * it each book with the size and time its directory entry already gave.
+ *
+ * The walk passes over every folder whose name starts with a dot, but for
+ * one: /.rockbox/games, where the release puts its own carts, is walked for
+ * carts alone.
  *
  * The lists are plain text, one path per line, written to a .tmp and renamed
  * only on a completed walk -- so an interrupted one leaves the previous list
@@ -56,6 +60,10 @@
 
 #define FILE_INDEX_DOCS   LIB_DOCUMENTS_FILE
 #define FILE_INDEX_IMAGES LIB_IMAGES_FILE
+#define FILE_INDEX_GAMES  LIB_GAMES_FILE
+
+/* The release's own carts, under a dot-folder the walk otherwise passes */
+#define FILE_INDEX_BUILT_IN_GAMES "/.rockbox/games"
 
 /* Deepest nesting the walk will follow. Recursion here costs stack, and the
  * thread's is modest; anything filed deeper than this is almost certainly not
@@ -67,10 +75,14 @@ static volatile bool fi_wants_scan;
 static volatile bool fi_abort;
 static volatile bool fi_busy;
 
-/* The walk's two output lists. path_list owns the .tmp-and-rename publishing,
- * and the line accounting with it. */
+/* The walk's three output lists. path_list owns the .tmp-and-rename
+ * publishing, and the line accounting with it. */
 static struct path_list_writer fi_docs;
 static struct path_list_writer fi_images;
+static struct path_list_writer fi_games;
+
+/* Walking /.rockbox/games: carts only, its saves and data passed over */
+static bool fi_games_only;
 
 /* One path buffer, reused down the recursion rather than one per level:
  * MAX_PATH per frame times the depth limit is far more stack than the thread
@@ -93,10 +105,11 @@ const char *file_index_state(void)
 
 /* The writers keep their line counts past the close, so these are the last
  * pass's totals once it has finished and its running ones while it walks. */
-void file_index_counts(int *docs, int *images)
+void file_index_counts(int *docs, int *images, int *games)
 {
     *docs = fi_docs.count;
     *images = fi_images.count;
+    *games = fi_games.count;
 }
 
 const char *file_index_activity(void)
@@ -107,6 +120,18 @@ const char *file_index_activity(void)
 const char *file_index_list(bool images)
 {
     return images ? FILE_INDEX_IMAGES : FILE_INDEX_DOCS;
+}
+
+const char *file_index_games(void)
+{
+    return FILE_INDEX_GAMES;
+}
+
+bool file_index_has_games(void)
+{
+    struct libfile_header h;
+    return libfile_peek(FILE_INDEX_GAMES, LIB_PATHS_MAGIC, LIB_PATHS_VERSION,
+                        &h) && h.count > 0;
 }
 
 /* A line of a list: the file's time (FAT date and time) in eight hex
@@ -166,11 +191,12 @@ static bool fi_is_cover_art(const char *name)
     return false;
 }
 
-/* Both lists full: nothing more can be recorded, so stop walking. */
+/* Every list full: nothing more can be recorded, so stop walking. */
 static bool fi_lists_full(void)
 {
     return path_list_write_full(&fi_docs)
-        && path_list_write_full(&fi_images);
+        && path_list_write_full(&fi_images)
+        && path_list_write_full(&fi_games);
 }
 
 /* Walk 'fi_path' (a directory) and everything under it. */
@@ -214,6 +240,12 @@ static void fi_walk(int depth)
             if (depth > 0 || strcasecmp((char *)entry->d_name, "Artwork"))
                 fi_walk(depth + 1);
         }
+        else if (fi_games_only)
+        {
+            if ((filetype_get_attr(fi_path) & FILE_ATTR_MASK)
+                == FILE_ATTR_GAME)
+                fi_record(&fi_games, info.mtime);
+        }
         else
         {
             switch (filetype_get_attr(fi_path) & FILE_ATTR_MASK)
@@ -227,6 +259,9 @@ static void fi_walk(int depth)
                 case FILE_ATTR_IMG:
                     if (!fi_is_cover_art((char *)entry->d_name))
                         fi_record(&fi_images, info.mtime);
+                    break;
+                case FILE_ATTR_GAME:
+                    fi_record(&fi_games, info.mtime);
                     break;
             }
         }
@@ -248,14 +283,16 @@ static void fi_run_scan(void)
     fi_abort = false;
     fi_busy = true;
 
-    /* Both or neither. One walk fills both lists, so a pass that could only
-     * open one of them has nothing worth publishing -- and publishing half a
-     * pass would leave the two lists describing different walks. */
+    /* All or none. One walk fills every list, so a pass that could only
+     * open some of them has nothing worth publishing -- and publishing part
+     * of a pass would leave the lists describing different walks. */
     if (!path_list_write_open(&fi_docs, FILE_INDEX_DOCS)
-        || !path_list_write_open(&fi_images, FILE_INDEX_IMAGES))
+        || !path_list_write_open(&fi_images, FILE_INDEX_IMAGES)
+        || !path_list_write_open(&fi_games, FILE_INDEX_GAMES))
     {
         path_list_write_close(&fi_docs, false);
         path_list_write_close(&fi_images, false);
+        path_list_write_close(&fi_games, false);
         fi_busy = false;
         fi_wants_scan = true;     /* no room to write now; try again later */
         return;
@@ -265,7 +302,14 @@ static void fi_run_scan(void)
     started = current_tick;
     book_index_begin();
     strcpy(fi_path, "/");
+    fi_games_only = false;
     fi_walk(0);
+    if (!fi_abort)
+    {
+        strcpy(fi_path, FILE_INDEX_BUILT_IN_GAMES);
+        fi_games_only = true;
+        fi_walk(1);
+    }
 
     completed = !fi_abort;
     if (book_index_end(completed))
@@ -279,6 +323,7 @@ static void fi_run_scan(void)
               (long)(current_tick - started) / HZ);
     path_list_write_close(&fi_docs, completed);
     path_list_write_close(&fi_images, completed);
+    path_list_write_close(&fi_games, completed);
 
     fi_busy = false;
     fi_wants_scan = !completed;   /* interrupted: try again later */
@@ -306,7 +351,7 @@ static void fi_tick(void)
 }
 
 /* bg_task.request: both triggers do the same thing here. There is nothing to
- * keep between passes -- the walk rewrites both lists from scratch -- so a
+ * keep between passes -- the walk rewrites every list from scratch -- so a
  * rebuild and an update are the same walk. The thread sends one after a USB
  * session too: the host has had the disk, the one moment files reliably
  * appear and disappear without anyone telling us. */
@@ -318,7 +363,7 @@ static void fi_request(bool rebuild)
 
 struct bg_task file_index_task =
 {
-    .name    = "books, documents & images",
+    .name    = "file index",
     .rank    = BG_RANK_FILES,
     .work_bytes = BOOK_INDEX_WORK_BYTES,
     .request = fi_request,
@@ -330,8 +375,9 @@ void file_index_init(void)
     bg_task_init(&file_index_task);
 
     /* Nothing to read on a first boot, or after the lists were deleted; or
-     * a book index an older version wrote, which only a walk replaces. */
+     * a book index an older version wrote, which only a walk replaces; or
+     * no list of games, which a walk before the games were indexed left. */
     if ((!file_exists(FILE_INDEX_DOCS) && !file_exists(FILE_INDEX_IMAGES))
-        || book_index_stale())
+        || !file_exists(FILE_INDEX_GAMES) || book_index_stale())
         fi_wants_scan = true;
 }

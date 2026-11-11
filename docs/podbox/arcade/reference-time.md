@@ -55,10 +55,11 @@ each second.
 
 ### Pausing
 
-Pressing Menu pauses the cart and shows the pause menu, unless the cart
-takes Menu as a button (`"menu_button": "game"` in `cart.json`). On the
-iPod, a cart left untouched for five minutes pauses too, so the player
-can turn its backlight off. The hold switch pauses it as well. No ticks
+Holding Menu for a second pauses the cart and shows the pause menu. A
+short press asks whether to quit, unless the cart takes it as a button
+(`"menu_button": "game"` in `cart.json`); the question pauses the game
+too. On the iPod, a cart left untouched for five minutes pauses as well,
+so the player can turn its backlight off. The hold switch pauses it as well. No ticks
 run while paused, and a dialog (`ui.*`) holds the ticks the same way
 while it is open. [`resumed()`](#resumed) tells the cart it was paused,
 and music the cart plays itself (`playback.play`) pauses with it.
@@ -168,8 +169,8 @@ function update() {
 
 ## resumed()
 
-Whether the game was paused -- by the pause menu or the hold switch --
-since the last call.
+Whether the game was paused -- by the pause menu, the hold switch or the
+question a short press of Menu asks -- since the last call.
 
 **Returns** true once after a pause, then false until the next.
 

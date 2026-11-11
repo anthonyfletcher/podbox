@@ -209,10 +209,12 @@ games/quiz/quiz_pick.c
 games/arcade/shell.c
 games/arcade/shell_tracks.c
 games/arcade/shell_score.c
+games/arcade/shell_table.c
 games/arcade/shell_opts.c
 games/arcade/shell_suspend.c
 games/arcade/shell_store.c
 games/arcade/shell_font.c
+games/arcade/shelf.c
 games/arcade/vm.c
 games/arcade/gc.c
 games/arcade/loader.c

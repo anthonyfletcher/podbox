@@ -134,6 +134,8 @@ enum {
     /* Every book's Listening Stats (screens/browse/listen_progress.c), from
      * the Audiobooks menu's built-in row */
     GO_TO_LISTEN_STATS,
+    /* The Arcade: the game carts on the player (games/arcade/shelf.c) */
+    GO_TO_ARCADE,
 };
 extern struct menu_item_ex root_menu_;
 

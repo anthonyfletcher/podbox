@@ -43,6 +43,8 @@
 #include "screens/browse/browser.h"
 #include "screens/browse/browser_db.h"
 #include "screens/browse/ebook_shelf.h"
+#include "games/arcade/shelf.h"
+#include "files/file_index.h"
 #include "screens/playback/wps.h"
 #include "playlist/playlist.h"
 #include "database/sound_mix.h"
@@ -902,6 +904,12 @@ static int books_scrn(void* param)
     return ebook_shelf_run();
 }
 
+static int arcade_scrn(void* param)
+{
+    (void)param;
+    return arcade_shelf_run();
+}
+
 /* Spun.
  *
  * It has to be a root-menu screen to work at all now that a card can be
@@ -983,6 +991,7 @@ static const struct root_items items[] = {
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_BOOKS] = { books_scrn, NULL, &text_viewer_menu },
+    [GO_TO_ARCADE] = { arcade_scrn, NULL, NULL },
     [GO_TO_PODCASTS] = { browser, (void*)GO_TO_PODCASTS, &tagcache_menu },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
     [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
@@ -1048,6 +1057,8 @@ MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(books_item, ID2P(LANG_EBOOKS), GO_TO_BOOKS,
                         NULL, Icon_Font);
+MENUITEM_RETURNVALUE(arcade_item, ID2P(LANG_ARCADE), GO_TO_ARCADE,
+                        item_callback, Icon_Plugin);
 MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
                         NULL, Icon_Audio);
 MENUITEM_RETURNVALUE(podcasts_item, ID2P(LANG_PODCASTS), GO_TO_PODCASTS,
@@ -1159,6 +1170,7 @@ static struct menu_table menu_table[] = {
     { "docs", &documents_item },
     { "images", &images_item },
     { "books", &books_item },
+    { "arcade", &arcade_item },
     { "spun", &spun_item },
     { "podcasts", &podcasts_item },
     { "playlists", &playlists },
@@ -1213,7 +1225,7 @@ static void root_menu_apply_canonical_order(void)
     static const struct menu_item_ex * const after_tagnavi[] = {
         &current_playlist, &playlists, &spun_item,
         &file_browser, &books_item, &documents_item, &images_item,
-        &shortcut_menu, &quiz_item,
+        &arcade_item, &shortcut_menu, &quiz_item,
         &menu_, &system_menu_,
     };
     struct menu_item_ex *reordered[MAX_MENU_ITEMS];
@@ -1336,6 +1348,7 @@ static const struct {
     { &books_item,        { &file_browser, NULL } },
     { &documents_item,    { &books_item, &file_browser } },
     { &images_item,       { &documents_item, &books_item, &file_browser } },
+    { &arcade_item,        { &images_item, &documents_item, &file_browser } },
     { &random_album_item, { &db_browser, NULL } },
     { &db_search_item,    { &db_browser, NULL } },
     { &current_playlist,  { &playlists, NULL } },
@@ -1879,6 +1892,13 @@ static int item_callback(int action,
                 char path[MAX_PATH];
                 if (!text_viewer_last_document(path, sizeof(path)) ||
                     !file_exists(path))
+                    return ACTION_EXIT_MENUITEM;
+            }
+            else if (this_item == &arcade_item)
+            {
+                /* On from the start, and shown once the File Index has
+                 * found a game: one header read, on the same terms. */
+                if (!file_index_has_games())
                     return ACTION_EXIT_MENUITEM;
             }
         break;

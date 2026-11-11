@@ -116,13 +116,13 @@ static int damaged(struct vm *vm, const char *what)
     return vm_fail(vm, "this game file is damaged: ", what, "");
 }
 
-/* Palette n's colours and how many, or NULL */
-static const uint8_t *palette_at(const struct vm *vm, uint32_t n,
+/* Palette n's colours and how many, or NULL, from a PALS chunk */
+static const uint8_t *palette_in(const uint8_t *p, uint32_t len, uint32_t n,
                                  uint32_t *count)
 {
-    const uint8_t *p = vm->pals, *end = p + vm->pals_len;
+    const uint8_t *end = p + len;
     *count = 0;
-    if (!p || vm->pals_len < 1 || n >= p[0])
+    if (!p || len < 1 || n >= p[0])
         return NULL;
     p++;
     for (uint32_t i = 0;; i++) {
@@ -137,6 +137,42 @@ static const uint8_t *palette_at(const struct vm *vm, uint32_t n,
         }
         p += 2 + k * 3;
     }
+}
+
+static const uint8_t *palette_at(const struct vm *vm, uint32_t n,
+                                 uint32_t *count)
+{
+    return palette_in(vm->pals, vm->pals_len, n, count);
+}
+
+/* A cart's logo, read without loading the cart: the LOGO chunk's picture
+ * in the colours of its first palette (PALS, or PodBox's sixteen without
+ * one), 0xRRGGBB a pixel into rgb. 1 when it fitted in cap pixels whole. */
+int arcade_logo_rgb(const uint8_t *logo, uint32_t logo_len,
+                    const uint8_t *pals, uint32_t pals_len,
+                    uint32_t *rgb, uint32_t cap, int *w, int *h)
+{
+    static uint8_t px[ARCADE_LOGO_SIZE * ARCADE_LOGO_SIZE];
+    uint32_t k = 0, pw, ph, n;
+    const uint8_t *pal = palette_in(pals, pals_len, 0, &k);
+    if (!logo || logo_len < 8)
+        return 0;
+    pw = le16(logo);
+    ph = le16(logo + 2);
+    n = le16(logo + 4) | le16(logo + 6) << 16;
+    if (!pw || !ph || pw * ph > cap || pw * ph > sizeof(px) ||
+        n > logo_len - 8 || !lz4_decode(logo + 8, n, px, pw * ph))
+        return 0;
+    for (uint32_t i = 0; i < pw * ph; i++) {
+        uint32_t c = px[i];
+        rgb[i] = pal ? (c < k ? (uint32_t)pal[c * 3] << 16 |
+                                (uint32_t)pal[c * 3 + 1] << 8 | pal[c * 3 + 2]
+                              : 0)
+                     : c < 16 ? default_rgb[c] : 0;
+    }
+    *w = (int)pw;
+    *h = (int)ph;
+    return 1;
 }
 
 static void use_palette(struct vm *vm, const uint8_t *rgb, uint32_t k)

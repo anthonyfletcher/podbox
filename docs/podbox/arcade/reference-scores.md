@@ -142,6 +142,10 @@ Shows the player's own table for a board, over the game, after this tick.
 **Returns** nothing.
 
 - The latest score is marked when it made the ten.
+- The table is the Arcade's own, drawn in its CAPS font in the player's
+  theme colours: the same screen as the pause menu's High Scores, a page
+  a board, then the achievements and how much the game was played, turned
+  with the wheel. Left closes it.
 - The game is paused while the table is open; it carries on with the next
   tick once the owner closes it.
 - Several calls in one tick show the last.
@@ -259,9 +263,9 @@ if (points == 100) ach.earn(ACH.hundred);
 
 ## The pause menu
 
-Menu pauses the game (unless the cart takes Menu as a button with
-`"menu_button": "game"` in `cart.json`) and opens the pause menu. Its
-rows, top to bottom:
+Holding Menu for a second pauses the game and opens the pause menu (a
+short press asks whether to quit, or with `"menu_button": "game"` in
+`cart.json` reaches the cart). Its rows, top to bottom:
 
 1. **Resume**
 2. the cart's own items, from `menuitem`

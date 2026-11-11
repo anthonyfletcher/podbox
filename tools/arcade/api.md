@@ -269,7 +269,7 @@ Ticks a second now.
 Frames that ran late and were not drawn since the last call.
 
 ### resumed()
-Whether the game was paused -- the pause menu, the hold switch -- since the last call.
+Whether the game was paused -- the pause menu, the hold switch, the question a short press of Menu asks -- since the last call.
 
 ### dget(i)
 Saved number `i`, 0 to 255; kept between plays.

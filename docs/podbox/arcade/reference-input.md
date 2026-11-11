@@ -142,14 +142,17 @@ function draw() {
 
 ## The Menu button
 
-By default **Menu pauses the game**: the player stops the cart and shows
-its pause menu -- the cart's options, high scores, help, and items of its
-own from `menuitem()`. The cart is not told, and carries on where it was
-when the menu closes.
+**Holding Menu for a second pauses the game**: the player stops the cart
+and shows its pause menu -- the cart's options, high scores, help, and
+items of its own from `menuitem()`. The cart carries on where it was when
+the menu closes, and [`resumed()`](reference-time.md#resumed) tells it the
+game was paused. Menu pressed in the pause menu leaves the game, as its
+Quit does, back to the list the game was started from.
 
-A cart that needs a fifth button can take Menu for itself, with
-`"menu_button": "game"` in `cart.json` (in the IDE, **Cart > Settings**,
-Running). Then:
+**A short press of Menu** asks over the game, in its dialog style, whether
+to quit. A cart that needs a fifth button can take the short press for
+itself instead, with `"menu_button": "game"` in `cart.json` (in the IDE,
+**Cart > Settings**, Running). Then:
 
 - **A short press of Menu** reaches the cart as button 2, for one tick,
   **when the button is let go**.

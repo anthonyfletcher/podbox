@@ -295,9 +295,9 @@ or a `1` where `1.5` should be, changes everything.
 ## Try it on your iPod
 
 Choose **Cart > Save as .pbg**. The whole cart is saved as one file.
-Copy it to your iPod -- into a folder called `Games`, say -- then on the
-iPod find it in Files and open it. Menu pauses it; choose Quit from the
-pause menu to leave.
+Copy it to your iPod -- into a folder called `Games`, say -- and it
+appears in the Arcade on the iPod's main menu. Press Menu and say Yes to
+leave it; hold Menu for a second to pause it.
 
 ## What you learned
 

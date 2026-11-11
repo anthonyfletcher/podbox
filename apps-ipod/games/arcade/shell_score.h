@@ -26,4 +26,14 @@ void shell_scores_write(struct vm *vm, bool leaving);
 bool shell_scores_menu(struct vm *vm);
 bool shell_score_table(struct vm *vm, int board, int rank);
 
+/* Each cart's file is here, <id>.sco */
+#define SCORES_DIR "/.rockbox/games/scores"
+
+/* A cart's record from its file, without the cart: false when there is
+ * none to read. The same High Scores menu for it, Clear writing the file
+ * back; true when the owner went out to the root. */
+struct arcade_scores;
+bool shell_scores_read(const char *path, struct arcade_scores *s);
+bool shell_scores_show(struct arcade_scores *s);
+
 #endif

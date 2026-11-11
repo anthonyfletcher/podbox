@@ -19,6 +19,16 @@
 /* playback.sound()'s record: SOUND.SIZE in arcade_api.def */
 #define ARCADE_SOUND_FIELDS 31
 
+/* A cart's logo, its LOGO chunk: this many pixels a side */
+#define ARCADE_LOGO_SIZE 44
+
+/* The logo as 0xRRGGBB pixels, read from the LOGO and PALS chunks without
+ * loading the cart (pals NULL for a cart with none); 1 when it fitted in
+ * cap pixels, its size in w and h */
+int arcade_logo_rgb(const uint8_t *logo, uint32_t logo_len,
+                    const uint8_t *pals, uint32_t pals_len,
+                    uint32_t *rgb, uint32_t cap, int *w, int *h);
+
 /* tracks.near(): the most it gives for a track, and the most tracks a
  * call takes */
 #define ARCADE_NEAR_MAX 64
@@ -516,10 +526,11 @@ int arcade_dialog(struct vm *vm, struct arcade_dialog *out);
  * message takes anything. NULL backs out of any. */
 void arcade_dialog_answer(struct vm *vm, const char *answer);
 /* The host's own question over the game, drawn and worked as ui.confirm()
- * is, with buttons labelled yes and no: 1 for yes. Translated text the
- * cart's font cannot draw is shown in FONT.WORLD. */
+ * is, with buttons labelled yes and no, the cursor on no when no_first:
+ * 1 for yes. Translated text the cart's font cannot draw is shown in
+ * FONT.WORLD. */
 int arcade_confirm(struct vm *vm, const char *prompt, const char *yes,
-                   const char *no);
+                   const char *no, int no_first);
 /* A banner across the top of the game's screen, head over title, in the
  * dialogs' style: the rows it covers, from 0, to present with it; the
  * game's pixels under them come back with arcade_banner_undo(). Draws

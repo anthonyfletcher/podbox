@@ -22,8 +22,6 @@
 #include "games/arcade/shell.h"
 #include "games/arcade/shell_suspend.h"
 
-#define SAVE_DIR "/.rockbox/games/saves"
-
 struct head
 {
     char magic[4];

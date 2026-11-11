@@ -27,6 +27,7 @@
 #include "config.h"
 #include "system.h"           /* TIME_BEFORE, cpu_boost */
 #include "kernel.h"
+#include "usb.h"                /* usb_inserted */
 #include "lcd.h"
 #include "font.h"
 #include "button.h"
@@ -84,8 +85,6 @@
 /* Untouched this long, the game pauses: the pause menu hands the
  * backlight, the CPU and idle power-off back to their settings. */
 #define IDLE_PAUSE (5 * 60 * HZ)
-
-#define SAVE_DIR "/.rockbox/games/saves"
 
 
 /* ---- the cart file and the save file ------------------------------------- */
@@ -836,12 +835,14 @@ static void wheel_events(bool on)
 #endif
 }
 
-/* A cart that claims MENU gets it as it is let go, for one tick, so the
- * hold that opens the pause menu is never also a press in the game. */
-static bool menu_down, menu_paused;
+/* MENU held for a second opens the pause menu. Let go sooner, it is a
+ * press: a cart that claims MENU gets it, for one tick, and any other asks
+ * whether to quit. Either way the hold that opens the pause menu is never
+ * also a press. */
+static bool menu_down, menu_paused, menu_tapped;
 static long menu_since;
 
-/* True once a claimed MENU has been held for a second: the pause menu. */
+/* True once MENU has been held for a second: the pause menu. */
 static bool menu_held_long(int status)
 {
     if (!(status & BUTTON_MENU))
@@ -864,9 +865,11 @@ static unsigned buttons(struct vm *vm, int status)
     if (status & BUTTON_RIGHT)  held |= ARCADE_NEXT;
     if (status & BUTTON_PLAY)   held |= ARCADE_PLAY;
     if (status & BUTTON_SELECT) held |= ARCADE_SELECT;
-    if (arcade_menu_is_game(vm) && menu_down && !(status & BUTTON_MENU)) {
-        if (!menu_paused)
+    if (menu_down && !(status & BUTTON_MENU)) {
+        if (!menu_paused && arcade_menu_is_game(vm))
             held |= ARCADE_MENU;
+        else if (!menu_paused)
+            menu_tapped = true;
         menu_down = false;
     }
     return held;
@@ -1137,6 +1140,15 @@ static bool music_menu(void)
     }
 }
 
+/* MENU in the pause menu, or in a list it opened, leaves the game as Quit
+ * does, back to the list the game was started from: for a game, that list
+ * is the root. A USB connection, which closes a list the same way, goes on
+ * to the root. */
+static int menu_out(void)
+{
+    return usb_inserted() ? USB : QUIT;
+}
+
 /* An item's function returning true keeps the menu up, relabelled, so a
  * cart can make a setting of its own; anything else resumes. */
 static int pause_menu(struct vm *vm, struct viewport *vp)
@@ -1174,30 +1186,28 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         info.get_value = menu_value;
         info.get_range = menu_range;
         info.selection = selection;
-        bool to_root = shell_list(&info);
-        /* MENU held or USB: out to the root, as everywhere else */
-        if (to_root)
-            return USB;
+        if (shell_list(&info))
+            return menu_out();
         selection = info.selection;
         int kind = selection < 0 ? ROW_RESUME : row_kind[selection];
         if (kind == ROW_OPTION) {
             if (shell_option_edit(vm, row_item[selection]))
-                return USB;
+                return menu_out();
             continue;
         }
         if (kind == ROW_HELP) {
             if (shell_help(vm))
-                return USB;
+                return menu_out();
             continue;
         }
         if (kind == ROW_SCORES) {
             if (shell_scores_menu(vm))
-                return USB;
+                return menu_out();
             continue;
         }
         if (kind == ROW_MUSIC) {
             if (music_menu())
-                return USB;
+                return menu_out();
             continue;
         }
         if (kind == ROW_RESTART)
@@ -1286,7 +1296,7 @@ static int hold_pause(struct vm *vm, bool idle)
 
 /* Everything queued since the last frame. The buttons are read as held
  * state, so their events are only drained; system events are acted on. */
-static int drain(struct vm *vm, bool *menu_pressed)
+static int drain(struct vm *vm)
 {
     long b;
     while ((b = button_get(false)) != BUTTON_NONE) {
@@ -1298,8 +1308,6 @@ static int drain(struct vm *vm, bool *menu_pressed)
             remote_key(vm, b);
         } else {
             beat_stamp(vm, b);
-            if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
-                *menu_pressed = true;
         }
     }
     return PLAYING;
@@ -1357,14 +1365,15 @@ static int run(const char *path, void *mem, size_t size)
     /* suspended last time: asked over the game as it was left */
     if (resumed && !arcade_confirm(vm, str(LANG_GAME_RESUME_ASK),
                                    str(LANG_CHESSBOX_MENU_RESUME_GAME),
-                                   str(LANG_CHESSBOX_MENU_RESTART_GAME))) {
+                                   str(LANG_CHESSBOX_MENU_RESTART_GAME),
+                                   0)) {
         give_screen();
         sound_vm = NULL;
         shell_font_end();       /* the question may have opened it */
         return dialog_to_root ? USB : RESTART;
     }
     last_wheel = -1;
-    menu_down = menu_paused = false;
+    menu_down = menu_paused = menu_tapped = false;
     beat_start();
     shell_tracks_start();
     sound_path[0] = '\0';         /* the track's record is read afresh */
@@ -1402,16 +1411,14 @@ static int run(const char *path, void *mem, size_t size)
                 continue;
             }
             beat_stamp(vm, b);
-            if (b == BUTTON_MENU && !arcade_menu_is_game(vm))
-                menu_pressed = true;
-            if (TIME_BEFORE(current_tick, due) && !menu_pressed)
+            if (TIME_BEFORE(current_tick, due))
                 continue;
         }
-        status = drain(vm, &menu_pressed);
+        status = drain(vm);
         if (status != PLAYING)
             break;
 
-        if (arcade_menu_is_game(vm) && menu_held_long(button_status()))
+        if (menu_held_long(button_status()))
             menu_pressed = true;
         /* a finger on the wheel counts, though it sends no events */
         if (button_status() || wheel_position() >= 0) {
@@ -1444,6 +1451,31 @@ static int run(const char *path, void *mem, size_t size)
         }
 
         unsigned held = buttons(vm, button_status());
+        if (menu_tapped) {
+            /* asked over the game, in its own dialog style; a pause, as
+             * the pause menu is, so a round timed against the music is
+             * lost to it */
+            menu_tapped = false;
+            pause_begin(vm);
+            int yes = arcade_confirm(vm, str(LANG_ARCADE_QUIT_ASK),
+                                     str(LANG_SET_BOOL_YES),
+                                     str(LANG_SET_BOOL_NO), 1);
+            if (dialog_to_root) {
+                status = USB;
+                break;
+            }
+            if (yes) {
+                status = QUIT;
+                suspend = true;
+                break;
+            }
+            shell_tracks_hold(false);
+            spk_clock_resume();
+            present(vm, true);
+            start = current_tick - (long)((frame * HZ) / rate);
+            touched = current_tick;
+            continue;
+        }
         int pos = wheel_position();
         frame++;
 
