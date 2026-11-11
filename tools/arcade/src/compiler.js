@@ -19,7 +19,7 @@ import { buildAssets } from './assets.js';
 import { DEFAULT_RGB } from './unpack.js';
 import * as num from './numbers.js';
 
-const FORMAT = 1;
+const FORMAT = 2;
 const RATES = [20, 25, 33, 50];
 const LEVELS = { LISTEN: 0, CONTROL: 1, OWN: 2 };
 const MUSIC = ['listen', 'control', 'own'];
@@ -99,7 +99,7 @@ const MISSING_GLOBALS = nullProto({
     Symbol: null, Promise: null, setTimeout: 'count ticks in update()',
     setInterval: 'count ticks in update()', window: null, document: null,
     arguments: 'name the parameters', eval: null,
-    Float32Array: 'use an array', Float64Array: 'use an array', Int16Array: 'use Int32Array',
+    Float32Array: 'use FixArray', Float64Array: 'use FixArray', Int16Array: 'use Int32Array',
     Uint16Array: 'use Int32Array', Int8Array: 'use Int32Array',
     Uint32Array: 'use Int32Array', Uint8ClampedArray: 'use Uint8Array',
     Map: 'use a record: o[key]', Set: 'use a record: o[key] = true',
@@ -108,7 +108,7 @@ const MISSING_GLOBALS = nullProto({
 
 /* The language's own names, reserved at the top level. */
 const BUILTINS = ['Math', 'String', 'parseInt', 'Int32Array', 'Uint8Array',
-                  'undefined', 'deg', 'rgb'];
+                  'FixArray', 'undefined', 'deg', 'rgb'];
 
 const BINARY = nullProto({
     '+': 'ADD', '-': 'SUB', '*': 'MUL', '/': 'DIV', '%': 'MOD',
@@ -1111,7 +1111,7 @@ class Fn extends Scope {
         case 'rgb':
             return fail(node, 'rgb() needs a colour written in the code, such as ' +
                         'rgb(0xff8800); at run time, use the colour\'s number');
-        case 'Int32Array': case 'Uint8Array':
+        case 'Int32Array': case 'Uint8Array': case 'FixArray':
             return fail(node, 'write new ' + name + '(length)');
         }
         return fail(node, name + ' is not a function');
@@ -1154,17 +1154,19 @@ class Fn extends Scope {
     newExpression(node) {
         const c = node.callee;
         const ok = c.type === 'Identifier' &&
-            (c.name === 'Int32Array' || c.name === 'Uint8Array');
+            (c.name === 'Int32Array' || c.name === 'Uint8Array' ||
+             c.name === 'FixArray');
         const sym = ok ? this.resolve(c.name, c) : null;
         if (!sym || sym.kind !== 'builtin')
-            fail(node, 'new is only for Int32Array and Uint8Array; ' +
+            fail(node, 'new is only for Int32Array, Uint8Array and FixArray; ' +
                  'make records with { }');
         if (node.arguments.length !== 1 ||
             node.arguments[0].type === 'ArrayExpression')
             fail(node, 'new ' + c.name + '(length) takes just a length');
         this.value(node.arguments[0]);
         this.at(node);
-        this.emit(c.name === 'Int32Array' ? 'NEWI32' : 'NEWU8', []);
+        this.emit(c.name === 'Int32Array' ? 'NEWI32' :
+                  c.name === 'FixArray' ? 'NEWFXA' : 'NEWU8', []);
     }
 }
 
@@ -2051,7 +2053,8 @@ export function compile(input) {
     }
     const entries = prog.main ? [prog.start, prog.entry('init', true),
                                  prog.entry('update', true),
-                                 prog.entry('draw', false)] : [];
+                                 prog.entry('draw', false),
+                                 prog.entry('ending', false)] : [];
     if (errors.length) return { cart: null, errors: errors };
 
     /* Keep what the entries and the globals can reach, numbered in order. */

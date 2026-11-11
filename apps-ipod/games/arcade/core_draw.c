@@ -2690,6 +2690,59 @@ NATIVE(textw)
     return 1;
 }
 
+/* textfit(s, w, [more]): s whole when it fits w pixels in the font set,
+ * else cut before a character, spaces at the cut dropped, with more
+ * ("..." when left out) after it, so the two fit. */
+NATIVE(textfit)
+{
+    static char more_buf[64];
+    if (a[0].tag != T_STR || !is_num(a[1]) ||
+        (argc > 2 && a[2].tag != T_STR))
+        return vm_fail(vm, "textfit() needs text, a width, and the text "
+                       "to end a cut one with", "", "");
+    const struct str *s = STR(vm, a[0]);
+    int32_t w = floor_int(a[1]);
+    uint32_t n = s->len < sizeof(text_buf) ? s->len : sizeof(text_buf) - 1;
+    memcpy(text_buf, s->b, n);
+    vm_charge(vm, 10 + n / 8);
+    if (n == s->len && text_width(vm, text_buf, n) <= w) {
+        *out = a[0];
+        return 1;
+    }
+    uint32_t mn = 3;
+    if (argc > 2) {
+        mn = STR(vm, a[2])->len < sizeof(more_buf) ? STR(vm, a[2])->len
+                                                    : sizeof(more_buf) - 1;
+        memcpy(more_buf, STR(vm, a[2])->b, mn);
+    } else {
+        memcpy(more_buf, "...", 3);
+    }
+    int32_t room = w - text_width(vm, more_buf, mn);
+    /* each character's first byte, then the longest run of them that fits:
+     * found by halving, a width measured each step */
+    static uint16_t starts[sizeof(text_buf)];
+    uint32_t count = 0;
+    for (uint32_t i = 1; i <= n; i++)
+        if (i == n || ((unsigned char)text_buf[i] & 0xc0) != 0x80)
+            starts[count++] = (uint16_t)i;
+    int32_t lo = -1, hi = (int32_t)count - 1;   /* lo fits, past hi not */
+    while (lo < hi) {
+        int32_t mid = (lo + hi + 1) / 2;
+        if (text_width(vm, text_buf, starts[mid]) <= room)
+            lo = mid;
+        else
+            hi = mid - 1;
+    }
+    uint32_t cut = lo < 0 ? 0 : starts[lo];
+    while (cut > 0 && text_buf[cut - 1] == ' ')
+        cut--;
+    if (cut + mn >= sizeof(text_buf))
+        cut = (uint32_t)sizeof(text_buf) - 1 - mn;
+    memcpy(text_buf + cut, more_buf, mn);
+    vm_charge(vm, 10 * 11);
+    return vm_new_string(vm, (const uint8_t *)text_buf, cut + mn, out);
+}
+
 NATIVE(texth)
 {
     char *buf = text_buf;
@@ -3830,7 +3883,7 @@ static int span_of(struct vm *vm, struct value v, const char *fn,
     *len = *size = 0;
     switch (v.tag) {
     case T_U8:  *len = U8A(vm, v)->len; *size = 1; return 1;
-    case T_I32: *len = I32(vm, v)->len; *size = 4; return 1;
+    case T_I32: case T_FXA: *len = I32(vm, v)->len; *size = 4; return 1;
     case T_ARR: *len = ARR(vm, v)->len; *size = sizeof(struct value);
                 return 1;
     }
@@ -3840,7 +3893,7 @@ static int span_of(struct vm *vm, struct value v, const char *fn,
 static void *elems(struct vm *vm, struct value v)
 {
     return v.tag == T_U8 ? (void *)U8A(vm, v)->d
-         : v.tag == T_I32 ? (void *)I32(vm, v)->d
+         : v.tag == T_I32 || v.tag == T_FXA ? (void *)I32(vm, v)->d
          : (void *)BUF(vm, ARR(vm, v)->buf)->v;
 }
 
@@ -3896,8 +3949,9 @@ NATIVE(fill)
         return bad(vm, "fill", "() puts numbers in a typed array, not a ", v);
     if (a[0].tag == T_U8)
         memset(U8A(vm, a[0])->d + i, (uint8_t)to_int(v), (uint32_t)n);
-    else if (a[0].tag == T_I32) {
-        int32_t *d = I32(vm, a[0])->d + i, x = to_int(v);
+    else if (a[0].tag == T_I32 || a[0].tag == T_FXA) {
+        int32_t *d = I32(vm, a[0])->d + i,
+                x = a[0].tag == T_FXA ? to_fix(v) : to_int(v);
         for (int32_t k = 0; k < n; k++)
             d[k] = x;
     } else {

@@ -5,7 +5,7 @@ is drawn in.
 
 - [How text works](#how-text-works)
 - [print](#printtext-x-y-c), [cursor](#cursorx-y-c)
-- [textw](#textwtext), [texth](#texthtext)
+- [textw](#textwtext), [textfit](#textfittext-w-more), [texth](#texthtext)
 - [font](#fontf-size), and [fonts of your own](#fonts-of-your-own)
 
 ## How text works
@@ -119,6 +119,29 @@ print("FOURTH");         // still blue: the pen
 - Each `print` without a position moves the cursor down a line, so a list
   of lines needs only the first position. `cls` puts the cursor back at
   0, 0.
+
+## textfit(text, w, [more])
+
+Text cut to fit a width, in the current font and size: a title on a row,
+a name in a box.
+
+| Argument | |
+|---|---|
+| `text` | the text |
+| `w` | the room, in pixels |
+| `more` | what marks a cut: `"..."` when left out |
+
+**Returns** `text` itself when it fits; otherwise the longest start of it
+that fits with `more` after it, cut between characters -- never inside an
+accented letter or an ideograph -- and spaces at the cut dropped.
+
+```js
+font(FONT.WORLD);
+print(textfit(playback.title(), 100), 4, 40, 7);
+```
+
+- A few hundred units, whatever the length: work it out when the text
+  changes, not every frame.
 
 ## textw(text)
 

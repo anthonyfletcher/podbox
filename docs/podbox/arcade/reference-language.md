@@ -11,14 +11,14 @@ to write instead, so you cannot use a missing feature by accident. The
 traps on this page are the differences it cannot catch: code that builds
 and does something other than what JavaScript would.
 
-- [A cart's files](#a-carts-files): [the three functions](#the-three-functions),
+- [A cart's files](#a-carts-files): [the functions the Arcade calls](#the-functions-the-arcade-calls),
   [namespaces](#namespaces), [the top level](#the-top-level), [names](#names)
 - [Numbers](#numbers): [integers and fractions](#integers-and-fractions),
   [turning fractions into whole numbers](#turning-fractions-into-whole-numbers),
   [operators](#operators)
 - Maths: [flr, ceil](#flrx-ceilx), [abs, sgn](#absx-sgnx), [min, max, mid](#mina-b-maxa-b),
   [sqrt](#sqrtx), [sin, cos](#sint-cost), [atan2](#atan2dx-dy), [rgb](#rgb0xrrggbb), [rnd](#rndx),
-  [srand](#srandx), [Math.*](#math)
+  [srand](#srandx), [rng](#rngseedg-seed-and-rngrndg-x), [Math.*](#math)
 - [Text: strings](#strings)
 - [true, false, null and typeof](#true-false-null-and-typeof), [== is ===](#-is-)
 - [Statements](#statements)
@@ -32,7 +32,7 @@ and does something other than what JavaScript would.
 
 ## A cart's files
 
-### The three functions
+### The functions the Arcade calls
 
 `main.js` holds the functions the Arcade calls:
 
@@ -41,6 +41,19 @@ function init()   { }   // once, when the cart starts
 function update() { }   // every tick: the game's rules
 function draw()   { }   // after each update that is shown: the drawing
 ```
+
+A fourth is optional:
+
+```js
+function ending() { }   // once, as the cart closes
+```
+
+`ending()` runs when the game is closing -- the pause menu's Quit, the
+quit question, the end of the run in the IDE or `pbgvm` -- after its last
+tick and before its saves are written: the place to `dset` or
+`store.write` what is in play, rather than saving it every tick. When Quit
+keeps the game to carry on later, it carries on as `ending()` left it.
+It may not draw: the screen is already the player's.
 
 `init` and `update` are required. Without `draw`, `update` draws as well
 -- fine for a cart whose drawing is cheap; but when the player falls
@@ -406,6 +419,36 @@ printh(rnd(6));   // 1 again
 - A cart starts with a different seed each run, so games differ. Seed it
   yourself for a level that should be the same every time -- a daily
   puzzle seeded from the date, say.
+- `srand(state)`, given the `Int32Array` that `rndstate(state)` filled,
+  puts `rnd` back where it was: save the state with a game, and a game
+  continued gets the same chances it would have had.
+
+## rng.seed(g, seed) and rng.rnd(g, [x])
+
+Generators of the cart's own, each a stream of its own, so a daily
+puzzle's layout is not changed by the sparks and enemy moves that also
+use chance.
+
+| Argument | |
+|---|---|
+| `g` | the generator: an `Int32Array` of 2, which holds its state |
+| `seed` | as `srand`'s |
+| `x` | as `rnd`'s: a whole number, a fraction, or an array to pick from |
+
+**Returns** `rng.rnd` gives what `rnd(x)` would; `rng.seed` nothing.
+
+```js
+var daily = new Int32Array(2);
+
+function newPuzzle(day) {
+    rng.seed(daily, day);                 // the same day, the same puzzle
+    for (var i = 0; i < 20; i++)
+        board[i] = rng.rnd(daily, 6);     // rnd() elsewhere leaves it alone
+}
+```
+
+- The generator is just two numbers: save them with `dset` or
+  `store.write` and the stream carries on where it was.
 
 ## Math.*
 
@@ -556,8 +599,8 @@ a.reverse();
 
 ### Typed arrays
 
-`new Int32Array(n)` and `new Uint8Array(n)` make fixed-length arrays of
-numbers, all 0:
+`new Int32Array(n)`, `new Uint8Array(n)` and `new FixArray(n)` make
+fixed-length arrays of numbers, all 0:
 
 ```js
 var board = new Int32Array(20 * 15);   // a board 20 by 15
@@ -565,11 +608,16 @@ board[y * 20 + x] = 3;
 ```
 
 - An `Int32Array` holds integers: storing `1.75` stores `1`.
+- A `FixArray` holds fractions, as a variable does: `1.75` stays `1.75`,
+  and every element reads back as a fraction. Use it for positions and
+  speeds of many things outside an actor pool. Like any fraction, a value
+  past 32767 wraps.
 - A `Uint8Array` holds 0 to 255, wrapping: `300` is stored as `44`, `-1` as
   `255`. It takes a quarter of the memory.
 - Reading past the end gives `null`; **writing past the end is silently
   ignored** -- unlike an array, which stops the cart.
-- `indexOf` and `lastIndexOf` work on them as on an array.
+- `indexOf` and `lastIndexOf` work on them as on an array; `copy` and
+  `fill` take them, two of one kind.
 - Use them for grids and boards, many numbers that change each tick, and
   wherever the API fills an array: `date`, `mapobj`, and the systems'
   `out` arrays all take an `Int32Array`. They take far less memory than an

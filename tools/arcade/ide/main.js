@@ -1096,6 +1096,9 @@ function takeSections() {
 /* the cart stopped; the screen cleared, but for an error, whose last
  * frame stays to be looked at */
 function stop(keep) {
+    /* the cart closing runs its ending(), as the player's does */
+    if (running && engine && !engine.error() && !engine.end())
+        say('error', engine.error());
     if (tape && tape.steps.length) lastTape = tape;
     tape = null;
     playing = null;

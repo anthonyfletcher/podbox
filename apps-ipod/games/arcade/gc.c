@@ -110,7 +110,7 @@ static void mark_off(struct vm *vm, uint32_t off)
         return;
     h->info |= GC_MARK;
     uint32_t t = h->info & 0xff;
-    if (t == T_STR || t == T_I32 || t == T_U8 || t == T_IMG)
+    if (t == T_STR || t == T_I32 || t == T_U8 || t == T_IMG || t == T_FXA)
         return;
     if (vm->msp < MARK_STACK)
         vm->mstack[vm->msp++] = off;
@@ -120,7 +120,8 @@ static void mark_off(struct vm *vm, uint32_t off)
 
 static void mark_value(struct vm *vm, struct value v)
 {
-    if ((v.tag >= T_STR && v.tag <= T_OBJ) || v.tag == T_IMG)
+    if ((v.tag >= T_STR && v.tag <= T_OBJ) || v.tag == T_IMG ||
+        v.tag == T_FXA)
         mark_off(vm, (uint32_t)v.v);
 }
 

@@ -511,13 +511,18 @@ static int write_value(struct vm *vm, struct jout *o, struct value v,
         put_string(o, STR(vm, v)->b, STR(vm, v)->len);
         return vm_spend(vm, STR(vm, v)->len / SPEND_BYTES);
     case T_I32:
-    case T_U8: {
-        uint32_t n = v.tag == T_I32 ? I32(vm, v)->len : U8A(vm, v)->len;
+    case T_U8:
+    case T_FXA: {
+        uint32_t n = v.tag == T_U8 ? U8A(vm, v)->len : I32(vm, v)->len;
         put_c(o, '[');
         for (uint32_t i = 0; i < n; i++) {
             if (i)
                 put_c(o, ',');
-            put_int(o, v.tag == T_I32 ? I32(vm, v)->d[i] : U8A(vm, v)->d[i]);
+            if (v.tag == T_FXA)
+                put_fix(o, I32(vm, v)->d[i]);
+            else
+                put_int(o, v.tag == T_I32 ? I32(vm, v)->d[i]
+                                          : U8A(vm, v)->d[i]);
         }
         put_c(o, ']');
         return vm_spend(vm, n / 16);

@@ -164,6 +164,7 @@ EXPORT("web_load") int web_load(uint32_t len, uint32_t seed_lo,
 }
 
 EXPORT("web_start") int web_start(void) { return arcade_start(vm); }
+EXPORT("web_end") int web_end(void) { return arcade_end(vm); }
 EXPORT("web_rate") int web_rate(void) { return arcade_rate(vm); }
 EXPORT("web_menu_is_game") int web_menu_is_game(void)
 {

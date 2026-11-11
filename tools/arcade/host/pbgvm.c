@@ -1013,6 +1013,9 @@ int main(int argc, char **argv)
             break;
         }
     }
+    /* the cart closing: its ending(), before the saves are written */
+    if (!arcade_end(vm))
+        return report(vm);
     if (saves_path && !saves_write(vm, saves_path)) {
         fprintf(stderr, "could not write %s\n", saves_path);
         return 2;

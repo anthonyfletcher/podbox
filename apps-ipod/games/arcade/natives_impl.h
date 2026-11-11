@@ -239,6 +239,10 @@ IMPL(ach_has)
 IMPL(opt_get)
 IMPL(opt_changed)
 IMPL(opt_set)
+IMPL(textfit)
+IMPL(rndstate)
+IMPL(rng_seed)
+IMPL(rng_rnd)
 
 /* sys_ui.c */
 IMPL(ui_choose)

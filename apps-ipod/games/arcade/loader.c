@@ -219,7 +219,9 @@ static int load_header(struct vm *vm, const uint8_t *p, uint32_t n)
 {
     if (n < 20)
         return bad(vm, "header");
-    if (rd16(p) != 1)
+    /* format 2 adds ending() to the entries */
+    vm->format = (uint8_t)rd16(p);
+    if (vm->format != 1 && vm->format != 2)
         return vm_fail(vm, "This game needs a newer PodBox", "", "");
     vm->api = (uint16_t)rd16(p + 2);
     if (vm->api > ARCADE_API_VERSION)
@@ -399,8 +401,8 @@ static int load_code(struct vm *vm, const uint8_t *p, uint32_t n)
     struct cur c = { p, p + n, 0 };
     vm->nfns = c16(&c);
     vm->nic = c16(&c);
-    for (int i = 0; i < 4; i++)
-        vm->entry[i] = c16(&c);
+    for (int i = 0; i < 5; i++)
+        vm->entry[i] = i < 4 || vm->format >= 2 ? c16(&c) : NONE;
     uint32_t off = perm_alloc(vm, vm->nfns * sizeof(struct fninfo) + 8);
     if (!off)
         return vm_fail(vm, "not enough memory for this game", "", "");

@@ -323,6 +323,9 @@ int arcade_quit_asked(const struct vm *vm);
 
 /* Runs the cart's global setup, then init(). */
 int arcade_start(struct vm *vm);
+/* The cart closing: its ending(), once, if it has one, before the host
+ * writes its saves and any copy kept to carry on. 0 when it failed. */
+int arcade_end(struct vm *vm);
 /* One tick: update(), then draw() when draw is set and the cart has one. */
 int arcade_tick(struct vm *vm, int draw);
 /* Between ticks: collect garbage if enough has been allocated. */

@@ -49,6 +49,7 @@ API(camera,    20, 0, 6, VOID, 0,     FLAT,   LISTEN, 1)
 API(clip,      21, 0, 4, VOID, 0,     FLAT,   LISTEN, 1)
 API(print,     22, 1, 4, VAL,  PARTS, PIXELS, LISTEN, 1)
 API(textw,     23, 1, 1, VAL,  PARTS, FLAT,   LISTEN, 1)
+API(textfit,  225, 2, 3, VAL,  0,     FLAT,   LISTEN, 1)
 API(font,      24, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)
 API(target,    25, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 
@@ -88,6 +89,7 @@ API(tone,      50, 5, 5, VOID, 0,     FLAT,   LISTEN, 1)
 /* Maths */
 API(rnd,       51, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(srand,     52, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
+API(rndstate, 226, 1, 1, VOID, 0,     FLAT,   LISTEN, 1)
 API(flr,       53, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(ceil,      54, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(abs,       55, 1, 1, VAL,  0,     FLAT,   LISTEN, 1)
@@ -290,6 +292,11 @@ API(score_get,        177, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 API(score_name,       178, 2, 2, VAL,  0, FLAT, LISTEN, 1)
 API(score_count,      179, 1, 1, VAL,  0, FLAT, LISTEN, 1)
 API(score_show,       180, 1, 1, VOID, 0, FLAT, LISTEN, 1)
+
+/* Generators of their own, beside rnd()'s stream */
+API_NS(rng)
+API(rng_seed,         227, 2, 2, VOID, 0, FLAT, LISTEN, 1)
+API(rng_rnd,          228, 1, 2, VAL,  0, FLAT, LISTEN, 1)
 
 /* Options: the settings cart.json declares, as OPT.<name> */
 API_NS(opt)

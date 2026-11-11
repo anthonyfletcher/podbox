@@ -100,6 +100,9 @@ Writes text, at the cursor without a position (moving it down a line). Returns t
 ### textw(str)
 How wide `print` would make `str`, in the current font and size.
 
+### textfit(str, w, [more])
+`str` cut to fit `w` pixels in the current font, with `more` ("..." when left out) after the cut; `str` itself when it fits. Cuts between characters, never inside one.
+
 ### texth(str)
 How tall `print` would make `str`: its lines, in the current font and size.
 
@@ -213,7 +216,16 @@ A plain note: `vol` 0-255, `wave` one of `WAVE.SQUARE`, `SAW`, `TRIANGLE`, `SINE
 `rnd()` a fraction below 1; `rnd(10)` a whole number 0 to 9; `rnd(10.0)` a fraction below 10; `rnd(array)` one of its elements.
 
 ### srand(x)
-Seeds `rnd`, so the same seed gives the same numbers.
+Seeds `rnd`, so the same seed gives the same numbers; given the `Int32Array` `rndstate` filled, puts that state back.
+
+### rndstate(out)
+`rnd`'s state into an `Int32Array` of 2, to save with the game and give back to `srand`, so a game carries on its random sequence.
+
+### rng.seed(g, seed)
+A generator of the cart's own in `g`, an `Int32Array` of 2, seeded as `srand` seeds `rnd`: a stream a daily puzzle can keep apart from the game's other chances. `g` is its state, to save like any numbers.
+
+### rng.rnd(g, [x])
+As `rnd(x)`, drawn from generator `g`, which moves on.
 
 ### flr(x)
 Rounds down to a whole number.

@@ -421,6 +421,84 @@ function update() { n++; if (n == 3 || n == 8 || n == 9) printh(n + " " + skippe
     assert.equal(r.out, '3 2\n8 4\n9 0\n');
 });
 
+test('a FixArray holds fractions, wraps as a fraction does, and copies, fills and stores as one', () => {
+    const r = run(`var a = new FixArray(4);
+function init() {
+    a[0] = 1.5; a[1] = 3; a[2] = -0.25; a[3] = 40000;
+    printh(a.join(",") + " " + a.length + " " + (a[0] + a[1]) + " " + a.indexOf(3) + " " + a[9]);
+    var b = new FixArray(4);
+    copy(b, 0, a, 0, 4);
+    fill(b, 0.5, 2);
+    printh(b.join(","));
+    a.reverse();
+    printh("" + a);
+}
+function update() {}`, 1);
+    assert.equal(r.status, 0, r.err);
+    /* 40000 wraps to 40000 - 65536 */
+    assert.equal(r.out, '1.5,3,-0.25,-25536 4 4.5 1 null\n1.5,3,0.5,0.5\n-25536,-0.25,3,1.5\n');
+    const mixed = run('var a = new FixArray(2), b = new Int32Array(2);\nfunction init() { copy(a, 0, b, 0, 2); }\nfunction update() {}', 1);
+    assert.equal(mixed.status, 1);
+    assert.match(mixed.err, /copy\(\) needs two arrays of one kind/);
+});
+
+test('textfit cuts between characters to fit, with ... or its own ending, and leaves what fits alone', () => {
+    const r = run(`function init() {
+    printh(textfit("SHORT", 40) + "|" + textfit("A LONGER TITLE", 40) + "|" + textfit("A LONGER TITLE", 40, "~"));
+    font(FONT.WORLD);
+    var s = textfit("Café del Mar über alles", 60);
+    printh(s + "|" + (textw(s) <= 60) + "|" + textfit("ééééééé", 20));
+}
+function update() {}`, 1);
+    assert.equal(r.status, 0, r.err);
+    const [caps, world] = r.out.trim().split('\n');
+    /* CAPS is 4 a character: 40 holds 10, "..." 12 of them, so 7 with it;
+     * the space before the cut goes */
+    assert.equal(caps, 'SHORT|A LONGE...|A LONGER~');
+    const [cut, fits, accents] = world.split('|');
+    assert.ok(cut.endsWith('...') && fits === '1', world);
+    /* never half a character: every é whole */
+    assert.match(accents, /^(é)*\.\.\.$/);
+});
+
+test('ending() runs once as the cart closes, after its last tick', () => {
+    const r = run(`var n = 0;
+function init() {}
+function update() { n++; }
+function ending() { printh("ending after " + n); }`, 3);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, 'ending after 3\n');
+    const quits = run(`function init() {}
+function update() { quit(); }
+function ending() { printh("ending"); }`, 5);
+    assert.equal(quits.out, 'quit\nending\n');
+});
+
+test('rng generators keep their own streams, and rnd()\'s state is kept and put back', () => {
+    const r = run(`var g = new Int32Array(2), h = new Int32Array(2), s = new Int32Array(2);
+function init() {
+    rng.seed(g, 7); rng.seed(h, 7);
+    var a = rng.rnd(g, 100) + " " + rng.rnd(g, 100);
+    srand(1);
+    var x = rnd(1000);
+    var b = rng.rnd(h, 100) + " " + rng.rnd(h, 100);
+    rndstate(s);
+    var y = rnd(1000), z = rnd(1000);
+    srand(s);
+    printh(a + "|" + b + "|" + (rnd(1000) == y) + (rnd(1000) == z) + "|" + rng.rnd(g, ["x"]) + "|" + (rng.rnd(g) < 1));
+}
+function update() {}`, 1);
+    assert.equal(r.status, 0, r.err);
+    const [a, b, same, pick, frac] = r.out.trim().split('|');
+    /* one seed, one stream, whatever rnd() did between */
+    assert.equal(a, b);
+    assert.equal(same, '11');
+    assert.equal(pick, 'x');
+    assert.equal(frac, '1');
+    const bad = run('function init() { rng.rnd(5); }\nfunction update() {}', 1);
+    assert.match(bad.err, /rng\.rnd\(\) needs an Int32Array of 2/);
+});
+
 test('resumed tells of a pause once', () => {
     const r = run(`var n = 0;
 function init() {}

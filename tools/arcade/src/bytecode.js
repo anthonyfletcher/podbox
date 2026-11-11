@@ -40,6 +40,7 @@ export function load(bytes) {
     const nfns = r.u16();
     const sites = r.u16();
     const entries = { start: r.u16(), init: r.u16(), update: r.u16(), draw: r.u16() };
+    if (header.format >= 2) entries.ending = r.u16();
     const fns = [];
     for (let i = 0; i < nfns; i++)
         fns.push({ arity: r.u8(), nlocals: r.u8(), maxstack: r.u16(),

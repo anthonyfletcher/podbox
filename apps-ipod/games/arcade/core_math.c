@@ -75,7 +75,8 @@ static uint32_t below(struct vm *vm, uint32_t n)
 
 /* rnd(): a fraction below 1. rnd(n): an integer below n, or a fraction
  * below n when n is one. rnd(array): an element. */
-NATIVE(rnd)
+static int draw(struct vm *vm, struct value *a, int argc,
+                struct value *out, const char *fn)
 {
     if (argc == 0)
         return RET_FIX(core_random(vm) & 0xffff);
@@ -84,18 +85,95 @@ NATIVE(rnd)
         *out = p->len ? BUF(vm, p->buf)->v[below(vm, p->len)] : mk(T_NULL, 0);
         return 1;
     }
-    NUMBER(0, "rnd");
+    NUMBER(0, fn);
     if (a[0].tag == T_FIX)
         return RET_FIX(a[0].v <= 0 ? 0 : below(vm, (uint32_t)a[0].v));
     return RET_INT(a[0].v <= 0 ? 0 : below(vm, (uint32_t)a[0].v));
 }
 
+NATIVE(rnd)
+{
+    return draw(vm, a, argc, out, "rnd");
+}
+
+/* A generator's state as the cart keeps it: an Int32Array of 2, the
+ * state's high and low halves */
+static int state_arg(struct vm *vm, struct value v, const char *fn)
+{
+    if (v.tag != T_I32 || I32(vm, v)->len < 2)
+        return vm_fail(vm, fn, "() needs an Int32Array of 2 for the state",
+                       "");
+    return 1;
+}
+
+static uint64_t state_of(struct vm *vm, struct value v)
+{
+    const int32_t *d = I32(vm, v)->d;
+    return (uint64_t)(uint32_t)d[0] << 32 | (uint32_t)d[1];
+}
+
+static void state_to(struct vm *vm, struct value v, uint64_t s)
+{
+    int32_t *d = I32(vm, v)->d;
+    d[0] = (int32_t)(uint32_t)(s >> 32);
+    d[1] = (int32_t)(uint32_t)s;
+}
+
+/* srand(seed), or srand(state) to put back what rndstate() kept */
 NATIVE(srand)
 {
     (void)argc; (void)out;
+    if (a[0].tag == T_I32) {
+        if (!state_arg(vm, a[0], "srand"))
+            return 0;
+        vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
+        vm->rng_state = state_of(vm, a[0]);
+        return 1;
+    }
     NUMBER(0, "srand");
     core_seed(vm, (uint32_t)a[0].v);
     return 1;
+}
+
+/* rndstate(out): rnd()'s state into an Int32Array of 2, for srand(out) */
+NATIVE(rndstate)
+{
+    (void)argc; (void)out;
+    if (!state_arg(vm, a[0], "rndstate"))
+        return 0;
+    state_to(vm, a[0], vm->rng_state);
+    return 1;
+}
+
+/* rng.seed(g, seed): a generator of its own in g, an Int32Array of 2, as
+ * srand(seed) seeds rnd(); rnd()'s own stream untouched */
+NATIVE(rng_seed)
+{
+    (void)argc; (void)out;
+    if (!state_arg(vm, a[0], "rng.seed"))
+        return 0;
+    NUMBER(1, "rng.seed");
+    uint64_t keep = vm->rng_state, inc = vm->rng_inc;
+    core_seed(vm, (uint32_t)a[1].v);
+    state_to(vm, a[0], vm->rng_state);
+    vm->rng_state = keep;
+    vm->rng_inc = inc;
+    return 1;
+}
+
+/* rng.rnd(g, [x]): as rnd(x), from generator g, which moves on */
+NATIVE(rng_rnd)
+{
+    if (!state_arg(vm, a[0], "rng.rnd"))
+        return 0;
+    uint64_t keep = vm->rng_state, inc = vm->rng_inc;
+    vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
+    vm->rng_state = state_of(vm, a[0]);
+    int ok = draw(vm, a + 1, argc - 1, out, "rng.rnd");
+    state_to(vm, a[0], vm->rng_state);
+    vm->rng_state = keep;
+    vm->rng_inc = inc;
+    return ok;
 }
 
 /* ---- arithmetic -------------------------------------------------------- */

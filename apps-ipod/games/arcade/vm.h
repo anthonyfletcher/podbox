@@ -27,7 +27,8 @@
 enum
 {
     T_NULL, T_INT, T_STR, T_ARR, T_I32, T_U8, T_OBJ, T_FN, T_BUF, T_FIX,
-    T_IMG
+    T_IMG,
+    T_FXA       /* a FixArray: an Int32Array's storage, each element 16.16 */
 };
 
 struct value
@@ -306,6 +307,7 @@ struct vm
     struct arcade_options opts;
     uint8_t opt_pending, opt_changed;
     uint8_t opt_set;            /* opt.set() since the host last asked */
+    uint8_t format;             /* the cart file's: 2 has ending() */
     uint32_t cart_hash;         /* the chunks' CRCs, folded: the cart's bytes */
     uint8_t listening;          /* beat.listen(true): the analyser runs */
     /* Dialogs (sys_ui.c): ui.style()'s colours -- the box, its text and
@@ -317,7 +319,8 @@ struct vm
     const uint8_t *code;
     struct fninfo *fns;
     uint32_t nfns;
-    uint32_t entry[4];          /* $start, init, update, draw; or NONE */
+    uint32_t entry[5];          /* $start, init, update, draw, ending;
+                                   or NONE */
     uint32_t *strings;          /* offsets of the constant strings */
     uint32_t nstrings;
     uint16_t *cshape;           /* a CNST shape's runtime shape */
@@ -469,6 +472,12 @@ static inline int64_t scaled(struct value v)
 static inline int32_t wrap32(int64_t x)
 {
     return (int32_t)(uint32_t)(uint64_t)x;
+}
+
+/* A number as a FixArray keeps it: 16.16, wrapping past 32767 */
+static inline int32_t to_fix(struct value v)
+{
+    return v.tag == T_FIX ? v.v : (int32_t)((uint32_t)v.v << 16);
 }
 
 /* A fraction toward zero, as bitwise operators and typed arrays take it. */

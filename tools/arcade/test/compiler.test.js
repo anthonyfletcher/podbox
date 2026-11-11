@@ -49,7 +49,7 @@ const REJECTED = [
     ['var a = Math.random();', 'use rnd()'],
     ['var a = Math.PI;', 'Math.PI is not supported'],
     ['delete o.x;', 'delete is not supported'],
-    ['var a = new Array(3);', 'new is only for Int32Array and Uint8Array'],
+    ['var a = new Array(3);', 'new is only for Int32Array, Uint8Array and FixArray'],
     ['var a = new Uint8Array([1]);', 'takes just a length'],
     ['var a = 1 ** 2;', 'use Math.pow'],
     ['var a = "x" in o;', 'in operator'],

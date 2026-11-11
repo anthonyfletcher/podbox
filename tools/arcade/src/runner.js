@@ -155,6 +155,8 @@ export class Engine {
     }
 
     start() { return this.run(() => this.x.web_start() !== 0); }
+    /* the cart closing: its ending(), as the player runs it */
+    end() { return this.run(() => this.x.web_end() !== 0); }
     /* ms: how far the music has played since the last tick */
     tick(held, clicks, pos, draw = true, ms = 0) {
         return this.run(() => this.x.web_tick(held, clicks, pos, draw ? 1 : 0, ms | 0) !== 0);

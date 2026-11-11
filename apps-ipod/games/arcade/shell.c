@@ -1552,6 +1552,10 @@ static int run(const char *path, void *mem, size_t size)
             status = QUIT;
     }
 
+    /* the game's last word, before its saves and any kept copy are
+     * written; not after it failed */
+    if (status != FAILED && !arcade_end(vm))
+        status = FAILED;
     if (status == FAILED)
         present(vm, false);
     beat_listen(NULL, 0);

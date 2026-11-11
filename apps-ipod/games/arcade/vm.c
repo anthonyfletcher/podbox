@@ -48,9 +48,9 @@ const char *vm_typename(uint32_t tag)
 {
     static const char *const names[] = {
         "null", "number", "string", "array", "Int32Array", "Uint8Array",
-        "record", "function", "buffer", "number", "image"
+        "record", "function", "buffer", "number", "image", "FixArray"
     };
-    return tag <= T_IMG ? names[tag] : "?";
+    return tag <= T_FXA ? names[tag] : "?";
 }
 
 int vm_truthy(struct vm *vm, struct value v)
@@ -172,6 +172,15 @@ static void tw_join(struct vm *vm, struct tw *w, struct value v,
                 tw_put(w, sep, seplen);
             tw_put(w, num, decimal(a->d[i], num));
         }
+    } else if (v.tag == T_FXA) {
+        struct i32 *a = I32(vm, v);
+        char f[24];
+        w->seen += a->len;
+        for (uint32_t i = 0; i < a->len && !TW_DONE(w); i++) {
+            if (i)
+                tw_put(w, sep, seplen);
+            tw_put(w, f, fix_text(a->d[i], f));
+        }
     } else {
         struct u8a *a = U8A(vm, v);
         w->seen += a->len;
@@ -195,7 +204,7 @@ static void tw_value(struct vm *vm, struct tw *w, struct value v, int depth)
         break;
     }
     case T_STR: tw_put(w, STR(vm, v)->b, STR(vm, v)->len); break;
-    case T_ARR: case T_I32: case T_U8:
+    case T_ARR: case T_I32: case T_U8: case T_FXA:
         tw_join(vm, w, v, (const uint8_t *)",", 1, depth);
         break;
     case T_OBJ: tw_put(w, "[object Object]", 15); break;
@@ -569,6 +578,10 @@ static int get_index(struct vm *vm, struct value c, struct value i,
             *out = k < I32(vm, c)->len ? mk(T_INT, I32(vm, c)->d[k])
                                        : mk(T_NULL, 0);
             return 1;
+        case T_FXA:
+            *out = k < I32(vm, c)->len ? mk(T_FIX, I32(vm, c)->d[k])
+                                       : mk(T_NULL, 0);
+            return 1;
         case T_U8:
             *out = k < U8A(vm, c)->len ? mk(T_INT, U8A(vm, c)->d[k])
                                        : mk(T_NULL, 0);
@@ -616,9 +629,9 @@ static inline int index_fast(struct vm *vm, const struct value *c,
         out->v = ev;
         return 1;
     }
-    if (t == T_I32 && k < ((struct i32 *)o)->len) {
+    if ((t == T_I32 || t == T_FXA) && k < ((struct i32 *)o)->len) {
         int32_t ev = ((struct i32 *)o)->d[k];
-        out->tag = T_INT;
+        out->tag = t == T_I32 ? T_INT : T_FIX;
         out->v = ev;
         return 1;
     }
@@ -642,6 +655,10 @@ static inline int store_fast(struct vm *vm, const struct value *c,
     void *o = MEM(vm, (uint32_t)c->v);
     if (t == T_I32 && v->tag == T_INT && k < ((struct i32 *)o)->len) {
         ((struct i32 *)o)->d[k] = v->v;
+        return 1;
+    }
+    if (t == T_FXA && is_num(*v) && k < ((struct i32 *)o)->len) {
+        ((struct i32 *)o)->d[k] = to_fix(*v);
         return 1;
     }
     if (t == T_ARR && k < ((struct arr *)o)->len) {
@@ -726,11 +743,14 @@ static int set_index(struct vm *vm, struct value c, struct value i,
         }
         case T_I32:
         case T_U8:
+        case T_FXA:
             if (!is_num(v))
                 return vm_fail(vm, "a typed array holds numbers, not a ",
                                vm_typename(v.tag), "");
             if (c.tag == T_I32 && k < I32(vm, c)->len)
                 I32(vm, c)->d[k] = to_int(v);
+            else if (c.tag == T_FXA && k < I32(vm, c)->len)
+                I32(vm, c)->d[k] = to_fix(v);
             else if (c.tag == T_U8 && k < U8A(vm, c)->len) {
                 U8A(vm, c)->d[k] = (uint8_t)to_int(v);
                 if (IS_SCREEN(vm, c))
@@ -910,7 +930,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         int32_t found = -1, len;
         if (is_arr)
             len = (int32_t)ARR(vm, self)->len;
-        else if (self.tag == T_I32)
+        else if (self.tag == T_I32 || self.tag == T_FXA)
             len = (int32_t)I32(vm, self)->len;
         else if (self.tag == T_U8)
             len = (int32_t)U8A(vm, self)->len;
@@ -939,6 +959,14 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
                 if (equal(vm, v[i], a[0]))
                     found = i;
             work = (uint32_t)len * 4;
+        } else if (self.tag == T_FXA) {
+            if (is_num(a[0])) {
+                int32_t want = to_fix(a[0]);
+                for (int32_t i = from; i >= 0 && i < len && found < 0; i += step)
+                    if (I32(vm, self)->d[i] == want)
+                        found = i;
+                work = (uint32_t)len * 4;
+            }
         } else if (self.tag == T_I32 || self.tag == T_U8) {
             if (a[0].tag == T_INT) {
                 for (int32_t i = from; i >= 0 && i < len && found < 0; i += step) {
@@ -975,7 +1003,8 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
         break;
     }
     case M_join: {
-        if (!is_arr && self.tag != T_I32 && self.tag != T_U8)
+        if (!is_arr && self.tag != T_I32 && self.tag != T_U8 &&
+            self.tag != T_FXA)
             return vm_fail(vm, ".join() needs an array, not a ",
                            vm_typename(self.tag), "");
         const uint8_t *sep = (const uint8_t *)",";
@@ -1009,7 +1038,7 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
             for (i = 0; i < n / 2; i++) {
                 t = v[i]; v[i] = v[n - 1 - i]; v[n - 1 - i] = t;
             }
-        } else if (self.tag == T_I32) {
+        } else if (self.tag == T_I32 || self.tag == T_FXA) {
             n = I32(vm, self)->len;
             int32_t *d = I32(vm, self)->d, t;
             for (i = 0; i < n / 2; i++) {
@@ -1860,23 +1889,26 @@ op_NEWARR: {
     NEXT();
 }
 op_NEWI32:
+op_NEWFXA:
 op_NEWU8: {
-    int is32 = pc[-1] == OP_NEWI32;
+    int is32 = pc[-1] != OP_NEWU8;
+    uint32_t kind = pc[-1] == OP_NEWI32 ? T_I32 : is32 ? T_FXA : T_U8;
     if (!is_num(sp[-1]) || to_int(sp[-1]) < 0)
-        FAIL(is32 ? "new Int32Array() needs a length, not a "
-                  : "new Uint8Array() needs a length, not a ",
+        FAIL(kind == T_I32 ? "new Int32Array() needs a length, not a "
+             : kind == T_FXA ? "new FixArray() needs a length, not a "
+                             : "new Uint8Array() needs a length, not a ",
              is_num(sp[-1]) ? "negative number" : vm_typename(sp[-1].tag));
     n = (uint32_t)to_int(sp[-1]);
     if (n > (vm->heap_hi - vm->heap_lo) / (is32 ? 4 : 1))
         FAIL("out of memory", "");
     SYNC();
-    uint32_t off = gc_alloc(vm, is32 ? T_I32 : T_U8,
+    uint32_t off = gc_alloc(vm, kind,
                             (uint32_t)(sizeof(struct i32) - sizeof(struct hdr))
                             + n * (is32 ? 4 : 1));
     if (!off)
         goto fail;
     ((struct i32 *)MEM(vm, off))->len = n;
-    sp[-1] = mk(is32 ? T_I32 : T_U8, (int32_t)off);
+    sp[-1] = mk(kind, (int32_t)off);
     /* cleared at the speed of memory */
     vm_charge(vm, n * (is32 ? 4 : 1) / BYTES_PER_UNIT);
     RELOAD();
@@ -1978,7 +2010,7 @@ op_LEN:
     switch (a.tag) {
     case T_STR: n = STR(vm, a)->len; break;
     case T_ARR: n = ARR(vm, a)->len; break;
-    case T_I32: n = I32(vm, a)->len; break;
+    case T_I32: case T_FXA: n = I32(vm, a)->len; break;
     case T_U8: n = U8A(vm, a)->len; break;
     default: FAIL(".length of a ", vm_typename(a.tag));
     }
@@ -2068,6 +2100,16 @@ int arcade_menu_choose(struct vm *vm, int i, int button)
  * setup -- a generated world, a big noise.fill -- is not a hung loop */
 #define INIT_CEILINGS 4
 
+int arcade_end(struct vm *vm)
+{
+    if (vm->err || vm->entry[4] == NONE)
+        return !vm->err;
+    begin(vm);
+    int ok = call_entry(vm, 4);
+    end(vm);
+    return ok;
+}
+
 int arcade_start(struct vm *vm)
 {
     uint32_t tick_ceiling = vm->ceiling;
@@ -2125,7 +2167,7 @@ int vm_out_ok(struct vm *vm, struct value o, uint32_t need)
 {
     if (o.tag == T_ARR)
         return ARR(vm, o)->len >= need;
-    if (o.tag == T_I32)
+    if (o.tag == T_I32 || o.tag == T_FXA)
         return I32(vm, o)->len >= need;
     return 0;
 }
@@ -2134,6 +2176,8 @@ void vm_out_set(struct vm *vm, struct value o, uint32_t i, struct value v)
 {
     if (o.tag == T_ARR)
         BUF(vm, ARR(vm, o)->buf)->v[i] = v;
+    else if (o.tag == T_FXA)
+        I32(vm, o)->d[i] = to_fix(v);
     else
         I32(vm, o)->d[i] = v.tag == T_FIX ? v.v >> 16 : v.v;
 }

@@ -103,6 +103,7 @@ OP(JLTLI,    "Bbh",  0, 0)   /* local < s8, jump: LDL, PUSHI8, JLT */
 OP(JLELI,    "Bbh",  0, 0)
 OP(JGTLI,    "Bbh",  0, 0)
 OP(JGELI,    "Bbh",  0, 0)
+OP(NEWFXA,   "",     1, 1)   /* length -> FixArray */
 
 /* Methods, numbered by position: MTH(name, min args, max args). The
  * receiver's type at run time picks the implementation; one a type does

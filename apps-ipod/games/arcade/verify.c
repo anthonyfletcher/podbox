@@ -267,7 +267,7 @@ int verify_cart(struct vm *vm)
     uint32_t room = vm->size - base;
     if (vm->entry[1] == NONE || vm->entry[2] == NONE)
         return vm_fail(vm, "this game file is damaged: ", "entries", "");
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 5; i++)
         if (vm->entry[i] != NONE && vm->entry[i] >= vm->nfns)
             return vm_fail(vm, "this game file is damaged: ", "entries", "");
     for (uint32_t i = 0; i < vm->nfns; i++)
