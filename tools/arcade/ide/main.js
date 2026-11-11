@@ -1478,9 +1478,18 @@ async function canWrite(handle) {
 /* ---- served by pbgide ---------------------------------------------------- *
  * pbgide serves this page from the computer it runs on, with a cart folder
  * it reads and writes on the page's behalf: the page's address carries the
- * token every request about the folder has to send back. */
+ * token every request about the folder has to send back.
+ *
+ * The folder is looked at again every SYNC_MS, and a file changed there --
+ * by another editor, or another program -- is taken in where it has not
+ * been changed here as well since it was last read or saved; where it has,
+ * the owner is asked which to keep. disk holds each file as last read or
+ * saved, and diskHash the server's fingerprint of it. */
 
 const SERVED = new URLSearchParams(location.search).get('token');
+const SYNC_MS = 1500;
+
+let disk = {}, diskHash = {}, syncing = false;
 
 function fromServer(path, init) {
     const o = Object.assign({}, init);
@@ -1491,17 +1500,40 @@ function fromServer(path, init) {
     });
 }
 
+async function readServed(name) {
+    const r = await fromServer('/cart/file?path=' + encodeURIComponent(name));
+    return isBinary(name) ? new Uint8Array(await r.arrayBuffer()) : await r.text();
+}
+
+function same(a, b) {
+    if (typeof a === 'string' || typeof b === 'string') return a === b;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
+
+const copyOf = (v) => typeof v === 'string' ? v : new Uint8Array(v);
+
 /* The folder pbgide was started with, opened; false where there is none */
 async function openServed() {
     if (!SERVED || !/^http/.test(location.protocol)) return false;
     let list;
-    try { list = await (await fromServer('/cart/list')).json(); } catch (e) { return false; }
+    try { list = await (await fromServer('/cart/list')).json(); } catch (e) {
+        say('error', /^403/.test(e.message)
+            ? 'pbgide no longer knows this page: it has been started again since. Open the address it ' +
+              'printed this time. This is the cart the browser kept from before, not the folder.'
+            : 'pbgide is not answering (' + e.message + '): start it again, and open the address it prints.');
+        return false;
+    }
     const files = {};
+    disk = {};
+    diskHash = {};
     try {
-        for (const name of list.files) {
-            if (!CART_FILE.test(name) && !isEditor(name)) continue;
-            const r = await fromServer('/cart/file?path=' + encodeURIComponent(name));
-            files[name] = isBinary(name) ? new Uint8Array(await r.arrayBuffer()) : await r.text();
+        for (const { path, hash } of list.files) {
+            if (!CART_FILE.test(path) && !isEditor(path)) continue;
+            files[path] = await readServed(path);
+            disk[path] = copyOf(files[path]);
+            diskHash[path] = hash;
         }
     } catch (e) {
         say('error', 'Could not read the folder pbgide serves: ' + e.message);
@@ -1510,12 +1542,68 @@ async function openServed() {
     if (!files['cart.json']) return false;
     load(files);
     saveTo = { served: list.name };
-    say('print', 'Opened the folder ' + list.name + ' through pbgide: Save writes its files back.');
+    say('print', 'Opened the folder ' + list.name + ' through pbgide: Save writes its files back, and ' +
+        'files changed there are taken in as they change.');
+    setInterval(syncServed, SYNC_MS);
     return true;
 }
 
+/* The folder looked at again: what changed there taken in */
+async function syncServed() {
+    if (syncing || !saveTo || !saveTo.served) return;
+    syncing = true;
+    try {
+        const list = await (await fromServer('/cart/list')).json();
+        const now = {}, took = [];
+        for (const { path, hash } of list.files)
+            if (CART_FILE.test(path) || isEditor(path)) now[path] = hash;
+        for (const name of Object.keys(now)) {
+            if (diskHash[name] === now[name]) continue;
+            const v = await readServed(name);
+            const mine = folder[name];
+            /* unchanged here since it was last read: the disk's, as it is */
+            if (mine === undefined && !gone.has(name) || mine !== undefined && same(mine, disk[name]) ||
+                mine !== undefined && same(mine, v) ||
+                await ask(name + ' changed on the disk', [{ text: name + ' has been changed in the folder, and ' +
+                    'here too since it was last saved. Take the folder\'s, losing the changes made here?' }],
+                    'Take the folder\'s') !== null) {
+                folder[name] = copyOf(v);
+                gone.delete(name);
+                took.push(name);
+            }
+            disk[name] = copyOf(v);
+            diskHash[name] = now[name];
+        }
+        /* gone from the disk: gone here too, unless changed here since */
+        for (const name of Object.keys(diskHash)) {
+            if (now[name] !== undefined) continue;
+            if (folder[name] !== undefined && same(folder[name], disk[name])) {
+                delete folder[name];
+                took.push(name);
+            }
+            delete disk[name];
+            delete diskHash[name];
+        }
+        if (took.length) {
+            const wasDirty = dirty;
+            /* the open editor goes too, or show() keeps its old text */
+            if (view && took.includes(current)) { view.destroy(); view = null; }
+            for (const name of took) delete states[name];
+            showFiles();
+            if (took.includes(current)) show(folder[current] !== undefined ? current : 'main.js');
+            changed();
+            if (!wasDirty) saved();
+            say('print', 'Taken in from the folder: ' + took.join(', ') + '.');
+        }
+    } catch (e) {
+        /* pbgide stopped, or busy: looked at again next time */
+    }
+    syncing = false;
+}
+
 /* Save through pbgide: each file written, and the ones renamed or deleted
- * removed */
+ * removed; what was written is then the disk's as far as the next look is
+ * concerned */
 async function saveServed() {
     try {
         for (const [name, v] of Object.entries(folder))
@@ -1523,6 +1611,14 @@ async function saveServed() {
         for (const name of gone)
             if (folder[name] === undefined)
                 await fromServer('/cart/file?path=' + encodeURIComponent(name), { method: 'DELETE' });
+        const list = await (await fromServer('/cart/list')).json();
+        disk = {};
+        diskHash = {};
+        for (const { path, hash } of list.files) {
+            if (folder[path] === undefined) continue;
+            disk[path] = copyOf(folder[path]);
+            diskHash[path] = hash;
+        }
     } catch (e) {
         say('error', 'Could not save through pbgide (' + e.message + '): is it still running? ' +
             'The cart is kept here; Save as .pbg writes it out instead.');

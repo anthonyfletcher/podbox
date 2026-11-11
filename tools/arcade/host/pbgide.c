@@ -5,9 +5,10 @@
  *
  * It serves the IDE's page on 127.0.0.1 -- this computer only -- and opens
  * it in the default browser. With a cart folder, the page opens that cart
- * and Save writes its files back through the server, so the browser never
- * writes a file itself and needs no leave to (some managed browsers refuse
- * pages that leave whatever the owner says).
+ * and Save writes its files back through the server, and the list it asks
+ * for carries a fingerprint of each file so the page sees one changed on
+ * the disk. The browser never writes a file itself and needs no leave to
+ * (some managed browsers refuse pages that leave whatever the owner says).
  *
  * The page's address carries a token made at each start; every request
  * that reads or writes the folder has to carry it back, so another page in
@@ -175,7 +176,22 @@ static int write_all(const char *rel, const char *data, long size)
     return 1;
 }
 
-/* The cart's files as a JSON list into out */
+/* A file's contents as FNV-1a, for the page to tell a file changed on the
+ * disk from one it already has; 0 where it cannot be read */
+static unsigned fingerprint(const char *path)
+{
+    long n;
+    char *data = read_all(path, &n);
+    unsigned h = 2166136261u;
+    if (!data)
+        return 0;
+    for (long i = 0; i < n; i++)
+        h = (h ^ (unsigned char)data[i]) * 16777619u;
+    free(data);
+    return h;
+}
+
+/* The cart's files as a JSON list into out: each its name and fingerprint */
 static size_t list_files(char *out, size_t cap)
 {
     size_t n = 0;
@@ -195,9 +211,10 @@ static size_t list_files(char *out, size_t cap)
             snprintf(rel, sizeof(rel), "%s%s%s", pass < 0 ? "" : DIRS[pass],
                      pass < 0 ? "" : "/", e->d_name);
             full_path(path, sizeof(path), rel);
-            if (!cart_name(rel) || !is_file(path) || n + strlen(rel) + 8 > cap)
+            if (!cart_name(rel) || !is_file(path) || n + strlen(rel) + 40 > cap)
                 continue;
-            n += (size_t)snprintf(out + n, cap - n, "%s\"%s\"", first ? "" : ",", rel);
+            n += (size_t)snprintf(out + n, cap - n, "%s{\"path\":\"%s\",\"hash\":\"%08x\"}",
+                                  first ? "" : ",", rel, fingerprint(path));
             first = 0;
         }
         closedir(d);
@@ -370,6 +387,7 @@ static void handle(sock_t s)
             return;
         }
         reply(s, 200, "OK", "application/octet-stream", data, (size_t)n);
+        printf("read %s\n", rel);
         free(data);
         return;
     }

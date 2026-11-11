@@ -60,7 +60,7 @@ test('the page is served to anyone on this computer, the files only with the tok
 test('the list is the cart\'s own files, and each reads back as it is', async () => {
     const list = await (await ask('/cart/list')).json();
     assert.equal(list.name, 'cart');
-    assert.deepEqual(list.files.sort(), ['cart.json', 'images/a.png', 'main.js']);
+    assert.deepEqual(list.files.map((f) => f.path).sort(), ['cart.json', 'images/a.png', 'main.js']);
     const png = new Uint8Array(await (await ask('/cart/file?path=images%2Fa.png')).arrayBuffer());
     assert.deepEqual([...png], [137, 80, 78, 71, 0, 255]);
 });
@@ -91,4 +91,13 @@ test('a request naming another host is refused', async () => {
         s.on('end', () => done(out));
     });
     assert.match(r, /^HTTP\/1\.1 403/);
+});
+
+test('a file changed on the disk lists with a new fingerprint, and only that one', async () => {
+    const before = Object.fromEntries((await (await ask('/cart/list')).json()).files.map((f) => [f.path, f.hash]));
+    fs.writeFileSync(path.join(cart, 'main.js'), 'function init() {}\nfunction update() { }\n');
+    const after = Object.fromEntries((await (await ask('/cart/list')).json()).files.map((f) => [f.path, f.hash]));
+    assert.notEqual(after['main.js'], before['main.js']);
+    assert.equal(after['cart.json'], before['cart.json']);
+    assert.equal(after['images/a.png'], before['images/a.png']);
 });

@@ -358,14 +358,17 @@ host/pbgide mygame          # opens the IDE in the browser, on the folder mygame
 
 `pbgide` serves the IDE from your own computer and opens it in your
 default browser, already editing the cart folder you give it: Save writes
-its files straight back there. The browser never writes a file itself, so
+its files straight back there, and a file changed in the folder by another
+program is taken into the IDE within a couple of seconds -- or, where you
+have changed it in the IDE too, you are asked which to keep. The browser never writes a file itself, so
 it works in any browser, including one set never to let pages write files.
 
 - It answers this computer only (`127.0.0.1`), and only the page it opened
   can read or write the folder: the address carries a key made each time
   it starts. It reads and writes the cart's own files and nothing else.
 - It runs until you stop it (Ctrl+C). Close the page and open the address
-  it printed to come back; a new IDE built with `node ide/build.js` is
+  it printed to come back -- each start prints a new one, and a page from an
+  earlier start says so; a new IDE built with `node ide/build.js` is
   served at the next reload.
 - `--port n` picks the port (8484, or the next free one, by default),
   `--no-browser` only prints the address, and `--ide file.html` serves an
