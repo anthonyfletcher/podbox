@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`51ea28ffd2`**, merged 2026-10-25 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`127dff1016`**, merged 2026-11-11 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -303,8 +303,41 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-17 | `685eb7a1af` `c8940732da` `c715b6f7a3` `cee3cb8963` `bad21c5f52` | cabbiev2: recording, FM and remote screens, one backdrop per size | **N/A** | `wps/`. Its two new `fonts/0[56]-Cabbie-Bold.bdf` are converted into every zip by `buildzip.pl`. |
 | 2026-10-20 | `3f9b8fc997` `e3b1d0c2f5` `4584b4ef02` `92ff5b292f` `299f69f56b` `c97aa2e641` `96e37a26a4` `5ba7999490` | hwstub, beastpatcher, rbutil, skinshots | **N/A** | `utils/`. |
 | 2026-10-22 | `8ea6f00d6f` `4b2d55842f` `6a0cbd8212` `96fa1f9a94` `6982a638e4` `6d2b2b7bc5` `64f1b245eb` `9c5ec176d9` `aad17bb83e` `f7d31808ff` `ac867479d9` `6d8094b2a5` `7be0ce3655` `1eecf5f62f` `e0d723fdfb` `25b755a21c` `8054a1dcd0` `0098ba6023` `9377ad18c7` | imx31, Fuze v2, iPod Nano 3G, rk27xx, YP-CP3, Ingenic, AXP PMU, HM-60x | **N/A** | Other targets. |
+| 2026-10-26 | `bb370f9504` `c2ade1451f` `f85b43398e` | mp4, id3: chapters as an embedded cuesheet | **Adopted (in part)** | The metadata half, but not for Nero lists: `mp4.c`'s `chpl` case is ours. `look_for_cuesheet_file()` ignores the chapter encodings, so `chapters.c` keeps reading every chapter format; upstream's chapter readers are linked and never called. |
+| 2026-10-31 | `bda08c8671` | mp4: trim only an encoder-delay-sized first chapter | **Superseded** | Ours trims only from a single record. |
+| 2026-10-22 | `decc6181c3` | playback: preserve USB disconnect while stopping playback | **Adopted** | |
+| 2026-10-26 | `ba96040021` | codec_thread: read_filebuf of 0 bytes reads nothing | **Adopted** | |
+| 2026-10-27 | `dacd53c781` | diskinfo: repaint only when requested | **Adopted (in part)** | The ATA screen; the other has no home here. |
+| 2026-10-27 | `963444a591` | pictureflow: don't flush the slide cache after walking all of it | **Adopted** | In the carousel's seek macros. |
+| 2026-10-31 | `790d282746` | tagtree, pictureflow: handle a refused database search | **Adopted (in part)** | The `<Random>` row and insert-all in `browser_db.c`. Cover Flow builds from `db_summary`, whose searches are checked. |
+| 2026-10-26 | `73f4f069b5` `58583e3467` `2203d38f38` `4a66a0ac85` | pictureflow: slide cache edge, last album, artist line, texture column | **Adopted (independently)** | |
+| 2026-10-26 | `4a821b37f3` `4fb20b03d4` `6256979302` | pictureflow: title flash, zoom 0, error strings | **N/A** | The carousel has no crossfade, configuration file or those strings. |
+| 2026-10-31 | `9b1f1e9e65` `8a1aee5c76` `91e1b24441` `3716177b5d` `11c4f68656` `ab8859915b` `b486769b23` `204c49b796` `86a3bb0678` `cc41dd21c1` | playlist, tagcache, settings, debug_menu | **Adopted (independently)** | Ported from PodBox. |
+| 2026-10-31 | `9836fc8c16` | bookmark: no track field is invalid | **N/A** | No bookmarks. Ported from PodBox. |
+| 2026-10-26 | `5d33e09f7c` | action: don't eat scroll wheel events on a context change | **Adopted (independently)** | RockPod's form of it. |
+| 2026-10-14 | `ae83f59f23` | FS#14030: reset theme settings that aren't set | **Adopted (independently)** | `F_THEME_RESET_MASK`. |
+| 2026-11-02 | `2c427b055a` `65a5b08e0d` | LANG_WPS becomes LANG_WHILE_PLAYING; German translation | **Declined** | `LANG_WPS` is this fork's "Now Playing Screen". |
+| 2026-11-09 | `2ae4d6cb42` `47379b4475` `f25395e6e5` | playlist: size limits from RAM | **Declined** | Both players are built as 64 MB, which would raise the ceiling to 250000; the 2000 and 10000 defaults and the 32000 ceiling stay. |
+| 2026-10-28 | `32a2076078` | ROLO with custom Rockbox directories | **Adopted** | The firmware half; `BOOTDIR` is still `/.rockbox`. |
+| 2026-10-30 | `0669b96d5c` `2ed4d36c17` | `HAVE_DBG_PORTS` | **Adopted (in part)** | The firmware half. The debug menu has no I/O ports screen. |
+| 2026-10-26 | `4db426cca6` `d52bc0f2d7` `11156e99a9` `127dff1016` `de3dab73b7` `51e9934dcb` `b174c74001` `d9dd1f8d9d` `1bc3fe0434` | serial iap: thread at boot, Restore on Exit, RX move, sound check off, provisional authentication, shutdown notice, button release, date/time, get_u32 | **Adopted** | Restore on Exit on serial only: libiap's SetShuffle and SetRepeat still save. |
+| 2026-10-26 | `c6d3012d7b` | iap: load the saved playlist when an accessory browses after cold start | **Declined** | A dock browses the database here, which an empty playlist does not empty. |
+| 2026-10-26 | `baa2b4564b` | iap: fail SetCurrentPlayingTrack while stopped | **Declined** | `iap_skip_to()` starts playback instead. |
+| 2026-10-26 | `6a2f2c77ad` | iap: pause when the interface mode changes | **Adopted (in part)** | Leaving Extended mode pauses; entering it does not. |
+| 2026-10-26 | the other `iap:` commits on `apps/iap/` | serial iap fixes | **Adopted (independently)** | From the same RockPod work this fork took; lingo 7 ones are **N/A** (no tuner). |
+| 2026-10-26 | `98b37ff36f` `8d431b8d0d` `8a675862ac` `e9ed290550` `b587cfb5e9` `c9bc89e350` `1dee7a7b36` | usb iap: re-identify, report ID 0x0F, BadParameter, random challenge, PlayControl, AuthMask, send_busy | **Adopted** | Merged with our libiap: DeferAuth still authenticates, a failed report drops its frame, and the 1.0 challenge is random too. |
+| 2026-10-26 | `a13aaaf5f1` `a858040976` `19c6915d8f` | iap: 6G undock reset, PP divisor window, autobaud per UART | **Adopted** | The first two were this fork's (from RockPod). |
+| 2026-10-26 | `af0205c478` | usb_core: no re-arm after a failed batch transfer | **Adopted** | The 6G's iAP audio stream ends on a failed transfer until the next start. |
+| 2026-10-31 | `13a0ac9a81` `bfea54e083` `1f5236c711` | usb_storage LUN and range, stall an out-of-range write; usb-drv-arc prime wait | **Adopted** | Ported from PodBox, and taken back as upstream's. |
+| 2026-10-26 | `94313491ab` `7fc6775be5` | ipod6g: no power cut before the flush; ATA flush on USB eject and ROLO | **Adopted** | Into our per-mode `ata_sleepnow()`. A USB eject now waits for the flush, up to about 6 s on the 6G. |
+| 2026-10-31 | `1c0d1f5cff` `5b67f8a57a` `35f08f7eb7` `15d73677bc` `0958cb732d` `9610042dc2` `9cc5a3589d` `1854a5b053` `358d6a1f61` `8aa98b33b6` | alac, libm4a, libopus, dsd, sdl | **Adopted** | Ported from PodBox. `libalac/alac.c` stays ours, which has all five. |
+| 2026-10-27 | `df88df55f1` | voice: Piper 1.x | **Adopted** | `build-voices.sh` passes `-m` and puts the piper-tts Python first on PATH. |
+| 2026-10-26 | `a0338697fb` `1e24bb882e` `4effa76914` `1414d47cd6` `bae8e18e1a` `0137ea5889` `437737913f` `46c888e5c3` | FAT FsInfo, GPT, s5l87xx bootloader multiplier, LCD shutdown, PCM started, clickwheel recovery, `RC_MENU` | **Adopted** | `46c888e5c3` was ours. |
+| 2026-10-26 | the libfaad SBR and PS, wavpack, flac, metadata and utf8proc commits | codecs and metadata | **Adopted** | |
+| 2026-09-09 | `2476968a20` `3b226dd23e`, and the nano 4G, S5L8720, 3DS and x1600 commits | other targets | **N/A** | |
+| 2026-10-27 | `b9002ac186` `f3ffe789ef` `8e4a103eb0` | mikmod, plugin splash, radio | **N/A** | |
 
-Complete through `51ea28ffd2` (2026-10-24), merged as `bd491b9915`.
+Complete through `127dff1016` (2026-11-10), merged as `MERGE_COMMIT`.
 
 ---
 
