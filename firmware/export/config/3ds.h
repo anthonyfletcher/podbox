@@ -7,7 +7,7 @@
 #define HAVE_FPU
 
 /* For Rolo and boot loader */
-#define MODEL_NUMBER  100s
+#define MODEL_NUMBER  122
 #define MODEL_NAME    "N3DS"
 
 #define USB_NONE
@@ -81,6 +81,10 @@
 #define HAVE_HEADPHONE_DETECTION
 #define HAVE_SW_TONE_CONTROLS
 /* #define HAVE_SW_VOLUME_CONTROL */
+
+/* The volume slider sets the hardware volume directly; the port reports
+ * changes with SYS_VOLUME_CHANGED (button-3ds.c) */
+#define PLATFORM_HAS_VOLUME_CHANGE
 /* #define PCM_SW_VOLUME_UNBUFFERED */
 /* #define PCM_SW_VOLUME_FRACBITS  (16) */
 
@@ -123,9 +127,6 @@
 /* Define this if a programmable hotkey is mapped */
 #define HAVE_HOTKEY
 
-#define BOOTDIR "/"
-
 /* No special storage */
 #define CONFIG_STORAGE STORAGE_HOSTFS
 #define HAVE_STORAGE_FLUSH
-

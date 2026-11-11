@@ -644,8 +644,10 @@ int usb_drv_batch_stop(void)
     return 0;
 }
 
-static void batch_xfer_complete(void) {
-    if(batch_stopped) {
+static void batch_xfer_complete(int status) {
+    /* a failed transfer was cancelled (e.g. by SET_CONFIGURATION), and the
+     * endpoint is about to be torn down, so do not queue another one */
+    if(batch_stopped || status != 0) {
         return;
     }
     batch_get_and_send();
@@ -1476,7 +1478,7 @@ void usb_core_transfer_complete(int ep, int dir, int status, int length) {
     if(batch_ep != 0 && (ep | dir) == batch_ep) {
         if(status != 0)
             batch_failed++;
-        batch_xfer_complete();
+        batch_xfer_complete(status);
         return;
     }
 #endif

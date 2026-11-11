@@ -8,7 +8,7 @@
 #
 
 # global CC options for all platforms
-CCOPTS="-W -Wall -Wextra -Wundef -Os -nostdlib -ffreestanding -Wstrict-prototypes -pipe -std=gnu11 -funit-at-a-time -fno-delete-null-pointer-checks -fno-strict-overflow -fno-common"
+CCOPTS="-W -Wall -Wextra -Wundef -Wno-format-security -Os -nostdlib -ffreestanding -Wstrict-prototypes -pipe -std=gnu11 -funit-at-a-time -fno-delete-null-pointer-checks -fno-strict-overflow -fno-common"
 
 # LD options for the core
 LDOPTS=""
@@ -591,7 +591,8 @@ arm1136jfscc () {
 
 arm1176jzscc () {
  findarmgcc
- GCCOPTS="$CCOPTS -mcpu=arm1176jz-s"
+ # Rockbox runs with SCTLR.U clear, so no unaligned accesses (as arm1176jzlinuxcc)
+ GCCOPTS="$CCOPTS -mcpu=arm1176jz-s -mno-unaligned-access"
  GCCOPTIMIZE="-fomit-frame-pointer"
  endian="little"
 }
@@ -929,7 +930,7 @@ devkitarmcc () {
     SHARED_LDFLAGS="-shared"
     SHARED_CFLAGS="-fPIC -fvisibility=hidden"
 
-    LDOPTS="-specs=3dsx.specs -L$DEVKITPRO/libctru/lib -L$DEVKITPRO/portlibs/3ds/lib -ldl -lCTRL -lctru -lm"
+    LDOPTS="-specs=3dsx.specs -L$DEVKITPRO/libctru/lib -L$DEVKITPRO/portlibs/3ds/lib -ldl -lCTRL -lcitro2d -lcitro3d -lctru -lm"
     GLOBAL_LDOPTS="$GLOBAL_LDOPTS -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft"
 
     # let's allow building shared libraries even if unresolved symbols are found,
@@ -1262,7 +1263,7 @@ voiceconfig () {
         DEFAULT_TTS_OPTS=$GTTS_OPTS
         DEFAULT_CHOICE="g"
     fi
-    if [ -n "`findtool piper`" ]; then
+    if python3 -m piper -h > /dev/null ; then
         PIPER="(p)iper "
         PIPER_OPTS=""
         DEFAULT_TTS="piper"
@@ -1368,6 +1369,7 @@ voiceconfig () {
 	fi
 	models=`(cd $PIPER_MODEL_DIR ; ls -1 *onnx)`
 	for model in $models; do
+	    model=`basename "$model" .onnx`
 	    PIPER_MODEL="$model"  # Default
 	    break;
         done
@@ -1376,6 +1378,7 @@ voiceconfig () {
         else
 	    i=1
 	    for model in $models; do
+		model=`basename "$model" .onnx`
 		printf "%3d. %s\n" "$i" "$model"
                 i=`expr $i + 1`
             done
@@ -1384,6 +1387,7 @@ voiceconfig () {
 	fi
         i=1
         for model in $models; do
+	    model=`basename "$model" .onnx`
             if [ "$i" = "$CHOICE" -o "$model" = "$CHOICE" ]; then
                 PIPER_MODEL="$model"
 		break;
@@ -1391,7 +1395,7 @@ voiceconfig () {
             i=`expr $i + 1`
         done
 
-	TTS_OPTS="$TTS_OPTS --model $PIPER_MODEL_DIR/$PIPER_MODEL"
+	TTS_OPTS="$TTS_OPTS -m $PIPER_MODEL"
         advopts="$advopts --voice=$PIPER_MODEL"
         echo "Piper model set to $PIPER_MODEL"
     elif [ "$TTS_ENGINE" = "mimic" ]; then
@@ -1455,7 +1459,7 @@ picklang() {
     # figure out which languages that are around -- in the application layer
     # being built, which --appsdir may have moved away from "apps"
     for file in $rootdir/${coreapps:-apps}/lang/*.lang; do
-        clean=`basename $file .lang`
+        clean=`basename "$file" .lang`
         langs="$langs $clean"
     done
 
@@ -1783,7 +1787,7 @@ cat <<EOF
  ==Shanling==                                    ==HiBy==
  260) Q1                   ==Surfans==           300) R3 Pro II
                            280) F28 (WIP)        301) R1
- ==Echo project==
+ ==Echo project==                                304) R1 baremetal (WIP)
  270) Echo R1 (WIP)       ==Nintendo==          ==Hidizs==
                           290) 3DS (WIP)        302) AP80 Pro Max (WIP)
 EOF
@@ -1806,6 +1810,8 @@ fi
   scramblebitmaptools="$genericbitmaptools scramble"
   # used by X1000 targets
   x1000tools="$genericbitmaptools scramble mkspl-x1000 uclpack"
+  # used by X1600 targets
+  x1600tools="$genericbitmaptools scramble mkspl-x1600 uclpack"
   # default to not generating ELF files
   USE_ELF="no"
   PLUGIN_USE_ELF="no"
@@ -2571,7 +2577,7 @@ fi
     ;;
 
    64|sansafuzeplus)
-    target_id=80
+    target_id=72
     modelname="sansafuzeplus"
     target="SANSA_FUZEPLUS"
     memory=64
@@ -2590,7 +2596,7 @@ fi
     ;;
 
    65|sansaclipzip)
-    target_id=68
+    target_id=76
     modelname="sansaclipzip"
     target="SANSA_CLIPZIP"
     memory=8 # not sure
@@ -2609,7 +2615,7 @@ fi
     ;;
 
    66|sansaconnect)
-    target_id=81
+    target_id=75
     modelname="sansaconnect"
     target="SANSA_CONNECT"
     memory=64
@@ -2712,6 +2718,7 @@ fi
     appextra=""
     plugins="yes"
     bootoutput="bootloader-$modelname.ipod"
+    arm_thumb_boot=1
     # toolset is the tools within the tools directory that we build for
     # this particular target.
     toolset=$ipodbitmaptools
@@ -2779,7 +2786,7 @@ fi
     ;;
 
    95|creativezenv)
-    target_id=92
+    target_id=77
     modelname="creativezenv"
     target="CREATIVE_ZENV"
     memory=32
@@ -3083,7 +3090,7 @@ fi
     ;;
 
    146|samsungypcp3)
-    target_id=117
+    target_id=132
     modelname="samsungypcp3"
     target="SAMSUNG_YPCP3"
     memory=16 # always
@@ -3173,7 +3180,7 @@ fi
     ;;
 
    180|rk27generic)
-    target_id=78
+    target_id=73
     modelname="rk27generic"
     target="RK27_GENERIC"
     memory=16 # always
@@ -3240,7 +3247,7 @@ fi
 
    200|sdlapp)
     application="yes"
-    target_id=73
+    target_id=25
     modelname="sdlapp"
     target="SDLAPP"
     app_set_paths
@@ -3313,7 +3320,7 @@ fi
 
    145|samsungypr1)
     application="yes"
-    target_id=93
+    target_id=42
     modelname="samsungypr1"
     target="SAMSUNG_YPR1"
     memory=24
@@ -3528,7 +3535,7 @@ fi
 
    223|sonynwze460)
     application="yes"
-    target_id=97
+    target_id=56
     modelname="sonynwze460"
     target="SONY_NWZE460"
     memory=16
@@ -3572,7 +3579,7 @@ fi
 
    225|sonynwze580)
     application="yes"
-    target_id=98
+    target_id=108
     modelname="sonynwze580"
     target="SONY_NWZE580"
     memory=16
@@ -3726,7 +3733,7 @@ fi
 
    250|ibassodx50)
     application="yes"
-    target_id=94
+    target_id=44
     modelname="ibassodx50"
     target="DX50"
     app_type="android_ndk"
@@ -3776,7 +3783,7 @@ fi
     ;;
 
    239|agptekrockernative)
-    target_id=126
+    target_id=133
     modelname="agptekrockernative"
     target="AGPTEK_ROCKER_NATIVE"
     memory=32
@@ -3802,7 +3809,7 @@ fi
    240|agptekrocker)
     application="yes"
     app_type="hibyos"
-    target_id=97
+    target_id=107
     modelname="agptekrocker"
     target="AGPTEK_ROCKER"
     memory=8
@@ -4024,7 +4031,7 @@ fi
     ;;
 
    232|ihifi770c)
-    target_id=107
+    target_id=97
     modelname="ihifi770c"
     target="IHIFI770C"
     memory=16
@@ -4046,7 +4053,7 @@ fi
     ;;
 
    231|ihifi770)
-    target_id=108
+    target_id=98
     modelname="ihifi770"
     target="IHIFI770"
     memory=16
@@ -4068,7 +4075,7 @@ fi
     ;;
 
    233|ihifi800)
-    target_id=109
+    target_id=99
     modelname="ihifi800"
     target="IHIFI800"
     memory=16
@@ -4287,6 +4294,32 @@ fi
     t_cpu="hosted"
     t_manufacturer="game_console"
     t_model="psp"
+    ;;
+
+    304|hibyr1native)
+    target_id=126
+    modelname="hibyr1native"
+    target="HIBY_R1_NATIVE"
+    memory=64
+    mipsr2elcc
+    appextra=""
+    plugins="yes"
+    tool="$rootdir/tools/scramble -add=hbr1 "
+    boottool="$rootdir/tools/mkspl-x1600 -type=nand -ppb=2 -bpp=2 "
+    output="rockbox.r1"
+    bootoutput="bootloader.r1"
+    sysfontbl="24-Terminus"
+    sysfont="20-Terminus"
+    # toolset is the tools within the tools directory that we build for
+    # this particular target.
+    toolset="$x1600tools"
+    bmp2rb_mono="$rootdir/tools/bmp2rb -f 0"
+    bmp2rb_native="$rootdir/tools/bmp2rb -f 4"
+    # architecture, manufacturer and model for the target-tree build
+    t_cpu="mips"
+    t_manufacturer="ingenic_x1600"
+    t_soc="ingenic"
+    t_model="hibyr1"
     ;;
 
 
@@ -4756,7 +4789,7 @@ fi
 if test "$ARG_ARM_THUMB" = "1"; then
   extradefines="$extradefines -DUSE_THUMB"
   GCCOPTS="$GCCOPTS -mthumb-interwork"
-  CC="$toolsdir/thumb-cc.py $CC"
+  CC="$toolsdir/thumb-cc.pl $CC"
 fi
 
 if test "X$endian" = "Xbig"; then

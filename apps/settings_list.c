@@ -95,12 +95,24 @@
 #endif
 #define NODEFAULT INT(0)
 
+/* Approximate size of a single playlist entry in bytes */
+#if defined(HAVE_DIRCACHE)
+# define PLAYLIST_ENTRY_SIZE 16
+#else
+# define PLAYLIST_ENTRY_SIZE 4
+#endif
+
+/* Allow playlist to be up to 1/16th of physical RAM, rounded to nearest 1000 */
+#define PLAYLIST_ABSOLUTE_MAX_SIZE \
+    (((MEMORYSIZE * 1000 * 1000 / 16 / PLAYLIST_ENTRY_SIZE) / 1000) * 1000)
+
 #ifdef HAVE_TOUCHSCREEN
 #if defined(APPLICATION) \
  || defined(ONDA_VX747)  \
  || defined(ONDA_VX767)  \
  || defined(ONDA_VX747P) \
- || defined(ONDA_VX777)
+ || defined(ONDA_VX777) \
+ || defined(HIBY_R1_NATIVE)
 #define DEFAULT_TOUCHSCREEN_MODE TOUCHSCREEN_POINT
 #else
 #define DEFAULT_TOUCHSCREEN_MODE TOUCHSCREEN_BUTTON
@@ -1386,12 +1398,12 @@ const struct settings_list settings[] = {
                   /** Slow CPU benefits greatly from building smaller playlists
                   On the iPod Mini 2nd gen, creating a playlist of 2000 entries takes around 10 seconds */
                   2000,
-#elif MEMORYSIZE > 1
+#elif MEMORYSIZE > 2
                   10000,
 #else
-                  400,
+                  1000,
 #endif
-                  "max files in playlist", UNIT_INT, 1000, 32000, 1000,
+                  "max files in playlist", UNIT_INT, 1000, PLAYLIST_ABSOLUTE_MAX_SIZE, 1000,
                   NULL, NULL, NULL),
     INT_SETTING(F_BANFROMQS, max_files_in_dir, LANG_MAX_FILES_IN_DIR,
                 MAX_FILES_IN_DIR_DEFAULT, "max files in dir", UNIT_INT,
@@ -2228,10 +2240,10 @@ const struct settings_list settings[] = {
 #endif
 #endif /* CONFIG_TUNER */
 #ifdef HAVE_RECORDING
-    TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, wrs_file, "wrs",
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY, wrs_file, "wrs",
                      DEFAULT_WRS_NAME, WPS_DIR "/", ".wrs"),
 #ifdef HAVE_REMOTE_LCD
-    TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, rwrs_file, "rwrs",
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY, rwrs_file, "rwrs",
                      DEFAULT_WRS_NAME, WPS_DIR "/", ".rwrs"),
 #endif
 #endif
@@ -2256,7 +2268,7 @@ const struct settings_list settings[] = {
 #endif
     TEXT_SETTING(0,lang_file,"lang","",LANG_DIR "/",".lng"),
 #if LCD_DEPTH > 1
-    TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY,backdrop_file,"backdrop",
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY,backdrop_file,"backdrop",
                      DEFAULT_BACKDROP, NULL, NULL),
 #endif
     TEXT_SETTING(0,kbd_file,"kbd","-",ROCKBOX_DIR "/",".kbd"),

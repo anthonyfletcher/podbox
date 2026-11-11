@@ -159,8 +159,8 @@ static bool read_iso_sector(int fd, uint32_t lsn, unsigned char *sector)
 }
 
 /* area is scratch for one sector; parse_iso() lends the master TOC's buffer,
- * whose fields it has already read. Two 2 KB buffers on the stack at once
- * overrun the 6.8 KB USB thread when a dock asks for an .iso's tags. */
+ * whose fields it has already read, so that only one 2 KB sector buffer is
+ * on the stack of whichever thread reads the tags. */
 static bool parse_iso_area(int fd, struct mp3entry *id3, uint32_t lsn,
                            unsigned char *area)
 {

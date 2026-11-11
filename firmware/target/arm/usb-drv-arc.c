@@ -1644,7 +1644,7 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
     int pipe = ep_num * 2 + (send ? 1 : 0);
     unsigned int mask = pipe2mask[pipe];
     struct queue_head* qh = &qh_array[pipe];
-    uint32_t start;
+    unsigned int us;
     struct transfer_descriptor *new_td, *cur_td, *prev_td;
 
     int oldlevel = disable_irq_save();
@@ -1685,20 +1685,21 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
         goto pt_error;
     }
 
-    /* Interrupts are off here, so current_tick stands still: the timeout
-     * has to come from the hardware timer. */
-    start = USEC_TIMER;
-    while ((REG_ENDPTPRIME & mask)) {
+    /* Interrupts are off, so current_tick does not advance: count the
+     * timeout (at least 250ms) in microsecond delays instead. */
+    for (us = 0; (REG_ENDPTPRIME & mask); us++) {
         if (REG_USBSTS & USBSTS_RESET) {
             rc = -1;
             goto pt_error;
         }
 
-        if ((uint32_t)USEC_TIMER - start > 250000) {
+        if (us >= 250000) {
             logf("prime timeout");
             rc = -2;
             goto pt_error;
         }
+
+        udelay(1);
     }
 
     if (!(REG_ENDPTSTATUS & mask)) {

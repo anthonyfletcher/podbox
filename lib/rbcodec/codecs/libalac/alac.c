@@ -207,7 +207,13 @@ static inline void br_end(const struct bitreader *br, alac_file *alac)
     alac->input_buffer_bitaccumulator = used & 7;
 }
 
-#define count_leading_zeros(x) bs_generic(x, BS_CLZ|BS_SHORT)
+#define count_leading_zeros(x) bs_generic(x, BS_CLZ)
+
+/* Without a CLZ instruction, bs_generic() is a table lookup and its
+   16-bit form (BS_SHORT) is cheaper; use it when the argument fits. */
+#if !defined(CPU_ARM) || ARM_ARCH < 5
+#define CLZ_BY_TABLE
+#endif
 
 #define RICE_THRESHOLD 8 // maximum number of bits for a rice prefix.
 

@@ -112,6 +112,15 @@ struct device_t {
                                      * call to SetRemoteEventNotification or GetRemoteEventStatus
                                      */
     bool do_notify;                 /* Notifications enabled */
+    uint32_t pb_notifications;      /* Extended Interface play status change
+                                     * notifications requested with
+                                     * SetPlayStatusChangeNotification
+                                     */
+    bool pb_track_changed;          /* A track change is waiting to be
+                                     * notified
+                                     */
+    uint32_t pb_trackpos_ms;        /* Last track position notified,
+                                     * 0xFFFFFFFF if none yet */
     bool do_power_notify;           /* Whether to send power change notifications.
                                      * These are sent automatically to all devices
                                      * that used IdentifyDeviceLingoes to identify
@@ -123,7 +132,8 @@ struct device_t {
     uint32_t chapter_index;         /* if they change */
     unsigned char play_status;
     bool mute;
-    unsigned char volume;
+    bool mute_notified;
+    unsigned char volume;           /* UI volume byte */
     unsigned char power_state;
     unsigned char battery_level;
     uint32_t equalizer_index;
@@ -145,7 +155,13 @@ struct device_t {
 };
 
 extern struct device_t device;
-#define DEVICE_AUTHENTICATED (device.auth.state == AUST_AUTH)
+/* Provisional authentication: the spec makes every lingo-authenticated
+ * command available once the iPod has acknowledged the accessory's
+ * certificate (AckDevAuthenticationInfo with success), which is when the
+ * state moves to AUST_CERTDONE. The states from there to AUST_AUTH are
+ * the background half of the handshake.
+ */
+#define DEVICE_AUTHENTICATED (device.auth.state >= AUST_CERTDONE)
 #define DEVICE_AUTH_RUNNING ((device.auth.state != AUST_NONE) && (device.auth.state != AUST_AUTH))
 #define DEVICE_LINGO_SUPPORTED(x) (device.lingoes & BIT_N((x)&0x1f))
 
@@ -235,6 +251,9 @@ void iap_repeat_next(void);
 void iap_fill_power_state(void);
 
 void iap_send_tx(void);
+int iap_byte_to_volume(unsigned char level);
+int iap_abs_byte_to_volume(unsigned char level);
+void iap_set_mute(bool mute);
 void iap_set_remote_volume(void);
 
 extern enum interface_state interface_state;
@@ -242,6 +261,19 @@ void iap_interface_state_change(const enum interface_state new);
 
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;
+
+/* How long a seek started by an accessory may last without being ended,
+ * in iap_periodic() ticks */
+#define IAP_SEEK_TIMEOUT (100)
+
+bool iap_resume_playlist_pending(void);
+void iap_load_resume_playlist(void);
+bool iap_wait_resume_playlist(long timeout);
+bool iap_play_or_resume(void);
+void iap_set_shuffle(bool shuffle, bool restore);
+void iap_set_repeat(int mode, bool restore);
+void iap_seek_start(bool forward);
+void iap_seek_stop(void);
 
 uint32_t iap_get_trackpos(void);
 uint32_t iap_get_trackindex(void);

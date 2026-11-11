@@ -42,6 +42,7 @@
 #include "action.h"
 #include "powermgmt.h"
 #include "usb.h"
+#include "misc.h"
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -95,6 +96,16 @@ int iap_repeatbtn = 0;
  */
 unsigned int iap_timeoutbtn = 0;
 bool iap_btnrepeat = false, iap_btnshuffle = false;
+/* Set when a session ends while muted, see iap_reset_device() */
+static bool iap_unmute_pending = false;
+/* The user's volume when an accessory muted, see iap_periodic() */
+static int iap_mute_volume;
+/* The shuffle and repeat modes to put back when the accessory detaches,
+ * or -1, see iap_set_shuffle() and iap_set_repeat() */
+static int iap_saved_shuffle = -1;
+static int iap_saved_repeat = -1;
+/* Set when a session ends with saved modes to restore */
+static bool iap_restore_pending = false;
 
 static long thread_stack[(DEFAULT_STACK_SIZE*8)/sizeof(long)];
 static struct event_queue iap_queue;
@@ -148,6 +159,9 @@ static unsigned char* iap_rxpayload;
 static unsigned char* iap_rxnext;
 static uint32_t iap_rxlen;
 static unsigned char* iap_txstart;
+/* Counts RX buffer discards by iap_reset_state(), so that
+ * iap_handlepkt() can tell the packet it is handling has gone */
+static volatile unsigned int iap_rx_discards;
 unsigned char* iap_txpayload;
 unsigned char* iap_txnext;
 
@@ -236,7 +250,10 @@ void put_u32(unsigned char *buf, const uint32_t data)
 
 uint32_t get_u32(const unsigned char *buf)
 {
-    return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+    /* Widen before shifting: buf[0] promotes to int, and shifting a
+     * value of 0x80 or more left by 24 overflows it */
+    return ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+           ((uint32_t)buf[2] << 8) | buf[3];
 }
 
 uint16_t get_u16(const unsigned char *buf)
@@ -283,6 +300,10 @@ void iap_tx_strlcpy(const unsigned char *str)
     ptrdiff_t txfree;
     int r;
 
+    /* Metadata fields are NULL when a file lacks the tag */
+    if (str == NULL)
+        str = "";
+
     txfree = TX_BUFLEN - (iap_txnext - iap_txstart);
     r = strlcpy(iap_txnext, str, txfree);
 
@@ -307,6 +328,8 @@ void iap_reset_auth(struct auth_t* auth)
 
 void iap_reset_state(IF_IAP_MP_NONVOID(int port))
 {
+    int level;
+
     if (!iap_running)
         return;
 
@@ -314,18 +337,26 @@ void iap_reset_state(IF_IAP_MP_NONVOID(int port))
        when we eventually maintain independent state */
     IF_IAP_MP((void)port);
 
+    /* Drop whatever the old accessory left in the RX buffer, or
+     * iap_handlepkt() hands it to the new session. This may run in
+     * interrupt context (a tick on the 6G, a timeout for the headphone
+     * port), so only reset the pointers, with interrupts disabled.
+     */
+    level = disable_irq_save();
+    frame_state.state = ST_SYNC;
+    iap_rxnext = iap_rxstart;
+    iap_rxpayload = iap_rxstart;
+    iap_rxlen = RX_BUFLEN+2;
+    iap_rx_discards++;
+    restore_irq(level);
+
     iap_reset_device(&device);
     iap_bitrate_set(global_settings.serial_bitrate);
-
-#if 0  // XXX this is still screwed up
-    memset(&frame_state, 0, sizeof(frame_state));
-    interface_state = IST_STANDARD;
-    frame_state.state = ST_SYNC;
-
-    iap_reset_buffers();
-#endif
 }
 
+/* Reset the session state. Called from interrupt context via
+ * iap_reset_state(), so this must not block.
+ */
 void iap_reset_device(struct device_t* device)
 {
     iap_reset_auth(&(device->auth));
@@ -333,10 +364,39 @@ void iap_reset_device(struct device_t* device)
     device->notifications = 0;
     device->changed_notifications = 0;
     device->do_notify = false;
+    device->pb_notifications = 0;
+    device->pb_track_changed = false;
+    device->pb_trackpos_ms = 0xFFFFFFFF;
     device->do_power_notify = false;
     device->accinfo = ACCST_NONE;
     device->capabilities = 0;
     device->capabilities_queried = 0;
+    /* Lift a mute the accessory left behind. That needs the codec, so
+     * leave it to iap_periodic(): this may run in interrupt context. */
+    if (device->mute)
+        iap_unmute_pending = true;
+    device->mute = false;
+    /* Likewise for shuffle and repeat changed with Restore on Exit */
+    if (iap_saved_shuffle >= 0 || iap_saved_repeat >= 0)
+        iap_restore_pending = true;
+
+    interface_state = IST_STANDARD;
+
+    /* Release a button the accessory was holding. A held seek keeps
+     * iap_timeoutbtn up for several seconds, and nothing will send the
+     * release now.
+     */
+    iap_remotebtn = BUTTON_NONE;
+    iap_timeoutbtn = 0;
+    iap_repeatbtn = 0;
+    iap_btnshuffle = false;
+    iap_btnrepeat = false;
+
+#if CONFIG_TUNER
+    /* Set again when the next accessory identifies with the RF Tuner
+     * lingo */
+    radio_present = 0;
+#endif
 }
 
 static int iap_task(struct timeout *tmo)
@@ -348,12 +408,93 @@ static int iap_task(struct timeout *tmo)
 }
 
 
+/* Map a volume within lo..hi onto 0..255 */
+static unsigned char iap_scale_volume(int volume, int lo, int hi)
+{
+    if (hi <= lo || volume <= lo)
+        return 0;
+    if (volume >= hi)
+        return 255;
+
+    return ((volume - lo) * 255 + (hi - lo) / 2) / (hi - lo);
+}
+
+/* The upper end of the UI volume scale: the volume limit, which never
+ * exceeds the codec's maximum */
+static int iap_ui_volume_max(void)
+{
+    return MIN(global_settings.volume_limit, sound_max(SOUND_VOLUME));
+}
+
+/* The absolute volume byte, 0..255 over the codec's whole range */
+unsigned char iap_volume_to_byte(int volume)
+{
+    return iap_scale_volume(volume, sound_min(SOUND_VOLUME),
+                            sound_max(SOUND_VOLUME));
+}
+
+/* The UI volume byte, which the spec normalises to the volume limit:
+ * 255 is the loudest the user lets the player go */
+unsigned char iap_volume_to_ui_byte(int volume)
+{
+    return iap_scale_volume(volume, sound_min(SOUND_VOLUME),
+                            iap_ui_volume_max());
+}
+
+/* The inverse of iap_volume_to_ui_byte(), for volumes set by an
+ * accessory */
+int iap_byte_to_volume(unsigned char level)
+{
+    int lo = sound_min(SOUND_VOLUME);
+    int hi = iap_ui_volume_max();
+
+    if (hi <= lo)
+        return lo;
+
+    return lo + (level * (hi - lo) + 127) / 255;
+}
+
+/* The inverse of iap_volume_to_byte(), still kept within the volume
+ * limit */
+int iap_abs_byte_to_volume(unsigned char level)
+{
+    int lo = sound_min(SOUND_VOLUME);
+    int hi = sound_max(SOUND_VOLUME);
+
+    if (hi <= lo)
+        return lo;
+
+    return MIN(lo + (level * (hi - lo) + 127) / 255, iap_ui_volume_max());
+}
+
+/* Mute or unmute on behalf of an accessory. Thread context only.
+ *
+ * sound_set_volume() also stores the value in global_status.volume, so
+ * put the user's volume back after muting, or unmuting would restore the
+ * mute level.
+ */
+void iap_set_mute(bool mute)
+{
+    if (mute)
+    {
+        iap_mute_volume = global_status.volume;
+        sound_set_volume(sound_min(SOUND_VOLUME));
+        global_status.volume = iap_mute_volume;
+    }
+    else
+    {
+        setvol();
+    }
+
+    device.mute = mute;
+}
+
 void iap_set_remote_volume(void)
 {
     IAP_TX_INIT(0x03, 0x0D);
     IAP_TX_PUT(0x04);
     IAP_TX_PUT(0x00);
-    IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+    IAP_TX_PUT(iap_volume_to_ui_byte(global_status.volume));
     iap_send_tx();
 }
 
@@ -400,7 +541,10 @@ static void iap_thread(void)
             case SYS_POWEROFF:
             case SYS_REBOOT:
             {
-                iap_shutdown = true;
+                /* iap_periodic() only runs once IAP is running, so do
+                 * not leave the flag for a later accessory */
+                if (iap_running)
+                    iap_shutdown = true;
                 break;
             }
 
@@ -414,67 +558,65 @@ static void iap_thread(void)
     }
 }
 
-/* called by playback when the next track starts */
+/* called by playback when the next track starts. This runs on the
+ * audio thread, so leave building and sending the notification to
+ * iap_periodic(), which owns the TX buffer.
+ */
 static void iap_track_changed(unsigned short id, void *ignored)
 {
     (void)id;
     (void)ignored;
-    if ((interface_state == IST_EXTENDED) && device.do_notify) {
-        long playlist_pos = playlist_next(0);
-        playlist_pos -= playlist_get_first_index(NULL);
-        if(playlist_pos < 0)
-            playlist_pos += playlist_amount();
-
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x01);
-        IAP_TX_PUT_U32(playlist_pos);
-
-        iap_send_tx();
-        return;
-    }
+    device.pb_track_changed = true;
 }
 
-/* Do general setup of the needed infrastructure.
- *
- * Please note that a lot of additional work is done by iap_start()
+/* Set up the needed infrastructure: the message queue and message
+ * handler thread. This runs at boot, in thread context. The buffers and
+ * the notification timer are set up later by iap_malloc(), on the iAP
+ * thread, after the first sync byte.
  */
 void iap_setup(const int ratenum)
 {
     iap_bitrate_set(ratenum);
     iap_remotebtn = BUTTON_NONE;
-    iap_setupflag = true;
-    iap_started = false;
     iap_running = false;
+
+    if (!iap_started)
+    {
+        unsigned int tid;
+
+        iap_reset_device(&device);
+        queue_init(&iap_queue, true);
+        tid = create_thread(iap_thread, thread_stack, sizeof(thread_stack),
+                0, "iap"
+                IF_PRIO(, PRIORITY_SYSTEM)
+                IF_COP(, CPU));
+        if (!tid)
+            panicf("Could not create iap thread");
+        add_event(PLAYBACK_EVENT_TRACK_CHANGE, iap_track_changed);
+        iap_started = true;
+    }
+
+    /* Only now let the UART interrupt post to the queue */
+    iap_setupflag = true;
 }
 
-/* Actually bring up the message queue, message handler thread and
- * notification timer
+/* Start up on the first received sync byte.
  *
- * NOTE: This is running in interrupt context
+ * NOTE: This is running in interrupt context. Creating threads and
+ * allocating memory are not allowed here, so post a message to our own
+ * queue and let the iAP thread allocate the buffers.
  */
 static void iap_start(void)
 {
-    unsigned int tid;
+    static bool malloc_posted = false;
 
-    if (iap_started)
+    /* Every sync byte calls this until iap_malloc() has run, so post
+     * only once instead of filling the queue */
+    if (malloc_posted)
         return;
 
-    iap_reset_device(&device);
-    queue_init(&iap_queue, true);
-    tid = create_thread(iap_thread, thread_stack, sizeof(thread_stack),
-            0, "iap"
-            IF_PRIO(, PRIORITY_SYSTEM)
-            IF_COP(, CPU));
-    if (!tid)
-        panicf("Could not create iap thread");
-    timeout_register(&iap_task_tmo, iap_task, MS_TO_TICKS(100), (intptr_t)NULL);
-    add_event(PLAYBACK_EVENT_TRACK_CHANGE, iap_track_changed);
-
-    /* Since we cannot allocate memory while in interrupt context
-     * post a message to our own queue to get that done
-     */
+    malloc_posted = true;
     queue_post(&iap_queue, IAP_EV_MALLOC, 0);
-    iap_started = true;
 }
 
 static void iap_malloc(void)
@@ -497,6 +639,10 @@ static void iap_malloc(void)
 
     iap_reset_buffers();
     iap_running = true;
+
+    /* Only tick the iAP thread once an accessory has sent a sync byte */
+    timeout_register(&iap_task_tmo, iap_task, MS_TO_TICKS(100),
+                     (intptr_t)NULL);
 }
 
 void iap_bitrate_set(const int ratenum)
@@ -650,8 +796,10 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             /* large packet */
             s->state = ST_LENH;
         } else {
-            /* small packet */
-            if (x > (iap_rxlen-2))
+            /* small packet. Compare by addition: iap_rxlen is unsigned,
+             * so (iap_rxlen-2) wraps once the buffer is within a byte of
+             * full, and every frame would then be accepted. */
+            if ((uint32_t)x + 2 > iap_rxlen)
             {
                 /* Packet too long for buffer */
                 s->state = ST_SYNC;
@@ -671,7 +819,7 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
     case ST_LENL:
         s->check += x;
         s->len += x;
-        if ((s->len == 0) || (s->len > (iap_rxlen-2))) {
+        if ((s->len == 0) || ((uint32_t)s->len + 2 > iap_rxlen)) {
             /* invalid length */
             s->state = ST_SYNC;
             break;
@@ -720,6 +868,7 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
 {
     int tracknum;
     struct playlist_track_info info;
+    struct mp3entry *current = NULL;
 
     tracknum = track;
 
@@ -727,16 +876,179 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     if(tracknum >= playlist_amount())
         tracknum -= playlist_amount();
 
+    /* The playback engine only has the current track's metadata while
+     * playing. When stopped, e.g. right after the saved playlist was
+     * loaded, it is empty and the track would be listed without a name. */
+    if (audio_status() & AUDIO_STATUS_PLAY)
+        current = audio_current_track();
+
     /* If the tracknumber is not the current one,
        read id3 from disk */
-    if(playlist_next(0) != tracknum)
+    if(!current || playlist_get_current()->index != tracknum)
     {
         playlist_get_track_info(NULL, tracknum, &info);
         /* memset(id3, 0, sizeof(*id3)) --get_metadata does this for us */
         get_metadata(id3, -1, info.filename);
     } else {
-        memcpy(id3, audio_current_track(), sizeof(*id3));
+        memcpy(id3, current, sizeof(*id3));
     }
+}
+
+/* Set while the playlist loaded by iap_load_playlist_ui() has not been
+ * started yet */
+static bool resume_playlist_loaded = false;
+/* Loading is only done once per boot: if the saved playlist can't be
+ * loaded, every later database query would wait for it again.
+ * POSTED: the UI thread has been asked to load it, LOADING: it is. */
+enum { RESUME_IDLE, RESUME_POSTED, RESUME_LOADING, RESUME_DONE };
+static volatile int resume_load_state = RESUME_IDLE;
+static long resume_post_tick;
+/* Requests the UI thread didn't take, or loads that failed. After two,
+ * accessories get the answers for an empty playlist again. */
+static int resume_load_failures = 0;
+#define RESUME_MAX_FAILURES 2
+
+static void resume_load_failed(void)
+{
+    resume_load_state = (++resume_load_failures < RESUME_MAX_FAILURES) ?
+                        RESUME_IDLE : RESUME_DONE;
+}
+
+static bool resume_playlist_wanted(void)
+{
+    return playlist_amount() <= 0 &&
+           global_status.resume_index != -1 &&
+           !(audio_status() & AUDIO_STATUS_PLAY);
+}
+
+/* An accessory that powers the iPod up starts browsing before the user
+ * resumed playback, while the current playlist is still empty. It then
+ * finds no tracks and gives up until it is reconnected. Returns true
+ * when the saved playlist would give it something to show and hasn't
+ * been loaded yet, or is still loading.
+ */
+bool iap_resume_playlist_pending(void)
+{
+    if (resume_load_state == RESUME_POSTED ||
+        resume_load_state == RESUME_LOADING)
+        return true;
+    return resume_load_state == RESUME_IDLE && resume_playlist_wanted();
+}
+
+/* Load the saved playlist without starting playback. playlist_resume()
+ * shows splashes and reads the button queue, so it has to run on the UI
+ * thread: ask it to, then wait with iap_wait_resume_playlist().
+ */
+void iap_load_resume_playlist(void)
+{
+    if (resume_load_state != RESUME_IDLE)
+        return;
+    resume_load_state = RESUME_POSTED;
+    resume_post_tick = current_tick;
+    button_queue_post(SYS_IAP_LOAD_PLAYLIST, 0);
+}
+
+/* Wait at most timeout ticks for the load. Returns true once it is done
+ * or has been given up. */
+bool iap_wait_resume_playlist(long timeout)
+{
+    long end = current_tick + timeout;
+
+    while (resume_load_state != RESUME_DONE && TIME_BEFORE(current_tick, end))
+    {
+        /* The screen showing may not pass system events on, as some
+         * plugins don't. Forget a request not taken within 2 s, so that
+         * a late event is ignored. */
+        if (resume_load_state == RESUME_POSTED &&
+            TIME_AFTER(current_tick, resume_post_tick + 2*HZ))
+        {
+            resume_load_failed();
+            break;
+        }
+        sleep(HZ/20);
+    }
+    return resume_load_state == RESUME_DONE;
+}
+
+/* SYS_IAP_LOAD_PLAYLIST, on the UI thread */
+void iap_load_playlist_ui(void)
+{
+    if (resume_load_state != RESUME_POSTED)
+        return;
+    resume_load_state = RESUME_LOADING;
+    /* Check again: the user may have resumed playback meanwhile */
+    if (resume_playlist_wanted())
+    {
+        int result = playlist_resume();
+
+        /* remove the splashes playlist_resume() left on screen; plugins
+         * read buttons themselves and could take this for a key press */
+        if (get_current_activity() != ACTIVITY_PLUGIN)
+            button_queue_post(BUTTON_REDRAW, 0);
+        if (result != -1)
+            resume_playlist_loaded = true;
+        else if (playlist_amount() <= 0)
+        {
+            /* it may load later, for example once a plugin that took
+             * the buffer has exited */
+            resume_load_failed();
+            return;
+        }
+    }
+    resume_load_state = RESUME_DONE;
+}
+
+/* Start playback of the current playlist when stopped, or resume it
+ * when paused. Returns false when there is nothing to play.
+ */
+bool iap_play_or_resume(void)
+{
+    int index;
+
+    if (audio_status() & AUDIO_STATUS_PLAY)
+    {
+        resume_playlist_loaded = false;
+        audio_resume();
+        return true;
+    }
+
+    if (playlist_amount() <= 0)
+        return false;
+
+    if (resume_playlist_loaded)
+    {
+        /* continue where the user left off */
+        resume_playlist_loaded = false;
+        playlist_resume_track(global_status.resume_index,
+                              global_status.resume_crc32,
+                              global_status.resume_elapsed,
+                              global_status.resume_offset);
+        return true;
+    }
+
+    index = playlist_get_current()->index;
+    playlist_start(index >= 0 ? index : 0, 0, 0);
+    return true;
+}
+
+/* Hold a remote seek button until iap_seek_stop(), or until the
+ * timeout releases it should the accessory never end the seek */
+void iap_seek_start(bool forward)
+{
+    iap_remotebtn = forward ? BUTTON_RC_RIGHT : BUTTON_RC_LEFT;
+    iap_repeatbtn = 2;
+    iap_timeoutbtn = IAP_SEEK_TIMEOUT;
+}
+
+void iap_seek_stop(void)
+{
+    if (iap_timeoutbtn == 0)
+        return;
+
+    /* Let the button driver see the release before the next packet */
+    iap_remotebtn = BUTTON_NONE;
+    iap_repeatbtn = 2;
+    iap_timeoutbtn = 0;
 }
 
 uint32_t iap_get_trackpos(void)
@@ -746,18 +1058,173 @@ uint32_t iap_get_trackpos(void)
     return id3->elapsed;
 }
 
+/* The index of the current track as the accessory counts them, from
+ * first_index on. Under shuffle the current track can come before
+ * first_index in the playlist, so wrap the difference around.
+ */
 uint32_t iap_get_trackindex(void)
 {
     struct playlist_info* playlist = playlist_get_current();
+    int index = playlist->index - playlist->first_index;
 
-    return (playlist->index - playlist->first_index);
+    if (index < 0)
+        index += playlist->amount;
+
+    return index;
+}
+
+static void apply_shuffle(bool shuffle)
+{
+    if (global_settings.playlist_shuffle == shuffle)
+        return;
+
+    global_settings.playlist_shuffle = shuffle;
+    /* A loaded playlist is saved in its play order, so reorder it even
+     * while stopped. Audio is only reloaded while playing. */
+    if (playlist_amount() > 0)
+    {
+        if (shuffle)
+            playlist_randomise(NULL, current_tick, true);
+        else
+            playlist_sort(NULL, true);
+    }
+}
+
+static void apply_repeat(int mode)
+{
+    if (global_settings.repeat_mode == mode)
+        return;
+
+    global_settings.repeat_mode = mode;
+    if (audio_status() & AUDIO_STATUS_PLAY)
+        audio_flush_and_reload_tracks();
+}
+
+/* Put back the shuffle and repeat modes an accessory changed with the
+ * Restore on Exit byte set, once it is gone */
+static void iap_restore_modes(void)
+{
+    if (!iap_restore_pending)
+        return;
+
+    iap_restore_pending = false;
+    if (iap_saved_shuffle < 0 && iap_saved_repeat < 0)
+        return;
+    if (iap_saved_shuffle >= 0)
+        apply_shuffle(iap_saved_shuffle);
+    if (iap_saved_repeat >= 0)
+        apply_repeat(iap_saved_repeat);
+    iap_saved_shuffle = -1;
+    iap_saved_repeat = -1;
+    /* Anything that saved the settings meanwhile wrote the accessory's
+     * modes to disk */
+    settings_save();
+}
+
+/* Set once the modes are final for this power cycle */
+static bool iap_modes_final = false;
+
+/* Called at shutdown on the UI thread, after playback stopped: keep the
+ * modes an accessory changed with Restore on Exit off disk. With
+ * save_playlist false, the playlist won't be saved and isn't reordered.
+ */
+void iap_prepare_shutdown(bool save_playlist)
+{
+    iap_modes_final = true;
+    if (!save_playlist)
+    {
+        if (iap_saved_shuffle >= 0)
+            global_settings.playlist_shuffle = iap_saved_shuffle;
+    }
+    else if (iap_saved_shuffle >= 0 &&
+             iap_saved_shuffle != global_settings.playlist_shuffle)
+    {
+        apply_shuffle(iap_saved_shuffle);
+        /* resume from the track's position in the new order */
+        if (global_status.resume_index != -1 && playlist_amount() > 0)
+            global_status.resume_index = playlist_get_current()->index;
+    }
+    if (iap_saved_repeat >= 0)
+        global_settings.repeat_mode = iap_saved_repeat;
+    iap_saved_shuffle = -1;
+    iap_saved_repeat = -1;
+}
+
+/* SetShuffle. With restore set, the change lasts until the accessory
+ * detaches and isn't saved; otherwise it is kept like a change made on
+ * the iPod. */
+void iap_set_shuffle(bool shuffle, bool restore)
+{
+    if (iap_modes_final)
+        return;
+    /* finish restoring for a previous session first */
+    iap_restore_modes();
+
+    if (restore)
+    {
+        if (iap_saved_shuffle < 0)
+            iap_saved_shuffle = global_settings.playlist_shuffle;
+        apply_shuffle(shuffle);
+    }
+    else
+    {
+        bool was_temporary = iap_saved_shuffle >= 0;
+
+        iap_saved_shuffle = -1;
+        if (was_temporary || global_settings.playlist_shuffle != shuffle)
+        {
+            apply_shuffle(shuffle);
+            settings_save();
+        }
+    }
+}
+
+/* SetRepeat, see iap_set_shuffle() */
+void iap_set_repeat(int mode, bool restore)
+{
+    if (iap_modes_final)
+        return;
+    iap_restore_modes();
+
+    if (restore)
+    {
+        if (iap_saved_repeat < 0)
+            iap_saved_repeat = global_settings.repeat_mode;
+        apply_repeat(mode);
+    }
+    else
+    {
+        bool was_temporary = iap_saved_repeat >= 0;
+
+        iap_saved_repeat = -1;
+        if (was_temporary || global_settings.repeat_mode != mode)
+        {
+            apply_repeat(mode);
+            settings_save();
+        }
+    }
 }
 
 void iap_periodic(void)
 {
     static int count;
+    static int pb_count;
 
     if(!iap_setupflag) return;
+
+    if (iap_unmute_pending)
+    {
+        iap_unmute_pending = false;
+        if (!device.mute)
+            setvol();
+    }
+
+    /* setvol() makes a volume changed on the player audible, which lifts
+     * an accessory's mute. The volume notification reports it. */
+    if (device.mute && (global_status.volume != iap_mute_volume))
+        device.mute = false;
+
+    iap_restore_modes();
 
     /* Handle pending authentication tasks */
     switch (device.auth.state)
@@ -808,18 +1275,26 @@ void iap_periodic(void)
         iap_btnrepeat = false;
     }
 
-    /* Handle power down messages. */
-    if (iap_shutdown && device.do_power_notify)
+    /* Handle power down messages. This is a one-shot event: a shutdown
+     * can be cancelled, and a latched flag would then tell the next
+     * accessory to identify that we are going down.
+     */
+    if (iap_shutdown)
     {
-        /* NotifyiPodStateChange */
-        IAP_TX_INIT(0x00, 0x23);
-        IAP_TX_PUT(0x01);
+        iap_shutdown = false;
 
-        iap_send_tx();
+        if (device.do_power_notify)
+        {
+            /* NotifyiPodStateChange */
+            IAP_TX_INIT(0x00, 0x23);
+            IAP_TX_PUT(0x01);
 
-        /* No further actions, we're going down */
-        iap_reset_device(&device);
-        return;
+            iap_send_tx();
+
+            /* No further actions, we're going down */
+            iap_reset_device(&device);
+            return;
+        }
     }
 
     /* Handle GetAccessoryInfo messages */
@@ -905,20 +1380,86 @@ void iap_periodic(void)
         }
     }
 
-    if (!device.do_notify) return;
-    if ((device.notifications == 0) && (interface_state != IST_EXTENDED)) return;
+    /* Extended Interface PlayStatusChangeNotification */
+    if (device.pb_track_changed)
+    {
+        device.pb_track_changed = false;
 
-    /* Volume change notifications are sent every 100ms */
-    if (device.notifications & (BIT_N(4) | BIT_N(16))) {
-        /* Currently we do not track volume changes for BIT_N(16),
-         *
-         */
-        IAP_TX_INIT(0x03, 0x09);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT(0x00);
-        IAP_TX_PUT(0xFF &(int)((global_status.volume + 90) * 2.65625));
-        device.changed_notifications |= BIT_N(4);
-        iap_send_tx();
+        /* Track index */
+        if ((interface_state == IST_EXTENDED) &&
+            (device.pb_notifications & BIT_N(2)))
+        {
+            IAP_TX_INIT4(0x04, 0x0027);
+            IAP_TX_PUT(0x01);
+            IAP_TX_PUT_U32(iap_get_trackindex());
+
+            iap_send_tx();
+        }
+    }
+
+    if ((interface_state == IST_EXTENDED) &&
+        (device.pb_notifications & BIT_N(3)))
+    {
+        /* Track position, at most every 500ms, and only when it has
+         * changed: nothing is sent while paused or stopped */
+        if (++pb_count >= 5)
+        {
+            uint32_t t = iap_get_trackpos();
+
+            pb_count = 0;
+
+            if (t != device.pb_trackpos_ms)
+            {
+                IAP_TX_INIT4(0x04, 0x0027);
+                IAP_TX_PUT(0x04);
+                IAP_TX_PUT_U32(t);
+
+                iap_send_tx();
+
+                device.pb_trackpos_ms = t;
+            }
+        }
+    }
+
+    if (!device.do_notify) return;
+    if (device.notifications == 0) return;
+
+    /* Volume changes are checked every 100ms */
+    if (device.notifications & (BIT_N(4) | BIT_N(16)))
+    {
+        unsigned char volume = iap_volume_to_ui_byte(global_status.volume);
+
+        if ((device.volume != volume) || (device.mute_notified != device.mute))
+        {
+            /* Mute/UI volume */
+            if (device.notifications & BIT_N(4))
+            {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x04);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(device.mute ? 0x00 : volume);
+                device.changed_notifications |= BIT_N(4);
+
+                iap_send_tx();
+            }
+
+            /* Mute/UI/Absolute volume */
+            if (device.notifications & BIT_N(16))
+            {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x10);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(device.mute ? 0x00 : volume);
+                IAP_TX_PUT(device.mute ? 0x00 :
+                           iap_volume_to_byte(global_status.volume));
+                device.changed_notifications |= BIT_N(16);
+
+                iap_send_tx();
+            }
+
+            device.volume = volume;
+            device.mute_notified = device.mute;
+        }
     }
 
     /* All other events are sent every 500ms */
@@ -929,25 +1470,12 @@ void iap_periodic(void)
 
     /* RemoteEventNotification */
 
-    /* Mode 04 PlayStatusChangeNotification */
-    /* Are we in Extended Mode */
-    if (interface_state == IST_EXTENDED) {
-        /* Return Track Position */
-        struct mp3entry *id3 = audio_current_track();
-        unsigned long time_elapsed = id3->elapsed;
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT_U32(time_elapsed);
-
-        iap_send_tx();
-    }
-
     /* Track position (ms)  or Track position (s) */
     if (device.notifications & (BIT_N(0) | BIT_N(15)))
     {
         uint32_t t;
         uint16_t ts;
-        bool changed;
+        bool changed = false;
 
         t = iap_get_trackpos();
         ts = (t / 1000) & 0xFFFF;
@@ -1155,6 +1683,16 @@ void iap_periodic(void)
                     IAP_TX_PUT(0x02);
                     break;
                 }
+
+                default:
+                {
+                    /* REPEAT_SHUFFLE and REPEAT_AB have no encoding of
+                     * their own. Both continue over the whole playlist,
+                     * so report "all" rather than leave out the data byte.
+                     */
+                    IAP_TX_PUT(0x02);
+                    break;
+                }
             }
             device.changed_notifications |= BIT_N(8);
 
@@ -1171,11 +1709,18 @@ void iap_periodic(void)
 
         tm = get_time();
 
-        if (memcmp(tm, &(device.datetime), sizeof(struct tm)))
+        /* Only the fields that are sent: the seconds change every
+         * second */
+        if ((tm->tm_year != device.datetime.tm_year) ||
+            (tm->tm_mon != device.datetime.tm_mon) ||
+            (tm->tm_mday != device.datetime.tm_mday) ||
+            (tm->tm_hour != device.datetime.tm_hour) ||
+            (tm->tm_min != device.datetime.tm_min))
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x09);
-            IAP_TX_PUT_U16(tm->tm_year);
+            /* tm_year counts from 1900, iAP wants the full year */
+            IAP_TX_PUT_U16(tm->tm_year + 1900);
 
             /* Month */
             IAP_TX_PUT(tm->tm_mon+1);
@@ -1247,11 +1792,19 @@ void iap_periodic(void)
  */
 void iap_interface_state_change(const enum interface_state new)
 {
+    /* Settings changed with Restore on Exit last until the accessory
+     * leaves the Extended Interface */
+    if (interface_state == IST_EXTENDED && new != IST_EXTENDED &&
+        (iap_saved_shuffle >= 0 || iap_saved_repeat >= 0))
+        iap_restore_pending = true;
+
     if (((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) ||
         ((interface_state == IST_STANDARD) && (new == IST_EXTENDED))) {
+        /* Pause the engine directly: outside the WPS a synthetic Play
+         * button would activate the selected item instead */
         if (audio_status() == AUDIO_STATUS_PLAY)
         {
-            REMOTE_BUTTON(BUTTON_RC_PLAY);
+            audio_pause();
         }
     }
 
@@ -1260,40 +1813,20 @@ void iap_interface_state_change(const enum interface_state new)
 
 static void iap_handlepkt_mode5(const unsigned int len, const unsigned char *buf)
 {
+    /* The Accessory Power lingo only has BeginHighPower (0x02) and
+     * EndHighPower (0x03), and both are sent by the iPod. An accessory
+     * has nothing to send here, and the lingo has no acknowledgement,
+     * so ignore whatever arrives.
+     */
     (void) len;
-    unsigned int cmd = buf[1];
-    switch (cmd)
-    {
-        /* Sent from iPod Begin Transmission */
-        case 0x02:
-        {
-            /* RF Transmitter: Begin High Power transmission */
-            unsigned char data0[] = {0x05, 0x02};
-            iap_send_pkt(data0, sizeof(data0));
-            break;
-        }
-
-        /* Sent from iPod End High Power Transmission */
-        case 0x03:
-        {
-            /* RF Transmitter: End High Power transmission */
-            unsigned char data1[] = {0x05, 0x03};
-            iap_send_pkt(data1, sizeof(data1));
-            break;
-        }
-        /* Return Version Number ?*/
-        case 0x04:
-        {
-            /* do nothing */
-            break;
-        }
-    }
+    (void) buf;
 }
 
 void iap_handlepkt(void)
 {
     int level;
     int length;
+    unsigned int discards;
 
     if(!iap_setupflag) return;
     if(!iap_running) return;
@@ -1315,11 +1848,27 @@ void iap_handlepkt(void)
             return;
         }
 
+        discards = iap_rx_discards;
+
         /* handle command by mode */
         length = get_u16(iap_rxstart);
 #if defined(LOGF_ENABLE) && defined(ROCKBOX_HAS_LOGF)
         logf("R: %s", hexstring(iap_rxstart+2, (length)));
 #endif
+
+        /* A corrupt length would walk iap_rxpayload past the start of
+         * the buffer, so stop draining and resynchronise instead.
+         */
+        if ((length + 2) > (iap_rxpayload - iap_rxstart))
+        {
+            level = disable_irq_save();
+            iap_rxnext = iap_rxstart;
+            iap_rxpayload = iap_rxstart;
+            iap_rxlen = RX_BUFLEN+2;
+            frame_state.state = ST_SYNC;
+            restore_irq(level);
+            return;
+        }
 
         if (length != 0) {
             unsigned char mode = *(iap_rxstart+2);
@@ -1344,7 +1893,20 @@ void iap_handlepkt(void)
          * cleanly
          */
         level = disable_irq_save();
-        memmove(iap_rxstart, iap_rxstart+(length+2), (RX_BUFLEN+2)-(length+2));
+        if (discards != iap_rx_discards)
+        {
+            /* iap_reset_state() emptied the buffer while the packet
+             * was being handled, there is nothing left to remove */
+            restore_irq(level);
+            continue;
+        }
+        /* Move only what is buffered: the complete packets still to
+         * handle and the frame being received, up to iap_rxnext, rather
+         * than the whole 64KB buffer with interrupts disabled. The check
+         * above guarantees the length is not negative.
+         */
+        memmove(iap_rxstart, iap_rxstart+(length+2),
+                (iap_rxnext - iap_rxstart) - (length+2));
         iap_rxnext -= (length+2);
         iap_rxpayload -= (length+2);
         iap_rxlen += (length+2);

@@ -31,6 +31,7 @@
 #include "logf.h"
 #include "debug.h"
 #include "replaygain.h"
+#include "rbunicode.h"
 
 #ifdef DEBUGF
 #undef DEBUGF
@@ -44,7 +45,9 @@
 #define MP4_cART FOURCC(0xa9, 'A', 'R', 'T')
 #define MP4_cgrp FOURCC(0xa9, 'g', 'r', 'p')
 #define MP4_cgen FOURCC(0xa9, 'g', 'e', 'n')
+#define MP4_chap FOURCC('c', 'h', 'a', 'p')
 #define MP4_chpl FOURCC('c', 'h', 'p', 'l')
+#define MP4_co64 FOURCC('c', 'o', '6', '4')
 #define MP4_cnam FOURCC(0xa9, 'n', 'a', 'm')
 #define MP4_cwrt FOURCC(0xa9, 'w', 'r', 't')
 #define MP4_ccmt FOURCC(0xa9, 'c', 'm', 't')
@@ -57,6 +60,7 @@
 #define MP4_hdlr FOURCC('h', 'd', 'l', 'r')
 #define MP4_ilst FOURCC('i', 'l', 's', 't')
 #define MP4_mdat FOURCC('m', 'd', 'a', 't')
+#define MP4_mdhd FOURCC('m', 'd', 'h', 'd')
 #define MP4_mdia FOURCC('m', 'd', 'i', 'a')
 #define MP4_mdir FOURCC('m', 'd', 'i', 'r')
 #define MP4_meta FOURCC('m', 'e', 't', 'a')
@@ -74,9 +78,14 @@
 #define MP4_vp09 FOURCC('v', 'p', '0', '9')
 #define MP4_encv FOURCC('e', 'n', 'c', 'v')
 #define MP4_stbl FOURCC('s', 't', 'b', 'l')
+#define MP4_stco FOURCC('s', 't', 'c', 'o')
+#define MP4_stsc FOURCC('s', 't', 's', 'c')
 #define MP4_stsd FOURCC('s', 't', 's', 'd')
+#define MP4_stsz FOURCC('s', 't', 's', 'z')
 #define MP4_stts FOURCC('s', 't', 't', 's')
+#define MP4_tkhd FOURCC('t', 'k', 'h', 'd')
 #define MP4_trak FOURCC('t', 'r', 'a', 'k')
+#define MP4_tref FOURCC('t', 'r', 'e', 'f')
 #define MP4_trkn FOURCC('t', 'r', 'k', 'n')
 #define MP4_udta FOURCC('u', 'd', 't', 'a')
 #define MP4_extra FOURCC('-', '-', '-', '-')
@@ -155,40 +164,51 @@ static unsigned int read_mp4_tag_string(int fd, int size_left, char** buffer,
     return length;
 }
 
+/* Read an atom header.  Sets *size to the size of the atom's contents,
+ * clamped to its parent, of which size_left bytes were left, and returns
+ * what is left of the parent after the atom.  An atom too small for its
+ * own header ends the parent: *type 0, *size 0, 0 left. */
 static unsigned int read_mp4_atom(int fd, uint32_t* size,
                                   uint32_t* type, uint32_t size_left)
 {
+    uint32_t header = 8;
+
     read_uint32be(fd, size);
     read_uint32be(fd, type);
 
     if (*size == 1)
     {
-        /* FAT32 doesn't support files this big, so something seems to
-         * be wrong. (64-bit sizes should only be used when required.)
-         */
-        errno = EFBIG;
+        /* 64-bit size.  FAT32 doesn't support files over 4 GB, so only
+         * the low 32 bits can be non-zero. */
+        uint32_t high;
+
+        read_uint32be(fd, &high);
+        read_uint32be(fd, size);
+        header = 16;
+
+        if (high != 0)
+        {
+            errno = EFBIG;
+            *type = 0;
+            return 0;
+        }
+    }
+
+    /* 0 means up to the end of the parent */
+    if (*size == 0 || *size > size_left)
+    {
+        *size = size_left;
+    }
+
+    if (*size < header)
+    {
         *type = 0;
+        *size = 0;
         return 0;
     }
 
-    if (*size > 0)
-    {
-        if (*size > size_left)
-        {
-            size_left = 0;
-        }
-        else
-        {
-            size_left -= *size;
-        }
-
-        *size -= 8;
-    }
-    else
-    {
-        *size = size_left;
-        size_left = 0;
-    }
+    size_left -= *size;
+    *size -= header;
 
     return size_left;
 }
@@ -408,7 +428,10 @@ static bool read_mp4_tags(int fd, struct mp3entry* id3,
 
     do
     {
+        off_t end;
+
         size_left = read_mp4_atom(fd, &size, &type, size_left);
+        end = lseek(fd, 0, SEEK_CUR) + size;
 
         /* DEBUGF("Tag atom: '%c%c%c%c' (%d bytes left)\n", type >> 24 & 0xff,
             type >> 16 & 0xff, type >> 8 & 0xff, type & 0xff, size); */
@@ -604,9 +627,12 @@ static bool read_mp4_tags(int fd, struct mp3entry* id3,
             break;
 
         default:
-            lseek(fd, size, SEEK_CUR);
             break;
         }
+
+        /* the next atom starts where this one ends, however much of it
+           was read */
+        lseek(fd, end, SEEK_SET);
     }
     while ((size_left > 0) && (errno == 0));
 
@@ -653,9 +679,22 @@ static bool read_mp4_video_minf(int fd, uint32_t size_left)
         || entry == MP4_hev1 || entry == MP4_mp4v || entry == MP4_av01
         || entry == MP4_vp09 || entry == MP4_encv;
 }
+/* The tracks read_mp4_container() has seen, to find an Apple chapter
+ * track: the audio track names it by its ID in a tref 'chap' atom */
+#define MP4_MAX_TRACKS 6
+struct mp4_tracks {
+    uint32_t chapter_id;
+    uint32_t id;        /* of the track being read, from its tkhd */
+    int count;
+    struct {
+        uint32_t id;
+        uint32_t size;
+        off_t pos;      /* of the contents of the trak atom */
+    } trak[MP4_MAX_TRACKS];
+};
 
 static bool read_mp4_container(int fd, struct mp3entry* id3,
-                               uint32_t size_left)
+                               uint32_t size_left, struct mp4_tracks *tracks)
 {
     uint32_t size    = 0;
     uint32_t type    = 0;
@@ -665,7 +704,10 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
 
     do
     {
+        off_t end;
+
         size_left = read_mp4_atom(fd, &size, &type, size_left);
+        end = lseek(fd, 0, SEEK_CUR) + size;
 
         /* DEBUGF("Atom: '%c%c%c%c' (0x%08lx, %lu bytes left)\n",
             (int) ((type >> 24) & 0xff), (int) ((type >> 16) & 0xff),
@@ -685,17 +727,71 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             break;
 
         case MP4_meta:
-            lseek(fd, 4, SEEK_CUR);  /* Skip version */
-            size -= 4;
+            {
+                /* ISO meta starts with 4 bytes of version and flags;
+                   QuickTime's has none, so its hdlr atom comes first */
+                uint32_t first_size, first_type = 0;
+
+                if (size >= 8)
+                {
+                    read_uint32be(fd, &first_size);
+                    read_uint32be(fd, &first_type);
+                    lseek(fd, -8, SEEK_CUR);
+                }
+
+                if (first_type != MP4_hdlr)
+                {
+                    lseek(fd, 4, SEEK_CUR);  /* Skip version */
+                    size -= 4;
+                }
+            }
             /* Fall through */
 
         case MP4_moov:
         case MP4_udta:
         case MP4_mdia:
         case MP4_stbl:
-        case MP4_trak:
-            rc = read_mp4_container(fd, id3, size);
+        case MP4_tref:
+            rc = read_mp4_container(fd, id3, size, tracks);
             size = 0;
+            break;
+
+        case MP4_trak:
+            {
+                off_t pos = lseek(fd, 0, SEEK_CUR);
+
+                tracks->id = 0;
+                rc = read_mp4_container(fd, id3, size, tracks);
+                if (tracks->id && tracks->count < MP4_MAX_TRACKS)
+                {
+                    tracks->trak[tracks->count].id = tracks->id;
+                    tracks->trak[tracks->count].size = size;
+                    tracks->trak[tracks->count].pos = pos;
+                    tracks->count++;
+                }
+                size = 0;
+            }
+            break;
+
+        case MP4_tkhd:
+            if (size >= 24)
+            {
+                uint8_t version = 0;
+
+                /* version, flags, then times of 4 or 8 bytes */
+                read_uint8(fd, &version);
+                lseek(fd, version ? 19 : 11, SEEK_CUR);
+                read_uint32be(fd, &tracks->id);
+                size -= version ? 24 : 16;
+            }
+            break;
+
+        case MP4_chap:
+            if (size >= 4 && !tracks->chapter_id)
+            {
+                read_uint32be(fd, &tracks->chapter_id);
+                size -= 4;
+            }
             break;
 
         case MP4_ilst:
@@ -710,7 +806,7 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
         case MP4_minf:
             if (handler == MP4_soun)
             {
-                rc = read_mp4_container(fd, id3, size);
+                rc = read_mp4_container(fd, id3, size, tracks);
                 size = 0;
             }
             else if (handler == MP4_vide)
@@ -724,7 +820,7 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
         case MP4_stsd:
             lseek(fd, 8, SEEK_CUR);
             size -= 8;
-            rc = read_mp4_container(fd, id3, size);
+            rc = read_mp4_container(fd, id3, size, tracks);
             size = 0;
             break;
 
@@ -747,6 +843,12 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                 lseek(fd, 4, SEEK_CUR);
                 read_uint32be(fd, &entries);
                 id3->samples = 0;
+
+                /* 8 bytes each, after version, flags and count */
+                if (size < 8)
+                    entries = 0;
+                else if (entries > (size - 8) / 8)
+                    entries = (size - 8) / 8;
 
                 for (i = 0; i < entries; i++)
                 {
@@ -886,26 +988,253 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             break;
         }
 
-        /* Skip final seek. */
+        /* The next atom starts where this one ends, however much of it
+           was read.  Skip the seek after the mdat that ends the walk. */
         if (!done)
         {
-            lseek(fd, size, SEEK_CUR);
+            lseek(fd, end, SEEK_SET);
         }
     } while (rc && (size_left > 0) && (errno == 0) && !done);
 
     return rc;
 }
 
+static uint32_t read_uint32be_at(int fd, off_t pos)
+{
+    uint32_t value = 0;
+
+    lseek(fd, pos, SEEK_SET);
+    read_uint32be(fd, &value);
+    return value;
+}
+
+/* Where the contents of the atoms that an Apple chapter track's samples
+ * are found from are, 0 for those not found */
+struct mp4_chapter_tables {
+    off_t mdhd, stts, stsc, stsz, stco;
+    bool co64;
+};
+
+static void find_chapter_tables(int fd, off_t pos, uint32_t size,
+                                struct mp4_chapter_tables *t)
+{
+    while (size >= 8)
+    {
+        uint32_t len = read_uint32be_at(fd, pos);
+        uint32_t type = read_uint32be_at(fd, pos + 4);
+
+        if (len < 8 || len > size)
+            return;
+
+        switch (type)
+        {
+        case MP4_mdia:
+        case MP4_minf:
+        case MP4_stbl:
+            find_chapter_tables(fd, pos + 8, len - 8, t);
+            break;
+        case MP4_mdhd:
+            t->mdhd = pos + 8;
+            break;
+        case MP4_stts:
+            t->stts = pos + 8;
+            break;
+        case MP4_stsc:
+            t->stsc = pos + 8;
+            break;
+        case MP4_stsz:
+            t->stsz = pos + 8;
+            break;
+        case MP4_co64:
+            t->co64 = true;
+            /* Fall through */
+        case MP4_stco:
+            t->stco = pos + 8;
+            break;
+        }
+
+        pos += len;
+        size -= len;
+    }
+}
+
+#define MP4_CHAPTER_TEXT 256
+#define MP4_MAX_CHAPTERS 1000
+
+/* Read a Nero chapter list of "size" bytes at the file position, from its
+ * chapter count on.  Each chapter is a 64-bit start in 100 ns units, then
+ * a title: a length byte and that many bytes of UTF-8. */
+static void read_nero_chapters(int fd, int size, chapter_add_fn *add,
+                               void *ctx)
+{
+    unsigned char title[MP4_CHAPTER_TEXT];
+    uint8_t count = 0;
+
+    read_uint8(fd, &count);
+    size--;
+
+    while (count-- > 0 && size >= 9)
+    {
+        uint64_t start = 0;
+        uint8_t len = 0;
+
+        if (read_uint64be(fd, &start) != 8 || read_uint8(fd, &len) != 1)
+            return;
+
+        size -= 9 + len;
+        if (size < 0 || read(fd, title, len) != len)
+            return;
+
+        title[len] = 0;
+        add(ctx, start / 10000, (char *)title);
+    }
+}
+
+/* Read the chapters from the "size" bytes of an Apple chapter track's trak
+ * atom at the file position.  Each sample is a chapter: a 16-bit length
+ * and the title in UTF-8, or UTF-16 with a BOM.  The tables are read an
+ * entry at a time, as there is no memory to hold them. */
+static void read_chapter_track(int fd, int size, chapter_add_fn *add,
+                               void *ctx)
+{
+    struct mp4_chapter_tables t;
+    unsigned char text[MP4_CHAPTER_TEXT + 2];
+    unsigned char title[MP4_CHAPTER_TEXT];
+    uint8_t version = 0;
+
+    memset(&t, 0, sizeof(t));
+    find_chapter_tables(fd, lseek(fd, 0, SEEK_CUR), size, &t);
+    if (!t.mdhd || !t.stts || !t.stsc || !t.stsz || !t.stco)
+        return;
+
+    lseek(fd, t.mdhd, SEEK_SET);
+    read_uint8(fd, &version);
+    uint32_t timescale = read_uint32be_at(fd, t.mdhd + (version ? 20 : 12));
+    uint32_t stts_count = read_uint32be_at(fd, t.stts + 4);
+    uint32_t stsc_count = read_uint32be_at(fd, t.stsc + 4);
+    uint32_t sample_size = read_uint32be_at(fd, t.stsz + 4);
+    uint32_t samples = read_uint32be_at(fd, t.stsz + 8);
+    uint32_t chunks = read_uint32be_at(fd, t.stco + 4);
+    if (!timescale)
+        return;
+
+    uint64_t time = 0;
+    uint32_t stts_i = 0, stts_left = 0, delta = 0;
+    uint32_t stsc_i = 0, per_chunk = 0;
+    uint32_t chunk = 0, in_chunk = 0;
+    uint32_t offset = 0;
+
+    for (uint32_t i = 0; i < samples && i < MP4_MAX_CHAPTERS; i++)
+    {
+        /* The duration, from runs of samples of the same duration */
+        while (stts_left == 0 && stts_i < stts_count)
+        {
+            off_t entry = t.stts + 8 + 8 * stts_i++;
+            stts_left = read_uint32be_at(fd, entry);
+            delta = read_uint32be_at(fd, entry + 4);
+        }
+        if (stts_left == 0)
+            return;
+
+        /* Where it is: samples follow each other in chunks, and runs of
+         * chunks have the same number of samples */
+        if (in_chunk == 0)
+        {
+            while (stsc_i < stsc_count
+                   && read_uint32be_at(fd, t.stsc + 8 + 12 * stsc_i)
+                      <= chunk + 1)
+            {
+                per_chunk = read_uint32be_at(fd, t.stsc + 12 + 12 * stsc_i);
+                stsc_i++;
+            }
+            if (chunk >= chunks || per_chunk == 0)
+                return;
+
+            /* co64: the low half, as files are under 4 GB */
+            offset = t.co64 ? read_uint32be_at(fd, t.stco + 12 + 8 * chunk)
+                            : read_uint32be_at(fd, t.stco + 8 + 4 * chunk);
+            chunk++;
+            in_chunk = per_chunk;
+        }
+
+        uint32_t len = sample_size ? sample_size
+                                   : read_uint32be_at(fd, t.stsz + 12 + 4 * i);
+
+        title[0] = 0;
+        if (len >= 2)
+        {
+            uint16_t n = 0;
+
+            lseek(fd, offset, SEEK_SET);
+            read_uint16be(fd, &n);
+            n = MIN(n, MIN(len - 2, MP4_CHAPTER_TEXT - 1));
+            if (read(fd, text, n) == n)
+            {
+                bool le;
+
+                /* utf16decode may look one unit past the end */
+                text[n] = text[n + 1] = 0;
+                if (n >= 2 && utf16_has_bom(text, &le))
+                {
+                    *utf16decode(text + 2, title, (n - 2) / 2,
+                                 MP4_CHAPTER_TEXT - 1, le) = 0;
+                }
+                else
+                {
+                    memcpy(title, text, n);
+                    title[n] = 0;
+                }
+            }
+        }
+
+        add(ctx, time * 1000 / timescale, (char *)title);
+
+        time += delta;
+        stts_left--;
+        in_chunk--;
+        offset += len;
+    }
+}
+
+/* Read the chapters that get_mp4_metadata() found, a Nero chapter list or
+ * an Apple chapter track, and call add() with the start in ms and the
+ * UTF-8 title of each */
+void mp4_read_chapters(int fd, int size, bool nero, chapter_add_fn *add,
+                       void *ctx)
+{
+    if (nero)
+        read_nero_chapters(fd, size, add, ctx);
+    else
+        read_chapter_track(fd, size, add, ctx);
+}
+
 bool get_mp4_metadata(int fd, struct mp3entry* id3)
 {
+    struct mp4_tracks tracks;
+
     id3->codectype = AFMT_UNKNOWN;
     id3->filesize = 0;
     errno = 0;
+    memset(&tracks, 0, sizeof(tracks));
 
-    if (read_mp4_container(fd, id3, ffilesize(fd)) && (errno == 0)
+    if (read_mp4_container(fd, id3, ffilesize(fd), &tracks) && (errno == 0)
         && (id3->samples > 0) && (id3->frequency > 0)
         && (id3->filesize > 0))
     {
+        /* An Apple chapter track, unless there is a Nero chapter list.
+         * ffmpeg and mp4v2 write both, with the same chapters. */
+        for (int i = 0; i < tracks.count; i++)
+        {
+            if (tracks.chapter_id && tracks.trak[i].id == tracks.chapter_id
+                && !id3->has_embedded_cuesheet)
+            {
+                id3->has_embedded_cuesheet = true;
+                id3->embedded_cuesheet.pos = tracks.trak[i].pos;
+                id3->embedded_cuesheet.size = tracks.trak[i].size;
+                id3->embedded_cuesheet.encoding = CHAR_ENC_MP4_CHAP_TRACK;
+            }
+        }
+
         if (id3->codectype == AFMT_UNKNOWN)
         {
             logf("Not an ALAC or AAC file");

@@ -251,7 +251,6 @@
 
 #define BOOTFILE_EXT "ipod"
 #define BOOTFILE "rockbox." BOOTFILE_EXT
-#define BOOTDIR "/.rockbox"
 
 #define IPOD_ACCESSORY_PROTOCOL
 /* The accessory detect is read through the PCF's I2C, so from a thread */

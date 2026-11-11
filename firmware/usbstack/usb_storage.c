@@ -338,27 +338,6 @@ static void send_and_read_next(void);
 static bool ejected[NUM_DRIVES];
 static bool locked[NUM_DRIVES];
 
-/* Scale a host-supplied LBA and block count by the sector multiplier and test
- * them against the device, committing to cur_cmd only if they fit. Doing this
- * at the call sites overflows twice: the multiply is 32-bit there, and
- * sector_t is 32-bit without STORAGE_64BIT_SECTOR, so sector + count can wrap
- * past the range test and turn a request the device should refuse into an
- * in-range access at the wrong offset. On a write that is silent corruption.
- * Both terms are widened here before anything is compared. */
-static bool set_transfer_range(uint64_t sector, uint32_t count,
-                               unsigned int multiplier, sector_t block_count)
-{
-    uint64_t first = sector * multiplier;
-    uint64_t last = first + (uint64_t)count * multiplier;
-
-    if (multiplier == 0 || last > (uint64_t)block_count)
-        return false;
-
-    cur_cmd.sector = first;
-    cur_cmd.count = count * multiplier;
-    return true;
-}
-
 /* Did the host write to us since the cable went in? Cleared when the stack
  * starts, not on SET_CONFIGURATION, so a host that writes and then
  * re-enumerates (sleep and resume, error recovery) still reports the write
@@ -373,6 +352,23 @@ static bool host_wrote;
 bool usb_storage_host_wrote(void)
 {
     return host_wrote;
+}
+
+static bool set_transfer_range(uint64_t usb_lba, uint32_t usb_count,
+                               unsigned int multiplier, sector_t hw_sector_cnt)
+{
+    usb_lba *= multiplier;
+
+    if(usb_lba > hw_sector_cnt)
+        return false;
+
+    uint64_t blocks = (uint64_t)usb_count * multiplier;
+    if(usb_lba > hw_sector_cnt || blocks > hw_sector_cnt - usb_lba)
+        return false;
+
+    cur_cmd.sector = usb_lba;
+    cur_cmd.count = blocks;
+    return true;
 }
 
 static int usb_interface;
@@ -902,10 +898,10 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
 {
     struct storage_info info;
     unsigned int length = cbw->data_transfer_length;
-    sector_t block_count;
-    unsigned int block_size;
+    sector_t hw_sector_count;
+    unsigned int hw_sector_size;
+    unsigned short lun = cbw->lun;
     bool lun_present=true;
-    unsigned char lun = cbw->lun;
 
     if(letoh32(cbw->signature) != CBW_SIGNATURE) {
         logf("ums: bad cbw signature (%x)", cbw->signature);
@@ -925,27 +921,23 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
     if(skip_first) lun++;
 #endif
 
-    /* The host picks the LUN, and it indexes ejected[] and locked[] as well as
-     * addressing the storage and disk layers. Refuse one past the last drive
-     * here, where it is still a protocol error, rather than below where it is
-     * an out-of-bounds access. The tag has to be in place first: send_csw()
-     * answers with it. */
+    /* The LUN comes from the host and indexes ejected[] and locked[], so
+     * refuse one past the last drive before it is used anywhere. */
     if(lun >= storage_num_drives()) {
+        cur_cmd.data_residue = letoh32(cbw->data_transfer_length);
         cur_cmd.tag = cbw->tag;
-        send_csw(UMS_STATUS_FAIL);
-        cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
-        cur_sense_data.asc=ASC_LOGICAL_UNIT_NOT_SUPPORTED;
-        cur_sense_data.ascq=0;
+        reject_command(cbw);
+        cur_sense_data.asc = ASC_LOGICAL_UNIT_NOT_SUPPORTED;
         return;
     }
 
     storage_get_info(lun,&info);
 #ifdef USB_USE_RAMDISK
-    block_size = SECTOR_SIZE;
-    block_count = RAMDISK_SIZE;
+    hw_sector_size = SECTOR_SIZE;
+    hw_sector_count = RAMDISK_SIZE;
 #else
-    block_size=info.sector_size;
-    block_count=info.num_sectors;
+    hw_sector_size=info.sector_size;
+    hw_sector_count=info.num_sectors;
 #endif
 
     if(storage_removable(lun) && !storage_present(lun))
@@ -963,8 +955,8 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
         block_size_mult = 1;
 #endif
 
-    uint32_t bsize = block_size*block_size_mult;
-    sector_t bcount = block_count/block_size_mult;
+    uint32_t bsize = hw_sector_size*block_size_mult;
+    sector_t bcount = hw_sector_count/block_size_mult;
 
     cur_cmd.data_residue = letoh32(cbw->data_transfer_length);
     cur_cmd.tag = cbw->tag;
@@ -1320,11 +1312,11 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
             cur_cmd.data[0] = tb.transfer_buffer;
             cur_cmd.data[1] = &tb.transfer_buffer[READ_BUFFER_SIZE];
             cur_cmd.data_select=0;
-            cur_cmd.block_size = block_size;
+            cur_cmd.block_size = hw_sector_size;
 
             if(!set_transfer_range(load_be32(&cbw->command_block[2]),
                                    load_be16(&cbw->command_block[7]),
-                                   block_size_mult, block_count)) {
+                                   block_size_mult, hw_sector_count)) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
@@ -1358,11 +1350,11 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
             cur_cmd.data[0] = tb.transfer_buffer;
             cur_cmd.data[1] = &tb.transfer_buffer[READ_BUFFER_SIZE];
             cur_cmd.data_select=0;
-            cur_cmd.block_size = block_size;
+            cur_cmd.block_size = hw_sector_size;
 
             if(!set_transfer_range(load_be64(&cbw->command_block[2]),
                                    load_be32(&cbw->command_block[10]),
-                                   block_size_mult, block_count)) {
+                                   block_size_mult, hw_sector_count)) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
@@ -1403,16 +1395,15 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
             cur_cmd.data[0] = tb.transfer_buffer;
             cur_cmd.data[1] = &tb.transfer_buffer[WRITE_BUFFER_SIZE];
             cur_cmd.data_select=0;
-            cur_cmd.block_size = block_size;
+            cur_cmd.block_size = hw_sector_size;
 
             /* expect data */
             if(!set_transfer_range(load_be32(&cbw->command_block[2]),
                                    load_be16(&cbw->command_block[7]),
-                                   block_size_mult, block_count)) {
-                send_csw(UMS_STATUS_FAIL);
-                cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
+                                   block_size_mult, hw_sector_count)) {
+                /* the host is about to send the data: stall it */
+                reject_command(cbw);
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
-                cur_sense_data.ascq=0;
             }
             else {
                 host_wrote = true;
@@ -1440,16 +1431,15 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
             cur_cmd.data[0] = tb.transfer_buffer;
             cur_cmd.data[1] = &tb.transfer_buffer[WRITE_BUFFER_SIZE];
             cur_cmd.data_select=0;
-            cur_cmd.block_size = block_size;
+            cur_cmd.block_size = hw_sector_size;
 
             /* expect data */
             if(!set_transfer_range(load_be64(&cbw->command_block[2]),
                                    load_be32(&cbw->command_block[10]),
-                                   block_size_mult, block_count)) {
-                send_csw(UMS_STATUS_FAIL);
-                cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
+                                   block_size_mult, hw_sector_count)) {
+                /* the host is about to send the data: stall it */
+                reject_command(cbw);
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
-                cur_sense_data.ascq=0;
             }
             else {
                 host_wrote = true;

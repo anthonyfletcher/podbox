@@ -38,11 +38,13 @@ struct ppuart {
     volatile unsigned long *LCR;
     volatile unsigned long *LSR;
     int autobaud;
+    int badbaud;
+    bool newpkt;
 };
 
-static struct ppuart SER0 = { &SER0_RBR, &SER0_LCR, &SER0_LSR, 0 };
+static struct ppuart SER0 = { &SER0_RBR, &SER0_LCR, &SER0_LSR, 0, 0, true };
 #if defined(IPOD_COLOR) || defined(IPOD_4G) || defined(IPOD_MINI) || defined(IPOD_MINI2G)
-static struct ppuart SER1 = { &SER1_RBR, &SER1_LCR, &SER1_LSR, 0 };
+static struct ppuart SER1 = { &SER1_RBR, &SER1_LCR, &SER1_LSR, 0, 0, true };
 static volatile struct ppuart *SERn = &SER1; // ie dock connector
 #else
 static volatile struct ppuart *SERn = &SER0;
@@ -51,12 +53,15 @@ static volatile struct ppuart *SERn = &SER0;
 static void set_bitrate(volatile struct ppuart *port, unsigned int rate)
 {
     unsigned int divisor;
+    int level;
 
     divisor = 24000000L / rate / 16;
-    /* RBR and DLL share an address. With the latch enabled, the receive
-     * interrupt's drain loop reads the divisor and never empties the FIFO,
-     * so it spins for ever: the window is kept from it. */
-    int level = disable_irq_save();
+    /* While the divisor latch is enabled, reading RBR returns DLL and
+     * does not pop the Rx FIFO, so an Rx interrupt in this window would
+     * spin in SERIAL_ISR() forever. The ISR calls this itself, which is
+     * fine since the previous level is restored.
+     */
+    level = disable_irq_save();
     *port->LCR = 0x80; /* Divisor latch enable */
     *port->RBR_THR_DLL = (divisor >> 0) & 0xFF;
     *port->LCR = 0x03; /* Divisor latch disable, 8-N-1 */
@@ -187,18 +192,26 @@ void serial_bitrate(int rate)
     if(rate == 0)
     {
         SER0.autobaud = 2;
+        SER0.badbaud = 0;
+        SER0.newpkt = true;
         set_bitrate(&SER0, 115200);
 #if defined(IPOD_COLOR) || defined(IPOD_4G) || defined(IPOD_MINI) || defined(IPOD_MINI2G)
         SER1.autobaud = 2;
+        SER1.badbaud = 0;
+        SER1.newpkt = true;
         set_bitrate(&SER1, 115200);
 #endif
     }
     else
     {
         SER0.autobaud = 0;
+        SER0.badbaud = 0;
+        SER0.newpkt = true;
         set_bitrate(&SER0, rate);
 #if defined(IPOD_COLOR) || defined(IPOD_4G) || defined(IPOD_MINI) || defined(IPOD_MINI2G)
         SER1.autobaud = 0;
+        SER1.badbaud = 0;
+        SER1.newpkt = true;
         set_bitrate(&SER1, rate);
 #endif
     }
@@ -219,8 +232,6 @@ void tx_writec(unsigned char c)
 
 void SERIAL_ISR(int port)
 {
-    static int badbaud = 0;
-    static bool newpkt = true;
     char temp;
 
 #ifdef HAVE_IAP_MULTIPORT
@@ -236,7 +247,7 @@ void SERIAL_ISR(int port)
     while((*SERn->LSR & 0x1))
     {
         temp = (*SERn->RBR_THR_DLL & 0xFF);
-        if (newpkt && SERn->autobaud > 0)
+        if (SERn->newpkt && SERn->autobaud > 0)
         {
             if (SERn->autobaud == 1)
             {
@@ -254,12 +265,12 @@ void SERIAL_ISR(int port)
                         temp = 0xFF;
                         break;
                     default:
-                        badbaud++;
-                        if (badbaud >= 6) /* Switch baud detection mode */
+                        SERn->badbaud++;
+                        if (SERn->badbaud >= 6) /* Switch baud detection mode */
                         {
                             SERn->autobaud = 2;
                             set_bitrate(SERn, 115200);
-                            badbaud = 0;
+                            SERn->badbaud = 0;
                         } else {
                             set_bitrate(SERn, 57600);
                         }
@@ -284,12 +295,12 @@ void SERIAL_ISR(int port)
                         temp = 0xFF;
                         break;
                     default:
-                        badbaud++;
-                        if (badbaud >= 6) /* Switch baud detection */
+                        SERn->badbaud++;
+                        if (SERn->badbaud >= 6) /* Switch baud detection */
                         {
                             SERn->autobaud = 1;
                             set_bitrate(SERn, 57600);
-                            badbaud = 0;
+                            SERn->badbaud = 0;
                         } else {
                             set_bitrate(SERn, 115200);
                         }
@@ -298,9 +309,9 @@ void SERIAL_ISR(int port)
             }
         }
         bool pkt = iap_getc(IF_IAP_MP(port,) temp);
-        if(newpkt && !pkt)
+        if(SERn->newpkt && !pkt)
             SERn->autobaud = 0; /* Found good baud */
-        newpkt = pkt;
+        SERn->newpkt = pkt;
     }
 }
 #endif

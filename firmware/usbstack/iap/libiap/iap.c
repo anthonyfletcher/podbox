@@ -500,6 +500,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 response->bits = swap_64(1 << 0);
                 break;
             case IAPLingoID_ExtendedInterface:
+                response->bits = swap_64(IAPRetIPodOptionsForLingoExtendedInterfaceBits_PlayControl);
+                break;
             case IAPLingoID_DigitalAudio:
             case IAPLingoID_Storage: /* caps and free space; no iTunes Tagging */
                 response->bits = 0;
@@ -1383,7 +1385,7 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
         }
         break;
     }
-    return -IAPAckStatus_EUnknownID;
+    return -IAPAckStatus_EBadParameter;
 }
 
 static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t command, struct IAPSpan* request_span, struct IAPSpan* response_span) {
@@ -1394,10 +1396,6 @@ static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             const int ret = _iap_hanlde_set_fid_token_values(request_span, response_span);
             check_ret(ret == 0, ret);
             return IAPGeneralCommandID_AckFIDTokenValues;
-        } break;
-        /* a second StartIDPS starts the tokens again */
-        case IAPGeneralCommandID_StartIDPS: {
-            return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
         case IAPGeneralCommandID_EndIDPS: {
             read_request(IAPEndIDPSPayload);
@@ -1417,7 +1415,7 @@ static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         }
         break;
     }
-    return -IAPAckStatus_EUnknownID;
+    return -IAPAckStatus_EBadParameter;
 }
 
 static IAPBool send_auth_challenge_sig_cb(struct IAPContext* ctx) {
@@ -1426,10 +1424,14 @@ static IAPBool send_auth_challenge_sig_cb(struct IAPContext* ctx) {
     if(ctx->auth_major == 1) {
         struct IAPGetAccAuthSigPayload1p0* request = iap_span_alloc(&request_span, sizeof(*request));
         check_ret(request != NULL, iap_false);
+        iap_platform_get_random(ctx, request->challenge, sizeof(request->challenge));
         request->retry = 1;
     } else {
         struct IAPGetAccAuthSigPayload2p0* request = iap_span_alloc(&request_span, sizeof(*request));
         check_ret(request != NULL, iap_false);
+        /* random, as the accessory is to sign a challenge it can't have
+         * signed before: see RetAccessoryAuthenticationSignature */
+        iap_platform_get_random(ctx, request->challenge, sizeof(request->challenge));
         request->retry = 1;
     }
     check_ret(_iap_send_packet(ctx, IAPLingoID_General, IAPGeneralCommandID_GetAccessoryAuthenticationSignature, _iap_next_trans_id(ctx), request_span.ptr), iap_false);
@@ -1514,6 +1516,11 @@ static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             }
         } break;
         case IAPGeneralCommandID_RetAccessoryAuthenticationSignature: {
+            /* The signature is accepted without being checked. To
+             * authenticate the accessory, verify it here: it signs the
+             * challenge sent by send_auth_challenge_sig_cb() with the key of
+             * the certificate sent in RetAccessoryAuthenticationInfo, which
+             * would have to be kept, and checked against Apple's CA. */
             print("accessory signature");
             /* iap_platform_dump_hex(request->ptr, request->size); */
 
@@ -1530,7 +1537,7 @@ static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         }
         break;
     }
-    return -IAPAckStatus_EUnknownID;
+    return -IAPAckStatus_EBadParameter;
 }
 
 static int32_t build_ipod_ack_response(uint8_t lingo, uint16_t command, uint8_t status, struct IAPSpan* response_span) {
@@ -1631,23 +1638,31 @@ IAPBool _iap_feed_packet(struct IAPContext* ctx, const uint8_t* const data, cons
     /* now span contains only payload */
 
     /* request handling */
-    if(ctx->trans_id_support == TransIDUnknown) {
-        check_ret(lingo == IAPLingoID_General, iap_false);
+    /* An accessory may identify again at any time, e.g. after resetting
+     * its own iAP stack, and the way it identifies decides whether it
+     * uses transaction IDs. Start over from the connected phase. */
+    const IAPBool identify = lingo == IAPLingoID_General &&
+                             (command == IAPGeneralCommandID_StartIDPS ||
+                              command == IAPGeneralCommandID_IdentifyDeviceLingoes);
+    if(identify) {
         if(command == IAPGeneralCommandID_StartIDPS) {
             ctx->trans_id_support = TransIDSupported;
-        } else if(command == IAPGeneralCommandID_IdentifyDeviceLingoes) {
+        } else {
             ctx->trans_id_support  = TransIDNotSupported;
             ctx->handling_trans_id = -1;
-        } else {
-            warn("the first command(%02X:%04X) must be StartIDPS or IdentifyDeviceLingoes", lingo, command);
-            return iap_false;
         }
-    }
-    /* IdentifyDeviceLingoes carries no transaction ID even after IDPS,
-     * and the session that follows has none */
-    if(lingo == IAPLingoID_General && command == IAPGeneralCommandID_IdentifyDeviceLingoes) {
-        ctx->trans_id_support  = TransIDNotSupported;
-        ctx->handling_trans_id = -1;
+        ctx->phase                       = IAPPhase_Connected;
+        ctx->enabled_notifications_3     = 0;
+        ctx->enabled_notifications_4     = 0;
+        ctx->waiting_for_audio_attrs_ack = iap_false;
+        ctx->on_send_complete            = NULL;
+        if(ctx->artwork.valid) {
+            iap_platform_close_artwork(ctx, &ctx->artwork);
+            ctx->artwork.valid = iap_false;
+        }
+    } else if(ctx->trans_id_support == TransIDUnknown) {
+        warn("the first command(%02X:%04X) must be StartIDPS or IdentifyDeviceLingoes", lingo, command);
+        return iap_false;
     }
     if(ctx->trans_id_support == TransIDSupported) {
         check_ret(iap_span_read_16(&span, &buf.u16), iap_false);

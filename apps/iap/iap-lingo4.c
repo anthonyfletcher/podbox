@@ -66,6 +66,59 @@ static void cmd_ack(const unsigned int cmd, const unsigned char status)
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
 
+/* Copy at most max bytes of src plus a NUL, cutting before a UTF-8
+ * sequence that would not fit whole, and return the length copied.
+ * dest may be src, to truncate a string in place.
+ */
+static size_t copy_utf8(unsigned char *dest, const char *src, size_t max)
+{
+    size_t len = strlen(src);
+
+    if (len > max)
+    {
+        len = max;
+        while (len > 0 && ((unsigned char)src[len] & 0xC0) == 0x80)
+            len--;
+    }
+    memmove(dest, src, len);
+    dest[len] = '\0';
+    return len;
+}
+
+static void cmd_pending(const unsigned int cmd, const uint32_t msdelay)
+{
+    IAP_TX_INIT4(0x04, 0x0001);
+    IAP_TX_PUT(IAP_ACK_PENDING);
+    IAP_TX_PUT_U16(cmd);
+    IAP_TX_PUT_U32(msdelay);
+    iap_send_tx();
+}
+
+/* Load the saved playlist before answering the first database query
+ * after a cold start, see iap_resume_playlist_pending(). Loading can
+ * take a while, so tell the accessory to wait for the answer. */
+/* For ResetDBSelection, which is answered with an ACK, so a pending ACK
+ * may come first. Returns false when the playlist is still loading after
+ * 30 s; the accessory must not be shown a partly loaded playlist. */
+static bool load_resume_playlist(const unsigned int cmd)
+{
+    int i;
+
+    if (!iap_resume_playlist_pending())
+        return true;
+
+    for (i = 0; i < 3; i++)
+    {
+        /* asks again if the UI thread didn't take the request */
+        iap_load_resume_playlist();
+        /* answer each pending ACK in time */
+        cmd_pending(cmd, 10000);
+        if (iap_wait_resume_playlist(9 * HZ))
+            return true;
+    }
+    return false;
+}
+
 static void get_playlist_name(unsigned char *dest,
                               unsigned long item_offset,
                               size_t max_length)
@@ -110,6 +163,38 @@ static void seek_to_playlist(unsigned long index)
                     ft_play_playlist(selected_playlist,
                                      global_settings.playlist_catalog_dir,
                                      strrchr(selected_playlist, '/') + 1);
+}
+
+/* Play the track at the given index of the accessory's track list. The
+ * index refers to the order the accessory enumerated the tracks in,
+ * which is the current play order: shuffle is already applied to it. */
+static void play_selected_track(uint32_t index)
+{
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
+    {
+        /* audio_skip() does nothing while stopped, so start
+         * playback at the selected track instead */
+        long trackcount = playlist_amount();
+        long tracknum = index + playlist_get_first_index(NULL);
+
+        if (tracknum >= trackcount)
+            tracknum -= trackcount;
+        playlist_start(tracknum, 0, 0);
+    }
+    else
+    {
+        audio_pause();
+        audio_skip(index - iap_get_trackindex());
+        audio_resume();
+    }
+}
+
+/* Day of the week of January 1st of a year, 0 is Sunday */
+static int jan1_weekday(int year)
+{
+    int y = year - 1;
+
+    return (1 + y + y / 4 - y / 100 + y / 400) % 7;
 }
 
 static unsigned long nbr_total_playlists(void)
@@ -599,67 +684,94 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            if (len < (10))
+            struct mp3entry id3;
+            uint32_t index;
+
+            CHECKLEN(10);
+            index = get_u32(&buf[4]);
+            switch(buf[3])
+            {
+                case 0x00: /* Capabilities */
+                case 0x01: /* Podcast name */
+                case 0x02: /* Release date */
+                case 0x03: /* Description */
+                case 0x04: /* Lyrics */
+                case 0x05: /* Genre */
+                case 0x06: /* Composer */
+                case 0x07: /* Artwork count */
+                    break;
+                default:
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    return;
+            }
+            if (index >= (uint32_t)playlist_amount())
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            struct mp3entry *id3 = audio_current_track();
+            /* Only these types need the track's metadata, which may have
+             * to be read from disk */
+            if (buf[3] == 0x00 || buf[3] == 0x02 ||
+                buf[3] == 0x05 || buf[3] == 0x06)
+                iap_get_trackinfo(index, &id3);
 
+            IAP_TX_INIT4(0x04, 0x000D);
+            IAP_TX_PUT(buf[3]);
             switch(buf[3])
             {
-                case 0x01: /* Podcast Not Supported */
-                case 0x04: /* Lyrics Not Supported */
-                case 0x03: /* Description */
-                case 0x05: /* Genre */
-                case 0x06: /* Composer */
+                case 0x00:
                 {
-                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    /* Track Capabilities 10Bytes Data */
+                    IAP_TX_PUT_U32(id3.year > 0 ? 0x20 : 0); /* Has release
+                                                               * date */
+                    IAP_TX_PUT_U32(id3.length);  /* Track Length */
+                    IAP_TX_PUT_U16(0x00);        /* Chapter Count */
                     break;
                 }
-                default:
+                case 0x02:
                 {
-                    IAP_TX_INIT4(0x04, 0x000D);
-                    IAP_TX_PUT(buf[3]);
-                    switch(buf[3])
-                    {
-                        case 0x00:
-                        {
-                            /* Track Capabilities 10Bytes Data */
-                            IAP_TX_PUT_U32(0);   /* Track Capabilities. */
-                                                 /* Currently None Supported*/
-                            IAP_TX_PUT_U32(id3->length); /* Track Length */
-                            IAP_TX_PUT_U16(0x00);        /* Chapter Count */
-                            break;
-                        }
-                        case 0x02:
-                        {
-                            /* Track Release Date 7 Bytes Data
-                             * Currently only returns a fixed value,
-                             * Sunday 1st Feb 2011 3Hr 4Min 5Secs
-                             */
-                            IAP_TX_PUT(5);               /* Seconds 0-59 */
-                            IAP_TX_PUT(4);               /* Minutes 0-59 */
-                            IAP_TX_PUT(3);               /* Hours 0-23 */
-                            IAP_TX_PUT(1);               /* Day Of Month 1-31 */
-                            IAP_TX_PUT(2);               /* Month 1-12 */
-                            IAP_TX_PUT_U16(2011);        /* Year */
-                            IAP_TX_PUT(0);               /* Day 0=Sunday */
-                            break;
-                        }
-                         case 0x07:
-                        {
-                            /* Track Artwork Count */
-                            /* Currently not supported */
-                            IAP_TX_PUT_U16(0x00);        /* Format ID */
-                            IAP_TX_PUT_U16(0x00);        /* Image Count */
-                            break;
-                        }
-                    }
-                    iap_send_tx();
+                    /* Track Release Date, all 0 when unknown. Tags only
+                     * give the year, so report January 1st. */
+                    int year = id3.year > 0 ? id3.year : 0;
+
+                    IAP_TX_PUT(0);               /* Seconds 0-59 */
+                    IAP_TX_PUT(0);               /* Minutes 0-59 */
+                    IAP_TX_PUT(0);               /* Hours 0-23 */
+                    IAP_TX_PUT(year ? 1 : 0);    /* Day Of Month 1-31 */
+                    IAP_TX_PUT(year ? 1 : 0);    /* Month 1-12 */
+                    IAP_TX_PUT_U16(year);        /* Year */
+                    IAP_TX_PUT(year ? jan1_weekday(year) : 0); /* 0=Sunday */
+                    break;
+                }
+                case 0x01:
+                    /* Podcast name, empty: tracks aren't podcasts here */
+                    IAP_TX_PUT(0x00);
+                    break;
+                case 0x03:
+                case 0x04:
+                    /* Description or lyrics, empty: the flags (no
+                     * further packets) and the packet index, then the
+                     * text */
+                    IAP_TX_PUT(0x00);
+                    IAP_TX_PUT_U16(0x0000);
+                    IAP_TX_PUT(0x00);
+                    break;
+                case 0x05:
+                    IAP_TX_PUT_STRLCPY(id3.genre_string);
+                    break;
+                case 0x06:
+                    IAP_TX_PUT_STRLCPY(id3.composer);
+                    break;
+                case 0x07:
+                {
+                    /* Track Artwork Count */
+                    /* Currently not supported */
+                    IAP_TX_PUT_U16(0x00);        /* Format ID */
+                    IAP_TX_PUT_U16(0x00);        /* Image Count */
                     break;
                 }
             }
+            iap_send_tx();
             break;
         }
         case 0x000D: /* ReturnIndexedPlayingTrackInfo. See Above */
@@ -1125,6 +1237,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
+            if (!load_resume_playlist(cmd))
+            {
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                break;
+            }
             cur_dbrecord[0] = 0;
             put_u32(&cur_dbrecord[1],0);
             /* respond with cmd ok packet */
@@ -1229,17 +1346,35 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t trackcount;
             index = get_u32(&cur_dbrecord[1]);
             trackcount = playlist_amount();
-            if ((cur_dbrecord[0] == 5) && (index > trackcount))
+            /* An index of -1 is how an accessory undoes a selection and
+             * moves up a category level. The spec makes it invalid only
+             * for Track. There is no selection to undo here, so accept
+             * it without touching playback.
+             */
+            if ((index == 0xFFFFFFFF) &&
+                (cur_dbrecord[0] >= 0x02) && (cur_dbrecord[0] <= 0x06) &&
+                (cur_dbrecord[0] != 0x05))
+            {
+                cmd_ok(cmd);
+                break;
+            }
+            /* Artists and albums are listed one per track, so a valid
+             * index is 0..count-1 for them. Genres and composers are not
+             * listed at all, but selecting them changes nothing.
+             * audio_skip() walks an out-of-range Track offset back one
+             * track at a time without yielding, locking the device up.
+             */
+            if ((cur_dbrecord[0] >= 0x02) && (cur_dbrecord[0] <= 0x06) &&
+                (index >= trackcount))
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            if ((cur_dbrecord[0] == 1) && (index > (nbr_total_playlists() + 1)))
+            if ((cur_dbrecord[0] == 1) && (index > nbr_total_playlists()))
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            audio_pause();
             switch (cur_dbrecord[0])
             {
                 case 0x01: /* Playlist*/
@@ -1247,31 +1382,32 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     if (index != 0x00) /* 0x00 is the On-The-Go Playlist and
                                           we do nothing with it  */
                     {
+                        audio_pause();
                         last_selected_playlist = index;
                         audio_skip(-iap_get_trackindex());
                         seek_to_playlist(last_selected_playlist);
+                        if (!paused)
+                            audio_resume();
                     }
                     break;
                 }
-                case 0x02: /* Artist   */
-                case 0x03: /* Album    */
-                case 0x04: /* Genre    */
                 case 0x05: /* Track    */
-                case 0x06: /* Composer */
                 {
-                    audio_skip(index - playlist_next(0));
+                    /* Selecting a single record starts its playback */
+                    play_selected_track(index);
                     break;
                 }
                 default:
                {
-                    /* We don't do anything with the other selections.
-                     * YET.
+                    /* Selecting an artist, album, genre or composer only
+                     * narrows the selection the accessory browses. It
+                     * must not change the playing track: head units send
+                     * this while the user browses and start playback
+                     * with PlayCurrentSelection.
                      */
                     break;
                }
             }
-            if (!paused)
-                audio_resume();
             /* respond with cmd ok packet */
             cmd_ok(cmd);
             break;
@@ -1321,6 +1457,18 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[] = {0x04, 0x00, 0x19,
                                     0x00, 0x00, 0x00, 0x00};
+            /* This command's answer isn't an ACK, so don't send a pending
+             * ACK while loading. Give a short load the time to finish and
+             * fail rather than count a playlist that is still loading. */
+            if (iap_resume_playlist_pending())
+            {
+                iap_load_resume_playlist();
+                if (!iap_wait_resume_playlist(HZ/2))
+                {
+                    cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                    break;
+                }
+            }
             switch(buf[3]) /* type number */
             {
                 case 0x01: /* total number of playlists */
@@ -1342,6 +1490,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                               there are none available. */
                     dbrecordcount = 0;
                     break;
+                default:
+                    /* Reserved category: do not answer with the count
+                     * left over from the previous query */
+                    dbrecordcount = 0;
+                    cmd_ack(cmd, IAP_ACK_UNKNOWN_DB);
+                    return;
             }
             put_u32(&data[3], dbrecordcount);
             iap_send_pkt(data, sizeof(data));
@@ -1437,15 +1591,49 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t trackcount;
             trackcount = playlist_amount();
 
-            if ((buf[3] == 0x05) && ((start_index + read_count ) > trackcount))
+            /* Bound the request by the same record counts that
+             * GetNumberCategorizedDBRecords reports. Categories without a
+             * bound used to run the loop below with the count as
+             * received, so the spec's way of asking for every record,
+             * count = -1, re-sent one packet 4.3 billion times and wedged
+             * the iAP thread. Clamp by subtraction so start + count
+             * cannot wrap.
+             */
             {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            if ((buf[3] == 0x01) && ((start_index + read_count) > (number_of_playlists + 1)))
-            {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
+                uint32_t total;
+
+                switch(buf[3])
+                {
+                    case 0x01: /* Playlists, plus the On-The-Go playlist */
+                        total = number_of_playlists + 1;
+                        break;
+                    case 0x02: /* Artists */
+                    case 0x03: /* Albums  */
+                    case 0x05: /* Tracks  */
+                        total = trackcount;
+                        break;
+                    case 0x04: /* Genres     */
+                    case 0x06: /* Composers  */
+                    case 0x07: /* Audiobooks */
+                    case 0x08: /* Podcasts   */
+                        total = 0;
+                        break;
+                    default:
+                        total = 0xFFFFFFFF;
+                        break;
+                }
+                if (total == 0xFFFFFFFF)
+                {
+                    cmd_ack(cmd, IAP_ACK_UNKNOWN_DB);
+                    break;
+                }
+                if (start_index >= total)
+                {
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    break;
+                }
+                if (read_count > total - start_index)
+                    read_count = total - start_index;
             }
             for (counter=0;counter<read_count;counter++)
             {
@@ -1470,13 +1658,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                         switch(buf[3])
                         {
                             case 0x05:
-                                strmemccpy((char *)&data[7], id3.title,64);
+                                copy_utf8(&data[7],
+                                          id3.title ? id3.title : "", 63);
                                 break;
                             case 0x02:
-                                strmemccpy((char *)&data[7], id3.artist,64);
+                                copy_utf8(&data[7],
+                                          id3.artist ? id3.artist : "", 63);
                                 break;
                             case 0x03:
-                                strmemccpy((char *)&data[7], id3.album,64);
+                                copy_utf8(&data[7],
+                                          id3.album ? id3.album : "", 63);
                                 break;
                             case 0x04:
                             case 0x06:
@@ -1486,7 +1677,15 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                         break;
                 }
                 put_u32(&data[3], start_index+counter);
-                iap_send_pkt(data, 7 + strlen(data+7) + 1);
+                {
+                    /* get_playlist_name() may fill the name up to
+                     * MAX_PATH, but the packet has to fit TX_BUFLEN or
+                     * iap_send_pkt() overruns the TX buffer. Truncate to
+                     * the same 63 bytes as the other string replies.
+                     */
+                    size_t nlen = copy_utf8(&data[7], (char *)&data[7], 63);
+                    iap_send_pkt(data, 7 + nlen + 1);
+                }
                 yield();
             }
             break;
@@ -1625,13 +1824,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[] = {0x04, 0x00, 0x1F,
                                     0xFF, 0xFF, 0xFF, 0xFF};
-            long playlist_pos = playlist_next(0);
             int status = audio_status();
-            playlist_pos -= playlist_get_first_index(NULL);
-            if(playlist_pos < 0)
-                playlist_pos += playlist_amount();
             if ((status == AUDIO_STATUS_PLAY) || (status & AUDIO_STATUS_PAUSE))
-                put_u32(&data[3], playlist_pos);
+                put_u32(&data[3], iap_get_trackindex());
             iap_send_pkt(data, sizeof(data));
             break;
         }
@@ -1664,6 +1859,17 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
+        /* 0x0021 and 0x0023 are replies sent by the iPod. They are
+         * refused here, because 0x0020, 0x0022 and 0x0024 below share one
+         * body and a body between them would divert 0x0020 and 0x0022.
+         */
+        case 0x0021: /* ReturnIndexedPlayingTrackTitle */
+        case 0x0023: /* ReturnIndexedPlayingTrackArtistName */
+        {
+            /* We should NEVER receive this command so ERROR if we do */
+            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            break;
+        }
         case 0x0020: /* GetIndexedPlayingTrackTitle. See 0x0024 below */
             /* The following is the description for the Apple Firmware
              *
@@ -1690,7 +1896,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * 10   0xNN  Telegram payload checksum byte
              *
              */
-        case 0x0021: /* ReturnIndexedPlayingTrackTitle. See 0x0024 Below */
+        /* 0x0021 ReturnIndexedPlayingTrackTitle is refused above */
             /* The following is the description for the Apple Firmware
              *
              * Returns the title of the indexed playing track in response to
@@ -1739,7 +1945,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * 10   0xNN  Telegram payload checksum byte
              *
              */
-        case 0x0023: /* ReturnIndexedPlayingTrackArtistName. See 0x0024 Below */
+        /* 0x0023 ReturnIndexedPlayingTrackArtistName is refused above */
             /* The following is the description for the Apple Firmware
              *
              * Returns the artist name of the indexed playing track in response
@@ -1793,37 +1999,39 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[70] = {0x04, 0x00, 0xFF};
             struct mp3entry id3;
-            size_t len;
-            long tracknum = get_u32(&buf[3]);
+            size_t slen;
+            uint32_t index;
 
-            data[2] = cmd + 1;
-            memcpy(&id3, audio_current_track(), sizeof(id3));
-            tracknum += playlist_get_first_index(NULL);
-            if(tracknum >= playlist_amount())
-                tracknum -= playlist_amount();
-            /* If the tracknumber is not the current one,
-               read id3 from disk */
-            if(playlist_next(0) != tracknum)
+            CHECKLEN(7);
+            index = get_u32(&buf[3]);
+            if (index >= (uint32_t)playlist_amount())
             {
-                struct playlist_track_info info;
-                playlist_get_track_info(NULL, tracknum, &info);
-                /* memset(&id3, 0, sizeof(struct mp3entry)); --get_metadata does this for us */
-                get_metadata(&id3, -1, info.filename);
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
             }
+            data[2] = cmd + 1;
+            iap_get_trackinfo(index, &id3);
             /* Return the requested track data */
             switch(cmd)
             {
+                /* The length sent must be what was copied: at most 63
+                 * bytes plus the NUL fit data[70], and the full tag can
+                 * be longer than the TX buffer.
+                 */
                 case 0x20:
-                    len = strlcpy((char *)&data[3], id3.title, 64);
-                    iap_send_pkt(data, 4+len);
+                    slen = copy_utf8(&data[3],
+                                    id3.title ? id3.title : "", 63);
+                    iap_send_pkt(data, 4+slen);
                     break;
                 case 0x22:
-                    len = strlcpy((char *)&data[3], id3.artist, 64);
-                    iap_send_pkt(data, 4+len);
+                    slen = copy_utf8(&data[3],
+                                    id3.artist ? id3.artist : "", 63);
+                    iap_send_pkt(data, 4+slen);
                     break;
                 case 0x24:
-                    len = strlcpy((char *)&data[3], id3.album, 64);
-                    iap_send_pkt(data, 4+len);
+                    slen = copy_utf8(&data[3],
+                                    id3.album ? id3.album : "", 63);
+                    iap_send_pkt(data, 4+slen);
                     break;
             }
             break;
@@ -1881,15 +2089,40 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *              0x01 = Enable all change notification
              *              0x02 - 0xFF = Reserved
              *  7     0xNN   Telegram payload checksum byte
+             *
+             * Protocol version 1.08 and later also have a four byte form,
+             * carrying a bitmask of the notifications to enable. Bits
+             * 31:13 are reserved, so its first byte is always 0x00.
              */
         {
-            device.do_notify = buf[3] ? true : false;
+            CHECKLEN(4);
+
+            if (len >= 7)
+            {
+                device.pb_notifications = get_u32(&buf[3]);
+            }
+            else if (buf[3] != 0x00)
+            {
+                /* Any non-zero value enables basic play state, track
+                 * index, track time offset (ms) and chapter index
+                 * changes */
+                device.pb_notifications =
+                    BIT_N(0) | BIT_N(2) | BIT_N(3) | BIT_N(5);
+            }
+            else
+            {
+                device.pb_notifications = 0;
+            }
+            /* Only report track changes from now on, and report the
+             * current position once */
+            device.pb_track_changed = false;
+            device.pb_trackpos_ms = 0xFFFFFFFF;
             /* respond with cmd ok packet */
             cmd_ok(cmd);
             break;
         }
         case 0x0027: /* PlayStatusChangeNotification */
-        /* This response is handled by iap_track_changed() and iap_periodic()
+        /* This response is sent by iap_periodic()
          * within iap-core.c
          * The following is the description for the Apple Firmware
          *
@@ -1974,6 +2207,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
          * 11   0xNN  Telegram payload checksum byte
          *
          */
+        {
+            /* We should NEVER receive this command so ERROR if we do */
+            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            break;
+        }
         case 0x0028: /* PlayCurrentSelection */
             /* The following is the description for the Apple Firmware
              *
@@ -2004,9 +2242,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
             uint32_t index;
             uint32_t trackcount;
+            CHECKLEN(7);
             index = get_u32(&buf[3]);
             trackcount = playlist_amount();
             if (index >= trackcount)
@@ -2014,18 +2252,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            audio_pause();
-            if(global_settings.playlist_shuffle)
-            {
-                playlist_randomise(NULL, current_tick, true);
-            }
-            else
-            {
-                playlist_sort(NULL, true);
-            }
-            audio_skip(index - playlist_next(0));
-            if (!paused)
-                audio_resume();
+            /* Don't reorder the playlist here: that would play a
+             * different track than the one selected. The selected track
+             * plays even when playback was paused; head units such as
+             * the Audi MMI pause before selecting the next track and
+             * expect it to play. */
+            play_selected_track(index);
             /* respond with cmd ok packet */
             cmd_ok(cmd);
             break;
@@ -2066,33 +2298,81 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Reserved             0x0A - 0xFF
              *
              */
+            int status = audio_status();
+
+            CHECKLEN(4);
+
+            /* Drive the playback engine directly. Synthetic remote
+             * buttons only do the right thing in the WPS: elsewhere Play
+             * selects the highlighted item and Next/Previous move the
+             * cursor.
+             */
             switch(buf[3])
             {
                 case 0x01: /* play/pause */
-                    iap_remotebtn = BUTTON_RC_PLAY;
-                    iap_repeatbtn = 2;
+                    if (status & AUDIO_STATUS_PAUSE)
+                        audio_resume();
+                    else if (status & AUDIO_STATUS_PLAY)
+                        audio_pause();
+                    else if (!iap_play_or_resume())
+                    {
+                        cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                        return;
+                    }
                     break;
                 case 0x02: /* stop */
-                    iap_remotebtn = BUTTON_RC_PLAY|BUTTON_REPEAT;
-                    iap_repeatbtn = 2;
+                    iap_seek_stop();
+                    audio_stop();
                     break;
                 case 0x03: /* skip++ */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    iap_repeatbtn = 2;
-                    break;
                 case 0x04: /* skip-- */
-                    iap_remotebtn = BUTTON_RC_LEFT;
-                    iap_repeatbtn = 2;
+                    if (!(status & AUDIO_STATUS_PLAY))
+                    {
+                        /* Start playback at the next or previous track
+                         * in play order instead of failing */
+                        long trackcount = playlist_amount();
+                        long pos;
+
+                        if (trackcount <= 0)
+                        {
+                            cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                            return;
+                        }
+                        pos = (playlist_get_current()->index < 0) ?
+                              0 : (long)iap_get_trackindex();
+                        pos += (buf[3] == 0x03) ? 1 : -1;
+                        if (pos < 0)
+                            pos = 0;
+                        else if (pos >= trackcount)
+                            pos = trackcount - 1;
+                        play_selected_track(pos);
+                        break;
+                    }
+                    if (buf[3] == 0x03)
+                        audio_next();
+                    else
+                        audio_prev();
                     break;
                 case 0x05: /* ffwd */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    break;
                 case 0x06: /* frwd */
-                    iap_remotebtn = BUTTON_RC_LEFT;
+                    if (!(status & AUDIO_STATUS_PLAY))
+                    {
+                        cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                        return;
+                    }
+                    iap_seek_start(buf[3] == 0x05);
                     break;
                 case 0x07: /* end ffwd/frwd */
-                    iap_remotebtn = BUTTON_NONE;
+                    iap_seek_stop();
                     break;
+                case 0x08: /* next chapter */
+                case 0x09: /* previous chapter */
+                    /* Tracks have no chapters here */
+                    cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                    return;
+                default:
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    return;
             }
             /* respond with cmd ok packet */
             cmd_ok(cmd);
@@ -2294,20 +2574,15 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
-            if(buf[3] && !global_settings.playlist_shuffle)
+            CHECKLEN(4);
+            if (buf[3] > 0x02)
             {
-                global_settings.playlist_shuffle = 1;
-                settings_save();
-                if (audio_status() & AUDIO_STATUS_PLAY)
-                    playlist_randomise(NULL, current_tick, true);
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
             }
-            else if(!buf[3] && global_settings.playlist_shuffle)
-            {
-                global_settings.playlist_shuffle = 0;
-                settings_save();
-                if (audio_status() & AUDIO_STATUS_PLAY)
-                    playlist_sort(NULL, true);
-            }
+            /* Shuffling albums is shuffling tracks here. Byte 7, when
+             * present, is the Restore on Exit byte. */
+            iap_set_shuffle(buf[3] != 0, len >= 5 && buf[4]);
 
             /* respond with cmd ok packet */
             cmd_ok(cmd);
@@ -2418,20 +2693,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
-            int oldmode = global_settings.repeat_mode;
-            if (buf[3] == 0)
-                global_settings.repeat_mode = REPEAT_OFF;
-            else if (buf[3] == 1)
-                global_settings.repeat_mode = REPEAT_ONE;
-            else if (buf[3] == 2)
-                global_settings.repeat_mode = REPEAT_ALL;
+            static const int modes[] = {REPEAT_OFF, REPEAT_ONE, REPEAT_ALL};
 
-            if (oldmode != global_settings.repeat_mode)
+            CHECKLEN(4);
+            if (buf[3] >= ARRAYLEN(modes))
             {
-                settings_save();
-                if (audio_status() & AUDIO_STATUS_PLAY)
-                    audio_flush_and_reload_tracks();
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
             }
+            /* Byte 7, when present, is the Restore on Exit byte */
+            iap_set_repeat(modes[buf[3]], len >= 5 && buf[4]);
             /* respond with cmd ok packet */
             cmd_ok(cmd);
             break;
@@ -2823,10 +3094,31 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              */
         {
             int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
-            long tracknum = get_u32(&buf[3]);
+            long tracknum;
+
+            CHECKLEN(7);
+            tracknum = get_u32(&buf[3]);
+
+            /* Usable only while playing or paused, as described above:
+             * audio_skip() does nothing while stopped */
+            if (!(audio_status() & AUDIO_STATUS_PLAY))
+            {
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                break;
+            }
+
+            /* audio_skip() walks an out-of-range offset back one track at
+             * a time, holding id3_mutex and never yielding, so a wild
+             * index locks the device up rather than being rejected.
+             */
+            if (tracknum < 0 || tracknum >= playlist_amount())
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
 
             audio_pause();
-            audio_skip(tracknum - playlist_next(0));
+            audio_skip(tracknum - iap_get_trackindex());
             if (!paused)
                 audio_resume();
 
@@ -2984,12 +3276,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t trackcount;
             index = get_u32(&cur_dbrecord[1]);
             trackcount = playlist_amount();
-            if ((cur_dbrecord[0] == 0x05) && (index > trackcount))
+            if ((cur_dbrecord[0] == 0x05) && (index >= trackcount))
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            if ((cur_dbrecord[0] == 0x01) && (index > (number_of_playlists + 1)))
+            if ((cur_dbrecord[0] == 0x01) && (index > number_of_playlists))
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
@@ -3019,7 +3311,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     audio_pause();
                     audio_skip(-iap_get_trackindex());
                     playlist_sort(NULL, true);
-                    audio_skip(index - playlist_next(0));
+                    audio_skip(index - iap_get_trackindex());
                     break;
                 }
             }
@@ -3141,6 +3433,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     break;
                 }
             }
+            break;
         }
         default:
         {

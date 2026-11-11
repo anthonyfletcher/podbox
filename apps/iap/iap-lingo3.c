@@ -262,9 +262,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             device.track_index = iap_get_trackindex();
             device.chapter_index = 0;
             device.play_status = audio_status();
-            /* TODO: Fix this */
-            device.mute = false;
-            device.volume = global_status.volume;
+            device.mute_notified = device.mute;
+            device.volume = iap_volume_to_ui_byte(global_status.volume);
             device.power_state = charger_input_state;
             device.battery_level = battery_level();
             /* TODO: Fix this */
@@ -358,7 +357,6 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
         case 0x0C:
         {
             struct mp3entry* id3;
-            struct playlist_info* playlist;
             int play_status;
             struct tm* tm;
 
@@ -387,8 +385,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x01:
                 {
-                    playlist = playlist_get_current();
-                    IAP_TX_PUT_U32(playlist->index - playlist->first_index);
+                    IAP_TX_PUT_U32(iap_get_trackindex());
 
                     iap_send_tx();
                     break;
@@ -399,8 +396,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x02:
                 {
-                    playlist = playlist_get_current();
-                    IAP_TX_PUT_U32(playlist->index - playlist->first_index);
+                    IAP_TX_PUT_U32(iap_get_trackindex());
                     /* Indicate that track does not have chapters */
                     IAP_TX_PUT_U16(0x0000);
                     IAP_TX_PUT_U16(0xFFFF);
@@ -440,7 +436,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
                         /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        IAP_TX_PUT(iap_volume_to_ui_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -511,6 +507,14 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                             IAP_TX_PUT(0x02);
                             break;
                         }
+
+                        default:
+                        {
+                            /* REPEAT_SHUFFLE and REPEAT_AB, see the
+                             * repeat notification in iap_periodic() */
+                            IAP_TX_PUT(0x02);
+                            break;
+                        }
                     }
 
                     iap_send_tx();
@@ -524,8 +528,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 {
                     tm = get_time();
 
-                    /* Year */
-                    IAP_TX_PUT_U16(tm->tm_year);
+                    /* Year, tm_year counts from 1900 */
+                    IAP_TX_PUT_U16(tm->tm_year + 1900);
 
                     /* Month */
                     IAP_TX_PUT(tm->tm_mon+1);
@@ -628,9 +632,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     if (device.mute == false) {
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
-                        /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        /* UI and absolute volume */
+                        IAP_TX_PUT(iap_volume_to_ui_byte(global_status.volume));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -706,6 +710,13 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                     CHECKLEN(7);
                     index = get_u32(&buf[0x03]);
+                    /* Same guard as SetCurrentPlayingTrack below: an
+                     * out-of-range offset locks up audio_skip(). */
+                    if (index >= (uint32_t)playlist_amount())
+                    {
+                        cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                        break;
+                    }
                     audio_skip(index-iap_get_trackindex());
 
                     cmd_ok(cmd);
@@ -765,11 +776,11 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     CHECKLEN(5);
                     if (buf[0x03]==0x00){
                         /* Not Muted */
-                        global_status.volume = (int) (buf[0x04]/2.65625)-90;
-                        device.mute = false;
+                        global_status.volume = iap_byte_to_volume(buf[0x04]);
+                        iap_set_mute(false);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
                     cmd_ok(cmd);
                     break;
@@ -932,18 +943,21 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                 /* Volume/Mute/Absolute
                  * Data length: 4
-                 * TODO: Fix this
                  */
                 case 0x10:
                 {
                     CHECKLEN(7);
                     if (buf[0x03]==0x00){
-                        /* Not Muted */
-                        global_status.volume = (int) (buf[0x04]/2.65625)-90;
-                        device.mute = false;
+                        /* Not Muted. A UI volume of 0 means the absolute
+                         * volume that follows it applies. */
+                        if (buf[0x04] != 0)
+                            global_status.volume = iap_byte_to_volume(buf[0x04]);
+                        else
+                            global_status.volume = iap_abs_byte_to_volume(buf[0x05]);
+                        iap_set_mute(false);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
 
                     cmd_ok(cmd);
@@ -985,7 +999,6 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
         {
             int play_status;
             struct mp3entry* id3;
-            struct playlist_info* playlist;
 
             CHECKAUTH;
 
@@ -1002,8 +1015,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     /* Playing */
                     IAP_TX_PUT(0x01);
                 }
-                playlist = playlist_get_current();
-                IAP_TX_PUT_U32(playlist->index - playlist->first_index);
+                IAP_TX_PUT_U32(iap_get_trackindex());
                 id3 = audio_current_track();
                 IAP_TX_PUT_U32(id3->length);
                 IAP_TX_PUT_U32(id3->elapsed);
@@ -1281,6 +1293,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             IAP_TX_PUT_U32(playlist_amount());
 
             iap_send_tx();
+            break;
         }
 
         /* RetNumPlayingTracks (0x15)
@@ -1462,11 +1475,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             CHECKAUTH;
             CHECKLEN(4);
 
-            /* Sound check is not supported right now
-             * TODO: Fix
-             */
-
-            cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+            /* Sound check is not supported: turning it off, the state
+             * GetSoundCheckState reports, is all that can succeed */
+            if (buf[2])
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+            else
+                cmd_ok(cmd);
             break;
         }
 
