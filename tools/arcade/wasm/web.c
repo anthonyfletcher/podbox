@@ -121,9 +121,12 @@ static const struct arcade_speak speak = { say, busy, stop, on };
 static const struct arcade_store store = { st_read, st_write, st_remove,
                                            st_list };
 /* playing and beat are set by web_music, before the cart loads */
+static uint32_t cart_at_read(void *ctx, uint32_t at, void *buf, uint32_t n);
+
 static struct arcade_host host = {
     NULL, print, NULL, date, click, NULL, NULL, setting, NULL, fake_control,
-    &fake_tracks, frame, &speak, &store, glyph, watch, prof_section
+    &fake_tracks, frame, &speak, &store, glyph, watch, prof_section,
+    cart_at_read
 };
 
 /* ---- driving a cart ------------------------------------------------------ */
@@ -144,6 +147,18 @@ static uint32_t cart_read(void *ctx, void *buf, uint32_t n)
     if (buf)
         memcpy(buf, cart + cart_at, n);
     cart_at += n;
+    return n;
+}
+
+/* the cart's maps and images as it plays, from the cart the page put */
+static uint32_t cart_at_read(void *ctx, uint32_t at, void *buf, uint32_t n)
+{
+    (void)ctx;
+    if (at > cart_len)
+        return 0;
+    if (n > cart_len - at)
+        n = cart_len - at;
+    memcpy(buf, cart + at, n);
     return n;
 }
 

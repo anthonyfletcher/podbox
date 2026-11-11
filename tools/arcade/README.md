@@ -55,6 +55,7 @@ A cart is a folder:
 | `boards` | the high-score tables, up to 8, below |
 | `options` | the settings the pause menu shows, up to 8, below |
 | `achievements` | up to 32 records: `name`, used in code as `ACH.<name>`; `title`, 1 to 31 bytes (the name when left out); and `text`, up to 95 bytes |
+| `lazy_images` | images left in the cart file until `img.load(IMG.name)` reads them, and `img.drop` lets go: an image needed only at times, such as one course's sky |
 | `flags` | names for the sprite flags, flag 0 first: `["solid", null, "ladder"]` gives `FLAG.solid` and `FLAG.ladder`, each the flag as a set of flags (1 and 4), for `actors.move()` and `map()`; `fget(n) & FLAG.solid` tests one |
 
 Errors name the file, line and column, and say what to write instead.

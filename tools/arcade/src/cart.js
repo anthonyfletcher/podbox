@@ -55,10 +55,13 @@ export function writeCart(chunks) {
     return w.done();
 }
 
-/* Returns { tag: data } in file order; throws on a malformed file. */
+/* Returns { chunks: { tag: data }, order: tags in file order, list: each
+ * { tag, data } in file order, chunks a tag repeats (MAPC, IMGC) all
+ * there }; throws on a malformed file. */
 export function readCart(bytes) {
     const chunks = {};
     const order = [];
+    const list = [];
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let at = 0;
     while (at < bytes.length) {
@@ -75,7 +78,8 @@ export function readCart(bytes) {
             throw new Error('not a cart: no PBG1 header');
         chunks[tag] = data;
         order.push(tag);
+        list.push({ tag: tag, data: data });
         at += 12 + len;
     }
-    return { chunks: chunks, order: order };
+    return { chunks: chunks, order: order, list: list };
 }

@@ -48,9 +48,10 @@ const char *vm_typename(uint32_t tag)
 {
     static const char *const names[] = {
         "null", "number", "string", "array", "Int32Array", "Uint8Array",
-        "record", "function", "buffer", "number", "image", "FixArray"
+        "record", "function", "buffer", "number", "image", "FixArray",
+        "lazy image not yet loaded with img.load()"
     };
-    return tag <= T_FXA ? names[tag] : "?";
+    return tag <= T_LAZY ? names[tag] : "?";
 }
 
 int vm_truthy(struct vm *vm, struct value v)
@@ -209,7 +210,7 @@ static void tw_value(struct vm *vm, struct tw *w, struct value v, int depth)
         break;
     case T_OBJ: tw_put(w, "[object Object]", 15); break;
     case T_FN: tw_put(w, "function", 8); break;
-    case T_IMG: tw_put(w, "[image]", 7); break;
+    case T_IMG: case T_LAZY: tw_put(w, "[image]", 7); break;
     }
 }
 

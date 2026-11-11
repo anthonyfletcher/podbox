@@ -29,13 +29,13 @@ example and its cost.
 
 ```
 mygame/
-  cart.json         id (16 hex digits -- never change it), name, rate, music, suspend, boards, options, achievements, flags
+  cart.json         id (16 hex digits -- never change it), name, rate, music, suspend, boards, options, achievements, flags, lazy_images
   main.js           init(), update(), draw(): the top level holds declarations only
   util.js           any other file is a namespace: util.f(), util.count
   sheet.png         128x128 indexed PNG, 256 sprites of 8x8
   flags.json        sprite flags
   maps/*.json       MAP.<name>; objects as OBJ.<kind>
-  images/*.png      IMG.<name>
+  images/*.png      IMG.<name>; a lazy one needs img.load(IMG.<name>) first
   palettes/*.gpl    PAL.<name>
   sounds/*.json     SFX.<name> (jsfxr parameters)
   fonts/*.bdf       FONT.<name>

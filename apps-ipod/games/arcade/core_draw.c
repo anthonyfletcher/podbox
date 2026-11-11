@@ -205,11 +205,21 @@ static int read_maps(struct vm *vm, uint32_t *cap)
         m->h = (uint16_t)le16(p + 2);
         m->zlen = rd_le32(p + 4);
         p += 8;
-        if (!m->w || !m->h || m->w > MAP_MAX || m->h > MAP_MAX ||
-            m->zlen > (uint32_t)(end - p))
+        if (!m->w || !m->h || m->w > MAP_MAX || m->h > MAP_MAX)
             return damaged(vm, "maps");
-        m->z = p;
-        p += m->zlen;
+        /* format 3 leaves the cells in the file, a chunk a map */
+        if (vm->format >= 3) {
+            if (i >= vm->nmapc || m->zlen != vm->mapc[i].len)
+                return damaged(vm, "maps");
+            m->z = NULL;
+            m->lazy = (int32_t)i;
+        } else {
+            if (m->zlen > (uint32_t)(end - p))
+                return damaged(vm, "maps");
+            m->z = p;
+            m->lazy = -1;
+            p += m->zlen;
+        }
         if (end - p < 2)
             return damaged(vm, "maps");
         m->nobj = (uint16_t)le16(p);
@@ -242,13 +252,25 @@ static int read_maps(struct vm *vm, uint32_t *cap)
     return 1;
 }
 
+/* A map's cells unpacked into dst, read from the cart file when it left
+ * them there */
+static int map_cells(struct vm *vm, const struct mapinfo *m, uint8_t *dst,
+                     uint32_t cells)
+{
+    if (m->lazy >= 0)
+        return lazy_unpack(vm, &vm->mapc[m->lazy], dst, cells);
+    if (!lz4_decode(m->z, m->zlen, dst, cells))
+        return damaged(vm, "a map");
+    return 1;
+}
+
 /* Map n becomes the active one, as stored */
 static int use_map(struct vm *vm, uint32_t n)
 {
     const struct mapinfo *m = &vm->mapdir[n];
     uint32_t cells = (uint32_t)m->w * m->h;
-    if (!lz4_decode(m->z, m->zlen, MEM(vm, vm->map), cells))
-        return damaged(vm, "a map");
+    if (!map_cells(vm, m, MEM(vm, vm->map), cells))
+        return 0;
     vm->map_w = m->w;
     vm->map_h = m->h;
     vm->active_map = (int32_t)n;
@@ -270,7 +292,10 @@ static int read_sheet(struct vm *vm)
     return 1;
 }
 
-/* Each image as an img outside the heap, and the globals IMG.* name */
+/* Each image as an img outside the heap, and the globals IMG.* name. In
+ * format 3 an image flagged lazy is left in the file, a chunk of its own,
+ * and named by a T_LAZY of its struct lazyimg until img.load(). */
+#define OFF_LAZY 0x80000000u        /* in offs: the image is a lazyimg */
 static int read_images(struct vm *vm)
 {
     const uint8_t *p = vm->imgs, *end = p + vm->imgs_len;
@@ -284,13 +309,41 @@ static int read_images(struct vm *vm)
         if (!at)
             return 0;
         offs = MEM(vm, at);
+        if (vm->format >= 3 && vm->nimgc) {
+            at = perm_alloc(vm, vm->nimgc * sizeof(struct lazyimg) + 8);
+            if (!at)
+                return 0;
+            vm->lazyimgs = MEM(vm, at);
+        }
         for (uint32_t i = 0; i < n; i++) {
             if (end - p < 8)
                 return damaged(vm, "images");
             uint32_t w = le16(p), h = le16(p + 2), zlen = rd_le32(p + 4);
             p += 8;
-            if (!w || !h || w > IMAGE_MAX || h > IMAGE_MAX ||
-                zlen > (uint32_t)(end - p))
+            uint32_t flags = 0;
+            if (vm->format >= 3) {
+                if (end - p < 1)
+                    return damaged(vm, "images");
+                flags = *p++;
+            }
+            if (!w || !h || w > IMAGE_MAX || h > IMAGE_MAX)
+                return damaged(vm, "images");
+            if (flags & 1) {
+                uint32_t k = vm->nlazyimgs;
+                if (k >= vm->nimgc || zlen != vm->imgc[k].len ||
+                    !lazy_unpack(vm, &vm->imgc[k], NULL, 0))
+                    return damaged(vm, "images");
+                struct lazyimg *r = &vm->lazyimgs[k];
+                r->w = (uint16_t)w;
+                r->h = (uint16_t)h;
+                r->chunk = (uint16_t)k;
+                r->slot = 0xffff;
+                r->copy = 0;
+                vm->nlazyimgs++;
+                offs[i] = OFF_LAZY | (uint32_t)((uint8_t *)r - vm->mem);
+                continue;
+            }
+            if (zlen > (uint32_t)(end - p))
                 return damaged(vm, "images");
             uint32_t bytes = (uint32_t)sizeof(struct img) + w * h;
             uint32_t off = perm_alloc(vm, bytes);
@@ -311,7 +364,12 @@ static int read_images(struct vm *vm)
         uint32_t slot = vm->img_globals[i * 2], img = vm->img_globals[i * 2 + 1];
         if (slot >= vm->nglobals || img >= n)
             return damaged(vm, "images");
-        vm->globals[slot] = mk(T_IMG, (int32_t)offs[img]);
+        if (offs[img] & OFF_LAZY) {
+            uint32_t off = offs[img] & ~OFF_LAZY;
+            ((struct lazyimg *)MEM(vm, off))->slot = (uint16_t)slot;
+            vm->globals[slot] = mk(T_LAZY, (int32_t)off);
+        } else
+            vm->globals[slot] = mk(T_IMG, (int32_t)offs[img]);
     }
     return 1;
 }
@@ -2690,16 +2748,95 @@ NATIVE(textw)
     return 1;
 }
 
-/* imgw(i), imgh(i): an image's width and height */
+/* imgw(i), imgh(i): an image's width and height, a lazy one's too */
 static int img_side(struct vm *vm, struct value v, int height,
                     struct value *out)
 {
+    if (v.tag == T_LAZY) {
+        const struct lazyimg *r = MEM(vm, (uint32_t)v.v);
+        vm_charge(vm, 2);
+        *out = mk(T_INT, height ? r->h : r->w);
+        return 1;
+    }
     if (v.tag != T_IMG)
         return vm_fail(vm, height ? "imgh" : "imgw",
                        "() needs an image, IMG.name or one img() made", "");
     struct img *im = MEM(vm, (uint32_t)v.v);
     vm_charge(vm, 2);
     *out = mk(T_INT, height ? im->height : im->width);
+    return 1;
+}
+
+/* The lazy cart image v names, as its T_LAZY or the copy img.load()
+ * made; NULL when it names none */
+static struct lazyimg *lazy_of(struct vm *vm, struct value v)
+{
+    for (uint32_t i = 0; i < vm->nlazyimgs; i++) {
+        struct lazyimg *r = &vm->lazyimgs[i];
+        uint32_t off = (uint32_t)((uint8_t *)r - vm->mem);
+        if ((v.tag == T_LAZY && (uint32_t)v.v == off) ||
+            (v.tag == T_IMG && r->copy && (uint32_t)v.v == r->copy))
+            return r;
+    }
+    return NULL;
+}
+
+/* img.load(IMG.name): a lazy image read from the cart file into a copy on
+ * the heap, which IMG.name then is; the copy again when it is loaded, and
+ * any image already in memory as it is. Returns the image. */
+NATIVE(img_load)
+{
+    (void)argc;
+    struct lazyimg *r = lazy_of(vm, a[0]);
+    if (!r) {
+        if (a[0].tag != T_IMG)
+            return bad(vm, "img.load", "() needs one of the cart's images, "
+                       "IMG.name, not a ", a[0]);
+        *out = a[0];
+        vm_charge(vm, COST_CALL);
+        return 1;
+    }
+    if (!r->copy) {
+        uint32_t bytes = (uint32_t)r->w * r->h;
+        uint32_t off = gc_alloc(vm, T_IMG, (uint32_t)(sizeof(struct img) -
+                                                      sizeof(struct hdr)) +
+                                bytes);
+        if (!off)
+            return 0;
+        struct img *im = MEM(vm, off);
+        im->width = r->w;
+        im->height = r->h;
+        struct value v = mk(T_IMG, (int32_t)off);
+        if (!vm_root(vm, v))
+            return 0;
+        int ok = lazy_unpack(vm, &vm->imgc[r->chunk], im->px, bytes);
+        vm_unroot(vm);
+        if (!ok)
+            return 0;
+        r->copy = off;
+        vm->globals[r->slot] = v;
+        /* measured on the ARM rig (lzcost): about 13 cycles a pixel, made
+         * and unpacked into */
+        vm_charge(vm, COST_CALL + bytes * 3 / 10);
+    }
+    *out = mk(T_IMG, (int32_t)r->copy);
+    return 1;
+}
+
+/* img.drop(IMG.name): a lazy image's copy let go, IMG.name lazy again; a
+ * copy the cart keeps elsewhere stays until it lets that go too */
+NATIVE(img_drop)
+{
+    (void)argc; (void)out;
+    struct lazyimg *r = lazy_of(vm, a[0]);
+    if (!r)
+        return vm_fail(vm, "img.drop() needs an image listed in cart.json's "
+                       "lazy_images, IMG.name", "", "");
+    if (r->copy) {
+        r->copy = 0;
+        vm->globals[r->slot] = mk(T_LAZY, (int32_t)((uint8_t *)r - vm->mem));
+    }
+    vm_charge(vm, COST_CALL);
     return 1;
 }
 
@@ -3647,8 +3784,8 @@ NATIVE(loadmap)
         if (a[1].tag != T_U8 || U8A(vm, a[1])->len < cells)
             return vm_fail(vm, "loadmap() unpacks into a Uint8Array of the "
                            "map's width times its height", "", "");
-        if (!lz4_decode(m->z, m->zlen, U8A(vm, a[1])->d, cells))
-            return damaged(vm, "a map");
+        if (!map_cells(vm, m, U8A(vm, a[1])->d, cells))
+            return 0;
     } else if (!use_map(vm, (uint32_t)n)) {
         return 0;
     }

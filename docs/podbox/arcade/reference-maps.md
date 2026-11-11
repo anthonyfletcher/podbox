@@ -264,6 +264,10 @@ print("CAVE: " + mapw() + " BY " + maph(), 40, 56, 7);
 
 - Any `mset` changes to the map that was active are lost, and the loaded
   one starts fresh -- also when it is loaded again.
+- Only the active map takes memory: the others wait in the cart file, and
+  `loadmap` reads the one asked for. So a cart can hold many large maps.
+  On the iPod Video the disk may be resting, and waking it takes a second
+  or two, so load a map between levels, not in play.
 - `MAP.<name>` numbers the maps in name order from 0, so a list of levels
   can be `MAP.level1`, `MAP.level2` and so on, or simply 0, 1, 2 when
   every map is a level.

@@ -106,6 +106,21 @@ static uint32_t file_read(void *ctx, void *buf, uint32_t n)
     return got < 0 ? 0 : (uint32_t)got;
 }
 
+/* The cart file, opened again for the maps and images it reads as it
+ * plays: on the 5G a read may wait for the disk to spin up */
+static char cart_path[MAX_PATH];
+
+static uint32_t host_cart_read(void *ctx, uint32_t at, void *buf, uint32_t n)
+{
+    (void)ctx;
+    int fd = open(cart_path, O_RDONLY);
+    if (fd < 0)
+        return 0;
+    ssize_t got = lseek(fd, at, SEEK_SET) == (off_t)at ? read(fd, buf, n) : -1;
+    close(fd);
+    return got < 0 ? 0 : (uint32_t)got;
+}
+
 void shell_id_path(char *path, size_t size, const char *dir,
                    const uint8_t *id, const char *ext)
 {
@@ -578,7 +593,8 @@ static const struct arcade_host host = {
     NULL, host_print, host_yield, host_date, host_click, host_playing,
     &beat_host, host_setting, host_translate, host_control, &shell_tracks,
     host_frame, &speak_host, &shell_store, shell_glyph,
-    NULL, NULL                  /* watch and prof: the IDE's alone */
+    NULL, NULL,                 /* watch and prof: the IDE's alone */
+    host_cart_read
 };
 
 /* ---- sound -----------------------------------------------------------------
@@ -1343,6 +1359,7 @@ static void show_error(struct vm *vm)
 static int run(const char *path, void *mem, size_t size)
 {
     struct viewport vp;
+    strmemccpy(cart_path, path, sizeof(cart_path));
     int fd = open(path, O_RDONLY);
     if (fd < 0) {
         splashf(HZ * 3, "%s", path);

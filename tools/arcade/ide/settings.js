@@ -10,7 +10,7 @@ import { iconButton } from './icons.js';
 
 const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const ORDER = ['id', 'name', 'author', 'version', 'help', 'rate', 'menu_button', 'music', 'suspend',
-               'flags', 'boards', 'options', 'achievements'];
+               'flags', 'lazy_images', 'boards', 'options', 'achievements'];
 
 /* cart.json as text: settings in a fixed order, empty texts and lists left
  * out, flag names trimmed of unnamed ones at the end */
@@ -22,7 +22,7 @@ export function writeSettings(cart) {
         while (f.length && !f[f.length - 1]) f.pop();
         if (f.length) c.flags = f; else delete c.flags;
     }
-    for (const k of ['boards', 'options', 'achievements'])
+    for (const k of ['lazy_images', 'boards', 'options', 'achievements'])
         if (Array.isArray(c[k]) && !c[k].length) delete c[k];
     const out = {};
     for (const k of ORDER) if (c[k] !== undefined) out[k] = c[k];

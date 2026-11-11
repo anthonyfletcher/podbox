@@ -60,7 +60,7 @@ export function cartLogo(bytes) {
 
 /* { path: Uint8Array } for every file of the cart's folder */
 export function unpackCart(bytes, inflateRaw, deflate) {
-    const { chunks } = readCart(bytes);
+    const { chunks, list } = readCart(bytes);
     if (!chunks.SRC_) throw new Error('the cart holds no sources');
     const src = reader(inflateRaw(chunks.SRC_));
     const files = {};
@@ -96,7 +96,15 @@ export function unpackCart(bytes, inflateRaw, deflate) {
     if (images.length) {
         const r = reader(chunks.IMGS || new Uint8Array(2));
         if (r.u16() !== images.length) throw new Error('the cart\'s images do not match its sources');
-        for (const f of images) files[f] = picture(r);
+        /* format 3 flags each image, a lazy one's pixels in an IMGC */
+        const format3 = chunks.PBG1 && (chunks.PBG1[0] | chunks.PBG1[1] << 8) >= 3;
+        const lazy = list.filter((c) => c.tag === 'IMGC').map((c) => c.data);
+        for (const f of images) {
+            const w = r.u16(), h = r.u16(), n = r.u32();
+            const z = format3 && r.u8() ? lazy.shift() : r.bytes(n);
+            if (!z || z.length !== n) throw new Error('the cart\'s images are damaged');
+            files[f] = encodeIndexedPng(w, h, lz4Decompress(z, w * h), rgb, deflate);
+        }
     }
     return files;
 }

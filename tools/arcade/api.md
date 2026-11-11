@@ -147,6 +147,12 @@ An image's width.
 ### imgh(i)
 An image's height.
 
+### img.load(i)
+A lazy image (named in cart.json's `lazy_images`) read from the cart file, so that `IMG.name` is then it; again, the same copy. Returns the image.
+
+### img.drop(i)
+A lazy image's copy let go: `IMG.name` is not loaded until `img.load` again.
+
 ### blit(i, x, y, [flip])
 Draws a whole image.
 
@@ -171,7 +177,7 @@ The sprite in map cell `x, y`; 0 off the map.
 Sets a map cell.
 
 ### loadmap(MAP.name, [cells])
-Makes one of the cart's maps the active one, as it was built; with `cells`, a `Uint8Array`, unpacks it there instead, the active map untouched. Returns the map's width.
+Makes one of the cart's maps the active one, read from the cart file as it was built; with `cells`, a `Uint8Array`, unpacks it there instead, the active map untouched. Returns the map's width.
 
 ### mapw()
 The active map's width in cells.

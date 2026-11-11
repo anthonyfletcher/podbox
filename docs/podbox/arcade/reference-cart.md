@@ -22,6 +22,7 @@ not know is an error when the cart is built.
 | `boards` | up to 8 high-score boards ([Declaring boards](reference-scores.md#declaring-boards)) |
 | `options` | up to 8 settings for the pause menu ([Declaring options](reference-scores.md#declaring-options)) |
 | `achievements` | up to 32 ([Declaring achievements](reference-scores.md#declaring-achievements)) |
+| `lazy_images` | images left in the cart file until `img.load` reads them: `["sky_desert", "sky_snow"]` ([Lazy images](reference-images.md#lazy-images)) |
 | `flags` | names for the sprite flags, flag 0 first: `["solid", null, "ladder"]` gives `FLAG.solid` and `FLAG.ladder` ([Maps](reference-maps.md#walls-floors-and-ladders-flags)) |
 
 ```json

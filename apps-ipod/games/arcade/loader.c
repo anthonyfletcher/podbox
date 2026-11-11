@@ -170,6 +170,44 @@ static uint32_t crc32(const uint8_t *b, uint32_t n)
     return c ^ 0xffffffffu;
 }
 
+/* Lazy chunk c, read from the cart file through the host and checked,
+ * then unpacked into size bytes at dst, or only checked when dst is NULL:
+ * 1, or 0 with the error set. Its bytes are working memory, from the
+ * heap's top, or the arena's while the cart loads. */
+int lazy_unpack(struct vm *vm, const struct lazy *c, uint8_t *dst,
+                uint32_t size)
+{
+    const struct arcade_host *h = vm->host;
+    if (!h || !h->cart_read)
+        return vm_fail(vm, "this player cannot read the game's maps and "
+                       "images as it plays", "", "");
+    uint32_t held = 0;
+    uint8_t *buf;
+    if (vm->heap_hi) {
+        uint32_t off = gc_scratch(vm, c->len);
+        if (!off)
+            return 0;
+        buf = MEM(vm, off);
+        held = c->len;
+    } else {
+        uint32_t top = (vm->size - c->len) & ~7u;
+        if (c->len > vm->size || top < vm->perm)
+            return vm_fail(vm, "not enough memory for this game", "", "");
+        buf = MEM(vm, top);
+    }
+    crc_init();
+    int ok = h->cart_read(h->ctx, c->at, buf, c->len) == c->len &&
+             crc32(buf, c->len) == c->crc &&
+             (!dst || lz4_decode(buf, c->len, dst, size));
+    if (held)
+        gc_scratch_end(vm, held);
+    /* measured on the ARM rig (lzcost): about 41 cycles a packed byte,
+     * read, checked and unpacked; the unpacked bytes are the caller's */
+    vm_charge(vm, c->len);
+    return ok ? 1 : vm_fail(vm, "the game file has changed or is damaged",
+                            "", "");
+}
+
 static uint32_t rd16(const uint8_t *p) { return p[0] | (p[1] << 8); }
 
 /* A bounded cursor over a chunk. */
@@ -219,9 +257,10 @@ static int load_header(struct vm *vm, const uint8_t *p, uint32_t n)
 {
     if (n < 20)
         return bad(vm, "header");
-    /* format 2 adds ending() to the entries */
+    /* format 2 adds ending() to the entries; 3 keeps each map's cells, and
+     * each lazy image's pixels, in a chunk of its own */
     vm->format = (uint8_t)rd16(p);
-    if (vm->format != 1 && vm->format != 2)
+    if (vm->format < 1 || vm->format > 3)
         return vm_fail(vm, "This game needs a newer PodBox", "", "");
     vm->api = (uint16_t)rd16(p + 2);
     if (vm->api > ARCADE_API_VERSION)
@@ -624,8 +663,9 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     const uint8_t *chunk[CHUNKS] = { 0 };
     uint32_t clen[CHUNKS] = { 0 };
     int first = 1;
+    uint32_t pos = 0;               /* where the chunk starts in the file */
     crc_init();
-    for (;;) {
+    for (;; pos += 12 + rd_le32(hd + 4)) {
         uint32_t got = read(ctx, hd, 8);
         if (got == 0)
             break;
@@ -642,6 +682,33 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
         for (int i = 0; i < CHUNKS; i++)
             if (!memcmp(hd, tags[i], 4))
                 want = i;
+        /* a map's cells or an image's pixels, left in the file: where
+         * they are and their checksum, read when they are used */
+        int mapc = !memcmp(hd, "MAPC", 4), imgc = !memcmp(hd, "IMGC", 4);
+        if (mapc || imgc) {
+            uint32_t *nc = mapc ? &vm->nmapc : &vm->nimgc;
+            struct lazy **table = mapc ? &vm->mapc : &vm->imgc;
+            uint8_t sum[4];
+            if (*nc >= LAZY_MAX)
+                return vm_fail(vm, "this game has more than 64 maps or "
+                               "lazy images", "", "");
+            if (!*table) {
+                uint32_t at = perm_alloc(vm, LAZY_MAX * sizeof(struct lazy));
+                if (!at)
+                    return vm_fail(vm, "not enough memory for this game", "",
+                                   "");
+                *table = MEM(vm, at);
+            }
+            struct lazy *c = *table + *nc;
+            if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
+                return bad(vm, "truncated");
+            c->at = pos + 8;
+            c->len = len;
+            c->crc = rd_le32(sum);
+            (*nc)++;
+            vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^ c->crc;
+            continue;
+        }
         int is_meta = !memcmp(hd, "META", 4);
         if (want < 0 && !is_meta) {
             if (read(ctx, NULL, len + 4) != len + 4)

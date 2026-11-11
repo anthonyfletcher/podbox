@@ -1607,7 +1607,7 @@ class Program {
 
 function header(cart, prog) {
     const w = new Writer();
-    w.u16(FORMAT);
+    w.u16(prog.format || FORMAT);
     w.u16(prog.version);
     w.u8(cart.rate);
     w.u8(cart.menu_button === 'game' ? 1 : 0);
@@ -1768,7 +1768,7 @@ function achievements(list) {
 
 const CART_KEYS = ['id', 'name', 'author', 'version', 'help', 'rate',
                    'menu_button', 'music', 'suspend', 'boards', 'options',
-                   'achievements', 'flags'];
+                   'achievements', 'flags', 'lazy_images'];
 const BOARD_KEYS = ['name', 'title', 'wins', 'format', 'version'];
 
 const OPTION_KEYS = ['name', 'title', 'type', 'choices', 'min', 'max', 'step',
@@ -1946,6 +1946,13 @@ function checkCart(cart, errors) {
     if (MUSIC.indexOf(c.music) < 0) bad('music must be one of ' + MUSIC.join(', '));
     if (c.suspend !== undefined && typeof c.suspend !== 'boolean')
         bad('suspend must be true or false');
+    c.lazy_images = cart.lazy_images === undefined ? [] : cart.lazy_images;
+    if (!Array.isArray(c.lazy_images) ||
+        c.lazy_images.some((n) => typeof n !== 'string') ||
+        new Set(c.lazy_images).size !== c.lazy_images.length) {
+        bad('lazy_images must be a list of image names, each once');
+        c.lazy_images = [];
+    }
     c.boards = checkBoards(cart.boards, bad);
     c.options = checkOptions(cart.options, bad);
     c.achievements = checkAchievements(cart.achievements, bad);
@@ -2016,7 +2023,11 @@ export function compile(input) {
     /* The cart's assets: MAP, PAL and OBJ as constant groups, and IMG as a
      * namespace of globals that the loader sets to the images. */
     const built = buildAssets(input.assets, input.inflate,
-                              (str) => prog.string(str), errors);
+                              (str) => prog.string(str), errors,
+                              cart.lazy_images);
+    /* format 3 keeps maps' cells and lazy images apart, read as they are
+     * used */
+    prog.format = built.format3 ? 3 : FORMAT;
     prog.palette = built.palette;
     const board = {}, option = {}, ach = {};
     cart.boards.forEach((b, i) => { board[b.name] = { value: i, version: 1 }; });

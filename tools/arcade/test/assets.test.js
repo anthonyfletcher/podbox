@@ -236,20 +236,134 @@ test('asset files that cannot be used are named with what to change', () => {
     assert.match(by['maps/my-level.json'], /usable as a name in code/);
 });
 
+/* A 256 by 256 map of cells that do not pack: about 64 KB in the file */
+function noiseMap(seed) {
+    let s = seed;
+    const rows = [];
+    for (let y = 0; y < 256; y++) {
+        let r = '';
+        for (let x = 0; x < 256; x++) {
+            s = (s * 1103515245 + 12345) >>> 0;
+            r += ((s >>> 16) & 255).toString(16).padStart(2, '0');
+        }
+        rows.push(r);
+    }
+    return { width: 256, height: 256, rows: rows, objects: [{ kind: 'start', x: seed, y: 0 }] };
+}
+
+test('maps stay in the cart file until loadmap, so four big ones fit beside a big heap', () => {
+    const files = { 'cart.json': CART };
+    const want = [];
+    for (let k = 0; k < 4; k++) {
+        const m = noiseMap(k + 1);
+        files['maps/m' + k + '.json'] = JSON.stringify(m);
+        want.push(parseInt(m.rows[200].slice(2 * 100, 2 * 100 + 2), 16));
+    }
+    /* 260 KB of maps: held whole beside 200 KB of heap, they would not fit */
+    files['main.js'] = `var big, obj = new Int32Array(5);
+function init() {
+    big = new Int32Array(50000);
+    var s = "";
+    for (var k = 0; k < 4; k++) {
+        loadmap(k);
+        mapobj(obj, 1);
+        s += mget(100, 200) + "/" + obj[1] + " ";
+    }
+    printh(s);
+}
+function update() {}`;
+    const r = run(folder('lazymaps', files));
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out.trim(), want.map((v, k) => v + '/' + (k + 1)).join(' '));
+    assert.equal(readCart(r.cart).list.filter((c) => c.tag === 'MAPC').length, 4);
+});
+
+test('a kept game reads its maps and lazy images from the file after it resumes', () => {
+    const files = {
+        'cart.json': JSON.stringify({ id: '00000000000a55ea', name: 'Keep', lazy_images: ['sky'] }),
+        'maps/a.json': JSON.stringify({ width: 2, height: 1, rows: ['0102'] }),
+        'maps/b.json': JSON.stringify({ width: 2, height: 1, rows: ['0708'] }),
+        'images/sky.png': png(2, 2, Uint8Array.of(5, 6, 7, 8)),
+        'main.js': `function init() {}
+function update() {
+    if (frame() == 5) {
+        loadmap(MAP.b);
+        cls(); blit(img.load(IMG.sky), 0, 0);
+        printh(mget(1, 0) + " " + pget(1, 1));
+    }
+}`
+    };
+    const dir = folder('lazykeep', files);
+    const res = compileFiles(readFolder(dir), readAssets(dir));
+    assert.deepEqual(res.errors, []);
+    const file = path.join(dir, 'keep.pbg');
+    fs.writeFileSync(file, res.cart);
+    for (const extra of [[], ['--suspend-at', '3']]) {
+        const r = spawnSync(exe, [file, '--ticks', '6'].concat(extra), { encoding: 'utf8', timeout: 20000 });
+        assert.equal(r.status, 0, r.stderr);
+        assert.ok(r.stdout.replace(/\r/g, '').split('\n').includes('8 8'), extra.join(' ') + ': ' + r.stdout);
+    }
+});
+
+test('a lazy image is read by img.load and let go by img.drop', () => {
+    const px = new Uint8Array(20 * 10);
+    for (let i = 0; i < px.length; i++) px[i] = 1 + i % 9;
+    const files = {
+        'cart.json': JSON.stringify({ id: '00000000000a55e8', name: 'Lazy', lazy_images: ['sky'] }),
+        'images/sky.png': png(20, 10, px),
+        'images/hud.png': png(4, 4, new Uint8Array(16).fill(3)),
+        'main.js': `var kept;
+function init() {
+    printh("size " + imgw(IMG.sky) + "x" + imgh(IMG.sky) + " " + imgw(IMG.hud));
+    var a = img.load(IMG.sky), b = img.load(IMG.sky);
+    cls(); blit(IMG.sky, 0, 0);
+    printh("loaded " + (a == b) + " " + (a == IMG.sky) + " " + pget(0, 0) + " " + pget(19, 9));
+    printh("hud " + (img.load(IMG.hud) == IMG.hud));
+    kept = IMG.sky;
+    img.drop(IMG.sky);
+    cls(); blit(kept, 0, 0);
+    printh("kept " + pget(0, 0) + " " + (kept == IMG.sky));
+    blit(IMG.sky, 0, 0);
+}
+function update() {}`
+    };
+    const r = run(folder('lazyimg', files));
+    assert.deepEqual(r.errors, []);
+    assert.deepEqual(r.out.trim().split('\n'), ['size 20x10 4', 'loaded 1 1 1 ' + (1 + 199 % 9),
+                                               'hud 1', 'kept 1 0']);
+    assert.match(r.err, /blit\(\) needs SCREEN or an image, not a lazy image not yet loaded with img\.load\(\)/);
+    const bad = run(folder('lazybad', Object.assign({}, files, {
+        'cart.json': JSON.stringify({ id: '00000000000a55e9', name: 'Lazy', lazy_images: ['nope'] }) })));
+    assert.match(bad.errors.map((e) => e.message).join(), /lazy_images names nope/);
+});
+
 test('the loader refuses damaged assets, and loadmap and mapprop check their arguments', () => {
     const dir = folder('damaged', assetCart());
     const good = run(dir);
-    const { chunks, order } = readCart(good.cart);
+    const { list } = readCart(good.cart);
     /* a map's height, the sheet's packed size, an image's height, a
-     * palette's length */
-    const at = { MAPS: 4, SHET: 4, IMGS: 4, PALS: 1 };
+     * palette's length; and a byte of the first map's cells, its checksum
+     * left as it was, as when the file changes after the cart loads */
+    const at = { MAPS: 4, SHET: 4, IMGS: 4, PALS: 1, MAPC: 3 };
     for (const tag in at) {
-        const copy = Object.assign({}, chunks);
-        const d = Uint8Array.from(copy[tag]);
-        d[at[tag]] ^= 0x5a;
-        copy[tag] = d;
+        let first = true;
+        const chunks = list.map((c) => {
+            if (c.tag !== tag || !first) return c;
+            first = false;
+            const d = Uint8Array.from(c.data);
+            d[at[tag]] ^= 0x5a;
+            return { tag: c.tag, data: d };
+        });
+        let bytes = writeCart(chunks);
+        if (tag === 'MAPC') {
+            bytes = Uint8Array.from(good.cart);
+            const k = list.findIndex((c) => c.tag === 'MAPC');
+            const start = list.slice(0, k).reduce((n, c) => n + 12 + c.data.length, 0);
+            bytes[start + 8 + at.MAPC] ^= 0x5a;
+        }
         const file = path.join(dir, 'damaged.pbg');
-        fs.writeFileSync(file, writeCart(order.map((t) => ({ tag: t, data: copy[t] }))));
+        fs.writeFileSync(file, bytes);
         const r = spawnSync(exe, [file, '--ticks', '1'], { encoding: 'utf8', timeout: 20000 });
         assert.notEqual(r.status, 0, tag + ' was accepted');
         assert.match(r.stderr, /damaged/, tag);

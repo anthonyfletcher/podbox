@@ -20,11 +20,15 @@
  * Chunks, little-endian (lengths and counts u16, sizes u32):
  *   PALS  count; each: entries, then r, g and b, a byte each
  *   SHET  width, height, LZ4 size, LZ4 pixels; then the 256 flags
- *   MAPS  count; each: width, height, LZ4 size, LZ4 cells, object count;
- *         each object: kind u8, x y w h i16, prop count u8; each prop:
- *         key (a string number), type u8 (0 an integer, 1 a string), then
- *         an i32 or a string number
- *   IMGS  count; each: width, height, LZ4 size, LZ4 pixels
+ *   MAPS  count; each: width, height, LZ4 size, object count; each
+ *         object: kind u8, x y w h i16, prop count u8; each prop: key (a
+ *         string number), type u8 (0 an integer, 1 a string), then an i32
+ *         or a string number
+ *   MAPC  one a map, in order: its LZ4 cells, which the player reads from
+ *         the file when the map is loaded
+ *   IMGS  count; each: width, height, LZ4 size, flags u8 (1 lazy), then
+ *         unless lazy the LZ4 pixels
+ *   IMGC  one a lazy image, in order: its LZ4 pixels, read by img.load()
  *   SFX_  count; each: samples (u32), scale (u16), then a signed byte a
  *         sample: the 16-bit sample is the byte times the scale, which is
  *         as small as lets the loudest sample fit */
@@ -84,9 +88,9 @@ export function parseGpl(text) {
 /* assets: { sheet, flags, palettes, maps, images } as the folder holds
  * them (PNGs as bytes, the rest as text); string(s) numbers a constant
  * string. Errors go to errors; returns { groups, images, chunks }. */
-export function buildAssets(assets, inflate, string, errors) {
+export function buildAssets(assets, inflate, string, errors, lazy = []) {
     const out = { groups: { MAP: {}, PAL: {}, OBJ: {}, SFX: {}, DATA: {}, FONT: {} },
-                  images: [], chunks: [] };
+                  images: [], chunks: [], format3: false };
     if (!assets) return out;
     function err(file, message) {
         errors.push({ file: file, line: 1, column: 1, message: message });
@@ -224,12 +228,14 @@ export function buildAssets(assets, inflate, string, errors) {
     const kindList = [...kinds].sort();
     if (kindList.length > 255) err('maps', 'at most 255 object kinds');
     kindList.forEach((k, i) => { out.groups.OBJ[k] = { value: i, version: 1 }; });
+    if (maps.length > 64) err('maps/', 'a cart has at most 64 maps');
     if (maps.length) {
-        const w = new Writer();
+        const w = new Writer(), cells = [];
         w.u16(maps.length);
         for (const m of maps) {
             const z = lz4Compress(m.cells);
-            w.u16(m.W); w.u16(m.H); w.u32(z.length); w.bytes(z);
+            cells.push({ tag: 'MAPC', data: z });
+            w.u16(m.W); w.u16(m.H); w.u32(z.length);
             w.u16(m.objects.length);
             for (const o of m.objects) {
                 w.u8(kindList.indexOf(o.kind));
@@ -244,7 +250,8 @@ export function buildAssets(assets, inflate, string, errors) {
                 }
             }
         }
-        out.chunks.push({ tag: 'MAPS', data: w.done() });
+        out.chunks.push({ tag: 'MAPS', data: w.done() }, ...cells);
+        out.format3 = true;
     }
 
     /* images */
@@ -260,19 +267,31 @@ export function buildAssets(assets, inflate, string, errors) {
             out.images.push(name);
         } catch (e) { err(file, e.message); }
     }
-    /* each image is held whole in the player's 512 KB as the cart starts */
-    const held = imgs.reduce((n, img) => n + ((16 + img.width * img.height + 7) & ~7), 0);
+    /* lazy_images in cart.json: left in the file until img.load() */
+    if (lazy.length > 64) err('cart.json', 'lazy_images names at most 64 images');
+    for (const name of lazy)
+        if (out.images.indexOf(name) < 0)
+            err('cart.json', 'lazy_images names ' + name + ', which is not an image in images/');
+    const isLazy = out.images.map((name) => lazy.indexOf(name) >= 0);
+    /* each other image is held whole in the player's 512 KB as the cart
+     * starts */
+    const held = imgs.reduce((n, img, i) => n + (isLazy[i] ? 0 : (16 + img.width * img.height + 7) & ~7), 0);
     if (held > IMAGE_BYTES)
         err('images/', 'the images take ' + Math.ceil(held / 1024) + ' KB, and the player has room for at most about ' +
             Math.floor(IMAGE_BYTES / 1024) + ' KB of images, less what the rest of the cart needs');
     if (imgs.length) {
-        const w = new Writer();
+        const w = new Writer(), pixels = [];
+        const format3 = out.format3 || isLazy.some(Boolean);
         w.u16(imgs.length);
-        for (const img of imgs) {
+        imgs.forEach((img, i) => {
             const z = lz4Compress(img.px);
-            w.u16(img.width); w.u16(img.height); w.u32(z.length); w.bytes(z);
-        }
-        out.chunks.push({ tag: 'IMGS', data: w.done() });
+            w.u16(img.width); w.u16(img.height); w.u32(z.length);
+            if (format3) w.u8(isLazy[i] ? 1 : 0);
+            if (isLazy[i]) pixels.push({ tag: 'IMGC', data: z });
+            else w.bytes(z);
+        });
+        out.chunks.push({ tag: 'IMGS', data: w.done() }, ...pixels);
+        out.format3 = format3;
     }
 
     /* sounds: rendered now, each with noise seeded from its name */

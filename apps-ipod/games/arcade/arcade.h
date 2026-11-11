@@ -88,6 +88,9 @@ struct arcade_host
      * (name) or ended (NULL); arcade_units_now() then times it. */
     void (*watch)(void *ctx, const char *name, const char *value);
     void (*prof)(void *ctx, const char *name);
+    /* n bytes of the cart file from byte at, for the maps and images it
+     * reads as it plays: how many it read. NULL where it cannot. */
+    uint32_t (*cart_read)(void *ctx, uint32_t at, void *buf, uint32_t n);
 };
 
 /* store.*: a cart's own JSON files, each name.json, in an area of its own.

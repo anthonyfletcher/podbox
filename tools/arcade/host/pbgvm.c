@@ -98,6 +98,20 @@ static uint32_t mem_read(void *ctx, void *buf, uint32_t n)
     return n;
 }
 
+/* the cart's maps and images as it plays: from the file read whole */
+static const struct mem_in *cart_file;
+
+static uint32_t cart_read(void *ctx, uint32_t at, void *buf, uint32_t n)
+{
+    (void)ctx;
+    if (at > cart_file->len)
+        return 0;
+    if (n > cart_file->len - at)
+        n = cart_file->len - at;
+    memcpy(buf, cart_file->b + at, n);
+    return n;
+}
+
 static void print(void *ctx, const char *s, int len)
 {
     (void)ctx;
@@ -911,7 +925,8 @@ int main(int argc, char **argv)
                                 beat_flag ? &fake_beat : NULL, fake_setting,
                                 NULL, fake_control, &fake_tracks, dialog_frame,
                                 &fake_speak, &fake_store, font_glyph, watch,
-                                prof };
+                                prof, cart_read };
+    cart_file = &in;
     prof_units = units;
     fake_music_init(music_say);
     fake_music_tempo((int32_t)bpm);

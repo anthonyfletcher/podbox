@@ -51,13 +51,17 @@ function build(files, assets) {
 }
 
 test('unpack gives back every file as written, and pack the same cart', () => {
-    const cart = build(CODE, ASSETS);
+    /* the title lazy: its pixels in a chunk of their own */
+    const code = Object.assign({}, CODE, { 'cart.json': JSON.stringify(
+        { id: '00000000000a7b0c', name: 'Every File', lazy_images: ['title'] }, null, 2) + '\n' });
+    const cart = build(code, ASSETS);
     const files = unpackCart(cart, inflateRaw, deflate);
     assert.deepEqual(Object.keys(files).sort(), [
         'cart.json', 'data/story.txt', 'data/waves.json', 'enemy.js', 'flags.json',
         'fonts/tiny.bdf', 'images/hud.png', 'images/title.png', 'logo.png', 'main.js', 'maps/level1.json',
         'palettes/day.gpl', 'palettes/night.gpl', 'sheet.png', 'sounds/coin.json']);
-    for (const [name, want] of Object.entries(CODE)) assert.equal(text(files[name]), want, name);
+    for (const [name, want] of Object.entries(code)) assert.equal(text(files[name]), want, name);
+    assert.deepEqual(decodeIndexedPng(files['images/title.png'], inflate).px, picture(40, 30, 2));
     assert.equal(text(files['flags.json']), ASSETS.flags);
     assert.equal(text(files['maps/level1.json']), ASSETS.maps.level1);
     assert.equal(text(files['data/waves.json']), ASSETS.data.waves);

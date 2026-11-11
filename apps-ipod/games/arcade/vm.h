@@ -28,7 +28,8 @@ enum
 {
     T_NULL, T_INT, T_STR, T_ARR, T_I32, T_U8, T_OBJ, T_FN, T_BUF, T_FIX,
     T_IMG,
-    T_FXA       /* a FixArray: an Int32Array's storage, each element 16.16 */
+    T_FXA,      /* a FixArray: an Int32Array's storage, each element 16.16 */
+    T_LAZY      /* a cart image left in the file: its struct lazyimg */
 };
 
 struct value
@@ -281,6 +282,14 @@ struct voice
 #define FREE_CLASSES 64     /* exact lists for blocks of 16..504 bytes */
 #define YIELD_UNITS  2048
 
+/* A chunk left in the cart file, read when it is used: where its bytes
+ * start in the file, how many, and their checksum */
+struct lazy
+{
+    uint32_t at, len, crc;
+};
+#define LAZY_MAX 64                 /* lazy maps, and lazy images */
+
 struct vm
 {
     uint8_t *mem;
@@ -391,6 +400,10 @@ struct vm
     int32_t active_map;         /* -1 while the map is the empty default */
     uint16_t *img_globals;      /* pairs: a global's slot, an image's number */
     uint32_t nimg_globals;
+    struct lazy *mapc, *imgc;       /* LAZY_MAX each, made as first needed */
+    uint32_t nmapc, nimgc;
+    struct lazyimg *lazyimgs;
+    uint32_t nlazyimgs;
     const uint8_t *sfx;
     uint32_t sfx_len, nsfx;
     struct sfxinfo *sfxdir;
@@ -431,13 +444,25 @@ struct vm
     char msg[112];
 };
 
-/* A cart map: its cells, LZ4, and where each object's record starts */
+/* A cart map: its cells, LZ4 -- in the arena, or left in the cart file as
+ * lazy chunk mapc[lazy] -- and where each object's record starts */
 struct mapinfo
 {
     uint16_t w, h, nobj;
     uint32_t zlen;
     const uint8_t *z;
     const uint8_t **obj;
+    int32_t lazy;               /* -1 when z holds the cells */
+};
+
+
+/* A cart image left in the file: IMG.<name>'s global holds a T_LAZY of
+ * this until img.load() puts there a T_IMG of the copy it makes */
+struct lazyimg
+{
+    uint16_t w, h;
+    uint16_t chunk, slot;           /* its imgc, and the global naming it */
+    uint32_t copy;                  /* the loaded copy's offset, or 0 */
 };
 
 #define NONE 0xffffu
@@ -648,6 +673,8 @@ void gc_collect(struct vm *vm);
 /* loader.c */
 uint32_t perm_alloc(struct vm *vm, uint32_t bytes);
 int lz4_decode(const uint8_t *src, uint32_t n, uint8_t *dst, uint32_t size);
+int lazy_unpack(struct vm *vm, const struct lazy *c, uint8_t *dst,
+                uint32_t size);
 uint32_t key_id(struct vm *vm, struct value s, int add);
 uint32_t key_find(struct vm *vm, const char *b, uint32_t len);
 /* A record's field by its name, from C; null when o is not a record or has

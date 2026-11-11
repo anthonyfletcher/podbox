@@ -5,6 +5,7 @@ Pictures bigger than a sprite -- a title, a background, a strip of frames
 
 - [How images work](#how-images-work)
 - Making one: [img](#imgw-h), and [a cart's own images](#a-carts-own-images)
+- [Lazy images](#lazy-images): [img.load](#imgloadimgname), [img.drop](#imgdropimgname)
 - Drawing one: [blit](#bliti-x-y-flip), [blitpart](#blitparti-sx-sy-w-h-x-y-flip),
   [rblit](#rbliti-x-y-angle-scale)
 - Drawing into one: [target](reference-drawing.md#targett)
@@ -34,7 +35,8 @@ Like a sprite, an image's **colour 0 is see-through** when it is drawn
 everything -- its code, its data, the screen, the sheet, the map and its
 images. A full-screen image, 160x120, is 19 KB.
 
-- A cart's own images take their memory from the start. In a cart with
+- A cart's own images take their memory from the start, but for
+  [lazy images](#lazy-images). In a cart with
   little else, about 336 KB of them fit -- one picture of 575x575, or
   several smaller. A cart with more does not build: "the images take ...
   KB, and the player has room for at most about 336 KB of images". A cart
@@ -78,6 +80,63 @@ after its file: `images/title.png` is `IMG.title`.
   not in the cart's file.
 - An image can also be a sprite sheet of its own, for more than 256
   sprites: see [sheet](reference-sprites.md#sheeti).
+
+## Lazy images
+
+An image the cart needs only at times -- one course's sky of four, a
+title screen -- can stay in the cart file until it is wanted, taking no
+memory. Name it in `cart.json`:
+
+```json
+"lazy_images": ["sky_desert", "sky_snow"]
+```
+
+Until [`img.load`](#imgloadimgname) reads it, `IMG.sky_desert` is a lazy
+image: `imgw` and `imgh` give its size, and drawing it or drawing into it
+stops the cart with "not a lazy image not yet loaded with img.load()". A
+lazy image does not count towards the 336 KB of images a cart may hold.
+
+## img.load(IMG.name)
+
+Reads a lazy image from the cart file into memory; `IMG.name` is then
+that image, for every call.
+
+**Returns** the image. Loaded already, the same one again; an image that
+is not lazy, as it is.
+
+```js
+var sky = null;
+
+function startCourse(n) {
+    if (sky != null) img.drop(sky);
+    sky = img.load(n == 0 ? IMG.sky_desert : IMG.sky_snow);
+}
+
+function draw() {
+    blit(sky, 0, 0);
+}
+```
+
+- Keep what it returns, or use `IMG.name`: a copy of `IMG.name` taken
+  before the load, in an array say, is still the lazy image.
+
+- It takes the image's memory from the cart's variables, a byte a pixel,
+  as `img` does.
+- **Load between levels, not in play.** On the iPod Video the disk may be
+  resting, and waking it takes a second or two.
+- A 160x64 sky costs about 3,400 units: 0.3 a pixel, and one for each
+  byte the image takes in the cart file.
+
+## img.drop(IMG.name)
+
+Lets a lazy image's copy go: `IMG.name` is lazy again, until the next
+`img.load`.
+
+**Returns** nothing.
+
+- A copy kept in a variable of the cart's own stays, and is freed when
+  nothing refers to it any more.
+- It costs about 20 units.
 
 ## imgw(i), imgh(i)
 
