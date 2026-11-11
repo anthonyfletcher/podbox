@@ -191,6 +191,40 @@ function update() {
     assert.deepEqual(run2(32, 2000), ['0 0']);
 });
 
+test('a film one cell deep on a floor comes to rest, and a deep block still levels', () => {
+    /* 42 cells on a floor 118 wide cannot make a full layer: once each
+     * rests on stone with nowhere to fall it stays, so the field sleeps;
+     * a block three deep runs out to one layer of 90 first */
+    const film = (fill) => run(`const STONE = 5, WATER = 12;
+var R, field;
+function init() {
+    R = cells.rules();
+    R.move[STONE] = MOVE.STATIC; R.density[STONE] = 255;
+    R.move[WATER] = MOVE.LIQUID; R.density[WATER] = 100; R.spread[WATER] = 4;
+    field = img(120, 120);
+    target(field);
+    rectfill(0, 110, 119, 119, STONE);
+    rect(0, 0, 119, 119, STONE);
+    ${fill}
+    target(SCREEN);
+}
+function update() {
+    var m = cells.step(field, 0, R);
+    if (frame() == 400) {
+        target(field);
+        var low = 0, above = 0;
+        for (var x = 1; x < 119; x++) {
+            if (pget(x, 109) == WATER) low++;
+            for (var y = 1; y < 109; y++) if (pget(x, y) == WATER) above++;
+        }
+        target(SCREEN);
+        printh(m + " " + low + " " + above);
+    }
+}`, 400).out.trim();
+    assert.equal(film('rectfill(10, 100, 30, 101, WATER);'), '0 42 0');
+    assert.equal(film('rectfill(40, 107, 69, 109, WATER);'), '0 90 0');
+});
+
 /* Materials for the layers: 0 air, 5 stone, 12 water, 15 sand */
 const LAYERS = `
 function rules2() {

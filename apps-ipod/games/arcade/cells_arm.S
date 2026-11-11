@@ -550,6 +550,21 @@ cells_step_cell:
     subs    r11, r11, #1
     bne     5b
 6:
+    /* resting on what never moves, or the field's edge, it runs only to
+     * fall: r2 the row under it */
+    ldr     r0, [r4, #S_H]
+    cmp     r2, r0
+    bhs     .Lleave
+    mla     r3, r2, r7, r5
+    ldr     r0, [r4, #S_C]
+    ldrb    r0, [r0, r3]
+    cmp     r0, #0
+    beq     4f
+    add     r3, r0, r4
+    ldrb    r3, [r3, #S_KIND]
+    tst     r3, #K_MOVES
+    beq     .Lleave
+4:
     sub     r1, r1, r10
     cmp     r1, r5
     beq     8f

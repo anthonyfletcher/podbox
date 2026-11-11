@@ -463,7 +463,9 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
      * first place on the way they could fall (or rise) into. Blocked
      * along, they turn round; blocked both ways, they stay. So a splash
      * mounds up and runs out, a part-full top layer keeps moving between
-     * the walls, and a full layer has nowhere to go and sleeps. */
+     * the walls, and a full layer has nowhere to go and sleeps. Resting on
+     * what never moves, or the field's edge, a cell runs only to fall: a
+     * film on a floor has nothing to level and sleeps too. */
     int32_t i = y * w + x, d = way(s, i) ? 1 : -1;
     int32_t speed = r[R_SPREAD][m] ? r[R_SPREAD][m] : 2, to = 0;
     for (int32_t k = 1; k <= speed && lighter(s, x + d * k, y, m); k++) {
@@ -473,6 +475,9 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
             return;
         }
     }
+    int32_t under = at(s, x, y + dy);
+    if (under < 0 || (under && !(s->kind[under] & K_MOVES)))
+        return;
     if (to) {
         swap(s, x, y, x + d * to, y);
     } else if (lighter(s, x - d, y, m)) {
