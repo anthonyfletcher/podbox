@@ -595,6 +595,21 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
  * images, text and particles go where their middle moves to, upright and
  * their own size, but for rspr and rblit, which turn and grow too. */
 
+/* a times b, 64 bits from 32: one smull on the player, where -Os would
+ * otherwise share turn_fix's 64-bit multiplies with its far path, about
+ * 220 cycles a point on the rig against 45 */
+static inline __attribute__((always_inline)) int64_t mul32(int32_t a,
+                                                           int32_t b)
+{
+#ifdef ARCADE_ASM
+    uint32_t lo, hi;
+    __asm__("smull %0, %1, %2, %3" : "=&r"(lo), "=&r"(hi) : "r"(a), "r"(b));
+    return (int64_t)((uint64_t)hi << 32 | lo);
+#else
+    return (int64_t)a * b;
+#endif
+}
+
 /* x, y, 16.16, turned */
 static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
 {
@@ -604,10 +619,8 @@ static void turn_fix(const struct draw *d, int64_t *x, int64_t *y)
     if (sx == (int32_t)sx && sy == (int32_t)sy) {
         /* the same products as below, from 32-bit multiplies */
         int32_t x32 = (int32_t)sx, y32 = (int32_t)sy;
-        *x = ox + (((int64_t)x32 * d->cam_cos - (int64_t)y32 * d->cam_sin)
-                   >> 16);
-        *y = oy + (((int64_t)x32 * d->cam_sin + (int64_t)y32 * d->cam_cos)
-                   >> 16);
+        *x = ox + ((mul32(x32, d->cam_cos) - mul32(y32, d->cam_sin)) >> 16);
+        *y = oy + ((mul32(x32, d->cam_sin) + mul32(y32, d->cam_cos)) >> 16);
         return;
     }
     /* far beyond any target, kept where the multiply cannot overflow at
