@@ -15,7 +15,10 @@
  * "Drag:<selector>:fx0;fy0;fx1;fy1@t" drags across it, by fractions,
  * "RightClick:<selector>:fx;fy@t" right-clicks a point of it,
  * "Hover:<selector>:fx;fy[:alt]@t" moves the pointer over one, and
- * "Choose:<selector>:<value>@t" sets a choice. BROWSER names a
+ * "Choose:<selector>:<value>@t" sets a choice or an input's value, and
+ * "Text:<selector>@t" prints what one holds: its text, then its inputs'
+ * values ([placeholder] where empty, # before a disabled one). WINDOW
+ * sets the window's size, "1280,760" when unset. BROWSER names a
  * Chromium-family browser other than Edge; only its --screenshot and
  * --dump-dom are used, so a browser whose remote control is shut off by
  * policy still serves. */
@@ -42,6 +45,7 @@ if (cartDir && !pbg) {
         ['fonts', 'fonts/', '.bdf'], ['images', 'images/', '.png'], ['editors', 'editors/', '.html']])
         for (const [n, v] of Object.entries(a[k] || {})) folder[dir + n + ext] = v;
     if (a.flags) folder['flags.json'] = a.flags;
+    if (a.objects) folder['objects.json'] = a.objects;
     if (a.sheet) folder['sheet.png'] = a.sheet;
     if (a.logo) folder['logo.png'] = a.logo;
 }
@@ -123,13 +127,26 @@ const script = `<script>
             continue;
         }
         if (key.startsWith('Choose:')) {
-            /* Choose:<select selector>:<value> */
-            const [, sel, value] = key.split(':');
+            /* Choose:<select selector>:<value>, the value after the last colon */
+            const sel = key.slice(7, key.lastIndexOf(':')), value = key.slice(key.lastIndexOf(':') + 1);
             setTimeout(() => there(sel, (el) => {
                 el.value = value;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }), +at);
+            continue;
+        }
+        if (key.startsWith('Text:')) {
+            /* what the selector finds, its text and its inputs' values and
+             * placeholders, into the console */
+            setTimeout(() => {
+                const el = document.querySelector(key.slice(5));
+                const d = document.createElement('div');
+                d.textContent = !el ? 'none' : el.textContent.replace(/\\s+/g, ' ') + ' | ' +
+                    [...el.querySelectorAll('input')].map((i) =>
+                        (i.disabled ? '#' : '') + (i.value || '[' + i.placeholder + ']')).join(' ');
+                document.getElementById('console').append(d);
+            }, +at);
             continue;
         }
         if (key === 'Dump') {
@@ -212,7 +229,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arcade-try-'));
 const file = path.join(tmp, 'try.html');
 fs.writeFileSync(file, page);
 const common = ['--headless=new', '--disable-gpu', '--user-data-dir=' + path.join(tmp, 'profile'),
-                '--window-size=1280,760', '--virtual-time-budget=' + (+ms + 1500),
+                '--window-size=' + (process.env.WINDOW || '1280,760'), '--virtual-time-budget=' + (+ms + 1500),
                 ...(process.env.LIGHT ? ['--blink-settings=preferredColorScheme=1'] : [])];
 execFileSync(EDGE, [...common, '--screenshot=' + path.resolve(out), 'file:///' + file.replace(/\\/g, '/')],
              { stdio: 'ignore' });
