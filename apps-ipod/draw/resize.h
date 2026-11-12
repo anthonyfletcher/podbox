@@ -55,6 +55,7 @@ struct uint32_argb {
    horizontal scaler, and row output
 */
 struct scaler_context {
+    const struct custom_format *format;
     uint32_t h_i_val;
     uint32_t h_o_val;
     uint32_t v_i_val;
@@ -76,16 +77,19 @@ struct custom_format {
     void (*output_row_8)(uint32_t,void*, struct scaler_context*);
     void (*output_row_32[2])(uint32_t,void*, struct scaler_context*);
     unsigned int (*get_size)(struct bitmap *bm);
+    bool (*progress)(int done, int rows);
 };
 
 struct rowset;
 
 extern const struct custom_format format_native;
 
-/* Called by every image reader after each row it writes, with the rows
- * written so far and the bitmap's height; false stops the decode, which then
- * fails. NULL, as it is unless a caller sets it, lets every decode finish. */
-extern bool (*image_row_hook)(int done, int rows);
+/* A decode owns its progress callback. No callback is shared between jobs. */
+static inline bool image_progress(const struct custom_format *format,
+                                  int done, int rows)
+{
+    return !format || !format->progress || format->progress(done, rows);
+}
 
 int recalc_dimension(struct dim *dst, struct dim *src);
 
@@ -107,7 +111,7 @@ int resize_on_load(struct bitmap *bm, bool dither,
  * the bitmap for a source of `src` as `format` asks and returns its size in
  * bytes. image_store_rows() writes every row from store_part(args): through
  * the scaler, in `buf`, when the sizes differ, else straight out. False if a
- * row fails or image_row_hook stops it. */
+ * row fails or the request callback stops it. */
 int image_fit_bitmap(struct bitmap *bm, struct dim *src, int format,
                      const struct custom_format *cformat);
 bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,

@@ -4,7 +4,7 @@ import os
 import shlex
 import subprocess
 import sys
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(os.environ.get("ART_TEST_ROOT", Path(__file__).resolve().parents[3])).resolve()
 OUT = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "build-art-tests").resolve()
 OUT.mkdir(parents=True, exist_ok=True)
 def run(args, name, check=True):

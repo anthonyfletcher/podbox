@@ -25,7 +25,7 @@
 #include "logf.h"
 #include "string-extra.h"    /* strmemccpy */
 #include "draw/bmp.h"        /* struct bitmap, FORMAT_* */
-#include "draw/resize.h"     /* format_native, image_row_hook */
+#include "draw/resize.h"     /* format_native */
 #include "draw/image_load.h"
 #include "../image_viewer.h"
 
@@ -101,11 +101,12 @@ static int decode(unsigned char *out, int size, int w, int h, int *used)
     }
 
     iv_decode_begin();
-    image_row_hook = iv_decode_row;
+    struct custom_format decode_format = format_native;
+    decode_format.progress = iv_decode_row;
     cpu_boost(true);
-    ret = image_load(&src, &bm, size, format, &format_native);
+    ret = image_load(&src, &bm, size, format, &decode_format);
     cpu_boost(false);
-    image_row_hook = NULL;
+
     close(src.fd);
 
     if (iv_decode_stop)

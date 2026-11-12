@@ -27,6 +27,7 @@
 #define LZW_MAX 4096
 
 struct gif {
+    const struct custom_format *format;
     bs_stream *in;
     int skip;                   /* bytes before the signature, after a reset */
     int w, h;
@@ -307,7 +308,7 @@ static bool load_band(struct gif *g, int y0)
             if (!mine)
                 continue;
             done++;
-            if (image_row_hook && !image_row_hook(y0 + done, g->h))
+            if (!image_progress(g->format, y0 + done, g->h))
                 return false;
         }
     return true;
@@ -324,6 +325,7 @@ int read_gif_stream(bs_stream *in, int skip, bs_arena *a, struct bitmap *bm,
 
     if (!g)
         return -1;
+    g->format = cformat;
     g->in = in;
     g->skip = skip;
     if (!read_header(g))

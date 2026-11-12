@@ -179,6 +179,132 @@ static enum image_kind sniff(const uint8_t *b, int tries, int *at)
     return IMAGE_UNKNOWN;
 }
 
+/* APP1 is parsed as a bounded TIFF directory, without keeping the segment. */
+static uint16_t exif_u16(const uint8_t *p, bool le)
+{
+    return le ? p[0] | p[1] << 8 : p[0] << 8 | p[1];
+}
+
+static uint32_t exif_u32(const uint8_t *p, bool le)
+{
+    return le ? (uint32_t)p[0] | (uint32_t)p[1] << 8 |
+                (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24
+              : (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 |
+                (uint32_t)p[2] << 8 | p[3];
+}
+
+static int jpeg_orientation(bs_stream *s, int skip)
+{
+    uint8_t b[14];
+    if (bs_skip(s, skip) != BS_OK || bs_read(s, b, 2) != BS_OK ||
+        b[0] != 0xff || b[1] != 0xd8)
+        return 1;
+    for (int marker = 0; marker < 256; marker++)
+    {
+        if (bs_read(s, b, 2) != BS_OK || b[0] != 0xff)
+            return 1;
+        while (b[1] == 0xff)
+            if (bs_read(s, b + 1, 1) != BS_OK)
+                return 1;
+        int kind = b[1];
+        if (kind == 0xda || kind == 0xd9)
+            return 1;
+        if (kind == 1 || (kind >= 0xd0 && kind <= 0xd7))
+            continue;
+        if (bs_read(s, b, 2) != BS_OK)
+            return 1;
+        unsigned left = (b[0] << 8) | b[1];
+        if (left < 2)
+            return 1;
+        left -= 2;
+        if (kind == 0xe1 && left >= sizeof(b))
+        {
+            if (bs_read(s, b, sizeof(b)) != BS_OK)
+                return 1;
+            left -= sizeof(b);
+            bool le = b[6] == 'I' && b[7] == 'I';
+            if (!memcmp(b, "Exif\0\0", 6) &&
+                (le || (b[6] == 'M' && b[7] == 'M')) &&
+                exif_u16(b + 8, le) == 42)
+            {
+                uint32_t offset = exif_u32(b + 10, le);
+                if (offset < 8 || offset - 8 > left ||
+                    left - (offset - 8) < 2 ||
+                    bs_skip(s, offset - 8) != BS_OK ||
+                    bs_read(s, b, 2) != BS_OK)
+                    return 1;
+                left -= offset - 8 + 2;
+                unsigned count = exif_u16(b, le);
+                for (unsigned i = 0; i < count && left >= 12; i++)
+                {
+                    if (bs_read(s, b, 12) != BS_OK)
+                        return 1;
+                    left -= 12;
+                    if (exif_u16(b, le) == 0x112 &&
+                        exif_u16(b + 2, le) == 3 &&
+                        exif_u32(b + 4, le) == 1)
+                    {
+                        int value = exif_u16(b + 8, le);
+                        return value >= 1 && value <= 8 ? value : 1;
+                    }
+                }
+            }
+        }
+        if (bs_skip(s, left) != BS_OK)
+            return 1;
+    }
+    return 1;
+}
+
+/* Permute the scaled pixels in place. One bit per pixel marks each cycle. */
+static bool image_orient(struct bitmap *bm, int maxsize, int orientation,
+                         const struct custom_format *format)
+{
+    int w = bm->width, h = bm->height;
+    size_t count = (size_t)w * h, bytes = count * sizeof(fb_data);
+    size_t marks = (count + 7) / 8;
+    if (w < 1 || h < 1 || bytes + marks > (size_t)maxsize)
+        return false;
+    uint8_t *seen = bm->data + bytes;
+    fb_data *pixels = (fb_data *)bm->data;
+    memset(seen, 0, marks);
+    for (size_t start = 0; start < count; start++)
+    {
+        if (seen[start / 8] & (1u << (start % 8)))
+            continue;
+        if (!image_progress(format, start / w, h))
+            return false;
+        size_t at = start;
+        fb_data held = pixels[at];
+        do
+        {
+            int x = at % w, y = at / w, nx = x, ny = y;
+            switch (orientation)
+            {
+            case 2: nx = w - 1 - x; break;
+            case 3: nx = w - 1 - x; ny = h - 1 - y; break;
+            case 4: ny = h - 1 - y; break;
+            case 5: nx = y; ny = x; break;
+            case 6: nx = h - 1 - y; ny = x; break;
+            case 7: nx = h - 1 - y; ny = w - 1 - x; break;
+            case 8: nx = y; ny = w - 1 - x; break;
+            }
+            size_t next = (size_t)ny * (orientation >= 5 ? h : w) + nx;
+            fb_data displaced = pixels[next];
+            pixels[next] = held;
+            held = displaced;
+            seen[at / 8] |= 1u << (at % 8);
+            at = next;
+        } while (at != start);
+    }
+    if (orientation >= 5)
+    {
+        bm->width = h;
+        bm->height = w;
+    }
+    return true;
+}
+
 int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
                int format, const struct custom_format *cformat)
 {
@@ -199,6 +325,15 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
         s = image_stream(&a, src);
         if (s && bs_read(s, head, 11 + tries) == BS_OK)
             kind = sniff(head, tries, &at);
+    }
+
+    int orientation = 1;
+    if (kind == IMAGE_JPEG && maxsize >= (int)(PNG_DECODE_OVERHEAD + 8))
+    {
+        a.used = 0;
+        s = image_stream(&a, src);
+        if (s)
+            orientation = jpeg_orientation(s, at);
     }
 
     switch (kind)
@@ -227,7 +362,29 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
     default:
         /* and anything unrecognised: JPEG is the default */
         lseek(src->fd, src->pos, SEEK_SET);
-        return clip_jpeg_fd(src->fd, src->flags, src->len < 0 ? 0 : src->len,
-                            bm, maxsize, format, cformat);
+        if (orientation >= 5)
+        {
+            int w = bm->width;
+            bm->width = bm->height;
+            bm->height = w;
+        }
+        int rc = clip_jpeg_fd(src->fd, src->flags,
+                             src->len < 0 ? 0 : src->len,
+                             bm, maxsize, format, cformat);
+        if (rc > 0 && orientation != 1)
+        {
+            if (format & FORMAT_RETURN_SIZE)
+            {
+                if (orientation >= 5)
+                {
+                    int w = bm->width;
+                    bm->width = bm->height;
+                    bm->height = w;
+                }
+            }
+            else if (!image_orient(bm, maxsize, orientation, cformat))
+                return -1;
+        }
+        return rc;
     }
 }

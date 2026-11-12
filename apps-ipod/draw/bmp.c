@@ -636,7 +636,7 @@ int read_bmp_fd(int fd,
     int row, done = 0;
     /* loop to read rows and put them to buffer */
     for (row = rset.rowstart; row != rset.rowstop; row += rset.rowstep) {
-        if (image_row_hook && !image_row_hook(done++, bm->height))
+        if (!image_progress(cformat, done++, bm->height))
             return -9;
         if (bm->width > BM_MAX_WIDTH)
         {
