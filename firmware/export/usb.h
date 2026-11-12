@@ -24,6 +24,13 @@
 #include "kernel.h"
 #include "button.h"
 
+#ifdef HAVE_USB_PODLINK
+/* Open only with the cable absent. Close is asynchronous and idempotent. */
+bool usb_podlink_open(void);
+void usb_podlink_close(void);
+bool usb_podlink_active(void);
+#endif
+
 /** USB introduction
  * Targets which do not have any hardware support for USB, and cannot even detect
  * it must define USB_NONE. Otherwise, they must at least implement USB
@@ -118,6 +125,7 @@ enum
     USB_NOTIFY_SET_ADDR,     /* Event */
     USB_NOTIFY_SET_CONFIG,   /* Event */
     USB_NOTIFY_BUS_RESET,    /* Event */
+    USB_PODLINK_CLOSE,       /* Restore normal descriptors in USB thread */
     USB_NOTIFY_CLASS_DRIVER, /* Event - notify_event() of specified class driver */
     USB_HOST_PROBE,          /* Event - data: port to the host probe or back */
 #ifdef HAVE_USB_HOST_AUDIO

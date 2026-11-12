@@ -28,6 +28,7 @@
 #include "usb.h"
 #include "usb_ch9.h"
 #include "usb_core.h"
+#include "usb_profile.h"
 #include "usb_class_driver.h"
 #include "usb_log.h"
 
@@ -94,7 +95,13 @@
  * a phone. */
 static int offered_configs(void)
 {
-    return usb_drive_only() ? 1 : NUM_CONFIGS;
+    return usb_profile_config_count(NUM_CONFIGS, usb_drive_only(),
+#ifdef HAVE_USB_PODLINK
+                                    usb_podlink_active()
+#else
+                                    false
+#endif
+                                   );
 }
 
 /*-------------------------------------------------------------------------*/
@@ -671,7 +678,7 @@ static void usb_core_set_serial_function_id(void)
         if(drivers[i]->enabled)
             id |= 1 << i;
 
-    usb_string_iSerial.wString[0] = hex[id];
+    usb_string_iSerial.wString[0] = usb_profile_serial_prefix(id);
 }
 
 /* synchronize endpoint initialization state to allocation state */

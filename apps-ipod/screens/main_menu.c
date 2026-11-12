@@ -35,6 +35,9 @@
 #include "widgets/splash.h"
 #include "screens/system/debug_menu.h"
 #include "screens/system/bg_task_info.h"
+#ifdef HAVE_USB_PODLINK
+#include "screens/system/podlink_screen.h"
+#endif
 #include "screens/system/about.h"
 #include "version.h"
 #include "time.h"
@@ -454,9 +457,17 @@ MENUITEM_FUNCTION(bg_task_info, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_BG_TASK_INFO),
                   bg_task_info_item, NULL, Icon_NOICON);
 
+#ifdef HAVE_USB_PODLINK
+MENUITEM_FUNCTION(podlink_item, 0, "PodLink", podlink_screen, NULL,
+                  Icon_NOICON);
+#endif
+
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_about_item, &show_info_item, &show_credits_item,
           &bg_task_info, &show_license_item,
+#ifdef HAVE_USB_PODLINK
+          &podlink_item,
+#endif
           &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),

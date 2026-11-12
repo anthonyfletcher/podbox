@@ -797,6 +797,9 @@ static uint64_t widen_us(uint32_t us)
 
 void usb_log_file_write(void)
 {
+#ifdef HAVE_USB_PODLINK
+    if (usb_podlink_active()) return;
+#endif
     unsigned long seq, head;
     struct usb_log_entry e;
     char line[112];

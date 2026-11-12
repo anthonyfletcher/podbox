@@ -1,0 +1,3 @@
+#define HAVE_USB_PODLINK
+#define USB_ENABLE_SERIAL
+#define USB_DEVBSS_ATTR

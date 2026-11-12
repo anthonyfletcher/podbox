@@ -32,6 +32,9 @@ static volatile bool attached;
 
 void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
 {
+#ifdef HAVE_USB_PODLINK
+    if (usb_podlink_active()) return;
+#endif
     int oldlevel = disable_interrupt_save(IRQ_FIQ_STATUS);
     struct usb_log_entry *e = &ring[head % USB_LOG_SIZE];
     e->us = (uint32_t)USEC_TIMER;
@@ -46,6 +49,9 @@ void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
 
 void usb_log_sync(void)
 {
+#ifdef HAVE_USB_PODLINK
+    if (usb_podlink_active()) return;
+#endif
     unsigned long target = head;
     uint32_t start = USEC_TIMER;
     bool timed_out = false;

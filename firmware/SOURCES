@@ -2222,3 +2222,8 @@ kernel/hang_catch.c
 #ifdef INCLUDE_TIMEOUT_API
 kernel/timeout.c
 #endif
+
+#ifdef HAVE_USB_PODLINK
+usbstack/podlink_wire.c
+usbstack/podlink.c
+#endif
