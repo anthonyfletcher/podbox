@@ -27690,3 +27690,59 @@
     *: "Play it now, or start a new queue?"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE
+  desc: a Now Playing button action: moves a theme option to its next choice
+  user: core
+  <source>
+    *: "Theme Toggle"
+  </source>
+  <dest>
+    *: "Theme Toggle"
+  </dest>
+  <voice>
+    *: "Theme Toggle"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_NAMED
+  desc: Theme Toggle's row in the button pickers; %s is the theme option's name
+  user: core
+  <source>
+    *: "Toggle %s"
+  </source>
+  <dest>
+    *: "Toggle %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_ASSIGN
+  desc: Theme Options context menu: makes this option the one Theme Toggle changes
+  user: core
+  <source>
+    *: "Assign to Button"
+  </source>
+  <dest>
+    *: "Assign to Button"
+  </dest>
+  <voice>
+    *: "Assign to Button"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_UNASSIGN
+  desc: Theme Options context menu: stops Theme Toggle changing this option
+  user: core
+  <source>
+    *: "Unassign Button"
+  </source>
+  <dest>
+    *: "Unassign Button"
+  </dest>
+  <voice>
+    *: "Unassign Button"
+  </voice>
+</phrase>

@@ -19,6 +19,7 @@
 #include "audiohw.h" /* for the AUDIOHW_* defines */
 #include "skin/statusbar.h" /* for the statusbar values */
 #include "screens/playback/quick_screen.h"
+#include "skin/theme_options.h" /* THEME_OPTION_KEY_MAX */
 #include "button.h"
 #include "audio.h"
 #include "dsp_proc_settings.h"
@@ -1058,6 +1059,9 @@ struct user_settings
     bool keyclick_hardware; /* hardware piezo keyclick */
 
     char start_directory[MAX_PATHNAME+1];
+    /* The theme option Theme Toggle changes, as "key:path" of its
+       .preferences file; empty for none */
+    char theme_toggle[THEME_OPTION_KEY_MAX + 1 + MAX_PATHNAME + 1];
     /* Has the root been customized from the .cfg file? false = no, true = loaded from cfg */
     bool root_menu_customized;
     bool shortcuts_replaces_qs;

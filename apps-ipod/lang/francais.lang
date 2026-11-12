@@ -27421,3 +27421,59 @@
     *: "Écran précédent"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE
+  desc: a Now Playing button action: moves a theme option to its next choice
+  user: core
+  <source>
+    *: "Theme Toggle"
+  </source>
+  <dest>
+    *: "Bascule de thème"
+  </dest>
+  <voice>
+    *: "Bascule de thème"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_NAMED
+  desc: Theme Toggle's row in the button pickers; %s is the theme option's name
+  user: core
+  <source>
+    *: "Toggle %s"
+  </source>
+  <dest>
+    *: "Basculer %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_ASSIGN
+  desc: Theme Options context menu: makes this option the one Theme Toggle changes
+  user: core
+  <source>
+    *: "Assign to Button"
+  </source>
+  <dest>
+    *: "Assigner à un bouton"
+  </dest>
+  <voice>
+    *: "Assigner à un bouton"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_UNASSIGN
+  desc: Theme Options context menu: stops Theme Toggle changing this option
+  user: core
+  <source>
+    *: "Unassign Button"
+  </source>
+  <dest>
+    *: "Retirer du bouton"
+  </dest>
+  <voice>
+    *: "Retirer du bouton"
+  </voice>
+</phrase>

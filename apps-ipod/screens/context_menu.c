@@ -2808,6 +2808,12 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
+    { .action = HOTKEY_THEME_TOGGLE,
+      .lang_id = LANG_THEME_TOGGLE,
+      .func = HOTKEY_FUNC(theme_toggle_press, NULL),
+      .return_code = ONPLAY_OK,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
       .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),
@@ -2850,12 +2856,17 @@ static int execute_hotkey(int action)
     return return_code;      /* or return the associated value */
 }
 
+/* Theme Toggle's row, named for its option while it has one */
+static const char *toggle_label;
+
 static const char *hotkey_get_name(int selected_item, void *data,
                                    char *buffer, size_t buffer_len)
 {
     (void)buffer; (void)buffer_len;
     const struct hotkey_assignment **hk_menu =
                 (const struct hotkey_assignment**)data;
+    if (hk_menu[selected_item]->action == HOTKEY_THEME_TOGGLE && toggle_label)
+        return toggle_label;
     return ID2P(hk_menu[selected_item]->lang_id);
 }
 
@@ -2890,10 +2901,17 @@ static int hotkey_list(intptr_t flag, bool execute, int current_action,
     struct simplelist_info info;
     int selected = 0;
     int count = 0;
+
+    toggle_label = flag & HOTKEY_FLAG_WPS ? theme_toggle_label() : NULL;
     for (size_t i = 0; i < ARRAYLEN(hotkey_items); i++)
     {
         hk_menu[i] = NULL; /*clear all the hk_menu entries prior to setting them */
         if (hotkey_items[i].action == HOTKEY_OFF && !offer_off)
+            continue;
+        /* Offered only with an option to change, or to show a button that
+         * still has it */
+        if (hotkey_items[i].action == HOTKEY_THEME_TOGGLE && !toggle_label
+            && current_action != HOTKEY_THEME_TOGGLE)
             continue;
         if ((hotkey_items[i].flags & flag) == flag)
         {

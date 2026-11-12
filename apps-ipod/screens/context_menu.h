@@ -74,6 +74,7 @@ enum hotkey_action {
     HOTKEY_MAIN_MENU,
     HOTKEY_STOP,
     HOTKEY_ADD_TO_PLAYLIST,
+    HOTKEY_THEME_TOGGLE,
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
        time into the saved hotkey integers, so renumbering one repoints every
        hotkey the user has already configured. */

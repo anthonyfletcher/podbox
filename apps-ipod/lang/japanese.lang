@@ -27401,3 +27401,59 @@
     *: "直前の画面"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE
+  desc: a Now Playing button action: moves a theme option to its next choice
+  user: core
+  <source>
+    *: "Theme Toggle"
+  </source>
+  <dest>
+    *: "テーマ切り替え"
+  </dest>
+  <voice>
+    *: "テーマ切り替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_NAMED
+  desc: Theme Toggle's row in the button pickers; %s is the theme option's name
+  user: core
+  <source>
+    *: "Toggle %s"
+  </source>
+  <dest>
+    *: "%sを切り替え"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_ASSIGN
+  desc: Theme Options context menu: makes this option the one Theme Toggle changes
+  user: core
+  <source>
+    *: "Assign to Button"
+  </source>
+  <dest>
+    *: "ボタンに割り当て"
+  </dest>
+  <voice>
+    *: "ボタンに割り当て"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_UNASSIGN
+  desc: Theme Options context menu: stops Theme Toggle changing this option
+  user: core
+  <source>
+    *: "Unassign Button"
+  </source>
+  <dest>
+    *: "ボタンの割り当てを解除"
+  </dest>
+  <voice>
+    *: "ボタンの割り当てを解除"
+  </voice>
+</phrase>

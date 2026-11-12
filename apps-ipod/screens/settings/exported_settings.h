@@ -70,6 +70,12 @@ int main_menu_config(void); /* in main_menu_config.c */
  * opening, while the theme has no options or one that reloads the theme.
  * Returns MENU_ATTACHED_USB to leave for the root. In theme_options_menu.c */
 int theme_options_from_wps(void);
+/* Theme Toggle: "Toggle <option>" while the option assigned in Theme Options
+ * is the loaded theme's and changes without a reload, otherwise NULL; and the
+ * press, which moves it to its next choice or says Unavailable. Both read the
+ * theme's files. In theme_options_menu.c */
+const char *theme_toggle_label(void);
+int theme_toggle_press(void);
 /* The main menu's own long press on 'item': whether it can be hidden (all
  * but Settings, the way back to this), hiding it, and the editor opened
  * carrying it for Move. The last returns as main_menu_config() does. */

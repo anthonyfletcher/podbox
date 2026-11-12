@@ -676,6 +676,11 @@ off until they do, so a theme built around switching layouts should say so.
 That menu leaves the row out for a theme that needs a reload, so keep within
 the three limits above if you want it there.
 
+The owner can also put one `choice` option on a Now Playing button: **Assign
+to Button** in its context menu, then **Theme Toggle** as the button's action.
+Each press moves it to the next choice, wrapping after the last, so a
+two-choice option becomes a switch. The same three limits apply.
+
 ### Ship `.preferences`, or not
 
 - **Ship both** if the theme should also work on firmware without this menu.

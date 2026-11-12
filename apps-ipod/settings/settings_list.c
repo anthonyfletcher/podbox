@@ -1960,6 +1960,7 @@ const struct settings_list settings[] = {
                    &wps_long_press_play_default, "wps long press play action",
                    wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
                    wps_context_menu_is_changed, wps_context_menu_set_default),
+    TEXT_SETTING(0, theme_toggle, "theme toggle", "", NULL, NULL),
     CHOICE_SETTING(0, go_to_album_via, LANG_GO_TO_ALBUM_VIA, ALBUM_VIA_DIRECT,
                    "go to album via", "direct,album,album artist,artist,genre",
                    NULL, 5, ID2P(LANG_DIRECT), ID2P(LANG_ID3_ALBUM),

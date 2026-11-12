@@ -9,6 +9,10 @@
  * read it at their next draw. Only a file some %ft reads at load alone (see
  * theme_options_live()) has the theme reload once, on leaving, and Now
  * Playing's menu and buttons do not offer it while the theme has such a file.
+ *
+ * Theme Toggle, at the end, is the button action that moves one option on
+ * to its next choice. The owner picks the option from its context menu here;
+ * the buttons offer the action only while that option's theme is loaded.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -200,6 +204,80 @@ static void reset_all(void)
     written();
 }
 
+static bool toggle_split(char *key, const char **path);
+
+/* Whether option n is the one Theme Toggle changes */
+static bool is_toggle(int n)
+{
+    char key[THEME_OPTION_KEY_MAX + 1];
+    const char *path;
+
+    return toggle_split(key, &path) && !strcmp(key, f.opts[n].key)
+           && !strcmp(path, f.prefs);
+}
+
+static void set_toggle(int n, bool on)
+{
+    if (on)
+        snprintf(global_settings.theme_toggle,
+                 sizeof global_settings.theme_toggle, "%s:%s",
+                 f.opts[n].key, f.prefs);
+    else
+        global_settings.theme_toggle[0] = '\0';
+    settings_save();
+}
+
+/* The option's context menu: Explain if it has help, Reset, and for a
+ * choice the buttons can reach, assigning it to Theme Toggle */
+static bool option_menu(int sel)
+{
+    enum { ROW_EXPLAIN, ROW_RESET, ROW_ASSIGN, ROW_UNASSIGN };
+    static const struct menu_callback_with_desc desc =
+        { NULL, ID2P(LANG_ONPLAY_MENU_TITLE), Icon_NOICON };
+    const struct theme_option *o = &f.opts[sel];
+    const char *rows[3];
+    int what[3], n = 0, pick;
+
+    if (o->help[0])
+    {
+        what[n] = ROW_EXPLAIN;
+        rows[n++] = ID2P(LANG_EXPLAIN);
+    }
+    what[n] = ROW_RESET;
+    rows[n++] = ID2P(LANG_RESET_SETTING);
+    if (o->type == THEME_OPTION_CHOICE && theme_options_live_only(f.prefs))
+    {
+        bool on = is_toggle(sel);
+
+        what[n] = on ? ROW_UNASSIGN : ROW_ASSIGN;
+        rows[n++] = on ? ID2P(LANG_THEME_TOGGLE_UNASSIGN)
+                       : ID2P(LANG_THEME_TOGGLE_ASSIGN);
+    }
+
+    const struct menu_item_ex menu =
+        { MT_RETURN_ID | MENU_HAS_DESC | MENU_ITEM_COUNT(n),
+          { .strings = rows }, { .callback_and_desc = &desc } };
+
+    pick = do_menu(&menu, NULL, NULL, false);
+    if (pick == MENU_ATTACHED_USB)
+        return true;
+    if (pick < 0 || pick >= n)
+        return false;
+    switch (what[pick])
+    {
+        case ROW_EXPLAIN:
+            return show_help(o->name, o->help);
+        case ROW_RESET:
+            set_value(sel, o->def);
+            break;
+        case ROW_ASSIGN:
+        case ROW_UNASSIGN:
+            set_toggle(sel, what[pick] == ROW_ASSIGN);
+            break;
+    }
+    return false;
+}
+
 static int option_action(int action, struct gui_synclist *lists)
 {
     int sel = gui_synclist_get_sel_pos(lists);
@@ -220,22 +298,7 @@ static int option_action(int action, struct gui_synclist *lists)
             type_text(sel);
     }
     else if (action == ACTION_STD_CONTEXT && sel < f.count)
-    {
-        MENUITEM_STRINGLIST(help_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
-                            ID2P(LANG_EXPLAIN), ID2P(LANG_RESET_SETTING));
-        MENUITEM_STRINGLIST(plain_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
-                            ID2P(LANG_RESET_SETTING));
-        const struct theme_option *o = &f.opts[sel];
-        bool help = o->help[0] != '\0';
-        int pick = do_menu(help ? &help_menu : &plain_menu, NULL, NULL, false);
-
-        if (help && pick == 0)
-            to_root = show_help(o->name, o->help);
-        else if (pick == (help ? 1 : 0))
-            set_value(sel, o->def);
-        else if (pick == MENU_ATTACHED_USB)
-            to_root = true;
-    }
+        to_root = option_menu(sel);
     else
         return action;
 
@@ -416,3 +479,98 @@ int theme_options_from_wps(void)
 MENUITEM_FUNCTION(theme_options_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_THEME_OPTIONS), theme_options_menu,
                   theme_options_callback, Icon_NOICON);
+
+/* --- Theme Toggle -------------------------------------------------------- */
+
+/* The assignment's key, copied out, and path */
+static bool toggle_split(char *key, const char **path)
+{
+    const char *s = global_settings.theme_toggle;
+    const char *colon = strchr(s, ':');
+
+    if (!colon || colon == s || colon - s > THEME_OPTION_KEY_MAX)
+        return false;
+    memcpy(key, s, colon - s);
+    key[colon - s] = '\0';
+    *path = colon + 1;
+    return true;
+}
+
+struct toggle
+{
+    char key[THEME_OPTION_KEY_MAX + 1];
+    const char *prefs;
+    char value[THEME_OPTION_TEXT_MAX + 1];  /* the current value, in */
+    char name[THEME_OPTION_NAME_MAX + 1];   /* ...and these out */
+    char next[THEME_OPTION_VALUE_MAX + 1];
+    bool found;
+};
+
+/* A value that is not a choice moves on from the default */
+static void toggle_find(const struct theme_option *opt, void *data)
+{
+    struct toggle *t = data;
+    int at = -1;
+
+    if (t->found || opt->type != THEME_OPTION_CHOICE
+        || strcmp(opt->key, t->key))
+        return;
+    for (int i = 0; i < opt->count; i++)
+        if (!strcmp(opt->choices[i].value, t->value))
+            at = i;
+    for (int i = 0; at < 0 && i < opt->count; i++)
+        if (!strcmp(opt->choices[i].value, opt->def))
+            at = i;
+    strcpy(t->name, opt->name);
+    strcpy(t->next, opt->choices[(at + 1) % opt->count].value);
+    t->found = true;
+}
+
+/* The assigned option, if the loaded theme has it and it changes without a
+ * reload. Reads its files. */
+static bool toggle_lookup(struct toggle *t)
+{
+    char opts_path[MAX_PATH];
+    const char *path;
+
+    t->found = false;
+    t->prefs = NULL;
+    if (!toggle_split(t->key, &path))
+        return false;
+    for (int i = 0; i < theme_options_count(); i++)
+        if (!strcmp(theme_options_path(i), path))
+            t->prefs = theme_options_path(i);
+    if (!t->prefs || !theme_options_live_only(t->prefs)
+        || !theme_options_options_path(t->prefs, opts_path, sizeof opts_path))
+        return false;
+    if (!theme_options_read(t->prefs, t->key, t->value, sizeof t->value))
+        t->value[0] = '\0';
+    theme_options_parse(opts_path, NULL, toggle_find, t);
+    return t->found;
+}
+
+const char *theme_toggle_label(void)
+{
+    static char label[THEME_OPTION_NAME_MAX + 32];
+    struct toggle t;
+
+    if (!toggle_lookup(&t))
+        return NULL;
+    snprintf(label, sizeof label, str(LANG_THEME_TOGGLE_NAMED), t.name);
+    return label;
+}
+
+int theme_toggle_press(void)
+{
+    struct toggle t;
+    const char *key = t.key, *value = t.next;
+
+    if (!toggle_lookup(&t))
+        splash(HZ, ID2P(LANG_UNAVAILABLE));
+    else if (!theme_options_write(t.prefs, &key, &value, 1))
+        splash(HZ, ID2P(LANG_FAILED));
+    /* A %ft line redraws only on a full update, which also clears a splash */
+    for (int i = 0; i < SKINNABLE_SCREENS_COUNT; i++)
+        skin_request_full_update(i);
+    return 0;
+}

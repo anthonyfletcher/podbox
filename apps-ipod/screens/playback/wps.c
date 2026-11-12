@@ -61,6 +61,7 @@
 #include "system/volume.h"
 #include "sound.h"
 #include "screens/context_menu.h"
+#include "screens/settings/exported_settings.h"  /* theme_toggle_press */
 #include "audio/ab_repeat.h"
 #include "audio/playback.h"
 #include "widgets/splash.h"
@@ -861,6 +862,13 @@ long gui_wps_show(void)
                 }
                 if (act == HOTKEY_OFF)
                     break;
+                /* Changes the theme in place, so the screen stays */
+                if (act == HOTKEY_THEME_TOGGLE)
+                {
+                    theme_toggle_press();
+                    update = true;
+                    break;
+                }
                 /* A NOSBS action's screen owns the display and turns the
                  * theme off itself, so leave without re-enabling it */
                 theme_enabled = !(get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS);

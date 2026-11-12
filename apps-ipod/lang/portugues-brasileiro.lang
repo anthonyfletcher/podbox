@@ -27396,3 +27396,59 @@
     *: "Tela Anterior"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE
+  desc: a Now Playing button action: moves a theme option to its next choice
+  user: core
+  <source>
+    *: "Theme Toggle"
+  </source>
+  <dest>
+    *: "Alternar tema"
+  </dest>
+  <voice>
+    *: "Alternar tema"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_NAMED
+  desc: Theme Toggle's row in the button pickers; %s is the theme option's name
+  user: core
+  <source>
+    *: "Toggle %s"
+  </source>
+  <dest>
+    *: "Alternar %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_ASSIGN
+  desc: Theme Options context menu: makes this option the one Theme Toggle changes
+  user: core
+  <source>
+    *: "Assign to Button"
+  </source>
+  <dest>
+    *: "Atribuir a um botão"
+  </dest>
+  <voice>
+    *: "Atribuir a um botão"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_TOGGLE_UNASSIGN
+  desc: Theme Options context menu: stops Theme Toggle changing this option
+  user: core
+  <source>
+    *: "Unassign Button"
+  </source>
+  <dest>
+    *: "Remover do botão"
+  </dest>
+  <voice>
+    *: "Remover do botão"
+  </voice>
+</phrase>
