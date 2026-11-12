@@ -18,24 +18,35 @@ env:
 permissions:
   contents: write
 
+# One build at a time on a branch, so the id is given only once
+concurrency:
+  group: build-${{ github.ref }}
+
 jobs:
   build:
+    # The template itself is not a game: it keeps the id of noughts
+    if: ${{ !github.event.repository.is_template }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       # A game made from the template has the template's id, all noughts:
       # saves and scores are kept under it, so each game is given its own
-      # the first time it is built, and that is committed back.
+      # the first time a branch is built, and that is committed back. A tag
+      # cannot take the commit, so one still on the noughts fails.
       - name: Give the game its own id
         run: |
           if grep -q '"id": *"0000000000000000"' "$CART/cart.json"; then
+            if [ "$GITHUB_REF_TYPE" != branch ]; then
+              echo "::error::$CART/cart.json still has the template's id: push a branch first, so the build gives the game its own, then tag that"
+              exit 1
+            fi
             id=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
             sed -i "s/\"id\": *\"0000000000000000\"/\"id\": \"$id\"/" "$CART/cart.json"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -am "Give the game its own id"
-            git push
+            git push origin "HEAD:$GITHUB_REF_NAME"
           fi
 
       - uses: anthonyfletcher/podbox-arcade-builder@latest
