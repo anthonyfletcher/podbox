@@ -22386,6 +22386,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_QUIZ
+  desc: Music menu: the row that starts the Music Quiz
+  user: core
+  <source>
+    *: "Quiz"
+  </source>
+  <dest>
+    *: "~Quiz"
+  </dest>
+  <voice>
+    *: "~Quiz"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_BOOK_SHELF_ROW_PROGRESS
   desc: a row of the Audiobooks and Books menus: the books in progress
   user: core

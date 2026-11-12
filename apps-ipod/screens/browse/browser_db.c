@@ -162,7 +162,7 @@ enum table {
     TABLE_FEATURED_TRACKS,
     TABLE_BOOK_RESUME,
     TABLE_BOOK_SHELF,
-    TABLE_MUSIC_QUIZ,           /* kept for its number: the Quiz row is gone */
+    TABLE_MUSIC_QUIZ,           /* the Quiz row, never drawn */
     TABLE_PLAY_UNPLAYED,
     TABLE_SHUFFLE_ALBUMS,
     TABLE_LISTEN_STATS,
@@ -220,6 +220,7 @@ static bool episodes_finished_available(void);
 static bool episodes_not_started_available(void);
 static bool episodes_in_progress_available(void);
 static bool episodes_all_available(void);
+static bool never_available(void);
 
 /* A podcast episode's state, and every episode, as the Podcasts menu lists
  * them */
@@ -253,6 +254,10 @@ static const struct builtin_row {
       TABLE_ALBUM_CHARTS, ARTIST_CHART_FORGOTTEN,       NULL },
     { "featured_artists", LANG_FEATURED_ARTISTS, TABLE_FEATURED_ARTISTS, 0,
       featured_artists_available },
+    /* The retired Music Quiz's row, never drawn: tagnavi.config still names
+     * it, and the rows after it keep their saved numbers only while it is
+     * a built-in row */
+    { "quiz", LANG_QUIZ, TABLE_MUSIC_QUIZ, 0, never_available },
     /* The Audiobooks shelves (book_shelf.c), the list in the param */
     { "book_finished", LANG_BOOK_SHELF_ROW_FINISHED, TABLE_BOOK_SHELF,
       BOOK_SHELF_FINISHED, shelf_finished_available },
@@ -288,6 +293,11 @@ static const struct builtin_row {
 static bool featured_artists_available(void)
 {
     return global_settings.featured_artists && db_featured_count() > 0;
+}
+
+static bool never_available(void)
+{
+    return false;
 }
 
 /* A shelf's row, unless the shelf is empty. Kept where the books cannot be
