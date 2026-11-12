@@ -4018,8 +4018,9 @@ void audio_playback_handler(struct queue_event *ev)
             audio_stop_playback(ev->id != SYS_USB_CONNECTED && ev->data == 0);
             /* The USB sound card reconfigures the playback DSP, and a
              * resident codec sets its sample format only when loaded: unload
-             * it so the next track loads it again. */
-            if (ev->id == SYS_USB_CONNECTED)
+             * it so the next track loads it again. A sound scan's codec is
+             * in the slot while one runs, and the scan closes it itself. */
+            if (ev->id == SYS_USB_CONNECTED && !track_decode_busy())
                 codec_unload();
             /* Unplug can queue the disconnect while playback stops: leave
              * it for usb_wait_for_disconnect() to consume. */
