@@ -276,8 +276,7 @@ function pace() {
 
 Once a second it looks at how many frames were skipped. More than four a
 second at 33 and it steps down to 25, where each tick has a third more
-time. When the music stops it steps back up. Plane Test, one of the SDK's
-example carts, does exactly this.
+time. When the music stops it steps back up.
 
 Stepping down is a last resort, after making the cart cheaper (see
 **Making it fast**): a game at 33 feels smoother than at 25.

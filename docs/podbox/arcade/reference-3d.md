@@ -75,8 +75,7 @@ function update() {
 ```
 
 Scale per-tick speeds by `33.0 / rate()` so the game plays at the same
-speed at either rate. Plane Test and Land Test, among the example carts,
-do this.
+speed at either rate.
 
 ## The resolution rule
 
@@ -435,8 +434,8 @@ function draw() {
 - It draws the ground only: clear to the sky first, and draw anything
   flying after.
 - At about 29,000 units it is more than a tick with music playing: use
-  `coarse` and a lower rate there (Land Test steps down by itself, to
-  coarse, then 25, then 20).
+  `coarse` and a lower rate there: step down to `coarse` first, then to
+  25, then 20, as frames are skipped.
 
 ## land.height(heights, x, y, [scale])
 
@@ -473,7 +472,7 @@ style. See the maze example above, under `plane.ceiling`.
   them, then the billboards, which hide behind the walls.
 - A door is a panel across the middle of its wall cell that slides aside
   as it opens. Have `actors.move` treat its cell as solid until it is
-  nearly open, as Maze Test does.
+  nearly open.
 - The player is best an actor, so `actors.move` stops them at the walls;
   the camera is then the actor's centre.
 

@@ -165,7 +165,7 @@ When over budget:
   A plain background is cheaper as `cls` and rectangles; a few lines of
   text are cheaper printed.
 - **Step down the rate**: on overrun, `setrate(25)` and scale speeds by
-  `33.0 / rate()` (Plane Test does this).
+  `33.0 / rate()`.
 
 Profile in the IDE (Run > Run and profile), where `prof()`
 sections are rows of their own and `watch()` values show in View >
@@ -193,8 +193,7 @@ and saves in the browser.
 - **More than 256 sprites**: `sheet(IMG.<name>)` draws sprites from an
   image's 8x8 cells.
 - **The plane** (racing, flying): one texel a world pixel, so floor and
-  billboards are 1:1 at the same depth. Plane Test is the worked example;
-  `reference-3d.md` explains it.
+  billboards are 1:1 at the same depth; `reference-3d.md` explains it.
 
 ## Libraries
 
@@ -213,30 +212,8 @@ reference.
 | `menu.js` | an in-game menu on the wheel |
 | `gui.js` | panels, buttons, lists and text fields in the dialogs' style |
 
-## Worked examples
+## Worked example
 
-`.build/arcade_source/<name>/`, each a whole cart whose `main.js` opens
-with what it shows:
-
-| Cart | Shows |
-|---|---|
-| `brickmania` | a whole game: levels, score and lives in side panels, the best kept |
-| `planetest` | the plane: a map as a floor, billboards, stepping down the rate |
-| `mazetest` | first-person walls, floor and ceiling |
-| `landtest` | a voxel landscape from noise |
-| `pulserun` | a game built on the beat of the music playing |
-| `systest`, `circletest` | actors under gravity, bouncing; particles |
-| `sandtest` | the cells system: falling sand and its materials |
-| `linkstest`, `clothtest` | ropes, a bridge, cloth |
-| `lighttest` | lights over a dark scene |
-| `arttest` | sheet, palettes, maps, objects and an image from the cart's files |
-| `inputtest` | what the wheel and buttons report; a saved launch counter |
-| `scoretest`, `opttest`, `uitest` | high-score boards, options, dialogs and speech |
-| `datatest` | data files and the store |
-| `soundtest` | sound effects and tones |
-| `fonttest` | text beyond ASCII in `FONT.WORLD` |
-| `trackstest`, `beattest` | the owner's library and queue; listening for the beat |
-| `libtest` | the script libraries together |
-
-The manual's tutorials build one more, a bat-and-ball game, a chapter at
-a time.
+The tutorials (`tutorial-1-ball-and-bat.md` to `tutorial-6-on-the-ipod.md`)
+build a whole bat-and-ball game a chapter at a time, each ending with the
+program so far.

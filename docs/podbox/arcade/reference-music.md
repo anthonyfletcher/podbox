@@ -409,9 +409,8 @@ in ms, up to which `beat.ahead` can see -- about two seconds past
 
 ## A rhythm game
 
-**Pulse Run**, one of the example carts, puts the pieces together. The
-player rides three lanes through walls that land on the beat of whatever
-is playing:
+The pieces fit together like this in a game where the player rides
+three lanes through walls that land on the beat of whatever is playing:
 
 1. On the title, it waits for `playback.playing()` -- "PLAY SOME MUSIC".
 2. Started, it calls `beat.listen(true)` and waits until `beat.state`

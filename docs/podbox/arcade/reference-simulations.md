@@ -372,9 +372,6 @@ A field can be a world for the other systems too:
 - **Particles**: a pool with `field` set settles into the field as it
   lands, each particle becoming a cell of its colour.
 
-Sand Test, among the example carts, does all of these: a walker who wades
-and floats, carries a torch, and throws fireballs.
-
 ---
 
 ## How links work
@@ -786,5 +783,5 @@ function draw() {
   together over two ticks' worth on an iPod Video playing FLAC. Use a
   smaller cloth, fewer `passes`, or `links.draw` (about 10,500) where the
   shading is not needed.
-- With `tear` set, a hard pull rips it: Cloth Test, among the example
-  carts, tears its hem.
+- With `tear` set, a hard pull rips it: tug a cloth's hem down hard and
+  it tears.
