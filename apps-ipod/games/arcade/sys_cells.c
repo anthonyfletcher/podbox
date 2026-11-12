@@ -160,10 +160,11 @@ static uint32_t chunk_sum(const struct field *f, int32_t cx, int32_t cy)
         /* a whole aligned row of the chunk a word at a time */
         if (x1 - x0 == CHUNK && !((uintptr_t)p & 3)) {
             const uint32_t *q = (const uint32_t *)(const void *)p;
-            for (int k = 0; k < CHUNK / 4; k++) {
-                s1 += q[k];
-                s2 += s1;
-            }
+            uint32_t a = q[0], b = q[1], c = q[2], d = q[3];
+            s1 += a; s2 += s1;
+            s1 += b; s2 += s1;
+            s1 += c; s2 += s1;
+            s1 += d; s2 += s1;
             continue;
         }
         for (int32_t x = x0; x < x1; x++) {
@@ -237,10 +238,10 @@ void cells_drawn(struct vm *vm, uint32_t id, int32_t w, int32_t h, int32_t x0,
     }
 }
 
-/* chunk k of a field cw chunks across, as cells, into sl's box */
-static void grow_chunk(struct cellsleep *sl, int32_t k, int32_t cw)
+/* chunk cx, cy, as cells, into sl's box */
+static void grow_chunk(struct cellsleep *sl, int32_t cx, int32_t cy)
 {
-    int32_t x = (k % cw) * CHUNK, y = (k / cw) * CHUNK;
+    int32_t x = cx * CHUNK, y = cy * CHUNK;
     grow(sl, x, y, x + CHUNK - 1 < sl->w - 1 ? x + CHUNK - 1 : sl->w - 1,
          y + CHUNK - 1 < sl->h - 1 ? y + CHUNK - 1 : sl->h - 1);
 }
@@ -287,6 +288,10 @@ struct stepper
     uint32_t bits;              /* random bits left over */
     int nbits;
     uint32_t moves;
+    uint32_t pad[2];
+    /* for each first reaction, a bit for each partner b of its chain;
+     * word 8 stays 0, for off the field */
+    uint32_t partner[REACTIONS][16];
 };
 
 /* One cell's tick; in cells_arm.S on the players, which reads the stepper
@@ -304,7 +309,8 @@ _Static_assert(offsetof(struct stepper, r) == 16 &&
                offsetof(struct stepper, vm) == 1416 &&
                offsetof(struct stepper, bits) == 1420 &&
                offsetof(struct stepper, nbits) == 1424 &&
-               offsetof(struct stepper, moves) == 1428,
+               offsetof(struct stepper, moves) == 1428 &&
+               offsetof(struct stepper, partner) == 1440,
                "cells_arm.S's stepper offsets");
 #else
 static uint32_t rand8(struct stepper *s)
@@ -393,6 +399,12 @@ static void swap(struct stepper *s, int32_t x, int32_t y, int32_t tx,
 
 static const int8_t near_x[4] = { -1, 1, 0, 0 }, near_y[4] = { 0, 0, -1, 1 };
 
+/* Whether material c (-1 off the field) is in partner bits pt */
+static inline int partner(const uint32_t *pt, int32_t c)
+{
+    return c >= 0 && (pt[c >> 5] >> (c & 31) & 1);
+}
+
 /* The material at x, y, or -1 off the field */
 static inline int32_t at(const struct stepper *s, int32_t x, int32_t y)
 {
@@ -458,20 +470,26 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
     if (r[R_DECAY][m])
         busy(s, x, y);
     if (s->first[m] != 255) {
+        const uint32_t *pt = s->partner[s->first[m]];
         uint32_t k = rand8(s) & 3;
         int32_t tx = x + near_x[k], ty = y + near_y[k], b = at(s, tx, ty);
-        for (uint32_t q = s->first[m]; q != 255; q = s->next[q]) {
-            for (int n = 0; n < 4; n++)
-                if (at(s, x + near_x[n], y + near_y[n]) == r[R_B][q])
-                    busy(s, x, y);
-            if (r[R_B][q] != b || is_moved(s, ty * s->f.w + tx))
-                continue;
+        /* a partner beside it keeps it awake; the one in the chosen
+         * place, not yet moved, reacts by chance -- the first reaction
+         * with it as b */
+        for (int n = 0; n < 4; n++)
+            if (partner(pt, at(s, x + near_x[n], y + near_y[n]))) {
+                busy(s, x, y);
+                break;
+            }
+        if (partner(pt, b) && !is_moved(s, ty * s->f.w + tx)) {
+            uint32_t q = s->first[m];
+            while (r[R_B][q] != b)
+                q = s->next[q];
             if (rand8(s) < r[R_CHANCE][q]) {
                 set(s, x, y, r[R_C][q]);
                 set(s, tx, ty, r[R_D][q]);
                 return;
             }
-            break;
         }
     }
     if (r[R_DECAY][m] && rand8(s) < r[R_DECAY][m]) {
@@ -546,39 +564,25 @@ void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
 struct run
 {
     const uint8_t *c, *moved, *dens;
-    int32_t w;
-    int32_t i;                  /* the first cell's index */
+    int32_t w, h;
+    int32_t row, stop;          /* rows row down to stop */
+    int32_t runs;               /* each row's runs, from[i] to to[i] - 1 */
     int32_t dx;                 /* 1 or -1 */
-    int32_t groups, size;       /* groups of size cells */
-    int32_t words;              /* whether a group is a word, tested whole */
-    int32_t lo;                 /* cell index x = 1 */
-    uint32_t span;              /* cells after lo that idle may test */
+    int32_t k;                  /* the assembly's: the run it is on */
+    uint32_t span;              /* the row's: cells after x = 1 idle tests */
     const uint8_t *first, *next, *b;
     struct stepper *s;
-    int32_t rowbase, y;
+    int32_t rowbase, y;         /* the row's */
+    int32_t from[FIELD_MAX / CHUNK], to[FIELD_MAX / CHUNK];
 };
 _Static_assert(offsetof(struct run, span) == 40 &&
-               offsetof(struct run, y) == 64, "cells_arm.S's offsets");
+               offsetof(struct run, y) == 64 &&
+               offsetof(struct run, from) == 68 &&
+               offsetof(struct run, to) == 132, "cells_arm.S's offsets");
 _Static_assert(offsetof(struct stepper, dens) ==
                offsetof(struct stepper, kind) + MATERIALS,
                "cells_arm.S finds kind 256 bytes before the density");
 uint32_t cells_run_arm(struct run *r);
-
-static uint32_t run(struct stepper *s, int32_t y, int32_t x0, int32_t x1,
-                    int forward)
-{
-    const int32_t w = s->f.w, n = x1 - x0;
-    int words = !((uintptr_t)(s->f.c + y * w + x0) & 3) && !(n & 3);
-    struct run r = {
-        s->f.c, s->moved, s->dens, w,
-        y * w + (forward ? x0 : x1 - 1), forward ? 1 : -1,
-        words ? n / 4 : 1, words ? 4 : n, words,
-        y * w + 1,
-        y > 0 && y < s->f.h - 1 && w > 2 ? (uint32_t)(w - 2) : 0,
-        s->first, s->next, s->r.f[R_B], s, y * w, y
-    };
-    return cells_run_arm(&r);
-}
 #else
 __attribute__((optimize("O2")))
 static uint32_t run(struct stepper *s, int32_t y, int32_t x0, int32_t x1,
@@ -609,35 +613,65 @@ static uint32_t run(struct stepper *s, int32_t y, int32_t x0, int32_t x1,
 /* Every awake chunk's cells, bottom up, a row left to right or right to
  * left as forward says, side by side awake chunks as one run. Returns the
  * cells looked at. */
+/* A chunk row's runs of side by side awake chunks, in the order the scan
+ * meets them, as cells from[i] to to[i] - 1. Returns how many. */
+static int32_t runs_of(const struct stepper *s, const uint8_t *chunks,
+                       int forward, int32_t *from, int32_t *to)
+{
+    const int32_t w = s->f.w, cw = s->cw;
+    int32_t runs = 0;
+    for (int32_t k = 0; k < cw; k++) {
+        if (!chunks[forward ? k : cw - 1 - k])
+            continue;
+        int32_t e = k;
+        while (e + 1 < cw && chunks[forward ? e + 1 : cw - 2 - e])
+            e++;
+        int32_t lo = forward ? k : cw - 1 - e;
+        int32_t hi = forward ? e : cw - 1 - k;
+        int32_t x1 = (hi + 1) << CHUNK_SHIFT;
+        from[runs] = lo << CHUNK_SHIFT;
+        to[runs++] = x1 < w ? x1 : w;
+        k = e;
+    }
+    return runs;
+}
+
 static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
 {
     uint32_t visited = 0;
-    const int32_t w = s->f.w, cw = s->cw;
-    /* a chunk row's runs, found once for its rows */
-    int32_t from[FIELD_MAX / CHUNK], to[FIELD_MAX / CHUNK], runs = 0;
-    int32_t at = -1;
-    for (int32_t y = s->f.h - 1; y >= 0; y--) {
-        if (y >> CHUNK_SHIFT != at) {
-            at = y >> CHUNK_SHIFT;
-            runs = 0;
-            const uint8_t *chunks = awake + at * cw;
-            for (int32_t k = 0; k < cw; k++) {
-                if (!chunks[forward ? k : cw - 1 - k])
-                    continue;
-                int32_t e = k;
-                while (e + 1 < cw && chunks[forward ? e + 1 : cw - 2 - e])
-                    e++;
-                int32_t lo = forward ? k : cw - 1 - e;
-                int32_t hi = forward ? e : cw - 1 - k;
-                int32_t x1 = (hi + 1) << CHUNK_SHIFT;
-                from[runs] = lo << CHUNK_SHIFT;
-                to[runs++] = x1 < w ? x1 : w;
-                k = e;
-            }
-        }
-        for (int32_t i = 0; i < runs; i++)
-            visited += run(s, y, from[i], to[i], forward);
+    const int32_t h = s->f.h;
+#ifdef ARCADE_ASM
+    /* a chunk row's rows in one call */
+    static struct run r;
+    r.c = s->f.c;
+    r.moved = s->moved;
+    r.dens = s->dens;
+    r.w = s->f.w;
+    r.h = h;
+    r.dx = forward ? 1 : -1;
+    r.first = s->first;
+    r.next = s->next;
+    r.b = s->r.f[R_B];
+    r.s = s;
+    for (int32_t at = (h - 1) >> CHUNK_SHIFT; at >= 0; at--) {
+        r.runs = runs_of(s, awake + at * s->cw, forward, r.from, r.to);
+        if (!r.runs)
+            continue;
+        r.stop = at << CHUNK_SHIFT;
+        r.row = r.stop + CHUNK - 1 < h - 1 ? r.stop + CHUNK - 1 : h - 1;
+        visited += cells_run_arm(&r);
     }
+#else
+    int32_t from[FIELD_MAX / CHUNK], to[FIELD_MAX / CHUNK];
+    for (int32_t at = (h - 1) >> CHUNK_SHIFT; at >= 0; at--) {
+        int32_t runs = runs_of(s, awake + at * s->cw, forward, from, to);
+        int32_t stop = at << CHUNK_SHIFT;
+        for (int32_t y = stop + CHUNK - 1 < h - 1 ? stop + CHUNK - 1 : h - 1;
+             y >= stop; y--)
+            for (int32_t i = 0; i < runs; i++)
+                visited += run(s, y, from[i], to[i], forward);
+    }
+#endif
     return visited;
 }
 
@@ -683,20 +717,28 @@ NATIVE(cells_step)
             s.next[q] = s.first[s.r.f[R_A][q]];
             s.first[s.r.f[R_A][q]] = (uint8_t)q;
         }
+    /* how far a liquid runs in a tick, in chunks, for the wake below */
+    int32_t across = 1;
     for (int32_t m = 0; m < MATERIALS; m++) {
-        uint8_t mv = s.r.f[R_MOVE][m], k = 0;
-        if (mv != MOVE_STATIC && mv <= MOVE_GAS)
-            k |= K_MOVES;
-        if (mv == MOVE_LIQUID || mv == MOVE_GAS)
-            k |= K_FLOWS;
-        if (mv == MOVE_GAS)
-            k |= K_GAS;
-        if (s.first[m] != 255)
+        static const uint8_t moves[4] = {
+            0, K_MOVES, K_MOVES | K_FLOWS, K_MOVES | K_FLOWS | K_GAS
+        };
+        uint8_t mv = s.r.f[R_MOVE][m];
+        uint8_t k = mv <= MOVE_GAS ? moves[mv] : 0;
+        if (k & K_FLOWS) {
+            int32_t spread = s.r.f[R_SPREAD][m];
+            int32_t n = (spread ? spread : 2) / CHUNK + 1;
+            if (n > across)
+                across = n;
+        }
+        if (s.first[m] != 255) {
+            uint32_t *pt = s.partner[s.first[m]];
             k |= K_REACTS;
-        if (s.r.f[R_DECAY][m])
-            k |= K_DECAYS;
-        else
-            k |= K_SAME;
+            memset(pt, 0, sizeof(s.partner[0]));
+            for (uint32_t q = s.first[m]; q != 255; q = s.next[q])
+                pt[s.r.f[R_B][q] >> 5] |= 1u << (s.r.f[R_B][q] & 31);
+        }
+        k |= s.r.f[R_DECAY][m] ? K_DECAYS : K_SAME;
         s.kind[m] = k;
     }
     for (uint32_t q = 0; q < REACTIONS; q++)
@@ -706,17 +748,18 @@ NATIVE(cells_step)
     s.dir = sl->dir;
     /* a sleeping chunk drawn on since wakes */
     uint32_t summed = 0;
-    for (int32_t k = 0; k < s.cw * chh; k++) {
-        s.slept[k] = 0;
-        if (!sl->awake[k]) {
-            summed++;
-            if (chunk_sum(&s.f, k % s.cw, k / s.cw) != sl->sum[k]) {
-                sl->awake[k] = 1;
-                grow_chunk(sl, k, s.cw);
-            } else
-                s.slept[k] = 1;
+    for (int32_t cy = 0, k = 0; cy < chh; cy++)
+        for (int32_t cx = 0; cx < s.cw; cx++, k++) {
+            s.slept[k] = 0;
+            if (!sl->awake[k]) {
+                summed++;
+                if (chunk_sum(&s.f, cx, cy) != sl->sum[k]) {
+                    sl->awake[k] = 1;
+                    grow_chunk(sl, cx, cy);
+                } else
+                    s.slept[k] = 1;
+            }
         }
-    }
     /* the chunks round each actor are awake: something may rest on it */
     for (int32_t b = 0; b < nbox; b++)
         for (int32_t cy = (boxes[b * 4 + 1] >> CHUNK_SHIFT) - 1;
@@ -728,9 +771,10 @@ NATIVE(cells_step)
     uint32_t visited = scan(&s, sl->awake, vm->frame & 1);
     /* the box of what changed: the chunks this step changed, those drawn
      * on since, and cells particles settled into; given, and begun again */
-    for (int32_t k = 0; k < s.cw * chh; k++)
-        if (s.changed[k])
-            grow_chunk(sl, k, s.cw);
+    for (int32_t cy = 0, k = 0; cy < chh; cy++)
+        for (int32_t cx = 0; cx < s.cw; cx++, k++)
+            if (s.changed[k])
+                grow_chunk(sl, cx, cy);
     if (argc > 4 && a[4].tag != T_NULL) {
         if (a[4].tag != T_I32 || I32(vm, a[4])->len < 4)
             return vm_fail(vm, "cells.step() writes its box to an Int32Array "
@@ -753,16 +797,9 @@ NATIVE(cells_step)
      * far as a liquid runs in a tick. */
     uint16_t band[FIELD_MAX / CHUNK + 1];
     band[0] = 0;
-    int32_t across = 1;
-    for (int32_t m = 0; m < MATERIALS; m++)
-        if (s.kind[m] & K_FLOWS) {
-            int32_t spread = s.r.f[R_SPREAD][m];
-            int32_t n = (spread ? spread : 2) / CHUNK + 1;
-            if (n > across)
-                across = n;
-        }
-    for (int32_t k = 0; k < s.cw * chh; k++) {
-        int32_t cx = k % s.cw, cy = k / s.cw, wake;
+    for (int32_t k = 0, cx = 0, cy = 0; k < s.cw * chh;
+         k++, cx = cx + 1 < s.cw ? cx + 1 : (cy++, 0)) {
+        int32_t wake;
         /* each chunk row's band (the row and those above and below) as a
          * running count of changed chunks along it, once a row */
         if (cx == 0) {

@@ -25,12 +25,12 @@
     .equ    R_MOVED, 4
     .equ    R_DENS, 8
     .equ    R_W, 12
-    .equ    R_I, 16
-    .equ    R_DX, 20
-    .equ    R_GROUPS, 24
-    .equ    R_SIZE, 28
-    .equ    R_WORDS, 32
-    .equ    R_LO, 36
+    .equ    R_H, 16
+    .equ    R_ROW, 20
+    .equ    R_STOP, 24
+    .equ    R_RUNS, 28
+    .equ    R_DX, 32
+    .equ    R_K, 36
     .equ    R_SPAN, 40
     .equ    R_FIRST, 44
     .equ    R_NEXT, 48
@@ -38,6 +38,8 @@
     .equ    R_S, 56
     .equ    R_ROWBASE, 60
     .equ    R_Y, 64
+    .equ    R_FROM, 68
+    .equ    R_TO, 132
 
 /* K_* in sys_cells.c; a material's kind is 256 bytes before its density */
     .equ    K_MOVES, 1
@@ -56,9 +58,52 @@
  * to; r10 its kind; r11 its material, then its density; r12 its address;
  * lr a neighbour. */
 .macro  scan dir
-    ldr     r9, [r0, #R_WORDS]
+    /* a row: its base, x = 1's index (r2) and the span idle may test */
+.Lrow\@:
+    ldr     r9, [r0, #R_ROW]
+    str     r9, [r0, #R_Y]
+    mul     r10, r9, r7
+    str     r10, [r0, #R_ROWBASE]
+    add     r2, r10, #1
+    ldr     r11, [r0, #R_H]
+    sub     r11, r11, #1
+    mov     r12, #0
     cmp     r9, #0
-    beq     2f
+    cmpgt   r11, r9
+    cmpgt   r7, #2
+    subgt   r12, r7, #2
+    str     r12, [r0, #R_SPAN]
+    mov     r9, #0
+    str     r9, [r0, #R_K]
+.Lrun\@:
+    /* the row's next run, x0 (r9) to x1 (r11): in groups of a word when
+     * it is in whole aligned words, else one group of them all */
+    ldr     r9, [r0, #R_K]
+    ldr     r10, [r0, #R_RUNS]
+    cmp     r9, r10
+    bge     .Lnext\@
+    add     r11, r0, r9, lsl #2
+    add     r9, r9, #1
+    str     r9, [r0, #R_K]
+    ldr     r9, [r11, #R_FROM]
+    ldr     r11, [r11, #R_TO]
+    ldr     r10, [r0, #R_ROWBASE]
+    sub     r12, r11, r9
+    .if \dir < 0
+    add     r1, r10, r11
+    sub     r1, r1, #1
+    .else
+    add     r1, r10, r9
+    .endif
+    add     lr, r4, r10
+    add     lr, lr, r9
+    orr     lr, lr, r12
+    tst     lr, #3
+    movne   r3, #0x10000
+    orrne   r3, r3, r12
+    bne     2f
+    mov     r3, r12, lsl #14
+    orr     r3, r3, #4
     /* four words of air pass sixteen cells, four groups, while as many
      * are left; then a word passes four; going back, they end here */
 1:
@@ -212,9 +257,19 @@
     subs    r3, r3, #0x10000
     orrne   r3, r3, #4
     bne     1b
+    b       .Lrun\@
+.Lnext\@:
+    /* the row below, down to the band's last */
+    ldr     r9, [r0, #R_ROW]
+    ldr     r10, [r0, #R_STOP]
+    cmp     r9, r10
+    sub     r9, r9, #1
+    str     r9, [r0, #R_ROW]
+    bgt     .Lrow\@
 .endm
 
-/* uint32_t cells_run_arm(struct run *r): the cells looked at */
+/* uint32_t cells_run_arm(struct run *r): rows r->row down to r->stop,
+ * each its runs; the cells looked at */
     .global cells_run_arm
     .type   cells_run_arm, %function
 cells_run_arm:
@@ -223,11 +278,6 @@ cells_run_arm:
     ldr     r5, [r0, #R_MOVED]
     ldr     r6, [r0, #R_DENS]
     ldr     r7, [r0, #R_W]
-    ldr     r1, [r0, #R_I]
-    ldr     r2, [r0, #R_LO]
-    ldr     r3, [r0, #R_GROUPS]
-    ldr     r9, [r0, #R_SIZE]
-    orr     r3, r9, r3, lsl #16
     mov     r8, #0
     ldr     r9, [r0, #R_DX]
     cmp     r9, #0
@@ -265,6 +315,20 @@ cells_run_arm:
     .equ    S_BITS, 1420
     .equ    S_NBITS, 1424
     .equ    S_MOVES, 1428
+    .equ    S_PARTNER, 1440
+
+/* acc op'd with material r0's bit of partner bits r12 (bit 0 of acc is the
+ * one that counts); r0 and lr are lost */
+.macro  partbit acc, op
+    mov     lr, r0, lsr #5
+    ldr     lr, [r12, lr, lsl #2]
+    and     r0, r0, #31
+    .ifc \op, mov
+    mov     \acc, lr, lsr r0
+    .else
+    orr     \acc, \acc, lr, lsr r0
+    .endif
+.endm
 
     .equ    MOVE_POWDER, 1
     .equ    MOVE_GAS, 3
@@ -398,46 +462,44 @@ cells_step_cell:
     ldr     lr, [r4, #S_C]
     ldrb    r3, [lr, r0]
 2:
-    /* the four neighbours, -1 off the field */
-    ldr     lr, [r4, #S_C]
-    add     lr, lr, r8
-    mvn     r0, #0
+    /* r12 its partners' bits: one beside it keeps it awake. r2 gathers
+     * each neighbour's bit; off the field is material 256, in word 8,
+     * which is 0. */
+    add     r12, r4, r12, lsl #6
+    add     r12, r12, #S_PARTNER
+    ldr     r1, [r4, #S_C]
+    add     r1, r1, r8
     cmp     r5, #0
-    ldrbgt  r0, [lr, #-1]
-    str     r0, [sp, #0]
-    mvn     r0, #0
-    sub     r1, r7, #1
-    cmp     r5, r1
-    ldrblt  r0, [lr, #1]
-    str     r0, [sp, #4]
-    mvn     r0, #0
+    ldrbgt  r0, [r1, #-1]
+    movle   r0, #256
+    partbit r2, mov
+    sub     lr, r7, #1
+    cmp     r5, lr
+    ldrblt  r0, [r1, #1]
+    movge   r0, #256
+    partbit r2, orr
     cmp     r6, #0
-    ldrbgt  r0, [lr, -r7]
-    str     r0, [sp, #8]
-    ldr     r1, [r4, #S_H]
-    sub     r1, r1, #1
-    mvn     r0, #0
-    cmp     r6, r1
-    ldrblt  r0, [lr, r7]
-    str     r0, [sp, #12]
-3:
-    /* reaction r12: a partner beside it keeps it awake */
-    ldr     r0, [r4, #S_RB]
-    ldrb    lr, [r0, r12]
-    ldr     r0, [sp, #0]
-    cmp     r0, lr
-    ldrne   r0, [sp, #4]
-    cmpne   r0, lr
-    ldrne   r0, [sp, #8]
-    cmpne   r0, lr
-    ldrne   r0, [sp, #12]
-    cmpne   r0, lr
-    bne     4f
+    ldrbgt  r0, [r1, -r7]
+    movle   r0, #256
+    partbit r2, orr
+    ldr     lr, [r4, #S_H]
+    sub     lr, lr, #1
+    cmp     r6, lr
+    ldrblt  r0, [r1, r7]
+    movge   r0, #256
+    partbit r2, orr
+    tst     r2, #1
+    beq     3f
     busy    r5, r6, r0, r1
-4:
-    /* and one in the chosen place, not yet moved, reacts by chance */
-    cmp     lr, r3
-    bne     5f
+3:
+    /* the chosen place's material r3, a partner not yet moved, reacts by
+     * chance: the first of its reactions with that b */
+    cmp     r3, #0
+    blt     .Ldecay
+    mov     r0, r3
+    partbit r2, mov
+    tst     r2, #1
+    beq     .Ldecay
     ldr     r1, [sp, #16]
     ldr     r2, [sp, #20]
     mla     r0, r2, r7, r1
@@ -446,7 +508,16 @@ cells_step_cell:
     and     r0, r0, #7
     mov     lr, lr, lsr r0
     tst     lr, #1
-    bne     5f
+    bne     .Ldecay
+    add     r0, r4, r9
+    ldrb    r12, [r0, #S_FIRST]
+    ldr     r0, [r4, #S_RB]
+4:
+    ldrb    lr, [r0, r12]
+    cmp     lr, r3
+    addne   lr, r4, r12
+    ldrbne  r12, [lr, #S_NEXT]
+    bne     4b
     rand8
     ldr     lr, [r4, #S_CHANCE]
     ldrb    lr, [lr, r12]
@@ -467,11 +538,6 @@ cells_step_cell:
     mla     r3, r2, r7, r1
     bl      .Lset
     b       .Lstepped
-5:
-    add     r0, r4, r12
-    ldrb    r12, [r0, #S_NEXT]
-    cmp     r12, #255
-    bne     3b
 
 .Ldecay:
     ldr     r0, [r4, #S_DECAY]
