@@ -4128,7 +4128,7 @@ static int album_covers_loop(void)
 {
     int ret;
     int button;
-    bool art_was_building = art_cache_is_busy();
+    unsigned art_seen_generation = art_cache_generation();
     /* What the screen owes, split so that the two things that change on their
      * own account can be repaired on their own account. The covers are the
      * expensive half by a wide margin, and while a track plays most frames want
@@ -4162,8 +4162,8 @@ static int album_covers_loop(void)
          * loader thread fetch them again -- now they exist. Everything goes,
          * the centre slide included: it is the one being looked at, and the
          * loader reloads it first. */
-        bool art_building = art_cache_is_busy();
-        if (art_was_building && !art_building)
+        unsigned art_generation = art_cache_generation();
+        if (art_seen_generation != art_generation && !art_cache_is_busy())
         {
             buf_ctx_lock();
             free_all_slide_prio(-1);
@@ -4171,8 +4171,8 @@ static int album_covers_loop(void)
             queue_remove_from_head(&thread_q, EV_WAKEUP);
             queue_post(&thread_q, EV_WAKEUP, 0);
             art_owed = true;   /* every slide on screen just went away */
+            art_seen_generation = art_generation;
         }
-        art_was_building = art_building;
 
         /* Get input first. The SBS renders during get_custom_action() and
          * writes into the framebuffer (including decorative viewports that

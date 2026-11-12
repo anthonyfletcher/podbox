@@ -2260,9 +2260,11 @@ static int audio_load_albumart(struct track_info *infop,
                 if (!same_album && is_cacheable)
                 {
                     clear_last_embedded_album_art();
-                    strlcpy(last_embedded_aa_album, track_id3->album,
+                    strlcpy(last_embedded_aa_album,
+                            track_id3->album ? track_id3->album : "",
                             sizeof(last_embedded_aa_album));
-                    strlcpy(last_embedded_aa_albumartist, track_id3->albumartist,
+                    strlcpy(last_embedded_aa_albumartist,
+                            track_id3->albumartist ? track_id3->albumartist : "",
                             sizeof(last_embedded_aa_albumartist));
                     last_embedded_aa_discnum = track_id3->discnum;
                 }

@@ -64,7 +64,7 @@ for f in sorted(fixtures.iterdir()):
         test(f,4 if f.name=='lossless.webp' else 0)
 test(fixtures/'baseline.jpg',4,(1024,),'-small-buffer')
 test(fixtures/'rgb.png',4,(1024,),'-small-buffer')
-# A valid UTF-16LE APIC description ends at byte 19; the original parser picks 17.
+# UTF-16LE APIC descriptions must be skipped as two-byte code units.
 apic=bytes([1])+b'image/png\0'+bytes([3,255,254,65,0,0,0])
 assert len(apic)==18
 # PNG's shorter MIME makes its correct position 18 (JPEG's was 19).

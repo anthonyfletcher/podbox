@@ -7,6 +7,9 @@ python3 tools/tests/albumart/metadata.py
 python3 tools/tests/albumart/decode.py
 python3 tools/tests/albumart/itunes.py
 python3 tools/tests/albumart/cache.py
+python3 tools/tests/albumart/publication.py
+python3 tools/tests/albumart/offers.py
+python3 tools/tests/albumart/consumers.py
 ```
 
 Dependencies: Python 3, GNU make, GCC with ASan/UBSan and SDL2 development
@@ -31,6 +34,16 @@ files-only exclusion and the central-cover override. It also checks lazy
 one-attempt-per-job indexing, failed-index preservation in passes/checks,
 deferred check invalidation and a later job's retry. The real index probe
 checks that valid empty artwork does not open or scan iTunesDB.
+The publication probe uses real temporary files and injects open, write,
+close and rename failures into the unchanged production writer. The offer
+probe uses deterministic queue, storage and allocation ports for sleep/wake,
+bounded retries, superseded offers and policy changes. The consumer probe
+checks null metadata and playback-report generation invalidation. Browser/report
+entries and missing-hash/hue caches must survive busy publications and clear
+once at idle. The offer probe also runs Cover Flow's actual refresh block
+between each simulated size publication, then checks one reload after idle.
+These ports
+do not run the firmware scheduler or UI.
 
 The default output is `build-art-tests/` in the checkout. Supply a directory
 as the first argument to keep separate runs. Logs contain each command and

@@ -241,6 +241,8 @@ bool art_covers_find(const char *artist, const char *title, char *buf,
 
 bool art_cover_file(const struct mp3entry *id3, char *buf, int buflen)
 {
+    if (!id3 || !buf || buflen <= 0)
+        return false;
     const char *artist = id3->albumartist && id3->albumartist[0]
                          ? id3->albumartist : id3->artist;
 

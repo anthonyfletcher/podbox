@@ -199,6 +199,8 @@ static struct aa_central *aa_central;
 static char *aa_central_names;
 
 static volatile bool cache_busy;
+/* Publication errors belong to the worker's current pass/check/offer. */
+static bool aa_io_failed;
 
 /* Counts every change to a thumbnail: see art_cache_generation(). */
 static volatile unsigned int aa_generation;
@@ -252,6 +254,7 @@ static struct
     off_t         pos;
     unsigned long size;
     int           flags;
+    unsigned      serial, retries;
 } aa_offer;
 
 /* An offer is on the queue. A pass does not drain the queue, so each track
@@ -1012,7 +1015,10 @@ static void aa_stamps_save(bool completed, unsigned int scheme)
     if (!libfile_begin(&w, AA_STAMP_FILE, AA_STAMP_MAGIC,
                        ART_CACHE_FORMAT_VERSION, sizeof(struct aa_stamp),
                        &lm))
+    {
+        aa_io_failed = true;
         return;
+    }
     ok = true;
     aa_stamp_io[n].key = AA_SCHEME_KEY;
     aa_stamp_io[n++].stamp = scheme;
@@ -1039,7 +1045,8 @@ static void aa_stamps_save(bool completed, unsigned int scheme)
     }
     if (ok && n)
         ok = libfile_write(&w, aa_stamp_io, n * sizeof(aa_stamp_io[0]), n);
-    libfile_finish(&w, ok);
+    if (!libfile_finish(&w, ok))
+        aa_io_failed = true;
 }
 
 /* Record one folder's stamp outside a pass, by appending to the file. */
@@ -1050,8 +1057,9 @@ static void aa_stamp_append(unsigned int h, unsigned int stamp)
     if (h == AA_SCHEME_KEY)
         rec.key--;
 
-    libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
-                   sizeof(rec), &rec, 1);
+    if (!libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                        sizeof(rec), &rec, 1))
+        aa_io_failed = true;
 }
 
 /* The stamp of the image at 'path': its path, size and modification time,
@@ -1259,7 +1267,10 @@ static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index
     strcpy(aa_tmp_path + strlen(aa_tmp_path) - 4, ".new");
     fd = open(aa_tmp_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd < 0)
+    {
+        aa_io_failed = true;
         return false;
+    }
 
     hdr.magic = ART_CACHE_MAGIC;
     hdr.version = ART_CACHE_FORMAT_VERSION;
@@ -1271,12 +1282,18 @@ static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index
 
     ok = (write(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)) &&
          (write(fd, bm->data, bytes) == (ssize_t)bytes);
-    close(fd);
+    if (close(fd) < 0)
+        ok = false;
 
     if (ok)
         ok = rename(aa_tmp_path, out_path) == 0;
     if (!ok)
+    {
+        aa_io_failed = true;
         remove(aa_tmp_path);
+    }
+    else
+        aa_generation++;
     return ok;
 }
 
@@ -1463,7 +1480,6 @@ static void aa_generate_size(const struct aa_src *src, int size_index,
                              unsigned int dh, const char *out_path,
                              void *workbuf, size_t workbuf_sz)
 {
-    aa_generation++;
     if (global_settings.art_cache_fast_build &&
         aa_generate_chained(size_index, dh, out_path, workbuf, workbuf_sz))
         return;
@@ -2832,6 +2848,7 @@ static enum bg_result aa_run_pass(void)
     bool completed;
     int since_yield = 0;
 
+    aa_io_failed = false;
     worksz = aa_work_bytes();
     /* No marks to have covered: a trigger, a first pass, a format bump or the
      * old scheme. An upgrade only renames, so its pass reads no tags again. */
@@ -2856,6 +2873,8 @@ static enum bg_result aa_run_pass(void)
     workbuf = core_get_data_pinned(wh);
     aa_tables_init(core_get_data_pinned(sh));
 
+    /* Includes placeholders and migration before the library walk. */
+    cache_busy = true;
     aa_ensure_dirs();
     /* A purge cut short leaves no stamp file, which saving one would hide */
     if (!aa_check_format_version())
@@ -2866,6 +2885,7 @@ static enum bg_result aa_run_pass(void)
         core_unpin(sh);
         core_free(sh);
         core_free(wh);
+        cache_busy = false;
         return BG_INTERRUPTED;
     }
     aa_itunes_state = AA_ITUNES_UNTRIED;
@@ -2910,8 +2930,6 @@ static enum bg_result aa_run_pass(void)
     memset(&aa_counts, 0, sizeof(aa_counts));
     noart_open();
 
-    /* A pass is running -> lights the status-bar %lc ("Caching") token. */
-    cache_busy = true;
     /* Speed up the (CPU-bound) image decoding, like Cover Flow's own
      * generator does. Passes are rare (only after the database settles or
      * changes), so the extra clock is a brief one-off. */
@@ -3036,14 +3054,16 @@ static enum bg_result aa_run_pass(void)
 out:
     /* What the walk did not visit is not missing when it saw only the
      * added tracks, or could not reach all it saw */
-    completed = !aborted && !failed && !aa_added_only && !aa_unreached;
+    completed = !aborted && !failed && !aa_io_failed
+                && !aa_added_only && !aa_unreached;
     noart_close(completed);
     if (completed)
         aa_remove_orphans();
     /* An interrupted move to new keys is taken up again by the next pass.
      * Without the RAM copy nothing moves, and the folders' keys are the ones
      * in use, so that pass records the scheme all the same. */
-    aa_stamps_save(completed, aborted || failed ? aa_scheme_began : AA_SCHEME);
+    aa_stamps_save(completed, aborted || failed || aa_io_failed
+                              ? aa_scheme_began : AA_SCHEME);
     itunes_art_close();
     aa_stamps = NULL;
     aa_visited = NULL;
@@ -3052,7 +3072,7 @@ out:
     core_free(sh);
     core_free(wh);
     cache_busy = false;
-    if (failed)
+    if (failed || aa_io_failed)
         return BG_FAILED;
     return aborted ? BG_INTERRUPTED : BG_DONE;
 }
@@ -3087,6 +3107,16 @@ static int aa_offer_poll(struct timeout *tmo)
     return 0;
 }
 
+/* At most three retries for this offer; a newer track owns its own budget. */
+static void aa_offer_retry(unsigned serial)
+{
+    if (serial == aa_offer.serial && aa_offer.retries < 3)
+    {
+        aa_offer.retries++;
+        timeout_register(&aa_offer_tmo, aa_offer_poll, HZ, 0);
+    }
+}
+
 /* Cache the offered track's embedded art into any of its album's thumbnails
  * that don't exist yet. Fill-only: never overwrites art already cached (folder
  * images are the preferred on-disk source) -- this just gives a coverless album
@@ -3100,9 +3130,13 @@ static void aa_handle_offer(void)
     int s, wh;
     void *workbuf;
     struct aa_src src = {0};
+    unsigned serial = aa_offer.serial;
 
+    timeout_cancel(&aa_offer_tmo);
+    aa_io_failed = false;
     aa_offer_posted = false;
-    if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
+    if (global_settings.art_cache_album_source == ART_SOURCE_FILES ||
+        aa_offer.path[0] == '\0' || !tagcache_is_usable())
         return;
     if (aa_disk_asleep())
     {
@@ -3138,12 +3172,19 @@ static void aa_handle_offer(void)
      * saves. */
     worksz = aa_work_bytes();
     if (core_allocatable() < worksz)
+    {
+        aa_offer_retry(serial);
         return;
+    }
     wh = core_alloc(worksz);
     if (wh <= 0)
+    {
+        aa_offer_retry(serial);
         return;
+    }
     workbuf = core_get_data_pinned(wh);
 
+    cache_busy = true;
     aa_ensure_dirs();
     int order[ART_CACHE_NUM_SIZES];
     int i;
@@ -3170,6 +3211,7 @@ static void aa_handle_offer(void)
 
     core_unpin(wh);
     core_free(wh);
+    cache_busy = false;
 }
 
 /* ---- checking one file ----
@@ -3277,6 +3319,7 @@ static void aa_run_check(void)
     const char *dir = path_key_strip(aa_chk.path);
     const char *dir_end = strrchr(dir, '/');
 
+    aa_io_failed = false;
     aa_chk.state = AA_CHECK_RUNNING;
     aa_chk.walked = 0;
     aa_chk.total = tagcache_get_stat()->total_entries;
@@ -3455,6 +3498,8 @@ out:
         aa_note(aa_itunes_state == AA_ITUNES_FAILED
                 ? "\nStopped: iTunes artwork index unavailable."
                 : "\nStopped: the disk was needed elsewhere");
+    else if (aa_io_failed)
+        aa_note("\nArtwork could not be saved.");
     else if (aa_chk_track[0] || aa_chk_ebook)
         aa_note("\nNow Playing updates on the next track.");
     itunes_art_close();
@@ -3512,6 +3557,8 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     aa_offer.pos = id3->albumart.pos;
     aa_offer.size = id3->albumart.size;
     aa_offer.flags = id3->albumart.type;
+    aa_offer.serial++;
+    aa_offer.retries = 0;
     if (aa_offer_posted)
         return;
     aa_offer_posted = true;
@@ -3552,7 +3599,8 @@ static enum bg_result aa_task_run(void)
     result = aa_run_pass();
     debug_log(DEBUG_LOG_ARTCACHE,
               result == BG_DONE   ? "pass complete, idle" :
-              result == BG_FAILED ? "pass failed: database unreadable" :
+              result == BG_FAILED ? (aa_io_failed ? "pass failed: artwork write"
+                                                  : "pass failed: database unreadable") :
                                     "pass interrupted");
     return result;
 }

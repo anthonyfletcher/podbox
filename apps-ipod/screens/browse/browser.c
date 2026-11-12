@@ -512,6 +512,13 @@ const struct bitmap *browser_art_row(int selected_item, void *data,
      * to fit the tighter of the two or it is cropped. */
     int want = size ? MIN(size->width, size->height) : TREE_AA_MAX_DIM;
 
+    static unsigned seen_generation;
+    unsigned generation = art_cache_generation();
+    if (generation != seen_generation && !art_cache_is_busy())
+    {
+        browser_aa_reset();
+        seen_generation = generation;
+    }
     if (!browser_aa_ready(want))
         return NULL;
 
