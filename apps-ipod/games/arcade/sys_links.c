@@ -2231,13 +2231,17 @@ NATIVE(links_step)
                 for (uint32_t s = 0; s < nsets; s++) {
                     const struct segs *sg = &sets[s];
                     /* the path's box in the set's place, wide enough for
-                     * where it was before this tick's move */
+                     * where it was before this tick's move: from the
+                     * tick's start, which seg_meet judges from, as well as
+                     * from the speed an earlier set left it */
                     int64_t sx = sg->ox >> 16, sy = sg->oy >> 16;
                     int64_t mx = sg->mx >> 16, my = sg->my >> 16;
-                    int64_t ax = (X < OX ? X : OX) >> 16;
-                    int64_t bx = (X > OX ? X : OX) >> 16;
-                    int64_t ay = (Y < OY ? Y : OY) >> 16;
-                    int64_t by = (Y > OY ? Y : OY) >> 16;
+                    int32_t lx = OX < OX0 ? OX : OX0, hx = OX > OX0 ? OX : OX0;
+                    int32_t ly = OY < OY0 ? OY : OY0, hy = OY > OY0 ? OY : OY0;
+                    int64_t ax = (X < lx ? X : lx) >> 16;
+                    int64_t bx = (X > hx ? X : hx) >> 16;
+                    int64_t ay = (Y < ly ? Y : ly) >> 16;
+                    int64_t by = (Y > hy ? Y : hy) >> 16;
                     int64_t mw = reach + (mx < 0 ? -mx : mx) + 1;
                     int64_t mh = reach + (my < 0 ? -my : my) + 1;
                     if (bx + mw < sx + sg->bx0 || ax - mw > sx + sg->bx1 ||
