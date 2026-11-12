@@ -40,7 +40,7 @@ function firstPalette(pals) {
 
 /* The names compile() writes into SRC_; any other is refused, so no name
  * reaches outside the folder */
-const SOURCE_NAME = new RegExp('^(cart\\.json|sheet\\.png|logo\\.png|flags\\.json|' +
+const SOURCE_NAME = new RegExp('^(cart\\.json|sheet\\.png|logo\\.png|flags\\.json|objects\\.json|' +
     '[^/\\\\:*?"<>|\\x00-\\x1f.][^/\\\\:*?"<>|\\x00-\\x1f]*\\.js|' +
     '(palettes/[A-Za-z_]\\w*\\.gpl|(maps|sounds|data)/[A-Za-z_]\\w*\\.json|' +
     'data/[A-Za-z_]\\w*\\.txt|fonts/[A-Za-z_]\\w*\\.bdf|editors/[A-Za-z_]\\w*\\.html|' +

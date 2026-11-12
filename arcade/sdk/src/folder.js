@@ -41,6 +41,7 @@ export function compileInput(folder) {
         if (name === 'sheet.png') { assets.sheet = asBytes(v); continue; }
         if (name === 'logo.png') { assets.logo = asBytes(v); continue; }
         if (name === 'flags.json') { assets.flags = asText(v); continue; }
+        if (name === 'objects.json') { assets.objects = asText(v); continue; }
         if (!name.includes('/')) {
             if (/\.js$/.test(name) || name === 'cart.json') files[name] = asText(v);
             continue;

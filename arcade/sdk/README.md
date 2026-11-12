@@ -110,6 +110,7 @@ A cart's art goes in the same folder:
 | `logo.png` | the cart's logo, 44x44 in its palette's colours: what a list of games shows for it, and an exported page's icon |
 | `palettes/<name>.gpl` | a palette in GIMP's format; the first, by name, is loaded when the cart starts |
 | `maps/<name>.json` | a map: `width` and `height` (up to 256), `rows` of two hex digits a cell, and `objects`, each with a `kind`, `x`, `y`, `w`, `h` in pixels and `props` of whole numbers or strings |
+| `objects.json` | the kinds of object the maps may hold, and each kind's properties with their defaults and help: see [Kinds of object](../manual/reference-maps.md#kinds-of-object) |
 | `images/<name>.png` | any other picture, up to 1024 pixels a side; after `sheet(IMG.<name>)` the sprite calls draw its 8x8 cells as sprites |
 | `data/<name>.json` | data the code reads: levels, waves, dialogue |
 | `data/<name>.txt` | text the code reads as one string |

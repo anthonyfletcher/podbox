@@ -93,7 +93,8 @@ export class MapEditor {
     /* opts: text (the JSON; readMap's error is thrown), file (its path,
      * which the tile bar is kept under), cart (its id, which with the file
      * keys the trace image), sheet (the sheet's pixels,
-     * 128x128, or null), rgb, flags (256), flagNames() (the eight, null
+     * 128x128, or null), rgb, flags (256), kinds (objects.json's, as
+     * objectKinds() reads it, or null for any), flagNames() (the eight, null
      * where none), changed(text), ask (the IDE's dialog), say(text,
      * error) */
     constructor(parent, opts) {
@@ -104,7 +105,9 @@ export class MapEditor {
         this.grid = true;
         this.layer = -1;          /* the flag whose cells are marked, or -1 */
         this.sel = -1;            /* the chosen object */
-        this.kind = 'thing';      /* the kind a new object takes */
+        this.known = opts.kinds || null;
+        /* the kind a new object takes */
+        this.kind = this.known && this.known.size ? this.known.keys().next().value : 'thing';
         this.undos = [];
         this.redos = [];
         this.hover = null;
@@ -268,10 +271,12 @@ export class MapEditor {
         const o = this.m.objects[this.sel];
         this.kindBox.hidden = this.tool !== 'object' && !o;
         this.kindInput.value = o ? o.kind : this.kind;
-        this.kindInput.title = o ? 'This object\'s kind: OBJ.' + o.kind + ' in code'
-                                 : 'The kind the next object placed takes';
+        const help = this.kindHelp(o ? o.kind : this.kind);
+        this.kindInput.title = (o ? 'This object\'s kind: OBJ.' + o.kind + ' in code'
+                                  : 'The kind the next object placed takes') + (help ? '\n' + help : '');
         this.kinds.innerHTML = '';
-        for (const k of new Set(this.m.objects.map((q) => q.kind))) {
+        for (const k of new Set([...(this.known ? this.known.keys() : []),
+                                 ...this.m.objects.map((q) => q.kind)])) {
             const opt = document.createElement('option');
             opt.value = k;
             this.kinds.append(opt);
@@ -284,6 +289,11 @@ export class MapEditor {
             this.showKind();
             return;
         }
+        if (this.known && !this.known.has(v)) {
+            this.o.say(v + ' is not a kind in objects.json: ' + [...this.known.keys()].join(', '), true);
+            this.showKind();
+            return;
+        }
         this.kind = v;
         const o = this.m.objects[this.sel];
         if (o && o.kind !== v) {
@@ -292,6 +302,11 @@ export class MapEditor {
             this.commit();
         }
         this.drawObjects();
+    }
+
+    kindHelp(kind) {
+        const k = this.known && this.known.get(kind);
+        return k ? k.help : '';
     }
 
     /* whole pixels a map pixel; a canvas no wider than 8192 */
@@ -870,6 +885,9 @@ export class MapEditor {
         head.innerHTML = '<span class="grow"></span>';
         head.firstChild.textContent = 'Object ' + this.sel;
         head.append(iconButton('trash', 'Delete it (Delete)', () => this.removeObject()));
+        const kindHelp = document.createElement('div');
+        kindHelp.className = 'map-help';
+        kindHelp.textContent = this.kindHelp(o.kind);
         const input = (value, set, type) => {
             const i = document.createElement('input');
             i.type = type || 'text';
@@ -898,24 +916,51 @@ export class MapEditor {
         const props = document.createElement('div');
         props.className = 'map-props';
         const p = o.props || {};
-        for (const [name, value] of Object.entries(p)) {
+        const kind = this.known && this.known.get(o.kind);
+        /* the kind's properties from objects.json, in its order, then any
+         * others; one this object does not set shows its default, which
+         * the build gives it */
+        const names = [...new Set([...(kind ? kind.props.keys() : []), ...Object.keys(p)])];
+        for (const name of names) {
             const row = document.createElement('div');
             row.className = 'map-prop';
+            /* one objects.json names keeps its name and its type */
+            const d = kind && kind.props.get(name);
+            const set = name in p, value = set ? p[name] : '';
             const n = input(name, (v) => {
                 if (!NAME.test(v) || (v !== name && v in p)) return false;
                 o.props = Object.fromEntries(Object.entries(p).map(([a, b]) => [a === name ? v : a, b]));
             });
-            n.title = 'mapprop(i, "' + name + '")';
-            const val = input(value, (v) => { p[name] = /^-?\d+$/.test(v.trim()) ? +v : v; o.props = p; });
-            val.title = 'A whole number, or else a string';
-            row.append(n, val, iconButton('close', 'Remove it', () => {
+            n.title = 'mapprop(i, "' + name + '")' + (d && d.help ? '\n' + d.help : '');
+            n.disabled = !!d;
+            const val = input(value, (v) => {
+                const num = /^-?\d+$/.test(v.trim());
+                /* emptied, it goes back to its default */
+                if (d && v.trim() === '') { delete p[name]; o.props = p; return; }
+                if (d && typeof d.value === 'number' && !num) return false;
+                p[name] = num && !(d && typeof d.value === 'string') ? +v : v;
+                o.props = p;
+            });
+            val.title = d ? (typeof d.value === 'number' ? 'A whole number' : 'Text') +
+                            (d.help ? '\n' + d.help : '')
+                          : 'A whole number, or else a string';
+            if (!set) val.placeholder = d.value === '' ? '(empty)' : String(d.value);
+            const remove = iconButton('close', d ? 'Back to the default' : 'Remove it', () => {
                 this.save();
                 delete p[name];
                 o.props = p;
                 this.commit();
                 this.drawObjects();
-            }));
+            });
+            if (!set) remove.style.visibility = 'hidden';
+            row.append(n, val, remove);
             props.append(row);
+            if (d && d.help) {
+                const h = document.createElement('div');
+                h.className = 'map-help';
+                h.textContent = d.help;
+                props.append(h);
+            }
         }
         const add = iconButton('plus', 'Add a property', () => {
             this.save();
@@ -929,8 +974,9 @@ export class MapEditor {
         const propHead = document.createElement('div');
         propHead.className = 'ed-sub';
         propHead.innerHTML = '<span class="grow">Properties</span>';
-        propHead.append(add);
-        this.insp.append(head, place, propHead, props);
+        /* a kind objects.json lists has the properties it gives */
+        if (!kind) propHead.append(add);
+        this.insp.append(head, ...(kindHelp.textContent ? [kindHelp] : []), place, propHead, props);
     }
 
     removeObject() {

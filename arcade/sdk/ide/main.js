@@ -35,7 +35,7 @@ import { createGame } from './game.js';
 import { VERSION, hashScreen, hashCart, memoryStore, readTape } from './replay.js';
 import { setPanelHost } from './chrome.js';
 import { missing, dither, medianCut } from './colours.js';
-import { parseGpl } from '../src/assets.js';
+import { parseGpl, objectKinds } from '../src/assets.js';
 import { hints, about } from './hints.js';
 import { ask } from './ask.js';
 import { CartEditor, CART_FILE, editorOf, isEditor, approved, approve, starterEditor } from './editors.js';
@@ -380,6 +380,7 @@ function showMap(pane, file) {
     try {
         pixels = new MapEditor(pane, {
             text: String(folder[file]), file: file, cart: cartId(), sheet: sheet, rgb: palette(folder), flags: readFlags(),
+            kinds: readKinds(),
             flagNames: flagNames, ask: ask,
             say: (text, bad) => say(bad ? 'error' : 'print', text),
             changed: (text) => { folder[file] = text; delete states[file]; changed(); }
@@ -434,6 +435,13 @@ function readFlags() {
         } catch (e) { /* the build reports it */ }
     }
     return flags;
+}
+
+/* objects.json's kinds, or null for any: none, or a file the build
+ * reports as wrong */
+function readKinds() {
+    if (folder['objects.json'] === undefined) return null;
+    try { return objectKinds(String(folder['objects.json'])); } catch (e) { return null; }
 }
 
 /* the eight flags' names from cart.json, null where none */

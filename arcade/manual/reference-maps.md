@@ -76,7 +76,8 @@ cells. It opens in the map editor:
   chosen or an object is; set it before placing, and new objects take it.
   The **Objects** panel lists them, and shows the chosen one's position,
   size and properties to change. Objects snap to whole cells unless Shift
-  is held.
+  is held. With an [`objects.json`](#kinds-of-object), the kinds come
+  from a list and each kind's properties are there to fill in.
 - **Map size** changes the map's size.
 - **A trace image** -- a picture from your computer, shown faintly under
   the map -- lets you paint a level over a sketch. It stays in your
@@ -108,6 +109,32 @@ A map is saved as `maps/<name>.json`:
   text. Up to 255 kinds across the cart's maps, 255 properties an object.
 
 The IDE writes this for you; it is plain text, so other tools can too.
+
+## Kinds of object
+
+`objects.json`, beside `cart.json`, lists the kinds of object your maps
+hold, and each kind's properties, with a default and a line of help:
+
+```json
+{
+  "coin": { "help": "A coin to collect",
+            "props": { "value": { "default": 10, "help": "Points it is worth" } } },
+  "door": { "help": "Leads to another map",
+            "props": { "to": { "default": "", "help": "The map it opens" },
+                       "locked": { "default": 0, "help": "1 if it needs a key" } } }
+}
+```
+
+- The map editor offers its kinds, and shows a chosen object's
+  properties with the help beside them. A property left empty takes its
+  default.
+- A default's type is the property's: a whole number, or text.
+- The build gives every object the defaults of the properties it does
+  not set, so `mapprop` always finds them.
+- A map with a kind or a property the file does not list, or a value of
+  the wrong type, fails the build with the map and the object named.
+
+Without the file, any kind and any property go.
 
 ---
 

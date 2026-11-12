@@ -236,6 +236,35 @@ test('asset files that cannot be used are named with what to change', () => {
     assert.match(by['maps/my-level.json'], /usable as a name in code/);
 });
 
+test('objects.json holds the maps to its kinds and properties', () => {
+    const kinds = { spawn: { help: 'Where a player starts',
+                             props: { hp: { default: 3, help: 'Lives' },
+                                      name: { default: '' } } },
+                    door: {} };
+    const files = assetCart();
+    files['objects.json'] = JSON.stringify(kinds);
+    /* assetCart's maps hold a spawn with hp and name, and a door */
+    assert.deepEqual(run(folder('objs-ok', files)).errors, []);
+
+    files['maps/c_odd.json'] = JSON.stringify({ width: 1, height: 1, objects: [
+        { kind: 'coin', x: 0, y: 0 }] });
+    files['maps/d_prop.json'] = JSON.stringify({ width: 1, height: 1, objects: [
+        { kind: 'spawn', x: 0, y: 0, props: { speed: 2 } }] });
+    files['maps/e_type.json'] = JSON.stringify({ width: 1, height: 1, objects: [
+        { kind: 'spawn', x: 0, y: 0, props: { hp: 'many' } }] });
+    let by = Object.fromEntries(run(folder('objs-bad', files)).errors
+                                .map((e) => [e.file, e.message]));
+    assert.match(by['maps/c_odd.json'], /kind coin is not in objects\.json/);
+    assert.match(by['maps/d_prop.json'], /spawn has no property speed/);
+    assert.match(by['maps/e_type.json'], /spawn\.hp is a whole number/);
+
+    const bad = assetCart();
+    bad['objects.json'] = JSON.stringify({ spawn: { props: { hp: { default: 1.5 } } } });
+    by = Object.fromEntries(run(folder('objs-file', bad)).errors
+                            .map((e) => [e.file, e.message]));
+    assert.match(by['objects.json'], /spawn\.hp: \{ "default": a whole number or text/);
+});
+
 /* A 256 by 256 map of cells that do not pack: about 64 KB in the file */
 function noiseMap(seed) {
     let s = seed;

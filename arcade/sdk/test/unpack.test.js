@@ -30,6 +30,8 @@ const ASSETS = {
     sheet: encodeIndexedPng(128, 128, picture(128, 128, 1), [0x102030], deflate),
     logo: encodeIndexedPng(44, 44, picture(44, 44, 4), [0x102030], deflate),
     flags: '{ "1": 3, "9": 128 }\n',
+    objects: '{ "door": { "help": "A way out", "props": { "to": { "default": "" },\n' +
+             '  "key": { "default": 0 } } } }\n',
     palettes: { day: 'GIMP Palette\nName: day\n#\n  0   0   0 black\n255 255 255 white\n',
                 night: 'GIMP Palette\n10 10 40\n200 200 255\n' },
     maps: { level1: JSON.stringify({ width: 4, height: 2, rows: ['01020304', '05060708'],
@@ -59,10 +61,11 @@ test('unpack gives back every file as written, and pack the same cart', () => {
     assert.deepEqual(Object.keys(files).sort(), [
         'cart.json', 'data/story.txt', 'data/waves.json', 'enemy.js', 'flags.json',
         'fonts/tiny.bdf', 'images/hud.png', 'images/title.png', 'logo.png', 'main.js', 'maps/level1.json',
-        'palettes/day.gpl', 'palettes/night.gpl', 'sheet.png', 'sounds/coin.json']);
+        'objects.json', 'palettes/day.gpl', 'palettes/night.gpl', 'sheet.png', 'sounds/coin.json']);
     for (const [name, want] of Object.entries(code)) assert.equal(text(files[name]), want, name);
     assert.deepEqual(decodeIndexedPng(files['images/title.png'], inflate).px, picture(40, 30, 2));
     assert.equal(text(files['flags.json']), ASSETS.flags);
+    assert.equal(text(files['objects.json']), ASSETS.objects);
     assert.equal(text(files['maps/level1.json']), ASSETS.maps.level1);
     assert.equal(text(files['data/waves.json']), ASSETS.data.waves);
     assert.equal(text(files['palettes/day.gpl']), ASSETS.palettes.day);

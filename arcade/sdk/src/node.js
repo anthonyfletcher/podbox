@@ -76,6 +76,8 @@ export function readAssets(dir) {
             ? new Uint8Array(fs.readFileSync(at('logo.png'))) : undefined,
         flags: fs.existsSync(at('flags.json'))
             ? fs.readFileSync(at('flags.json'), 'utf8') : undefined,
+        objects: fs.existsSync(at('objects.json'))
+            ? fs.readFileSync(at('objects.json'), 'utf8') : undefined,
         palettes: some('palettes', '.gpl', false),
         maps: some('maps', '.json', false),
         images: some('images', '.png', true),

@@ -2,6 +2,11 @@
  *
  *   sheet.png            the 128x128 sheet, an indexed PNG of palette numbers
  *   flags.json           the 256 sprite flags: an array, or { "n": flags }
+ *   objects.json         the kinds of object the maps may hold, and each
+ *                        kind's properties with their defaults
+ *                        (objectKinds()), which an object that does not
+ *                        set one takes; without it any kind and property
+ *                        goes
  *   palettes/<name>.gpl  palettes, GIMP's text format; the first is loaded
  *                        when the cart starts
  *   maps/<name>.json     { width, height, rows: ["0a0b..", ...], objects:
@@ -43,6 +48,40 @@ import { parseBdf, fontChunk, MAX_FONTS, MAX_FONT_BYTES } from './bdf.js';
 const FIRST_FONT = 3, ENGINE_FONTS = ['CAPS', 'WORLD'];
 
 const NAME = /^[A-Za-z_][\w]*$/;
+
+/* objects.json's text as a Map of kind to { help, props: Map of name to
+ * { value, help } }, value a whole number or a string, the default a new
+ * object takes. Throws on a file not of that shape:
+ *   { "coin": { "help": "...", "props": { "value": { "default": 10,
+ *                                                   "help": "..." } } } } */
+export function objectKinds(text) {
+    const f = JSON.parse(text), kinds = new Map();
+    const isText = (v) => v === undefined || typeof v === 'string';
+    if (!f || typeof f !== 'object' || Array.isArray(f))
+        throw new Error('an object of kinds: { "coin": { ... } }');
+    for (const [kind, k] of Object.entries(f)) {
+        if (!NAME.test(kind))
+            throw new Error(kind + ': a kind is a name: letters, digits and _');
+        if (!k || typeof k !== 'object' || !isText(k.help))
+            throw new Error(kind + ': { "help": text, "props": { ... } }');
+        const props = new Map();
+        for (const [name, p] of Object.entries(k.props || {})) {
+            const v = p && p.default;
+            if (!NAME.test(name))
+                throw new Error(kind + '.' + name + ': a property is a name: ' +
+                                'letters, digits and _');
+            if (!p || typeof p !== 'object' || !isText(p.help) ||
+                !(typeof v === 'string' || v === (v | 0)))
+                throw new Error(kind + '.' + name + ': { "default": a whole ' +
+                                'number or text, "help": text }');
+            props.set(name, { value: v, help: p.help || '' });
+        }
+        if (props.size > 255)
+            throw new Error(kind + ': at most 255 properties');
+        kinds.set(kind, { help: k.help || '', props: props });
+    }
+    return kinds;
+}
 const MAX_MAP = 256;
 const MAX_IMAGE = 1024;
 /* a logo's side: the player's small album art */
@@ -176,7 +215,12 @@ export function buildAssets(assets, inflate, string, errors, lazy = []) {
         } catch (e) { err('logo.png', e.message); }
     }
 
-    /* maps */
+    /* maps, held to objects.json where there is one */
+    let known = null;
+    if (assets.objects !== undefined) {
+        try { known = objectKinds(assets.objects); }
+        catch (e) { err('objects.json', e.message); }
+    }
     const maps = [], kinds = new Set();
     for (const name of sortedNames(assets.maps)) {
         const file = 'maps/' + name + '.json';
@@ -219,6 +263,24 @@ export function buildAssets(assets, inflate, string, errors, lazy = []) {
                         !(typeof props[k] === 'number' && props[k] === (props[k] | 0)))
                         throw new Error('property ' + k + ' is a whole number or ' +
                                         'a string');
+                const kn = known && known.get(o.kind);
+                if (known && !kn)
+                    throw new Error('object kind ' + o.kind + ' is not in ' +
+                                    'objects.json');
+                for (const k in props) {
+                    const p = kn && kn.props.get(k);
+                    if (kn && !p)
+                        throw new Error(o.kind + ' has no property ' + k +
+                                        ' in objects.json');
+                    if (p && typeof p.value !== typeof props[k])
+                        throw new Error(o.kind + '.' + k + ' is ' +
+                                        (typeof p.value === 'string'
+                                         ? 'text' : 'a whole number') +
+                                        ', as its default in objects.json');
+                }
+                if (kn)
+                    o.props = Object.assign(Object.fromEntries(
+                        [...kn.props].map(([k, p]) => [k, p.value])), props);
                 kinds.add(o.kind);
             }
             maps.push({ W: W, H: H, cells: cells, objects: objects });

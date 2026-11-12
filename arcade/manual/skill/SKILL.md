@@ -38,6 +38,7 @@ mygame/
   sheet.png         128x128 indexed PNG, 256 sprites of 8x8
   flags.json        sprite flags
   maps/*.json       MAP.<name>; objects as OBJ.<kind>
+  objects.json      the object kinds and their properties, with defaults
   images/*.png      IMG.<name>; a lazy one needs img.load(IMG.<name>) first
   palettes/*.gpl    PAL.<name>
   sounds/*.json     SFX.<name> (jsfxr parameters)
