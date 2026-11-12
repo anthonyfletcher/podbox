@@ -2521,41 +2521,66 @@ static int scale_of(struct vm *vm)
     return vm->d.font == 1 ? 2 : vm->d.font_big + 1;
 }
 
-/* A glyph wholly inside the clip, unpatterned, k pixels to a dot: the
- * pixels span() would draw, without a clipped call for each. */
-static void glyph(struct pen *p, uint16_t g, int32_t x, int32_t y, int k)
+/* Each small glyph's dots, and its first and last rows with any, worked
+ * out once rather than at every glyph drawn */
+static uint8_t glyph_dots[95], glyph_rows[95];  /* top << 4 | bottom */
+static int glyph_known;
+
+static void glyph_table(void)
 {
+    for (int i = 0; i < 95; i++) {
+        uint16_t g = font_small[i];
+        int top = -1, bot = 0, dots = 0;
+        for (int r = 0; r < 5; r++) {
+            uint32_t bits = (g >> (12 - r * 3)) & 7;
+            if (!bits)
+                continue;
+            dots += (int)((bits & 1) + ((bits >> 1) & 1) + (bits >> 2));
+            if (top < 0)
+                top = r;
+            bot = r;
+        }
+        glyph_dots[i] = (uint8_t)dots;
+        glyph_rows[i] = (uint8_t)(top < 0 ? 0xff : top << 4 | bot);
+    }
+    glyph_known = 1;
+}
+
+/* Small glyph i wholly inside the clip, unpatterned, k pixels to a dot:
+ * the pixels span() would draw, without a clipped call for each. */
+static void glyph(struct pen *p, uint32_t i, int32_t x, int32_t y, int k)
+{
+    uint32_t rows = glyph_rows[i];
+    if (rows == 0xff)
+        return;
+    uint16_t g = font_small[i];
     int32_t w = p->s.w;
-    uint8_t ink = p->c, *row = p->s.px + y * w + x;
-    int top = -1, bot = 0;
-    uint32_t dots = 0;
-    for (int r = 0; r < 5; r++, row += w * k) {
+    int top = (int)(rows >> 4), bot = (int)(rows & 15);
+    uint8_t ink = p->c, *row = p->s.px + (y + top * k) * w + x;
+    for (int r = top; r <= bot; r++, row += w * k) {
         uint32_t bits = (g >> (12 - r * 3)) & 7;
-        if (!bits)
-            continue;
-        dots += (bits & 1) + ((bits >> 1) & 1) + (bits >> 2);
-        if (top < 0)
-            top = r;
-        bot = r;
         if (k == 1) {
             if (bits & 4) row[0] = ink;
             if (bits & 2) row[1] = ink;
             if (bits & 1) row[2] = ink;
-            continue;
-        }
-        for (int dy = 0; dy < k; dy++) {
-            uint8_t *d = row + dy * w;
-            for (int c = 0; c < 3; c++, d += k)
-                if ((bits >> (2 - c)) & 1)
-                    for (int dx = 0; dx < k; dx++)
-                        d[dx] = ink;
-        }
+        } else if (k == 2) {
+            for (uint8_t *d = row; d < row + 2 * w; d += w) {
+                if (bits & 4) d[0] = d[1] = ink;
+                if (bits & 2) d[2] = d[3] = ink;
+                if (bits & 1) d[4] = d[5] = ink;
+            }
+        } else
+            for (int dy = 0; dy < k; dy++) {
+                uint8_t *d = row + dy * w;
+                for (int c = 0; c < 3; c++, d += k)
+                    if ((bits >> (2 - c)) & 1)
+                        for (int dx = 0; dx < k; dx++)
+                            d[dx] = ink;
+            }
     }
-    if (top >= 0) {
-        p->count += dots * (uint32_t)(k * k);
-        row_touched(p, y + top * k);
-        row_touched(p, y + bot * k + k - 1);
-    }
+    p->count += glyph_dots[i] * (uint32_t)(k * k);
+    area_touched(p, y + top * k, x, x + 3 * k - 1);
+    area_touched(p, y + bot * k + k - 1, x, x + 3 * k - 1);
 }
 
 /* Draws text at (x, y) in camera space, or with draw 0 only measures it.
@@ -2566,6 +2591,11 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
     int64_t cx = x;
     *widest = 0;
     *lines = 1;
+    if (draw && !glyph_known)
+        glyph_table();
+    /* whether the line's glyphs lie inside the clip's rows, once a line */
+    int rows_in = draw && !p->pat && y + p->oy >= p->cy0 &&
+                  y + p->oy + 5 * k <= p->cy1;
     for (uint32_t i = 0; i < n; i++) {
         uint8_t ch = (uint8_t)s[i];
         if (ch == '\n') {
@@ -2574,6 +2604,8 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
             cx = x;
             y += 6 * k;
             (*lines)++;
+            rows_in = draw && !p->pat && y + p->oy >= p->cy0 &&
+                      y + p->oy + 5 * k <= p->cy1;
             continue;
         }
         if (ch >= 0x80 && ch < 0xc0)
@@ -2583,10 +2615,10 @@ static int64_t text(struct pen *p, const char *s, uint32_t n, int64_t x,
         uint16_t g = font_small[ch - 32];
         if (draw && g)
             p->cost += k == 1 ? COST_GLYPH : COST_BIG_GLYPH;
-        if (draw && g && !p->pat && cx + p->ox >= p->cx0 &&
-            y + p->oy >= p->cy0 && cx + p->ox + 3 * k <= p->cx1 &&
-            y + p->oy + 5 * k <= p->cy1) {
-            glyph(p, g, (int32_t)(cx + p->ox), (int32_t)(y + p->oy), k);
+        if (draw && g && rows_in && cx + p->ox >= p->cx0 &&
+            cx + p->ox + 3 * k <= p->cx1) {
+            glyph(p, ch - 32u, (int32_t)(cx + p->ox), (int32_t)(y + p->oy),
+                  k);
         } else if (draw && g) {
             for (int r = 0; r < 5; r++)
                 for (int c = 0; c < 3; c++)
