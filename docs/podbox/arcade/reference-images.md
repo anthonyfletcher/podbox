@@ -59,7 +59,7 @@ images. A full-screen image, 160x120, is 19 KB.
 | `img(160, 120)` | about 1,200; `img(16, 16)` about 40 |
 | `target` | under 5 |
 
-Copying costs about seven times what clearing or filling the same pixels
+Copying costs about fifteen times what clearing or filling the same pixels
 does (see [Drawing](reference-drawing.md#how-drawing-works)). Copy what is
 needed, not the whole screen out of habit.
 
@@ -272,16 +272,16 @@ rblit(IMG.title, 115, 85, -0.05, 0.75);
 
 - **The position is the centre**, so it turns on the spot.
 - A positive angle turns it anticlockwise, as `rspr` and `sin` do.
-- It costs about four times `blit` for the same image -- about 1.8 units
+- It costs about six times `blit` for the same image -- about 2.2 units
   a pixel of the image at its own size, more when scaled up: a 96x32
-  picture is about 5,700 units turned, 8,900 doubled. A spinning logo on a
+  picture is about 6,800 units turned, 15,400 doubled. A spinning logo on a
   title screen is fine; dozens of turning things a frame are not.
 
 ## When an image is worth it
 
 Copying a pixel from an image costs about 0.3 units -- 0.05 when nothing
 in it is clear and no colour is swapped; clearing or filling one about
-0.02, and a character of text about 15. So **an image saves time
+0.02, and a character of text about 12. So **an image saves time
 only when what is in it costs more to draw than to copy.**
 
 **Worth it:**
@@ -327,8 +327,8 @@ only when what is in it costs more to draw than to copy.**
 
 **Not worth it:**
 
-- A plain background: `cls` and a few `rectfill`s are seven times cheaper
-  than copying the same area.
+- A plain background: `cls` and a few `rectfill`s are fifteen times
+  cheaper than copying the same area.
 - A few lines of text in the built-in font, which cost less printed than
   copied.
 - A full-screen copy every frame when only a corner changes: copy the

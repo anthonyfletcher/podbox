@@ -463,15 +463,15 @@ in when you share it.
 cart without a screen, printing what `printh()` prints:
 
 ```sh
-sh host/build.sh                      # needs gcc, or CLion's MinGW on Windows
+sh host/build.sh                      # needs gcc (MinGW on Windows)
 host/pbgvm mygame.pbg --ticks 100 --units
 ```
 
 `--units` reports the cost of `init()` and of each tick. A unit is about
-0.55 µs on an iPod Video with no music playing, and about twice that with
-music playing; the iPod Classic is three to four times faster. A cart
-that redraws the whole screen at 30 ticks a second has about 45,000 units
-a tick on the iPod Video with no music, and about half that with music.
+0.55 µs on an iPod Video with no music playing, and about 1.9 µs playing
+FLAC; the iPod Classic is three to four times faster. A cart that redraws
+the whole screen at 33 ticks a second has about 12,500 units a tick on an
+iPod Video playing FLAC: see the manual's *Making it fast*.
 A runtime error names the file, the line and the function.
 
 These options show what a cart drew, after the last tick:

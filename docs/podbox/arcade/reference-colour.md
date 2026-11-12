@@ -421,8 +421,9 @@ function draw() {
 
 The library **`lib/palfx.js`** has all three ready-made --
 `palfx.fade(t, rgb)`, `palfx.flash(rgb)` and `palfx.cycle(first, n,
-ticks)` -- after `palfx.keep()` has read the colours to go back to. Copy
-it into the cart and call them as above.
+ticks)`. The first fade or flash keeps the palette as it is, to go back
+to; after a `loadpal` or `setpal`, call `palfx.keep()` so they go back to
+the new colours. Copy it into the cart and call them as above.
 
 Each of these sends the whole screen on the iPod in the frames it changes
 a colour. A fade over half a second is fine; a cycle that changes every

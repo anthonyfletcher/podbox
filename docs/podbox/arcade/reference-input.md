@@ -401,6 +401,4 @@ function draw() {
 
 ![PLAY, OPTIONS, SCORES, QUIT, with SCORES on a purple bar](img/n-menu.png)
 
-- The lines are spaced for `FONT.CAPS`; for a bigger font, draw your own
-  from `menu.choice()`.
 - The library is plain cart code: copy it and change it to suit.

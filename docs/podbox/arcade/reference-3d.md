@@ -462,7 +462,7 @@ style. See the maze example above, under `plane.ceiling`.
 | Argument | |
 |---|---|
 | `solid` | flags: map cells whose sprite shares a bit with these are walls |
-| `height` | how tall, in world pixels: 8, a cell, makes cubes |
+| `height` | how tall, in world pixels: 8, a cell, makes cubes; 8 when left out |
 | `far` | how far to look, in world pixels; 512 |
 | `dark` | an array: what each colour becomes on faces running along y, so corners show |
 | `doors` | three numbers a door: its cell's column and row, and how open it is, 0 to 1 |
@@ -487,7 +487,7 @@ darker, in steps, and what is near them stays in full colour.
 | Argument | |
 |---|---|
 | `x`, `y`, `r` | each light's centre and reach: numbers for one, arrays for several |
-| `n` | how many lights |
+| `n` | how many lights; at most 4,096 |
 | `ramp` | 1 to 8 colour tables, **darkest first**: each an array taking every colour to its darker one |
 
 **Returns** nothing.

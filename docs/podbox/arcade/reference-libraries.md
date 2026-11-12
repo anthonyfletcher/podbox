@@ -41,6 +41,7 @@ is for.
 | `text.right(s, x, y, c)` | `s` ending at `x` |
 | `text.outline(s, x, y, c, edge)`, `text.shadow(s, x, y, c, under)` | `s` with an edge round it, or over its own shadow |
 | `text.box(s, x, y, w, c)` | `s` wrapped at spaces to lines `w` wide; returns the height |
+| `text.width(s)` | `s`'s width in pixels |
 
 Cutting a line short to fit, with "...", is the engine's
 [`textfit`](reference-text.md#textfittext-w-more).
@@ -61,7 +62,8 @@ and things that happen a few ticks later.
 | `fx.stop(ticks)` | a hit-stop: `fx.stopped()` is true for `ticks` |
 | `fx.step()` | once a tick, first: counts both down, and the timers |
 | `fx.view(x, y)` | `camera(x, y)` with the shake added |
-| `fx.after(ticks, id)` | `id` due in `ticks`; up to 32 wait at once |
+| `fx.x`, `fx.y` | the shake this tick, to add when drawing by hand |
+| `fx.after(ticks, id)` | `id` due in `ticks`; up to 32 wait at once, and false when all 32 are taken |
 | `fx.due()` | the next `id` due this tick, -1 when none: call it until -1 |
 
 ```js
@@ -103,7 +105,8 @@ Easing curves -- `tween.linear`, `in_quad`, `out_quad`, `in_out_quad`,
 `tween.start(arr, i, target, ticks, curve)` moves `arr[i]`, any slot of
 an array, to `target` over `ticks`; `tween.step()` advances every one
 once a tick and returns how many still run; `tween.running(arr, i)` says
-whether that one does. Up to 32 at once.
+whether that one does. Up to 32 at once: `tween.start` returns -1 when
+all are taken.
 
 ```js
 var pos = new FixArray(2);
@@ -116,8 +119,11 @@ Effects on the palette: everything on the screen changes at once,
 nothing redrawn. `palfx.fade(t, rgb)` takes the colours `t` of the way
 to `rgb`, `palfx.flash(rgb)` turns them all to it, and
 `palfx.cycle(first, n, ticks)` turns a run of entries round for water,
-lava and lights. See [Colour and palettes](reference-colour.md) for what
-a change of the palette costs.
+lava and lights. The first fade or flash keeps the palette as it then
+is, to go back to: after a `loadpal` or `setpal`, call `palfx.keep()`,
+or the effects return to the old colours. See
+[Colour and palettes](reference-colour.md) for what a change of the
+palette costs.
 
 ## dial and menu
 

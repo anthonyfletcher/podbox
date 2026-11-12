@@ -58,8 +58,9 @@ each second.
 Holding Menu for a second pauses the cart and shows the pause menu. A
 short press asks whether to quit, unless the cart takes it as a button
 (`"menu_button": "game"` in `cart.json`); the question pauses the game
-too. On the iPod, a cart left untouched for five minutes pauses as well,
-so the player can turn its backlight off. The hold switch pauses it as well. No ticks
+too. On the iPod, a cart left untouched for five minutes pauses, so the
+player can turn its backlight off, and so does sliding the hold switch
+on. No ticks
 run while paused, and a dialog (`ui.*`) holds the ticks the same way
 while it is open. [`resumed()`](#resumed) tells the cart it was paused,
 and music the cart plays itself (`playback.play`) pauses with it.
@@ -177,7 +178,7 @@ learn from `skipped()` after.
 if (unitsnow() < 9000) particles.draw(smoke);   // smoke only with room
 ```
 
-- The budget differs by player and by what it plays: about 13,000 a tick
+- The budget differs by player and by what it plays: about 12,500 a tick
   at 33 ticks a second on an iPod Video playing FLAC.
 
 ## resumed()

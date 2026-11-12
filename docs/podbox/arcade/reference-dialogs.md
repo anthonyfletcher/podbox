@@ -62,7 +62,7 @@ A list to choose one from.
 | Argument | |
 |---|---|
 | `prompt` | the question, over the list |
-| `items` | a list of 1 to 32 texts |
+| `items` | a list of 1 to 32 texts, each cut to 48 bytes |
 | `at` | the item highlighted to begin with, 0 first; 0 when left out |
 
 **Returns** the index of the item chosen, 0 first, or -1 when the player
@@ -128,10 +128,10 @@ A number, chosen with the wheel.
 | `prompt` | the question |
 | `min`, `max` | the least and the most it can be; `min` must be below `max` |
 | `value` | the number it starts at |
-| `step` | how much one turn changes it; 1 when left out |
+| `step` | how much it moves each 6 clicks of the wheel, or each press of Prev or Next; 1 when left out |
 
-**Returns** the number chosen, or `value` -- unchanged -- when backed out
-of.
+**Returns** the number chosen, or `value` -- kept between `min` and `max`
+-- when backed out of.
 
 ```js
 balls = ui.number("HOW MANY BALLS?", 1, 9, 3);

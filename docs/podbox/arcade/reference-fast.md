@@ -46,9 +46,9 @@ screen every tick:
 
 | Rate | Units a tick, at most |
 |---|---|
+| 50 | about 7,000 |
 | 33 | about 12,500 |
 | 25 | about 17,500 |
-| 50 | about 7,000 |
 | 20 | about 22,800 |
 
 In general:

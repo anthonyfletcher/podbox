@@ -351,8 +351,9 @@ function draw() {
 
 ![Two coins with their values over them, and the start marked red](img/m-objects.png)
 
-- `out` must have room for `max` objects -- five numbers each -- or the
-  cart stops with an error.
+- `out` must have room for the objects given -- five numbers each, for
+  `max` or the map's count if that is fewer -- or the cart stops with an
+  error.
 - The return is the map's whole count, so `min(mapobj(objs, 64), 64)` is
   how many were given. Make the array big enough for your largest level.
 - Usually called once, when a level starts, to set up the level's coins,

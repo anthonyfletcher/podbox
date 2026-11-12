@@ -25,9 +25,10 @@ Connect the iPod to your computer by USB; it shows up as a drive. Make a
 folder on it called `Games`, copy `bat_and_ball.pbg` into it, and eject
 the iPod.
 
-On the iPod, go to **Files**, open `Games`, and select
-`bat_and_ball.pbg`. The game starts. **Menu** brings up the pause menu --
-with your high scores, your Lives setting and your New game item -- and
+On the iPod, choose **Arcade** on the main menu: the game is there, by
+its name. Select it and it starts (it is also in **Files**, under
+`Games`). Holding **Menu** for a second brings up the pause menu -- with
+your high scores, your Lives setting and your New game item -- and
 **Quit** leaves the game.
 
 To update it, save it again from the IDE and copy it over the old one.
@@ -60,8 +61,8 @@ As each player, each tick takes as long as it would on that iPod. The line
 at the bottom right of the IDE says how it is doing: "33 frames a second
 as an iPod Video, playing FLAC" means it keeps up. FLAC is the heaviest
 music to play alongside a game, so a game that keeps up there keeps up
-everywhere. A lower number than
-33 means frames are being dropped -- it would stutter on the iPod.
+everywhere. A lower number than 33 means frames are being dropped -- it
+would stutter on the iPod.
 
 ## Where the time goes
 
@@ -129,8 +130,9 @@ The reference's **Making it fast** goes through each.
 
 Every time you run the game in the IDE, it is recorded: every press of a
 button, every turn of the wheel, and where its random numbers started
-from, so the run can be played again exactly. **Run > Replay the last run** does that, frame
-for frame, and then hands the game back to you where the recording ends.
+from, so the run can be played again exactly. **Run > Replay the last
+run** does that, frame for frame, and then hands the game back to you
+where the recording ends.
 
 Replays are for two things:
 

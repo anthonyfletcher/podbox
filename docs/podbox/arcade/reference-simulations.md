@@ -407,6 +407,7 @@ A pool's fields, plain arrays you read and write:
 | `bounce` | how much of a point's speed into a line it keeps, bounced back: 0 none |
 | `passes` | how many times a step pulls the links straight: 4; more is stiffer |
 | `tear` | above 0, a link stretched more than this share past its length breaks |
+| `field`, `rules`, `field_x`, `field_y` | a cells field, its rules and where its top left lies, as an actor pool takes them: points are kept out of its solid cells and slowed in its liquids |
 | `points`, `links`, `broken` | how many points and links are used, and how many broke |
 
 ## links.pool(points, links)

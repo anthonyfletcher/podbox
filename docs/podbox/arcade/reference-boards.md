@@ -134,10 +134,10 @@ its cells.
 hold them all.
 
 ```js
-var cells = new Int32Array(W * H);
-var n = grid.region(board, W, x, y, cells);
+var group = new Int32Array(W * H);
+var n = grid.region(board, W, x, y, group);
 if (n >= 3)                            // a group of three or more: pop it
-    for (var k = 0; k < n; k++) board[cells[k]] = 0;
+    for (var k = 0; k < n; k++) board[group[k]] = 0;
 ```
 
 - The groups in a "same game" or bubble puzzle: find the group under the
@@ -424,8 +424,9 @@ function draw() {
   partly above it; past the sides or the bottom does not.
 - The usual drop: move the piece down while it fits one row lower, and
   place it when it no longer does.
-- `rotate` writes into `out`, never into `s`: keep the piece and its turn
-  in two arrays, and swap them when the turn fits.
+- `out` may be `s` itself, turning the piece in place. To try a turn
+  before keeping it, write it into a second array, test that with `fits`,
+  and swap the two when it fits.
 
 ---
 
@@ -538,7 +539,7 @@ function draw() {
   than a field: about 1,300 units corner to corner on 20x15, against
   2,300. Among walls it searches further and can cost more: on the board
   above, about 1,650 against 1,600 for a field.
-- It needs 8 bytes of scratch a cell, and boards up to 65,535 cells.
+- It needs 10 bytes of scratch a cell, and boards up to 65,535 cells.
 
 ## path.sight(b, w, solid, x0, y0, x1, y1)
 

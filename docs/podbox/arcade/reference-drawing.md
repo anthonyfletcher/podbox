@@ -209,7 +209,7 @@ rect(10, 70, 69, 109, 11);       // an edge round a filled box
   square. For a box `w` wide at `x`, the far corner is `x + w - 1`.
 - The corners can be given in either order.
 - `rectfill` is the fastest way to colour many pixels: a whole screen is
-  about 1,350 units.
+  about 460 units.
 
 ## circ(x, y, r, [c])
 ## circfill(x, y, r, [c])
@@ -235,8 +235,8 @@ circ(110, 60, 30, 10);           // a yellow edge on an orange disc
 
 - The circle is `2 * r + 1` pixels across: radius 0 is a single pixel,
   radius 3 a ball 7 pixels wide. A negative radius draws nothing.
-- A large outline costs more than the same circle filled: about 850 units
-  for `circ` of radius 50, against 720 for `circfill`.
+- A large outline costs more than the same circle filled: about 830 units
+  for `circ` of radius 50, against 550 for `circfill`.
 
 ## oval(x0, y0, x1, y1, [c])
 ## ovalfill(x0, y0, x1, y1, [c])
@@ -286,7 +286,7 @@ tri(80, 20, 150, 60, 90, 110, 7);
 
 - Three points in a line draw that line.
 - Triangles make any flat shape: a ship, an arrow, a polygon in pieces. A
-  large one costs more than a rectangle of the same area -- about 1,600
+  large one costs more than a rectangle of the same area -- about 1,100
   units for one across half the screen.
 
 ---

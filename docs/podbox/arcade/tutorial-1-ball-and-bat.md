@@ -126,7 +126,7 @@ function update() {
 ```
 
 Run it. The ball slides right and off the edge of the screen -- here it is
-after a second's worth of ticks:
+after 30 ticks, nearly a second:
 
 ![The ball after 30 ticks, 30 pixels to the right](img/t1-move.png)
 

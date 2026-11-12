@@ -13,10 +13,12 @@ Start from the cart you finished in chapter 4.
 
 ## The pause menu
 
-Press **Menu** on the iPod while a cart runs, and the game stops and the
-pause menu comes up. It always has:
+Hold **Menu** for a second on the iPod while a cart runs, and the game
+stops and the pause menu comes up (a short press asks whether to quit).
+It always has:
 
 - **Resume**, back to the game;
+- **Game Sound**, to mute the game's own sounds;
 - **Now Playing**, to see and change the music;
 - **Restart**, to start the cart again from the beginning;
 - **Quit**, back to the iPod's menus.
@@ -160,8 +162,9 @@ closes, `start()` runs, and play carries on from a fresh game.
 
 ## Seeing it on the iPod
 
-Save the cart (**Cart > Save as .pbg**), copy it to the iPod, and open it
-from Files. Play a game to the end: the table comes up. Then press Menu:
+Save the cart (**Cart > Save as .pbg**), copy it to the iPod, and start
+it from the Arcade on the main menu. Play a game to the end: the table
+comes up. Then hold Menu for a second:
 
 - **Lives** is a row with the number beside it; select it to change it.
 - **High Scores** shows the table any time.

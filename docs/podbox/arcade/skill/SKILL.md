@@ -18,18 +18,21 @@ example and its cost.
 | `reference-sprites.md`, `reference-images.md`, `reference-maps.md` | the sheet, image sheets, images and targets, maps and objects |
 | `reference-input.md`, `reference-sound.md`, `reference-time.md` | buttons and the wheel, sound effects, ticks and rates |
 | `reference-saving.md`, `reference-scores.md`, `reference-dialogs.md`, `reference-music.md` | saves and data, boards/options/achievements/pause menu, dialogs and speech, the owner's music and the beat |
-| `reference-actors.md`, `reference-boards.md`, `reference-simulations.md`, `reference-3d.md` | the native systems |
+| `reference-actors.md`, `reference-boards.md`, `reference-simulations.md`, `reference-3d.md` | the systems: actors, particles and sprite batches; grids, paths and noise; cells, links and segment sets; the plane, walls, the landscape and lights |
+| `reference-cart.md`, `reference-libraries.md` | `cart.json` and the cart's files; the script libraries in `tools/arcade/lib/` |
 | `reference-fast.md` | units, the budget, the profiler, what costs what |
 | `tutorial-*.md` | a whole game built step by step |
 
-`tools/arcade/api.md` lists every function on one line each, as an index.
-`tools/arcade/README.md` has `cart.json`'s keys and the asset files.
+**Read `tools/arcade/api.md` first** for what exists: every function,
+with its optional arguments in brackets, on one line each. Colours are
+0-255 and positions are rounded down. Then read the chapter for how it
+behaves and what it costs.
 
 ## The shape of a cart
 
 ```
 mygame/
-  cart.json         id (16 hex digits -- never change it), name, rate, music, suspend, boards, options, achievements, flags, lazy_images
+  cart.json         id (16 hex digits -- never change it), name, author, version, help, rate, music, menu_button, suspend, boards, options, achievements, flags, lazy_images
   main.js           init(), update(), draw(): the top level holds declarations only
   util.js           any other file is a namespace: util.f(), util.count
   sheet.png         128x128 indexed PNG, 256 sprites of 8x8
@@ -73,8 +76,8 @@ The ones that make wrong games rather than compile errors:
     are palette numbers; `rgb(0xff8800)`, with a literal only, gives the
     nearest in the palette the cart starts in.
 12. **An `Int32Array` out array rounds down.** `plane.project`,
-    `plane.pick` and `path.ray` give fractions: pass a plain array when
-    they matter (a projected scale under 1 becomes 0).
+    `plane.pick` and `path.ray` give fractions: pass a plain array or a
+    `FixArray` when they matter (a projected scale under 1 becomes 0).
 
 ## Build, run, look
 
@@ -143,10 +146,10 @@ Measured costs to plan with (more in `reference-fast.md`):
 |---|---|
 | `cls()`, `rectfill` of the whole screen | ~200, ~460 (0.01-0.02 a pixel) |
 | copying pixels: `blit`, `map`, `spr` | ~0.3 a pixel: full-screen blit 6,000, 1,000 with `palt(0, false)` and no `pal`; full-screen map ~8,700 |
-| `spr` 8x8 | ~67; ~25 off the screen |
+| `spr` 8x8 | ~67; ~26 off the screen |
 | `pset` | ~10, plus ~4 a loop turn |
-| `print` in `FONT.CAPS` | ~18 a character (31 in `FONT.WORLD`) |
-| a native call | ~8 |
+| `print` in `FONT.CAPS` | ~12 a character (34 in `FONT.WORLD`) |
+| a native call | ~3 |
 
 When over budget:
 
@@ -164,7 +167,7 @@ When over budget:
 - **Step down the rate**: on overrun, `setrate(25)` and scale speeds by
   `33.0 / rate()` (Plane Test does this).
 
-The owner profiles in the IDE (Run > Run and profile), where `prof()`
+Profile in the IDE (Run > Run and profile), where `prof()`
 sections are rows of their own and `watch()` values show in View >
 Watch, and replays runs (Run > Replay the last run). On the command line,
 compare `--units` before and after, and wrap a suspect stretch in

@@ -119,7 +119,8 @@ function update() {
   it cut itself off: coins on channel 1 means a run of quick pickups
   restarts the coin each time rather than piling four up. Leave music-like
   sounds their own channel, and let the rest share.
-- `sfx(-1, channel)` stops that channel.
+- `sfx(-1, channel)` stops that channel. Always give the channel with -1:
+  left out, it stops whichever channel a new sound would have taken.
 - A number that is not one of the cart's effects, or a channel other than
   0 to 3, stops the cart with an error.
 
@@ -174,7 +175,7 @@ Plays a plain note, made as it plays rather than stored.
 |---|---|
 | `channel` | the channel, 0 to 3, or -1 for the first silent one |
 | `hz` | its pitch, in hertz: 440 is the A above middle C; up to 20,000 |
-| `ticks` | how long, in ticks of the cart (at 33 a second, 33 is a second) |
+| `ticks` | how long, in ticks of the cart (at 33 a second, 33 is a second); at most 3,000 |
 | `vol` | its loudness, 0 to 255 |
 | `wave` | `WAVE.SQUARE`, `WAVE.SAW`, `WAVE.TRIANGLE`, `WAVE.SINE` or `WAVE.NOISE` |
 

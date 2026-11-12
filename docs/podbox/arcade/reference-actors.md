@@ -139,8 +139,8 @@ Turns on the first free actor in a pool, with its speed cleared.
 
 **Returns** the actor's index, or **-1 when every actor is in use**.
 
-- It sets `on`, clears `dx`, `dy` and `cell`, and leaves the rest as they
-  were: set `x`, `y` and `sp` after spawning. Check for -1 before using
+- It sets `on`, clears `dx`, `dy`, `cell` and `zone`, and leaves the rest
+  as they were: set `x`, `y` and `sp` after spawning. Check for -1 before using
   the index.
 - To remove an actor, set `on` to 0: it is free for the next `spawn`.
 
@@ -544,7 +544,7 @@ balls, marbles, pinball bumpers.
 
 **Returns** how many pairs touched.
 
-Each actor is a circle **centred in its hitbox, half its width across**.
+Each actor is a circle **centred in its hitbox, as wide as it**.
 Touching circles are pushed apart and their speeds bounced: with `b` the
 same pool, both of a pair move, as balls of one weight do; with another
 pool, `b`'s actors stand still -- pegs and bumpers -- and only `a`'s give

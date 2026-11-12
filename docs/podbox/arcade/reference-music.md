@@ -136,7 +136,7 @@ level but `enqueue`, above.
 |---|---|
 | `tracks.count([filter])` | how many tracks match |
 | `tracks.pick(n, filter, out)` | `n` tracks at random that match, their ids into `out` (an `Int32Array` or a list); how many it found |
-| `tracks.field(id, f)` | one thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as text, `TRACK.YEAR` or `LENGTH` (ms) as a number |
+| `tracks.field(id, f)` | one thing about a track: `TRACK.TITLE`, `ARTIST`, `ALBUM` or `GENRE` as text, `TRACK.YEAR` or `LENGTH` (ms) as a number; null for a track or field there is not |
 | `tracks.near(id, n, out, [sound])` | up to `n` tracks (64 at most) most like `id` -- the same genre and decade first -- into `out`; how many. With `sound` true, those that sound most like it, nearest first, by the Sound Index; none when `id` has not been measured. `id` can be a list of up to 10 tracks: `out` then holds `n` for each in turn, -1 after the last of each |
 | `tracks.sound(id, out)` | a track's Sound Index (below) |
 | `tracks.queued()` | how many tracks the queue holds |
@@ -398,8 +398,9 @@ there, so these are hits that are about to be heard.
 
 **Returns** how many hits; each is its time, its bands (1 low, 2 mid, 4
 high, added together) and its strength (128 level with the hits round it,
-192 an accent). Only while listening. `beat.horizon()` is how far ahead it
-can see -- about two seconds -- or -1 when not listening.
+192 an accent). Only while listening. `beat.horizon()` is the track time,
+in ms, up to which `beat.ahead` can see -- about two seconds past
+`beat.clock()` -- or -1 when not listening.
 
 - This is the costly path: the cart must keep listening, about 6,300 units
   a tick, for as long as it reads hits ahead.

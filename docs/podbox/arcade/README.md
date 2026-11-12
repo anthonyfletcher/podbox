@@ -75,8 +75,8 @@ example and what it costs.
   sprite batches
 - [Boards and paths](reference-boards.md) -- grids for puzzles, finding
   paths, and noise
-- [Simulations](reference-simulations.md) -- falling sand, Life, ropes
-  and cloth
+- [Simulations](reference-simulations.md) -- falling sand, Life, ropes,
+  cloth, soft bodies, and outlines as solid ground
 - [3D views](reference-3d.md) -- a map as a floor in perspective,
   landscapes, walls and light
 

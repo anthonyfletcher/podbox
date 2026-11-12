@@ -229,8 +229,9 @@ Change the hit to:
   about -12 at the left end to 12 at the right. Divided by 5.0 that is a
   speed across of up to about 2.4 either way.
 
-Note the `5.0`. With `5`, two whole numbers would divide to a whole
-number, and the ball could only go across at speeds of -2, -1, 0, 1 or 2.
+Note the `5.0`. Two whole numbers divide to a whole number, so when the
+ball and the bat both sit on whole pixels, `/ 5` would give only -2, -1,
+0, 1 or 2; `5.0` keeps the fraction whatever they hold.
 
 ![A game in play, POINTS 5 and three lives](img/t2-playing.png)
 

@@ -64,7 +64,7 @@ flags section) and code can use them by name: a flag named `solid` is
 | `sprites.draw`, each sprite | about 34 |
 | `fget`, `sget` | under 5 |
 
-A sprite wholly off the screen costs only the call, about 30 whatever its
+A sprite wholly off the screen costs only the call, about 26 whatever its
 size, so there is no need to test for that before drawing. Most of a plain
 `spr`'s cost is the call itself. A hundred sprites a frame is
 about 6,700 units, half the budget on an iPod Video playing FLAC;
@@ -119,7 +119,7 @@ is.
 | Argument | |
 |---|---|
 | `sx`, `sy` | the rectangle's top left on the sheet, in pixels |
-| `sw`, `sh` | its width and height on the sheet; 8 and 8 when left out |
+| `sw`, `sh` | its width and height on the sheet |
 | `dx`, `dy` | where its top left goes on the screen |
 | `dw`, `dh` | its width and height on the screen; the same as `sw`, `sh` when left out |
 | `flip` | as for `spr`: 1 to mirror it left to right, 2 to turn it upside down, 3 both; `true` is 1 |
