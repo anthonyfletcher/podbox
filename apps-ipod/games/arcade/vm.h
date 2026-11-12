@@ -175,6 +175,7 @@ struct draw
     uint8_t transparent[32];
     uint16_t xlat[256];         /* dpal[c], or 0x100 if c is transparent */
     uint8_t xlat_stale;         /* set when either changes */
+    uint8_t xlat_plain;         /* xlat[c] is c for every c: a copy */
     uint32_t rgb[256];          /* each entry as 0xRRGGBB */
     uint32_t shown[256];        /* rgb[spal[i]], what present uses */
     int palette_changed;

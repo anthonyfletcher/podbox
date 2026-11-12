@@ -70,9 +70,13 @@ static void reset_palettes(struct draw *d)
 static const uint16_t *xlat_of(struct draw *d)
 {
     if (d->xlat_stale) {
-        for (int c = 0; c < 256; c++)
+        int plain = 1;
+        for (int c = 0; c < 256; c++) {
             d->xlat[c] = d->transparent[c >> 3] & (1 << (c & 7))
                          ? XLAT_CLEAR : d->dpal[c];
+            plain &= d->xlat[c] == c;
+        }
+        d->xlat_plain = (uint8_t)plain;
         d->xlat_stale = 0;
     }
     return d->xlat;
@@ -1901,12 +1905,75 @@ static int walk_to(struct walk *w, int64_t qx, int64_t qy, int curve)
 /* One outline, points s to e - 1 and back to s, as a TrueType outline:
  * lines from point to point, but a point with bend non-zero bends the
  * line through it */
+/* A point's place against the clip's rows and right edge: 1 on or above
+ * the first row's middle, 2 below the last's, 4 right of it */
+static unsigned poly_code(const struct poly *g, int64_t x, int64_t y,
+                          int64_t top, int64_t bot)
+{
+    return (unsigned)(y <= top) | (unsigned)(y > bot) << 1 |
+           (unsigned)(x > g->xr) << 2;
+}
+
+/* An outline without curve points, s to e - 1 and back to s, as
+ * poly_line would take each line: one with both ends above the clip's
+ * rows, or both below, or level, makes no edge, and one with both right
+ * of it only its count, so neither is set up as an edge -- most of a
+ * long level outline when a part of it is in view */
+static int poly_plain(struct poly *g, const struct pen *p,
+                      const struct column *xs, const struct column *ys,
+                      uint32_t s, uint32_t e)
+{
+    int64_t top = ((int64_t)g->y0 << 16) + 32768;
+    int64_t bot = ((int64_t)(g->y1 - 1) << 16) + 32768;
+    int64_t ax, ay, bx, by, sx, sy;
+    poly_point(p, xs, ys, s, &ax, &ay);
+    sx = ax;
+    sy = ay;
+    unsigned ca = poly_code(g, ax, ay, top, bot);
+    for (uint32_t i = s + 1; i <= e; i++) {
+        if (i < e)
+            poly_point(p, xs, ys, i, &bx, &by);
+        else {
+            bx = sx;
+            by = sy;
+        }
+        unsigned cb = poly_code(g, bx, by, top, bot), both = ca & cb;
+        if (ay != by && !(both & 3)) {
+            if (both & 4) {
+                /* as poly_line counts it: only where its rows meet the
+                 * clip's, and wherever it reaches */
+                int64_t ly = ay < by ? ay : by, hy = ay > by ? ay : by;
+                int64_t r0 = (ly - 32768 + 65535) >> 16;
+                int64_t r1 = (hy - 32768 + 65535) >> 16;
+                if (r0 < g->y0)
+                    r0 = g->y0;
+                if (r1 > g->y1)
+                    r1 = g->y1;
+                if (r0 < r1) {
+                    if (ax < g->xmin) g->xmin = ax;
+                    if (ax > g->xmax) g->xmax = ax;
+                    if (bx < g->xmin) g->xmin = bx;
+                    if (bx > g->xmax) g->xmax = bx;
+                    g->aside++;
+                }
+            } else if (!poly_line(g, ax, ay, bx, by))
+                return 0;
+        }
+        ax = bx;
+        ay = by;
+        ca = cb;
+    }
+    return 1;
+}
+
 static int poly_outline(struct poly *g, const struct pen *p,
                         const struct column *xs, const struct column *ys,
                         const struct column *bend, uint32_t s, uint32_t e)
 {
     if (e - s < 2)
         return 1;
+    if (bend->tag == T_INT && bend->k == 0)
+        return poly_plain(g, p, xs, ys, s, e);
     uint32_t n = e - s, j = 0;
     while (j < n && column_at(bend, s + j, 0))
         j++;
@@ -3106,17 +3173,26 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         if (v1 > v0)
             p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_COPY / 16;
         int32_t ua = (int32_t)u0, ub = (int32_t)u1;
+        /* the pen's own table, every colour itself and none clear */
+        const int plain = xl == p->d->xlat && p->d->xlat_plain;
         for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
             int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - v : v);
             if (yy < 0 || yy >= sh_img)
                 continue;
             const uint8_t *srow = src + yy * sw_img;
             uint8_t *drow = p->s.px + ((int32_t)dy + v) * stride + (int32_t)dx;
-            uint32_t n = fx ? copy_row(drow + ua, srow + (int32_t)sx +
-                                       (int32_t)w - 1 - ua, ub - ua, -1, xl)
-                            : copy_row_forward(drow + ua,
-                                               srow + (int32_t)sx + ua,
-                                               ub - ua, xl);
+            uint32_t n;
+            if (fx)
+                n = copy_row(drow + ua, srow + (int32_t)sx + (int32_t)w - 1 -
+                             ua, ub - ua, -1, xl);
+            else if (plain) {
+                /* nothing clear and no colour swapped: a plain copy, about
+                 * 0.7 cycles a pixel on the rig against 12 */
+                memcpy(drow + ua, srow + (int32_t)sx + ua, (size_t)(ub - ua));
+                n = (uint32_t)(ub - ua);
+            } else
+                n = copy_row_forward(drow + ua, srow + (int32_t)sx + ua,
+                                     ub - ua, xl);
             if (n) {
                 p->count += n;
                 area_touched(p, (int32_t)dy + v, (int32_t)dx + ua,
