@@ -90,6 +90,7 @@ function present(e) {
  * player's rule applies -- behind by a whole tick, one update without
  * drawing; further behind, the time is given up. */
 let clock, seen = null;
+const HELD_BACK = 250;              /* ms the page may run late, caught up */
 
 function rebase(e) {
     seen = null;
@@ -99,6 +100,10 @@ function rebase(e) {
 
 async function until(ms, e, live) {
     await sleep(clock.real + ms - performance.now());
+    /* the page held back -- a tab out of sight runs its timers late --
+     * is time the player never had: given up, not caught up */
+    const over = performance.now() - (clock.real + ms);
+    if (over > HELD_BACK) clock.real += over;
     if (!paused && !choosing) return;
     while ((paused || choosing) && live()) await sleep(50);
     rebase(e);
@@ -582,7 +587,7 @@ window.addEventListener('keydown', (e) => {
     }
     if (!running) return;
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        clicksOwed += e.key === 'ArrowDown' ? 8 : -8;
+        clicksOwed += e.key === 'ArrowDown' ? 4 : -4;
         e.preventDefault();
         return;
     }

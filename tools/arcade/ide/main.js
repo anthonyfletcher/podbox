@@ -776,6 +776,7 @@ const MANUAL = 'https://github.com/anthonyfletcher/podbox/blob/master/docs/podbo
  * late the player's rule applies -- behind by a whole tick, one update
  * without drawing; further behind, the time is given up. */
 let clock;
+const HELD_BACK = 250;              /* ms the page may run late, caught up */
 
 function clockStart() {
     clock = { real: performance.now(), emu: 0, start: 0, frame: 0, drawn: [] };
@@ -791,6 +792,10 @@ function rebase(e) {
 
 async function until(ms, e, live) {
     await sleep(clock.real + ms - performance.now());
+    /* the page held back -- a tab out of sight runs its timers late --
+     * is time the player never had: given up, not caught up */
+    const over = performance.now() - (clock.real + ms);
+    if (over > HELD_BACK) clock.real += over;
     if (!paused && !held()) return;
     while ((paused || held()) && live()) await sleep(50);
     rebase(e);
@@ -1205,7 +1210,7 @@ const KEYS = { ArrowLeft: PREV, ArrowRight: NEXT, Escape: MENU, ' ': PLAY, Enter
 
 $('screen').addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        clicksOwed += e.key === 'ArrowDown' ? 8 : -8;
+        clicksOwed += e.key === 'ArrowDown' ? 4 : -4;
         e.preventDefault();
         return;
     }
