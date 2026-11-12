@@ -53,6 +53,21 @@ At step 3 the image file is used first and the embedded cover when there is none
 kind; steps 1 and 2 are used whatever it says. An album in disc folders (`CD1`, `CD2`) can
 keep its image in the folder above them. The README says which kinds of image work.
 
+For music copied with iTunes, the art cache also reads thumbnails from
+`iPod_Control/Artwork` when neither an image file nor embedded art supplies a
+cover. Run Update Art Cache after syncing. This fallback is available with
+either source order and with tags only; files only excludes it. It also applies
+to audiobook tracks registered in iTunesDB. People's pictures still use image
+files; standalone ebook covers follow the book index. The generated cache serves Now
+Playing, lists and accessory artwork through their usual cache lookup.
+
+This reads plain `iTunesDB`, `ArtworkDB` and RGB565 thumbnail formats 1055,
+1060 and 1061. Compressed databases and other thumbnail layouts are not
+supported. Indexing needs free memory proportional to the database size; when
+that memory is unavailable, the job stops and keeps existing thumbnails until
+a later attempt. Indexing starts only when a track needs the fallback.
+It never borrows the audio buffer or writes to the iTunes databases.
+
 A book's folder gives it a cover only when the book has the folder to itself. So with several
 books loose in one folder, name each one's image after the book, as in step 2. A folder named
 after the book's author is the author's, and its image is their picture, not the book's cover.

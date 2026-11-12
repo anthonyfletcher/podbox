@@ -1,5 +1,6 @@
 """Build small sanitized host probes with the target simulator's headers."""
 from pathlib import Path
+import re
 import os
 import shlex
 import subprocess
@@ -38,3 +39,18 @@ def link(name, source, objects):
     path.write_text(source)
     run([CC, *FLAGS, path, *objects, "-Wl,--gc-sections", "-o", OUT / name], "link-" + name)
     return OUT / name
+
+def function(path, name):
+    text = (ROOT / path).read_text()
+    match = re.search(r'(?m)^[A-Za-z_][\w \t*]*\b' + name + r'\s*\([^;{}]*\)\s*\{', text)
+    assert match, name
+    start, brace, depth = match.start(), match.end() - 1, 0
+    pattern = r'/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[{}]'
+    for token in re.finditer(pattern, text[brace:], re.S):
+        if token.group() == '{':
+            depth += 1
+        if token.group() == '}':
+            depth -= 1
+            if not depth:
+                return '\n#line %d "%s"\n%s\n' % (text[:start].count('\n') + 1, path, text[start:brace + token.end()])
+    raise ValueError(name)

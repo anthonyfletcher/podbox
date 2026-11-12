@@ -5,6 +5,8 @@ From a clean checkout, run:
 ```sh
 python3 tools/tests/albumart/metadata.py
 python3 tools/tests/albumart/decode.py
+python3 tools/tests/albumart/itunes.py
+python3 tools/tests/albumart/cache.py
 ```
 
 Dependencies: Python 3, GNU make, GCC with ASan/UBSan and SDL2 development
@@ -18,6 +20,17 @@ all eight EXIF orientations by dimensions and quadrant pixels, buffer limits,
 and request cancellation while another decode runs without that callback.
 Metadata helpers linked for byte-stream decoding are not instrumented in this
 probe; the separate metadata probe instruments the affected parsers.
+The iTunes probe generates 2,000 tracks and images, builds the production
+indexes, and makes 10,000 lookups with bounded read counts. It checks valid
+small thumbnails followed by missing, short or unsafe larger candidates,
+decoded pixels, exact-path collision checks, allocation failure, short headers
+and an isolated UTF-16 low surrogate. Its core allocator is a deterministic
+host port. The cache probe extracts the production source-selection function
+unchanged and supplies deterministic source/decode ports. It checks fallback,
+files-only exclusion and the central-cover override. It also checks lazy
+one-attempt-per-job indexing, failed-index preservation in passes/checks,
+deferred check invalidation and a later job's retry. The real index probe
+checks that valid empty artwork does not open or scan iTunesDB.
 
 The default output is `build-art-tests/` in the checkout. Supply a directory
 as the first argument to keep separate runs. Logs contain each command and

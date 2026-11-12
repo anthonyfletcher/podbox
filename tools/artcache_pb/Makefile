@@ -41,6 +41,7 @@ SRC := artcache_pb.c stubs.c \
        $(APPS)/metadata/art_cache.c \
        $(APPS)/metadata/art_name.c \
        $(APPS)/metadata/albumart.c \
+       $(APPS)/metadata/itunes_art.c \
        $(APPS)/draw/image_load.c \
        $(APPS)/draw/jpeg_load.c \
        $(APPS)/draw/png_load.c \

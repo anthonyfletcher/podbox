@@ -42,6 +42,7 @@
 #include "rbpaths.h"
 #include "metadata.h"
 #include "albumart.h"
+#include "itunes_art.h"
 #include "art_cache.h"
 #include "art_name.h"
 #include "art_sizes.h"
@@ -1130,10 +1131,16 @@ struct aa_src
     off_t         emb_pos;   /* embedded image offset, or -1 for a whole file */
     unsigned long emb_size;  /* embedded image length (embedded only) */
     int           emb_flags; /* embedded mp3_albumart type and flags */
+    const struct itunes_art *itunes; /* raw thumbnail, or NULL */
 };
 
 /* Rendering a book's cover: fitted at its own shape, never cropped */
 static bool aa_book;
+static struct itunes_art aa_itunes;
+static enum
+{
+    AA_ITUNES_UNTRIED, AA_ITUNES_ABSENT, AA_ITUNES_READY, AA_ITUNES_FAILED
+} aa_itunes_state;
 
 /* Read the source image into `bm` with `fmt`, requesting a `w` x `h` target (the
  * readers treat that as the resize target, or overwrite it with the source's own
@@ -1146,6 +1153,9 @@ static int aa_read_source(const struct aa_src *src, struct bitmap *bm, int fmt,
     bm->width = w;
     bm->height = h;
     bm->format = FORMAT_NATIVE;
+
+    if (src->itunes)
+        return itunes_art_decode(src->itunes, bm, workbuf_sz, fmt, NULL);
 
     struct image_src is = {
         .fd = open(src->path, O_RDONLY),
@@ -1669,6 +1679,27 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
     return false;
 }
 
+/* Resolve the optional index once, only after ordinary cover sources fail. */
+static bool aa_find_itunes(const char *path, bool *aborted)
+{
+    if (aa_itunes_state == AA_ITUNES_UNTRIED)
+    {
+        if (!file_exists(ITUNES_ARTWORK_DB))
+            aa_itunes_state = AA_ITUNES_ABSENT;
+        else
+            aa_itunes_state = itunes_art_open(aa_check_abort)
+                              ? AA_ITUNES_READY : AA_ITUNES_FAILED;
+    }
+    if (aa_itunes_state == AA_ITUNES_FAILED)
+    {
+        aa_note("iTunes artwork index unavailable");
+        *aborted = true;
+        return false;
+    }
+    return aa_itunes_state == AA_ITUNES_READY
+           && itunes_art_find(path, &aa_itunes);
+}
+
 /* Resolve one work's cover art and bring its thumbnails in line with it.
  * `probe_path` is its first track; `dh` is the cache key and `slot` its table
  * entry. A file in /Artwork/Covers named for it comes first, then, as 'w'
@@ -1683,7 +1714,8 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
 {
     int source = global_settings.art_cache_album_source;
     bool embedded = source != ART_SOURCE_FILES;
-    struct aa_src src;
+    struct aa_src src = {0};
+    unsigned stamp;
 
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
         return true;
@@ -1721,14 +1753,30 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
                 return false;
             }
             if (aa_find_embedded(probe_path, &src))
-                return aa_fill(&src, AA_STAMP_EMBEDDED, dh, slot,
-                               workbuf, worksz, aborted);
+            {
+                stamp = AA_STAMP_EMBEDDED;
+                goto fill;
+            }
         }
     }
 
     if (source == ART_SOURCE_EMBEDDED_FIRST && w->folder
         && aa_find_file(probe_path))
         goto from_file;
+
+    if (embedded && aa_find_itunes(probe_path, aborted))
+    {
+        stamp = aa_art_stamp(ITUNES_ARTWORK_DB) ^
+                         aa_art_stamp(aa_itunes.path) ^ (unsigned)aa_itunes.pos;
+        if (stamp <= AA_STAMP_NO_EMBED)
+            stamp += AA_STAMP_NO_EMBED + 1;
+        src.itunes = &aa_itunes;
+        src.path = aa_itunes.path;
+        aa_note("iTunes thumbnail: %s", aa_leaf(aa_itunes.path));
+        goto fill;
+    }
+    if (*aborted)
+        return false;
 
     /* Nothing found. Thumbnails stamped EMBEDDED came from tags all the same:
      * playback fills a folder from whichever track it plays, which need not be
@@ -1752,8 +1800,15 @@ from_file:
     src.emb_pos = -1;
     src.emb_size = 0;
     src.emb_flags = 0;
-    return aa_fill(&src, aa_art_stamp(aa_artpath), dh, slot,
-                   workbuf, worksz, aborted);
+    stamp = aa_art_stamp(aa_artpath);
+fill:
+    /* A check discards old pixels only after its source is available. */
+    if (aa_checking)
+    {
+        aa_remove_thumbs(dh);
+        slot->stamp = AA_STAMP_NONE;
+    }
+    return aa_fill(&src, stamp, dh, slot, workbuf, worksz, aborted);
 }
 
 static void aa_log_miss(const char *kind, const char *dir)
@@ -2739,7 +2794,7 @@ static void aa_album_adopt(unsigned int fh, unsigned int dh,
                            void *buf, size_t size)
 {
     struct aa_stamp *os = aa_find(fh);
-    struct aa_src src;
+    struct aa_src src = {0};
 
     if (!os || os->stamp == AA_STAMP_CLAIMED || aa_was_visited(fh))
         return;
@@ -2813,6 +2868,7 @@ static enum bg_result aa_run_pass(void)
         core_free(wh);
         return BG_INTERRUPTED;
     }
+    aa_itunes_state = AA_ITUNES_UNTRIED;
     aa_unreached = aa_libdirs.full = aa_bookdirs.full = false;
     aa_ensure_fallback(workbuf, worksz);
     aa_stamps_load();
@@ -2988,6 +3044,7 @@ out:
      * Without the RAM copy nothing moves, and the folders' keys are the ones
      * in use, so that pass records the scheme all the same. */
     aa_stamps_save(completed, aborted || failed ? aa_scheme_began : AA_SCHEME);
+    itunes_art_close();
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);
@@ -3042,7 +3099,7 @@ static void aa_handle_offer(void)
     size_t worksz;
     int s, wh;
     void *workbuf;
-    struct aa_src src;
+    struct aa_src src = {0};
 
     aa_offer_posted = false;
     if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
@@ -3200,8 +3257,6 @@ static void aa_check_audiobook(void *workbuf, size_t worksz, bool *aborted)
     aa_note("From first track: %s", aa_leaf(aa_chk_first));
     if (!slot)
         return;
-    aa_remove_thumbs(bh);
-    slot->stamp = AA_STAMP_NONE;
     aa_only_book = bh;
     aa_people_walk(&c);
     aa_only_book = 0;
@@ -3250,6 +3305,7 @@ static void aa_run_check(void)
     cache_busy = true;
     cpu_boost(true);
 
+    aa_itunes_state = AA_ITUNES_UNTRIED;
     aa_ensure_dirs();
     if (!aa_check_format_version())
     {
@@ -3357,8 +3413,6 @@ static void aa_run_check(void)
             aa_note("From first track: %s", aa_leaf(aa_chk_probe));
         if ((slot = aa_visit(dh)))
         {
-            aa_remove_thumbs(dh);
-            slot->stamp = AA_STAMP_NONE;
             aa_cache_dir(aa_chk_probe, dh, slot, &w, workbuf, worksz,
                          &aborted);
             aa_stamp_append(dh, slot->stamp);
@@ -3398,9 +3452,12 @@ out:
     cpu_boost(false);
     cache_busy = false;
     if (aborted)
-        aa_note("\nStopped: the disk was needed elsewhere");
+        aa_note(aa_itunes_state == AA_ITUNES_FAILED
+                ? "\nStopped: iTunes artwork index unavailable."
+                : "\nStopped: the disk was needed elsewhere");
     else if (aa_chk_track[0] || aa_chk_ebook)
         aa_note("\nNow Playing updates on the next track.");
+    itunes_art_close();
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);
