@@ -1105,8 +1105,10 @@ static enum list_row_kind menu_kind(int row, void *data)
 
 static const char *menu_value(int row, void *data, char *buf, size_t len)
 {
+    /* Yes and No, as an on/off option says them: a skin draws its switch
+     * for those words */
     if (row_kind[row] == ROW_SOUND)
-        return str(arcade_muted(data) ? LANG_OFF : LANG_ON);
+        return str(arcade_muted(data) ? LANG_SET_BOOL_NO : LANG_SET_BOOL_YES);
     return row_kind[row] == ROW_OPTION
         ? shell_option_value(data, row_item[row], buf, len) : NULL;
 }

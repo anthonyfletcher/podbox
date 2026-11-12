@@ -40,6 +40,7 @@ cart with `"music": "control"` can turn with
 effects and tones -- not the owner's music, not speech -- and the iPod
 remembers it for that game. A muted game plays on as before: each effect
 still lasts as long, and `sfxat` still reports it; only silence is heard.
+Every cart has the row, so a cart needs no sound option of its own.
 
 **What it costs**: about 11 units to start an effect, 14 a tone. The
 mixing is done by the iPod, not counted against the cart.
