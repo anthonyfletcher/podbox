@@ -7,6 +7,24 @@ Start with the tutorial: six chapters that build one game, a bat-and-ball
 game, from an empty cart to something on your iPod. Then use the
 reference for whatever your own game needs.
 
+## Getting the tools
+
+- **The IDE**, in a browser: [anthonyfletcher.github.io/podbox/ide](https://anthonyfletcher.github.io/podbox/ide/).
+  It edits, draws, runs and saves a game with nothing to install. Use
+  Chrome or Edge to edit a game's folder in place; other browsers save a
+  copy instead.
+- **A repository of your own**, for a game kept on GitHub: make one from
+  the [podbox-game](https://github.com/anthonyfletcher/podbox-game)
+  template. Every push builds the game into a `.pbg`, and can put it on
+  the web to play.
+- **The SDK**, for the command line: `arcade/sdk` in the
+  [PodBox repository](https://github.com/anthonyfletcher/podbox), with
+  the compiler `pbgc` and the runners `pbgvm` and `pbgrun`; its README
+  says how to set it up.
+
+The IDE and the build action follow the newest PodBox release: keep the
+iPod on it, and the games you build will run.
+
 ## Learning, a chapter at a time
 
 1. [A ball and a bat](tutorial-1-ball-and-bat.md) -- the screen, colours,

@@ -6,8 +6,9 @@ finish over the next chapters, and along the way it covers the ideas every
 Arcade game is built on: the screen, colours, the three functions that run
 a game, and reading the wheel.
 
-You need the Arcade IDE open in a browser. Nothing else: the IDE runs your
-game on the same engine as the iPod.
+You need the [Arcade IDE](https://anthonyfletcher.github.io/podbox/ide/)
+open in a browser, Chrome or Edge for the best of it. Nothing else: the IDE
+runs your game on the same engine as the iPod.
 
 ## Start a cart
 
