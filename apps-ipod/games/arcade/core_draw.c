@@ -488,14 +488,16 @@ ARG_INLINE int colour(struct vm *vm, struct value *a, int argc, int i,
 #define COST_SPRITE    18   /* spr's of an 8x8 tile, on top of tile8's */
 #define COST_RECT      10   /* rect's and rectfill's, on top of the call's */
 #define COST_ROW       2
+#define CLS_PIXELS     110  /* cls's pixels a unit */
 #define COST_GLYPH     16
 #define COST_BIG_GLYPH 48
 #define COST_TEXT_GLYPH 20  /* FONT.WORLD's and a cart font's */
 #define COST_TILE      5
-#define PER16_FILL     1
+#define FILL256        4    /* a memset's pixels, per 256: about 1 cycle each */
 #define PER16_PATTERN  10
 #define PER16_TILE     6
-#define PER16_COPY     7
+#define PER16_COPY     5
+#define PLAIN256       13   /* a plain copy's pixels, per 256 */
 #define PER16_SMALL    9    /* small_sprite's pixels */
 #define PER16_SCALED   16
 #define PER16_DOT      18
@@ -547,7 +549,7 @@ struct pen
     uint16_t pat;
     uint32_t count;                 /* pixels drawn */
     uint32_t cost;                  /* units, besides the pixels */
-    uint16_t per16;                 /* units per 16 pixels */
+    uint16_t per256;                /* units per 256 pixels */
     int32_t lo, hi;
     int32_t xlo, xhi;               /* the columns drawn, as area_touched */
     int wide;                       /* columns unknown: a row_touched */
@@ -577,7 +579,7 @@ static void begin(struct vm *vm, struct pen *p, uint32_t c, int patterned)
     p->alt = d->dpal[(c >> 8) & 0xff];
     p->count = 0;
     p->cost = COST_CALL;
-    p->per16 = p->pat ? PER16_PATTERN : PER16_FILL;
+    p->per256 = p->pat ? PER16_PATTERN * 16 : FILL256;
     p->lo = 0x7fffffff;
     p->hi = -1;
     p->xlo = 0x7fffffff;
@@ -683,8 +685,9 @@ static void row_touched(struct pen *p, int32_t y)
     p->wide = 1;
 }
 
-/* Columns x0..x1 of row y drawn on */
-static void area_touched(struct pen *p, int32_t y, int32_t x0, int32_t x1)
+/* Columns x0..x1 of row y drawn on; inlined, as every span calls it */
+static inline __attribute__((always_inline)) void
+area_touched(struct pen *p, int32_t y, int32_t x0, int32_t x1)
 {
     if (y < p->lo)
         p->lo = y;
@@ -709,7 +712,7 @@ static void finish(struct vm *vm, struct pen *p)
         cells_drawn(vm, (uint32_t)vm->d.target.v, p->s.w, p->s.h,
                     p->wide ? 0 : p->xlo, p->lo,
                     p->wide ? p->s.w - 1 : p->xhi, p->hi);
-    vm_charge(vm, p->cost + p->count * p->per16 / 16);
+    vm_charge(vm, p->cost + p->count * p->per256 / 256);
 }
 
 /* Pixels x0..x1 of row y, in surface coordinates, clipped. */
@@ -926,6 +929,8 @@ static int circle_near(struct pen *p, int64_t a, int64_t b, int64_t r,
             wc = sqrt_from(rr - d * d, wc);
             span32(p, y, ca - wc, ca + wc);
         }
+        /* each row's width found, beyond span32's: measured on the rig */
+        p->cost += (uint32_t)(y1 - y0 + 1) * COST_ROW;
         return 1;
     }
     int up = y0 - 1 >= top;
@@ -1340,7 +1345,7 @@ NATIVE(line)
     struct pen p;
     begin(vm, &p, c, 1);
     p.cost += 8;
-    p.per16 = PER16_DOT;
+    p.per256 = PER16_DOT * 16;
     walk_line(&p, x0, y0, x1, y1, plot_dot, p.pat ? NULL : run_dots, NULL);
     finish(vm, &p);
     return 1;
@@ -1450,7 +1455,7 @@ NATIVE(tline)
         return 0;
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* each pixel walked is charged */
+    p.per256 = 0;                    /* each pixel walked is charged */
     /* run_map is exact while the map position fits in 32 bits at every
      * pixel, which holds if it does at both ends of the line. */
     int64_t len = clampc(x1) - clampc(x0), ylen = clampc(y1) - clampc(y0);
@@ -1646,7 +1651,7 @@ static int triangle(struct vm *vm, struct value *a, int argc, int outline,
     begin(vm, &p, c, 1);
     if (outline) {
         run_fn run = p.pat ? NULL : run_dots;
-        p.per16 = PER16_DOT;
+        p.per256 = PER16_DOT * 16;
         walk_line(&p, v[0], v[1], v[2], v[3], plot_dot, run, NULL);
         walk_line(&p, v[2], v[3], v[4], v[5], plot_dot, run, NULL);
         walk_line(&p, v[4], v[5], v[0], v[1], plot_dot, run, NULL);
@@ -1683,7 +1688,7 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 #define POLY_CROSS 3
 #define POLY_SHIFT 1
 #define POLY_CURVE 29
-#define POLY_TURN  7    /* each point walked, when the camera turns */
+#define POLY_TURN  2    /* each point walked, when the camera turns */
 #define POLY_ASIDE 2    /* each edge wholly left or right of the clip */
 
 /* A row's first edge in starts[], plus one, with this bit flipped where an
@@ -2290,7 +2295,7 @@ NATIVE(polyline)
     const struct draw *d = &vm->d;
     struct pen p;
     begin(vm, &p, c, 1);
-    p.per16 = PER16_DOT;
+    p.per256 = PER16_DOT * 16;
     uint32_t s = 0;
     for (uint32_t k = 0; k <= nends && s < (uint32_t)n; k++) {
         uint32_t e = (uint32_t)n;
@@ -2391,7 +2396,7 @@ static int turned_rect(struct vm *vm, const int64_t b[4], uint32_t c,
     struct pen p;
     begin(vm, &p, c, 1);
     p.cost += COST_RECT;
-    p.per16 = PER16_DOT;
+    p.per256 = PER16_DOT * 16;
     for (int k = 0; k < 4; k++)
         walk_line(&p, x[k], y[k], x[(k + 1) & 3], y[(k + 1) & 3], plot_dot,
                   p.pat ? NULL : run_dots, NULL);
@@ -2501,7 +2506,8 @@ NATIVE(cls)
         vm->d.dirty_lo = 0;
         vm->d.dirty_hi = (int16_t)(s.h - 1);
     }
-    vm_charge(vm, COST_CALL + (uint32_t)(s.w * s.h) / BYTES_PER_UNIT);
+    /* measured on the rig (cal): about 195 units a screen, a memset */
+    vm_charge(vm, COST_CALL + (uint32_t)(s.w * s.h) / CLS_PIXELS);
     return 1;
 }
 
@@ -2818,7 +2824,7 @@ static int64_t text_wide(struct vm *vm, struct pen *p, const char *s,
     int32_t line = f ? f->line : TEXT_LINE;
     int64_t cx = x;
     if (draw)
-        p->per16 = PER16_TEXT;
+        p->per256 = PER16_TEXT * 16;
     *widest = 0;
     *lines = 1;
     for (uint32_t i = 0; i < n;) {
@@ -3215,11 +3221,13 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
         }
         if (u0 >= u1)
             return;
+        /* the pen's own table, every colour itself and none clear, and
+         * not flipped: rows copied whole */
+        const int plain = xl == p->d->xlat && p->d->xlat_plain && !fx;
         if (v1 > v0)
-            p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) * PER16_COPY / 16;
+            p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) *
+                       (plain ? PLAIN256 : PER16_COPY * 16) / 256;
         int32_t ua = (int32_t)u0, ub = (int32_t)u1;
-        /* the pen's own table, every colour itself and none clear */
-        const int plain = xl == p->d->xlat && p->d->xlat_plain;
         for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
             int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - v : v);
             if (yy < 0 || yy >= sh_img)
@@ -3473,7 +3481,7 @@ NATIVE(spr)
     struct pen p;
     int32_t tx, ty;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* tile8 and copy_rect charge */
+    p.per256 = 0;                    /* tile8 and copy_rect charge */
     if (w == 8 && h == 8 && !fx && !fy && tile_inside(&p, x, y, &tx, &ty)) {
         p.cost += COST_SPRITE;
         tile8(&p, cell_px(&sh, (int32_t)n), sh.w, tx, ty);
@@ -3501,7 +3509,7 @@ NATIVE(sspr)
     turn_box(&vm->d, &dx, &dy, dw, dh);
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* copy_rect charges what it reads */
+    p.per256 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, src.px, src.w, src.h, sx, sy, sw, sh,
               dx, dy, dw, dh, FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
@@ -3603,7 +3611,7 @@ NATIVE(blit)
     turn_box(&vm->d, &x, &y, s.w, s.h);
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* copy_rect charges what it reads */
+    p.per256 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, 0, 0, s.w, s.h, x, y, s.w, s.h,
               FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
@@ -3627,7 +3635,7 @@ NATIVE(blitpart)
     turn_box(&vm->d, &x, &y, w, h);
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* copy_rect charges what it reads */
+    p.per256 = 0;                    /* copy_rect charges what it reads */
     copy_rect(&p, s.px, s.w, s.h, sx, sy, w, h, x, y, w, h,
               FLIP_X(flip), FLIP_Y(flip));
     finish(vm, &p);
@@ -3765,7 +3773,7 @@ NATIVE(rspr)
     if (h > (sh.h - sy) / 8) h = (sh.h - sy) / 8;
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;
+    p.per256 = 0;
     struct turn t;
     t.src = sh.px + sy * sh.w + sx;
     t.stride = sh.w;
@@ -3797,7 +3805,7 @@ NATIVE(rblit)
         return 0;
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;
+    p.per256 = 0;
     struct turn t;
     t.src = s.px;
     t.stride = s.w;
@@ -3842,7 +3850,7 @@ NATIVE(map)
     WHOLE(6, 0, layers, "map");
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* tile8 and copy_rect charge */
+    p.per256 = 0;                    /* tile8 and copy_rect charge */
     int64_t j0 = cy < 0 ? -(int64_t)cy : 0, i0 = cx < 0 ? -(int64_t)cx : 0;
     int64_t j1 = (int64_t)mh - cy < ch ? (int64_t)mh - cy : ch;
     int64_t i1 = (int64_t)mw - cx < cw ? (int64_t)mw - cx : cw;
@@ -4417,7 +4425,7 @@ void core_draw_sprites(struct vm *vm, const struct column *on,
     struct sheet sh;
     sheet_of(vm, &sh);
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* tile8 and copy_rect charge */
+    p.per256 = 0;                    /* tile8 and copy_rect charge */
     for (uint32_t i = 0; i < n; i++) {
         int32_t s = column_at(sp, i, -1);
         if (s < 0 || s >= sh.count || !column_true(vm, on, i, 1))
@@ -4478,7 +4486,7 @@ void core_draw_lines(struct vm *vm, const int32_t *seg, uint32_t n,
 {
     struct pen p;
     begin(vm, &p, c, 1);
-    p.per16 = PER16_DOT;
+    p.per256 = PER16_DOT * 16;
     for (uint32_t i = 0; i < n; i++, seg += 4) {
         p.cost += 18;               /* a line's setup, measured on the rig */
         int32_t x0 = seg[0], y0 = seg[1], x1 = seg[2], y1 = seg[3];
@@ -4560,7 +4568,7 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
     static uint16_t ramp[256];
     sheet_of(vm, &sh);
     begin(vm, &p, 0, 0);
-    p.per16 = 0;                    /* copy_rect charges; dots below */
+    p.per256 = 0;                    /* copy_rect charges; dots below */
     p.cost += n / 8;
     const uint16_t *plain = p.xl;
     uint32_t dots = 0;
@@ -5103,7 +5111,7 @@ uint32_t core_draw_land(struct vm *vm, const struct landspec *l)
 {
     struct pen p;
     begin_view(vm, &p);
-    p.per16 = 0;
+    p.per256 = 0;
     const struct planeview *v = &vm->plane;
     static int16_t top[SCREEN_W];
     struct slice sl;
@@ -5238,7 +5246,7 @@ void core_draw_floor(struct vm *vm, const struct floor_row *rows,
     struct pen p;
     struct floor_env e;
     begin_view(vm, &p);
-    p.per16 = 0;                    /* each pixel read is charged */
+    p.per256 = 0;                    /* each pixel read is charged */
     const uint8_t *sheet = MEM(vm, vm->sheet);
     for (uint32_t m = 0; m < 256; m++) {
         uint32_t s = remap ? remap[m] : m;
@@ -5364,7 +5372,7 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     begin_view(vm, &p);
     p.ox = p.oy = 0;
     p.cost = COST_CALL / 2;
-    p.per16 = 0;                    /* copy_rect charges the area */
+    p.per256 = 0;                    /* copy_rect charges the area */
     const struct planeview *v = &vm->plane;
     struct sheet sheet;
     sheet_of(vm, &sheet);
@@ -5419,7 +5427,7 @@ void core_draw_sky(struct vm *vm, const uint8_t *px, int32_t w, int32_t h,
 {
     struct pen p;
     begin(vm, &p, 0, 0);
-    p.per16 = 0;
+    p.per256 = 0;
     const struct planeview *v = &vm->plane;
     const uint16_t *xl = p.xl;
     int32_t bottom = v->horizon - lift, top = bottom - h;
@@ -5539,7 +5547,7 @@ uint32_t core_draw_walls(struct vm *vm, const struct wallspec *ws)
 {
     struct pen p;
     begin_view(vm, &p);
-    p.per16 = 0;
+    p.per256 = 0;
     struct planeview *v = &vm->plane;
     const uint8_t *map = MEM(vm, vm->map), *flags = MEM(vm, vm->flags);
     const uint8_t *sheet = MEM(vm, vm->sheet);
@@ -6121,7 +6129,7 @@ NATIVE(light_draw)
         }
     }
     p.count = (uint32_t)(w * h);
-    p.per16 = LIGHT_DARK16;
+    p.per256 = LIGHT_DARK16 * 16;
     p.cost += cost + light_units(step, mapped, rows, lamprows) +
               walked * LIGHT_WALK;
     finish(vm, &p);

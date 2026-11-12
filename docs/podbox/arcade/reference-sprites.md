@@ -144,7 +144,8 @@ sspr(16, 0, 16, 8, 10, 80, 32, 16);        // any rectangle: sprites 2 and 3 tog
   size can sit anywhere on the sheet: a 20x12 title, a 3x5 digit.
 - Stretching repeats pixels, which keeps them sharp; shrinking leaves some
   out.
-- It costs by the pixels drawn: about 0.44 units each, plus the call.
+- It costs by the pixels drawn: about 0.3 units each as it is, 1 stretched
+  or shrunk, plus the call.
 
 ## rspr(n, x, y, angle, [scale], [w], [h], [flip])
 

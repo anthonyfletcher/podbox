@@ -59,18 +59,21 @@ in a loop also pays about 4 units a turn for the loop itself.
 
 | Call | Units |
 |---|---|
-| `cls()`, the whole screen | about 1,200 |
-| `rectfill` of the whole screen | about 1,350 |
-| `rectfill` 20x20 | about 80 |
-| `circfill` of radius 10, radius 50 | about 90, 720 |
-| `circ` of radius 50 | about 850 |
-| `trifill` across half the screen | about 1,600 |
+| `cls()`, the whole screen | about 200 |
+| `rectfill` of the whole screen | about 460 |
+| `rectfill` 20x20 | about 60 |
+| `circfill` of radius 10, radius 50 | about 115, 550 |
+| `circ` of radius 50 | about 830 |
+| `trifill` across half the screen | about 1,100 |
 | `line` 100 pixels long | about 150 |
 | `pset` | about 10 each |
-| copying pixels -- `blit`, `map`, `spr` | about 0.44 a pixel: 8,500 for a whole screen |
+| copying pixels -- `blit`, `map`, `spr` | about 0.3 a pixel: 6,000 for a whole screen |
+| `blit` with nothing clear and no colour swapped | about 0.05 a pixel: 1,000 for a whole screen |
 
 Clearing and filled rectangles are the cheapest pixels there are, about
-0.06 units each; copying a picture is seven times that. Hundreds of `pset`
+0.02 units each; copying a picture is fifteen times that, but for a
+picture with nothing clear -- `palt(0, false)` -- and no colour swapped,
+which is copied whole, row by row, at about 0.05. Hundreds of `pset`
 calls a tick add up quickly: for many moving points, see
 `particles.draw`.
 
@@ -99,7 +102,7 @@ function draw() {
   [camera](#camerax-y-turn-px-py-zoom), and its colour does not become the pen colour.
 - Call it first in `draw()`, unless every pixel is about to be covered
   anyway -- by a full-screen map or background image -- in which case it
-  is about 1,200 units saved.
+  is about 200 units saved.
 
 ## pset(x, y, [c])
 
@@ -514,7 +517,7 @@ print("TILT " + tilt, 2, 2, 7);
 - **Not turned**: `map` and `tline`, the 3D systems (they have their own
   camera), and the clip. For a turning world drawn from a map, draw its
   outlines with `polyfill`.
-- Turning costs little: about 7 units a point for `polyfill`, and nothing
+- Turning costs little: about 2 units a point for `polyfill`, and nothing
   that shows for the other calls.
 
 **Zooming.** A camera that comes in close when the player rests and pulls
@@ -614,9 +617,10 @@ function draw() {
 
 - Drawn every frame, these 1,200 stars cost about 24,000 units -- more
   than a whole tick on an iPod Video playing music. Copied from `bg`, the
-  frame costs about 8,500.
-- Copying is not free: about 0.44 units a pixel, 8,500 for the whole
-  screen. An image saves time only when what is in it costs more than
+  frame costs about 6,000.
+- Copying is not free: about 0.3 units a pixel, 6,000 for the whole
+  screen -- or 1,000 for a picture with nothing clear and no colour
+  swapped, copied whole. An image saves time only when what is in it costs more than
   that to draw. A plain background is cheaper as `cls` and a few
   rectangles; a few lines of text in the built-in font, about 18 units a
   character, are cheaper printed.

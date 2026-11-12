@@ -1691,6 +1691,26 @@ op_ADD:
     sp--;
     NEXT();
 
+/* units on top of an op's own, from the budget: as vm_charge() takes them
+ * when the slice has fewer left, so it still ends where it should */
+#define EXTRA(n) do { \
+    if (budget > (n)) \
+        budget -= (n); \
+    else { \
+        SYNC(); \
+        vm_charge(vm, (n)); \
+        RELOAD(); \
+    } \
+} while (0)
+
+/* What a divide or remainder with a fraction costs beyond its op,
+ * measured on the rig (cal, vmbench): about 440 cycles a divide, and a
+ * 64-bit remainder some 600 */
+#define FIXCOST_SUB 0
+#define FIXCOST_MUL 0
+#define FIXCOST_DIV 9
+#define FIXCOST_MOD 13
+
 /* Arithmetic: integers inline, anything with a fraction through
  * vm_fix_op, anything else an error. */
 #define ARITH(name, what, expr) \
@@ -1703,6 +1723,8 @@ op_##name: \
     } \
     if (fix_fast(&sp[-2], &sp[-1], OP_##name)) { \
         sp--; \
+        if (FIXCOST_##name) \
+            EXTRA(FIXCOST_##name); \
         NEXT(); \
     } \
     a = sp[-2]; b = sp[-1]; \
@@ -1712,6 +1734,8 @@ op_##name: \
     if (!vm_fix_op(vm, OP_##name, a, b, &sp[-2])) \
         goto fail; \
     sp--; \
+    if (FIXCOST_##name) \
+        EXTRA(FIXCOST_##name); \
     NEXT();
 
 ARITH(SUB, "-", sp[-2].v = (int32_t)((uint32_t)av - (uint32_t)bv))

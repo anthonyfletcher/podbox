@@ -52,7 +52,8 @@ and for Life on an 80x60 board, about 8,400 units with `cells.life`
 against 311,000 in script -- nearly forty times as fast, and well inside
 a tick; the script version would take fifteen.
 
-The `blit` that shows a full-screen field costs about 8,500 more (see
+The `blit` that shows a full-screen field costs about 6,000 more, or
+1,000 drawn over a background of its own with `palt(0, false)` (see
 **Drawing**); a field smaller than the screen costs less to show.
 
 Random choices come from the cart's own `rnd`, so a replay goes the same

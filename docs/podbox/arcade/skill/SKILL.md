@@ -141,8 +141,8 @@ Measured costs to plan with (more in `reference-fast.md`):
 
 | | Units |
 |---|---|
-| `cls()`, `rectfill` of the whole screen | ~1,200, ~1,350 (0.06 a pixel) |
-| copying pixels: `blit`, `map`, `spr` | ~0.44 a pixel: full screen 8,500; full-screen map ~8,700 |
+| `cls()`, `rectfill` of the whole screen | ~200, ~460 (0.01-0.02 a pixel) |
+| copying pixels: `blit`, `map`, `spr` | ~0.3 a pixel: full-screen blit 6,000, 1,000 with `palt(0, false)` and no `pal`; full-screen map ~8,700 |
 | `spr` 8x8 | ~67; ~25 off the screen |
 | `pset` | ~10, plus ~4 a loop turn |
 | `print` in `FONT.CAPS` | ~18 a character (31 in `FONT.WORLD`) |
@@ -156,7 +156,7 @@ When over budget:
 - **Typed arrays** for boards and grids.
 - **Draw only what changes** -- fewer rows sent, fewer pixels drawn.
 - **An image only pays** when drawing its contents costs more than
-  copying them (0.44 a pixel): hundreds of shapes, generated landscapes.
+  copying them (0.3 a pixel): hundreds of shapes, generated landscapes.
   A plain background is cheaper as `cls` and rectangles; a few lines of
   text are cheaper printed.
 - **Step down the rate**: on overrun, `setrate(25)` and scale speeds by

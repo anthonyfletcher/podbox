@@ -137,12 +137,12 @@ local first, and the arrays the loop reads are best kept global.
 
 | Drawing (see **Drawing**) | Units |
 |---|---|
-| `cls()`, or a whole-screen `rectfill` | about 1,200 to 1,350 |
-| a 20x20 `rectfill` | about 80 |
-| `circfill` radius 10 / 50 | about 90 / 720 |
+| `cls()`, or a whole-screen `rectfill` | about 200, 460 |
+| a 20x20 `rectfill` | about 60 |
+| `circfill` radius 10 / 50 | about 115 / 550 |
 | `pset` | about 10 |
-| copying a picture: `blit`, `map`, `spr` | about 0.44 a pixel |
-| a whole-screen `blit` | about 8,500 |
+| copying a picture: `blit`, `map`, `spr` | about 0.3 a pixel |
+| a whole-screen `blit` | about 6,000; 1,000 with nothing clear and no colour swapped |
 | the whole map on the screen, 20 by 15 cells | about 8,700 |
 | a character of text, `FONT.CAPS` / `FONT.WORLD` | about 18 / 31 |
 | `copy` or `fill` of 1,000 elements | about 250 |
@@ -265,8 +265,9 @@ cheap as printing the characters -- so this is about strings made into
 variables, arrays and records each tick.
 
 **4. Draw into an image only when drawing costs more than copying.**
-Copying a picture is about 0.44 units a pixel -- a whole screen about
-8,500. A background of 1,200 stars drawn with `pset` costs about 24,000
+Copying a picture is about 0.3 units a pixel -- a whole screen about
+6,000, or 1,000 for one with nothing clear (`palt(0, false)`) and no
+colour swapped, which is copied whole. A background of 1,200 stars drawn with `pset` costs about 24,000
 a frame, so drawn once into an image and blitted it saves more than half.
 But a page of text in `FONT.WORLD` costs about 5,300 to print and 7,600
 to blit, and a plain background is cheapest of all as `cls` and

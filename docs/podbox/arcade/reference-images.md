@@ -51,7 +51,8 @@ images. A full-screen image, 160x120, is 19 KB.
 
 | Call | Units |
 |---|---|
-| `blit` or `blitpart`, each pixel copied | about 0.44 -- 8,500 for the whole screen |
+| `blit` or `blitpart`, each pixel copied | about 0.3 -- 6,000 for the whole screen |
+| the same with nothing clear (`palt(0, false)`) and no colour swapped | about 0.05 -- 1,000 for the whole screen |
 | `blit` flipped | the same |
 | `rblit`, each pixel of the image | about 1.8 at its own size, more scaled up |
 | any of them wholly off the screen | about 85 |
@@ -278,8 +279,9 @@ rblit(IMG.title, 115, 85, -0.05, 0.75);
 
 ## When an image is worth it
 
-Copying a pixel from an image costs about 0.44 units; clearing or filling
-one about 0.06, and a character of text about 18. So **an image saves time
+Copying a pixel from an image costs about 0.3 units -- 0.05 when nothing
+in it is clear and no colour is swapped; clearing or filling one about
+0.02, and a character of text about 15. So **an image saves time
 only when what is in it costs more to draw than to copy.**
 
 **Worth it:**
@@ -287,7 +289,7 @@ only when what is in it costs more to draw than to copy.**
 - A background of hundreds of small shapes, or generated with noise, or
   built from many sprites -- drawn once into an image in `init()` and
   copied each frame (see [target](reference-drawing.md#targett)'s
-  example: 1,200 stars cost 24,000 units drawn, 8,500 copied).
+  example: 1,200 stars cost 24,000 units drawn, 6,000 copied).
 - **Pictures that remember**: paint, trails, scorch marks, a map revealed
   as it is explored. Draw each new mark into an image that is never
   cleared, and show the image:
