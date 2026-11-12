@@ -778,8 +778,6 @@ struct cellworld
 };
 int cells_world(struct vm *vm, struct value field, struct value rules,
                 struct cellworld *w);
-void cells_touched(struct vm *vm, uint32_t id, int32_t w, int32_t h,
-                   const int32_t box[4]);
 void cells_drawn(struct vm *vm, uint32_t id, int32_t w, int32_t h, int32_t x0,
                  int32_t y0, int32_t x1, int32_t y1);
 enum { CELL_SOLID = 1, CELL_LIQUID = 2, CELL_HARM = 4 };

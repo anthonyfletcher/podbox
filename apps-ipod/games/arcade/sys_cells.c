@@ -214,21 +214,10 @@ static void grow(struct cellsleep *sl, int32_t x0, int32_t y0, int32_t x1,
     if (y1 > sl->box[3]) sl->box[3] = y1;
 }
 
-/* Cells x0..x1, y0..y1 of field id, w by h, written outside cells.step --
- * particles settling into it -- for the box the next step gives */
-void cells_touched(struct vm *vm, uint32_t id, int32_t w, int32_t h,
-                   const int32_t box[4])
-{
-    for (int i = 0; i < 2; i++) {
-        struct cellsleep *sl = &vm->sleep[i];
-        if (sl->id == id && sl->w == w && sl->h == h)
-            grow(sl, box[0], box[1], box[2], box[3]);
-    }
-}
-
-/* Cells x0..x1, y0..y1 of field id, w by h, drawn into, for the box the
- * next step gives: a chunk awake when drawn on is not summed, so nothing
- * else would see it */
+/* Cells x0..x1, y0..y1 of field id, w by h, drawn into or written outside
+ * cells.step -- particles settling into it -- for the box the next step
+ * gives: a chunk awake when drawn on is not summed, so nothing else would
+ * see it */
 void cells_drawn(struct vm *vm, uint32_t id, int32_t w, int32_t h, int32_t x0,
                  int32_t y0, int32_t x1, int32_t y1)
 {

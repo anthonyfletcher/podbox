@@ -1629,7 +1629,8 @@ NATIVE(particles_step)
     }
     /* about 7 units a live particle, measured; 2 more over a field */
     if (fd.c && fd.box[0] <= fd.box[2])
-        cells_touched(vm, (uint32_t)f[P_FIELD].v, fd.w, fd.h, fd.box);
+        cells_drawn(vm, (uint32_t)f[P_FIELD].v, fd.w, fd.h, fd.box[0],
+                    fd.box[1], fd.box[2], fd.box[3]);
     vm_charge(vm, 10 + n / 8 + live * (fd.c ? 9 : 7) + scanned / 8);
     return 1;
 }
