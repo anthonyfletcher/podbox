@@ -59,8 +59,27 @@
     ldr     r9, [r0, #R_WORDS]
     cmp     r9, #0
     beq     2f
-    /* a word of air passes four cells; going back, the word ends here */
+    /* four words of air pass sixteen cells, four groups, while as many
+     * are left; then a word passes four; going back, they end here */
 1:
+    cmp     r3, #(4 << 16)
+    blo     6f
+    .if \dir < 0
+    sub     lr, r1, #15
+    .else
+    mov     lr, r1
+    .endif
+    add     lr, r4, lr
+    ldmia   lr, {r9-r12}
+    orr     r9, r9, r10
+    orr     r11, r11, r12
+    orrs    r9, r9, r11
+    bne     6f
+    add     r1, r1, #(16 * \dir)
+    sub     r3, r3, #(3 << 16)
+    sub     r3, r3, #4
+    b       9f
+6:
     .if \dir < 0
     sub     r9, r1, #3
     ldr     r9, [r4, r9]

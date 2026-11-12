@@ -613,21 +613,30 @@ static uint32_t scan(struct stepper *s, const uint8_t *awake, int forward)
 {
     uint32_t visited = 0;
     const int32_t w = s->f.w, cw = s->cw;
+    /* a chunk row's runs, found once for its rows */
+    int32_t from[FIELD_MAX / CHUNK], to[FIELD_MAX / CHUNK], runs = 0;
+    int32_t at = -1;
     for (int32_t y = s->f.h - 1; y >= 0; y--) {
-        const uint8_t *chunks = awake + (y >> CHUNK_SHIFT) * cw;
-        for (int32_t k = 0; k < cw; k++) {
-            if (!chunks[forward ? k : cw - 1 - k])
-                continue;
-            int32_t e = k;
-            while (e + 1 < cw && chunks[forward ? e + 1 : cw - 2 - e])
-                e++;
-            int32_t lo = forward ? k : cw - 1 - e;
-            int32_t hi = forward ? e : cw - 1 - k;
-            int32_t x1 = (hi + 1) << CHUNK_SHIFT;
-            visited += run(s, y, lo << CHUNK_SHIFT, x1 < w ? x1 : w,
-                           forward);
-            k = e;
+        if (y >> CHUNK_SHIFT != at) {
+            at = y >> CHUNK_SHIFT;
+            runs = 0;
+            const uint8_t *chunks = awake + at * cw;
+            for (int32_t k = 0; k < cw; k++) {
+                if (!chunks[forward ? k : cw - 1 - k])
+                    continue;
+                int32_t e = k;
+                while (e + 1 < cw && chunks[forward ? e + 1 : cw - 2 - e])
+                    e++;
+                int32_t lo = forward ? k : cw - 1 - e;
+                int32_t hi = forward ? e : cw - 1 - k;
+                int32_t x1 = (hi + 1) << CHUNK_SHIFT;
+                from[runs] = lo << CHUNK_SHIFT;
+                to[runs++] = x1 < w ? x1 : w;
+                k = e;
+            }
         }
+        for (int32_t i = 0; i < runs; i++)
+            visited += run(s, y, from[i], to[i], forward);
     }
     return visited;
 }
