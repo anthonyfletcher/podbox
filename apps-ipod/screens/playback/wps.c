@@ -828,11 +828,17 @@ long gui_wps_show(void)
                     action_wait_for_release();
                 /* Stop leaves through this screen's exit, which saves a
                  * book's place and the resume point. Party mode refuses it,
-                 * as it refuses every way of stopping. */
+                 * as it refuses every way of stopping; Menu then leaves
+                 * with the music playing, so the screen can still be left. */
                 if (act == HOTKEY_STOP)
                 {
                     if (!global_settings.party_mode)
                         exit = true;
+                    else if (button == ACTION_WPS_MENU)
+                    {
+                        gwps_leave_wps(true);
+                        return GO_TO_PREVIOUS;
+                    }
                     break;
                 }
                 /* Album Covers opens over this screen, so BACK returns here */
