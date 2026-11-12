@@ -45,6 +45,8 @@ struct yesno_ctx
     const struct text_message *no_message;  /* shown on cancel, optional */
     enum yesno_res result;
     bool defer_usb;                /* return YESNO_USB without handling it */
+    int yes_id, no_id;             /* the buttons' labels, as lang ids */
+    bool back_cancels;             /* Back is YESNO_CANCEL, not YESNO_NO */
     /* message word-wrapped to the box width, rebuilt by yesno_measure() */
     struct dialog_text_line wrap[YN_MAX_LINES];
     int wrap_count;
@@ -67,10 +69,10 @@ static void talk_text_message(const struct text_message * message, bool enqueue)
     }
 }
 
-static void talk_button(enum yesno_res selection, bool enqueue)
+static void talk_button(struct yesno_ctx *c, enum yesno_res selection,
+                        bool enqueue)
 {
-    talk_id(selection == YESNO_YES ? LANG_SET_BOOL_YES : LANG_SET_BOOL_NO,
-            enqueue);
+    talk_id(selection == YESNO_YES ? c->yes_id : c->no_id, enqueue);
 }
 
 static int put_message(struct screen *display,
@@ -102,14 +104,14 @@ static void yesno_button_labels(struct yesno_ctx *c, int secs,
                                 char *yes, char *no, size_t sz)
 {
     if (secs >= 0 && c->tmo_default == YESNO_YES)
-        snprintf(yes, sz, "%s (%d)", str(LANG_SET_BOOL_YES), secs);
+        snprintf(yes, sz, "%s (%d)", str(c->yes_id), secs);
     else
-        snprintf(yes, sz, "%s", str(LANG_SET_BOOL_YES));
+        snprintf(yes, sz, "%s", str(c->yes_id));
 
     if (secs >= 0 && c->tmo_default == YESNO_NO)
-        snprintf(no, sz, "%s (%d)", str(LANG_SET_BOOL_NO), secs);
+        snprintf(no, sz, "%s (%d)", str(c->no_id), secs);
     else
-        snprintf(no, sz, "%s", str(LANG_SET_BOOL_NO));
+        snprintf(no, sz, "%s", str(c->no_id));
 }
 
 /* Widest button width for this dialog: sized to the initial countdown so the
@@ -277,7 +279,7 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
     {
         c->talked = true;
         talk_text_message(c->message, false);
-        talk_button(c->selection, true);
+        talk_button(c, c->selection, true);
     }
 
     switch (action)
@@ -293,7 +295,7 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
             enum yesno_res sel = action == ACTION_STD_PREV ? YESNO_YES
                                                            : YESNO_NO;
             if (sel != c->selection && c->talk_menu)
-                talk_button(sel, false);
+                talk_button(c, sel, false);
             c->selection = sel;
             break;
         }
@@ -301,7 +303,7 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
         case ACTION_STD_MENU:
             if (!d->backlight_on)
                 break;
-            c->result = YESNO_NO; /* back / cancel */
+            c->result = c->back_cancels ? YESNO_CANCEL : YESNO_NO;
             return DIALOG_CANCEL;
         case ACTION_NONE:
             if (c->tmo_default != YESNO_TMO &&
@@ -370,7 +372,8 @@ static void yesno_on_close(struct dialog *d, void *data)
  *   no_message - displayed when YESNO_NO is choosen
 */
 static enum yesno_res yesno_run(int ticks, enum yesno_res tmo_default_res,
-                                bool defer_usb, const char * title,
+                                bool defer_usb, int yes_id, int no_id,
+                                const char * title,
                                 const struct text_message * main_message,
                                 const struct text_message * yes_message,
                                 const struct text_message * no_message)
@@ -398,6 +401,10 @@ static enum yesno_res yesno_run(int ticks, enum yesno_res tmo_default_res,
     c.no_message   = no_message;
     c.result       = YESNO_NO;
     c.defer_usb    = defer_usb;
+    c.yes_id       = yes_id;
+    c.no_id        = no_id;
+    /* A right button other than No is a choice of its own, which Back is not */
+    c.back_cancels = no_id != LANG_SET_BOOL_NO;
 
     dialog_init(&d, CONTEXT_YESNOSCREEN, title, NULL, &cb, &c);
     dialog_run(&d, HZ / 2); /* poll for statusbar and the timeout countdown */
@@ -410,14 +417,24 @@ enum yesno_res gui_syncyesno_run_w_tmo(int ticks, enum yesno_res tmo_default_res
                                        const struct text_message * yes_message,
                                        const struct text_message * no_message)
 {
-    return yesno_run(ticks, tmo_default_res, false, title,
+    return yesno_run(ticks, tmo_default_res, false,
+                     LANG_SET_BOOL_YES, LANG_SET_BOOL_NO, title,
                      main_message, yes_message, no_message);
 }
 
 enum yesno_res gui_syncyesno_run_defer_usb(
                                  const struct text_message * main_message)
 {
-    return yesno_run(TIMEOUT_BLOCK, YESNO_TMO, true, NULL,
+    return yesno_run(TIMEOUT_BLOCK, YESNO_TMO, true,
+                     LANG_SET_BOOL_YES, LANG_SET_BOOL_NO, NULL,
+                     main_message, NULL, NULL);
+}
+
+enum yesno_res gui_syncyesno_run_labels(
+                                 const struct text_message * main_message,
+                                 int yes_id, int no_id)
+{
+    return yesno_run(TIMEOUT_BLOCK, YESNO_TMO, false, yes_id, no_id, NULL,
                      main_message, NULL, NULL);
 }
 

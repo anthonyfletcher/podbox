@@ -38,6 +38,16 @@ bool warn_on_pl_erase(void);
  * the caller passes on as GO_TO_ROOT. usb may be NULL. */
 bool warn_on_pl_erase_usb(bool *usb);
 
+enum pl_erase_answer
+{
+    PL_ERASE_CANCEL,
+    PL_ERASE_REPLACE,   /* the caller replaces the playlist */
+    PL_ERASE_PLAY_NOW,  /* 'path' was put in next, Play Once, and started */
+};
+/* For one track chosen from a list: while something plays, the prompt offers
+ * Play Now beside New Queue. Otherwise it is warn_on_pl_erase(). */
+enum pl_erase_answer warn_on_pl_erase_track(const char *path);
+
 bool show_search_progress(bool init, int count, int current, int total);
 
 /* Note: Don't rely on title being visible. It is not

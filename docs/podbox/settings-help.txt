@@ -476,7 +476,8 @@ Adding a folder to a playlist also adds everything in its subfolders.
 
 [warn when erasing dynamic playlist]
 Asks before replacing a queue you have built up by hand, which is otherwise
-easy to lose with one Select.
+easy to lose with one Select. Choosing one track while the queue plays offers
+Play Now instead, which plays it at once and keeps the rest of the queue.
 
 [keep current track when replacing playlist]
 Leaves the playing track in place when a new selection replaces the queue, so

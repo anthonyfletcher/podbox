@@ -177,7 +177,7 @@ Settings
 | Playlist Viewer Settings ▸ Show Indices | Numbers the entries in the playing queue. | Yes |  |
 | Playlist Viewer Settings ▸ Track Display | What each entry in the queue and in a saved playlist shows: the filename, the full path, or the title from the tags, alone or with the album. Number, Title & Album also puts the disc and track number first, which shows whether an album's tracks are still in order. | Title from ID3 Tags |  |
 | Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | On |  |
-| Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | Yes |  |
+| Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. Choosing one track while the queue plays offers Play Now instead, which plays it at once and keeps the rest of the queue. | Yes |  |
 | Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |
 | Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | Yes | **Adv** |
 | Queue ▸ Show Shuffled Adding Options | Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder, album or playlist. | Yes | **Adv** |

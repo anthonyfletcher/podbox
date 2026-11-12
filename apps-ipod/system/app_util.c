@@ -31,6 +31,7 @@
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
 #include "widgets/list.h"
+#include "audio.h"
 #include "draw/screen_access.h"
 #include "draw/viewport.h"
 #include "draw/bmp.h"
@@ -101,6 +102,15 @@ bool warn_on_pl_erase(void)
     return warn_on_pl_erase_usb(NULL);
 }
 
+/* Whether replacing the current playlist asks first */
+static bool pl_erase_asks(void)
+{
+    return global_status.resume_index != -1 &&
+           global_settings.warnon_erase_dynplaylist &&
+           !global_settings.party_mode &&
+           playlist_modified(NULL);
+}
+
 bool warn_on_pl_erase_usb(bool *usb)
 {
     if (usb)
@@ -113,10 +123,7 @@ bool warn_on_pl_erase_usb(bool *usb)
      * the right one. */
     book_resume_save();
 
-    if (global_status.resume_index != -1 &&
-        global_settings.warnon_erase_dynplaylist &&
-        !global_settings.party_mode &&
-        playlist_modified(NULL))
+    if (pl_erase_asks())
     {
         static const char *lines[] =
             {ID2P(LANG_WARN_ERASEDYNPLAYLIST_PROMPT)};
@@ -136,6 +143,40 @@ bool warn_on_pl_erase_usb(bool *usb)
     }
     else
         return true;
+}
+
+enum pl_erase_answer warn_on_pl_erase_track(const char *path)
+{
+    static const char *lines[] = {ID2P(LANG_PLAY_NOW_PROMPT)};
+    static const struct text_message message = {lines, 1};
+    enum yesno_res res;
+    int index;
+
+    /* With nothing playing there is no current track to slot it after */
+    if (!(audio_status() & AUDIO_STATUS_PLAY) || !pl_erase_asks())
+        return warn_on_pl_erase() ? PL_ERASE_REPLACE : PL_ERASE_CANCEL;
+
+    book_resume_save();     /* as warn_on_pl_erase_usb(): both leave it */
+
+    res = gui_syncyesno_run_labels(&message, LANG_PLAY_NOW, LANG_NEW_QUEUE);
+    if (res == YESNO_NO)
+        return PL_ERASE_REPLACE;
+    if (res != YESNO_YES)
+    {
+        splash(HZ, ID2P(LANG_CANCEL));
+        return PL_ERASE_CANCEL;
+    }
+
+    /* Play Once, so the queue is its old length again once it has played */
+    index = playlist_insert_track(NULL, path, PLAYLIST_INSERT_FIRST,
+                                  true, true);
+    if (index < 0)
+    {
+        splash(HZ, ID2P(LANG_FAILED));
+        return PL_ERASE_CANCEL;
+    }
+    playlist_start(index, 0, 0);
+    return PL_ERASE_PLAY_NOW;
 }
 
 bool show_search_progress(bool init, int display_count, int current, int total)

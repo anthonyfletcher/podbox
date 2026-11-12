@@ -683,7 +683,11 @@ int browser_disk_enter(struct browser_context* c)
 
                 /* about to create a new current playlist...
                    allow user to cancel the operation */
-                if (!warn_on_pl_erase())
+                enum pl_erase_answer answer = warn_on_pl_erase_track(buf);
+
+                if (answer == PL_ERASE_PLAY_NOW)
+                    rc = GO_TO_WPS;
+                if (answer != PL_ERASE_REPLACE)
                     break;
 
                 if (global_settings.party_mode && audio_status())

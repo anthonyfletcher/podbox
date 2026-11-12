@@ -9,3 +9,6 @@
 - A car or dock that changes shuffle or repeat only for while it is
   connected now puts your setting back when you unplug, instead of keeping
   its own.
+- Choosing a track while your queue plays now asks **Play Now** or **New
+  Queue**, with Play Now selected. Play Now plays the track at once and keeps
+  the rest of the queue; to replace the queue as before, choose New Queue.

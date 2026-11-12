@@ -28166,3 +28166,45 @@
     *: "Audiobook Cover If No Photo"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PLAY_NOW
+  desc: choosing a track while the queue plays: play it next, now, and keep the queue
+  user: core
+  <source>
+    *: "Play Now"
+  </source>
+  <dest>
+    *: "Play Now"
+  </dest>
+  <voice>
+    *: "Play Now"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEW_QUEUE
+  desc: choosing a track while the queue plays: replace the queue with its list
+  user: core
+  <source>
+    *: "New Queue"
+  </source>
+  <dest>
+    *: "New Queue"
+  </dest>
+  <voice>
+    *: "New Queue"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_NOW_PROMPT
+  desc: asked when a track is chosen while the queue plays; buttons Play Now and New Queue
+  user: core
+  <source>
+    *: "Play it now, or start a new queue?"
+  </source>
+  <dest>
+    *: "Play it now, or start a new queue?"
+  </dest>
+  <voice>
+    *: "Play it now, or start a new queue?"
+  </voice>
+</phrase>

@@ -5529,7 +5529,17 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
                 c->dirlevel--;
                 /* about to create a new current playlist...
                  allow user to cancel the operation */
-                if (!warn_on_pl_erase())
+                char path[MAX_PATH];
+                enum pl_erase_answer answer;
+
+                if (browser_db_get_filename(c, path, sizeof(path)) >= 0)
+                    answer = warn_on_pl_erase_track(path);
+                else
+                    answer = warn_on_pl_erase() ? PL_ERASE_REPLACE
+                                                : PL_ERASE_CANCEL;
+                if (answer == PL_ERASE_PLAY_NOW)
+                    rc = 2;
+                if (answer != PL_ERASE_REPLACE)
                     break;
                 if (browser_db_play_folder(c) >= 0)
                     rc = 2;

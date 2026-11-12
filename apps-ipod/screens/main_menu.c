@@ -78,6 +78,7 @@ static int reset_settings(void)
             break;
         case YESNO_TMO:
         case YESNO_NO:
+        case YESNO_CANCEL:
             break;
         case YESNO_USB:
             return 1;

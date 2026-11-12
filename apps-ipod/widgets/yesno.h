@@ -16,7 +16,8 @@ enum yesno_res
     YESNO_YES,
     YESNO_NO,
     YESNO_USB,
-    YESNO_TMO
+    YESNO_TMO,
+    YESNO_CANCEL    /* Back, from gui_syncyesno_run_labels() only */
 };
 
 struct text_message
@@ -57,6 +58,12 @@ extern enum yesno_res gui_syncyesno_run_w_tmo(
  * SYS_USB_CONNECTED to default_event_handler() itself. */
 extern enum yesno_res gui_syncyesno_run_defer_usb(
                            const struct text_message * main_message);
+
+/* As gui_syncyesno_run(), with the buttons labelled by the lang ids 'yes_id'
+ * (left, YESNO_YES) and 'no_id' (right, YESNO_NO). Back is YESNO_CANCEL. */
+extern enum yesno_res gui_syncyesno_run_labels(
+                           const struct text_message * main_message,
+                           int yes_id, int no_id);
 
 bool yesno_pop(const char* text);
 bool yesno_pop_confirm(const char* text);
