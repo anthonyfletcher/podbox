@@ -299,70 +299,55 @@ static int parsegenre( struct mp3entry* entry, char* tag, int bufferpos )
 /* parse embed albumart */
 static int parsealbumart( struct mp3entry* entry, char* tag, int bufferpos )
 {
-    /* don't parse albumart if already one found. This callback function is
-     * called unconditionally. */
-    if(entry->has_embedded_albumart)
-        return bufferpos;
-
-    bool unsync = entry->albumart.type == AA_FLAG_ID3_UNSYNC;
-
-    entry->albumart.type = AA_TYPE_UNKNOWN;
-
     char *start = tag;
-    /* skip text encoding */
-    tag += 1;
-    static const char *img_options[] = {"jpeg", "jpg", "png", NULL};
-
-    if (memcmp(tag, "image/", 6) == 0)
+    size_t left = entry->albumart.size;
+    bool unsync = entry->albumart.type == AA_FLAG_ID3_UNSYNC;
+    int type = AA_TYPE_UNKNOWN;
+    if (left < 5)
+        return bufferpos;
+    unsigned char encoding = *tag++;
+    left--;
+    if (left >= 6 && !memcmp(tag, "image/", 6))
     {
-        /* ID3 v2.3+ */
-        tag += 6;
-        int tg_op = string_option(tag, img_options, false);
-
-        if (tg_op == 0) /*jpeg*/
-        {
-            entry->albumart.type = AA_TYPE_JPG;
-            tag += 5;
-        }
-        else if (tg_op == 1) /*jpg*/
-        {
-            /* image/jpg is technically invalid, but it does occur in
-             * the wild */
-            entry->albumart.type = AA_TYPE_JPG;
-            tag += 4;
-        }
-        else if (tg_op == 2) /*png*/
-        {
-            entry->albumart.type = AA_TYPE_PNG;
-            tag += 4;
-        }
+        const char *end = memchr(tag, 0, left);
+        if (!end)
+            return bufferpos;
+        if (!strcmp(tag, "image/jpeg") || !strcmp(tag, "image/jpg"))
+            type = AA_TYPE_JPG;
+        else if (!strcmp(tag, "image/png"))
+            type = AA_TYPE_PNG;
+        left -= end + 1 - tag;
+        tag = (char *)end + 1;
     }
     else
     {
-        /* ID3 v2.2 */
-        if (memcmp(tag, "JPG", 3) == 0)
-            entry->albumart.type = AA_TYPE_JPG;
-        else if (memcmp(tag, "PNG", 3) == 0)
-            entry->albumart.type = AA_TYPE_PNG;
+        if (left < 4)
+            return bufferpos;
+        if (!memcmp(tag, "JPG", 3))
+            type = AA_TYPE_JPG;
+        else if (!memcmp(tag, "PNG", 3))
+            type = AA_TYPE_PNG;
         tag += 3;
+        left -= 3;
     }
-
-    if (entry->albumart.type != AA_TYPE_UNKNOWN)
+    if (!left || type == AA_TYPE_UNKNOWN || encoding > 3)
+        return bufferpos;
+    unsigned char picture_type = *tag++;
+    left--;
+    unsigned width = (encoding == 1 || encoding == 2) ? 2 : 1;
+    while (left >= width && (tag[0] || (width == 2 && tag[1])))
     {
-        /* skip picture type */
-        tag += 1;
-        /* skip description */
-        tag = strchr(tag, '\0') + 1;
-        /* fixup offset&size for image data */
-        entry->albumart.pos  += tag - start;
-        entry->albumart.size -= tag - start;
-        if (unsync)
-        {
-            entry->albumart.type |= AA_FLAG_ID3_UNSYNC;
-        }
-        /* check for malformed tag with no picture data */
-        entry->has_embedded_albumart = (entry->albumart.size != 0);
+        tag += width;
+        left -= width;
     }
+    if (left <= width)
+        return bufferpos;
+    tag += width;
+    entry->albumart.pos += tag - start;
+    entry->albumart.size -= tag - start;
+    entry->albumart.type = type | (unsync ? AA_FLAG_ID3_UNSYNC : 0);
+    entry->albumart_picture_type = picture_type;
+    entry->has_embedded_albumart = true;
     /* return bufferpos as we didn't store anything in id3v2buf */
     return bufferpos;
 }
@@ -1147,16 +1132,32 @@ retry_with_limit:
                     *ptag = tag;
 
 #ifdef HAVE_ALBUMART
-                /* albumart */
-                if ((!entry->has_embedded_albumart) &&
-                    ((tr->tag_length == 4 && !memcmp( header, "APIC", 4)) ||
-                     (tr->tag_length == 3 && !memcmp( header, "PIC" , 3))))
+                /* Prefer the front cover; preserve a valid fallback. */
+                if ((tr->tag_length == 4 && !memcmp(header, "APIC", 4)) ||
+                    (tr->tag_length == 3 && !memcmp(header, "PIC", 3)))
                 {
+                    struct mp3_albumart previous = entry->albumart;
+                    unsigned char previous_type = entry->albumart_picture_type;
+                    bool had = entry->has_embedded_albumart;
+                    entry->has_embedded_albumart = false;
                     entry->albumart.pos = frame_pos;
-                    entry->albumart.size = totframelen;
-                    entry->albumart.type = (unsynch || (global_unsynch && version <= ID3_VER_2_3))
-                                           ? AA_FLAG_ID3_UNSYNC
-                                           : AA_TYPE_UNKNOWN;
+                    entry->albumart.size = bytesread;
+                    entry->albumart.type =
+                        (unsynch || (global_unsynch && version <= ID3_VER_2_3))
+                        ? AA_FLAG_ID3_UNSYNC : AA_TYPE_UNKNOWN;
+                    parsealbumart(entry, tag, bufferpos);
+                    if (entry->has_embedded_albumart)
+                        entry->albumart.size += totframelen - bytesread;
+                    if (had && (!entry->has_embedded_albumart ||
+                        previous_type == 3 || entry->albumart_picture_type != 3))
+                    {
+                        entry->albumart = previous;
+                        entry->albumart_picture_type = previous_type;
+                        entry->has_embedded_albumart = true;
+                    }
+                    /* The callback has consumed this binary frame. */
+                    bufferpos -= bytesread + 1;
+                    break;
                 }
 #endif
                 if( tr->ppFunc )

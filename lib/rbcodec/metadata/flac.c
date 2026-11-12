@@ -33,41 +33,27 @@
 
 bool parse_flac_album_art(unsigned char *buf, int bytes_read, enum mp3_aa_type *type, int *picframe_pos)
 {
-    *picframe_pos = 4; /* skip picture type */
-    int mime_length, description_length;
-
-    if (bytes_read <= *picframe_pos + 4) /* get_long_be expects 4 chars */
-    {
-        logf("flac picture length invalid!");
-        return false;
-    }
-
-    mime_length = get_long_be(&buf[(*picframe_pos)]);
-
-    char *mime = buf + *picframe_pos + 4;
-    *picframe_pos +=  4 + mime_length;
-
-    if (bytes_read < *picframe_pos)
-    {
-        logf("flac picture length invalid!");
-        return false;
-    }
-
     *type = AA_TYPE_UNKNOWN;
-    if (memcmp(mime, "image/", 6) == 0)
-    {
-        mime += 6;
-        if (strcmp(mime, "jpeg") == 0 || strcmp(mime, "jpg") == 0){
-            *type = AA_TYPE_JPG;
-        }else if (strcmp(mime, "png") == 0)
-            *type = AA_TYPE_PNG;
-    }
-
-    description_length  = get_long_be(&buf[(*picframe_pos)]);
-
-    /* 16 = skip picture width,height,color-depth,color-used */
-    *picframe_pos += 4 + description_length + 16;
-    return true;
+    *picframe_pos = 0;
+    if (bytes_read < 8)
+        return false;
+    uint32_t mime_length = get_long_be(buf + 4);
+    if (mime_length > (uint32_t)bytes_read - 8)
+        return false;
+    if ((mime_length == 10 && !memcmp(buf + 8, "image/jpeg", 10)) ||
+        (mime_length == 9 && !memcmp(buf + 8, "image/jpg", 9)))
+        *type = AA_TYPE_JPG;
+    else if (mime_length == 9 && !memcmp(buf + 8, "image/png", 9))
+        *type = AA_TYPE_PNG;
+    uint32_t at = 8 + mime_length;
+    if (at + 4 > (uint32_t)bytes_read)
+        return false;
+    uint32_t description = get_long_be(buf + at);
+    if (description > (uint32_t)bytes_read - at - 4 ||
+        at + 4 + description + 20 > (uint32_t)bytes_read)
+        return false;
+    *picframe_pos = at + 4 + description + 16;
+    return *type != AA_TYPE_UNKNOWN;
 }
 
 #endif /* HAVE_ALBUMART */
@@ -158,27 +144,28 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
 #ifdef HAVE_ALBUMART
         else if (type == 6) /* 6 is the PICTURE block */
         {
-            if(!id3->has_embedded_albumart) /* only use the first PICTURE */
+            unsigned int buf_size = MIN(sizeof(id3->path), i);
+            off_t picture_pos = lseek(fd, 0, SEEK_CUR);
+            int bytes_read = read(fd, buf, buf_size);
+            if (bytes_read < 0)
+                return false;
+            i -= bytes_read;
+            int picframe_pos;
+            enum mp3_aa_type picture_format;
+            if (parse_flac_album_art(buf, bytes_read, &picture_format,
+                                     &picframe_pos))
             {
-                unsigned int buf_size = MIN(sizeof(id3->path), i);
-
-                id3->albumart.pos = lseek(fd, 0, SEEK_CUR);
-
-                int bytes_read = read(fd, buf, buf_size);
-                buf[buf_size-1] = '\0';
-                i -= bytes_read;
-
-                int picframe_pos;
-                if (!parse_flac_album_art(buf, bytes_read, &id3->albumart.type, &picframe_pos))
-                    return false;
-
-                /* if we support the format and image length is in the buffer */
-                if(id3->albumart.type != AA_TYPE_UNKNOWN
-                   && (picframe_pos + 4) - buf_size > 0)
+                unsigned picture_type = get_long_be(buf);
+                unsigned length = get_long_be(buf + picframe_pos);
+                if (length <= (unsigned)(i + bytes_read - picframe_pos - 4) &&
+                    (!id3->has_embedded_albumart ||
+                     (picture_type == 3 && id3->albumart_picture_type != 3)))
                 {
                     id3->has_embedded_albumart = true;
-                    id3->albumart.size = get_long_be(&buf[picframe_pos]);
-                    id3->albumart.pos += picframe_pos + 4;
+                    id3->albumart.type = picture_format;
+                    id3->albumart.size = length;
+                    id3->albumart.pos = picture_pos + picframe_pos + 4;
+                    id3->albumart_picture_type = picture_type;
                 }
             }
 

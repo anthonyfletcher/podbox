@@ -315,6 +315,7 @@ struct mp3entry {
 #ifdef HAVE_ALBUMART
     bool has_embedded_albumart;
     struct mp3_albumart albumart;
+    unsigned char albumart_picture_type;
 #endif
 
     /* Cuesheet support */

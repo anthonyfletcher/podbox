@@ -306,7 +306,7 @@ const signed char b64_codes[] =
 size_t base64_decode(const char *in, size_t in_len, unsigned char *out)
 {
     size_t i = 0;
-    int val = 0;
+    uint32_t val = 0;
     size_t len = 0;
 
     while (i < in_len)
@@ -424,8 +424,7 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
 
         logf("Vorbis comment %d: %s=%s", i, name, value);
 #ifdef HAVE_ALBUMART
-        if (!id3->has_embedded_albumart /* only use the first PICTURE */
-            && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
+        if (!strcasecmp(name, "METADATA_BLOCK_PICTURE"))
         {
             int after_block_pos = lseek(fd, 0, SEEK_CUR);
 
@@ -433,15 +432,20 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
             size_t outlen = base64_decode(buf, MIN(read_len, (int32_t) sizeof(value) - 1), buf);
 
             int picframe_pos;
-            parse_flac_album_art(buf, outlen, &id3->albumart.type, &picframe_pos);
-            if(id3->albumart.type != AA_TYPE_UNKNOWN)
+            enum mp3_aa_type picture_format;
+            unsigned picture_type = outlen >= 4 ? get_long_be(buf) : 0;
+            if (parse_flac_album_art((unsigned char *)buf, outlen,
+                                     &picture_format, &picframe_pos)
+                && (!id3->has_embedded_albumart ||
+                    (picture_type == 3 && id3->albumart_picture_type != 3)))
             {
                 //NOTE: This is not exact location due to padding in base64 (up to 3 chars)!!
                 // But it's OK with our jpeg decoder if we add or miss few bytes in jpeg header
                 const int picframe_pos_b64 = base64_encoded_size(picframe_pos + 4);
 
                 id3->has_embedded_albumart = true;
-                id3->albumart.type |= AA_FLAG_VORBIS_BASE64;
+                id3->albumart.type = picture_format | AA_FLAG_VORBIS_BASE64;
+                id3->albumart_picture_type = picture_type;
                 id3->albumart.pos = picframe_pos_b64 + before_block_pos;
                 id3->albumart.size = after_block_pos - id3->albumart.pos;
             }
