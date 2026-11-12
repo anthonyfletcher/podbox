@@ -722,6 +722,11 @@ int shell_tracks_tick(void)
     return changed;
 }
 
+bool shell_tracks_held(void)
+{
+    return held;
+}
+
 void shell_tracks_hold(bool hold)
 {
     int status = audio_status() & (AUDIO_STATUS_PLAY | AUDIO_STATUS_PAUSE);

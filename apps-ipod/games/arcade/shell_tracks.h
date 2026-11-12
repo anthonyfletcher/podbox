@@ -26,6 +26,9 @@ void shell_tracks_end(void);
  * aside: a dock or a car must not browse or change the queue meanwhile */
 bool shell_tracks_owned(void);
 
+/* Whether music the cart owns is held still by a pause */
+bool shell_tracks_held(void);
+
 /* The game paused (true) and playing on: music the cart owns held still
  * meanwhile, so a round timed against it loses nothing */
 void shell_tracks_hold(bool hold);

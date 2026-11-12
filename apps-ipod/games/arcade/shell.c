@@ -1025,12 +1025,16 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
     /* held or left alone, a dialog rests as the game does */
     bool idle = TIME_AFTER(current_tick, dialog_touched + IDLE_PAUSE);
     if (button_hold() || idle) {
+        /* a question asked in a pause holds the music already, and keeps
+         * holding it once the hold switch is off */
+        bool was_held = shell_tracks_held();
         pause_begin(vm);
         if (hold_pause(vm, idle && !button_hold()) == USB) {
             dialog_to_root = true;
             return 0;
         }
-        shell_tracks_hold(false);
+        if (!was_held)
+            shell_tracks_hold(false);
         /* the press that woke it is not also an answer */
         while (button_status())
             button_get_w_tmo(HZ / 20);
