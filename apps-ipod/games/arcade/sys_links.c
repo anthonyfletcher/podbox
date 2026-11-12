@@ -193,8 +193,11 @@ NATIVE(links_point)
 }
 
 /* The square root of a 64-bit square, rounded down */
+static uint32_t root32(uint32_t v);
 static uint32_t root(uint64_t v)
 {
+    if (!(v >> 32))
+        return root32((uint32_t)v);
     uint64_t r = 0, bit = (uint64_t)1 << 62;
     while (bit > v)
         bit >>= 2;
@@ -213,7 +216,7 @@ static uint32_t root(uint64_t v)
  * root, at a fraction of root()'s cost on an ARM7 */
 static uint32_t root32(uint32_t v)
 {
-    uint32_t r = 0, bit = 1u << 30;
+    uint32_t r = 0, bit = v >> 16 ? 1u << 30 : 1u << 14;
     while (bit > v)
         bit >>= 2;
     while (bit) {
@@ -440,12 +443,21 @@ static const char *const seg_keys[S_FIELDS] = {
 struct segs
 {
     const int32_t *x0, *y0, *x1, *y1, *start, *items;
+    uint32_t nitems;
     const uint8_t *mat;
     uint32_t count;
     int32_t ox, oy, mx, my;         /* the offset, and its move this tick */
     int32_t cell, gx, gy, gw, gh;
     int32_t bx0, by0, bx1, by1;     /* its lines' bounds, whole pixels */
+    uint32_t gen;                   /* its normals' mark, below */
 };
+
+/* Each line's normal, unflipped, 16.16, once worked out while a set is in
+ * use: a root and two 64-bit divides that every point resting on the line,
+ * and each push pass, would make again. A line is k in its set, and sets
+ * share the slots, so each is marked with the gen of the set it is for. */
+static int32_t norm_x[MAX_SEGS], norm_y[MAX_SEGS];
+static uint32_t norm_mark[MAX_SEGS], norm_gen;
 
 /* An Int32Array (or Uint8Array) of n, zeroed */
 static int new_ints(struct vm *vm, uint32_t n, int bytes, struct value *out)
@@ -491,6 +503,9 @@ static int segs_of(struct vm *vm, struct value v, const char *fn,
     s->gy = whole(f[S_GY], 0);
     s->gw = whole(f[S_GW], 0);
     s->gh = whole(f[S_GH], 0);
+    if (!++norm_gen)
+        ++norm_gen;                 /* 0 marks a slot never filled */
+    s->gen = norm_gen;
     s->bx0 = whole(f[S_BX0], INT32_MIN);
     s->by0 = whole(f[S_BY0], INT32_MIN);
     s->bx1 = whole(f[S_BX1], INT32_MAX);
@@ -506,10 +521,7 @@ static int segs_of(struct vm *vm, struct value v, const char *fn,
         (uint32_t)s->start[cells] > I32(vm, f[S_ITEMS])->len)
         return vm_fail(vm, fn, "() needs a set whose arrays are as "
                        "segs.make() made them", "");
-    for (uint32_t c = 0; c < cells; c++)
-        if (s->start[c] < 0 || s->start[c] > s->start[c + 1])
-            return vm_fail(vm, fn, "() needs a set whose arrays are as "
-                           "segs.make() made them", "");
+    s->nitems = I32(vm, f[S_ITEMS])->len;
     return 1;
 }
 
@@ -1263,7 +1275,10 @@ static uint32_t seg_near(const struct segs *s, int64_t x0, int64_t y0,
             *seen += (uint32_t)(s->start[i + 1] - s->start[i]);
             if (*seen > 1u << 30)
                 *seen = 1u << 30;
-            for (int32_t t = s->start[i]; t < s->start[i + 1]; t++) {
+            int32_t t0 = s->start[i], t1 = s->start[i + 1];
+            if (t0 < 0 || (uint32_t)t1 > s->nitems)
+                continue;
+            for (int32_t t = t0; t < t1; t++) {
                 int32_t k = s->items[t];
                 if ((uint32_t)k >= s->count || stamp[k] == mark)
                     continue;
@@ -1273,6 +1288,24 @@ static uint32_t seg_near(const struct segs *s, int64_t x0, int64_t y0,
             }
         }
     return n;
+}
+
+/* Line k's normal, unflipped: (-ey, ex) over its length, 16.16, 0 for a
+ * line of no length */
+static void seg_normal(const struct segs *s, int32_t k, int64_t *nx,
+                       int64_t *ny)
+{
+    if (norm_mark[k] != s->gen) {
+        int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
+        int64_t ex = ((int64_t)s->x1[k] >> 8) - ax;
+        int64_t ey = ((int64_t)s->y1[k] >> 8) - ay;
+        int64_t el = (int64_t)root((uint64_t)(ex * ex + ey * ey));
+        norm_x[k] = (int32_t)(el ? (-ey << 16) / el : 0);
+        norm_y[k] = (int32_t)(el ? (ex << 16) / el : 0);
+        norm_mark[k] = s->gen;
+    }
+    *nx = norm_x[k];
+    *ny = norm_y[k];
 }
 
 /* The point p kept r from line k (all 1/256 pixels): moved out along the
@@ -1294,11 +1327,7 @@ static int seg_push(const struct segs *s, int32_t k, int64_t *px, int64_t *py,
         /* beside the line's middle: out along its normal, the distance by
          * the cross product -- the nearest point's rounding would point
          * the way out along the line */
-        int64_t el = (int64_t)root((uint64_t)ee);
-        if (el <= 0)
-            return 0;
-        nx = (-ey << 16) / el;
-        ny = (ex << 16) / el;
+        seg_normal(s, k, &nx, &ny);
         if ((ox - ax) * nx + (oy - ay) * ny < 0) {
             nx = -nx;
             ny = -ny;
@@ -1335,10 +1364,8 @@ static void seg_side(const struct segs *s, int32_t k, int64_t ox, int64_t oy,
                      struct touch *t)
 {
     int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
-    int64_t ex = ((int64_t)s->x1[k] >> 8) - ax;
-    int64_t ey = ((int64_t)s->y1[k] >> 8) - ay;
-    int64_t el = (int64_t)root((uint64_t)(ex * ex + ey * ey));
-    int64_t nx = el ? (-ey << 16) / el : 0, ny = el ? (ex << 16) / el : 0;
+    int64_t nx, ny;
+    seg_normal(s, k, &nx, &ny);
     if ((ox - ax) * nx + (oy - ay) * ny < 0) {
         nx = -nx;
         ny = -ny;
@@ -1492,6 +1519,7 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
      * its move along the line -- stopping it at the crossing would lose
      * that, every tick, on a curve */
     int32_t fk;
+    const int64_t pxa = px, pya = py;
     seg_first(s, &nb, ox, oy, px, py, &fk);
     if (fk >= 0) {
         seg_side(s, fk, ox, oy, &t);
@@ -1514,7 +1542,8 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
     /* last, the path again: a push out of one side of a V can cross the
      * other, and a point is never let through a line -- back along its
      * path to just short of the first it crosses */
-    for (int again = 0; again < 3; again++) {
+    for (int again = fk < 0 && px == pxa && py == pya ? 3 : 0; again < 3;
+         again++) {
         int32_t ck;
         int64_t c = seg_first(s, &nb, ox, oy, px, py, &ck);
         if (ck < 0)
