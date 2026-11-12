@@ -2130,6 +2130,25 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
     return hid;
 }
 
+/* The cover that stands in for a missing portrait of the album artist of the
+ * track at 'path': their latest album's, or their latest book's for a book,
+ * when the setting for that kind asks for it. 0 for none, which is always
+ * the answer without the RAM database. */
+static unsigned int artist_cover_key(const char *path)
+{
+    struct tagcache_album al;
+    struct tagcache_artist ar;
+    int idx = tagcache_find_path(path);
+
+    if (idx < 0 || !tagcache_album_get(tagcache_album_of(idx), &al)
+        || !tagcache_artist_get(tagcache_artist_find(al.artist_seek), &ar))
+        return 0;
+    if (!(al.spoken == al.tracks ? global_settings.db_author_cover
+                                 : global_settings.db_artist_cover))
+        return 0;
+    return ar.cover_hash;
+}
+
 /* Load the track's folder art from the pre-scaled cache (the 300px "wps"
  * thumbnail). Returns a handle, or an error when there is no real cached art --
  * the placeholder is rejected so an artless album falls through to the theme's
@@ -2137,7 +2156,9 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
  *
  * Which picture that is, 'artist' says: the album's, by the key the browser
  * shows it with (art_cache_track_key()), or the artist's, keyed by the name the
- * database files the track under -- its album artist, or else its artist. */
+ * database files the track under -- its album artist, or else its artist.
+ * Under the Artist setting an artist with no portrait takes
+ * artist_cover_key()'s; Auto has the track's own cover to fall back on. */
 static int load_cached_albumart(struct mp3entry *track_id3,
                                 struct bufopen_bitmap_data *user_data,
                                 bool is_current_track, int i, bool artist)
@@ -2157,6 +2178,13 @@ static int load_cached_albumart(struct mp3entry *track_id3,
                             ? track_id3->albumartist : track_id3->artist);
     else
         key = art_cache_track_key(track_id3->path);
+
+    if (key
+        && art_cache_lookup_hash(key, wps_size_idx, path, sizeof(path),
+                                 &is_fallback)
+        && is_fallback && artist
+        && global_settings.wps_art_source == WPS_ART_ARTIST)
+        key = artist_cover_key(track_id3->path);
 
     if (!key
         || !art_cache_lookup_hash(key, wps_size_idx, path, sizeof(path),
@@ -2192,8 +2220,9 @@ static int audio_load_albumart(struct track_info *infop,
          * embedded tags and folder images both belong to the record, not the
          * performer -- so under the explicit Artist setting an artist with no
          * portrait ends with no artwork rather than quietly falling through to
-         * the album cover. Missing portraits are meant to be visible; that is
-         * what the art cache health screen reports on.
+         * the album cover, unless Album Cover If No Photo asks for their
+         * latest album's. Missing portraits are otherwise meant to be
+         * visible; that is what the art cache health screen reports on.
          *
          * "Auto" is the exception, and asks for artist art only for a playlist
          * built from an artist browse. It is a convenience rather than a

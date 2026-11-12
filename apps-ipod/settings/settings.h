@@ -834,6 +834,10 @@ struct user_settings
     /* Artist art (a photo in <artist>/folder.jpg) on artist browse rows, same
      * mechanism as db_albumart. On by default. */
     bool db_artistart;
+    /* An artist with no photograph shows the artist's latest album cover
+     * instead of the placeholder: on their row, in Artist Portraits and as
+     * Now Playing's artist art. Off by default. */
+    bool db_artist_cover;
     /* Art on the book rows of an audiobook browse, overriding the two above
      * for those lists only -- tall rows are a different bargain over a few
      * dozen books than over a few thousand albums. Off by default. */
@@ -841,6 +845,9 @@ struct user_settings
     /* The same for the author rows, apart, since few people keep a photograph
      * of an author. Off by default. */
     bool db_authorart;
+    /* The same as db_artist_cover for an audiobook author, with their latest
+     * book's cover. Off by default. */
+    bool db_author_cover;
     bool db_ebookauthorart;
     /* Show art on the Podcasts lists. On by default: a podcatcher embeds the
      * show's art in every episode. */

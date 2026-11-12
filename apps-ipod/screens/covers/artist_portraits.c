@@ -137,6 +137,13 @@ static unsigned int artist_art_key(int index)
     return carousel_idx.artist_index[index].art_hash;
 }
 
+/* carousel_model.fallback_key: with no portrait, the latest album's cover */
+static unsigned int artist_fallback_key(int index)
+{
+    return global_settings.db_artist_cover
+           ? carousel_idx.artist_index[index].cover_hash : 0;
+}
+
 /* Select an artist: open that album-artist's own album listing in the database
  * browser (armed for the next load; BACK returns here). Records the slide to
  * resume to, so backing out lands on the artist just visited rather than on
@@ -334,6 +341,7 @@ static const struct carousel_model artist_model = {
     .build_index = artist_build_index,
     .count       = artist_count,
     .art_key     = artist_art_key,
+    .fallback_key = artist_fallback_key,
     .enter       = artist_enter,
     .jump_prev   = artist_jump_prev,
     .jump_next   = artist_jump_next,

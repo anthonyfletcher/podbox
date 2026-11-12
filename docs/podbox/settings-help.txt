@@ -850,6 +850,11 @@ Draws artist photographs beside the rows in the database browser, from
 /Artwork/People or the artist's folder. Needs a theme that supports artwork in
 lists, or the rows are tall and empty.
 
+[database artist cover]
+Shows the cover of an artist's latest album when there is no photograph of
+them, instead of the placeholder: beside their row, in Artist Portraits, and
+on the now-playing screen when it shows the artist photograph.
+
 [database audiobook art]
 Draws cover art beside the rows in the Audiobooks browser. Needs a theme that
 supports artwork in lists, or the rows are tall and empty.
@@ -858,6 +863,11 @@ supports artwork in lists, or the rows are tall and empty.
 Draws a photograph beside each author in the Audiobooks browser, from an image
 named after them in /Artwork/People or a folder.jpg in the author's folder.
 Without one the row shows a placeholder.
+
+[database author cover]
+Shows the cover of an audiobook author's latest book beside their row when
+there is no photograph of them, instead of the placeholder. Only shown where
+Audiobook Author Art Rows is on.
 
 [database book art]
 Draws each book's cover beside its row in the Books lists. Needs a theme that

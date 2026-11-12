@@ -28138,3 +28138,31 @@
     *: "Game Sound"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_ARTIST_COVER
+  desc: in Settings, an artist row with no photo shows their latest album cover
+  user: core
+  <source>
+    *: "Album Cover If No Photo"
+  </source>
+  <dest>
+    *: "Album Cover If No Photo"
+  </dest>
+  <voice>
+    *: "Album Cover If No Photo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_COVER
+  desc: in Settings, an audiobook author row with no photo shows their latest book cover
+  user: core
+  <source>
+    *: "Audiobook Cover If No Photo"
+  </source>
+  <dest>
+    *: "Audiobook Cover If No Photo"
+  </dest>
+  <voice>
+    *: "Audiobook Cover If No Photo"
+  </voice>
+</phrase>

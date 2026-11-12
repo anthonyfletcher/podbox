@@ -7089,6 +7089,23 @@ unsigned int browser_db_get_art_hash(struct browser_context* c, int item)
     return hash;
 }
 
+unsigned int browser_db_get_artist_cover_hash(struct browser_context* c,
+                                              int item)
+{
+    struct tagentry *entry;
+    struct tagcache_artist ar;
+    int tag;
+
+    if (item < c->special_entry_count
+        || !browser_db_is_artist_list(c)
+        || !(entry = browser_db_get_entry(c, item)))
+        return 0;
+    tag = csi->tagorder[shown_level(c->currextra)];
+    if (!is_artist_tag(tag) || !artist_by_name(tag, entry->extraseek, &ar))
+        return 0;
+    return ar.cover_hash;
+}
+
 /* ---- scoping a search to the selected row ------------------------------- */
 
 enum browser_db_scope browser_db_current_scope(void)

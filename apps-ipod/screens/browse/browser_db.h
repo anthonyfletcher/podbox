@@ -116,6 +116,10 @@ bool browser_db_current_under_artist_level(void);
  * same name, from the RAM copy only. 0 for any other row, or one with no
  * folder. */
 unsigned int browser_db_get_art_hash(struct browser_context* c, int item);
+/* The art key of the latest album of an artist row's album artist, 0 for
+ * any other row or an artist who is no album artist */
+unsigned int browser_db_get_artist_cover_hash(struct browser_context* c,
+                                              int item);
 int browser_db_get_icon(struct browser_context* c);
 /* %Lk and %LP for row 'id' of the level on screen. */
 enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id);

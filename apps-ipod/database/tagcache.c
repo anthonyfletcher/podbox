@@ -1192,6 +1192,11 @@ static void albums_finish(int entries)
         if (ar->art_hash == 0)
             ar->art_hash = art_name_hash(row_name(tag_albumartist, ar->seek));
         al->artist_art_hash = ar->art_hash;
+        if (al->art_hash && (!ar->cover_hash || al->year > ar->cover_year))
+        {
+            ar->cover_hash = al->art_hash;
+            ar->cover_year = al->year;
+        }
     }
 }
 

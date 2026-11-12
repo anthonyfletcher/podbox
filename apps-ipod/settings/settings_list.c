@@ -2219,10 +2219,16 @@ const struct settings_list settings[] = {
                   true, "database album art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_artistart, LANG_DB_ARTIST_ART,
                   false, "database artist art", NULL),
+    /* This and "database author cover" are the owner's choice about their
+     * library, not the theme's, so a theme neither sets nor resets them */
+    OFFON_SETTING(0, db_artist_cover, LANG_DB_ARTIST_COVER,
+                  false, "database artist cover", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_bookart, LANG_DB_BOOK_ART,
                   true, "database audiobook art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_authorart, LANG_DB_AUTHOR_ART,
                   false, "database author art", NULL),
+    OFFON_SETTING(0, db_author_cover, LANG_DB_AUTHOR_COVER,
+                  false, "database author cover", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookart, LANG_DB_EBOOK_ART,
                   true, "database book art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_ebookauthorart,

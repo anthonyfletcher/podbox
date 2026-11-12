@@ -49,6 +49,7 @@ struct artist_data {
     long lastplayed;
     long seek;    /* album artist taglist position */
     unsigned int art_hash;  /* art_name_hash() of its name */
+    unsigned int cover_hash; /* art_hash of its latest album, 0 for none */
 };
 
 /* The lists, and the database commit they were copied at. Seeks are seeks

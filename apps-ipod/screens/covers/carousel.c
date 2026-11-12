@@ -1783,12 +1783,19 @@ static inline bool load_and_prepare_surface(const int slide_index,
 
     /* Prefer the shared, database-driven thumbnail cache. It is keyed by a hash
      * of the folder the tracks live in, which the album tables resolved when
-     * the database loaded -- so this costs a file open, not a database search. */
-    unsigned int art_hash = model->art_key(slide_index);
-    if (pf_cover_size_idx >= 0 && art_hash != 0)
+     * the database loaded -- so this costs a file open, not a database search.
+     * The model's fallback key is opened only when its own key has nothing. */
+    unsigned int keys[2] = {
+        model->art_key(slide_index),
+        model->fallback_key ? model->fallback_key(slide_index) : 0 };
+    for (int k = 0; k < 2 && !got_shared; k++)
     {
         static char aat_file[MAX_PATH];  /* off the loader thread's stack */
+        unsigned int art_hash = keys[k];
         int fh;
+
+        if (pf_cover_size_idx < 0 || art_hash == 0)
+            continue;
 
         /* Opened rather than looked up: this runs while an animation is
          * scrolling, and asking whether the file exists before opening it is

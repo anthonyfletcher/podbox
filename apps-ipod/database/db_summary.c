@@ -103,6 +103,7 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
         d->lastplayed = r.lastplayed;
         d->seek = r.seek;
         d->art_hash = r.art_hash;
+        d->cover_hash = r.cover_hash;
         n++;
     }
     t->artist_ct = n;

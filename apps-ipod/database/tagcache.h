@@ -306,7 +306,9 @@ struct tagcache_artist {
     uint16_t albums;
     uint16_t spoken_albums;      /* albums all of whose tracks are spoken */
     uint16_t podcast_albums;     /* of them, all of whose are podcasts */
-    uint16_t pad;
+    int16_t  cover_year;         /* the year of cover_hash's album */
+    uint32_t cover_hash;         /* art_hash of its latest album, the first
+                                    of them in table order on a tie */
 };
 
 /* Albums in album-seek order then artist-seek order; artists in seek order.

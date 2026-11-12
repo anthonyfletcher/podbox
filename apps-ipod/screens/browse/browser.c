@@ -569,10 +569,26 @@ hit:
     return &browser_aa_bm;
 }
 
+/* An artist with no photograph takes their latest album's cover, and an
+ * author their latest book's, when asked; an album with no cover keeps the
+ * placeholder either way. */
 static unsigned int browser_row_art_hash(int selected_item, void *data)
 {
-    return browser_db_get_art_hash((struct browser_context *)data,
-                                   selected_item);
+    struct browser_context *c = (struct browser_context *)data;
+    unsigned int hash = browser_db_get_art_hash(c, selected_item);
+    unsigned int cover;
+    char aat[MAX_PATH];
+    bool is_fallback;
+
+    if (hash
+        && (browser_db_is_spoken_list(c) ? global_settings.db_author_cover
+                                         : global_settings.db_artist_cover)
+        && art_cache_lookup_hash(hash, browser_aa_size_idx, aat, sizeof(aat),
+                                 &is_fallback)
+        && is_fallback
+        && (cover = browser_db_get_artist_cover_hash(c, selected_item)))
+        hash = cover;
+    return hash;
 }
 
 static const struct bitmap *browser_get_albumart(int selected_item, void * data,

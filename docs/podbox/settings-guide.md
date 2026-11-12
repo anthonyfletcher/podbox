@@ -402,8 +402,10 @@ Separator set above zero.
 |---|---|---|---|
 | Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser, from /Artwork/People or the artist's folder. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Album Cover If No Photo | Shows the cover of an artist's latest album when there is no photograph of them, instead of the placeholder: beside their row, in Artist Portraits, and on the now-playing screen when it shows the artist photograph. | No |  |
 | Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from an image named after them in /Artwork/People or a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
+| Art Rows ▸ Audiobook Cover If No Photo | Shows the cover of an audiobook author's latest book beside their row when there is no photograph of them, instead of the placeholder. Only shown where Audiobook Author Art Rows is on. | No |  |
 | Art Rows ▸ Book Art Rows | Draws each book's cover beside its row in the Books lists. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Book Author Art Rows | Draws a photograph beside each author in Books > By Author, from an image named after them in /Artwork/People, or a folder.jpg in a folder named after them, or else in the folder the book is in or the one above. | No |  |
 | Art Rows ▸ Podcast Art Rows | Draws each show's art beside its row in the Podcasts list, from an image named after the show in /Artwork/Covers, the art its episodes carry or a folder.jpg beside them. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
