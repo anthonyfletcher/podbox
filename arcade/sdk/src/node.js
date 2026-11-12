@@ -13,11 +13,17 @@ const engine = path.resolve(here, '../../../apps-ipod/games/arcade');
 
 let defs = null;
 
+/* the engine's .def files: from the checkout, or built into the one-file
+ * compiler the build action carries (arcade/builder), which sets
+ * globalThis.arcadeDefs before this is first asked */
 export function loadDefs() {
     if (!defs) {
+        const built = globalThis.arcadeDefs;
+        const text = (name) => built ? built[name]
+            : fs.readFileSync(path.join(engine, name), 'utf8');
         defs = {
-            isa: parseOpcodes(fs.readFileSync(path.join(engine, 'opcodes.def'), 'utf8')),
-            api: parseApi(fs.readFileSync(path.join(engine, 'arcade_api.def'), 'utf8'))
+            isa: parseOpcodes(text('opcodes.def')),
+            api: parseApi(text('arcade_api.def'))
         };
     }
     return defs;

@@ -698,6 +698,16 @@ inside the script:
   deliberately and a bare commit sweeps it in. `release.sh` does not commit; it
   refuses to run unless the tree is already clean.
 
+**The Arcade's repositories.** After the firmware is published, `release.sh`
+runs `release-arcade.sh` (`--no-arcade` skips it; `--dry-run` rehearses it
+too): from the released commit it makes the build action
+(`arcade/builder` -> `podbox-arcade-builder`, its `latest` tag moved to the
+release), the game template (`arcade/template` and the Arcade skill ->
+`podbox-game`) and the IDE (this repository's `gh-pages`, as `ide/`), and
+pushes them from this computer. Those repositories are outputs: change
+`arcade/builder` and `arcade/template`, never them. The WebAssembly engine
+and the text font come from the release's tree on the build server.
+
 Releases belong to this fork. Upstream remotes are not writable from here.
 
 That workflow invokes `rockboxdev.sh` as `bash ./tools/rockboxdev.sh`, not

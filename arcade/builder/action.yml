@@ -1,0 +1,34 @@
+name: Build a PodBox Arcade cart
+description: Compiles a PodBox Arcade cart folder into a .pbg the iPod's Arcade plays
+author: PodBox
+
+inputs:
+  cart:
+    description: The cart's folder, the one holding cart.json
+    default: .
+  output:
+    description: Where to write the .pbg; the folder's name with .pbg when left out
+    default: ''
+
+outputs:
+  pbg:
+    description: The .pbg written
+    value: ${{ steps.build.outputs.pbg }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - id: build
+      shell: bash
+      env:
+        CART: ${{ inputs.cart }}
+        OUTPUT: ${{ inputs.output }}
+      run: |
+        set -e
+        dir="${CART%/}"
+        out="${OUTPUT:-$(basename "$(cd "$dir" && pwd)").pbg}"
+        node "$GITHUB_ACTION_PATH/pbgc.mjs" build "$dir" -o "$out"
+        echo "pbg=$out" >> "$GITHUB_OUTPUT"
