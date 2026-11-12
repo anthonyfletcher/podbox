@@ -42,6 +42,7 @@
 #include "skin/skin_albumart_color.h"
 #include "sound.h"                     /* sound_min, sound_max */
 #include "system/volume.h"             /* adjust_volume */
+#include "games/arcade/shell.h"            /* shell_walk_yield */
 #include "games/arcade/shell_tracks.h"
 
 /* ---- tracks and their ids ------------------------------------------------ */
@@ -286,7 +287,7 @@ static int32_t music_count(void *ctx, const struct arcade_filter *f)
         if (walk_passes(&tcs, f))
             n++;
         if ((++seen & 63) == 0)
-            yield();
+            shell_walk_yield();
     }
     tagcache_search_finish(&tcs);
     walked = seen;
@@ -312,7 +313,7 @@ static int32_t music_pick(void *ctx, int32_t n, const struct arcade_filter *f,
             found++;
         }
         if ((++seen & 63) == 0)
-            yield();
+            shell_walk_yield();
     }
     tagcache_search_finish(&tcs);
     walked = seen;
@@ -414,7 +415,7 @@ static void resolve_nearest(int count)
         uint64_t key = path_key(path);
         int lo = 0, hi = by_key_ct;
         if ((++seen & 15) == 0)
-            yield();
+            shell_walk_yield();
         while (lo < hi) {
             int mid = (lo + hi) / 2;
             if (by_key[mid]->key < key)
@@ -468,7 +469,7 @@ static int32_t near_by_sound(const int32_t *ids, int count, int32_t n,
     }
     for (int i = 0; measured && i < r.count; i++) {
         if ((i & 63) == 0)
-            yield();
+            shell_walk_yield();
         if (!sound_index_read(&r, i, &rec) || !sound_record_usable(&rec))
             continue;
         sound_mix_axes(&rec, &ax);
@@ -516,7 +517,7 @@ static int32_t near_by_tags(int32_t id, int32_t n, int32_t *out)
     tagcache_entry_numeric(id, tag_year, &year);
     while (tagcache_get_next(&tcs, title, sizeof(title))) {
         if ((++seen & 63) == 0)
-            yield();
+            shell_walk_yield();
         if (tcs.idx_id == id)
             continue;
         bool same_genre = has_genre &&

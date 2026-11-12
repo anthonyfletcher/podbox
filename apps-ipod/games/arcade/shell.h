@@ -21,6 +21,11 @@ struct simplelist_info;
  * simplelist_show_list(): true when the owner went out to the root. */
 bool shell_list(struct simplelist_info *info);
 
+/* A walk of the library for a cart, yielding as it goes: the time is the
+ * player's, so the stall that stops a cart not responding is timed again
+ * from now */
+void shell_walk_yield(void);
+
 /* Each cart's saved numbers, <id>.sav, and a game left with Quit, <id>.sus */
 #define SAVE_DIR "/.rockbox/games/saves"
 

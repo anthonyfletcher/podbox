@@ -209,6 +209,12 @@ static void sound_fill(void);
 static struct vm *sound_vm;     /* while a cart runs and may sound */
 static long call_began;         /* the current tick of a call or dialog frame */
 
+void shell_walk_yield(void)
+{
+    call_began = current_tick;
+    yield();
+}
+
 static void host_yield(void *ctx)
 {
     (void)ctx;
