@@ -76,7 +76,7 @@ node "$WORK/src/arcade/builder/build.mjs" "$WORK/builder" "$WORK/font/font.bin"
 say "The template"
 node "$WORK/src/arcade/builder/template.mjs" "$WORK/template"
 
-# repo dir: a clone of repo's branch, or an empty one when it has none;
+# repo dir: a clone of repo's branch, or a new one when it has none;
 # then its files replaced by those in dir, but for .git and keep
 publish() {
     repo=$1 branch=$2 from=$3 name=$4 keep=$5
@@ -84,11 +84,16 @@ publish() {
     # the files as they are in the repository, LF, whatever this computer's
     # git would convert them to: a clone made first and set after would
     # leave a LICENSE checked out CRLF, and commit it so
-    if ! git -c core.autocrlf=false clone -q --depth 1 --branch "$branch" "$repo" "$to" 2>/dev/null; then
-        git -c core.autocrlf=false clone -q --depth 1 "$repo" "$to" 2>/dev/null ||
-            { mkdir -p "$to"; git -C "$to" init -q; git -C "$to" remote add origin "$repo"; }
+    if git ls-remote --exit-code --heads "$repo" "$branch" >/dev/null; then
+        git -c core.autocrlf=false clone -q --depth 1 --branch "$branch" "$repo" "$to"
+    else
+        # 2 is a repository without the branch; anything else, one that
+        # cannot be reached
+        [ $? -eq 2 ] || die "cannot read $repo"
+        mkdir -p "$to"
+        git -C "$to" init -q
         git -C "$to" checkout -q --orphan "$branch"
-        git -C "$to" rm -rq --cached . 2>/dev/null || true
+        git -C "$to" remote add origin "$repo"
     fi
     git -C "$to" config core.autocrlf false
     find "$to" -mindepth 1 -maxdepth 1 ! -name .git $keep -exec rm -rf {} +
