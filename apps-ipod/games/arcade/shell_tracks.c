@@ -174,11 +174,16 @@ static int music_play(void *ctx, int32_t id, int32_t ms)
     char path[MAX_PATH];
     if (!path_of_id(id, path, sizeof(path)))
         return 0;
-    stop_owners();
-    if (!owned) {
+    /* owned from before the stop, which waits on the audio thread: a dock
+     * leaves the queue alone (iap_library_queue_lent()) from here */
+    bool was = owned;
+    owned = true;
+    if (!was)
+        book_resume_save();
+    audio_stop();
+    if (!was) {
         playlist_set_aside();
         audio_set_unrecorded(true);
-        owned = true;
     }
     if (playlist_create(NULL, NULL) < 0 ||
         playlist_insert_track(NULL, path, PLAYLIST_INSERT_LAST, false,
