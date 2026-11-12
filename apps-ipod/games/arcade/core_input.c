@@ -722,8 +722,12 @@ NATIVE(beat_press)
         return vm_fail(vm, "beat.press() needs a button", "", "");
     int32_t i = floor_int(a[0]);
     int32_t t = (uint32_t)i < 5 ? vm->heard.press[i] : -1;
-    return RET_INT(t < 0 ? -1 : t - vm->beat_offset < 0 ? 0
-                                 : t - vm->beat_offset);
+    if (t >= 0) {
+        t -= vm->beat_offset;
+        if (t < 0)
+            t = 0;
+    }
+    return RET_INT(t);
 }
 
 /* beat.offset([ms]): the cart's calibration, taken off every press
