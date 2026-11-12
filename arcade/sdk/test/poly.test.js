@@ -167,10 +167,10 @@ ${v} polyfill(X, Y, X.length, 7, E, null, ${boxes ? 'B' : 'null'}); camera(); cl
 
 test('polyboxes: runs of 16 lines in each outline, and a box round each', () => {
     const r = run(`var b = polyboxes([0, 10, 10, 0, 50, 60, 55], [0, 0, 10, 10, 0, 0, 9], 7, [4]);
-printh(b.length + " " + b[0] + " " + b[1] + " " + b[2] / 65536 + " " + b[5] / 65536 + " " + b[6] / 65536 + " " + b[9] / 65536);`,
+printh(b.length + " " + b[0] + " " + b[1] + " " + b[3] / 65536 + " " + b[6] / 65536 + " " + b[7] / 65536 + " " + b[10] / 65536);`,
                   '0,0,1,1');
     assert.equal(r.status, 0, r.err);
-    assert.equal(r.out.split('\n')[0], '10 7 2 0 10 50 9');
+    assert.equal(r.out.split('\n')[0], '11 7 2 0 10 50 9');
     const long = run(`var x = [], y = []; for (var i = 0; i < 40; i++) { x.push(i); y.push(i % 3); }
 printh(polyboxes(x, y, 40)[1]);`, '0,0,1,1');
     assert.equal(long.out.split('\n')[0], '3');
@@ -180,6 +180,10 @@ test('polyboxes: the boxes must be for these points, and for outlines without be
     const sq = 'var x = [0, 9, 9, 0], y = [0, 0, 9, 9], b = polyboxes(x, y, 4);';
     assert.match(run(sq + 'polyfill(x, y, 3, 7, null, null, b);', '0,0,1,1').err, /other points or ends/);
     assert.match(run(sq + 'polyfill(x, y, 4, 7, [2], null, b);', '0,0,1,1').err, /other points or ends/);
+    /* two outlines of a run each, against one outline of two runs */
+    const two = 'var x = [], y = []; for (var i = 0; i < 32; i++) { x.push(i); y.push(i % 5); }' +
+                'var b = polyboxes(x, y, 32, [16]);';
+    assert.match(run(two + 'polyfill(x, y, 32, 7, null, null, b);', '0,0,1,1').err, /other points or ends/);
     assert.match(run(sq + 'polyfill(x, y, 4, 7, null, [1, 1, 1, 1], b);', '0,0,1,1').err, /without bend/);
     assert.match(run(sq + 'polyfill(x, y, 4, 7, null, null, [1, 2]);', '0,0,1,1').err, /Int32Array from polyboxes/);
     assert.match(run('polyboxes([0, 9, 9, 0], [0, 0, 9, 9], 4, [3, 2]);', '0,0,1,1').err, /ends must rise/);

@@ -2055,7 +2055,7 @@ static int poly_plain(struct poly *g, const struct pen *p,
             uint32_t b = i - 1 + POLY_RUN_LINES < e ? i - 1 + POLY_RUN_LINES
                                                     : e;
             int64_t lx, hx;
-            int side = run_side(g, p, g->boxes + 2 + 4 * g->run++, top, bot,
+            int side = run_side(g, p, g->boxes + 3 + 4 * g->run++, top, bot,
                                 &lx, &hx);
             g->tally[1]++;
             next = b + 1;
@@ -2283,14 +2283,16 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
 
 /* The runs polyboxes() cuts the outlines into: POLY_RUN_LINES lines each,
  * from each outline's start, the last of an outline as many as are left;
- * an outline of fewer than two points has none. 0 with the error set for
- * ends out of order. */
+ * an outline of fewer than two points has none. fold, where each outline
+ * ends, folded into a number, tells boxes for other ends. 0 with the error
+ * set for ends out of order. */
 static int poly_runs(struct vm *vm, const char *fn,
                      const struct column *ends, uint32_t nends, uint32_t n,
-                     uint32_t *runs)
+                     uint32_t *runs, uint32_t *fold)
 {
     uint32_t s = 0;
     *runs = 0;
+    *fold = 0;
     for (uint32_t k = 0; k <= nends && s < n; k++) {
         uint32_t e = n;
         if (k < nends) {
@@ -2302,14 +2304,15 @@ static int poly_runs(struct vm *vm, const char *fn,
         }
         if (e - s >= 2)
             *runs += (e - s + POLY_RUN_LINES - 1) / POLY_RUN_LINES;
+        *fold = *fold * 31 + e;
         s = e;
     }
     return 1;
 }
 
 /* polyboxes(xs, ys, n, [ends]): polyfill()'s outlines in runs, each with
- * the box round its points, in an Int32Array: n, the runs, then each
- * run's x0, y0, x1, y1 in 16.16 */
+ * the box round its points, in an Int32Array: n, the runs, the ends'
+ * fold, then each run's x0, y0, x1, y1 in 16.16 */
 NATIVE(polyboxes)
 {
     struct column xs, ys, ends;
@@ -2327,29 +2330,30 @@ NATIVE(polyboxes)
     if ((uint32_t)n > xs.len || (uint32_t)n > ys.len)
         return vm_fail(vm, "polyboxes() has fewer x or y than points", "",
                        "");
-    uint32_t nends = 0, runs;
+    uint32_t nends = 0, runs, fold;
     if (argc > 3 && a[3].tag != T_NULL) {
         if (!column_of(vm, a[3], &ends) || ends.tag == T_INT)
             return vm_fail(vm, "polyboxes()'s ends is an array", "", "");
         nends = ends.len;
     }
-    if (!poly_runs(vm, "polyboxes", &ends, nends, (uint32_t)n, &runs))
+    if (!poly_runs(vm, "polyboxes", &ends, nends, (uint32_t)n, &runs, &fold))
         return 0;
     uint32_t off = gc_alloc(vm, T_I32,
                             (uint32_t)(sizeof(struct i32) -
-                                       sizeof(struct hdr)) + (2 + 4 * runs) * 4);
+                                       sizeof(struct hdr)) + (3 + 4 * runs) * 4);
     if (!off)
         return 0;
     struct i32 *box = (struct i32 *)MEM(vm, off);
-    box->len = 2 + 4 * runs;
+    box->len = 3 + 4 * runs;
     box->d[0] = n;
     box->d[1] = (int32_t)runs;
+    box->d[2] = (int32_t)fold;
     /* the allocation may have collected: the arrays found again */
     column_of(vm, a[0], &xs);
     column_of(vm, a[1], &ys);
     if (nends)
         column_of(vm, a[3], &ends);
-    int32_t *r = box->d + 2;
+    int32_t *r = box->d + 3;
     uint32_t s = 0;
     for (uint32_t k = 0; k <= nends && s < (uint32_t)n; k++) {
         uint32_t e = k < nends ? (uint32_t)column_at(&ends, k, 0) : (uint32_t)n;
@@ -2415,18 +2419,19 @@ NATIVE(polyfill)
                        "point", "", "");
     const int32_t *boxes = NULL;
     if (argc > 6 && a[6].tag != T_NULL) {
-        uint32_t runs;
+        uint32_t runs, fold;
         if (a[6].tag != T_I32)
             return vm_fail(vm, "polyfill()'s boxes are an Int32Array from "
                            "polyboxes()", "", "");
         if (argc > 5 && a[5].tag != T_NULL)
             return vm_fail(vm, "polyfill()'s boxes are for outlines without "
                            "bend", "", "");
-        if (!poly_runs(vm, "polyfill", &ends, nends, (uint32_t)n, &runs))
+        if (!poly_runs(vm, "polyfill", &ends, nends, (uint32_t)n, &runs,
+                       &fold))
             return 0;
         const struct i32 *b = I32(vm, a[6]);
-        if (b->len != 2 + 4 * runs || b->d[0] != n ||
-            b->d[1] != (int32_t)runs)
+        if (b->len != 3 + 4 * runs || b->d[0] != n ||
+            b->d[1] != (int32_t)runs || b->d[2] != (int32_t)fold)
             return vm_fail(vm, "polyfill()'s boxes are from polyboxes() for "
                            "other points or ends", "", "");
         boxes = b->d;
