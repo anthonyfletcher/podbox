@@ -850,6 +850,39 @@ static unsigned long cluster2sec(struct bpb *fat_bpb, long cluster)
             + fat_bpb->firstdatasector;
 }
 
+#if MEMORYSIZE >= 16 && !defined(BOOTLOADER)
+/* Seek marks: for the last few long files sought far into, the cluster at
+   every SEEK_MARK_STEP of their chains, so that a seek walks from the mark
+   before it instead of from the start. Freeing any cluster forgets them
+   all, as a chain can then be rebuilt differently under its old marks;
+   making a chain longer leaves them right. */
+#define HAVE_SEEK_MARKS
+#define SEEK_MARK_SHIFT 6
+#define SEEK_MARK_STEP  (1L << SEEK_MARK_SHIFT)
+#define SEEK_MARKS      1024    /* 2 GB in 32K clusters */
+#define SEEK_MARK_FILES 4
+
+static struct seek_marks
+{
+    struct bpb *bpb;            /* the volume, NULL when unused */
+    long firstcluster;          /* the chain's */
+    unsigned long used;         /* when it was last, to drop the oldest */
+    unsigned int count;         /* marks known, from the start on */
+    long cluster[SEEK_MARKS];   /* mark i: cluster number i*SEEK_MARK_STEP */
+} seek_marks[SEEK_MARK_FILES];
+static unsigned long seek_marks_gen;    /* one more each time they go */
+static unsigned long seek_marks_clock;
+
+static void forget_seek_marks(void)
+{
+    for (int i = 0; i < SEEK_MARK_FILES; i++)
+        seek_marks[i].bpb = NULL;
+    seek_marks_gen++;
+}
+#else
+#define forget_seek_marks()
+#endif /* MEMORYSIZE >= 16 && !BOOTLOADER */
+
 #ifdef HAVE_FAT16SUPPORT
 static long get_next_cluster16(struct bpb *fat_bpb, long startcluster)
 {
@@ -967,6 +1000,9 @@ static int update_fat_entry16(struct bpb *fat_bpb, unsigned long entry,
     dc_dirty_buf(sec);
 
     dc_unlock_cache();
+    /* after the change, see update_fat_entry32() */
+    if (!val)
+        forget_seek_marks();
     return 0;
 }
 
@@ -1131,6 +1167,10 @@ static int update_fat_entry32(struct bpb *fat_bpb, unsigned long entry,
     dc_dirty_buf(sec);
 
     dc_unlock_cache();
+    /* after the change, not before: reading the FAT can yield, and marks
+       made of the old chain meanwhile would stay */
+    if (!val)
+        forget_seek_marks();
     return 0;
 }
 
@@ -2710,6 +2750,120 @@ void fat_seek_to_stream(struct fat_filestr *filestr,
     filestr->eof         = filestr_seek_to->eof;
 }
 
+/* The cluster count clusters on from this one, or 0 past the end of the
+   chain. Each FAT sector is looked up once for all the steps that stay in
+   it, and the steps do no division, which ARM does in software. */
+static long skip_clusters(struct bpb *fat_bpb, long cluster, long count)
+{
+#ifdef HAVE_FAT16SUPPORT
+    if (fat_bpb->is_fat16)
+    {
+        for (; count > 0 && cluster; count--)
+            cluster = get_next_cluster(fat_bpb, cluster);
+        return cluster;
+    }
+#endif /* HAVE_FAT16SUPPORT */
+
+    const unsigned long per_sector = CLUSTERS_PER_FAT_SECTOR;
+    while (count > 0)
+    {
+        unsigned long sector = (unsigned long)cluster / per_sector;
+        unsigned long first = sector * per_sector;
+
+        dc_lock_cache();
+
+        uint32_t *sec = cache_sector(fat_bpb, sector + fat_bpb->fatrgnstart);
+        if (!sec)
+        {
+            dc_unlock_cache();
+            DEBUGF("%s: Could not cache sector %lu\n", __func__, sector);
+            return 0;
+        }
+
+        do
+        {
+            cluster = letoh32(sec[cluster - first]) & 0x0fffffff;
+            /* is this last cluster in chain? */
+            if (cluster >= FAT_EOF_MARK)
+                cluster = 0;
+        }
+        while (--count > 0 && cluster &&
+               (unsigned long)cluster - first < per_sector);
+
+        dc_unlock_cache();
+
+        if (!cluster)
+            break;
+    }
+
+    return cluster;
+}
+
+/* The cluster at number to of the file's chain, from cluster, which is at
+   number from; 0 past the end */
+static long seek_chain(struct bpb *fat_bpb, const struct fat_file *file,
+                       long cluster, long from, long to)
+{
+#ifdef HAVE_SEEK_MARKS
+    if (to - from <= SEEK_MARK_STEP || file->firstcluster <= 0)
+#endif
+        return skip_clusters(fat_bpb, cluster, to - from);
+
+#ifdef HAVE_SEEK_MARKS
+    /* the file's marks, or the place of the oldest */
+    struct seek_marks *m = NULL, *old = &seek_marks[0];
+    for (int i = 0; i < SEEK_MARK_FILES; i++)
+    {
+        struct seek_marks *s = &seek_marks[i];
+        if (s->bpb == fat_bpb && s->firstcluster == file->firstcluster)
+            m = s;
+        else if (!s->bpb || (old->bpb && s->used < old->used))
+            old = s;
+    }
+    if (!m)
+    {
+        m = old;
+        m->bpb = fat_bpb;
+        m->firstcluster = file->firstcluster;
+        m->cluster[0] = file->firstcluster;
+        m->count = 1;
+    }
+    m->used = ++seek_marks_clock;
+
+    /* from the last mark before it, when that is nearer */
+    unsigned long k = MIN((unsigned long)to >> SEEK_MARK_SHIFT, m->count - 1);
+    if ((long)(k << SEEK_MARK_SHIFT) > from)
+    {
+        from = k << SEEK_MARK_SHIFT;
+        cluster = m->cluster[k];
+    }
+
+    /* and on, marking the way past the last mark. Reading the FAT may
+       yield, so a mark is made only if nothing changed meanwhile. */
+    const unsigned long gen = seek_marks_gen;
+    while (true)
+    {
+        if (from == (long)m->count << SEEK_MARK_SHIFT && m->count < SEEK_MARKS
+            && gen == seek_marks_gen && m->bpb == fat_bpb
+            && m->firstcluster == file->firstcluster)
+        {
+            m->cluster[m->count++] = cluster;
+        }
+        if (from >= to)
+            break;
+
+        long mark = (long)m->count << SEEK_MARK_SHIFT;
+        long stop = mark > from && mark < to ? mark : to;
+        cluster = skip_clusters(fat_bpb, cluster, stop - from);
+        if (!cluster)
+            break;
+        from = stop;
+    }
+
+    return cluster;
+#endif /* HAVE_SEEK_MARKS */
+}
+
 int fat_seek(struct fat_filestr *filestr, unsigned long seeksector)
 {
     const struct fat_file * const file = filestr->fatfilep;
@@ -2745,23 +2899,23 @@ int fat_seek(struct fat_filestr *filestr, unsigned long seeksector)
         clusternum = seeksector / fat_bpb->bpb_secperclus;
         sectornum = seeksector % fat_bpb->bpb_secperclus;
 
-        long numclusters = clusternum;
+        long from = 0;
 
         if (filestr->clusternum && clusternum >= filestr->clusternum)
         {
             /* seek forward from current position */
             cluster = filestr->lastcluster;
-            numclusters -= filestr->clusternum;
+            from = filestr->clusternum;
         }
 
-        for (long i = 0; i < numclusters; i++)
+        if (clusternum > from)
         {
-            cluster = get_next_cluster(fat_bpb, cluster);
+            cluster = seek_chain(fat_bpb, file, cluster, from, clusternum);
 
             if (!cluster)
             {
                 DEBUGF("Seeking beyond the end of the file! "
-                       "(sector %lu, cluster %ld)\n", seeksector, i);
+                       "(sector %lu)\n", seeksector);
                 FAT_ERROR(FAT_SEEK_EOF);
             }
         }
@@ -2800,6 +2954,7 @@ int fat_truncate(const struct fat_filestr *filestr)
     {
         next = get_next_cluster(fat_bpb, last);
         int rc2 = update_fat_entry(fat_bpb, last, FAT_EOF_MARK);
+        forget_seek_marks();
         if (rc2 < 0)
             FAT_ERROR(rc2 * 10 - 2);
     }
@@ -2986,6 +3141,7 @@ int fat_mount(IF_MV(int volume,) IF_MD(int drive,) unsigned long startsector)
         FAT_ERROR(rc * 10 - 2);
 
     /* it worked */
+    forget_seek_marks();
     fat_bpb->mounted = true;
 
     /* calculate freecount if unset */
@@ -3011,6 +3167,7 @@ int fat_unmount(IF_MV_NONVOID(int volume))
 
     /* free the entries for this volume */
     cache_discard(IF_MV(fat_bpb));
+    forget_seek_marks();
     fat_bpb->mounted = false;
 
     return 0;
