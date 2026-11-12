@@ -1681,14 +1681,16 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 /* units, measured on the ARM rig (polyprobe): the call's set-up beyond
  * any call's, each point each time the outlines are walked, each edge
  * kept (a division), each edge a row crosses, each step of putting a
- * row's crossings in order, and each curve; each span is a row's set-up,
- * COST_ROW, and its pixels the pen's */
+ * row's crossings in order, each curve, and each line a curve is cut
+ * into, beyond its edge's; each span is a row's set-up, COST_ROW, and its
+ * pixels the pen's */
 #define POLY_CALL  30
 #define POLY_POINT 8
 #define POLY_EDGE  8
 #define POLY_CROSS 3
 #define POLY_SHIFT 1
-#define POLY_CURVE 29
+#define POLY_CURVE 19
+#define POLY_PIECE 8
 #define POLY_TURN  2    /* each point walked, when the camera turns */
 #define POLY_ASIDE 2    /* each edge wholly left or right of the clip */
 
@@ -1733,7 +1735,7 @@ struct poly
     int32_t y0, y1;             /* the clip's rows */
     int32_t lo, hi;             /* the rows the edges cover */
     int counting;               /* only count the edges, for the memory */
-    uint32_t curves;
+    uint32_t curves, pieces;
     int64_t xmin, xmax;         /* how far the edges reach, 16.16 */
     int full;                   /* more edges than max */
     int64_t xl, xr;             /* edges past these are aside, 16.16 */
@@ -1853,8 +1855,10 @@ static int poly_curve(struct poly *g, int64_t ax, int64_t ay, int64_t cx,
                       int64_t cy, int64_t bx, int64_t by)
 {
     int32_t k = poly_pieces(ax, ay, cx, cy, bx, by);
-    if (!g->counting)
+    if (!g->counting) {
         g->curves++;
+        g->pieces += (uint32_t)k;
+    }
     /* a + 2t (c - a) + t^2 (a - 2c + b), t in sixteenths of 1/65536 */
     int64_t ux = 2 * (cx - ax), uy = 2 * (cy - ay);
     int64_t vx = ax - 2 * cx + bx, vy = ay - 2 * cy + by;
@@ -1933,6 +1937,44 @@ static unsigned poly_code(const struct poly *g, int64_t x, int64_t y,
            (unsigned)(x > g->xr) << 2;
 }
 
+/* Point i of a column in 16.16, as column_fix, an array's read in place */
+static inline __attribute__((always_inline)) int32_t plain_fix(
+    const struct column *c, uint32_t i)
+{
+    if (c->tag == T_ARR) {
+        struct value v = ((const struct value *)c->p)[i];
+        if (v.tag == T_FIX)
+            return v.v;
+        if (v.tag == T_INT)
+            return (int32_t)((uint32_t)v.v << 16);
+        return 0;
+    }
+    return column_fix(c, i);
+}
+
+/* Point i of the outline, as poly_point, with the turn done in place
+ * where it is near: the walk along a long outline is most of its cost */
+static inline __attribute__((always_inline)) void plain_point(
+    const struct pen *p, const struct column *xs, const struct column *ys,
+    uint32_t i, int64_t ox, int64_t oy, int64_t *x, int64_t *y)
+{
+    int64_t fx = plain_fix(xs, i), fy = plain_fix(ys, i);
+    const struct draw *d = p->d;
+    if (d->cam_moved) {
+        int64_t cx = ((int64_t)d->cam_x << 16) + d->cam_px;
+        int64_t cy = ((int64_t)d->cam_y << 16) + d->cam_py;
+        int64_t sx = fx - cx, sy = fy - cy;
+        if (sx == (int32_t)sx && sy == (int32_t)sy) {
+            int32_t x32 = (int32_t)sx, y32 = (int32_t)sy;
+            fx = cx + ((mul32(x32, d->cam_cos) - mul32(y32, d->cam_sin)) >> 16);
+            fy = cy + ((mul32(x32, d->cam_sin) + mul32(y32, d->cam_cos)) >> 16);
+        } else
+            turn_fix(d, &fx, &fy);
+    }
+    *x = fx + ox;
+    *y = fy + oy;
+}
+
 /* An outline without curve points, s to e - 1 and back to s, as
  * poly_line would take each line: one with both ends above the clip's
  * rows, or both below, or level, makes no edge, and one with both right
@@ -1945,13 +1987,14 @@ static int poly_plain(struct poly *g, const struct pen *p,
     int64_t top = ((int64_t)g->y0 << 16) + 32768;
     int64_t bot = ((int64_t)(g->y1 - 1) << 16) + 32768;
     int64_t ax, ay, bx, by, sx, sy;
-    poly_point(p, xs, ys, s, &ax, &ay);
+    int64_t ox = (int64_t)p->ox << 16, oy = (int64_t)p->oy << 16;
+    plain_point(p, xs, ys, s, ox, oy, &ax, &ay);
     sx = ax;
     sy = ay;
     unsigned ca = poly_code(g, ax, ay, top, bot);
     for (uint32_t i = s + 1; i <= e; i++) {
         if (i < e)
-            poly_point(p, xs, ys, i, &bx, &by);
+            plain_point(p, xs, ys, i, ox, oy, &bx, &by);
         else {
             bx = sx;
             by = sy;
@@ -2136,7 +2179,7 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
     } else
         memset(held_starts, 0, rows * 4);
     struct poly g = { held_edges, starts, 0, 4, p.cy0, p.cy1, p.cy1, p.cy0,
-                      0, 0, 0, 0, 0, ((int64_t)p.cx0 - 1) << 16,
+                      0, 0, 0, 0, 0, 0, ((int64_t)p.cx0 - 1) << 16,
                       ((int64_t)p.cx1 + 1) << 16, 0, 0 };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
@@ -2193,7 +2236,7 @@ NATIVE(polyfill)
     uint32_t rows = (uint32_t)(p.cy1 - p.cy0), walks = 1;
     int64_t xl = ((int64_t)p.cx0 - 1) << 16, xr = ((int64_t)p.cx1 + 1) << 16;
     struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
-                      p.cy1, p.cy0, 0, 0, (int64_t)1 << 62,
+                      p.cy1, p.cy0, 0, 0, 0, (int64_t)1 << 62,
                       -((int64_t)1 << 62), 0, xl, xr, 0, 0 };
     struct pedge **act = held_act;
     if (rows <= POLY_HELD_ROWS) {
@@ -2205,7 +2248,7 @@ NATIVE(polyfill)
     if (rows > POLY_HELD_ROWS || g.full) {
         walks += rows <= POLY_HELD_ROWS;
         struct poly count = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0,
-                              1, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
+                              1, 0, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
                               0, xl, xr, 0, 0 };
         g = count;
         if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
@@ -2247,7 +2290,7 @@ NATIVE(polyfill)
     }
     p.cost += POLY_CALL + (uint32_t)n * walks * POLY_POINT +
               (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE +
-                                g.measured * POLY_EDGE);
+                                g.pieces * POLY_PIECE + g.measured * POLY_EDGE);
     if (vm->d.cam_moved)
         p.cost += (uint32_t)n * walks * POLY_TURN;
     /* wholly left or right of the clip, or above or below it: no row is

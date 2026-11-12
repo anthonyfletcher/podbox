@@ -830,7 +830,7 @@ NATIVE(cells_step)
     }
     /* measured on the ARM rig (.build/arcade-rig, sysprobe): the parts
      * as they were weighed, three and a half times over */
-    vm_charge(vm, (20 + visited + s.moves + summed * 16) * 7 / 2 +
+    vm_charge(vm, (20 + visited + s.moves + summed * 7) * 7 / 2 +
                   s.steps * STEP_UNITS);
     *out = mk(T_INT, (int32_t)s.moves);
     return 1;

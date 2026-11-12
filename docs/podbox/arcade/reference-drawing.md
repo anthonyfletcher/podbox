@@ -331,7 +331,7 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   corners make a rounded square, and a ring of them a smooth blob.
 - `fillp` patterns it, and the camera and clip apply as to any shape.
 - **What it costs.** The hill above is about 1,400 units, and the bush
-  about 620; a full-screen shape about 1,300. The cost grows with the
+  about 670; a full-screen shape about 1,300. The cost grows with the
   edges each row crosses and the pieces of row filled between them: a
   ragged ground line of 100 points along the bottom third of the screen
   is about 900. Points outside the clip cost about 8 units
