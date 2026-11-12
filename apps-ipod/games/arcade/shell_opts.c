@@ -41,8 +41,7 @@ void shell_options_load(struct vm *vm)
 {
     char path[MAX_PATH];
     uint8_t b[ARCADE_OPTIONS_MAX];
-    if (!arcade_options(vm)->count)
-        return;
+    /* read for a cart with no options too: Game Sound is kept here */
     options_path(arcade_id(vm), path, sizeof(path));
     int fd = open(path, O_RDONLY);
     if (fd < 0)
