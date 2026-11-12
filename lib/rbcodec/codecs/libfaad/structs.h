@@ -247,20 +247,11 @@ typedef struct
     uint8_t window_group_length[8];
     uint8_t window_shape;
     uint8_t scale_factor_grouping;
-    uint16_t sect_sfb_offset[8][15*8];
-    uint16_t swb_offset[52];
-
-    uint8_t sect_cb[8][15*8];
-    uint16_t sect_start[8][15*8];
-    uint16_t sect_end[8][15*8];
-    uint8_t sfb_cb[8][8*15];
     uint8_t num_sec[8]; /* number of sections in a group */
 
     uint8_t global_gain;
-    int16_t scale_factors[8][51]; /* [0..255] */
 
     uint8_t ms_mask_present;
-    uint8_t ms_used[MAX_WINDOW_GROUPS][MAX_SFB];
 
     uint8_t noise_used;
 
@@ -270,7 +261,6 @@ typedef struct
     uint8_t predictor_data_present;
 
     pulse_info pul;
-    tns_info tns;
 #ifdef MAIN_DEC
     pred_info pred;
 #endif
@@ -295,6 +285,24 @@ typedef struct
     uint8_t length_of_rvlc_escapes;
     uint16_t dpcm_noise_last_position;
 #endif
+
+    /* These are read for every band, whether or not the frame has any data for
+       it, and so have to be 0 until then */
+    uint8_t sfb_cb[8][8*15];
+    int16_t scale_factors[8][51]; /* [0..255] */
+
+    /* The rest is only read as far as what's above says was written, so it isn't
+       cleared for each frame: it would go through the whole cache twice over.
+       These are the part of it that a second channel with common window
+       information gets from the first. */
+    uint16_t sect_sfb_offset[8][15*8];
+    uint16_t swb_offset[52];
+    uint8_t ms_used[MAX_WINDOW_GROUPS][MAX_SFB];
+
+    uint8_t sect_cb[8][15*8];
+    uint16_t sect_start[8][15*8];
+    uint16_t sect_end[8][15*8];
+    tns_info tns;
 } ic_stream; /* individual channel stream */
 
 typedef struct

@@ -628,7 +628,7 @@ enum codec_status codec_run(void)
         file_end = 0;
 
         framelength = synth.pcm.length - samples_to_skip;
-        if (framelength < 0) {
+        if (framelength <= 0) {
             framelength = 0;
             samples_to_skip -= synth.pcm.length;
         }

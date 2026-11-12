@@ -222,7 +222,6 @@ void ifilter_bank(uint8_t window_sequence, uint8_t window_shape,
     int64_t count = faad_get_ts();
 #endif
 
-    memset(transf_buf,0,sizeof(transf_buf));
     /* select windows of current frame and previous frame (Sine or KBD) */
 #ifdef LD_DEC
     if (object_type == LD)

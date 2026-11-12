@@ -28,6 +28,7 @@
    Reads the AAC bitstream as defined in 14496-3 (MPEG-4 Audio)
 */
 
+#include <stddef.h>
 #include "common.h"
 #include "structs.h"
 
@@ -555,6 +556,14 @@ void raw_data_block(NeAACDecHandle hDecoder, NeAACDecFrameInfo *hInfo,
     return;
 }
 
+static void element_clear(element *e)
+{
+    const size_t ics_size = offsetof(ic_stream, sect_sfb_offset);
+
+    memset(e, 0, offsetof(element, ics1) + ics_size);
+    memset(&e->ics2, 0, ics_size);
+}
+
 /* Table 4.4.4 and */
 /* Table 4.4.9 */
 static int16_t spec_data[FRAME_LEN] MEM_ALIGN_ATTR = {0};
@@ -566,7 +575,7 @@ static uint8_t single_lfe_channel_element(NeAACDecHandle hDecoder, bitfile *ld,
     ic_stream *ics = &(sce.ics1);
 
     memset(spec_data,0,sizeof(spec_data));
-    memset(&sce,0,sizeof(sce));
+    element_clear(&sce);
     sce.element_instance_tag = (uint8_t)faad_getbits(ld, LEN_TAG
         DEBUGVAR(1,38,"single_lfe_channel_element(): element_instance_tag"));
 
@@ -615,7 +624,7 @@ static uint8_t channel_pair_element(NeAACDecHandle hDecoder, bitfile *ld,
 
     memset(spec_data1,0,sizeof(spec_data1));
     memset(spec_data2,0,sizeof(spec_data2));
-    memset(&cpe,0,sizeof(cpe));
+    element_clear(&cpe);
     cpe.channel        = channels;
     cpe.paired_channel = channels+1;
 
@@ -666,7 +675,10 @@ static uint8_t channel_pair_element(NeAACDecHandle hDecoder, bitfile *ld,
         }
 #endif
 
-        memcpy(ics2, ics1, sizeof(ic_stream));
+        memcpy(ics2, ics1, offsetof(ic_stream, sfb_cb));
+        memcpy(ics2->sect_sfb_offset, ics1->sect_sfb_offset,
+               offsetof(ic_stream, sect_cb) -
+               offsetof(ic_stream, sect_sfb_offset));
     } else {
         ics1->ms_mask_present = 0;
     }
@@ -1685,7 +1697,8 @@ static uint8_t section_data(NeAACDecHandle hDecoder, ic_stream *ics, bitfile *ld
             printf("%d\n", ics->sect_end[g][i]);
 #endif
 
-            if (k + sect_len >= 8*15)
+            /* past num_swb, sect_sfb_offset holds what an earlier track left */
+            if (k + sect_len >= 8*15 || k + sect_len > ics->num_swb)
                 return 15;
             if (i >= 8*15)
                 return 15;
