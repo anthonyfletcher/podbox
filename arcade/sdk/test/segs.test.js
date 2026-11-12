@@ -211,6 +211,26 @@ function update() {
     assert.ok(Math.abs(after - 1000) < Math.abs(before - 1000) / 2, r.out[0]);
 });
 
+test('links.ring opens a ring crushed to one spot, and it comes back toward its area', () => {
+    const r = run(`var p, tk = 0;
+function init() {
+    p = links.pool(8, 8);
+    for (var i = 0; i < 8; i++) links.point(p, 80, 60);
+    for (var i = 0; i < 8; i++) links.link(p, i, (i + 1) % 8, 5);
+    p.slack = 1;
+}
+function update() {
+    var held = links.ring(p, 0, 8, 100, 1);
+    links.step(p, 0);
+    tk++;
+    if (tk == 1 || tk == 40) printh(flr(held));
+}`, 40);
+    assert.equal(r.status, 0, r.err);
+    const [first, last] = r.out.map(Number);
+    assert.equal(first, 0);
+    assert.ok(last > 60, r.out.join(' '));
+});
+
 test('a slack link pulls but never pushes; gravity across moves points sideways', () => {
     const r = run(`var p;
 function init() {
@@ -504,20 +524,25 @@ function update() { links.step(p, 0); }`, 3, ['--units']);
 });
 
 test('links.ring pushes a crushed ring outward, however large the area asked', () => {
-    const push = (area) => {
+    const grow = (area) => {
         const r = run(`var p;
 function init() {
     p = links.pool(3, 0);
     var d = 0.0078125;
     links.point(p, 100, 100); links.point(p, 100 + d, 100); links.point(p, 100, 100 + d);
-    links.ring(p, 0, 3, ${area}, 1);
-    printh(flr((p.ox[0] - 100) * 65536));
 }
-function update() {}`);
+function update() {
+    var before = links.ring(p, 0, 3, ${area}, 1);
+    links.step(p, 0);
+    printh((links.ring(p, 0, 3, ${area}, 0) > before) + " " + p.x[0]);
+}`);
         assert.equal(r.status, 0, r.err);
-        return Number(r.out[0]);
+        return r.out[0];
     };
-    /* point 0, the corner, moves away from the others, up and left: its
-     * speed x - ox goes negative, so ox rises */
-    for (const area of [100, 10000, 1000000, 3000000]) assert.ok(push(area) > 0, String(area));
+    /* opened, never turned inside out or flung by a wrapped product */
+    for (const area of [100, 10000, 1000000, 3000000]) {
+        const [bigger, x0] = grow(area).split(' ');
+        assert.equal(bigger, '1', String(area));
+        assert.ok(Math.abs(Number(x0) - 100) <= 2, area + ': ' + x0);
+    }
 });

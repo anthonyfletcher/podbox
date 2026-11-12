@@ -512,7 +512,11 @@ size however it is squashed.
   them out of the lines as they go.
 - An area a little under the ring's own -- 0.8 of a circle's -- makes a
   body that slumps under its own weight.
-- About 24 units a point.
+- A ring crushed under a tenth of its area -- thrown hard into a corner,
+  its points heaped or wound round each other -- opens out again by
+  itself, each point heading for its place round a circle, up to two
+  pixels a tick, then fills as usual.
+- About 24 units a point; 36 while it opens a crushed ring.
 
 A soft body: a ring of slack links, under-filled, dropped into a bowl
 with ice up its right side:

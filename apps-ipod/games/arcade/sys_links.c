@@ -1721,7 +1721,14 @@ static int32_t seg_meet(const struct segs *s, int32_t *X, int32_t *Y,
  * the next step at stiffness 1, a share of it below -- each along the way
  * its area grows fastest. The speed is given through where each point
  * was, not by moving it: links.step then carries it, and keeps it out of
- * the lines as it goes. Returns the area it held. */
+ * the lines as it goes. Returns the area it held.
+ * A ring crushed under a tenth of its area -- heaped in a corner, or wound
+ * round itself, where the way it grows fastest leads nowhere -- is sped
+ * instead toward a circle of the area, each point to its place in the
+ * ring's order, k / n of a turn, at most two pixels a tick: the order
+ * unwinds it. The circle stands off the ring's middle against the pool's
+ * gravity, so a ring crushed into a corner by its weight opens into the
+ * air above it rather than into the lines. */
 NATIVE(links_ring)
 {
     (void)argc;
@@ -1762,22 +1769,49 @@ NATIVE(links_ring)
     }
     *out = mk(T_FIX, wrap32(have));
     vm_charge(vm, 10 + (uint32_t)n * 24);
-    if (!grow || !stiff)
+    if (!stiff)
+        return 1;
+    /* crushed: the circle's radius and middle, 16.16, the radius from want
+     * / pi square pixels, pi as 205887 / 65536 */
+    int crushed = want > 0 && have < want / 10;
+    int64_t r = 0, cx = 0, cy = 0;
+    if (crushed) {
+        int64_t w = want > (int64_t)1 << 40 ? (int64_t)1 << 40 : want;
+        r = root((uint64_t)w * 65536 / 205887 * 65536);
+        for (int32_t k = 0; k < n; k++) {
+            cx += fx(x[first + k]);
+            cy += fx(y[first + k]);
+        }
+        cx /= n;
+        cy /= n;
+        /* a quarter radius against gravity, gx across and gravity down:
+         * a whole radius sends the ring hopping out of the corner */
+        int64_t gvx = fx(l.f[L_GX]), gvy = fx(l.f[L_GRAVITY]);
+        int64_t glen = root((uint64_t)(gvx * gvx + gvy * gvy));
+        if (glen) {
+            cx -= r * gvx / glen / 4;
+            cy -= r * gvy / glen / 4;
+        }
+        vm_charge(vm, (uint32_t)n * 12);
+    } else if (!grow)
         return 1;
     /* the share of each point's way to move, 16.16, at most half a pixel
      * a tick for each pixel of its way */
     /* each product held inside 64 bits, its sign kept: a ring crushed to
      * under a pixel has a tiny grow, and a huge area or stiffness after it
      * would otherwise wrap */
-    int64_t gap = want - have;
-    if (gap > (int64_t)1 << 46) gap = (int64_t)1 << 46;
-    if (gap < -((int64_t)1 << 46)) gap = -((int64_t)1 << 46);
-    int64_t lambda = (gap << 16) / grow;
-    if (lambda > INT32_MAX) lambda = INT32_MAX;
-    if (lambda < -INT32_MAX) lambda = -INT32_MAX;
-    lambda = lambda * stiff >> 16;
-    if (lambda > 32768) lambda = 32768;
-    if (lambda < -32768) lambda = -32768;
+    int64_t lambda = 0;
+    if (grow) {
+        int64_t gap = want - have;
+        if (gap > (int64_t)1 << 46) gap = (int64_t)1 << 46;
+        if (gap < -((int64_t)1 << 46)) gap = -((int64_t)1 << 46);
+        lambda = (gap << 16) / grow;
+        if (lambda > INT32_MAX) lambda = INT32_MAX;
+        if (lambda < -INT32_MAX) lambda = -INT32_MAX;
+        lambda = lambda * stiff >> 16;
+        if (lambda > 32768) lambda = 32768;
+        if (lambda < -32768) lambda = -32768;
+    }
     for (int32_t k = 0; k < n; k++) {
         uint32_t i = (uint32_t)(first + k);
         if (vm_truthy(vm, pin[i]))
@@ -1786,8 +1820,23 @@ NATIVE(links_ring)
         uint32_t in = (uint32_t)(first + (k + 1) % n);
         int64_t gx = ((int64_t)(fx(y[in]) - fx(y[ip])) >> 8) / 2 * sign;
         int64_t gy = ((int64_t)(fx(x[ip]) - fx(x[in])) >> 8) / 2 * sign;
-        ox[i] = mk(T_FIX, wrap32(fx(ox[i]) - ((gx * lambda) >> 8)));
-        oy[i] = mk(T_FIX, wrap32(fx(oy[i]) - ((gy * lambda) >> 8)));
+        int64_t dx, dy;
+        if (crushed) {
+            uint32_t t = (uint32_t)((int64_t)k * 65536 / n);
+            dx = cx + (r * core_sine(t + 0x4000) >> 16) - fx(x[i]);
+            dy = cy + (r * core_sine(t) >> 16) - fx(y[i]);
+            dx = (dx * stiff >> 16) / 4;
+            dy = (dy * stiff >> 16) / 4;
+            if (dx > 131072) dx = 131072;
+            if (dx < -131072) dx = -131072;
+            if (dy > 131072) dy = 131072;
+            if (dy < -131072) dy = -131072;
+        } else {
+            dx = (gx * lambda) >> 8;
+            dy = (gy * lambda) >> 8;
+        }
+        ox[i] = mk(T_FIX, wrap32(fx(ox[i]) - dx));
+        oy[i] = mk(T_FIX, wrap32(fx(oy[i]) - dy));
     }
     return 1;
 }
