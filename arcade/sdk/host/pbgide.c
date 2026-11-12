@@ -46,6 +46,7 @@ typedef SOCKET sock_t;
 #define make_dir(p) _mkdir(p)
 #else
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -366,8 +367,18 @@ static void handle(sock_t s)
         static char list[262144];
         char out[262144 + MAX_PATH_LEN + 64];
         const char *base = strrchr(folder, '/');
+        char name[2 * MAX_PATH_LEN], *q = name;
+        /* the folder's name as a JSON string: it may hold a quote or a
+         * backslash, where a cart's file names cannot */
+        for (const char *p = base ? base + 1 : folder; *p; p++) {
+            if (*p == '"' || *p == '\\')
+                *q++ = '\\';
+            if ((unsigned char)*p >= 0x20)
+                *q++ = *p;
+        }
+        *q = 0;
         list_files(list, sizeof(list));
-        snprintf(out, sizeof(out), "{\"name\":\"%s\",\"files\":%s}", base ? base + 1 : folder, list);
+        snprintf(out, sizeof(out), "{\"name\":\"%s\",\"files\":%s}", name, list);
         reply(s, 200, "OK", "application/json", out, strlen(out));
         return;
     }
@@ -588,6 +599,16 @@ int main(int argc, char **argv)
         sock_t s = accept(ls, NULL, NULL);
         if (s == BAD_SOCK)
             continue;
+        /* one connection at a time, so one that sends nothing must not
+         * hold the rest up: a read waits 2 s at most */
+        {
+#ifdef _WIN32
+            DWORD wait = 2000;
+#else
+            struct timeval wait = { 2, 0 };
+#endif
+            setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&wait, sizeof(wait));
+        }
         handle(s);
         fflush(stdout);
         close_sock(s);
