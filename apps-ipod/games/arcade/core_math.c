@@ -45,10 +45,13 @@ static int real(struct vm *vm, struct value *a, int i, const char *fn,
 
 /* ---- random: PCG32, seeded the same way everywhere ------------------- */
 
+/* PCG32's stream: one, for rnd() and every rng generator alike */
+#define RNG_INC ((0xda3e39cb94b95bdbull << 1) | 1)
+
 uint32_t core_random(struct vm *vm)
 {
     uint64_t old = vm->rng_state;
-    vm->rng_state = old * 6364136223846793005ull + vm->rng_inc;
+    vm->rng_state = old * 6364136223846793005ull + RNG_INC;
     uint32_t x = (uint32_t)(((old >> 18) ^ old) >> 27);
     uint32_t r = (uint32_t)(old >> 59);
     return (x >> r) | (x << ((0u - r) & 31));
@@ -56,7 +59,6 @@ uint32_t core_random(struct vm *vm)
 
 void core_seed(struct vm *vm, uint64_t seed)
 {
-    vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
     vm->rng_state = 0;
     core_random(vm);
     vm->rng_state += seed;
@@ -126,7 +128,6 @@ NATIVE(srand)
     if (a[0].tag == T_I32) {
         if (!state_arg(vm, a[0], "srand"))
             return 0;
-        vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
         vm->rng_state = state_of(vm, a[0]);
         return 1;
     }
@@ -153,11 +154,10 @@ NATIVE(rng_seed)
     if (!state_arg(vm, a[0], "rng.seed"))
         return 0;
     NUMBER(1, "rng.seed");
-    uint64_t keep = vm->rng_state, inc = vm->rng_inc;
+    uint64_t keep = vm->rng_state;
     core_seed(vm, (uint32_t)a[1].v);
     state_to(vm, a[0], vm->rng_state);
     vm->rng_state = keep;
-    vm->rng_inc = inc;
     return 1;
 }
 
@@ -166,13 +166,11 @@ NATIVE(rng_rnd)
 {
     if (!state_arg(vm, a[0], "rng.rnd"))
         return 0;
-    uint64_t keep = vm->rng_state, inc = vm->rng_inc;
-    vm->rng_inc = (0xda3e39cb94b95bdbull << 1) | 1;
+    uint64_t keep = vm->rng_state;
     vm->rng_state = state_of(vm, a[0]);
     int ok = draw(vm, a + 1, argc - 1, out, "rng.rnd");
     state_to(vm, a[0], vm->rng_state);
     vm->rng_state = keep;
-    vm->rng_inc = inc;
     return ok;
 }
 

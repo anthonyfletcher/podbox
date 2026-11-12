@@ -445,7 +445,7 @@ struct vm
     int32_t beat_margin;        /* from the last beat.downbeat() */
     int quit;
     struct value menu_label[5], menu_fn[5];   /* menuitem(); roots */
-    uint64_t rng_state, rng_inc;
+    uint64_t rng_state;
     int32_t save[256];
     uint8_t save_frac[32];      /* which saved values are fractions */
     int save_dirty;
