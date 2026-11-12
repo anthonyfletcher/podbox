@@ -106,7 +106,7 @@ static struct usb_device_descriptor __attribute__((aligned(2)))
     .bLength            = sizeof(struct usb_device_descriptor),
     .bDescriptorType    = USB_DT_DEVICE,
 #ifndef USB_NO_HIGH_SPEED
-    .bcdUSB             = 0x0200,
+    .bcdUSB             = 0x0210,
 #else
     .bcdUSB             = 0x0110,
 #endif
@@ -122,6 +122,14 @@ static struct usb_device_descriptor __attribute__((aligned(2)))
     .iSerialNumber      = USB_STRING_INDEX_SERIAL,
     .bNumConfigurations = NUM_CONFIGS
 } ;
+
+/* bcdUSB 2.10, as an iPhone reports, promises a BOS: one USB 2.0 Extension
+ * with LPM clear, which neither controller driver handles */
+static const uint8_t bos_descriptor[12] =
+{
+    5, USB_DT_BOS, 12, 0, 1,
+    7, 0x10, 0x02, 0, 0, 0, 0,
+};
 
 static struct usb_config_descriptor __attribute__((aligned(2)))
                                     config_descriptor =
@@ -996,6 +1004,11 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             qualifier_descriptor.bNumConfigurations = offered_configs();
             ptr = &qualifier_descriptor;
             size = sizeof(struct usb_qualifier_descriptor);
+            break;
+
+        case USB_DT_BOS:
+            ptr = bos_descriptor;
+            size = sizeof(bos_descriptor);
             break;
 
         default:
