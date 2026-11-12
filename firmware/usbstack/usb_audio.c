@@ -356,6 +356,9 @@ bool usb_audio_playing = false;
 int tmp_saved_vol;
 /* the host has muted the player: tmp_saved_vol is what unmuting restores */
 static bool host_muted;
+/* The stream holds a boost: unboosted, a sleeping 5G LCD drops the CPU to
+ * 24 MHz, too slow to take every packet. */
+static bool stream_boosted;
 
 /* buffers used for usb, queuing and playback */
 static unsigned char *rx_buffer;
@@ -727,6 +730,11 @@ static void playback_audio_get_more(const void **start, size_t *size)
 
 static void usb_audio_start_playback(void)
 {
+    if (!stream_boosted)
+    {
+        cpu_boost(true);
+        stream_boosted = true;
+    }
     usb_audio_playing = true;
     usb_rx_overflow = false;
     playback_audio_underflow = true;
@@ -775,6 +783,11 @@ static void usb_audio_stop_playback(void)
     {
         mixer_channel_stop(PCM_MIXER_CHAN_USBAUDIO);
         usb_audio_playing = false;
+    }
+    if (stream_boosted)
+    {
+        cpu_boost(false);
+        stream_boosted = false;
     }
     send_fb = false;
     /* The transfer queued for the next packet stays primed when the host
