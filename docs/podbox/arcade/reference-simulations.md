@@ -37,7 +37,7 @@ rules.
 drawing functions, `target(field)` first: a `circfill` in sand's colour
 pours sand, a `rectfill` in stone's builds a wall.
 
-**Why it is native.** A 160x120 field is 19,200 cells, each looked at
+**Script or system.** A 160x120 field is 19,200 cells, each looked at
 every tick -- far beyond script. The engine also lets settled parts
 **sleep**: the field is kept in 16x16 chunks, and a chunk where nothing
 moved, and nothing beside it changed, is skipped, so a resting pile costs

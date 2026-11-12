@@ -16,7 +16,9 @@ consoles took. Choose **Cart > New cart**. Two files appear in the Files
 panel:
 
 - `cart.json` holds the cart's settings: its name, its speed, its
-  high-score tables. You can leave it alone for now.
+  high-score tables. Open it and change `"New Game"` to `"Bat and Ball"`:
+  the name the iPod lists the game by, and the name of its file when you
+  save it. Leave the rest for now.
 - `main.js` holds the code. It opens in the editor.
 
 Press **Ctrl+Enter** (or the power button at the top right of the Player).
@@ -50,7 +52,7 @@ yourself.
 - **`draw()`** runs after each `update()`, and draws the frame you see.
 
 Keeping the rules in `update()` and the drawing in `draw()` matters on the
-iPod: when the player is too busy to draw every frame -- playing music and
+iPod: when the iPod is too busy to draw every frame -- playing music and
 running your game at once -- the Arcade skips a `draw()` but never an
 `update()`, so the game keeps its speed even when its picture stutters.
 

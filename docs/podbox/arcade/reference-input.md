@@ -28,7 +28,7 @@ finger is resting on it, 0 to 95 clockwise from the top.
 
 **Input is read once a tick.** What the functions report is the state at
 the start of the tick, the same however many times they are asked during
-it. Read input in `update()`; `draw()` may be skipped when the player is
+it. Read input in `update()`; `draw()` may be skipped when the iPod is
 busy, and input read there would be missed.
 
 **What each costs** is a few units a call. Input is never what makes a
@@ -149,7 +149,7 @@ function draw() {
 
 ## The Menu button
 
-**Holding Menu for a second pauses the game**: the player stops the cart
+**Holding Menu for a second pauses the game**: the iPod stops the cart
 and shows its pause menu -- the cart's options, high scores, help, and
 items of its own from `menuitem()`. The cart carries on where it was when
 the menu closes, and [`resumed()`](reference-time.md#resumed) tells it the
@@ -208,7 +208,7 @@ function draw() {
 ## wheelsteps()
 
 How many rows a list moves for this tick's turn of the wheel, the way
-the player's own lists move.
+the iPod's own lists move.
 
 **Returns** the rows, clockwise positive; usually 0, 1 or -1.
 
@@ -235,10 +235,10 @@ function draw() {
 - A row every 4 clicks, however slowly they come, the rest carried to
   the next tick.
 - Spun fast -- past about three quarters of a turn a second -- it moves
-  many rows a step, as the player's lists do, so a long list is crossed
+  many rows a step, as the iPod's lists do, so a long list is crossed
   with a flick.
 - Use it for any list or menu, so the cart's lists move as the
-  player's own do. The dialogs (`ui.choose` and the rest), `gui.list`
+  iPod's own do. The dialogs (`ui.choose` and the rest), `gui.list`
   and the menu library use it.
 
 ## wheelpos()
@@ -269,7 +269,7 @@ print("WHEELPOS " + p, 2, 2, 7);
 
 ## click([beep])
 
-Makes the player's click: the tick the wheel makes as it turns, or a short
+Makes the iPod's click: the tick the wheel makes as it turns, or a short
 beep -- from the iPod's little built-in speaker, not the headphones.
 
 | Argument | |
@@ -317,7 +317,7 @@ choice = mid(0, choice + dial.steps(16), ITEMS.length - 1);
   menu would never move by a line a click; `steps` adds the clicks up and
   moves one line for every six, however slowly they come.
 - It keeps one carry, so use one `n` for the whole cart.
-- For a list, [`wheelsteps`](#wheelsteps) moves as the player's lists
+- For a list, [`wheelsteps`](#wheelsteps) moves as the iPod's lists
   do; `steps` is for a dial of your own count, such as 16 settings
   round a knob.
 
@@ -378,7 +378,7 @@ buttons.
 | Function | |
 |---|---|
 | `menu.open(items)` | starts a menu of `items`, an array of text, with the first chosen |
-| `menu.update()` | call once a tick while it is open: the wheel moves the choice as the player's lists move ([`wheelsteps`](#wheelsteps)), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
+| `menu.update()` | call once a tick while it is open: the wheel moves the choice as the iPod's lists move ([`wheelsteps`](#wheelsteps)), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
 | `menu.draw(x, y, c, bar)` | draws the lines from `x, y`, a line of the current font apart, in colour `c`, the chosen one on a bar of colour `bar` |
 | `menu.choice()` | the line chosen now, 0 first |
 

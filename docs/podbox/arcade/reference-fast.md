@@ -1,6 +1,6 @@
 # Making it fast
 
-Every cart must keep up on the slowest player it will meet: an iPod Video
+Every cart must keep up on the slowest iPod it will meet: an iPod Video
 playing music. This chapter is how the Arcade counts the work a cart
 does, how much a tick may do, how to find what is costing the time, and
 the changes that save the most.
@@ -22,11 +22,11 @@ of script -- adding two numbers, reading a variable, testing a condition
 -- and the API's functions charge units for the work they do: a pixel
 filled, a sprite copied, a character drawn.
 
-Units are the same on every player and in the IDE, so a cart's cost can be
+Units are the same on every iPod and in the IDE, so a cart's cost can be
 known without an iPod. What a unit takes in real time depends on the
-player:
+iPod:
 
-| Player | A unit | |
+| iPod | A unit | |
 |---|---|---|
 | iPod Classic | about 0.16 µs | music makes little difference |
 | iPod Video, music stopped | about 0.55 µs | |
@@ -74,18 +74,18 @@ listening once the tempo is held.
 One call that runs to 2,000,000 units stops the cart as "The game stopped
 responding": a loop that never ends. `init()` may run to 8,000,000, for
 work done once -- building a world, a big `noise.fill` -- which the player
-waits for before the first frame. On the player a call is also stopped
+waits for before the first frame. On the iPod a call is also stopped
 after ten seconds, however few units it has used.
 
 ### The screen
 
-After each drawn tick, the player sends the rows of the screen that
+After each drawn tick, the iPod sends the rows of the screen that
 changed to the display. On an iPod Video playing FLAC the whole screen
 takes about 6.6 ms -- a fifth of a tick at 33 -- and part of it takes its
 share: 10 rows, about 0.55 ms. Four rows a frame are also sent
 whatever they hold, which costs about 0.2 ms.
 
-**What counts as changed**: the player compares each row the tick drew
+**What counts as changed**: the iPod compares each row the tick drew
 with the same row last frame, and sends only those whose pixels differ.
 Comparing costs too, though less: a whole screen drawn and found the
 same is about 2 ms on the Video. Rows not drawn at all cost nothing.
@@ -149,7 +149,7 @@ local first, and the arrays the loop reads are best kept global.
 
 ## Run as
 
-**Run > Run as** chooses which player the IDE runs the cart as. Each
+**Run > Run as** chooses which iPod the IDE runs the cart as. Each
 tick takes as long as it would there -- its units, and the rows it sends
 -- so the cart falls behind in the IDE where it would on the iPod. The
 choices are the iPod Classic, the iPod Video, the iPod Video playing FLAC
@@ -157,7 +157,7 @@ choices are the iPod Classic, the iPod Video, the iPod Video playing FLAC
 
 The status bar under the editor shows the frames drawn each second: "33
 frames a second as an iPod Video, playing FLAC" when it keeps up, "29
-of 33" when it does not. Click it to choose another player.
+of 33" when it does not. Click it to choose another iPod.
 
 ## The profiler
 
@@ -167,7 +167,7 @@ then play the cart for a few seconds.
 
 ![The profiler under the editor, recording the tutorial game: a bar a frame, and a table of functions and API calls](img/f-profiler.png)
 
-- **The graph** has a bar for each frame: its cost on the player you run
+- **The graph** has a bar for each frame: its cost on the iPod you run
   as, against a dashed line for the time a frame has. A bar over the line
   is red: that frame ran late.
 - **The line above it** sums up: frames recorded, their average cost
@@ -178,7 +178,7 @@ then play the cart for a few seconds.
   - **Total**: the share spent in it or in anything it called. `draw`'s
     total is everything `draw()` did.
   - **ms a frame**: its self, as milliseconds a frame on the chosen
-    player.
+    iPod.
   - **sending the screen**: the time to send the rows drawn, a row of its
     own.
 
@@ -219,14 +219,14 @@ host/pbgvm mygame.pbg --ticks 300 --units
 ```
 
 ```
-start 375
-tick 1 4134
-tick 2 4134
+start 325
+tick 1 2839
+tick 2 2839
 ...
 ```
 
 That is the tutorial game: its start-up (`init()` and the globals set
-before it) cost 375 units, and each tick about 4,100 -- well inside the
+before it) cost 325 units, and each tick about 2,800 -- well inside the
 12,500 a tick has on an iPod Video playing FLAC, at 33.
 
 `--dirty` prints the rows the last tick sent -- all of them after a

@@ -8,7 +8,7 @@ own palettes.
 - Drawing in other colours: [pal](#palc0-c1-p), [palt](#paltc-t)
 - What the colours look like: [setpal](#setpali-rgb), [getpal](#getpali),
   [loadpal](#loadpalpalname)
-- Colours made at run time: [the player's colours, and shades of any colour](#the-players-colours-and-shades-of-any-colour)
+- Colours made at run time: [the iPod's colours, and shades of any colour](#the-ipods-colours-and-shades-of-any-colour)
 - [Fades, flashes and cycling](#fades-flashes-and-cycling)
 
 ## How colour works
@@ -66,7 +66,7 @@ call:
 
 **What it costs.** The calls themselves are almost free -- about 3 units
 for `pal` or `setpal`, 26 for `loadpal`. But on the iPod, **any change to
-what the colours look like makes the player send the whole screen** that
+what the colours look like makes the iPod send the whole screen** that
 frame, not just the rows that changed: up to 6.6 ms on an iPod Video
 playing FLAC. That is `setpal`, the screen form of `pal`, `loadpal`, and
 `pal()` with nothing in the brackets, which resets the screen palette too.
@@ -267,11 +267,11 @@ function init() {
 - A cart with no palette files starts with the sixteen above.
 - It sends the whole screen on the iPod that frame.
 
-## The player's colours, and shades of any colour
+## The iPod's colours, and shades of any colour
 
-`playback.colors` gives the colours the player is showing, and the
+`playback.colors` gives the colours the iPod is showing, and the
 `colour` calls make more from them -- so a cart can dress itself in the
-playing album's colours, as the player's own screens do under **Dynamic
+playing album's colours, as the iPod's own screens do under **Dynamic
 Colours**, or in the theme's.
 
 | Call | Returns |

@@ -1,8 +1,8 @@
 # Dialogs and speech
 
 Asking the player something -- pick one of these, are you sure, how many,
-what is your name -- in boxes that work like the player's own menus; and
-having the player speak.
+what is your name -- in boxes that work like the iPod's own menus; and
+having the iPod speak.
 
 - [How dialogs work](#how-dialogs-work)
 - [ui.choose](#uichooseprompt-items-at), [ui.confirm](#uiconfirmtext-title),
@@ -10,7 +10,7 @@ having the player speak.
   [ui.text](#uitextprompt-max-start), [ui.style](#uistylebox-text-highlight)
 - Speech: [speak.say](#speaksayvalue-more), [speak.queue](#speakqueuevalue-more),
   [speak.busy](#speakbusy), [speak.stop](#speakstop), [speak.on](#speakon)
-- The player's own: [sys.setting](#syssettingname), [sys.translate](#systranslatephrase)
+- The iPod's own: [sys.setting](#syssettingname), [sys.translate](#systranslatephrase)
 - [Trying them out](#trying-them-out)
 
 ## How dialogs work
@@ -38,7 +38,7 @@ are put back as they were.
 text the font cannot draw is shown in `FONT.WORLD` instead. Long text
 wraps to the box, and scrolls with the wheel when it does not fit.
 
-**It works like the player's menus:**
+**It works like the iPod's menus:**
 
 | | |
 |---|---|
@@ -47,8 +47,8 @@ wraps to the box, and scrolls with the wheel when it does not fit.
 | Select | chooses |
 | Menu | backs out: the dialog closes with its "nothing chosen" answer |
 
-When the owner has the player's menus spoken, a dialog speaks its prompt
-and each choice as it is highlighted, as the player's own menus do.
+When the owner has the iPod's menus spoken, a dialog speaks its prompt
+and each choice as it is highlighted, as the iPod's own menus do.
 
 Dialogs can be opened from `init()`, `update()` or `draw()`, or from a
 pause-menu item's function.
@@ -161,7 +161,7 @@ if (name != null) score.submit(BOARD.points, points, name);
 
 ![YOUR NAME, a text line holding ADA with the caret after it, and OK and Cancel](img/dl-text.png)
 
-How it is typed, as on the player:
+How it is typed, as on the iPod:
 
 - **Turning the wheel** puts a letter in at the caret and turns it
   through the letters, a letter every 6 clicks.
@@ -205,7 +205,7 @@ ui.confirm("Save your game before you quit?", "Quit");
 
 ## speak.say(value, ...more)
 
-Says something, with the player's speech synthesiser.
+Says something, with the iPod's speech synthesiser.
 
 | Argument | |
 |---|---|
@@ -238,7 +238,7 @@ Stops speaking, and forgets anything queued.
 
 ## speak.on()
 
-**Returns** whether the owner has the player's menus spoken.
+**Returns** whether the owner has the iPod's menus spoken.
 
 ```js
 if (speak.on()) speak.say("Press select to start");
@@ -246,21 +246,21 @@ if (speak.on()) speak.say("Press select to start");
 
 - A cart that narrates its screens -- reading out the menu, the score, the
   level -- for players who cannot see them should do so when this is true,
-  as the player's own menus do.
+  as the iPod's own menus do.
 - A cart whose game *is* speech can speak whatever this says, but nothing
   is heard if the owner has the synthesiser switched off.
-- Each call costs about 20 units; the speaking itself is the player's.
+- Each call costs about 20 units; the speaking itself is the iPod's.
 - A phrase is at most 512 bytes; more is cut off.
 
 ---
 
 ## sys.setting(name)
 
-One of the owner's player settings, read-only.
+One of the owner's iPod settings, read-only.
 
 | Argument | |
 |---|---|
-| `name` | the setting's name as the player's `config.cfg` file writes it: `volume`, for instance |
+| `name` | the setting's name as the iPod's `config.cfg` file writes it: `volume`, for instance |
 
 **Returns** a number when the setting is one, otherwise its text as
 `config.cfg` writes it (`"on"`, a choice's name, a colour as `rrggbb`), or
@@ -275,22 +275,22 @@ var v = sys.setting("volume");   // the owner's volume, in dB
 
 ## sys.translate(phrase)
 
-A phrase the player already knows, in the owner's language.
+A phrase the iPod already knows, in the owner's language.
 
 | Argument | |
 |---|---|
-| `phrase` | the phrase in English, exactly as the player's English menus show it |
+| `phrase` | the phrase in English, exactly as the iPod's English menus show it |
 
 **Returns** it in the owner's language, or the phrase as given when the
-player does not know it.
+iPod does not know it.
 
 ```js
 var resume = sys.translate("Resume Game");
 ```
 
-- It searches every phrase the player has, about 500 units: translate
+- It searches every phrase the iPod has, about 500 units: translate
   once, in `init()`, and keep the answer.
-- It knows only the player's own phrases -- menu words such as "Resume
+- It knows only the iPod's own phrases -- menu words such as "Resume
   Game", "Yes", "Quit" -- not a cart's own text.
 
 ---

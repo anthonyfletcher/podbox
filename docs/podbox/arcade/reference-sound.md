@@ -24,25 +24,25 @@ behind thousands of small games' sounds -- and the build turns it into
 sound and stores it in the cart, at 22,050 samples a second, a byte each.
 So:
 
-- an effect sounds the same every time, and on every player;
+- an effect sounds the same every time, and on every iPod;
 - it costs memory: a second of sound is about 21.5 KB of the cart's 512 KB
   -- most effects are a tenth of a second or so, a couple of KB;
 - playing one costs almost nothing.
 
 **Where it is heard.** Effects go to the headphones or dock, mixed over
-the owner's music, at the player's volume. (The wheel's click, `click()`,
+the owner's music, at the iPod's volume. (The wheel's click, `click()`,
 is the separate little speaker inside the iPod.) Each effect has its own
 loudness, set when it is made; the owner's volume is the music's, which a
 cart with `"music": "control"` can turn with
 [`playback.adjust`](reference-music.md#controlling-it).
 
 **Game Sound.** The pause menu's **Game Sound** row mutes a game's own
-effects and tones -- not the owner's music, not speech -- and the player
+effects and tones -- not the owner's music, not speech -- and the iPod
 remembers it for that game. A muted game plays on as before: each effect
 still lasts as long, and `sfxat` still reports it; only silence is heard.
 
 **What it costs**: about 11 units to start an effect, 14 a tone. The
-mixing is done by the player, not counted against the cart.
+mixing is done by the iPod, not counted against the cart.
 
 ---
 

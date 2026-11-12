@@ -22,11 +22,11 @@ one or two:
 | **The store**, `store.*` | values by name -- records, lists, text, numbers | a game in progress, a level the player built, anything with structure |
 | **Data files**, `data.read` | files that come inside the cart, read-only | levels, enemy waves, dialogue: the game's content |
 
-Scores, options and achievements are kept by the player itself; see
+Scores, options and achievements are kept by the iPod itself; see
 **Scores, options and the pause menu**.
 
 **Everything is kept under the cart's `id`**, the 16 hex digits in
-`cart.json`. That is how the player knows a save belongs to this cart, so
+`cart.json`. That is how the iPod knows a save belongs to this cart, so
 **never change a cart's id**: a cart with a new id starts with nothing
 saved, and its old saves are left behind. Copying a cart and changing its
 name keeps the id, and the copy shares the original's saves -- give a
@@ -34,7 +34,7 @@ genuinely new game a new id (**Cart > New cart** makes one).
 
 **Saving in the IDE.** The IDE keeps the store and the saved numbers in
 the browser, for each cart, so they survive stopping the cart and
-reloading the page, as they survive on the player. A replay runs on its
+reloading the page, as they survive on the iPod. A replay runs on its
 own copy of them as they were when the run began, so playing one back
 changes nothing. `pbgvm` keeps neither unless told to (the end of this
 chapter).
@@ -84,9 +84,9 @@ function gameOver(points) {
 - Only numbers can be saved this way: `dset(2, "x")` stops the cart. For
   text, records or lists, use the store.
 - Setting a number outside 0 to 255 does nothing.
-- **When it is written.** `dset` costs almost nothing; the player writes
+- **When it is written.** `dset` costs almost nothing; the iPod writes
   the 256 numbers to its disk when the game is paused, when it ends, and
-  before anything that might switch the player off -- so a save is never
+  before anything that might switch the iPod off -- so a save is never
   lost to the battery, and setting numbers every tick is fine.
 - Give each number a fixed meaning and note it at the top of the file:
   `// 0 best score, 1 furthest level, 2 sound on`.
@@ -147,11 +147,11 @@ function draw() {
 - **Limits.** One name holds at most 64 KB as JSON -- about 10,000
   numbers in a list. A cart has 256 KB and 64 names in all. Past either,
   `store.write` returns false and keeps the old value, in the IDE as on
-  the player.
+  the iPod.
 - **Writing is safe.** The new value is written beside the old one and
   only then replaces it, so a full disk or a flat battery mid-write leaves
   the old value whole.
-- **Names** are not case-sensitive on the player: `Save` and `save` are
+- **Names** are not case-sensitive on the iPod: `Save` and `save` are
   one. A name with a space or other characters stops the cart.
 - **What it costs**: each call goes to the disk, so it costs 2,000 units
   before anything is read, and a write 8,000 more; on top of that about 2
@@ -240,7 +240,7 @@ function init() {
 
 ## Where it all lives
 
-On the player, each cart's things are kept in the hidden `.rockbox`
+On the iPod, each cart's things are kept in the hidden `.rockbox`
 folder, by its id:
 
 | | File |
@@ -250,11 +250,11 @@ folder, by its id:
 | high scores and achievements | `/.rockbox/games/scores/<id>.sco` |
 | option values | `/.rockbox/games/options/<id>.opt` |
 
-Copying these to another player moves a cart's saves with it. The store's
+Copying these to another iPod moves a cart's saves with it. The store's
 files are plain JSON, readable on a computer.
 
-**Testing saves without a player.** `pbgvm` keeps nothing by default; give
+**Testing saves without an iPod.** `pbgvm` keeps nothing by default; give
 it `--store folder` to keep the store there between runs, as `name.json`
-files, within the player's limits, and `--saves file` to keep the saved
+files, within the iPod's limits, and `--saves file` to keep the saved
 numbers in that file: read before the run starts, written after its last
 tick.

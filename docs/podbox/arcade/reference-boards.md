@@ -34,7 +34,7 @@ function init() {
 bytes as a `Uint8Array`, `mapw()` wide, so every function here works on
 the map as it is.
 
-**Why these are native.** A board's work is loops over every cell, every
+**Script or system.** A board's work is loops over every cell, every
 neighbour, every row, each tick something changes. In script those loops
 are slow; here they run inside the engine. Measured on a 20x15 board:
 

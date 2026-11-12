@@ -6,7 +6,7 @@ how many lives a game starts with, and an item of its own in the pause
 menu.
 
 These are things the iPod looks after for the cart: it stores the scores
-and the settings, and draws the tables and the menu in the player's own
+and the settings, and draws the tables and the menu in the iPod's own
 style. The cart only says what it has and when a score is made.
 
 Start from the cart you finished in chapter 4.

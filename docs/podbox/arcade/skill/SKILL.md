@@ -14,7 +14,7 @@ example and its cost.
 | Chapter | For |
 |---|---|
 | `reference-language.md` | numbers, strings, arrays, records, functions; what is refused and what to write instead. **Read first.** |
-| `reference-drawing.md`, `reference-text.md`, `reference-colour.md` | shapes, the drawing state, text and fonts, palettes, and palettes made from the player's colours (`playback.colors`, `color.*`) |
+| `reference-drawing.md`, `reference-text.md`, `reference-colour.md` | shapes, the drawing state, text and fonts, palettes, and palettes made from the iPod's colours (`playback.colors`, `color.*`) |
 | `reference-sprites.md`, `reference-images.md`, `reference-maps.md` | the sheet, image sheets, images and targets, maps and objects |
 | `reference-input.md`, `reference-sound.md`, `reference-time.md` | buttons and the wheel, sound effects, ticks and rates |
 | `reference-saving.md`, `reference-scores.md`, `reference-dialogs.md`, `reference-music.md` | saves and data, boards/options/achievements/pause menu, dialogs and speech, the owner's music and the beat |
@@ -103,7 +103,7 @@ refused: the web has no music library.
 |---|---|
 | `--buttons 30:16,31:0` | button masks from those ticks on (1 PREV, 2 NEXT, 4 MENU, 8 PLAY, 16 SELECT) |
 | `--wheel 5:12:30` | 12 clicks at tick 5, the finger at 30 from then (-1 lifts it) |
-| `--skip 10:1` | tick 10 late, as on a slow player: `skipped()` gives 1 and it runs undrawn |
+| `--skip 10:1` | tick 10 late, as on a slow iPod: `skipped()` gives 1 and it runs undrawn |
 | `--ui 2,1,~` | answers to `ui.*` dialogs in order: an index, 1/0, a number, text (`~` backs out) |
 | `--menu i` | chooses pause-menu item `i` after the ticks |
 | `--store dir`, `--saves file`, `--scores file`, `--options file`, `--opt t:i:v` | keep store files, `dset` numbers, scores and option values; set an option before tick `t` |
@@ -171,7 +171,7 @@ Profile in the IDE (Run > Run and profile), where `prof()`
 sections are rows of their own and `watch()` values show in View >
 Watch, and replays runs (Run > Replay the last run). On the command line,
 compare `--units` before and after, and wrap a suspect stretch in
-`prof()`. The IDE's Game menu holds what the player's pause menu does --
+`prof()`. The IDE's Game menu holds what the iPod's pause menu does --
 the cart's items, Options, High scores, Help -- and keeps scores, options
 and saves in the browser.
 

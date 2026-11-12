@@ -4,7 +4,7 @@ The things in a game that move -- the player, enemies, shots, coins,
 balls -- and the sparks, smoke and debris round them, moved, collided and
 drawn many at a time.
 
-- [How pools work](#how-pools-work), and [why they are native](#why-they-are-native)
+- [How pools work](#how-pools-work), and [script or system](#script-or-system)
 - Actors: [actors.pool](#actorspooln), [actors.spawn](#actorsspawnp),
   [actors.move](#actorsmovep-solid-trigger-out-oneway), [actors.overlaps](#actorsoverlapsa-b-out),
   [actors.draw](#actorsdrawp), [actors.zones](#actorszonesp-objs-n-out)
@@ -92,7 +92,7 @@ p.slope_up = 2; p.slope_down = 4; p.ladders = 8;
 actors.move(p, 1, 0, hits, 16);      // 1 walls, 16 one-way floors
 ```
 
-## Why they are native
+## Script or system
 
 A game of 100 moving things does the same few steps to each every tick.
 Done in script, that loop is a large part of the budget; done in the

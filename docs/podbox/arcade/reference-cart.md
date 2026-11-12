@@ -39,7 +39,7 @@ not know is an error when the cart is built.
 ## Keeping a game to carry on
 
 When the owner quits -- **Quit** in the pause menu, or **Yes** to the
-question a tap of Menu asks -- the player keeps the whole game as it
+question a tap of Menu asks -- the iPod keeps the whole game as it
 stands: every variable, array, image and pool, after
 [`ending()`](reference-language.md#a-carts-files) has run. The next time the cart
 starts it asks, over the game, whether to carry on; either answer

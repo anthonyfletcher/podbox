@@ -54,10 +54,10 @@ quit question, the end of the run in the IDE or `pbgvm` -- after its last
 tick and before its saves are written: the place to `dset` or
 `store.write` what is in play, rather than saving it every tick. When Quit
 keeps the game to carry on later, it carries on as `ending()` left it.
-It may not draw: the screen is already the player's.
+It may not draw: the screen is already the iPod's.
 
 `init` and `update` are required. Without `draw`, `update` draws as well
--- fine for a cart whose drawing is cheap; but when the player falls
+-- fine for a cart whose drawing is cheap; but when the iPod falls
 behind it runs `update()` without drawing, and only a separate `draw()`
 can be left out then (see **Time and speed**).
 
@@ -843,7 +843,7 @@ Each is rounded up to a whole number of 8 bytes, and takes at least 16.
 
 A mistake the compiler cannot see stops the cart when it happens. The IDE
 shows the message in Output with the file, line and function, and puts
-the editor on the line; on the iPod, the player shows it.
+the editor on the line; the iPod shows it on its screen.
 
 | Message | Means |
 |---|---|

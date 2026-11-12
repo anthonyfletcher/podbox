@@ -1,9 +1,9 @@
 # Scores, options and the pause menu
 
-The parts of a game the player looks after itself: high-score tables,
+The parts of a game the iPod looks after itself: high-score tables,
 settings the owner can change, achievements, and the menu that opens when
 the game is paused. A cart declares them in `cart.json` and reads and
-updates them from code; the player keeps them, shows them in the same
+updates them from code; the iPod keeps them, shows them in the same
 style as its own menus, and saves them.
 
 - [How it works](#how-it-works)
@@ -26,7 +26,7 @@ option named `level` is `OPT.level`, an achievement named `first` is
 `ACH.first`. The IDE's **Cart > Settings** form edits all three, and
 checks each name as you type it.
 
-The player then:
+The iPod then:
 
 - keeps each board's ten best scores, with the date and an optional name;
 - shows the boards in the pause menu's **High Scores**, with the
@@ -134,7 +134,7 @@ for (var r = 1; r <= score.count(BOARD.points); r++) {
 
 ## score.show(board)
 
-Shows the player's own table for a board, over the game, after this tick.
+Shows the iPod's own table for a board, over the game, after this tick.
 
 | Argument | |
 |---|---|
@@ -143,7 +143,7 @@ Shows the player's own table for a board, over the game, after this tick.
 **Returns** nothing.
 
 - The latest score is marked when it made the ten.
-- The table is the Arcade's own, drawn in its CAPS font in the player's
+- The table is the Arcade's own, drawn in its CAPS font in the iPod's
   theme colours: the same screen as the pause menu's High Scores, a page
   a board, then the achievements and how much the game was played, turned
   with the wheel. Left closes it.
@@ -267,7 +267,7 @@ function update() {
 
 Earns an achievement.
 
-**Returns** true the first time -- when the player announces it -- and
+**Returns** true the first time -- when the iPod announces it -- and
 false every time after.
 
 ```js
@@ -358,7 +358,7 @@ function toTitle() {
 
 ## quit()
 
-Leaves the game, back to the player's menu, at the end of this tick.
+Leaves the game, back to the iPod's menu, at the end of this tick.
 
 **Returns** nothing.
 
@@ -374,7 +374,7 @@ Leaves the game, back to the player's menu, at the end of this tick.
 ## Trying them out
 
 **In the IDE**, a cart's scores, achievements and option values are kept
-in the browser under its `id`, as the player keeps them, so each run
+in the browser under its `id`, as the iPod keeps them, so each run
 starts where the last left off. `score.show` opens the board:
 
 ![The tutorial game over, its board open in a dialog with the new score marked](img/sc-ide-scores.png)
@@ -384,7 +384,7 @@ Options are set from **Game > Options...**, and stay set for later runs.
 A replay starts from the scores and options its run began with, and
 keeps nothing it changes.
 
-To try the player's side without a player or a browser, `pbgvm` has
+To try the iPod's side without an iPod or a browser, `pbgvm` has
 options for each:
 
 | Option | Does |

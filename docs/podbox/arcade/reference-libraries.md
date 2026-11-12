@@ -133,7 +133,7 @@ The wheel as a control, and an in-game menu worked by it: see
 
 ## gui
 
-The pieces the player's dialogs are made of, for a cart's own screens,
+The pieces the iPod's dialogs are made of, for a cart's own screens,
 in the same style: `gui.box`, `gui.button`, `gui.buttons`, `gui.bar`,
 `gui.lines` for text broken into lines, `gui.list` for a list moved by
 the wheel, and `gui.field` for text typed with it. Its opening comment

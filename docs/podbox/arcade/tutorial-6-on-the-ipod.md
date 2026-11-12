@@ -53,11 +53,11 @@ How much is left depends on the iPod:
 
 So an iPod Video playing music is the slowest case, and the one every
 game must keep up on. The IDE runs your game as that by default: the
-**Run** menu's **Run as** says which player it pretends to be.
+**Run** menu's **Run as** says which iPod it pretends to be.
 
 ![The Run menu, with Run as: iPod Classic, iPod Video, iPod Video playing FLAC (chosen), and No limit](img/t6-runas.png)
 
-As each player, each tick takes as long as it would on that iPod. The line
+As each iPod, each tick takes as long as it would on that iPod. The line
 at the bottom right of the IDE says how it is doing: "33 frames a second
 as an iPod Video, playing FLAC" means it keeps up. FLAC is the heaviest
 music to play alongside a game, so a game that keeps up there keeps up
@@ -69,25 +69,25 @@ would stutter on the iPod.
 Choose **Run > Run and profile**. The game runs, with the **Profiler**
 panel open under the code. Press Select and play for a few seconds:
 
-![The profiler under the code: a bar for each frame below a dashed line, and a table: spr() 3.52 ms, cls() 2.17, draw 1.39, sending the screen 2.34](img/t6-profiler.png)
+![The profiler under the code: a bar for each frame below a dashed line, and a table: spr() 3.40 ms, draw 1.06, cls() 0.40, sending the screen 2.70](img/t6-profiler.png)
 
-- **The line at the top** sums it up: each frame takes 9.9 ms of the 30.3
-  it has on an iPod Video playing FLAC -- 33%. Plenty to spare.
+- **The line at the top** sums it up: each frame takes 8.1 ms of the 30.3
+  it has on an iPod Video playing FLAC -- 27%. Plenty to spare.
 - **The graph** has a bar for each frame, how long it took, against the
   dashed line of the time a frame has. A bar over the line is drawn red: a
   frame that would be dropped.
 - **The table** lists what took the time: each function of yours and each
   Arcade call. **Self** is the time spent in it alone, **Total** with
   everything it called, and the last column what that comes to each frame,
-  on the player you run as.
+  on the iPod you run as.
 
 For this game:
 
-- **`spr()`** and **`cls()`** take most of the time: about 3.5 ms a
-  frame for `spr`, for 24 stars, the ball and three pieces of bat, and
-  2.2 ms for `cls`, clearing the whole screen.
-- **`draw`** itself, the code around those calls, is about 1.4 ms.
-- **Sending the screen** takes 2.3 ms. The iPod compares each row drawn
+- **`spr()`** takes most of the time: about 3.4 ms a frame, for 24
+  stars, the ball and three pieces of bat. Clearing the whole screen with
+  **`cls()`** is only 0.4 ms.
+- **`draw`** itself, the code around those calls, is about 1.1 ms.
+- **Sending the screen** takes 2.7 ms. The iPod compares each row drawn
   with the last frame and sends only those that changed: here, the rows
   with the ball, the bat and the twinkling stars. A whole new screen
   would take 6.6 ms.
@@ -103,14 +103,14 @@ not over a few; play for a few seconds before reading the numbers.
 
 The Arcade counts a game's work in **units**, about one for each step of
 your code, with each Arcade call costing what its work is worth. A tick of
-this game costs about **4,100 units**. Each player turns units into time
+this game costs about **2,800 units**. Each iPod turns units into time
 at its own speed: on an iPod Video playing FLAC a unit is about 1.9
-millionths of a second, so 4,100 units are about 7.6 ms, and with the
-2.3 ms of the screen, 9.9 ms.
+millionths of a second, so 2,800 units are about 5.4 ms, and with the
+2.7 ms of the screen, 8.1 ms.
 
 The rule of thumb: on an iPod Video playing FLAC, a game at 33 ticks a
 second that redraws the whole screen has room for about **12,500 units**
-a tick. This one uses a third of that, so there is room for much more --
+a tick. This one uses under a quarter of that, so there is room for much more --
 more stars, more balls, a wall of bricks.
 
 When a game does run out, the profiler says where to look. Common causes,

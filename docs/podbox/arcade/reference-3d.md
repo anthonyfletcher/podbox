@@ -5,7 +5,7 @@ flat as a road or a field and seen from a camera, with sprites standing on
 it; hills to fly over; the walls of a maze from inside; and light over a
 dark scene.
 
-- [How the plane works](#how-the-plane-works), [why it is native](#why-it-is-native), and [the resolution rule](#the-resolution-rule)
+- [How the plane works](#how-the-plane-works), [script or system](#script-or-system), and [the resolution rule](#the-resolution-rule)
 - The camera: [plane.view](#planeviewx-y-z-angle-horizon-fov)
 - Drawing: [plane.draw](#planedrawtop-bottom-outside-coarse-under), [plane.sky](#planeskyimage-lift),
   [plane.fog](#planefognear-far-colour), [plane.ceiling](#planeceilingheight-table-outside-coarse-top),
@@ -35,7 +35,7 @@ camera by `x += cos(a) * v; y += sin(a) * v` goes the way it looks. The
 engine's `sin` is upside down -- y grows down the screen, and down the map
 -- so **0 looks east, 0.25 north, 0.5 west, 0.75 south**.
 
-## Why it is native
+## Script or system
 
 The floor is the cost: some 80 rows of 160 pixels, each pixel a step
 across the map, a sprite looked up, a colour copied. Done in script with

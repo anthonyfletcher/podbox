@@ -17,7 +17,7 @@ reference for whatever your own game needs.
    sprite sheet, and animating them
 4. [Sound](tutorial-4-sound.md) -- sound effects for hits and misses
 5. [High scores and the pause menu](tutorial-5-high-scores.md) -- a board
-   the player keeps, an option, and the pause menu
+   the iPod keeps, an option, and the pause menu
 6. [On your iPod](tutorial-6-on-the-ipod.md) -- putting it on the iPod,
    making sure it keeps up there, and sharing it as a web page
 
@@ -56,7 +56,7 @@ example and what it costs.
 - [Time and speed](reference-time.md) -- ticks, the rate, late frames and
   the date
 
-**The player's services**
+**The iPod's services**
 
 - [cart.json](reference-cart.md) -- every setting a cart declares, and
   what Quit keeps to carry on
@@ -64,7 +64,7 @@ example and what it costs.
   files
 - [Scores, options and the pause menu](reference-scores.md) --
   high-score boards, options, achievements and the pause menu
-- [Dialogs and speech](reference-dialogs.md) -- the player's own dialogs,
+- [Dialogs and speech](reference-dialogs.md) -- the iPod's own dialogs,
   speaking, and the owner's settings
 - [The owner's music and the beat](reference-music.md) -- what is playing,
   controlling it, the library, and playing to the beat

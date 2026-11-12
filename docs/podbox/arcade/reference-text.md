@@ -253,12 +253,12 @@ font(FONT.CAPS);                 // back to the default
 
   ![The same word: CAPS shows question marks, WORLD the accented letters](img/x-missing.png)
 
-- Japanese, Chinese and Korean come from a font file the player installs
+- Japanese, Chinese and Korean come from a font file the iPod installs
   with PodBox, and that the IDE has when it was built with it. Without it,
   they draw as `?`.
 - The `ui` dialogs draw in the current font and size, so a cart's
   dialogs match its text; any text the font cannot draw is shown in
-  `FONT.WORLD` instead. The pause menu is the player's own, and `font`
+  `FONT.WORLD` instead. The pause menu is the iPod's own, and `font`
   does not change it.
 
 ## Fonts of your own

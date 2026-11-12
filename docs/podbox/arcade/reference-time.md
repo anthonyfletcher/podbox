@@ -1,9 +1,9 @@
 # Time and speed
 
-How a cart's time passes: ticks, the rate, what happens when the player
+How a cart's time passes: ticks, the rate, what happens when the iPod
 cannot keep up, and the clock and calendar.
 
-- [How time works](#how-time-works): [ticks](#ticks), [when the player falls behind](#when-the-player-falls-behind),
+- [How time works](#how-time-works): [ticks](#ticks), [when the iPod falls behind](#when-the-ipod-falls-behind),
   [pausing](#pausing)
 - [rate](#rate), [setrate](#setraten), [t and time](#t-time), [frame](#frame),
   [skipped](#skipped), [unitsnow](#unitsnow), [resumed](#resumed), [date](#dateout)
@@ -24,15 +24,15 @@ second, 37.5 at 25.
 
 **Time in a cart is the ticks it has run**, not the clock on the wall.
 `t()` is the ticks so far divided by the rate. When the cart is paused,
-or the player falls far behind (below), no ticks run and `t()` stands
+or the iPod falls far behind (below), no ticks run and `t()` stands
 still -- which is what a game wants: a level timer does not count the
 time spent in the pause menu.
 
-### When the player falls behind
+### When the iPod falls behind
 
 Each tick has a time slot: 1/33 of a second at 33. When a tick's work --
 your `update()` and `draw()`, and sending the screen -- takes longer than
-its slot, the next tick is late. The player catches up like this:
+its slot, the next tick is late. The iPod catches up like this:
 
 - **A tick late**: it runs one `update()` **without** `draw()`, then a
   normal tick. The game's rules keep their speed; only one frame of the
@@ -48,7 +48,7 @@ sooner.
 `skipped()` tells the cart how many frames it fell behind by, so it can
 react -- by stepping its rate down (below), or by drawing less.
 
-The IDE runs a cart as the player you choose under **Run > Run as**,
+The IDE runs a cart as the iPod you choose under **Run > Run as**,
 each tick taking as long as it would there, so falling behind happens in
 the IDE as it would on the iPod. The status bar shows the frames drawn
 each second.
@@ -59,7 +59,7 @@ Holding Menu for a second pauses the cart and shows the pause menu. A
 short press asks whether to quit, unless the cart takes it as a button
 (`"menu_button": "game"` in `cart.json`); the question pauses the game
 too. On the iPod, a cart left untouched for five minutes pauses, so the
-player can turn its backlight off, and so does sliding the hold switch
+iPod can turn its backlight off, and so does sliding the hold switch
 on. No ticks
 run while paused, and a dialog (`ui.*`) holds the ticks the same way
 while it is open. [`resumed()`](#resumed) tells the cart it was paused,
@@ -148,7 +148,7 @@ if (frame() % 33 == 0) printh("a second's worth of ticks at 33");
 
 ## skipped()
 
-How many frames the player fell behind by since the last call.
+How many frames the iPod fell behind by since the last call.
 
 **Returns** an integer, 0 when it kept up. Each call starts the count
 again.
@@ -165,7 +165,7 @@ function update() {
   A tick further behind reports how many frames it was late by, though
   only one `update()` was run to catch up.
 - In `pbgvm`, `--skip 5:1,10:3` makes ticks 5 and 10 late, as a slow
-  player would: tick 5 reports one frame skipped and tick 10 three, and
+  iPod would: tick 5 reports one frame skipped and tick 10 three, and
   both run `update()` without `draw()`.
 
 ## unitsnow()
@@ -178,7 +178,7 @@ learn from `skipped()` after.
 if (unitsnow() < 9000) particles.draw(smoke);   // smoke only with room
 ```
 
-- The budget differs by player and by what it plays: about 12,500 a tick
+- The budget differs by iPod and by what it plays: about 12,500 a tick
   at 33 ticks a second on an iPod Video playing FLAC.
 
 ## resumed()
@@ -201,7 +201,7 @@ function update() {
 
 ## date(out)
 
-The date and time, from the player's clock.
+The date and time, from the iPod's clock.
 
 | Argument | |
 |---|---|
@@ -218,8 +218,8 @@ printh(d.join(","));     // e.g. 2026,11,3,12,0,0,2
 
 - An array shorter than 7 stops the cart: "date() needs an Int32Array of
   7".
-- On the iPod it is the player's own clock. In the IDE it is the
-  computer's: the time the run began, plus the player's time since, so a
+- On the iPod it is the iPod's own clock. In the IDE it is the
+  computer's: the time the run began, plus the iPod's time since, so a
   replay is told the same dates its run was. In `pbgvm` it is always 3
   November 2026, 12:00, a Tuesday, so a script gets the same result every
   time.
@@ -234,7 +234,7 @@ printh(d.join(","));     // e.g. 2026,11,3,12,0,0,2
 A speed in pixels a tick depends on the rate: at 25 ticks a second, the
 same speed covers a quarter less ground than at 33. A cart that only
 ever runs at one rate can ignore this. One that changes its rate -- to
-keep up on a slow player, say -- scales its speeds:
+keep up on a slow iPod, say -- scales its speeds:
 
 ```js
 var k = 1.0;                 // how much to scale per-tick speeds by
@@ -257,7 +257,7 @@ with `t()`, or scale the count.
 ## Stepping the rate down
 
 The iPod Video playing heavy music -- high-resolution FLAC, say -- has
-much less time to give a cart than the same player playing nothing. A
+much less time to give a cart than the same iPod playing nothing. A
 cart that is busy every frame can measure how it is doing and step down:
 
 ```js

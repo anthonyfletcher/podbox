@@ -10,7 +10,7 @@ choose tracks from the owner's library, or take over the music entirely.
 - Owning it: [play, stop, started](#owning-it)
 - The library and the queue: [tracks.*](#the-library-and-the-queue)
 - The sound of it: [playback.bands](#playbackbandsout-n), [playback.sound and tracks.sound](#playbacksoundout)
-- Its colours: [playback.colors](reference-colour.md#the-players-colours-and-shades-of-any-colour), in Colour and palettes
+- Its colours: [playback.colors](reference-colour.md#the-ipods-colours-and-shades-of-any-colour), in Colour and palettes
 - The beat: [listening](#the-beat), [beat.listen](#beatlistenon), [beat.state](#beatstateout),
   [beat.next and beat.inbar](#beatnextfrom-n), [beat.downbeat](#beatdownbeat),
   [the clock](#beatclock), [beat.press](#beatpressi), [beat.offset](#beatoffsetms), [beat.jumped](#beatjumped),
@@ -92,7 +92,7 @@ At `control` level.
 | `playback.next()`, `playback.prev()` | the next track; back a track |
 | `playback.seek(ms)` | moves to `ms` into the track |
 | `playback.duck(level, [ticks])` | turns the music down to `level`/256 of the owner's volume, over `ticks` (at once when left out) -- for a moment of speech or a big effect; `duck(256)` brings it back. Never louder than the owner set it, and undone when the cart ends |
-| `playback.adjust(n)` | turns the owner's volume up `n` of the player's own steps, or down for a negative `n`, as the wheel does on the player's screens. It stays where it is put when the cart ends. Returns the volume then, 0 to 100 |
+| `playback.adjust(n)` | turns the owner's volume up `n` of the iPod's own steps, or down for a negative `n`, as the wheel does on the iPod's screens. It stays where it is put when the cart ends. Returns the volume then, 0 to 100 |
 | `tracks.enqueue(id, [next])` | adds a track to the queue: after the playing one with `next` true, else at the end. Returns whether it was added |
 
 None of these return anything but `adjust` and `enqueue`. `playback.volume()`
@@ -129,7 +129,7 @@ it happened.
 
 ## The library and the queue
 
-The owner's library, read through the player's database. All at `listen`
+The owner's library, read through the iPod's database. All at `listen`
 level but `enqueue`, above.
 
 | Call | Returns |
@@ -168,7 +168,7 @@ function newRound() {
 ```
 
 - Library calls read the database as they are called, which on the
-  player can take a while: make them while a round is set up, not every
+  iPod can take a while: make them while a round is set up, not every
   frame. `tracks.count`, `tracks.pick` and `tracks.near` look at every
   track in the library and cost 200 units and 4 a track -- about 40,000
   for a library of 10,000, over three ticks' worth on an iPod Video
@@ -195,7 +195,7 @@ The music's spectrum this tick: the bars a skin's spectrum display shows.
 
 ## playback.sound(out)
 
-The current track's **Sound Index**: what the player's library worked out
+The current track's **Sound Index**: what the iPod's library worked out
 about the whole track when it was scanned.
 
 | Argument | |
@@ -228,9 +228,9 @@ night level; a dense one more enemies.
 
 ## The beat
 
-The player can listen to the music as it plays, find its tempo and
+The iPod can listen to the music as it plays, find its tempo and
 predict its beats, so a game can land things exactly on them -- the same
-beat tracker the player's own rhythm game uses.
+beat tracker the iPod's own rhythm game uses.
 
 **Listening is costly.** While a cart listens, the analyser takes about a
 third of an iPod Video's time: in units, about 6,300 a tick at 33 ticks a
@@ -387,7 +387,7 @@ the music.
 
 ### beat.ahead(out, from, to)
 
-The hits already heard in the music between `from` and `to`: the player
+The hits already heard in the music between `from` and `to`: the iPod
 decodes music a little ahead of the speaker, and the analyser reads it
 there, so these are hits that are about to be heard.
 
