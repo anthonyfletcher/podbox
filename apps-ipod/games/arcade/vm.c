@@ -319,6 +319,11 @@ static int equal(struct vm *vm, struct value a, struct value b)
     return a.v == b.v;
 }
 
+/* arcade_api.def's slots for the maths NCALL works inline, slots being
+ * permanent; natives.c checks them */
+enum { INLINE_FLR = 53, INLINE_ABS = 55, INLINE_MIN = 56, INLINE_MAX = 57,
+       INLINE_MID = 58, INLINE_SGN = 59 };
+
 /* ---- arrays and records --------------------------------------------- */
 
 static int new_buf(struct vm *vm, uint32_t cap, uint32_t *off)
@@ -645,8 +650,9 @@ static inline int index_fast(struct vm *vm, const struct value *c,
     return 0;
 }
 
-/* c[i] = v inline for an integer index in range of an array, or of an
- * Int32Array given an integer. 0 leaves it to set_index(). */
+/* c[i] = v inline for an integer index in range of an array, an
+ * Int32Array or FixArray given a number, or a Uint8Array other than the
+ * screen's, which set_index() marks as drawn on. 0 leaves it to that. */
 static inline int store_fast(struct vm *vm, const struct value *c,
                              const struct value *i, const struct value *v)
 {
@@ -654,8 +660,13 @@ static inline int store_fast(struct vm *vm, const struct value *c,
         return 0;
     uint32_t k = (uint32_t)i->v, t = c->tag;
     void *o = MEM(vm, (uint32_t)c->v);
-    if (t == T_I32 && v->tag == T_INT && k < ((struct i32 *)o)->len) {
-        ((struct i32 *)o)->d[k] = v->v;
+    if (t == T_I32 && is_num(*v) && k < ((struct i32 *)o)->len) {
+        ((struct i32 *)o)->d[k] = to_int(*v);
+        return 1;
+    }
+    if (t == T_U8 && is_num(*v) && k < ((struct u8a *)o)->len &&
+        !IS_SCREEN(vm, *c)) {
+        ((struct u8a *)o)->d[k] = (uint8_t)to_int(*v);
         return 1;
     }
     if (t == T_FXA && is_num(*v) && k < ((struct i32 *)o)->len) {
@@ -671,6 +682,76 @@ static inline int store_fast(struct vm *vm, const struct value *c,
     return 0;
 }
 
+/* n / d, n below d << 32 so the quotient fits 32 bits: shift and
+ * subtract, a bit a step, which on the player is five instructions a bit
+ * -- its 64 by 64 divide, which the C compiles to, costs some 600 cycles
+ * against 170 on the rig */
+static uint32_t div_64_32(uint64_t n, uint32_t d)
+{
+    uint32_t hi = (uint32_t)(n >> 32), lo = (uint32_t)n;
+#ifdef ARCADE_ASM
+    /* lo shifts out into hi as the quotient's bits shift in: a carry out
+     * of hi, or hi reaching d, takes d off and sets the bit. Eight bits a
+     * pass, four passes: whole, the 32 would push vm.c's literals out of
+     * reach. */
+    uint32_t passes;
+    __asm__("mov   %2, #4\n"
+            "1:\n\t"
+            ".rept 8\n\t"
+            "adds  %0, %0, %0\n\t"
+            "adcs  %1, %1, %1\n\t"
+            "cmpcc %1, %3\n\t"
+            "subcs %1, %1, %3\n\t"
+            "orrcs %0, %0, #1\n\t"
+            ".endr\n\t"
+            "subs  %2, %2, #1\n\t"
+            "bne   1b"
+            : "+r"(lo), "+r"(hi), "=&r"(passes) : "r"(d) : "cc");
+    return lo;
+#else
+    uint32_t q = 0;
+    for (int i = 0; i < 32; i++) {
+        uint32_t top = hi >> 31;
+        hi = hi << 1 | lo >> 31;
+        lo <<= 1;
+        q <<= 1;
+        if (top || hi >= d) {
+            hi -= d;
+            q |= 1;
+        }
+    }
+    return q;
+#endif
+}
+
+/* a / b for two numbers not both integers, as vm_fix_op() works it --
+ * (a * 65536) / b in 16.16, toward 0 -- when b is not 0 and the quotient
+ * fits 32 bits: a fraction over an integer is a.v / b.v, the same
+ * quotient; 0 to leave it to vm_fix_op. Out of line: inside run() it
+ * would push the loop's literals out of a load's reach. */
+static __attribute__((noinline)) int div_fast(struct value *a,
+                                              const struct value *b)
+{
+    uint32_t ta = a->tag, tb = b->tag;
+    int32_t x = a->v, y = b->v;
+    if (!y)
+        return 0;
+    if (ta == T_FIX && tb == T_INT) {
+        a->v = y == -1 ? (int32_t)(0u - (uint32_t)x) : x / y;
+        return 1;
+    }
+    int64_t n = ta == T_FIX ? (int64_t)x << 16 : (int64_t)x << 32;
+    int64_t d = tb == T_FIX ? y : (int64_t)y << 16;
+    uint64_t un = n < 0 ? 0 - (uint64_t)n : (uint64_t)n;
+    uint64_t ud = d < 0 ? 0 - (uint64_t)d : (uint64_t)d;
+    if (ud >> 32 || (un >> 32) >= ud)
+        return 0;
+    uint32_t q = div_64_32(un, (uint32_t)ud);
+    a->v = (int32_t)((n < 0) != (d < 0) ? 0u - q : q);
+    a->tag = T_FIX;
+    return 1;
+}
+
 /* a + b, a - b or a * b in place of a, for two numbers not both
  * integers, as vm_fix_op() works them but without the call; 0 for any
  * other op or value, left to it */
@@ -679,6 +760,8 @@ static inline int fix_fast(struct value *a, const struct value *b, int op)
     uint32_t ta = a->tag, tb = b->tag;
     if ((ta != T_FIX && ta != T_INT) || (tb != T_FIX && tb != T_INT))
         return 0;
+    if (op == OP_DIV)
+        return div_fast(a, b);
     int32_t x = a->v, y = b->v;
     if (op == OP_MUL) {
         if (ta == T_INT || tb == T_INT)
@@ -1674,10 +1757,13 @@ op_BNOT:
         FAIL("~ needs a number, not a ", vm_typename(sp[-1].tag));
     sp[-1] = mk(T_INT, ~to_int(sp[-1]));
     NEXT();
-/* Strings are compared at a charge for their length, so the registers go
+/* Two of one kind but different strings are equal by their place alone;
+ * strings are compared at a charge for their length, so the registers go
  * over for them */
 #define EQUAL(x, y, r) do { \
-    if ((x).tag == T_STR && (y).tag == T_STR) { \
+    if ((x).tag == (y).tag && ((x).tag != T_STR || (x).v == (y).v)) \
+        r = (x).v == (y).v; \
+    else if ((x).tag == T_STR && (y).tag == T_STR) { \
         SYNC(); \
         r = equal(vm, x, y); \
         RELOAD(); \
@@ -1822,12 +1908,28 @@ op_ORJ: {
     NEXT();
 }
 
-op_CALL:
+op_CALL: {
+    /* as enter() does it, but with the arguments the arity always, so
+     * none to pad or drop, and without the call */
     n = U16();
+    const struct fninfo *f = &vm->fns[n];
     SYNC();
-    if (!enter(vm, n, vm->fns[n].arity, 0))
-        goto fail;
-    goto entered;
+    if (vm->nframes >= MAX_FRAMES ||
+        (uint32_t)(sp - vm->stack) + f->nlocals + f->maxstack + STACK_SLACK >
+        STACK_VALUES)
+        FAIL("too much recursion", "");
+    fr = &vm->frames[vm->nframes++];
+    fr->fn = n;
+    fr->bp = (uint32_t)(sp - f->arity - vm->stack);
+    fr->drop = 0;
+    fr->pc = f->off;
+    for (uint32_t i = f->arity; i < f->nlocals; i++)
+        *sp++ = mk(T_NULL, 0);
+    vm->sp = sp;
+    pc = code + f->off;
+    lp = vm->stack + fr->bp;
+    NEXT();
+}
 op_CALLV:
     n = U8();
     if (sp[-(int)n - 1].tag != T_FN)
@@ -1835,7 +1937,6 @@ op_CALLV:
     SYNC();
     if (!enter(vm, (uint32_t)sp[-(int)n - 1].v, n, 1))
         goto fail;
-entered:
     fr = &vm->frames[vm->nframes - 1];
     pc = code + fr->pc;
     lp = vm->stack + fr->bp;
@@ -1863,6 +1964,55 @@ leave:
 
 op_NCALL: {
     uint32_t slot = U16(), argc = U8();
+    /* the small maths given numbers, as core_math.c works them, without
+     * the call: about 105 cycles round 25 on the rig. Anything else goes
+     * to the native, which reports it. */
+    switch (slot) {
+    case INLINE_FLR:
+        if (is_num(sp[-1])) {
+            sp[-1] = mk(T_INT, floor_int(sp[-1]));
+            NEXT();
+        }
+        break;
+    case INLINE_ABS:
+        if (is_num(sp[-1])) {
+            if (sp[-1].v < 0)
+                sp[-1].v = (int32_t)(0u - (uint32_t)sp[-1].v);
+            NEXT();
+        }
+        break;
+    case INLINE_MIN:
+    case INLINE_MAX:
+        if (is_num(sp[-2]) && is_num(sp[-1])) {
+            int64_t x = scaled(sp[-2]), y = scaled(sp[-1]);
+            if (slot == INLINE_MIN ? y < x : y > x)
+                sp[-2] = sp[-1];
+            sp--;
+            NEXT();
+        }
+        break;
+    case INLINE_MID:
+        if (is_num(sp[-3]) && is_num(sp[-2]) && is_num(sp[-1])) {
+            struct value x = sp[-3], y = sp[-2], z = sp[-1], t;
+            if (scaled(x) > scaled(y)) {
+                t = x;
+                x = y;
+                y = t;
+            }
+            if (scaled(y) > scaled(z))
+                y = z;
+            sp[-3] = scaled(x) > scaled(y) ? x : y;
+            sp -= 2;
+            NEXT();
+        }
+        break;
+    case INLINE_SGN:
+        if (is_num(sp[-1])) {
+            sp[-1] = mk(T_INT, sp[-1].v < 0 ? -1 : 1);
+            NEXT();
+        }
+        break;
+    }
     struct value out = mk(T_NULL, 0);
     int32_t outer = vm->native;
     SYNC();

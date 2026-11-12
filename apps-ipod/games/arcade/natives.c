@@ -30,6 +30,10 @@ enum
 #undef API
 };
 
+_Static_assert(SLOT_flr == 53 && SLOT_abs == 55 && SLOT_min == 56 &&
+               SLOT_max == 57 && SLOT_mid == 58 && SLOT_sgn == 59,
+               "vm.c's INLINE_ slots");
+
 const struct native_def arcade_api[] = {
 #define API(name, slot, min, max, ret, flags, cost, level, version) \
     [slot] = { min, max, ret, flags, level, cost, version },
