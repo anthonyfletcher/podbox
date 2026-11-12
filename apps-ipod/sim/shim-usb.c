@@ -61,6 +61,13 @@ void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
     (void)d;
 }
 
+/* shutdown.c leaves the bus before restarting the firmware. A target's own
+ * USB driver supplies it. */
+void usb_enable(bool on)
+{
+    (void)on;
+}
+
 /* Set by the stack when a host ejects the disk. */
 bool usb_storage_is_ejected(void)
 {

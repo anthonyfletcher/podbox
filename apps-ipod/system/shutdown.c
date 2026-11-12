@@ -276,6 +276,17 @@ void car_adapter_mode_init(void)
 }
 
 #ifdef BOOTFILE
+/* Starts the firmware on disk again. The bus is left first: with the USB
+ * Sound Card on, the host is still talking to us after an eject, and a
+ * controller that stops answering mid-session is what Windows reports as a
+ * device that has malfunctioned. */
+static void restart_firmware(void)
+{
+    audio_hard_stop();
+    usb_enable(false);
+    rolo_load(BOOTDIR "/" BOOTFILE);
+}
+
 /* A computer rewrote the database (tools/database_pb). This run holds the old
  * one's track numbers, in the playlist and the buffered tracks, so start
  * again. Tried once: a failed load leaves the database closed to this run. */
@@ -286,8 +297,7 @@ static void restart_if_database_replaced(void)
     if (!tried && tagcache_changed_over_usb())
     {
         tried = true;
-        audio_hard_stop();
-        rolo_load(BOOTDIR "/" BOOTFILE);
+        restart_firmware();
     }
 }
 
@@ -509,10 +519,7 @@ void check_bootfile(bool do_rolo)
                     static const struct text_message message={ lines, 2 };
                     button_clear_queue(); /* Empty the keyboard buffer */
                     if(gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
-                    {
-                        audio_hard_stop();
-                        rolo_load(BOOTDIR "/" BOOTFILE);
-                    }
+                        restart_firmware();
                 }
             }
             mtime = info.mtime;
