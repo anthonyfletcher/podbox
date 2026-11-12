@@ -4309,6 +4309,11 @@ bool browser_db_walk_pending(void)
     return walk_root_tag != -1;
 }
 
+void browser_db_cancel_walk(void)
+{
+    walk_root_tag = -1;
+}
+
 /* Set where the walk opened the album on its own instead */
 static bool walk_fell_back;
 

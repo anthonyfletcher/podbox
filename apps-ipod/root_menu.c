@@ -333,7 +333,11 @@ static int browser(void* param)
         break;
         case GO_TO_DBBROWSER:
             if (!wait_for_tagcache_ready() || !db_browser_ready())
+            {
+                /* else the next Music opens on the album */
+                browser_db_cancel_walk();
                 return GO_TO_PREVIOUS;
+            }
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
             /* Go to Album walks in from Music's root, not the resume point */

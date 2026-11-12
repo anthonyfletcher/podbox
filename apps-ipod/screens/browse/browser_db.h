@@ -233,6 +233,8 @@ void browser_db_walk_to_album_on_next_load(int root_tag, int track_idx,
                                            long album_seek, long artist_seek,
                                            const char *album_title);
 bool browser_db_walk_pending(void);
+/* Drops an armed walk, for an entry that gives up before the load */
+void browser_db_cancel_walk(void);
 /* Whether the last walk opened the album on its own; reading it clears it */
 bool browser_db_take_walk_fallback(void);
 /* As above, but jumps straight to a specific album-artist's album listing
