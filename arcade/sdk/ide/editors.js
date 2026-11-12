@@ -108,11 +108,11 @@ function bridge(file) {
         '})();</script>\n';
 }
 
-/* the page with the bridge first in its head */
+/* the page with the bridge ahead of everything it holds: the parser puts
+ * the bridge in the head whatever the page's own markup, and no comment or
+ * script of the page's can come before it */
 export function framed(html, file) {
-    const b = bridge(file), m = /<head[^>]*>/i.exec(html);
-    return m ? html.slice(0, m.index + m[0].length) + '\n' + b + html.slice(m.index + m[0].length)
-             : b + html;
+    return '<!doctype html>\n' + bridge(file) + html.replace(/^﻿?\s*<!doctype[^>]*>/i, '');
 }
 
 /* An editor's page in a frame in pane. o: folder (the cart's files, read

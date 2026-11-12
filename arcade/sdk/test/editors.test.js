@@ -26,12 +26,16 @@ test('the page gets the no-network policy and window.cart before its own scripts
     const page = framed('<!doctype html><html><head><title>x</title><script>go()</script></head></html>',
                         'data/a</script>.json');
     const policy = page.indexOf('Content-Security-Policy'), own = page.indexOf('go()');
-    assert.ok(policy > page.indexOf('<head>') && policy < own);
+    assert.ok(page.startsWith('<!doctype html>\n<meta http-equiv="Content-Security-Policy"'));
+    assert.ok(policy < own && page.indexOf('<!doctype', 1) < 0);
     assert.match(page, /default-src 'none'/);
     assert.ok(page.indexOf('window.cart') < own);
     /* the file's name cannot close the bridge's script */
     assert.ok(!page.includes('a</script>.json'));
-    assert.match(framed('<p>no head</p>', null), /^<meta http-equiv="Content-Security-Policy"/);
+    assert.match(framed('<p>no head</p>', null), /^<!doctype html>\n<meta http-equiv="Content-Security-Policy"/);
+    /* a <head> in a comment ahead of the real one does not move it */
+    const tricked = framed('<!-- <head> --><script>go()</script><head></head>', null);
+    assert.ok(tricked.indexOf('Content-Security-Policy') < tricked.indexOf('<!--'));
 });
 
 test('a cart carries its editors, and unpack gives them back', () => {
