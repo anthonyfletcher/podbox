@@ -1811,6 +1811,19 @@ static bool audio_init_codec(struct track_info *track_infop,
     int codt_loaded = get_audio_base_codec_type(codec_loaded());
     int hid = ERR_HANDLE_NOT_FOUND;
 
+#ifdef USB_ENABLE_AUDIO
+    /* A codec sets the DSP's format only when loaded, and a sound card
+     * stream since then has set it to its own */
+    static unsigned int loaded_claims;
+    if (codt_loaded != AFMT_UNKNOWN
+        && loaded_claims != usb_audio_get_dsp_claims())
+    {
+        codec_unload();
+        codt_loaded = AFMT_UNKNOWN;
+    }
+    loaded_claims = usb_audio_get_dsp_claims();
+#endif
+
     if (codt_loaded != AFMT_UNKNOWN)
     {
         int codt = get_audio_base_codec_type(track_id3->codectype);

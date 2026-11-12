@@ -157,6 +157,14 @@ int usb_audio_get_cur_volume(void);
 
 bool usb_audio_get_active(void);
 
+/*
+ * usb_audio_get_dsp_claims():
+ *
+ * How many streams have set the playback DSP up for themselves. A codec
+ * loaded before the count last moved has lost its format to one.
+ */
+unsigned int usb_audio_get_dsp_claims(void);
+
 extern struct usb_class_driver usb_cdrv_audio;
 
 #endif

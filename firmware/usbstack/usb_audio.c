@@ -359,6 +359,7 @@ static bool host_muted;
 /* The stream holds a boost: unboosted, a sleeping 5G LCD drops the CPU to
  * 24 MHz, too slow to take every packet. */
 static bool stream_boosted;
+static unsigned int dsp_claims;
 
 /* buffers used for usb, queuing and playback */
 static unsigned char *rx_buffer;
@@ -739,6 +740,7 @@ static void usb_audio_start_playback(void)
      * thread has stopped, music still being decoded through it plays as
      * static once it expects our format. */
     dsp = dsp_get_config(CODEC_IDX_AUDIO);
+    dsp_claims++;
     dsp_configure(dsp, DSP_RESET, 0);
     dsp_configure(dsp, DSP_SET_STEREO_MODE, STEREO_INTERLEAVED);
     dsp_configure(dsp, DSP_SET_SAMPLE_DEPTH, 16);
@@ -1277,6 +1279,11 @@ static void usb_audio_disconnect(void)
 
     usb_audio_stop_playback();
     usbaudio_active = false;
+}
+
+unsigned int usb_audio_get_dsp_claims(void)
+{
+    return dsp_claims;
 }
 
 bool usb_audio_get_active(void)
