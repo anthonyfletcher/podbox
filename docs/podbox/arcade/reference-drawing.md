@@ -9,8 +9,8 @@ this page.
 - Clearing and pixels: [cls](#clsc), [pset](#psetx-y-c), [pget](#pgetx-y)
 - Lines and shapes: [line](#linex0-y0-x1-y1-c), [rect and rectfill](#rectx0-y0-x1-y1-c),
   [circ and circfill](#circx-y-r-c), [oval and ovalfill](#ovalx0-y0-x1-y1-c),
-  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend),
-  [polyline](#polylinexs-ys-n-c-ends-closed)
+  [tri and trifill](#trix0-y0-x1-y1-x2-y2-c), [polyfill](#polyfillxs-ys-n-c-ends-bend-boxes),
+  [polyboxes](#polyboxesxs-ys-n-ends), [polyline](#polylinexs-ys-n-c-ends-closed)
 - The drawing state: [color](#colorc), [fillp](#fillpp), [camera](#camerax-y-turn-px-py-zoom),
   [clip](#clipx0-y0-x1-y1), [target](#targett)
 
@@ -291,7 +291,7 @@ tri(80, 20, 150, 60, 90, 110, 7);
 
 ---
 
-## polyfill(xs, ys, n, [c], [ends], [bend])
+## polyfill(xs, ys, n, [c], [ends], [bend], [boxes])
 
 Any flat shape from a list of points: a hill, a cave, a ship, a blob. The
 points are joined in order and back to the first, and the inside filled.
@@ -303,6 +303,7 @@ points are joined in order and back to the first, and the inside filled.
 | `c` | its colour; the pen colour when left out |
 | `ends` | to draw several outlines at once: an array of where each ends, the index after its last point |
 | `bend` | an array, one number a point: where it is not 0, the point bends the line through it into a curve rather than lying on it |
+| `boxes` | from [`polyboxes`](#polyboxesxs-ys-n-ends) for the same points and `ends`: for an outline far larger than the screen. Not with `bend` |
 
 **Returns** nothing.
 
@@ -335,8 +336,65 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   edges each row crosses and the pieces of row filled between them: a
   ragged ground line of 100 points along the bottom third of the screen
   is about 900. Points outside the clip cost about 8 units
-  each, so a large outline mostly off screen stays cheap. One `polyfill` is much cheaper than the same
+  each, so a large outline mostly off screen stays cheap -- and with
+  `boxes`, cheaper still. One `polyfill` is much cheaper than the same
   shape cut into `trifill` triangles, each of which pays for its rows.
+
+## polyboxes(xs, ys, n, [ends])
+
+Gets a large outline ready for `polyfill` to draw only the part in view:
+a level's ground thousands of pixels long, scrolled past a screen at a
+time. Make it once, when the outline is made, and pass it to every
+`polyfill` of those points.
+
+| Argument | |
+|---|---|
+| `xs`, `ys` | the outline's points, as `polyfill` takes them |
+| `n` | how many points to use, from the first |
+| `ends` | where each outline ends, as `polyfill` takes it |
+
+**Returns** an `Int32Array`: the outlines cut into runs of 16 lines,
+with the box round each run's points.
+
+```js
+var gx = [], gy = [], boxes, x = 0;
+
+function init() {
+    // ground 2,000 pixels long, a point every 4
+    for (var i = 0; i <= 500; i++) {
+        gx.push(i * 4);
+        gy.push(80 + sin(i / 60.0) * 20 + rnd(6));
+    }
+    gx.push(2000); gy.push(120); gx.push(0); gy.push(120);
+    boxes = polyboxes(gx, gy, gx.length);
+}
+
+function update() {
+    x = (x + 2) % 1840;
+}
+
+function draw() {
+    cls(12);
+    camera(x, 0);
+    polyfill(gx, gy, gx.length, 3, null, null, boxes);
+    camera();
+}
+```
+
+![Rolling green hills against a blue sky, the stretch of a long ground line the camera has scrolled to](img/d-polyboxes.png)
+
+- `polyfill` draws exactly the same pixels with the boxes as without:
+  a run wholly off the screen is passed over without reading its points.
+- The boxes are for the points as they were when made. Moving the
+  camera, turning or zooming it is fine; change the points, or their
+  number, and make the boxes again -- `polyfill` stops the cart if the
+  number of points or outlines no longer matches.
+- Plain outlines only: `polyfill` refuses `boxes` together with `bend`.
+- **What it costs.** Making the boxes above, 503 points, is about 2,100
+  units, once. Each frame's `polyfill` then costs about 2,600 units
+  against 6,000 without them. A run off the screen costs about 22 units
+  against about 130 for walking its points. An outline that is mostly
+  on screen gains little.
 
 ## polyline(xs, ys, n, [c], [ends], [closed])
 

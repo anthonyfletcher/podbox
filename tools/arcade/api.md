@@ -43,8 +43,11 @@ A triangle's outline.
 ### trifill(x0, y0, x1, y1, x2, y2, [c])
 A filled triangle.
 
-### polyfill(xs, ys, n, [c], [ends], [bend])
-The first n points of xs and ys as a filled outline, concave or crossing itself, by the even-odd rule. ends, an array, cuts it into several outlines, each ending before the index given; one inside another is a hole. Where bend is non-zero, that point bends the line through it into a curve rather than lying on it, as in a TrueType outline. At most 8192 points.
+### polyfill(xs, ys, n, [c], [ends], [bend], [boxes])
+The first n points of xs and ys as a filled outline, concave or crossing itself, by the even-odd rule. ends, an array, cuts it into several outlines, each ending before the index given; one inside another is a hole. Where bend is non-zero, that point bends the line through it into a curve rather than lying on it, as in a TrueType outline. boxes, from `polyboxes` for the same points and ends, passes over the parts of a large outline out of view, drawing the same pixels for less; not with bend. At most 8192 points.
+
+### polyboxes(xs, ys, n, [ends])
+The outlines `polyfill` would draw from these points, cut into runs of 16 lines, with the box round each run, as an `Int32Array` to hand to `polyfill`. Made once for an outline that stays still, such as a level's ground; made again if its points change.
 
 ### polyline(xs, ys, n, [c], [ends], [closed])
 Lines from each of the first n points of xs and ys to the next, in one call. c is a colour, or an array of one for each line (line i from point i). ends, an array, cuts the points into runs, each ending before the index given; closed joins each run's last point back to its first. At most 8192 points.

@@ -1677,6 +1677,7 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 #define POLY_PIECES 16      /* the most lines a curve is cut into */
 #define POLY_HELD   512     /* edges built in one pass, in held_edges */
 #define POLY_HELD_ROWS 256  /* and the rows that takes */
+#define POLY_RUN_LINES 16   /* the lines in each run polyboxes() boxes */
 
 /* units, measured on the ARM rig (polyprobe): the call's set-up beyond
  * any call's, each point each time the outlines are walked, each edge
@@ -1692,6 +1693,7 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 #define POLY_CURVE 19
 #define POLY_PIECE 8
 #define POLY_TURN  2    /* each point walked, when the camera turns */
+#define POLY_RUN   22   /* each run of an outline polyboxes() boxed */
 #define POLY_ASIDE 2    /* each edge wholly left or right of the clip */
 
 /* A row's first edge in starts[], plus one, with this bit flipped where an
@@ -1741,6 +1743,9 @@ struct poly
     int64_t xl, xr;             /* edges past these are aside, 16.16 */
     uint32_t aside;             /* edges wholly left or right */
     uint32_t measured;          /* edges cut to the clip's rows to test */
+    const int32_t *boxes;       /* polyboxes()' runs, or none */
+    uint32_t run;               /* the next of them */
+    uint32_t *tally;            /* the points walked and the runs looked at */
 };
 
 /* (n << 16) / d, d above 0, toward 0: the 64-bit divide, but a byte at a
@@ -1975,11 +1980,62 @@ static inline __attribute__((always_inline)) void plain_point(
     *y = fy + oy;
 }
 
+enum { RUN_WALK, RUN_OVER, RUN_LEFT, RUN_RIGHT };
+
+/* Where a run's box lies on the surface against the clip: wholly above or
+ * below its rows, wholly left or right of it, or across it and to be
+ * walked. The box's corners are turned as the points are, its reach then
+ * a pixel wider for their rounding; one too far out to turn as near is
+ * walked. lx and hx are how far it reaches. */
+static int run_side(const struct poly *g, const struct pen *p,
+                    const int32_t *box, int64_t top, int64_t bot,
+                    int64_t *lx, int64_t *hx)
+{
+    const struct draw *d = p->d;
+    int64_t x0 = INT64_MAX, y0 = INT64_MAX, x1 = INT64_MIN, y1 = INT64_MIN;
+    for (int k = 0; k < 4; k++) {
+        int64_t x = box[k & 1 ? 2 : 0], y = box[k & 2 ? 3 : 1];
+        if (d->cam_moved) {
+            int64_t cx = ((int64_t)d->cam_x << 16) + d->cam_px;
+            int64_t cy = ((int64_t)d->cam_y << 16) + d->cam_py;
+            int64_t sx = x - cx, sy = y - cy;
+            if (sx != (int32_t)sx || sy != (int32_t)sy)
+                return RUN_WALK;
+            int32_t x32 = (int32_t)sx, y32 = (int32_t)sy;
+            x = cx + ((mul32(x32, d->cam_cos) - mul32(y32, d->cam_sin)) >> 16);
+            y = cy + ((mul32(x32, d->cam_sin) + mul32(y32, d->cam_cos)) >> 16);
+        }
+        x += p->ox << 16;
+        y += p->oy << 16;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+    }
+    x0 -= 65536;
+    y0 -= 65536;
+    x1 += 65536;
+    y1 += 65536;
+    *lx = x0;
+    *hx = x1;
+    if (y1 <= top || y0 > bot)
+        return RUN_OVER;
+    if (x0 > g->xr)
+        return RUN_RIGHT;
+    if (x1 < g->xl)
+        return RUN_LEFT;
+    return RUN_WALK;
+}
+
 /* An outline without curve points, s to e - 1 and back to s, as
  * poly_line would take each line: one with both ends above the clip's
  * rows, or both below, or level, makes no edge, and one with both right
  * of it only its count, so neither is set up as an edge -- most of a
- * long level outline when a part of it is in view */
+ * long level outline when a part of it is in view.
+ * With polyboxes()' runs, a run wholly above, below or right of the clip
+ * is passed over in the same way without its points; one wholly left
+ * sets the rows between its ends as left of the clip, as the line from
+ * its first point to its last does, which is what its lines come to. */
 static int poly_plain(struct poly *g, const struct pen *p,
                       const struct column *xs, const struct column *ys,
                       uint32_t s, uint32_t e)
@@ -1989,13 +2045,47 @@ static int poly_plain(struct poly *g, const struct pen *p,
     int64_t ax, ay, bx, by, sx, sy;
     int64_t ox = (int64_t)p->ox << 16, oy = (int64_t)p->oy << 16;
     plain_point(p, xs, ys, s, ox, oy, &ax, &ay);
+    g->tally[0]++;
     sx = ax;
     sy = ay;
     unsigned ca = poly_code(g, ax, ay, top, bot);
-    for (uint32_t i = s + 1; i <= e; i++) {
-        if (i < e)
+    for (uint32_t i = s + 1, next = s + 1; i <= e; i++) {
+        if (g->boxes && i == next) {
+            /* a run begins: the lines from point i - 1 to point b */
+            uint32_t b = i - 1 + POLY_RUN_LINES < e ? i - 1 + POLY_RUN_LINES
+                                                    : e;
+            int64_t lx, hx;
+            int side = run_side(g, p, g->boxes + 2 + 4 * g->run++, top, bot,
+                                &lx, &hx);
+            g->tally[1]++;
+            next = b + 1;
+            if (side != RUN_WALK) {
+                if (b < e)
+                    plain_point(p, xs, ys, b, ox, oy, &bx, &by);
+                else {
+                    bx = sx;
+                    by = sy;
+                }
+                g->tally[0]++;
+                if (side == RUN_LEFT) {
+                    if (ay != by && !poly_line(g, ax, ay, bx, by))
+                        return 0;
+                } else if (side == RUN_RIGHT) {
+                    if (lx < g->xmin) g->xmin = lx;
+                    if (hx > g->xmax) g->xmax = hx;
+                    g->aside++;
+                }
+                ax = bx;
+                ay = by;
+                ca = poly_code(g, ax, ay, top, bot);
+                i = b;
+                continue;
+            }
+        }
+        if (i < e) {
             plain_point(p, xs, ys, i, ox, oy, &bx, &by);
-        else {
+            g->tally[0]++;
+        } else {
             bx = sx;
             by = sy;
         }
@@ -2077,6 +2167,7 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
                       const struct column *bend, uint32_t n)
 {
     uint32_t s = 0;
+    g->run = 0;
     for (uint32_t k = 0; k <= nends && s < n; k++) {
         uint32_t e = n;
         if (k < nends) {
@@ -2180,7 +2271,7 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
         memset(held_starts, 0, rows * 4);
     struct poly g = { held_edges, starts, 0, 4, p.cy0, p.cy1, p.cy1, p.cy0,
                       0, 0, 0, 0, 0, 0, ((int64_t)p.cx0 - 1) << 16,
-                      ((int64_t)p.cx1 + 1) << 16, 0, 0 };
+                      ((int64_t)p.cx1 + 1) << 16, 0, 0, NULL, 0, NULL };
     for (int k = 0; k < 4; k++)
         poly_line(&g, qx[k] + (p.ox << 16), qy[k] + (p.oy << 16),
                   qx[(k + 1) & 3] + (p.ox << 16),
@@ -2190,10 +2281,107 @@ static int quad_fill(struct vm *vm, uint32_t c, const int64_t qx[4],
     return 1;
 }
 
-/* polyfill(xs, ys, n, [c], [ends], [bend]): the n points as outlines,
- * filled by the even-odd rule. ends, when given, is where each outline
- * ends (the index after its last point); bend, where non-zero, makes a
- * point bend the line through it rather than be on it. */
+/* The runs polyboxes() cuts the outlines into: POLY_RUN_LINES lines each,
+ * from each outline's start, the last of an outline as many as are left;
+ * an outline of fewer than two points has none. 0 with the error set for
+ * ends out of order. */
+static int poly_runs(struct vm *vm, const char *fn,
+                     const struct column *ends, uint32_t nends, uint32_t n,
+                     uint32_t *runs)
+{
+    uint32_t s = 0;
+    *runs = 0;
+    for (uint32_t k = 0; k <= nends && s < n; k++) {
+        uint32_t e = n;
+        if (k < nends) {
+            int32_t v = column_at(ends, k, 0);
+            if (v <= (int32_t)s || (uint32_t)v > n)
+                return vm_fail(vm, fn, "()'s ends must rise, each past the "
+                               "last and none past n", "");
+            e = (uint32_t)v;
+        }
+        if (e - s >= 2)
+            *runs += (e - s + POLY_RUN_LINES - 1) / POLY_RUN_LINES;
+        s = e;
+    }
+    return 1;
+}
+
+/* polyboxes(xs, ys, n, [ends]): polyfill()'s outlines in runs, each with
+ * the box round its points, in an Int32Array: n, the runs, then each
+ * run's x0, y0, x1, y1 in 16.16 */
+NATIVE(polyboxes)
+{
+    struct column xs, ys, ends;
+    ends.tag = T_INT;
+    ends.k = 0;
+    if (!column_of(vm, a[0], &xs) || !column_of(vm, a[1], &ys) ||
+        xs.tag == T_INT || ys.tag == T_INT || !is_num(a[2]))
+        return vm_fail(vm, "polyboxes() needs arrays of x and y, then how "
+                       "many points", "", "");
+    int32_t n = floor_int(a[2]);
+    if (n < 0)
+        n = 0;
+    if (n > POLY_POINTS)
+        return vm_fail(vm, "polyboxes() takes at most 8192 points", "", "");
+    if ((uint32_t)n > xs.len || (uint32_t)n > ys.len)
+        return vm_fail(vm, "polyboxes() has fewer x or y than points", "",
+                       "");
+    uint32_t nends = 0, runs;
+    if (argc > 3 && a[3].tag != T_NULL) {
+        if (!column_of(vm, a[3], &ends) || ends.tag == T_INT)
+            return vm_fail(vm, "polyboxes()'s ends is an array", "", "");
+        nends = ends.len;
+    }
+    if (!poly_runs(vm, "polyboxes", &ends, nends, (uint32_t)n, &runs))
+        return 0;
+    uint32_t off = gc_alloc(vm, T_I32,
+                            (uint32_t)(sizeof(struct i32) -
+                                       sizeof(struct hdr)) + (2 + 4 * runs) * 4);
+    if (!off)
+        return 0;
+    struct i32 *box = (struct i32 *)MEM(vm, off);
+    box->len = 2 + 4 * runs;
+    box->d[0] = n;
+    box->d[1] = (int32_t)runs;
+    /* the allocation may have collected: the arrays found again */
+    column_of(vm, a[0], &xs);
+    column_of(vm, a[1], &ys);
+    if (nends)
+        column_of(vm, a[3], &ends);
+    int32_t *r = box->d + 2;
+    uint32_t s = 0;
+    for (uint32_t k = 0; k <= nends && s < (uint32_t)n; k++) {
+        uint32_t e = k < nends ? (uint32_t)column_at(&ends, k, 0) : (uint32_t)n;
+        if (e - s >= 2)
+            for (uint32_t i = s; i < e; i += POLY_RUN_LINES, r += 4) {
+                /* points i to the run's last, the outline's first after
+                 * its last */
+                uint32_t b = i + POLY_RUN_LINES < e ? i + POLY_RUN_LINES : e;
+                r[0] = r[1] = INT32_MAX;
+                r[2] = r[3] = INT32_MIN;
+                for (uint32_t j = i; j <= b; j++) {
+                    uint32_t q = j < e ? j : s;
+                    int32_t x = column_fix(&xs, q), y = column_fix(&ys, q);
+                    if (x < r[0]) r[0] = x;
+                    if (y < r[1]) r[1] = y;
+                    if (x > r[2]) r[2] = x;
+                    if (y > r[3]) r[3] = y;
+                }
+            }
+        s = e;
+    }
+    *out = mk(T_I32, (int32_t)off);
+    vm_charge(vm, POLY_CALL + (uint32_t)n * POLY_POINT / 2 + runs);
+    return 1;
+}
+
+/* polyfill(xs, ys, n, [c], [ends], [bend], [boxes]): the n points as
+ * outlines, filled by the even-odd rule. ends, when given, is where each
+ * outline ends (the index after its last point); bend, where non-zero,
+ * makes a point bend the line through it rather than be on it; boxes,
+ * from polyboxes() for these outlines, lets the runs out of view be
+ * passed over. */
 NATIVE(polyfill)
 {
     (void)out;
@@ -2225,6 +2413,24 @@ NATIVE(polyfill)
          bend.len < (uint32_t)n))
         return vm_fail(vm, "polyfill()'s bend is an array, one for each "
                        "point", "", "");
+    const int32_t *boxes = NULL;
+    if (argc > 6 && a[6].tag != T_NULL) {
+        uint32_t runs;
+        if (a[6].tag != T_I32)
+            return vm_fail(vm, "polyfill()'s boxes are an Int32Array from "
+                           "polyboxes()", "", "");
+        if (argc > 5 && a[5].tag != T_NULL)
+            return vm_fail(vm, "polyfill()'s boxes are for outlines without "
+                           "bend", "", "");
+        if (!poly_runs(vm, "polyfill", &ends, nends, (uint32_t)n, &runs))
+            return 0;
+        const struct i32 *b = I32(vm, a[6]);
+        if (b->len != 2 + 4 * runs || b->d[0] != n ||
+            b->d[1] != (int32_t)runs)
+            return vm_fail(vm, "polyfill()'s boxes are from polyboxes() for "
+                           "other points or ends", "", "");
+        boxes = b->d;
+    }
     struct pen p;
     begin(vm, &p, c, 1);
     if (n < 3 || p.cy0 >= p.cy1 || p.cx0 >= p.cx1) {
@@ -2237,8 +2443,11 @@ NATIVE(polyfill)
     int64_t xl = ((int64_t)p.cx0 - 1) << 16, xr = ((int64_t)p.cx1 + 1) << 16;
     struct poly g = { held_edges, held_starts, 0, POLY_HELD, p.cy0, p.cy1,
                       p.cy1, p.cy0, 0, 0, 0, (int64_t)1 << 62,
-                      -((int64_t)1 << 62), 0, xl, xr, 0, 0 };
+                      -((int64_t)1 << 62), 0, xl, xr, 0, 0, NULL, 0, NULL };
     struct pedge **act = held_act;
+    uint32_t tally[2] = { 0, 0 };
+    g.boxes = boxes;
+    g.tally = tally;
     if (rows <= POLY_HELD_ROWS) {
         memset(held_starts, 0, rows * 4);
         if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
@@ -2249,8 +2458,10 @@ NATIVE(polyfill)
         walks += rows <= POLY_HELD_ROWS;
         struct poly count = { NULL, NULL, 0, 0, p.cy0, p.cy1, p.cy1, p.cy0,
                               1, 0, 0, (int64_t)1 << 62, -((int64_t)1 << 62),
-                              0, xl, xr, 0, 0 };
+                              0, xl, xr, 0, 0, NULL, 0, NULL };
         g = count;
+        g.boxes = boxes;
+        g.tally = tally;
         if (!poly_edges(vm, &g, &p, &xs, &ys, &ends, nends, &bend,
                         (uint32_t)n))
             return 0;
@@ -2270,6 +2481,9 @@ NATIVE(polyfill)
                 column_of(vm, a[4], &ends);
             if (argc > 5 && a[5].tag != T_NULL)
                 column_of(vm, a[5], &bend);
+            if (boxes)
+                boxes = I32(vm, a[6])->d;
+            g.boxes = boxes;
             begin(vm, &p, c, 1);
             g.e = (struct pedge *)(void *)mem;
             g.starts = (int32_t *)(void *)(mem + at_starts);
@@ -2288,11 +2502,14 @@ NATIVE(polyfill)
                                "counted", "", "");
         }
     }
-    p.cost += POLY_CALL + (uint32_t)n * walks * POLY_POINT +
+    /* with boxes, the points the walk took; without, every point each
+     * time the outlines were walked */
+    uint32_t walked = boxes ? tally[0] : (uint32_t)n * walks;
+    p.cost += POLY_CALL + walked * POLY_POINT + tally[1] * POLY_RUN +
               (g.counting ? 0 : g.n * POLY_EDGE + g.curves * POLY_CURVE +
                                 g.pieces * POLY_PIECE + g.measured * POLY_EDGE);
     if (vm->d.cam_moved)
-        p.cost += (uint32_t)n * walks * POLY_TURN;
+        p.cost += walked * POLY_TURN;
     /* wholly left or right of the clip, or above or below it: no row is
      * walked */
     if (!g.counting && (g.n || g.aside) &&

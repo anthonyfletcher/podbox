@@ -273,11 +273,17 @@ But a page of text in `FONT.WORLD` costs about 5,300 to print and 7,600
 to blit, and a plain background is cheapest of all as `cls` and
 rectangles. Measure before reaching for an image.
 
-**5. Do less often what can wait.** An enemy's path need not be found
+**5. Box a large outline.** A `polyfill` of a level's whole ground walks
+every point of it each frame, about 8 units a point, though most lie
+off the screen. Made once, [`polyboxes`](reference-drawing.md#polyboxesxs-ys-n-ends)
+lets it pass over the runs out of view: a ground line of 500 points
+scrolled past costs about 2,600 a frame against 6,000.
+
+**6. Do less often what can wait.** An enemy's path need not be found
 every tick: every 8th, with the work spread across the ticks between
 (`if ((frame() + i) % 8 == 0)` for enemy `i`).
 
-**6. Prefer typed arrays and plain variables for what changes every
+**7. Prefer typed arrays and plain variables for what changes every
 tick.** In units, an element of an `Int32Array` costs what an array's
 does, and a record's field a little more. But each record, array or
 string made in a tick is memory the engine must later clear up, between
@@ -285,7 +291,7 @@ ticks, in time the units do not show. A cart that makes none in its
 `update()` and `draw()` -- reusing arrays, keeping numbers in typed
 arrays -- avoids that work entirely.
 
-**7. Step the rate down**, as a last resort: see **Time and speed**. At
+**8. Step the rate down**, as a last resort: see **Time and speed**. At
 25 ticks a second, each tick has a third more time.
 
 ## printh(text)

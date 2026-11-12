@@ -154,6 +154,8 @@ When over budget:
   (pixels, or sprites recoloured per particle -- debris, shards, coins),
   `grid`, `path`, `cells`, `links`, `sprites.draw`.
 - **Typed arrays** for boards and grids.
+- **A large outline** (a level's whole ground): `polyboxes` once, then
+  pass the boxes to each `polyfill`; the runs off the screen are skipped.
 - **Draw only what changes** -- fewer rows sent, fewer pixels drawn.
 - **An image only pays** when drawing its contents costs more than
   copying them (0.3 a pixel): hundreds of shapes, generated landscapes.
