@@ -41,6 +41,7 @@
 #define CHUNK     (1 << CHUNK_SHIFT)
 #define FIELD_MAX 256           /* cells across and down */
 #define MAX_BOXES 256           /* actors woken round in a step */
+#define STEP_UNITS 6            /* a waking cell's tick, as the rig weighs it */
 
 enum { MOVE_STATIC, MOVE_POWDER, MOVE_LIQUID, MOVE_GAS };
 
@@ -288,7 +289,8 @@ struct stepper
     uint32_t bits;              /* random bits left over */
     int nbits;
     uint32_t moves;
-    uint32_t pad[2];
+    uint32_t steps;             /* cells_step_cell's calls, for the charge */
+    uint32_t pad;
     /* for each first reaction, a bit for each partner b of its chain;
      * word 8 stays 0, for off the field */
     uint32_t partner[REACTIONS][16];
@@ -310,6 +312,7 @@ _Static_assert(offsetof(struct stepper, r) == 16 &&
                offsetof(struct stepper, bits) == 1420 &&
                offsetof(struct stepper, nbits) == 1424 &&
                offsetof(struct stepper, moves) == 1428 &&
+               offsetof(struct stepper, steps) == 1432 &&
                offsetof(struct stepper, partner) == 1440,
                "cells_arm.S's stepper offsets");
 #else
@@ -465,6 +468,7 @@ static int idle(const struct stepper *s, int32_t x, int32_t y)
 __attribute__((optimize("O2")))
 void cells_step_cell(struct stepper *s, int32_t x, int32_t y)
 {
+    s->steps++;
     uint8_t m = s->f.c[y * s->f.w + x];
     const uint8_t *const *r = s->r.f;
     if (r[R_DECAY][m])
@@ -708,6 +712,7 @@ NATIVE(cells_step)
     s.vm = vm;
     s.nbits = 0;
     s.moves = 0;
+    s.steps = 0;
     s.cw = (s.f.w + CHUNK - 1) / CHUNK;
     int32_t chh = (s.f.h + CHUNK - 1) / CHUNK;
     memset(s.changed, 0, sizeof(s.changed));
@@ -825,7 +830,8 @@ NATIVE(cells_step)
     }
     /* measured on the ARM rig (.build/arcade-rig, sysprobe): the parts
      * as they were weighed, three and a half times over */
-    vm_charge(vm, (20 + visited + s.moves + summed * 16) * 7 / 2);
+    vm_charge(vm, (20 + visited + s.moves + summed * 16) * 7 / 2 +
+                  s.steps * STEP_UNITS);
     *out = mk(T_INT, (int32_t)s.moves);
     return 1;
 }

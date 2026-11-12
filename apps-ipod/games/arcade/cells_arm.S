@@ -315,6 +315,7 @@ cells_run_arm:
     .equ    S_BITS, 1420
     .equ    S_NBITS, 1424
     .equ    S_MOVES, 1428
+    .equ    S_STEPS, 1432
     .equ    S_PARTNER, 1440
 
 /* acc op'd with material r0's bit of partner bits r12 (bit 0 of acc is the
@@ -420,6 +421,9 @@ cells_step_cell:
     mov     r4, r0
     mov     r5, r1
     mov     r6, r2
+    ldr     r0, [r4, #S_STEPS]
+    add     r0, r0, #1
+    str     r0, [r4, #S_STEPS]
     ldr     r7, [r4, #S_W]
     mla     r8, r6, r7, r5
     ldr     r0, [r4, #S_C]

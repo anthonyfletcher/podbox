@@ -46,7 +46,7 @@ no more than empty air. Drawing into a sleeping chunk wakes it.
 | `cells.step` on 160x120 | Units |
 |---|---|
 | everything settled, or air | about 4,600 |
-| two streams pouring | about 14,300 |
+| two streams pouring | about 24,000 |
 
 and for Life on an 80x60 board, about 8,400 units with `cells.life`
 against 311,000 in script -- nearly forty times as fast, and well inside
