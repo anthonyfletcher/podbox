@@ -570,7 +570,7 @@ Draws the cloth filled, each cell shaded from `ramp` by how it faces the light. 
 ## Segment sets
 
 ### segs.make(xs, ys, n, [mats], [ends])
-The outlines through the n points, as polyfill takes them, as lines points meet: each line takes the material of the point it starts from. Set it in a links pool's `segs`. At most 4096 points.
+The outlines through the n points, as polyfill takes them, as lines points meet: what polyfill would fill is solid, and points are kept out of it; each line takes the material of the point it starts from. Set it in a links pool's `segs`. At most 4096 points.
 
 ### segs.move(s, dx, dy)
 Moves the set by `dx, dy`; points resting on it are carried by the `links.step` that follows in the same tick. Called after the step, nothing is carried: a lift rises through what stands on it.

@@ -431,11 +431,11 @@ struct seg_counts
 
 enum { S_X0, S_Y0, S_X1, S_Y1, S_MAT, S_START, S_ITEMS, S_COUNT, S_OX, S_OY,
        S_MX, S_MY, S_MOVED, S_CELL, S_GX, S_GY, S_GW, S_GH, S_BX0, S_BY0,
-       S_BX1, S_BY1, S_FIELDS };
+       S_BX1, S_BY1, S_SIDE, S_FIELDS };
 static const char *const seg_keys[S_FIELDS] = {
     "x0", "y0", "x1", "y1", "mat", "start", "items", "count", "ox", "oy",
     "mx", "my", "moved", "cell", "gx", "gy", "gw", "gh", "bx0", "by0",
-    "bx1", "by1"
+    "bx1", "by1", "side"
 };
 
 /* A set handed back: its lines (16.16, before the offset), materials, and
@@ -450,7 +450,14 @@ struct segs
     int32_t cell, gx, gy, gw, gh;
     int32_t bx0, by0, bx1, by1;     /* its lines' bounds, whole pixels */
     uint32_t gen;                   /* its normals' mark, below */
+    const uint8_t *side;            /* each line's air side, or NULL */
 };
+
+/* side[k]: which way line k's unflipped normal, (-ey, ex), faces -- toward
+ * the air (SIDE_AIR), toward the solid (SIDE_SOLID), or not known
+ * (SIDE_NONE: a line of two points), when a point beside it is put on the
+ * side it came from */
+enum { SIDE_NONE, SIDE_AIR, SIDE_SOLID };
 
 /* Each line's normal, unflipped, 16.16, once worked out while a set is in
  * use: a root and two 64-bit divides that every point resting on the line,
@@ -506,6 +513,8 @@ static int segs_of(struct vm *vm, struct value v, const char *fn,
     if (!++norm_gen)
         ++norm_gen;                 /* 0 marks a slot never filled */
     s->gen = norm_gen;
+    s->side = f[S_SIDE].tag == T_U8 && U8A(vm, f[S_SIDE])->len >= s->count
+              ? U8A(vm, f[S_SIDE])->d : NULL;
     s->bx0 = whole(f[S_BX0], INT32_MIN);
     s->by0 = whole(f[S_BY0], INT32_MIN);
     s->bx1 = whole(f[S_BX1], INT32_MAX);
@@ -603,8 +612,10 @@ NATIVE(segs_make)
     }
     /* the lines, from the outlines */
     static int32_t X0[MAX_SEGS], Y0[MAX_SEGS], X1[MAX_SEGS], Y1[MAX_SEGS];
-    static uint8_t M[MAX_SEGS];
-    uint32_t count = 0, s0 = 0;
+    static uint8_t M[MAX_SEGS], SD[MAX_SEGS];
+    /* each closed outline's first line and how many */
+    static uint32_t ofirst[MAX_SEGS], olen[MAX_SEGS];
+    uint32_t count = 0, s0 = 0, outlines = 0;
     for (uint32_t k = 0; k <= nends && s0 < (uint32_t)n; k++) {
         uint32_t e = (uint32_t)n;
         if (k < nends) {
@@ -615,6 +626,10 @@ NATIVE(segs_make)
             e = (uint32_t)v;
         }
         uint32_t m = e - s0;
+        if (m >= 3) {
+            ofirst[outlines] = count;
+            olen[outlines++] = m;
+        }
         for (uint32_t i = 0; m >= 2 && i < (m == 2 ? 1 : m); i++) {
             uint32_t p = s0 + i, q = s0 + (i + 1) % m;
             X0[count] = column_fix(&xs, p);
@@ -623,9 +638,54 @@ NATIVE(segs_make)
             Y1[count] = column_fix(&ys, q);
             M[count] = (uint8_t)(mats.tag == T_NULL ? 0
                                  : column_at(&mats, p, 0));
+            SD[count] = SIDE_NONE;
             count++;
         }
         s0 = e;
+    }
+    /* Which side of each line of a closed outline is solid: inside an odd
+     * number of outlines, as polyfill fills them. An outline's inside is
+     * on the left of its lines when it winds one way (its area above 0),
+     * on the right the other; and it is solid when as many outlines again
+     * hold it as an even number. So a point already in the solid is put
+     * out into the air, and one at a convex corner is not taken for coming
+     * from inside by where the next line would run on past the corner. */
+    for (uint32_t i = 0; i < outlines; i++) {
+        int64_t area = 0;
+        for (uint32_t j = 0; j < olen[i]; j++) {
+            uint32_t k = ofirst[i] + j;
+            area += ((int64_t)X0[k] >> 8) * ((int64_t)Y1[k] >> 8) -
+                    ((int64_t)X1[k] >> 8) * ((int64_t)Y0[k] >> 8);
+        }
+        if (!area)
+            continue;
+        /* a point just off its first line's middle, inside it */
+        uint32_t f0 = ofirst[i];
+        int64_t mx = (((int64_t)X0[f0] + X1[f0]) >> 9);
+        int64_t my = (((int64_t)Y0[f0] + Y1[f0]) >> 9);
+        uint32_t held = 0;
+        for (uint32_t o = 0; o < outlines; o++) {
+            if (o == i)
+                continue;
+            int in = 0;
+            for (uint32_t j = 0; j < olen[o]; j++) {
+                uint32_t k = ofirst[o] + j;
+                int64_t ay = (int64_t)Y0[k] >> 8, by = (int64_t)Y1[k] >> 8;
+                if ((ay > my) == (by > my))
+                    continue;
+                int64_t ax = (int64_t)X0[k] >> 8, bx = (int64_t)X1[k] >> 8;
+                /* where the line crosses the row my, against mx */
+                if (((mx - ax) * (by - ay) < (bx - ax) * (my - ay)) ==
+                    (by - ay > 0))
+                    in = !in;
+            }
+            held += (uint32_t)in;
+        }
+        /* the unflipped normal faces the inside when the area is above 0 */
+        int inside_solid = !(held & 1);
+        uint8_t sd = (area > 0) == inside_solid ? SIDE_SOLID : SIDE_AIR;
+        for (uint32_t j = 0; j < olen[i]; j++)
+            SD[ofirst[i] + j] = sd;
     }
     /* The grid over the lines a level is made of: cells of 16 pixels,
      * larger to keep it small. A line longer than SEG_LONG -- a wall
@@ -706,6 +766,11 @@ NATIVE(segs_make)
         }
         BUF(vm, OBJ(vm, *out)->buf)->v[f] = v;
     }
+    if (!new_ints(vm, count ? count : 1, 1, &v)) {
+        vm_unroot(vm);
+        return 0;
+    }
+    BUF(vm, OBJ(vm, *out)->buf)->v[S_SIDE] = v;
     vm_unroot(vm);
     struct value *F = BUF(vm, OBJ(vm, *out)->buf)->v;
     memcpy(I32(vm, F[S_X0])->d, X0, count * 4);
@@ -713,6 +778,7 @@ NATIVE(segs_make)
     memcpy(I32(vm, F[S_X1])->d, X1, count * 4);
     memcpy(I32(vm, F[S_Y1])->d, Y1, count * 4);
     memcpy(U8A(vm, F[S_MAT])->d, M, count);
+    memcpy(U8A(vm, F[S_SIDE])->d, SD, count);
     memcpy(I32(vm, F[S_START])->d, per, (cells + 1) * 4);
     int32_t *it = I32(vm, F[S_ITEMS])->d;
     for (uint32_t k = 0; k < count; k++)
@@ -731,7 +797,8 @@ NATIVE(segs_make)
     F[S_BY1] = mk(T_INT, by1 + 1);
     /* measured on the ARM rig (bagprobe): most of it the divisions that
      * find each line's cells */
-    vm_charge(vm, 40 + count * 80 + items * 10 + cells / 4);
+    vm_charge(vm, 40 + count * 80 + items * 10 + cells / 4 +
+                  outlines * count / 4);
     return 1;
 }
 
@@ -1308,6 +1375,15 @@ static void seg_normal(const struct segs *s, int32_t k, int64_t *nx,
     *ny = norm_y[k];
 }
 
+/* Whether line k's unflipped normal is to be turned round to face out: by
+ * the side known to be air, or else by the side o is on, from (o - a) . n */
+static int seg_flip(const struct segs *s, int32_t k, int64_t from)
+{
+    if (s->side && s->side[k] != SIDE_NONE)
+        return s->side[k] == SIDE_SOLID;
+    return from < 0;
+}
+
 /* The point p kept r from line k (all 1/256 pixels): moved out along the
  * way from the line's nearest point, or, sitting on the line, toward the
  * side o came from. 1 when it was moved, with the way out in t. */
@@ -1328,13 +1404,17 @@ static int seg_push(const struct segs *s, int32_t k, int64_t *px, int64_t *py,
          * the cross product -- the nearest point's rounding would point
          * the way out along the line */
         seg_normal(s, k, &nx, &ny);
-        if ((ox - ax) * nx + (oy - ay) * ny < 0) {
+        if (seg_flip(s, k, (ox - ax) * nx + (oy - ay) * ny)) {
             nx = -nx;
             ny = -ny;
         }
-        /* how far out on that side, which is below 0 when behind it */
+        /* how far out on that side, which is below 0 when behind it; by a
+         * side known to be air, a point more than r behind is past the
+         * line, outside by another -- above a triangle, behind its base
+         * -- or through it, which the path's crossing deals with */
         int64_t side = ((*px - ax) * nx + (*py - ay) * ny) >> 16;
-        if (side >= r)
+        if (side >= r ||
+            (side <= -r && s->side && s->side[k] != SIDE_NONE))
             return 0;
         *px += nx * (r - side) >> 16;
         *py += ny * (r - side) >> 16;
@@ -1366,7 +1446,7 @@ static void seg_side(const struct segs *s, int32_t k, int64_t ox, int64_t oy,
     int64_t ax = (int64_t)s->x0[k] >> 8, ay = (int64_t)s->y0[k] >> 8;
     int64_t nx, ny;
     seg_normal(s, k, &nx, &ny);
-    if ((ox - ax) * nx + (oy - ay) * ny < 0) {
+    if (seg_flip(s, k, (ox - ax) * nx + (oy - ay) * ny)) {
         nx = -nx;
         ny = -ny;
     }
@@ -1471,11 +1551,21 @@ static int64_t seg_first(const struct segs *s, const struct nearby *nb,
     for (uint32_t i = 0; i < nb->n; i++) {
         if (nb->in && !nb->keep[i])
             continue;
-        int64_t c = seg_cross(s, nb->k[i], ox, oy, px, py);
-        if (c >= 0 && (first < 0 || c < first)) {
-            first = c;
-            *k = nb->k[i];
+        int32_t j = nb->k[i];
+        int64_t c = seg_cross(s, j, ox, oy, px, py);
+        if (c < 0 || (first >= 0 && c >= first))
+            continue;
+        /* a line whose air side is known is crossed only going into the
+         * solid: a point coming out of it, put there by a push, goes */
+        if (s->side && s->side[j] != SIDE_NONE) {
+            int64_t nx, ny;
+            seg_normal(s, j, &nx, &ny);
+            int64_t out = (px - ox) * nx + (py - oy) * ny;
+            if (s->side[j] == SIDE_AIR ? out > 0 : out < 0)
+                continue;
         }
+        first = c;
+        *k = j;
     }
     return first;
 }

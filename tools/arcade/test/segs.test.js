@@ -154,6 +154,35 @@ function update() {
     assert.equal(r.out[0], '48 -1');
 });
 
+test('a point inside a closed outline is put out on its air side', () => {
+    /* slipped just under a box's top, where it was a tick ago too: where it
+     * came from would put it deeper -- as a bag caught on a convex corner
+     * was, the corner's next line run on past it taking the top for the
+     * inside -- but the outline's inside is solid, so it goes out above */
+    const r = run(`var p, s, out = [0, 0, 0];
+function init() {
+    p = links.pool(1, 0);
+    links.point(p, 50, 50.6); p.ox[0] = 50; p.oy[0] = 50.9;
+    p.gravity = 0; p.radius = 2;
+    s = segs.make([0, 100, 100, 0], [50, 50, 100, 100], 4);
+    p.segs = s;
+}
+function update() {
+    links.step(p, 0, out);
+    printh(flr(p.y[0] * 10) / 10.0 + " " + out[2]);
+}`, 1);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out[0], '48 -1');
+    /* the outline's lines know their air side, here toward the solid
+     * from their normals; a lone line does not */
+    const k = run(`function init() {
+    printh(segs.make([0, 100, 100], [0, 0, 50], 3).side.join(",") + " " +
+           segs.make([0, 100], [0, 0], 2).side.join(","));
+}
+function update() {}`);
+    assert.equal(k.out[0], '2,2,2 0');
+});
+
 test('more than 16 sets, or something else in the array, stops the cart', () => {
     const many = run(PARTS.replace('p.segs = [s, plat];',
         'p.segs = []; for (var i = 0; i < 17; i++) p.segs.push(s);') + `

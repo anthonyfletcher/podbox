@@ -580,6 +580,12 @@ Outlines, as lines for points to meet: the ground, walls, platforms.
 
 **Returns** the set. At most 4,096 points.
 
+- **What is solid** is what `polyfill` would fill: inside an outline,
+  but not inside one inside that. Draw a closed outline round the ground,
+  not round the air -- a bowl is its curve closed underneath. Points are
+  kept on the air side of each line, so one that slips into the solid is
+  put back out, and a corner cannot catch it. A line of two points has no
+  inside: a point stays on the side it came from.
 - Make sets once, in `init()` or as a level starts: a ragged ground line
   of 100 points costs about 9,700 units. Moving a set does not make it
   again.
