@@ -2284,6 +2284,25 @@ NATIVE(links_step)
             if (which)
                 vm_out_set(vm, w, i, mk(T_INT, met));
         }
+    } else {
+        /* no set to meet: what each touched is nothing, still written */
+        struct value o = argc > 2 ? a[2] : mk(T_NULL, 0);
+        struct value w = argc > 3 ? a[3] : mk(T_NULL, 0);
+        if (o.tag != T_NULL) {
+            if (!vm_out_ok(vm, o, np * 3))
+                return vm_fail(vm, "links.step() writes three numbers a "
+                               "point to an array or Int32Array", "", "");
+            for (uint32_t i = 0; i < np * 3; i++)
+                vm_out_set(vm, o, i, mk(T_INT, 0));
+        }
+        if (w.tag != T_NULL) {
+            if (!vm_out_ok(vm, w, np))
+                return vm_fail(vm, "links.step() writes the set each point "
+                               "met to an array or Int32Array of one a "
+                               "point", "", "");
+            for (uint32_t i = 0; i < np; i++)
+                vm_out_set(vm, w, i, mk(T_INT, -1));
+        }
     }
     /* out of the walls: back along whichever axis came in */
     if (mask)
