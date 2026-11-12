@@ -1,6 +1,7 @@
 // Array and string methods taking several values or a place to start:
-// push and unshift of many, splice putting items in, indexOf from a place,
-// and lastIndexOf, on arrays, typed arrays and strings.
+// push and unshift of many, splice putting items in (fractions kept),
+// indexOf from a place, and lastIndexOf, on arrays, typed arrays and
+// strings.
 var u = new Uint8Array(6);
 
 function init() {
@@ -18,6 +19,10 @@ function init() {
     printh(a.splice(1, 3, 9) + " | " + a + " " + a.length);
     a = [1, 2, 3];
     printh(a.splice(-1, 1, "x", "y") + " | " + a);
+    // what splice inserts is kept as it is, a fraction too
+    a = [1, 4];
+    a.splice(1.0, 0, 2.5, 0.25);
+    printh(a);
 
     a = [5, 6, 5, 6];
     printh(a.indexOf(5, 1) + " " + a.indexOf(6, -1) + " " + a.indexOf(5, 9) + " " + a.indexOf(5, -99));

@@ -885,9 +885,11 @@ static int method(struct vm *vm, int m, struct value *r, struct value *a,
     struct value self = *r, out = mk(T_NULL, 0);
     uint32_t work = 0;              /* bytes moved or made, charged after */
     int is_arr = self.tag == T_ARR, is_str = self.tag == T_STR;
+    /* positions and counts are whole; splice's values from the third on
+     * are what it inserts, kept as they are */
     if (m == M_splice || m == M_slice || m == M_charCodeAt ||
         m == M_substring)
-        for (int k = 0; k < argc; k++)
+        for (int k = 0; k < argc && (m != M_splice || k < 2); k++)
             if (a[k].tag == T_FIX)
                 a[k] = mk(T_INT, to_int(a[k]));
     switch (m) {
