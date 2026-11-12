@@ -144,7 +144,7 @@ local first, and the arrays the loop reads are best kept global.
 | copying a picture: `blit`, `map`, `spr` | about 0.3 a pixel |
 | a whole-screen `blit` | about 6,000; 1,000 with nothing clear and no colour swapped |
 | the whole map on the screen, 20 by 15 cells | about 8,700 |
-| a character of text, `FONT.CAPS` / `FONT.WORLD` | about 18 / 31 |
+| a character of text, `FONT.CAPS` / `FONT.WORLD` | about 12 / 34 |
 | `copy` or `fill` of 1,000 elements | about 250 |
 
 ## Run as

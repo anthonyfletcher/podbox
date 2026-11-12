@@ -330,10 +330,11 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   point halfway between them, so four bending points at a square's
   corners make a rounded square, and a ring of them a smooth blob.
 - `fillp` patterns it, and the camera and clip apply as to any shape.
-- **What it costs.** The hill above is about 1,600 units, and the bush
-  about 570; a full-screen shape about 2,300. The cost grows with the
-  edges each row crosses: a ragged ground line of 100 points across the
-  screen is about 6,600. Points outside the clip cost about 8 units
+- **What it costs.** The hill above is about 1,400 units, and the bush
+  about 620; a full-screen shape about 1,300. The cost grows with the
+  edges each row crosses and the pieces of row filled between them: a
+  ragged ground line of 100 points along the bottom third of the screen
+  is about 900. Points outside the clip cost about 8 units
   each, so a large outline mostly off screen stays cheap. One `polyfill` is much cheaper than the same
   shape cut into `trifill` triangles, each of which pays for its rows.
 
@@ -622,7 +623,7 @@ function draw() {
   screen -- or 1,000 for a picture with nothing clear and no colour
   swapped, copied whole. An image saves time only when what is in it costs more than
   that to draw. A plain background is cheaper as `cls` and a few
-  rectangles; a few lines of text in the built-in font, about 18 units a
+  rectangles; a few lines of text in the built-in font, about 12 units a
   character, are cheaper printed.
 - Drawing in an image uses the image's own pixels: `0, 0` is its top left,
   and it cuts off at its own edges. `cls` clears the image.

@@ -49,9 +49,9 @@ size.
 
 | | Units |
 |---|---|
-| a character in `FONT.CAPS` | about 18 |
-| a character in `FONT.WORLD` or a cart font | about 31 |
-| a character in `FONT.CAPS` at size 2 | about 52 |
+| a character in `FONT.CAPS` | about 12 |
+| a character in `FONT.WORLD` or a cart font | about 34 |
+| a character in `FONT.CAPS` at size 2 | about 58 |
 | `textw` or `texth` | under 10, whatever the length |
 
 A score and a few labels cost a few hundred units a frame. A screen full
@@ -284,5 +284,5 @@ by typing them.
   can hold 64 KB of characters in all.
 - A character a cart font lacks draws as its `?`, or not at all if it has
   no `?` either.
-- Cart fonts cost about the same as `FONT.WORLD`: about 31 units a
+- Cart fonts cost about the same as `FONT.WORLD`: about 34 units a
   character.

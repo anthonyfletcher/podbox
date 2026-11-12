@@ -489,9 +489,9 @@ ARG_INLINE int colour(struct vm *vm, struct value *a, int argc, int i,
 #define COST_RECT      10   /* rect's and rectfill's, on top of the call's */
 #define COST_ROW       2
 #define CLS_PIXELS     110  /* cls's pixels a unit */
-#define COST_GLYPH     16
-#define COST_BIG_GLYPH 48
-#define COST_TEXT_GLYPH 20  /* FONT.WORLD's and a cart font's */
+#define COST_GLYPH     11
+#define COST_BIG_GLYPH 56
+#define COST_TEXT_GLYPH 26  /* FONT.WORLD's and a cart font's */
 #define COST_TILE      5
 #define FILL256        4    /* a memset's pixels, per 256: about 1 cycle each */
 #define PER16_PATTERN  10
@@ -1681,7 +1681,8 @@ NATIVE(trifill) { (void)out; return triangle(vm, a, argc, 0, "trifill"); }
 /* units, measured on the ARM rig (polyprobe): the call's set-up beyond
  * any call's, each point each time the outlines are walked, each edge
  * kept (a division), each edge a row crosses, each step of putting a
- * row's crossings in order, and each curve -- besides the spans filled */
+ * row's crossings in order, and each curve; each span is a row's set-up,
+ * COST_ROW, and its pixels the pen's */
 #define POLY_CALL  30
 #define POLY_POINT 8
 #define POLY_EDGE  8
@@ -2050,12 +2051,12 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
 }
 
 /* The rows the edges in g cover, filled by the even-odd rule; the units
- * the walking cost, besides the spans */
+ * the walking and the spans' set-up cost, besides their pixels */
 static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
 {
     /* the edges crossing the row, kept in order of where they cross: a
      * row's order is nearly the last's, so putting it right is cheap */
-    uint32_t nact = 0, crossings = 0, shifts = 0;
+    uint32_t nact = 0, crossings = 0, shifts = 0, spans = 0;
     struct pedge *e0 = g->e;
     /* whether an odd number of edges lie left of the clip on the row */
     uint32_t left = 0;
@@ -2096,19 +2097,23 @@ static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
         int64_t l = p->cx0;
         if (left & POLY_LEFT) {
             int64_t r = m ? ((act[0]->x + 32767) >> 16) - 1 : p->cx1 - 1;
-            if (l <= r)
+            if (l <= r) {
                 span(p, y, l, r);
+                spans++;
+            }
             k = 1;
         }
         for (; k < m; k += 2) {
             l = (act[k]->x + 32767) >> 16;
             int64_t r = k + 1 < m ? ((act[k + 1]->x + 32767) >> 16) - 1
                                   : p->cx1 - 1;
-            if (l <= r)
+            if (l <= r) {
                 span(p, y, l, r);
+                spans++;
+            }
         }
     }
-    return crossings * POLY_CROSS + shifts * POLY_SHIFT +
+    return crossings * POLY_CROSS + shifts * POLY_SHIFT + spans * COST_ROW +
            g->aside * POLY_ASIDE;
 }
 
