@@ -4806,10 +4806,10 @@ void core_draw_quads(struct vm *vm, const int32_t *q, const uint8_t *c,
     finish(vm, &p);
 }
 
-/* A sprite of at most 8 x 8 wholly inside the clip, at dx, dy in surface
- * pixels, flipped by fl (1 across, 2 up and down), through xl: a plain
- * loop, without copy_rect's clipping, for the small sprites particle pools
- * draw by the dozen */
+/* A sprite wholly inside the clip and wholly on its sheet, at dx, dy in
+ * surface pixels, flipped by fl (1 across, 2 up and down), through xl: a
+ * plain loop, without copy_rect's clipping, for the small sprites particle
+ * pools draw by the dozen */
 static void small_sprite(struct pen *p, const uint8_t *src, int32_t stride,
                          int32_t w, int32_t h, int32_t dx, int32_t dy,
                          int32_t fl, const uint16_t *xl)
@@ -4880,8 +4880,11 @@ void core_draw_particles(struct vm *vm, struct value *const *arr,
             }
             int32_t fl = num_or_0(flip[i]);
             int64_t dx = xx + p.ox, dy = yy + p.oy;
+            /* a 16 x 16 sprite at the sheet's right or bottom edge reaches
+             * past it: copy_rect clips that */
             if (dx >= p.cx0 && dx + w <= p.cx1 && dy >= p.cy0 &&
-                dy + h <= p.cy1) {
+                dy + h <= p.cy1 && cell_x(&sh, s) + w <= sh.w &&
+                cell_y(&sh, s) + h <= sh.h) {
                 p.cost += COST_SMALL;
                 small_sprite(&p, cell_px(&sh, s), sh.w, w, h, (int32_t)dx,
                              (int32_t)dy, fl, xl);
