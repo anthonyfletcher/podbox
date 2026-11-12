@@ -12,8 +12,8 @@
 # Needs Piper (piper1-gpl, the piper-tts Python package) in the Python named
 # by $PIPER_PYTHON (default ~/piper/bin/python), with pyopenjtalk for
 # Japanese -- without that, Japanese is left out and said so. voice.pl runs
-# Piper's HTTP server as `python3 -m piper.http_server` and asks it with
-# curl. The models are fetched into $PIPER_MODEL_DIR (default
+# Piper's HTTP server as `python3 -m piper.http_server`, which needs Flask,
+# and asks it with curl. The models are fetched into $PIPER_MODEL_DIR (default
 # ~/piper-models) the first time each is wanted. Clips are kept in $POOL
 # (default ~/.cache/podbox-voice-pool) and reused by every build, so only a
 # string that changed is synthesised again: the first run takes about five
@@ -36,6 +36,12 @@ export PIPER_MODEL_DIR POOL
 PIPER_PYTHON="${PIPER_PYTHON:-$HOME/piper/bin/python}"
 if ! "$PIPER_PYTHON" -c 'import piper' 2>/dev/null; then
     echo "build-voices.sh: no piper-tts in $PIPER_PYTHON" >&2
+    exit 1
+fi
+# Piper's HTTP server, which voice.pl runs, needs Flask; without it every
+# clip fails as a refused connection
+if ! "$PIPER_PYTHON" -c 'import flask' 2>/dev/null; then
+    echo "build-voices.sh: no flask in $PIPER_PYTHON (pip install flask)" >&2
     exit 1
 fi
 
@@ -119,9 +125,11 @@ for lang in $LANGUAGES; do
     # the next language's. It clears them itself only when it finishes.
     rm -f "$BUILDDIR"/*.enc "$BUILDDIR"/*.wav
     # A normal build is configured without a TTS engine, so make has no voice
-    # target until these are given on its command line.
+    # target until these are given on its command line. Its Makefile also
+    # exports PIPER_MODEL_DIR empty, which only the command line overrides.
     make -C "$BUILDDIR" voice \
         VOICELANGUAGE="$lang" TTS_ENGINE=piper \
+        PIPER_MODEL_DIR="$PIPER_MODEL_DIR" \
         TTS_OPTS="-m $model" \
         ENCODER=rbspeexenc ENC_OPTS="-q 7 -c 10" \
         > "$BUILDDIR/voice-$lang.log" 2>&1 || {
