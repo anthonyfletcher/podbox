@@ -2403,6 +2403,11 @@ int arcade_suspends(const struct vm *vm)
     return !vm->no_suspend;
 }
 
+int arcade_between_calls(const struct vm *vm)
+{
+    return !vm->err && vm->nframes == 0;
+}
+
 struct vm *arcade_resume(void *mem, uint32_t size,
                          const struct arcade_host *host)
 {

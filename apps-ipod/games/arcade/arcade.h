@@ -411,6 +411,9 @@ uint32_t arcade_cart_hash(const struct vm *vm);
 int arcade_owns_music(const struct vm *vm);
 /* whether Quit keeps the game to resume: not where cart.json says "suspend": false */
 int arcade_suspends(const struct vm *vm);
+/* whether none of the cart's code is running, so a snapshot is one to
+ * resume: not within a call, nor after an error */
+int arcade_between_calls(const struct vm *vm);
 /* mem holds a snapshot read back to where it was taken: the cart, ready
  * for its next tick, or NULL when mem is not one */
 struct vm *arcade_resume(void *mem, uint32_t size,

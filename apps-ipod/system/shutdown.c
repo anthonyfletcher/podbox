@@ -45,6 +45,7 @@
 #include "playlist/playlist.h"
 #include "database/tagcache.h"
 #include "screens/system/usb_screen.h"
+#include "games/arcade/shell.h"   /* shell_power_off */
 #include "metadata/book_resume.h"
 #include "screens/playback/wps.h"      /* pause_action, unpause_action */
 #include "screens/browse/browser.h"  /* browser_flush, browser_restore */
@@ -133,6 +134,7 @@ static bool clean_shutdown(enum shutdown_type sd_type,
         if (batt_safe) /* do not save on critical battery */
         {
             book_resume_save();
+            shell_power_off();
 
             /* audio_stop_recording == audio_stop for HWCODEC */
             audio_stop();

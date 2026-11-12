@@ -26,6 +26,10 @@ bool shell_list(struct simplelist_info *info);
  * from now */
 void shell_walk_yield(void);
 
+/* The power going off or the player restarting, with a cart open: the game
+ * kept to resume, as Quit keeps it */
+void shell_power_off(void);
+
 /* Each cart's saved numbers, <id>.sav, and a game left with Quit, <id>.sus */
 #define SAVE_DIR "/.rockbox/games/saves"
 

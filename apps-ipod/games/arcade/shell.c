@@ -1079,6 +1079,21 @@ static int event(struct vm *vm, long button)
     return PLAYING;
 }
 
+/* The saves first, as event() writes them; the game to resume only where
+ * none of the cart's code is running -- between ticks, in the pause menu or
+ * the hold pause -- since inside a call the arena is mid-step */
+void shell_power_off(void)
+{
+    struct vm *vm = sound_vm;
+    if (!vm)
+        return;
+    save_write(vm);
+    shell_options_keep(vm);
+    shell_scores_write(vm, false);
+    if (arcade_between_calls(vm))
+        shell_suspend_write(vm);
+}
+
 /* The pause menu's rows: Resume, the cart's own (menuitem), its options,
  * High Scores when it has boards, Help when it has any, Now Playing,
  * Restart, Quit. An option row is a setting, the rest plain. */
