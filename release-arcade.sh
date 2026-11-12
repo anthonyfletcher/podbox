@@ -63,7 +63,8 @@ git -c core.autocrlf=false -c core.eol=lf archive "$SHA" arcade apps-ipod/games/
 say "The engine and font from the release's build"
 ssh "$SERVER" "cd '$REMOTE_DIR' && sh arcade/sdk/wasm/build.sh >/dev/null &&
     rm -rf /tmp/release-arcade-font &&
-    unzip -o -q build-hw-ipodvideo/rockbox.zip '.rockbox/games/font.bin'         '.rockbox/games/LICENSE-font.txt' '.rockbox/games/LICENSES-font/*' -d /tmp/release-arcade-font"
+    unzip -o -q build-hw-ipodvideo/rockbox.zip '.rockbox/games/font.bin' \
+        '.rockbox/games/LICENSE-font.txt' '.rockbox/games/LICENSES-font/*' -d /tmp/release-arcade-font"
 scp -q "$SERVER:$REMOTE_DIR/arcade/sdk/wasm/arcade.wasm" "$WORK/src/arcade/sdk/wasm/arcade.wasm"
 scp -q -r "$SERVER:/tmp/release-arcade-font/.rockbox/games" "$WORK/font"
 
