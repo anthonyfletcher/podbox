@@ -398,11 +398,23 @@ NATIVE(path_view)
         r = 0;
     int32_t seen = 0;
     uint32_t steps = 0;
-    for (int32_t cy = y - r; cy <= y + r; cy++)
-        for (int32_t cx = x - r; cx <= x + r; cx++) {
-            int32_t dx = cx - x, dy = cy - y;
-            if (cx < 0 || cy < 0 || cx >= w.b.w || cy >= w.b.h ||
-                dx * dx + dy * dy > r * r + r)
+    /* a viewer off the board sees nothing of it */
+    if (x < 0 || y < 0 || x >= w.b.w || y >= w.b.h) {
+        vm_charge(vm, 20);
+        *out = mk(T_INT, 0);
+        return 1;
+    }
+    /* the square round x, y as far as it lies on the board, its distances
+     * squared in 64 bits: r may reach far past it */
+    int64_t r2 = (int64_t)r * r + r;
+    int32_t cy0 = (int64_t)y - r > 0 ? y - r : 0;
+    int32_t cy1 = (int64_t)y + r < w.b.h - 1 ? y + r : w.b.h - 1;
+    int32_t cx0 = (int64_t)x - r > 0 ? x - r : 0;
+    int32_t cx1 = (int64_t)x + r < w.b.w - 1 ? x + r : w.b.w - 1;
+    for (int32_t cy = cy0; cy <= cy1; cy++)
+        for (int32_t cx = cx0; cx <= cx1; cx++) {
+            int64_t dx = (int64_t)cx - x, dy = (int64_t)cy - y;
+            if (dx * dx + dy * dy > r2)
                 continue;
             steps += (uint32_t)((dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy));
             if (line_clear(&w, x, y, cx, cy)) {

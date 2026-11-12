@@ -611,6 +611,7 @@ function look() {
 }
 ```
 
+- From a cell off the board nothing is seen, and 0 is returned.
 - About 20 units, and a quarter of a unit for each cell along each line
   looked down: a radius of 6 costs a few hundred.
 
