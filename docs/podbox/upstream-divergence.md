@@ -111,6 +111,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | `usbstack/usb_audio.c` | The receive ring is full one slot early and always re-arms; a bad packet is dropped and the endpoint re-armed | Upstream stops receiving when the ring fills. |
 | `usbstack/usb_audio.c` | The receive buffer is cache-line aligned and read through `UNCACHED_ADDR` | On the 5G a cached read plays as silence. |
 | `usbstack/usb_audio.c` | An unanswered endpoint request is stalled | Upstream leaves the host waiting. |
+| `usbstack/usb_audio.c` | The playback DSP is set up when a stream starts, not at `SET_CONFIGURATION` | Music still decoding through it after a connect plays as static in the sound card's format. |
 | `usbstack/usb_audio.c` | The streaming alternate holds a CPU boost | At 24 MHz, the 5G's speed while its LCD sleeps, half the packets are lost. |
 | `usbstack/usb_audio.c` | The sample rate returns to the default once a cable, in `init()`, not at every `SET_CONFIGURATION` | Windows' recovery from a bus reset restores the configuration and streaming alternate without resending the rate, and the stream then plays slow. |
 | `usbstack/usb_audio.c` | `start_mixer()` powers the CS42L55 up (6G) | `pcmbuf_play_stop()` powers the codec down, and a USB connect stops playback, so the sound card otherwise plays into a powered-down codec. |

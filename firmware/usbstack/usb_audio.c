@@ -735,6 +735,17 @@ static void usb_audio_start_playback(void)
         cpu_boost(true);
         stream_boosted = true;
     }
+    /* The playback DSP is set up here, not at connect: until the audio
+     * thread has stopped, music still being decoded through it plays as
+     * static once it expects our format. */
+    dsp = dsp_get_config(CODEC_IDX_AUDIO);
+    dsp_configure(dsp, DSP_RESET, 0);
+    dsp_configure(dsp, DSP_SET_STEREO_MODE, STEREO_INTERLEAVED);
+    dsp_configure(dsp, DSP_SET_SAMPLE_DEPTH, 16);
+#ifdef HAVE_PITCHCONTROL
+    sound_set_pitch(PITCH_SPEED_100);
+    dsp_set_timestretch(PITCH_SPEED_100);
+#endif
     usb_audio_playing = true;
     usb_rx_overflow = false;
     playback_audio_underflow = true;
@@ -1223,8 +1234,7 @@ static bool usb_audio_control_request(struct usb_ctrlrequest* req, uint8_t* reqd
 
 /*
  * Called by usb_core_do_set_config() when the
- * connection is ready to be used. Resets the DSP and
- * reapplies the sample rate.
+ * connection is ready to be used. Reapplies the sample rate.
  */
 static int usb_audio_init_connection(void)
 {
@@ -1240,15 +1250,6 @@ static int usb_audio_init_connection(void)
     }
 
     usbaudio_active = true;
-    dsp = dsp_get_config(CODEC_IDX_AUDIO);
-    dsp_configure(dsp, DSP_RESET, 0);
-    dsp_configure(dsp, DSP_SET_STEREO_MODE, STEREO_INTERLEAVED);
-    dsp_configure(dsp, DSP_SET_SAMPLE_DEPTH, 16);
-#ifdef HAVE_PITCHCONTROL
-    sound_set_pitch(PITCH_SPEED_100);
-    dsp_set_timestretch(PITCH_SPEED_100);
-#endif
-
     usb_as_playback_intf_alt = 0;
     /* Windows' recovery from a bus reset restores the configuration and the
      * streaming alternate but never resends the rate, so the rate it last

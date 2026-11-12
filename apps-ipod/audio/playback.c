@@ -4003,6 +4003,11 @@ void audio_playback_handler(struct queue_event *ev)
              * one nobody asked for (the buflib shrink callback), where a
              * caller is blocked waiting on us. */
             audio_stop_playback(ev->id != SYS_USB_CONNECTED && ev->data == 0);
+            /* The USB sound card reconfigures the playback DSP, and a
+             * resident codec sets its sample format only when loaded: unload
+             * it so the next track loads it again. */
+            if (ev->id == SYS_USB_CONNECTED)
+                codec_unload();
             /* Unplug can queue the disconnect while playback stops: leave
              * it for usb_wait_for_disconnect() to consume. */
             if (ev->data != 0 && ev->id != SYS_USB_CONNECTED)
