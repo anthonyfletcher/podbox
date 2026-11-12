@@ -1392,6 +1392,9 @@ static int run(const char *path, void *mem, size_t size)
     banner_ach = -1;
     take_screen(&vp);
     sound_vm = vm;
+    /* the stall is timed from here: drawing the question below yields,
+     * and a time left from the last game would stop this one */
+    call_began = current_tick;
     /* suspended last time: asked over the game as it was left */
     if (resumed && !arcade_confirm(vm, str(LANG_GAME_RESUME_ASK),
                                    str(LANG_CHESSBOX_MENU_RESUME_GAME),
@@ -1465,7 +1468,7 @@ static int run(const char *path, void *mem, size_t size)
             shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
-            touched = current_tick;
+            touched = call_began = current_tick;
             continue;
         }
         if (button_hold()) {
@@ -1476,7 +1479,7 @@ static int run(const char *path, void *mem, size_t size)
             shell_scores_run(true);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
-            touched = current_tick;
+            touched = call_began = current_tick;
             continue;
         }
 
@@ -1556,7 +1559,7 @@ static int run(const char *path, void *mem, size_t size)
             status = show_scores(vm, &vp, board, rank);
             spk_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
-            touched = current_tick;
+            touched = call_began = current_tick;
             continue;
         }
         sound_fill();
