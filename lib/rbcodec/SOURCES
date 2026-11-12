@@ -15,6 +15,7 @@ dsp/dsp_misc.c
 dsp/dsp_sample_io.c
 dsp/dsp_sample_input.c
 dsp/dsp_sample_output.c
+dsp/dither.c
 dsp/eq.c
 dsp/eq_filter.c
 dsp/resample.c
@@ -31,6 +32,7 @@ dsp/dsp_cf.S
 dsp/dsp_arm.S
 dsp/eq_filter_arm.S
 dsp/pbe_delay_arm.S
+dsp/dither_arm.S
 #  if ARM_ARCH >= 6
 dsp/dsp_arm_v6.S
 #  endif

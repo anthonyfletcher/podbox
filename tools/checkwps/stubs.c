@@ -340,7 +340,7 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
 }
 bool debug_log_enabled(enum debug_log_id id) { (void)id; return false; }
 void dsp_afr_enable(int var) { (void)var; }
-void dsp_dither_enable(bool enable) { (void)enable; }
+void dsp_dither_enable(int mode) { (void)mode; }
 void dsp_pbe_enable(int var) { (void)var; }
 void dsp_pbe_precut(int var) { (void)var; }
 void dsp_set_compressor(const struct compressor_settings *s) { (void)s; }

@@ -22,8 +22,17 @@
 #ifndef DSP_MISC_H
 #define DSP_MISC_H
 
-/* Set the tri-pdf dithered output */
-void dsp_dither_enable(bool enable); /* in dsp_sample_output.c */
+/* The tri-pdf dithered output: automatic dithers only the blocks with
+   bits below the output's LSB, so a 16-bit source no stage has changed
+   comes out exact */
+enum dither_modes
+{
+    DITHER_OFF = 0,
+    DITHER_ALWAYS,
+    DITHER_AUTO
+};
+
+void dsp_dither_enable(int mode); /* in dsp_sample_output.c */
 
 enum replaygain_types
 {

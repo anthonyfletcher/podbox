@@ -563,7 +563,7 @@ struct user_settings
     int  beep;              /* system beep volume when changing tracks etc. */
     int  keyclick;          /* keyclick volume */
     int  keyclick_repeats;  /* keyclick on repeats */
-    bool dithering_enabled;
+    int  dithering_enabled; /* enum dither_modes */
 
 
     /* misc options */

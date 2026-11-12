@@ -23,3 +23,8 @@
 - **Arcade** now appears on the main menu even where you have arranged the
   menu yourself, in its usual place. Turn it off in Settings > Appearance >
   Menus > Edit Main Menu if you do not want it.
+- **Dithering** has a new choice, **Auto**, which leaves a 16-bit file
+  exactly as it is in the file and dithers the rest; On is now called
+  Always. A new install starts with Dithering on Auto and Replaygain off, so
+  16-bit files play bit for bit. An updated iPod keeps its own settings: set
+  the same two yourself for the same result.

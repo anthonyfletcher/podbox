@@ -396,7 +396,7 @@ static void perform_config(void)
             if (atoi(val) > num_output_samples)
                 return;
         } else if (!strncmp(name, "dither=", 7)) {
-            dsp_dither_enable(atoi(val) ? true : false);
+            dsp_dither_enable(atoi(val)); /* enum dither_modes */
         } else if (!strncmp(name, "halt=", 5)) {
             if (atoi(val))
                 codec_action = CODEC_ACTION_HALT;
@@ -913,7 +913,7 @@ static void print_help(const char *progname)
                     "  -r            Write raw 32-bit codec output without WAV header\n"
                     "\n"
                     "configuration:\n"
-                    "  dither=<0|1>  Enable/disable dithering [0]\n"
+                    "  dither=<0|1|2> Dithering off, always or auto [0]\n"
                     "  halt=<0|1>    Stop decoding if 1 [0]\n"
                     "  loop=<0|1>    Enable/disable looping [0]\n"
                     "  offset=<n>    Start at byte offset within the file [0]\n"

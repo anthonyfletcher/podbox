@@ -84,6 +84,11 @@ the absence of a particular kind of distortion on very quiet passages.
 
 Inaudible on almost all material through headphones.
 
+Automatic adds it only where it is needed. A 16-bit file plays exactly as it is
+in the file, bit for bit, unless Replaygain or a sound effect changes it; 24-bit
+and lossy files are dithered. A USB DAC gets the same, with the volume at 0 dB
+or above. Always dithers everything.
+
 [disk spindown]
 How long the drive sits idle before it is allowed to stop.
 
@@ -147,7 +152,8 @@ Uses the loudness information many rippers write into files, so albums recorded
 at different levels play at a similar volume.
 
 Album gain keeps the balance between tracks on one record; track gain levels
-everything, which suits shuffling.
+everything, which suits shuffling. Off plays each file at its own level, which
+a file needs to play bit for bit.
 
 [replaygain preamp]
 A fixed adjustment applied on top of whatever Replaygain works out.

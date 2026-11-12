@@ -24,6 +24,8 @@
 #include "dsp_sample_io.h"
 #include "dsp_proc_entry.h"
 #include "dsp-util.h"
+#include "dsp_misc.h"
+#include "dither.h"
 #include <string.h>
 
 #if 0
@@ -93,13 +95,10 @@ void sample_output_stereo(struct sample_io_data *this,
  */
 static struct dither_data
 {
-    struct dither_state
-    {
-        long error[3];  /* 00h: error term history */
-        long random;    /* 0ch: last random value */
-    } state[2];         /* 0=left, 1=right */
-    bool enabled;       /* 20h: dithered output enabled */
-                        /* 24h */
+    struct dither_state state[2]; /* 0=left, 1=right */
+    int mode;           /* 20h: enum dither_modes */
+    bool dithering;     /* 24h: automatic: the last block was dithered */
+                        /* 28h */
 } dither_data IBSS_ATTR;
 
 void sample_output_dithered(struct sample_io_data *this,
@@ -108,42 +107,10 @@ void sample_output_dithered(struct sample_io_data *this,
     int count = this->outcount;
     int channels = src->format.num_channels;
     int scale = src->format.output_scale;
-    int32_t dc_bias = 1L << (scale - 1); /* 1/2 bit of significance */
-    int32_t mask = (1L << scale) - 1; /* Mask of bits quantized away */
 
     for (int ch = 0; ch < channels; ch++)
-    {
-        struct dither_state *dither = &dither_data.state[ch];
-
-        const int32_t *s = src->p32[ch];
-        int16_t *d = &dst->p16out[ch];
-
-        for (int i = 0; i < count; i++, s++, d += 2)
-        {
-            /* Noise shape and bias (for correct rounding later) */
-            int32_t sample = *s;
-
-            sample += dither->error[0] - dither->error[1] + dither->error[2];
-            dither->error[2] = dither->error[1];
-            dither->error[1] = dither->error[0] / 2;
-
-            int32_t output = sample + dc_bias;
-
-            /* Dither, highpass triangle PDF */
-            int32_t random = dither->random*0x0019660dL + 0x3c6ef35fL;
-            output += (random & mask) - (dither->random & mask);
-            dither->random = random;
-
-            /* Quantize sample to output range */
-            output >>= scale;
-
-            /* Error feedback of quantization */
-            dither->error[0] = sample - (output << scale);
-
-            /* Clip and store */
-            *d = clip_sample_16(output);
-        }
-    }
+        dither_channel(&dither_data.state[ch], src->p32[ch],
+                       &dst->p16out[ch], count, scale);
 
     if (channels > 1)
         return;
@@ -160,6 +127,33 @@ void sample_output_dithered(struct sample_io_data *this,
     while (--count > 0);
 }
 
+/* Automatic: a block with no bits below the output's LSB goes through the
+   plain copy, which quantises it without error */
+static void sample_output_auto(struct sample_io_data *this,
+                               struct dsp_buffer *src, struct dsp_buffer *dst)
+{
+    int channels = src->format.num_channels;
+
+    if (!dither_block_exact(src->p32, channels, this->outcount,
+                            src->format.output_scale))
+    {
+        dither_data.dithering = true;
+        sample_output_dithered(this, src, dst);
+        return;
+    }
+
+    if (dither_data.dithering)
+    {
+        dither_data.dithering = false;
+        dsp_sample_output_flush(this);
+    }
+
+    if (channels > 1)
+        sample_output_stereo(this, src, dst);
+    else
+        sample_output_mono(this, src, dst);
+}
+
 /* Initialize the output function for settings and format */
 void dsp_sample_output_format_change(struct sample_io_data *this,
                                      struct sample_format *format)
@@ -172,13 +166,16 @@ void dsp_sample_output_format_change(struct sample_io_data *this,
           sample_output_dithered },
     };
 
-    bool dither = dsp_get_id((void *)this) == CODEC_IDX_AUDIO &&
-                  dither_data.enabled;
+    int mode = dsp_get_id((void *)this) == CODEC_IDX_AUDIO ?
+               dither_data.mode : DITHER_OFF;
     int channels = format->num_channels;
 
     DSP_PRINT_FORMAT(DSP Output, *format);
 
-    this->output_samples = fns[dither ? 1 : 0][channels - 1];
+    if (mode == DITHER_AUTO)
+        this->output_samples = sample_output_auto;
+    else
+        this->output_samples = fns[mode == DITHER_ALWAYS ? 1 : 0][channels - 1];
     this->output_version = format->version;
 }
 
@@ -199,15 +196,16 @@ void dsp_sample_output_flush(struct sample_io_data *this)
 /** Output settings **/
 
 /* Set the tri-pdf dithered output */
-void dsp_dither_enable(bool enable)
+void dsp_dither_enable(int mode)
 {
-    if (enable == dither_data.enabled)
+    if (mode == dither_data.mode)
         return;
 
-    dither_data.enabled = enable;
+    dither_data.mode = mode;
+    dither_data.dithering = false;
     struct sample_io_data *data = (void *)dsp_get_config(CODEC_IDX_AUDIO);
 
-    if (enable)
+    if (mode != DITHER_OFF)
         dsp_sample_output_flush(data);
 
     data->output_version = 0; /* Force format update */

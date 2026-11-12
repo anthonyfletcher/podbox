@@ -1574,8 +1574,10 @@ const struct settings_list settings[] = {
 #undef EQ_BAND
 
     /* dithering */
-    OFFON_SETTING(F_SOUNDSETTING, dithering_enabled, LANG_DITHERING, false,
-                  "dithering enabled", dsp_dither_enable),
+    CHOICE_SETTING(F_SOUNDSETTING, dithering_enabled, LANG_DITHERING,
+                   DITHER_OFF, "dithering enabled", "off,on,auto",
+                   dsp_dither_enable, 3, ID2P(LANG_OFF), ID2P(LANG_ALWAYS),
+                   ID2P(LANG_AUTO)),
     /* surround */
      TABLE_SETTING(F_TIME_SETTING | F_SOUNDSETTING, surround_enabled,
                   LANG_SURROUND, 0, "surround enabled", off,
