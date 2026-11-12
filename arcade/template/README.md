@@ -43,3 +43,9 @@ folder, change `CART` in `.github/workflows/build.yml` to match.
 With [Claude Code](https://claude.com/claude-code), the Arcade skill in
 `.claude/skills/podbox-arcade` is loaded when you ask for help with the
 game.
+
+## Licence
+
+The template is under the 0BSD licence (`LICENSE`): your game is yours,
+under whatever licence you choose. The skill in `.claude/skills` is text
+from the PodBox manual, under the GPL version 2.
