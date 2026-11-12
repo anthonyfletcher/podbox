@@ -279,12 +279,15 @@ void car_adapter_mode_init(void)
 /* Starts the firmware on disk again. The bus is left first: with the USB
  * Sound Card on, the host is still talking to us after an eject, and a
  * controller that stops answering mid-session is what Windows reports as a
- * device that has malfunctioned. */
+ * device that has malfunctioned. A load that fails returns, and the bus is
+ * taken back if the cable is still in. */
 static void restart_firmware(void)
 {
     audio_hard_stop();
     usb_enable(false);
     rolo_load(BOOTDIR "/" BOOTFILE);
+    if (usb_inserted())
+        usb_enable(true);
 }
 
 /* A computer rewrote the database (tools/database_pb). This run holds the old
