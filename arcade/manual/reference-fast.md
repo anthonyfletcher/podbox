@@ -9,7 +9,8 @@ the changes that save the most.
   [the budget](#the-budget), [the screen](#the-screen)
 - [What things cost](#what-things-cost)
 - Finding it: [Run as](#run-as), [the profiler](#the-profiler),
-  [replays](#replays), [pbgvm --units](#pbgvm---units)
+  [the memory view](#the-memory-view), [replays](#replays),
+  [pbgvm --units](#pbgvm---units)
 - [Making it cheaper](#making-it-cheaper)
 - Tools in code: [printh](#printhtext), [watch](#watchname-v), [prof](#profname)
 
@@ -196,6 +197,44 @@ Record a few seconds, not a few frames. In the tutorial game above,
 `update()` shows at 0.4%: it takes far less than 2048 units a frame, so
 is caught only now and then.
 
+## The memory view
+
+A cart has the iPod's 512 KB for everything, and an allocation that
+does not fit stops it with "out of memory". **View > Memory** shows what
+that memory holds while the cart runs, twice a second:
+
+```js
+var big, words, small;
+function init() {
+    big = new Int32Array(10000);
+    words = [];
+    for (var i = 0; i < 100; i++) words.push("word" + i);
+    small = { a: 1, b: [1, 2, 3] };
+}
+function update() { var junk = [1, 2, 3, 4]; }
+function draw() {}
+```
+
+![The memory view for the cart above: 43 KB held, most of it the Int32Array in big](img/f-memory.png)
+
+- **The line at the top** and its bar: the heap, the part of the arena
+  the cart's arrays, records and strings live in. What is **held** is
+  reached from a global; **garbage** was dropped -- `junk` above, a new
+  array every tick -- and is freed when the engine next clears up;
+  the rest is **free**. *Most* is the most held since the run began.
+- **The largest free block** is the biggest thing that can be made
+  without clearing up first. Past it, the engine clears up; if no
+  block is then large enough, the cart stops with "out of memory".
+- **By kind**: how many of each thing are held, and their bytes. An
+  array's or record's values are its **storage**, a block of its own
+  beside it.
+- **By global**: the bytes each global reaches. What two globals both
+  reach is counted to the one declared first.
+
+The rest of the arena -- 157 KB for this cart -- is the engine and the
+loaded cart: its code, sheet, map and images. Hover over the top line to
+see it.
+
 ## Replays
 
 Every run of a cart in the IDE is recorded: its random seed, the store as
@@ -235,6 +274,24 @@ play input into it, and `--skip t:n` runs tick `t` undrawn, as a late
 frame is, so a cart's busiest moments can be measured from a script.
 With `--units`, each `prof()` section's units go to the error output
 as `prof name units`.
+
+`--memory` prints what the memory view shows, after the last tick, each
+global by its number in declaration order:
+
+```
+memory arena 524288 tables 161376 heap 362912 held 44376 garbage 2952 free 315584 largest 315584 constants 0 engine 0
+memory kind string 100 3200
+memory kind array 2 48
+memory kind Int32Array 1 40016
+memory kind record 1 24
+memory kind storage 3 1088
+memory global 0 40016
+memory global 1 4256
+memory global 2 104
+```
+
+That is the cart above after 30 ticks: `big`, global 0, holds the 40,016
+bytes of the `Int32Array`.
 
 ## Making it cheaper
 

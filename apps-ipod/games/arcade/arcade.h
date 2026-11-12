@@ -334,6 +334,32 @@ int arcade_tick(struct vm *vm, int draw);
 /* Between ticks: collect garbage if enough has been allocated. */
 void arcade_idle(struct vm *vm);
 
+/* What the arena holds, for a host's memory view (arcade_memory): bytes
+ * throughout. The heap's objects are held (reached from the cart's
+ * globals or the engine's roots), garbage (unreached, until the next
+ * collection frees them) or free; a held object is counted by its kind,
+ * a value tag, the storage behind arrays and records as T_BUF. */
+#define ARCADE_KINDS 16
+struct arcade_memory
+{
+    uint32_t arena;             /* the whole arena */
+    uint32_t tables;            /* the engine's state and the loaded cart */
+    uint32_t heap;              /* the heap, the rest */
+    uint32_t held, garbage, free;
+    uint32_t largest;           /* the largest free block: the biggest
+                                   allocation that needs no collection */
+    uint32_t constants;         /* of held, the cart's strings, never freed */
+    uint32_t engine;            /* of held, reached only from the engine's
+                                   own roots: the target, the sheet, the
+                                   pause menu's labels */
+    uint32_t kind_bytes[ARCADE_KINDS], kind_count[ARCADE_KINDS];
+};
+/* Fills m, and by_global[i] (up to n of them) with the bytes reached from
+ * global i that no earlier global reaches. Between ticks only; nothing is
+ * collected or charged, so the cart runs on as though never looked at. */
+void arcade_memory(struct vm *vm, struct arcade_memory *m,
+                   uint32_t *by_global, uint32_t n);
+
 /* Units charged by the last arcade_start or arcade_tick: the cart's own,
  * and while it listens to playing music, the beat analyser's share of the
  * tick. */

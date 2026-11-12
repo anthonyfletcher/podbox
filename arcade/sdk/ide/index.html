@@ -161,6 +161,18 @@ header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
                           transparent var(--share, 0%)); }
 .prof-none { grid-column: 1 / -1; padding: 12px; color: var(--dim); font: 13px system-ui, sans-serif; }
 
+/* ---- the memory view ---- */
+.mem-head { padding: 6px 8px; color: var(--dim); font: 12px system-ui, sans-serif; flex: none; }
+.mem-bar { display: flex; height: 10px; margin: 0 8px 6px; border-radius: 3px; overflow: hidden; flex: none;
+           background: var(--bg); }
+.mem-held { background: var(--accent); }
+.mem-garbage { background: color-mix(in srgb, var(--bad) 70%, transparent); }
+.mem-free { background: var(--line); }
+.prof-table.mem-table { grid-template-columns: minmax(160px, 2fr) 80px 90px; }
+.mem-table .prof-td:nth-child(5n+3) { background: none; }
+.mem-table .prof-td.share { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent)
+                            var(--share, 0%), transparent var(--share, 0%)); }
+
 /* ---- the status bar ---- */
 #statusbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; min-height: 24px;
              background: var(--accent); color: #fff; font-size: 12px; }
@@ -455,6 +467,7 @@ dialog.ask { min-width: 340px; }
       <button data-do="view-objects" class="check" id="v-objects">Objects</button>
       <button data-do="view-output" class="check" id="v-output">Output<kbd>Ctrl+J</kbd></button>
       <button data-do="view-profiler" class="check" id="v-profiler">Profiler</button>
+      <button data-do="view-memory" class="check" id="v-memory">Memory</button>
       <button data-do="view-watch" class="check" id="v-watch">Watch</button>
       <button data-do="view-player" class="check" id="v-player">Player<kbd>Ctrl+Shift+B</kbd></button>
       <hr>
@@ -499,6 +512,7 @@ dialog.ask { min-width: 340px; }
   <div id="pane-picker" class="pane"></div>
   <div id="pane-objects" class="pane"></div>
   <div id="pane-profiler" class="pane"></div>
+  <div id="pane-memory" class="pane"></div>
   <div id="pane-watch" class="pane watch"></div>
   <button class="ib" id="new-file" data-icon="plus" title="New file"></button>
   <button class="ib" id="clear-output" data-icon="clear" title="Clear"></button>

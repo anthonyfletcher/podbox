@@ -31,6 +31,7 @@ import { SoundEditor } from './sound.js';
 import { CartSettings } from './settings.js';
 import { createDock } from './dock.js';
 import { Profiler } from './profiler.js';
+import { MemoryView } from './memory.js';
 import { createGame } from './game.js';
 import { VERSION, hashScreen, hashCart, memoryStore, readTape } from './replay.js';
 import { setPanelHost } from './chrome.js';
@@ -982,6 +983,8 @@ async function runCart(replay) {
     metronomeAt = -1;
     e.ceiling(CEILING);
     profiler.begin(functions(lastBuild.cart));
+    memoryView.begin(lastBuild.globals || []);
+    memoryAt = 0;
     e.profile(profiler.on);
     if (!audio) audio = new AudioContext({ sampleRate: 44100 });
     audio.resume();
@@ -1055,6 +1058,11 @@ async function runCart(replay) {
             const c = cost(e, true);
             clock.emu += c;
             profiler.frame(e.samples(), c, 1000 / rate, c - e.units() * DEVICES[device].unit, takeSections(), e.units());
+            /* twice a second while the panel shows: the walk is the whole heap */
+            if (dock.shown('memory') && performance.now() - memoryAt > 500) {
+                memoryAt = performance.now();
+                memoryView.show(e.memory());
+            }
         }
         if (game.tick(e)) return quitRun();
         if (e.rate() !== rate) {
@@ -2064,6 +2072,7 @@ const ACTIONS = {
     'view-player': () => toggle('player'),
     'view-output': () => toggle('output'),
     'view-profiler': () => toggle('profiler'),
+    'view-memory': () => toggle('memory'),
     'view-watch': () => toggle('watch'),
     profile: () => { dock.show('profiler'); profiler.record(true); if (!running) run(); },
     'view-reset': () => dock.reset(),
@@ -2141,7 +2150,7 @@ for (const b of document.querySelectorAll('[data-icon]')) b.innerHTML = icon(b.d
 dock = createDock($('dock'), {
     files: $('pane-files'), editor: $('editor'), output: $('output'), player: $('pane-player'),
     picker: $('pane-picker'), objects: $('pane-objects'), profiler: $('pane-profiler'),
-    watch: $('pane-watch')
+    memory: $('pane-memory'), watch: $('pane-watch')
 }, { files: [$('new-file')], output: [$('clear-output')], player: [$('power')] }, refreshView, $('tray'));
 setPanelHost(dock);
 
@@ -2159,6 +2168,10 @@ const profiler = new Profiler($('pane-profiler'), {
     goTo: goTo, apiName: apiName, device: () => DEVICES[device],
     recording: (on) => { if (engine && running) engine.profile(on); }
 });
+/* the memory view, refreshed from the running engine while it shows */
+const memoryView = new MemoryView($('pane-memory'));
+let memoryAt = 0;
+
 /* the output opens when there is something to read */
 dock.hide('output');
 
@@ -2166,7 +2179,7 @@ dock.hide('output');
  * for what the open editor puts there, and offered only when it does */
 function refreshView() {
     if (!dock) return;
-    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output', 'profiler', 'watch']) {
+    for (const k of ['files', 'editor', 'picker', 'objects', 'player', 'output', 'profiler', 'memory', 'watch']) {
         const b = $('v-' + k);
         b.classList.toggle('on', dock.shown(k));
         b.disabled = !dock.has(k);

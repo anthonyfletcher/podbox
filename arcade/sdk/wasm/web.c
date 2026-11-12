@@ -241,6 +241,22 @@ EXPORT("web_prof_take") int web_prof_take(void)
     return n;
 }
 EXPORT("web_prof_data") int32_t *web_prof_data(void) { return prof; }
+/* What the arena holds now, for the IDE's memory view: the totals and
+ * kinds as struct arcade_memory lays them out, and web_memory_globals()
+ * the bytes each global reaches. Between ticks only. */
+static struct arcade_memory mem_view;
+static uint32_t mem_globals[65536];
+EXPORT("web_memory") struct arcade_memory *web_memory(void)
+{
+    memset(mem_globals, 0, sizeof(mem_globals));
+    arcade_memory(vm, &mem_view, mem_globals, 65536);
+    return &mem_view;
+}
+EXPORT("web_memory_globals") uint32_t *web_memory_globals(void)
+{
+    return mem_globals;
+}
+
 EXPORT("web_ceiling") void web_ceiling(uint32_t u)
 {
     arcade_set_ceiling(vm, u);

@@ -242,6 +242,9 @@ show as `?`.
   row of its own. Click a row to go to its code. It samples every 2048
   units, so something cheaper than that a frame shows only now and then:
   record a few seconds.
+- **Memory** (View > Memory) shows what the cart's 512 KB holds as it
+  runs: the heap held, waiting to be cleared up and free, the largest
+  free block, and the bytes held by kind and by each global.
 - **Replays**: every run is recorded -- its random seed, the store as it
   began, the music, and every tick's buttons and wheel -- and Run >
   Replay the last run plays it again exactly, frame for frame, whatever
@@ -484,6 +487,9 @@ These options show what a cart drew, after the last tick:
 - `--dirty` prints `dirty lo hi`: the rows drawn since the last tick that
   drew began, a late tick drawing nothing, which are the rows the player
   sends to the screen next.
+- `--memory` prints what the memory view shows after the last tick: the
+  totals, each kind's count and bytes, and each global's bytes by its
+  number in declaration order.
 - `--menu i` chooses the cart's pause-menu item `i` (from `menuitem()`), as
   SELECT would, printing the items first and what the item's function
   returned. Give it more than once to choose several in turn.

@@ -128,6 +128,9 @@ static int in_heap(struct vm *vm, uint32_t off)
     return off >= vm->heap_lo && off < vm->bump;
 }
 
+/* bytes marked since last cleared: arcade_memory's share of each root */
+static uint32_t marked_bytes;
+
 static void mark_off(struct vm *vm, uint32_t off)
 {
     if (!in_heap(vm, off))
@@ -136,6 +139,7 @@ static void mark_off(struct vm *vm, uint32_t off)
     if (h->info & GC_MARK)
         return;
     h->info |= GC_MARK;
+    marked_bytes += h->size;
     uint32_t t = h->info & 0xff;
     if (t == T_STR || t == T_I32 || t == T_U8 || t == T_IMG || t == T_FXA)
         return;
@@ -167,8 +171,10 @@ static void scan(struct vm *vm, uint32_t off)
     }
     if (!b)
         return;
-    if (in_heap(vm, b))
+    if (in_heap(vm, b) && !(HDR(vm, b)->info & GC_MARK)) {
         HDR(vm, b)->info |= GC_MARK;
+        marked_bytes += HDR(vm, b)->size;
+    }
     struct buf *bf = BUF(vm, b);
     for (uint32_t i = 0; i < n; i++)
         mark_value(vm, bf->v[i]);
@@ -180,14 +186,27 @@ static void drain(struct vm *vm)
         scan(vm, vm->mstack[--vm->msp]);
 }
 
-void gc_collect(struct vm *vm)
+/* everything marked's children marked, rescanning the heap for any the
+ * mark stack overflowed past */
+static void finish_marking(struct vm *vm)
 {
-    uint32_t i, off;
-    vm->msp = 0;
-    vm->moverflow = 0;
-    for (i = 0; i < vm->nglobals; i++)
-        mark_value(vm, vm->globals[i]);
     drain(vm);
+    while (vm->moverflow) {
+        vm->moverflow = 0;
+        for (uint32_t off = vm->heap_lo; off < vm->bump;
+             off += HDR(vm, off)->size) {
+            if (HDR(vm, off)->info & GC_MARK) {
+                scan(vm, off);
+                drain(vm);
+            }
+        }
+    }
+}
+
+/* the engine's roots beside the globals */
+static void mark_engine_roots(struct vm *vm)
+{
+    uint32_t i;
     for (struct value *v = vm->stack; v < vm->sp; v++) {
         mark_value(vm, *v);
         drain(vm);
@@ -198,16 +217,64 @@ void gc_collect(struct vm *vm)
     mark_value(vm, vm->d.sheet);
     for (i = 0; i < 5; i++)
         mark_value(vm, vm->menu_label[i]);
-    drain(vm);
-    while (vm->moverflow) {
-        vm->moverflow = 0;
-        for (off = vm->heap_lo; off < vm->bump; off += HDR(vm, off)->size) {
-            if (HDR(vm, off)->info & GC_MARK) {
-                scan(vm, off);
-                drain(vm);
-            }
-        }
+    finish_marking(vm);
+}
+
+void arcade_memory(struct vm *vm, struct arcade_memory *m,
+                   uint32_t *by_global, uint32_t n)
+{
+    uint32_t i, off;
+    memset(m, 0, sizeof(*m));
+    m->arena = vm->size;
+    m->tables = vm->heap_lo;
+    m->heap = vm->heap_hi - vm->heap_lo;
+    vm->msp = 0;
+    vm->moverflow = 0;
+    for (i = 0; i < vm->nglobals; i++) {
+        marked_bytes = 0;
+        mark_value(vm, vm->globals[i]);
+        finish_marking(vm);
+        if (i < n)
+            by_global[i] = marked_bytes;
     }
+    marked_bytes = 0;
+    mark_engine_roots(vm);
+    m->engine = marked_bytes;
+    for (off = vm->heap_lo; off < vm->bump;) {
+        struct hdr *h = HDR(vm, off);
+        uint32_t size = h->size, kind = h->info & 0xff;
+        if (h->info & GC_FREE) {
+            m->free += size;
+            if (size > m->largest)
+                m->largest = size;
+        } else if (h->info & (GC_MARK | GC_PERM)) {
+            m->held += size;
+            if (h->info & GC_PERM)
+                m->constants += size;
+            if (kind < ARCADE_KINDS) {
+                m->kind_bytes[kind] += size;
+                m->kind_count[kind]++;
+            }
+        } else
+            m->garbage += size;
+        h->info &= ~GC_MARK;
+        off += size;
+    }
+    /* the untouched tail above the last object */
+    m->free += vm->heap_hi - vm->bump;
+    if (vm->heap_hi - vm->bump > m->largest)
+        m->largest = vm->heap_hi - vm->bump;
+}
+
+void gc_collect(struct vm *vm)
+{
+    uint32_t i, off;
+    vm->msp = 0;
+    vm->moverflow = 0;
+    for (i = 0; i < vm->nglobals; i++)
+        mark_value(vm, vm->globals[i]);
+    drain(vm);
+    mark_engine_roots(vm);
 
     /* Sweep: merge each run of dead and free blocks into one. */
     memset(vm->freelist, 0, sizeof(vm->freelist));

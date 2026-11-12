@@ -2144,6 +2144,8 @@ export function compile(input) {
         cart: bytes, errors: [],
         groups: Object.assign({}, built.groups, { BOARD: board, OPT: option, ACH: ach, FLAG: flag,
             IMG: Object.fromEntries(built.images.map((n) => [n, {}])) }),
+        /* each global's name, by its slot: the memory view's labels */
+        globals: prog.globals.map((g) => g.name),
         stats: { functions: fns.length, dropped: prog.fns.length - fns.length,
                  code: codeBytes, globals: prog.globals.length,
                  strings: prog.strings.length, size: bytes.length,

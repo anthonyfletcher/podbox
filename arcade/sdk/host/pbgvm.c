@@ -9,7 +9,7 @@
  *                  [--scores file] [--options file] [--opt t:i:v,...]
  *                  [--ui answer,...] [--speech] [--suspend-at t]
  *                  [--store dir] [--saves file] [--font font.bin]
- *                  [--pause t,...]
+ *                  [--pause t,...] [--memory]
  *
  * printh() lines go to stdout. A runtime error goes to stderr as
  * file:line: message (in function), and the exit status is 1. With
@@ -828,6 +828,30 @@ static int report(struct vm *vm)
     return 1;
 }
 
+/* --memory: what the arena holds after the last tick, as the IDE's
+ * memory view shows it, a global by its slot */
+static void memory_show(struct vm *vm)
+{
+    static const char *const kinds[ARCADE_KINDS] = {
+        [2] = "string", [3] = "array", [4] = "Int32Array", [5] = "Uint8Array",
+        [6] = "record", [8] = "storage", [10] = "image", [11] = "FixArray",
+        [12] = "lazy"
+    };
+    static uint32_t by_global[65536];
+    struct arcade_memory m;
+    arcade_memory(vm, &m, by_global, 65536);
+    printf("memory arena %u tables %u heap %u held %u garbage %u free %u "
+           "largest %u constants %u engine %u\n", m.arena, m.tables, m.heap,
+           m.held, m.garbage, m.free, m.largest, m.constants, m.engine);
+    for (int k = 0; k < ARCADE_KINDS; k++)
+        if (m.kind_count[k])
+            printf("memory kind %s %u %u\n", kinds[k] ? kinds[k] : "other",
+                   m.kind_count[k], m.kind_bytes[k]);
+    for (uint32_t g = 0; g < 65536; g++)
+        if (by_global[g])
+            printf("memory global %u %u\n", g, by_global[g]);
+}
+
 int main(int argc, char **argv)
 {
     const char *path = NULL;
@@ -846,6 +870,7 @@ int main(int argc, char **argv)
     const char *saves_path = NULL;
     long suspend_at = -1;
     const char *pauses = NULL;
+    int memory_flag = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--ticks") && i + 1 < argc)
             ticks = atol(argv[++i]);
@@ -863,6 +888,8 @@ int main(int argc, char **argv)
             units = 1;
         else if (!strcmp(argv[i], "--dirty"))
             dirty = 1;
+        else if (!strcmp(argv[i], "--memory"))
+            memory_flag = 1;
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc)
             wav_path = argv[++i];
         else if (!strcmp(argv[i], "--wheel") && i + 1 < argc)
@@ -1037,6 +1064,8 @@ int main(int argc, char **argv)
             break;
         }
     }
+    if (memory_flag)
+        memory_show(vm);
     /* the cart closing: its ending(), before the saves are written */
     if (!arcade_end(vm))
         return report(vm);

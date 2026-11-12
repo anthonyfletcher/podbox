@@ -228,6 +228,24 @@ export class Engine {
 
     /* inside a call, from the host's prof(): the units so far in it */
     unitsNow() { return this.x.web_units_now() >>> 0; }
+    /* What the arena holds, between ticks: the totals as struct
+     * arcade_memory has them, kinds[tag] = { count, bytes } and globals[slot]
+     * the bytes each global reaches that no earlier one does. Nothing the
+     * cart sees changes. */
+    memory() {
+        const p = this.x.web_memory() >>> 2, u = new Uint32Array(this.x.memory.buffer);
+        const names = ['arena', 'tables', 'heap', 'held', 'garbage', 'free', 'largest',
+                       'constants', 'engine'];
+        const m = { kinds: [], globals: null };
+        names.forEach((k, i) => { m[k] = u[p + i]; });
+        const KINDS = 16;
+        for (let k = 0; k < KINDS; k++)
+            m.kinds.push({ bytes: u[p + names.length + k], count: u[p + names.length + KINDS + k] });
+        const g = this.x.web_memory_globals() >>> 2;
+        m.globals = u.slice(g, g + 65536);
+        return m;
+    }
+
     /* sampling for the profiler, every 2048 units, on or off */
     profile(on) { this.x.web_profile(on ? 1 : 0); }
     /* the samples since the last take, 12 words each: the native call (or

@@ -39,12 +39,15 @@ const PANELS = {
                                                                     : { direction: 'left' } },
     profiler: { title: 'Profiler', place: (d) => d.getPanel('output') ? { referencePanel: 'output', direction: 'right' }
                                                                       : { direction: 'below' } },
+    memory: { title: 'Memory', place: (d) => d.getPanel('profiler') ? { referencePanel: 'profiler', direction: 'right' }
+                                  : d.getPanel('output') ? { referencePanel: 'output', direction: 'right' }
+                                  : { direction: 'below' } },
     watch: { title: 'Watch', place: (d) => d.getPanel('player') ? { referencePanel: 'player', direction: 'below' }
                                                                 : { direction: 'right' } }
 };
-const ORDER = ['files', 'editor', 'player', 'output', 'picker', 'objects', 'profiler', 'watch'];
+const ORDER = ['files', 'editor', 'player', 'output', 'picker', 'objects', 'profiler', 'memory', 'watch'];
 /* hidden until asked for */
-const LATER = ['profiler', 'watch'];
+const LATER = ['profiler', 'memory', 'watch'];
 const OWN = ['picker', 'objects'];
 
 /* a tab: the panel's title, kept as written for the editor's file and in
