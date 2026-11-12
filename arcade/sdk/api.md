@@ -595,8 +595,8 @@ The camera for the plane: position and height in world pixels, heading in turns,
 ### plane.draw([top], [bottom], [outside], [coarse], [under])
 The active map as a floor seen from the camera, on the rows from `top` to `bottom`.
 
-### plane.fog(near, far, colour)
-Fades the ground to `colour` from `near` to `far` world pixels away; colour -1 turns it off.
+### plane.fog(near, far, colour, [billboards])
+Fades the ground to `colour` from `near` to `far` world pixels away; colour -1 turns it off. The billboards fade with it unless `billboards` is false.
 
 ### plane.sky(image, [lift])
 A panorama behind the view, the image's width a whole turn.

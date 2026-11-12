@@ -5660,7 +5660,7 @@ void core_draw_billboard(struct vm *vm, int32_t s, int32_t x, int32_t y,
     const struct planeview *v = &vm->plane;
     struct sheet sheet;
     sheet_of(vm, &sheet);
-    int32_t fog = core_fog_level(v, depth);
+    int32_t fog = v->fog_billboards ? core_fog_level(v, depth) : 0;
     uint8_t fogc = p.d->dpal[v->fog_colour];
     if (!v->depth_set && !v->land_set) {
         billboard_copy(&p, &sheet, s, x, y, w, h, cw, ch, flip, fog, fogc);

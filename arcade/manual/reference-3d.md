@@ -8,7 +8,7 @@ dark scene.
 - [How the plane works](#how-the-plane-works), [script or system](#script-or-system), and [the resolution rule](#the-resolution-rule)
 - The camera: [plane.view](#planeviewx-y-z-angle-horizon-fov)
 - Drawing: [plane.draw](#planedrawtop-bottom-outside-coarse-under), [plane.sky](#planeskyimage-lift),
-  [plane.fog](#planefognear-far-colour), [plane.ceiling](#planeceilingheight-table-outside-coarse-top),
+  [plane.fog](#planefognear-far-colour-billboards), [plane.ceiling](#planeceilingheight-table-outside-coarse-top),
   [plane.billboards](#planebillboardsxs-ys-zs-sprites-sizes-flips-n-ws-hs)
 - Points: [plane.project](#planeprojectx-y-z-out), [plane.pick](#planepicksx-sy-out)
 - [land.draw and land.height](#landdrawheights-colours-far-scale-coarse-ramp)
@@ -205,7 +205,7 @@ A panorama behind everything, that turns as the camera turns.
 - 256 pixels wide is a whole turn in 256 steps: make the picture join up
   at its two ends, or a seam shows when the camera turns.
 
-## plane.fog(near, far, colour)
+## plane.fog(near, far, colour, [billboards])
 
 Fades the ground to a colour with distance, from `near` world pixels away
 to fully at `far`, dithered -- haze, darkness, mist.
@@ -214,6 +214,7 @@ to fully at `far`, dithered -- haze, darkness, mist.
 |---|---|
 | `near`, `far` | where it starts and where it is complete, in world pixels |
 | `colour` | the colour it fades to; -1 turns it off |
+| `billboards` | `false` to leave the billboards clear of it -- lamps in a dark dungeon, or a kart race's rivals always in view; true when left out |
 
 **Returns** nothing.
 

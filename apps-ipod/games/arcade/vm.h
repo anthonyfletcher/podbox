@@ -202,8 +202,9 @@ struct planeview
     int land_set;
     int16_t land_top[LAND_BANDS][SCREEN_W];
     /* plane.fog(): from near to far (16.16 world pixels) the ground goes
-     * to colour, dithered; kept until changed */
-    int fog_on;
+     * to colour, dithered, and the billboards too unless fog_billboards is
+     * 0; kept until changed */
+    int fog_on, fog_billboards;
     int32_t fog_near, fog_far;
     uint8_t fog_colour;
 };

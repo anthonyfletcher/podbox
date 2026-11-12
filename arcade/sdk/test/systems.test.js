@@ -993,10 +993,17 @@ test('plane: billboards fade into the fog with the ground', () => {
     blue = 0;
     for (y = 0; y < 120; y++) for (x = 0; x < 160; x++) if (pget(x, y) == 12) blue++;
     printh(blue);
+    // fog on, but not on the billboards: the ground's colour only
+    plane.fog(40, 100, 12, false);
+    cls(1);
+    plane.billboards(xs, ys, 0, 1, 16, 0, 3);
+    blue = 0;
+    for (y = 0; y < 120; y++) for (x = 0; x < 160; x++) if (pget(x, y) == 12) blue++;
+    printh(blue);
 }
 function update() {}`);
     assert.equal(r.status, 0, r.err);
-    assert.equal(r.out, '1 1\n0\n');
+    assert.equal(r.out, '1 1\n0\n0\n');
 });
 
 test('plane: a sky panorama sits on the horizon and turns with the view', () => {
