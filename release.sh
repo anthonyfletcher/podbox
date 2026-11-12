@@ -191,10 +191,14 @@ say "Checking the tree"
 sh tools/check-settings-docs.sh ||
     die "settings and their documents disagree -- see the lines above"
 
-UPSTREAM=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null) ||
-    die "this branch has no upstream; push it before releasing"
-[ "$(git rev-parse HEAD)" = "$(git rev-parse '@{u}')" ] ||
-    die "HEAD differs from $UPSTREAM -- push first, so the tag names a published commit"
+# A rehearsal tags nothing, and builds from git archive, so it needs nothing
+# pushed: unpushed work can be rehearsed before it goes out.
+if [ -z "$DRY_RUN" ]; then
+    UPSTREAM=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null) ||
+        die "this branch has no upstream; push it before releasing"
+    [ "$(git rev-parse HEAD)" = "$(git rev-parse '@{u}')" ] ||
+        die "HEAD differs from $UPSTREAM -- push first, so the tag names a published commit"
+fi
 
 # The release belongs to whatever origin points at here. Derived rather than
 # hardcoded so a renamed fork doesn't silently publish to the wrong place.
