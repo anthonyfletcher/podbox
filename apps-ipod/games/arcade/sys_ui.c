@@ -56,8 +56,8 @@
 #define INNER_W    (BOX_X1 - BOX_X0 + 1 - 2 * PAD)
 #define MARGIN     4
 
-/* Wheel clicks to a step: a row, a button, a number, a character */
-#define CLICKS_ROW  8
+/* Wheel clicks to a step of a number or a character; rows and buttons move
+ * as the player's lists do, by arcade_scroll() */
 #define CLICKS_CHAR 6
 
 /* The wheel's cycle when the cart's font is FONT.CAPS, and the English of
@@ -85,6 +85,7 @@ struct dialog
     /* input */
     unsigned held;
     int acc, hold_prev, hold_next;
+    struct arcade_scroll scroll;    /* the wheel, as a list takes it */
 };
 
 /* ---- text in ------------------------------------------------------------- */
@@ -486,6 +487,11 @@ static int steps(struct dialog *g, int wheel, int per)
     return s;
 }
 
+static int wheel_rows(struct vm *vm, struct dialog *g, int wheel)
+{
+    return arcade_scroll(&g->scroll, wheel, vm->rate);
+}
+
 static void say(struct vm *vm, const char *text, int queue)
 {
     const struct arcade_speak *sp = vm->host->speak;
@@ -580,7 +586,7 @@ static void input(struct vm *vm, struct dialog *g, unsigned held, int wheel)
     switch (g->kind) {
     case ARCADE_DIALOG_MESSAGE:
     case ARCADE_DIALOG_CONFIRM: {
-        int s = steps(g, wheel, CLICKS_ROW);
+        int s = wheel_rows(vm, g, wheel);
         if (scrolls) {
             g->top += s;
             if (g->top > g->lines - g->shown)
@@ -603,7 +609,7 @@ static void input(struct vm *vm, struct dialog *g, unsigned held, int wheel)
         break;
     }
     case ARCADE_DIALOG_CHOOSE:
-        g->at += steps(g, wheel, CLICKS_ROW);
+        g->at += wheel_rows(vm, g, wheel);
         if (pressed & ARCADE_PREV)
             g->at--;
         if (pressed & ARCADE_NEXT)
@@ -633,7 +639,7 @@ static void input(struct vm *vm, struct dialog *g, unsigned held, int wheel)
     }
     case ARCADE_DIALOG_TEXT:
         if (g->focus) {
-            g->at += steps(g, wheel, CLICKS_ROW);
+            g->at += wheel_rows(vm, g, wheel);
             if (pressed & ARCADE_PREV)
                 g->at = 0;
             if (pressed & ARCADE_NEXT)
@@ -798,6 +804,7 @@ static void run(struct vm *vm, struct dialog *g)
 static void dialog_open(struct dialog *g, int kind, const char *prompt)
 {
     memset(g, 0, offsetof(struct dialog, brk));
+    memset(&g->scroll, 0, sizeof(g->scroll));
     g->kind = kind;
     g->prompt = prompt;
 }

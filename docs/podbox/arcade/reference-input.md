@@ -6,7 +6,7 @@ that turn the wheel into the controls games usually want.
 
 - [How input works](#how-input-works), and [in the IDE](#in-the-ide)
 - Buttons: [btn](#btni), [btnp](#btnpi), [btnr](#btnri), [the Menu button](#the-menu-button)
-- The wheel: [wheel](#wheel), [wheelpos](#wheelpos), [click](#clickbeep)
+- The wheel: [wheel](#wheel), [wheelsteps](#wheelsteps), [wheelpos](#wheelpos), [click](#clickbeep)
 - [The dial library](#the-dial-library): steps, angle, speed, paddle
 - [The menu library](#the-menu-library)
 
@@ -41,7 +41,7 @@ Click the Player's screen first, to give it the keys:
 | Key | Is |
 |---|---|
 | Left, Right | Prev, Next |
-| Up, Down | turns the wheel 8 clicks anticlockwise, clockwise |
+| Up, Down | turns the wheel 4 clicks anticlockwise, clockwise: a list's row |
 | Enter | Select |
 | Space | Play |
 | Esc | Menu |
@@ -203,7 +203,43 @@ function draw() {
 - Turned fast, the wheel gives many clicks in one tick; nothing is lost
   between ticks.
 - For menus, where a click is too small a step, see
-  [`dial.steps`](#dialstepsn).
+  [`wheelsteps`](#wheelsteps).
+
+## wheelsteps()
+
+How many rows a list moves for this tick's turn of the wheel, the way
+the player's own lists move.
+
+**Returns** the rows, clockwise positive; usually 0, 1 or -1.
+
+```js
+var SONGS = ["ALONE", "BLUE", "CORNER", "DUSK", "EMBER", "FROST", "GLASS",
+             "HARBOUR", "ISLAND", "JUNE", "KITE", "LANTERN"];
+var at = 0;
+
+function update() {
+    at = mid(0, at + wheelsteps(), SONGS.length - 1);
+}
+
+function draw() {
+    cls(1);
+    for (var i = 0; i < SONGS.length; i++) {
+        if (i == at) rectfill(0, 4 + i * 9, 159, 12 + i * 9, 2);
+        print(SONGS[i], 6, 6 + i * 9, 7);
+    }
+}
+```
+
+![Twelve song names with FROST, the sixth, on a purple bar: five rows down for 20 clicks](img/n-wheelsteps.png)
+
+- A row every 4 clicks, however slowly they come, the rest carried to
+  the next tick.
+- Spun fast -- past about three quarters of a turn a second -- it moves
+  many rows a step, as the player's lists do, so a long list is crossed
+  with a flick.
+- Use it for any list or menu, so the cart's lists move as the
+  player's own do. The dialogs (`ui.choose` and the rest), `gui.list`
+  and the menu library use it.
 
 ## wheelpos()
 
@@ -281,6 +317,9 @@ choice = mid(0, choice + dial.steps(16), ITEMS.length - 1);
   menu would never move by a line a click; `steps` adds the clicks up and
   moves one line for every six, however slowly they come.
 - It keeps one carry, so use one `n` for the whole cart.
+- For a list, [`wheelsteps`](#wheelsteps) moves as the player's lists
+  do; `steps` is for a dial of your own count, such as 16 settings
+  round a knob.
 
 ### dial.angle()
 
@@ -334,12 +373,12 @@ print(x < 0 ? "NOT TOUCHED" : "PADDLE AT " + flr(x), 2, 2, 7);
 ## The menu library
 
 `lib/menu.js` is a whole in-game menu, worked by the wheel and the
-buttons. It needs `dial.js` in the cart too.
+buttons.
 
 | Function | |
 |---|---|
 | `menu.open(items)` | starts a menu of `items`, an array of text, with the first chosen |
-| `menu.update()` | call once a tick while it is open: the wheel moves the choice a line a step (12 to a turn, as the player's dialogs and `gui.list` do), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
+| `menu.update()` | call once a tick while it is open: the wheel moves the choice as the player's lists move ([`wheelsteps`](#wheelsteps)), Prev and Next a line a press, and both wrap round. **Returns** the number of the line chosen when Select is pressed, else -1 |
 | `menu.draw(x, y, c, bar)` | draws the lines from `x, y`, a line of the current font apart, in colour `c`, the chosen one on a bar of colour `bar` |
 | `menu.choice()` | the line chosen now, 0 first |
 

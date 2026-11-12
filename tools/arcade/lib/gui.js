@@ -121,12 +121,12 @@ function say(s) {
 }
 
 function list(items, rows) {
-    return { items: items, at: 0, top: 0, rows: min(rows, items.length), acc: 0 };
+    return { items: items, at: 0, top: 0, rows: min(rows, items.length) };
 }
 
 function list_update(l) {
     var before = l.at, n = l.items.length;
-    l.at += steps(l, 8);
+    l.at += wheelsteps();
     if (btnp(0)) l.at--;
     if (btnp(1)) l.at++;
     l.at = mid(0, l.at, n - 1);

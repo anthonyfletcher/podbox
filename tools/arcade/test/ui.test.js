@@ -99,11 +99,11 @@ test('wrong arguments stop the cart with what was wanted', () => {
 });
 
 /* Worked as on the player: the dialog opens in init, each of its frames a
- * tick. Masks: 1 PREV, 2 NEXT, 4 MENU, 16 SELECT; 8 wheel clicks a row,
- * 6 a character. */
+ * tick. Masks: 1 PREV, 2 NEXT, 4 MENU, 16 SELECT; 4 wheel clicks a row,
+ * as the player's lists, 6 a character. */
 test('choose is worked with the wheel and SELECT', () => {
     const r = run('function init() { printh(ui.choose("Pick", ["a", "b", "c", "d"])); }',
-                  undefined, ['--wheel', '1:16:0,2:0', '--buttons', '3:16,4:0'], 10);
+                  undefined, ['--wheel', '1:8:0,2:0', '--buttons', '3:16,4:0'], 10);
     assert.equal(r.status, 0, r.err);
     assert.equal(r.out, 'choose Pick: a|b|c|d at 0\n2\n');
 });

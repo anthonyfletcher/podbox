@@ -18,6 +18,56 @@
                                   struct value *out)
 #define RET_INT(v) (*out = mk(T_INT, (int32_t)(v)), 1)
 
+/* The rows a list moves for clicks of the wheel in a tick of 1/rate s, as
+ * the player's own lists move them: a step each SCROLL_CLICKS clicks, and
+ * each step then many rows once the wheel's smoothed speed passes
+ * SCROLL_START degrees a second, by the speed's fourth power. A step the
+ * other way, or one after SCROLL_PAUSE ms with none, starts the speed
+ * again. The click wheel's driver and button_apply_acceleration() hold
+ * the same numbers for both players. */
+#define SCROLL_CLICKS 4
+#define SCROLL_START  270
+#define SCROLL_PAUSE  250
+#define SCROLL_FAST   36000         /* degrees a second: 100 turns */
+
+static int32_t scroll_rows(uint32_t vel)
+{
+    uint64_t v = ((uint64_t)((1 << 16) / SCROLL_START) * vel) >> 12;
+    v = (v * v * v * v + (1 << 15)) >> 16;
+    return v > 1 ? (int32_t)v : 1;
+}
+
+int32_t arcade_scroll(struct arcade_scroll *s, int32_t clicks, uint32_t rate)
+{
+    uint32_t ms = 1000 / (rate ? rate : 30);
+    s->carry += clicks;
+    int32_t steps = s->carry / SCROLL_CLICKS;
+    s->carry -= steps * SCROLL_CLICKS;
+    if (!steps) {
+        if (s->quiet < SCROLL_PAUSE)
+            s->quiet += ms;
+        return 0;
+    }
+    int32_t dir = steps > 0 ? 1 : -1, n = steps * dir;
+    uint32_t span = s->quiet + ms;
+    int restart = dir != s->dir || span > SCROLL_PAUSE;
+    /* each step's speed, its clicks over its share of the time: 360
+     * degrees a turn of 96 clicks, by the ms */
+    uint32_t v = (uint32_t)n * SCROLL_CLICKS * 3750 / span;
+    if (v > SCROLL_FAST)
+        v = SCROLL_FAST;
+    int32_t rows = 0;
+    for (int32_t i = 0; i < n; i++) {
+        s->vel = (15 * s->vel + v) / 16;
+        if (!i && restart)
+            s->vel = 0;
+        rows += scroll_rows(s->vel);
+    }
+    s->dir = dir;
+    s->quiet = 0;
+    return rows * dir;
+}
+
 void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos)
 {
     uint8_t pressed = 0;
@@ -38,6 +88,7 @@ void arcade_input(struct vm *vm, unsigned held, int wheel, int wheelpos)
     vm->held = (uint8_t)held;
     vm->pressed = pressed;
     vm->wheel = wheel;
+    vm->wheelsteps = arcade_scroll(&vm->scroll, wheel, vm->rate);
     vm->wheelpos = wheelpos < 0 || wheelpos > 95 ? -1 : wheelpos;
     /* no presses stamped unless the host follows the music this tick */
     vm->heard.jumped = 0;
@@ -84,6 +135,13 @@ NATIVE(wheel)
 {
     (void)a; (void)argc;
     *out = mk(T_INT, vm->wheel);
+    return 1;
+}
+
+NATIVE(wheelsteps)
+{
+    (void)a; (void)argc;
+    *out = mk(T_INT, vm->wheelsteps);
     return 1;
 }
 

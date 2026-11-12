@@ -205,7 +205,7 @@ reference.
 | `fx.js` | screen shake, hit-stop, timers that count ticks down |
 | `rand.js` | shuffles, weighted picks, ranges, from `rnd()` or a generator |
 | `palfx.js` | palette fades, flashes and colour cycling |
-| `menu.js` | an in-game menu on the wheel (needs `dial.js`) |
+| `menu.js` | an in-game menu on the wheel |
 | `gui.js` | panels, buttons, lists and text fields in the dialogs' style |
 
 ## Worked examples

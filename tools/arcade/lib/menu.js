@@ -4,16 +4,14 @@
 //   menu.open(items)        items, an array of strings, with the first
 //                           chosen
 //   menu.update()           once a tick while open: the wheel moves the
-//                           choice a line a detent (twelve to a turn, as
-//                           the dialogs and gui.list), PREV and NEXT a
+//                           choice as the player's lists move (wheelsteps,
+//                           as the dialogs and gui.list), PREV and NEXT a
 //                           line a press; returns the line
 //                           chosen when SELECT is pressed, else -1
 //   menu.draw(x, y, c, bar) the lines from x, y, a line of the current
 //                           font apart, the chosen one on a bar of colour
 //                           bar
 //   menu.choice()           the line chosen now
-//
-// It moves with dial.steps(), so a cart using menu needs dial too.
 
 var lines = [];
 var at = 0;
@@ -26,7 +24,7 @@ function open(items) {
 function update() {
     if (lines.length == 0) return -1;
     var n = lines.length;
-    at = (at + dial.steps(12) + n * 12) % n;
+    at = ((at + wheelsteps()) % n + n) % n;
     if (btnp(0)) at = (at + n - 1) % n;
     if (btnp(1)) at = (at + 1) % n;
     if (btnp(4)) return at;

@@ -211,7 +211,7 @@ first in `update()`:
 at the left edge (0) and the right (140, so its 20 pixels end at 159).
 
 Run it, then **click the Player's screen** to give it the keys. In the
-IDE, the Up and Down arrow keys turn the wheel, eight clicks a press; or
+IDE, the Up and Down arrow keys turn the wheel, four clicks a press; or
 drag your mouse round the ring of the drawn wheel under the screen. On the
 iPod, it is the wheel itself.
 

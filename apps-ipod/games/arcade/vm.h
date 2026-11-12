@@ -238,6 +238,14 @@ struct landspec
  * world pixels */
 struct floor_row { int32_t u, v, du, dv, fog; };
 
+/* The wheel as the player's own lists take it, for arcade_scroll() */
+struct arcade_scroll {
+    int32_t carry;              /* clicks short of a step */
+    int32_t dir;                /* the last step's way, 1 or -1 */
+    uint32_t vel;               /* the smoothed speed, degrees a second */
+    uint32_t quiet;             /* ms since the last step, up to the pause */
+};
+
 /* An effect: signed bytes, each times scale a 16-bit sample */
 struct sfxinfo
 {
@@ -430,6 +438,8 @@ struct vm
     uint8_t released;           /* btnr()'s: down last tick, up this one */
     uint16_t held_ticks[5];
     int32_t wheel, wheelpos;
+    int32_t wheelsteps;         /* this tick's, by arcade_scroll() */
+    struct arcade_scroll scroll;
     struct arcade_music heard;  /* this tick's, from arcade_music() */
     int32_t beat_inbar;         /* from the last beat.next() */
     int32_t beat_margin;        /* from the last beat.downbeat() */
@@ -638,6 +648,7 @@ void vm_out_set(struct vm *vm, struct value o, uint32_t i, struct value v);
 int vm_fix_op(struct vm *vm, int op, struct value a, struct value b,
               struct value *out);
 void vm_charge(struct vm *vm, uint32_t units);
+int32_t arcade_scroll(struct arcade_scroll *s, int32_t clicks, uint32_t rate);
 /* vm_charge() for a native's long work, as it goes: 0, the cart stopped,
  * once the call is past the ceiling */
 int vm_spend(struct vm *vm, uint32_t units);

@@ -186,6 +186,23 @@ function update() {}`);
     assert.deepEqual(out, [String(0x7f4000), String(0xffffff), String(0xff8000)]);
 });
 
+test('wheelsteps: a row every 4 clicks slowly, many a step spun fast, back at once', () => {
+    /* 12 clicks one a tick: three rows. Then 12 a tick, near four turns a
+     * second: well past the 24 rows of 96 clicks taken slowly. Then a turn
+     * back of 4: one row, the speed started again */
+    const slow = [], fast = [];
+    for (let t = 1; t <= 12; t++) slow.push(t + ':1');
+    for (let t = 20; t < 28; t++) fast.push(t + ':12');
+    const out = run([], `var a = 0, b = 0, c = 0;
+function init() {}
+function update() {
+    var s = wheelsteps(), f = frame();
+    if (f <= 15) a += s; else if (f < 40) b += s; else c += s;
+    if (f == 45) printh(a + " " + (b > 24) + " " + c);
+}`, 45, ['--wheel', slow.concat(fast, ['28:0', '40:-4', '41:0']).join(',')]);
+    assert.deepEqual(out, ['3 1 -1']);
+});
+
 test('menu: the wheel and buttons move the choice, SELECT takes it', () => {
     const out = run(['dial', 'menu'], `var tk = 0;
 function init() { menu.open(["PLAY", "OPTIONS", "QUIT"]); }
@@ -195,8 +212,8 @@ function update() {
     if (chose >= 0) printh(tk + " chose " + chose);
     if (tk == 3) printh("at " + menu.choice());
 }
-function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:16', '--buttons', '4:2,5:0,7:16']);
-    /* 16 clicks is two detents, 8 each: QUIT; NEXT wraps to PLAY; SELECT takes it */
+function draw() { cls(0); menu.draw(10, 10, 7, 1); }`, 8, ['--wheel', '1:8', '--buttons', '4:2,5:0,7:16']);
+    /* 8 clicks is two rows, 4 each: QUIT; NEXT wraps to PLAY; SELECT takes it */
     assert.deepEqual(out, ['at 2', '8 chose 0']);
 });
 
@@ -220,9 +237,10 @@ function update() {
 }`, 30, ['--wheel', '1:6:0,2:0,4:12,5:0,8:-6,9:0',
          '--buttons', '2:2,3:0,10:1,27:0,28:16,29:0']);
     /* the wheel puts A after XY; Right keeps it; two on puts in A and
-     * turns it to B, back one makes it A; Left held deletes one. The list:
-     * NEXT, two rows on, PREV and PREV's repeat leave B */
-    assert.deepEqual(out, ['[XYA]', 'chose 1 top 1']);
+     * turns it to B, back one makes it A; Left held deletes one. The list,
+     * a row every 4 clicks: one on, NEXT, three on (held at D), one back,
+     * then PREV and its repeats leave A */
+    assert.deepEqual(out, ['[XYA]', 'chose 0 top 0']);
 });
 
 /* The dialogs and the library draw the same pixels: each pair of carts

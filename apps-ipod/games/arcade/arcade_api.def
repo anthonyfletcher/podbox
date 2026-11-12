@@ -86,6 +86,7 @@ API(btnp,      45, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(btnr,     230, 0, 1, VAL,  0,     FLAT,   LISTEN, 1)
 API(wheel,     46, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
 API(wheelpos,  47, 0, 0, VAL,  0,     FLAT,   LISTEN, 1)
+API(wheelsteps, 238, 0, 0, VAL, 0,    FLAT,   LISTEN, 1)
 
 /* Sound */
 API(sfx,       48, 1, 2, VOID, 0,     FLAT,   LISTEN, 1)

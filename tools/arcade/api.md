@@ -205,6 +205,9 @@ Whether button `i` was let go this tick: down last tick, up this one.
 ### wheel()
 The clicks the wheel turned this tick, 96 to a turn, clockwise positive.
 
+### wheelsteps()
+The rows a list moves for this tick's turn of the wheel, as the player's own lists move: one every 4 clicks, and many at once when it is spun fast. Clockwise positive.
+
 ### wheelpos()
 Where the finger is on the wheel, 0 to 95 clockwise from the top, or -1 when it is not touched.
 

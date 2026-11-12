@@ -27,7 +27,7 @@ is for.
 | `tween.js` | easing curves; any array slot moved along one over ticks |
 | `palfx.js` | palette fades, flashes and colour cycling |
 | `dial.js` | the wheel as a control: detents, angle, smoothed speed, a paddle |
-| `menu.js` | an in-game menu on the wheel (needs `dial.js`) |
+| `menu.js` | an in-game menu on the wheel |
 | `gui.js` | panels, buttons, lists and text fields in the dialogs' style |
 
 ## text

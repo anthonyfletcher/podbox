@@ -146,7 +146,7 @@ test('a dialog paused for each frame ends as one answered at once', async () => 
     const wasm = new WebAssembly.Module(fs.readFileSync(wasmFile));
     /* the same presses: SELECT on the frames given, PLAY on 8, the wheel
      * on others */
-    const input = (n) => ({ held: n === 8 ? 8 : [3, 10, 14].includes(n) ? 16 : 0, wheel: n === 1 ? 8 : n === 6 ? 6 : 0 });
+    const input = (n) => ({ held: n === 8 ? 8 : [3, 10, 14].includes(n) ? 16 : 0, wheel: n === 1 ? 4 : n === 6 ? 6 : 0 });
     async function play(paused) {
         let n = 0;
         const lines = [], units = [];
