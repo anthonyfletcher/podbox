@@ -1,0 +1,1178 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spike's phrases</title>
+<style>
+  :root {
+    --ink: #17181c; --paper: #f7f6f2; --line: #cfcbc0; --dim: #7d7a72;
+    --accent: #b4472a; --hi: #f2e7c9; --ok: #2f7d4f; --bad: #b4302a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 13px/1.45 "SF Mono", "Cascadia Mono", Consolas, monospace;
+    display: grid; grid-template-columns: 250px 1fr; height: 100vh;
+  }
+  h1 { font-size: 14px; margin: 0; letter-spacing: .12em; text-transform: uppercase; }
+  button {
+    font: inherit; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 3px; padding: 3px 9px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--hi); }
+  button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  select, input[type=text], textarea {
+    font: inherit; background: var(--paper); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px;
+  }
+
+  /* ---- list ---- */
+  #side { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  #sidehead { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; align-items: center; }
+  #list { overflow-y: auto; flex: 1; }
+  .row {
+    padding: 5px 12px; border-bottom: 1px solid #e6e2d8; cursor: pointer;
+    display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: baseline;
+  }
+  .row:hover { background: var(--hi); }
+  .row.sel { background: var(--ink); color: var(--paper); }
+  .row .n { color: var(--dim); }
+  .row.sel .n { color: #b9b4a6; }
+  .row .t { font-size: 11px; letter-spacing: .05em; }
+  .row .d { font-size: 11px; color: var(--dim); }
+  .row.sel .d { color: #b9b4a6; }
+  .row.bad { box-shadow: inset 3px 0 0 var(--bad); }
+  .row.good { box-shadow: inset 3px 0 0 var(--ok); }
+  .row.cur { background: var(--hi); }
+  .row.drop { box-shadow: inset 0 2px 0 var(--accent); }
+  .row.sheetrow { border-bottom: 2px solid var(--line); }
+
+  /* ---- editor ---- */
+  #main { overflow-y: auto; padding: 14px 18px 60px; min-height: 0; }
+  #bar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  #bar .sp { flex: 1; }
+  .meta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .meta label { color: var(--dim); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tags button { font-size: 11px; padding: 2px 7px; }
+
+  #tools { display: flex; gap: 5px; flex-wrap: wrap; margin: 12px 0 8px; }
+  #tools button { font-size: 11px; }
+
+  table.grid { border-collapse: collapse; margin-bottom: 6px; }
+  table.grid td, table.grid th {
+    border: 1px solid var(--line); width: 34px; height: 26px;
+    text-align: center; padding: 0; font-size: 12px;
+  }
+  table.grid th { border: 0; color: var(--dim); font-weight: normal; font-size: 11px; width: 46px; text-align: right; padding-right: 6px; }
+  table.grid td { cursor: pointer; background: #fff; font-size: 15px; line-height: 1; }
+  table.grid td:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+  td.surf { background: #e7e3d6; }
+  td.wait { background: repeating-linear-gradient(135deg, #e7e3d6 0 3px, #fff 3px 6px); }
+  td .g { display: block; }
+  td .s { color: #8a8579; }              /* the surface, under everything */
+  td .d { color: var(--accent); }        /* diamond */
+  td .c { color: #17181c; }              /* creature */
+  td .w { color: #2f5d8c; }              /* switch */
+  td .bad { color: var(--bad); font-size: 11px; }
+  td.blk { font-size: 12px; letter-spacing: 1px; }
+  td.blk b { color: var(--accent); }
+
+  /* The block and waits rows belong to the cell rather than to a level, and
+     sit under a gap with a tint of their own -- next to the ground row they
+     are one row's slip away from a surface, and a mis-click there authors a
+     different phrase rather than an obviously wrong one. */
+  tr.gap th, tr.gap td { border: 0; height: 14px; background: none;
+                         cursor: default; vertical-align: bottom; }
+  tr.gap td:hover { outline: none; }
+  tr.gap th { color: var(--dim); font-size: 10px; letter-spacing: .08em;
+              text-transform: uppercase; }
+  table.grid tr.cellrow td { background: #f6f4ec; }
+  table.grid tr.cellrow td.surf { background: #e7e3d6; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--dim);
+            font-size: 11px; margin: 4px 0 12px; }
+  .legend span b { color: var(--ink); font-weight: normal; font-size: 13px; }
+  tr.head td { border: 0; color: var(--dim); font-size: 10px; height: 16px; cursor: default; background: none; }
+  tr.head td:hover { outline: none; }
+
+  .preview { border: 1px solid var(--line); background: #fff; margin: 10px 0 4px; }
+
+  /* ---- contact sheet ---- */
+  #sheet { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .card {
+    border: 1px solid var(--line); border-left-width: 3px; background: #fff;
+    padding: 5px 7px 7px; cursor: pointer; min-width: 168px;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card.sel { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .card.bad { border-left-color: var(--bad); }
+  .card.good { border-left-color: var(--ok); }
+  .card.drop { background: var(--hi); border-color: var(--accent); }
+  .card .preview { margin: 3px 0 0; border: 0; }
+  .cardhead { display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline;
+              font-size: 10px; letter-spacing: .05em; }
+  .cardhead .d { color: var(--dim); }
+  .card .note { font-size: 10px; color: var(--dim); margin-top: 3px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hint { color: var(--dim); font-size: 11px; margin: 2px 0 12px; }
+  .hint details { margin-top: 4px; }
+  .hint summary { cursor: pointer; color: var(--accent); }
+  .hint details p { margin: 6px 0 0; }
+  textarea { width: 100%; height: 52px; resize: vertical; }
+  #report { white-space: pre-wrap; font-size: 11px; border: 1px solid var(--line);
+            background: #fff; padding: 8px 10px; max-height: 260px; overflow: auto; }
+  .verdict { border: 1px solid var(--line); border-left-width: 3px; background: #fff;
+             padding: 6px 9px; margin: 0 0 12px; font-size: 11px; }
+  .verdict.bad { border-left-color: var(--bad); }
+  .verdict.good { border-left-color: var(--ok); }
+  .vhead { letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
+  .verdict.bad .vhead { color: var(--bad); }
+  .verdict.good .vhead { color: var(--ok); }
+  .vfault { margin-top: 3px; }
+  .vline { color: var(--dim); margin-top: 4px; }
+  .flash { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div id="side">
+  <div id="sidehead">
+    <h1>Phrases</h1>
+    <span class="sp" style="flex:1"></span>
+    <span id="count" class="hint" style="margin:0"></span>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="main">
+  <div id="bar">
+    <button id="save">Save</button>
+    <button id="revert">Reload</button>
+    <button id="check" title="Whether each phrase can be crossed, by the game's own rules">Check</button>
+    <span class="sp"></span>
+    <button id="up" title="Move this phrase one earlier (Alt+Up)">Move &uarr;</button>
+    <button id="down" title="Move this phrase one later (Alt+Down)">Move &darr;</button>
+    <button id="add">New</button>
+    <button id="dup">Duplicate</button>
+    <button id="del">Delete</button>
+    <span id="msg" class="flash"></span>
+  </div>
+
+  <div id="editor"></div>
+  <div id="report" hidden></div>
+</div>
+
+<script>
+const LEVELS = 4;
+const TAGS = ['REST','GAP','CREATURE','BLOCK','SWITCH','DIAMOND','BAIT','TEACH',
+              'SPRING','SPIKED'];
+/* 'spiked' is the creature tool again with a spike on its head, rather than a
+   modifier on the one beside it: the two are different obstacles and want
+   different verbs, and a modifier would be one more click on the level rows
+   where mis-clicks already cost the most. */
+const TOOLS = [
+  ['surface', 'Surface'],
+  ['diamond', 'Diamond'],
+  ['creature', 'Creature'],
+  ['spiked', 'Spiked'],
+  ['flyer', 'Flyer'],
+  ['switch', 'Switch'],
+  ['erase', 'Erase'],
+];
+
+let patterns = [];
+let sel = 0;
+let view = 'edit';        /* 'edit' one phrase, or 'sheet' all of them */
+let tool = 'surface';
+let report = {};          /* index -> what a check said; none runs in the cart */
+let leftover = [];        /* check lines naming no phrase */
+
+const $ = (id) => document.getElementById(id);
+const msg = (t) => { $('msg').textContent = t;
+                     setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 4000); };
+
+function blankCell() {
+  return { surfaces: [], diamond: null, creature: null, switch: null,
+           block: null, spiked: false, spring: false, sw: 0, flyer: null };
+}
+
+function blankPattern(len) {
+  return { length: len, entry: 0, exit: 0, difficulty: 0, tags: ['REST'],
+           note: '', cells: Array.from({length: len}, () => {
+             const c = blankCell(); c.surfaces = [0]; return c; }) };
+}
+
+/* ------------------------------------------------------------ loading */
+
+const FILE = cart.file || 'data/phrases.json';
+const SURFACES = { G: 0, P1: 1, P2: 2, P3: 3 };
+const SWITCH_MODES = { SWP: 1, SWG: 2, SWX: 3 };
+const SWITCH_NAMES = { 1: 'SWP', 2: 'SWG', 3: 'SWX' };
+
+/* One cell's macros, "G|P2|DI(2)", to the page's model of it */
+function parseCell(expr) {
+  const c = blankCell();
+  for (const tok of expr.split('|').map(t => t.trim())) {
+    if (!tok || tok === '__') continue;
+    if (tok in SURFACES) { c.surfaces.push(SURFACES[tok]); continue; }
+    const m = /^(DI|CR2|CR|SW|BL|FLY)\(\s*(\d+)\s*\)$/.exec(tok);
+    if (m) {
+      const key = { DI: 'diamond', CR: 'creature', CR2: 'creature', SW: 'switch',
+                    BL: 'block', FLY: 'flyer' }[m[1]];
+      c[key] = +m[2];
+      if (m[1] === 'CR2') c.spiked = true;
+      continue;
+    }
+    if (tok in SWITCH_MODES) c.sw = SWITCH_MODES[tok];
+    else if (tok === 'SPR') c.spring = true;
+    else throw new Error('a cell part this editor does not know: ' + tok);
+  }
+  return c;
+}
+
+/* ...and back */
+function emitCell(c) {
+  const parts = c.surfaces.slice().sort().map(lv => lv ? 'P' + lv : 'G');
+  if (c.diamond != null) parts.push('DI(' + c.diamond + ')');
+  if (c.creature != null) parts.push((c.spiked ? 'CR2(' : 'CR(') + c.creature + ')');
+  if (c.flyer != null) parts.push('FLY(' + c.flyer + ')');
+  if (c.block != null) parts.push('BL(' + c.block + ')');
+  if (c.switch != null) parts.push('SW(' + c.switch + ')');
+  if (c.sw) parts.push(SWITCH_NAMES[c.sw]);
+  if (c.spring) parts.push('SPR');
+  return parts.length ? parts.join('|') : '__';
+}
+
+async function load() {
+  let j;
+  try {
+    j = JSON.parse(await cart.read(FILE));
+    patterns = j.phrases.map(p => ({
+      length: p.cells.length, entry: p.entry, exit: p.exit,
+      difficulty: p.difficulty, note: p.note || '',
+      tags: (p.tags || '').split('|').filter(t => TAGS.includes(t)),
+      cells: p.cells.map(parseCell) }));
+  } catch (e) {
+    msg(FILE + ': ' + e.message);
+    return;
+  }
+  patterns.forEach(fit);
+  forget();
+  draw();
+}
+
+/* Cells and length must agree: the C array is fixed width and the game
+   reads `length` of it. */
+function fit(p) {
+  while (p.cells.length < p.length) p.cells.push(blankCell());
+  p.cells.length = p.length;
+  p.cells.forEach(c => {
+    if (!Array.isArray(c.surfaces)) c.surfaces = [];
+  });
+}
+
+/* -------------------------------------------------------------- list */
+
+function drawList() {
+  const el = $('list');
+  el.innerHTML = '';
+  $('count').textContent = patterns.length + ' phrases';
+
+  const all = document.createElement('div');
+  all.className = 'row sheetrow' + (view === 'sheet' ? ' sel' : '');
+  all.innerHTML = '<div class="n">&#9638;</div><div>' +
+    '<div class="t">CONTACT SHEET</div>' +
+    '<div class="d">every phrase at once</div></div>';
+  all.onclick = () => { view = 'sheet'; draw(); };
+  el.appendChild(all);
+
+  patterns.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'row' +
+      (i === sel ? (view === 'edit' ? ' sel' : ' cur') : '');
+    const r = report[i];
+    if (r) row.className += r.fault ? ' bad' : ' good';
+    row.innerHTML =
+      '<div class="n">' + i + '</div><div>' +
+      '<div class="t">' + (p.tags.join(' ') || '&mdash;') + '</div>' +
+      '<div class="d">' + p.length + ' cells &middot; difficulty ' + p.difficulty +
+      (r ? ' &middot; ' + (r.fault ? verdictWord(r) : r.summary) : '') +
+      '</div></div>';
+    row.onclick = () => { sel = i; view = 'edit'; draw(); };
+    reorderable(row, i);
+    el.appendChild(row);
+  });
+}
+
+/* ---------------------------------------------------------- reorder */
+
+/* Order is authored rather than incidental: `course` wants a rest phrase at
+   least every eight, and phrase 0 is what the generator falls back to when
+   nothing else fits the entry level and tier. Any move invalidates the last
+   report, which is keyed by index. */
+function move(from, to) {
+  if (from === to || to < 0 || to >= patterns.length || !patterns[from])
+    return;
+  patterns.splice(to, 0, patterns.splice(from, 1)[0]);
+  sel = to;
+  forget();
+  draw();
+}
+
+let dragging = null;
+
+/* Dropping onto a phrase takes its place and pushes it the other way, so a
+   drag reads the same in both directions. */
+function reorderable(el, i) {
+  el.draggable = true;
+  el.ondragstart = (e) => {
+    dragging = i;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(i));
+  };
+  el.ondragover = (e) => {
+    if (dragging === null || dragging === i) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drop');
+  };
+  el.ondragleave = () => el.classList.remove('drop');
+  el.ondragend = () => { dragging = null; el.classList.remove('drop'); };
+  el.ondrop = (e) => {
+    e.preventDefault();
+    el.classList.remove('drop');
+    if (dragging !== null) move(dragging, i);
+    dragging = null;
+  };
+}
+
+/* ------------------------------------------------------------ editor */
+
+/* One switch mode a cell, mirroring SPK_SW_* -- 0 none, 1 the platforms wait,
+   2 the ground waits, 3 one for the other. */
+const SW_NONE = 0, SW_PLAT = 1, SW_GROUND = 2, SW_SWAP = 3;
+const SW_MARK = { 1: '▲', 2: '▼', 3: '⇅' };
+const SW_SAYS = {
+  0: 'nothing here waits',
+  1: 'the platforms wait on the switch; the floor stays',
+  2: 'the ground waits on the switch; the platforms stand over the hole',
+  3: 'the switch trades the platforms for the floor',
+};
+
+/* A surface that waits on the switch is drawn as a promise, exactly as the
+   game draws it. */
+function waiting(c, level) {
+  if (c.sw === SW_SWAP) return level === 0;
+  if (c.sw === SW_PLAT) return level > 0;
+  if (c.sw === SW_GROUND) return level === 0;
+  return false;
+}
+
+function cellClass(c, level) {
+  if (!c.surfaces.includes(level)) return '';
+  return waiting(c, level) ? 'wait' : 'surf';
+}
+
+/* What a press buys, mirroring SPK_ARC_UP and SPK_CLIMB_UP in spike_world.h.
+   The arc rises two levels; the landing gains one. They are different
+   numbers on purpose -- a jump that landed wherever its arc reached made the
+   middle of the field pointless. */
+const ARC_UP = 2, CLIMB_UP = 1;
+
+/* Whether a diamond at this level can be occupied at all. Two ways: stood on,
+   which needs the level to be within a climb of the cell before it; or passed
+   through at the apex, which still reaches two.
+
+   Standing is the half that changed. It used to be enough for a surface to be
+   there, because a jump could land on anything within two -- now it has to be
+   somewhere the player can actually get to.
+
+   Local and advisory, and deliberately not a solver: Validate answers it
+   properly by shelling out to the real rules. Anything cleverer here would be
+   right the day it was written and wrong the day spike_world.c next moved. */
+function reachable(p, i, level) {
+  const c = p.cells[i];
+  const prev = i > 0 ? p.cells[i - 1].surfaces : [p.entry];
+
+  /* Dropping is free, so any earlier level at or above this one reaches it;
+     climbing is capped at CLIMB_UP. */
+  if (c.surfaces.includes(level) && prev.some(l => level <= l + CLIMB_UP))
+    return true;
+
+  return prev.includes(level - ARC_UP);
+}
+
+function cellMark(p, i, level) {
+  const c = p.cells[i];
+  let m = '';
+
+  if (c.surfaces.includes(level))
+    m += '<span class="g s">' + (waiting(c, level) ? '┄' : '▬') + '</span>';
+  if (c.diamond === level)
+    m += '<span class="g d">◆' +
+         (reachable(p, i, level) ? '' : '<span class="bad">!</span>') +
+         '</span>';
+  if (c.creature === level)
+    m += '<span class="g c">' + (c.spiked ? '☗' : '●') + '</span>';
+  if (c.flyer === level)
+    m += '<span class="g c">✦' + (laneOk(p, i) ? '' :
+         '<span class="bad">!</span>') + '</span>';
+  if (c.switch === level) m += '<span class="g w">▲</span>';
+
+  return m;
+}
+
+/* A flyer flies in over the three cells after its own, so those have to be
+   inside the phrase: authored any later and it arrives over cells this
+   phrase does not own, and what it is drawn through is whatever the
+   assembler happened to lay next. Nothing in the game checks this. */
+function laneOk(p, i) {
+  return p.length - 1 - i >= 3;
+}
+
+function applyTool(c, level) {
+  if (tool === 'surface') {
+    const i = c.surfaces.indexOf(level);
+    if (i >= 0) c.surfaces.splice(i, 1); else c.surfaces.push(level);
+  } else if (tool === 'erase') {
+    const i = c.surfaces.indexOf(level);
+    if (i >= 0) c.surfaces.splice(i, 1);
+    if (c.diamond === level) c.diamond = null;
+    if (c.creature === level) c.creature = null;
+    if (c.flyer === level) c.flyer = null;
+    if (c.switch === level) c.switch = null;
+    if (level === 0) c.spring = false;
+  } else if (tool === 'creature' || tool === 'spiked') {
+    /* One creature a cell, so the two tools set the same slot and differ
+       only in what is standing there. A flyer is a creature that arrives,
+       so the two are exclusive as well -- a cell holding both is a cell the
+       game would draw twice over. */
+    const want = tool === 'spiked';
+    if (c.creature === level && c.spiked === want) c.creature = null;
+    else { c.creature = level; c.spiked = want; c.flyer = null; }
+  } else if (tool === 'flyer') {
+    if (c.flyer === level) c.flyer = null;
+    else { c.flyer = level; c.creature = null; }
+  } else {
+    c[tool] = (c[tool] === level) ? null : level;
+  }
+}
+
+function drawEditor() {
+  const p = patterns[sel];
+  const e = $('editor');
+  if (!p) { e.innerHTML = '<p class="hint">No phrase selected.</p>'; return; }
+
+  e.innerHTML = '';
+
+  /* --- metadata --- */
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  const len = document.createElement('select');
+  [4, 8, 12, 16].forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n + ' cells';
+    if (n === p.length) o.selected = true;
+    len.appendChild(o);
+  });
+  len.onchange = () => { p.length = +len.value; fit(p); draw(); };
+
+  const diff = document.createElement('select');
+  [0,1,2,3,4,5,6].forEach(n => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = 'difficulty ' + n;
+    if (n === p.difficulty) o.selected = true;
+    diff.appendChild(o);
+  });
+  diff.onchange = () => { p.difficulty = +diff.value; drawList(); };
+
+  /* The two fields nothing here used to show, and which kept being left at 0
+     while the cells said otherwise. They are what the assembler joins phrases
+     by: entry is the level the player arrives on, exit the level they are
+     handed to the next phrase at. */
+  const lvSel = (key, label) => {
+    const sel = document.createElement('select');
+    for (let n = 0; n < LEVELS; n++) {
+      const o = document.createElement('option');
+      o.value = n; o.textContent = label + ' ' + n;
+      if (n === p[key]) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.onchange = () => { p[key] = +sel.value; draw(); };
+    return sel;
+  };
+  const ent = lvSel('entry', 'enter at');
+  const ext = lvSel('exit', 'leave at');
+
+  const tags = document.createElement('div');
+  tags.className = 'tags';
+  TAGS.forEach(t => {
+    const b = document.createElement('button');
+    b.textContent = t;
+    if (p.tags.includes(t)) b.className = 'on';
+    b.onclick = () => {
+      const i = p.tags.indexOf(t);
+      if (i >= 0) p.tags.splice(i, 1); else p.tags.push(t);
+      p.tags.sort((a, b2) => TAGS.indexOf(a) - TAGS.indexOf(b2));
+      draw();
+    };
+    tags.appendChild(b);
+  });
+
+  meta.append(len, diff, ent, ext, tags);
+  e.appendChild(meta);
+
+  /* What Check said about this phrase, beside the phrase it is about.
+     The check covers a hundred and more, and a fault read off the end of a
+     scrolling list has to be carried back here by hand. */
+  {
+    const r = report[sel];
+
+    if (r) {
+      const v = document.createElement('div');
+      v.className = 'verdict ' + (r.fault ? 'bad' : 'good');
+
+      const h = document.createElement('div');
+      h.className = 'vhead';
+      h.textContent = r.fault
+        ? (r.faults.length || 1) + (r.faults.length === 1 ? ' fault' : ' faults')
+        : 'clean';
+      v.appendChild(h);
+
+      r.faults.forEach(f => {
+        const li = document.createElement('div');
+        li.className = 'vfault';
+        li.textContent = f;
+        v.appendChild(li);
+      });
+
+      const s = document.createElement('div');
+      s.className = 'vline';
+      s.textContent = (r.lines ? r.lines.toLocaleString() + ' lines cross · ' : '')
+        + r.summary + (r.best ? ' · fewest presses: ' + r.best : '');
+      v.appendChild(s);
+
+      e.appendChild(v);
+    }
+  }
+
+  /* Whether the declaration agrees with what has been drawn.
+     Validate answers it properly, but not until a save -- and a phrase whose
+     entry or exit names a level with no surface under it is one the assembler
+     will hand to a phrase built for somewhere else. Worth knowing while it is
+     being drawn rather than afterwards. */
+  {
+    const first = p.cells[0].surfaces;
+    const last = p.cells[p.length - 1].surfaces;
+    const say = [];
+
+    if (!first.includes(p.entry))
+      say.push('<b class="bad">enters at ' + p.entry + '</b> and its first cell has '
+               + (first.length ? 'only ' + first.slice().sort().join(', ') : 'no surface'));
+    if (!last.includes(p.exit))
+      say.push('<b class="bad">leaves at ' + p.exit + '</b> and its last cell has '
+               + (last.length ? 'only ' + last.slice().sort().join(', ') : 'no surface'));
+
+    /* Two floors at the end means the player decides, and the field can only
+       name one. The lower is the safe answer: anyone higher drops to it,
+       where anyone lower would find nothing and fall. */
+    if (say.length === 0 && last.length > 1)
+      say.push('ends on ' + last.slice().sort().join(' or ')
+               + ', so where the player finishes is up to them -- declare the '
+               + 'lowest, since anyone higher drops to it safely');
+
+    if (say.length) {
+      const w = document.createElement('p');
+      w.className = 'hint';
+      w.innerHTML = 'This phrase ' + say.join('; and ') + '.';
+      e.appendChild(w);
+    }
+
+    /* The other levels the assembler will hand this phrase to. It never asks:
+       a level with a surface at both ends is walked into, and the pair of
+       fields above has no room to say so. Entered that way the phrase leaves
+       where it was entered, so only the declared route changes level. */
+    const also = [];
+    for (let n = 0; n < LEVELS; n++)
+      if (n !== p.entry && first.includes(n) && last.includes(n))
+        also.push(n);
+
+    if (also.length) {
+      const w = document.createElement('p');
+      w.className = 'hint';
+      w.innerHTML = 'Also played at <b>level ' + also.join(' and ') + '</b>, '
+        + 'entering and leaving there &mdash; both ends carry a surface, which '
+        + 'is the whole of what decides it. Only the declared '
+        + p.entry + '&nbsp;&rarr;&nbsp;' + p.exit + ' route changes level.';
+      e.appendChild(w);
+    }
+  }
+
+  /* --- tools --- */
+  const tools = document.createElement('div');
+  tools.id = 'tools';
+  TOOLS.forEach(([k, label]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (tool === k) b.className = 'on';
+    b.onclick = () => { tool = k; draw(); };
+    tools.appendChild(b);
+  });
+  e.appendChild(tools);
+
+  /* --- grid --- */
+  const t = document.createElement('table');
+  t.className = 'grid';
+
+  const head = document.createElement('tr');
+  head.className = 'head';
+  head.innerHTML = '<th></th>' +
+    p.cells.map((_, i) => '<td>' + i + '</td>').join('');
+  t.appendChild(head);
+
+  for (let level = LEVELS - 1; level >= 0; level--) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<th>' + (level ? 'level ' + level : 'ground') + '</th>';
+    p.cells.forEach((c, i) => {
+      const td = document.createElement('td');
+      td.className = cellClass(c, level);
+      td.innerHTML = cellMark(p, i, level);
+      td.onclick = () => { applyTool(c, level); draw(); };
+      tr.appendChild(td);
+    });
+    t.appendChild(tr);
+  }
+
+  /* Block, and the two switch flags: these belong to the cell rather than
+     to a level, so they get rows of their own under the grid -- across a
+     gap, because a row's slip off the ground row would otherwise author a
+     block instead of a surface. The tools above do not apply to them. */
+  const gap = document.createElement('tr');
+  gap.className = 'gap';
+  gap.innerHTML = '<th>per cell</th>' +
+    p.cells.map(() => '<td></td>').join('');
+  t.appendChild(gap);
+
+  /* The four beats of the block's own cycle, with the beat the player
+     arrives on in bold -- which is the only one that decides anything. */
+  const blk = document.createElement('tr');
+  blk.className = 'cellrow';
+  blk.innerHTML = '<th>block</th>';
+  p.cells.forEach((c, i) => {
+    const td = document.createElement('td');
+    td.className = 'blk';
+    if (c.block !== null) {
+      let html = '';
+      for (let b = 0; b < 4; b++) {
+        const up = (c.block >> b) & 1 ? '▔' : '▁';
+        html += (b === (i & 3)) ? '<b>' + up + '</b>' : up;
+      }
+      td.innerHTML = html;
+      td.className = 'blk surf';
+    }
+    td.onclick = () => {
+      /* The four up-stop-down-stop phases, then off. */
+      const cycle = [3, 6, 12, 9, null];
+      const at = cycle.indexOf(c.block);
+      c.block = cycle[(at + 1) % cycle.length];
+      draw();
+    };
+    blk.appendChild(td);
+  });
+  t.appendChild(blk);
+
+  const wait = document.createElement('tr');
+  wait.className = 'cellrow';
+  wait.innerHTML = '<th>waits</th>';
+  p.cells.forEach(c => {
+    const td = document.createElement('td');
+    const overhead = c.surfaces.some(l => l > 0);
+    const floor = c.surfaces.includes(0);
+
+    td.textContent = SW_MARK[c.sw] || '';
+    td.title = SW_SAYS[c.sw];
+    if (c.sw) td.className = 'surf';
+
+    /* A mode with nothing to act on turns nothing on, and the validator
+       calls it a fault; say so here instead of at Validate time. */
+    let bad = '';
+    if (c.sw === SW_PLAT && !overhead)
+      bad = 'no platform above the floor to wait: use the next state to make '
+          + 'the ground itself wait, or clear this';
+    else if (c.sw === SW_GROUND && !floor)
+      bad = 'no ground here to wait: this cell is already a hole';
+    else if (c.sw === SW_SWAP && !(floor && overhead))
+      bad = 'a swap needs a floor and a platform to trade: draw both, and the '
+          + 'switch turns one into the other';
+
+    if (bad) {
+      td.innerHTML = '<span class="bad">' + SW_MARK[c.sw] + '!</span>';
+      td.title = bad;
+    }
+
+    td.onclick = () => { c.sw = (c.sw + 1) & 3; draw(); };
+    wait.appendChild(td);
+  });
+  t.appendChild(wait);
+
+  /* The spring: on the ground and nowhere else, so it is the cell's property
+     rather than a level's, and it sits with the other two. */
+  const spr = document.createElement('tr');
+  spr.className = 'cellrow';
+  spr.innerHTML = '<th>spring</th>';
+  p.cells.forEach(c => {
+    const td = document.createElement('td');
+
+    td.textContent = c.spring ? '⤴' : '';
+    td.title = c.spring
+      ? 'landed on from above it launches to the top level; walked over it '
+        + 'does nothing'
+      : 'no spring here';
+    if (c.spring) td.className = 'surf';
+
+    if (c.spring && !c.surfaces.includes(0)) {
+      td.innerHTML = '<span class="bad">⤴!</span>';
+      td.title = 'a spring stands on the ground, and there is none here';
+    }
+
+    td.onclick = () => { c.spring = !c.spring; draw(); };
+    spr.appendChild(td);
+  });
+  t.appendChild(spr);
+
+  e.appendChild(t);
+
+  const legend = document.createElement('div');
+  legend.className = 'legend';
+  legend.innerHTML =
+    '<span><b class="s">▬</b> surface</span>' +
+    '<span><b class="s">┄</b> waits on the switch</span>' +
+    '<span><b class="d">◆</b> diamond</span>' +
+    '<span><b class="c">●</b> creature</span>' +
+    '<span><b class="c">☗</b> spiked — fatal from above too</span>' +
+    '<span><b class="c">✦</b> flyer — flies in from the right, arrives here; '
+      + 'the spike kills, the flank stomps</span>' +
+    '<span><b class="w">▲</b> switch</span>' +
+    '<span><b>⤴</b> spring</span>' +
+    '<span><b>▲▼⇅</b> platforms / ground / trade</span>' +
+    '<span><b>▔▁</b> block up / down</span>' +
+    '<span><b class="bad">!</b> nothing can be there</span>';
+  e.appendChild(legend);
+
+  /* One line for what a click does, and the two rows that are not obvious
+     folded away behind it. The rules they describe do not change while a
+     phrase is being drawn, so they are reference rather than instruction. */
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.innerHTML =
+    'Click a cell to apply the chosen tool. The <b>per cell</b> rows below ' +
+    'the gap ignore the tools and cycle on click.' +
+    '<details><summary>What the per-cell rows cycle through</summary>' +
+    '<p><b>spring</b> — on or off, and only on the ground. Landed on ' +
+    'from above it launches to the top level, which no press from the ' +
+    'ground reaches; walked over it does nothing, so missing one costs ' +
+    'nothing.</p>' +
+    '<p><b>block</b> — the four up-stop-down-stop phases, then off. ' +
+    'Its four marks are the four beats of the cycle; the bold one is the ' +
+    'beat the player arrives on, which is the only one that decides ' +
+    'anything.</p>' +
+    '<p><b>waits</b> — one of three things the phrase’s switch ' +
+    'does here, never a combination. ▲ its platforms wait and the ' +
+    'floor stays; ▼ the ground waits and the platforms stand over the ' +
+    'hole; ⇅ one is traded for the other. A hole is one cell to jump, ' +
+    'so missing a switch costs a press and never the run — and ⇅ ' +
+    'offers a high line for no press and a walk for one, so a diamond up ' +
+    'there is reachable only by the line that never pressed.</p>' +
+    '</details>';
+  e.appendChild(hint);
+
+  /* --- preview --- */
+  e.appendChild(preview(p));
+
+  /* --- note --- */
+  const lab = document.createElement('div');
+  lab.className = 'hint';
+  lab.textContent = 'Note, kept with the phrase:';
+  const note = document.createElement('textarea');
+  note.value = p.note || '';
+  note.oninput = () => { p.note = note.value.replace(/\s+/g, ' ').trim(); };
+  e.append(lab, note);
+
+  if (report[sel] && report[sel].detail) {
+    const d = document.createElement('pre');
+    d.className = 'hint';
+    d.style.whiteSpace = 'pre-wrap';
+    d.textContent = report[sel].detail;
+    e.appendChild(d);
+  }
+}
+
+/* -------------------------------------------------- the field, drawn */
+
+const CELL = 32, LEVEL = 20, GROUND = 96, PAD = 8;
+
+/* The creature's measurements, as spike_draw.c has them, so the flyer drawn
+   here is the flyer drawn there rather than an impression of it. */
+const CR_TOP = 12, CR_BOT = 9, CR_BODY = 11, CR_UP = 12, CR_HIP = 3,
+      FOOT_IN = 2, SPK_W = 5, SPK_H = 8, FLY_MID = 13;
+
+function svgEl(name, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', name);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+/* `still` drops the block animation and draws the bar's whole travel in one
+   frame instead; `scale` shrinks the drawing without changing it. */
+function preview(p, still, scale) {
+  const w = p.length * CELL + PAD * 2;
+  const h = still ? 112 : 140;
+  const k = scale || 1;
+  const svg = svgEl('svg', { 'class': 'preview',
+                             width: Math.round(w * k),
+                             height: Math.round(h * k),
+                             viewBox: '0 0 ' + w + ' ' + h });
+  const ink = '#17181c';
+  const line = (x1, y1, x2, y2, dash) =>
+    svg.appendChild(svgEl('line', { x1, y1, x2, y2, stroke: ink,
+      'stroke-width': 2, 'stroke-dasharray': dash || '' }));
+
+  p.cells.forEach((c, i) => {
+    const x = PAD + i * CELL;
+    const y0 = GROUND;
+
+    /* Floor, or the hooks that say there is none. A floor waiting on a
+       switch is a hole with the promise of a floor drawn in it. */
+    const live = c.surfaces.includes(0) && !waiting(c, 0);
+    if (live) {
+      line(x, y0, x + CELL, y0);
+      line(x, y0, x, y0 + 4);
+    } else {
+      line(x, y0, x, y0 + 8);
+      line(x + CELL - 2, y0, x + CELL - 2, y0 + 8);
+      if (c.surfaces.includes(0)) line(x + 4, y0, x + CELL - 6, y0, '3 3');
+    }
+
+    for (let lv = 1; lv < LEVELS; lv++) {
+      if (!c.surfaces.includes(lv)) continue;
+      const y = GROUND - LEVEL * lv;
+      if (waiting(c, lv)) {
+        line(x + 3, y, x + CELL - 5, y, '3 3');
+      } else {
+        svg.appendChild(svgEl('rect', { x: x + 3, y: y, width: CELL - 8,
+          height: 8, fill: 'none', stroke: ink, 'stroke-width': 2 }));
+      }
+    }
+
+    if (c.diamond !== null) {
+      const cx = x + CELL / 2, cy = GROUND - LEVEL * c.diamond - 13;
+      svg.appendChild(svgEl('polygon', {
+        points: [cx, cy - 6, cx + 5, cy, cx, cy + 6, cx - 5, cy].join(' '),
+        fill: 'none', stroke: ink, 'stroke-width': 2 }));
+    }
+
+    if (c.creature !== null) {
+      const cx = x + CELL / 2, base = GROUND - LEVEL * c.creature;
+      svg.appendChild(svgEl('rect', { x: cx - 9, y: base - 20, width: 18,
+        height: 10, fill: ink }));
+      line(cx - 3, base - 10, cx - 7, base);
+      line(cx + 3, base - 10, cx + 7, base);
+      if (c.spiked) {
+        line(cx - 5, base - 20, cx, base - 30);
+        line(cx + 5, base - 20, cx, base - 30);
+      }
+    }
+
+    /* The flyer: where it lands, and where it came from.
+
+       Drawn solid in the cell it is authored in -- the cell it meets the
+       player in -- and again, faintly, one cell to the right for each beat
+       still to come, because that is where it was on those beats. It flies
+       right to left at a cell a beat while the world scrolls the other way
+       under it, so on the panel it closes at two.
+
+       The ghosts are not decoration: they are the lane. Those three cells
+       are what its body is drawn through on the way in, so they have to be
+       inside the phrase and carry nothing in the storey above it, and
+       neither of those is checked anywhere else. A ghost hanging off the
+       right-hand edge of the picture is that fault, drawn. */
+    if (c.flyer !== null) {
+      const mid = GROUND - LEVEL * c.flyer - FLY_MID;
+
+      for (let back = 3; back >= 0; back--) {
+        const nose = x + CELL / 2 - (SPK_H + CR_BODY + CR_UP) / 2 + SPK_H
+                     + back * CELL;
+        const tail = nose + CR_BODY;
+        const g = svgEl('g', { opacity: back ? 0.16 * (4 - back) : 1 });
+
+        /* The shell on its side, wide at the nose and tapering back -- the
+           same outline the game draws, turned a quarter turn. */
+        g.appendChild(svgEl('polygon', {
+          points: [nose, mid - CR_TOP, tail, mid - CR_BOT,
+                   tail, mid + CR_BOT, nose, mid + CR_TOP].join(' '),
+          fill: 'none', stroke: ink, 'stroke-width': 2 }));
+
+        /* The legs, trailing and solid, which is what tells the two ends
+           apart: a thin V in front and two filled wedges behind. Drawn
+           straight back, the half of the kick that carries it. */
+        [-1, 1].forEach((side) => g.appendChild(svgEl('polygon', {
+          points: [tail, mid + side * CR_BOT, tail, mid + side * CR_HIP,
+                   tail + CR_UP, mid + side * FOOT_IN].join(' '),
+          fill: ink })));
+
+        /* ...and the spike out in front, which is what a walk runs into. */
+        [-1, 1].forEach((side) => g.appendChild(svgEl('line', {
+          x1: nose, y1: mid + side * SPK_W, x2: nose - SPK_H, y2: mid,
+          stroke: ink, 'stroke-width': 2 })));
+
+        svg.appendChild(g);
+      }
+    }
+
+    /* The spring, always on the ground: two plates and a zigzag, as the game
+       draws it. */
+    if (c.spring) {
+      const cx = x + CELL / 2, top = GROUND - 11;
+      line(cx - 8, top, cx + 8, top);
+      line(cx - 8, top, cx + 8, top + 4);
+      line(cx + 8, top + 4, cx - 8, top + 8);
+      line(cx - 8, top + 8, cx + 8, GROUND);
+    }
+
+    if (c.switch !== null) {
+      const cx = x + CELL / 2, base = GROUND - LEVEL * c.switch;
+      line(cx - 8, base - 6, cx + 8, base - 6);
+      line(cx - 8, base - 6, cx - 8, base);
+      line(cx + 8, base - 6, cx + 8, base);
+    }
+
+    if (c.block !== null) {
+      const cx = x + CELL / 2;
+      const up = GROUND - 40, down = GROUND - 14;
+      /* Every beat of the cycle in turn, so the shape of it can be *seen*.
+         A still frame shows only where the block happens to be on the beat
+         the player arrives, which is the one thing the author already
+         knows. */
+      const ys = [0, 1, 2, 3].map(b => ((c.block >> b) & 1) ? up : down);
+
+      /* A still frame is read, not watched, so it is drawn as the beat the
+         player arrives on -- the only one that decides anything -- with the
+         far end of the travel dashed behind it. */
+      if (still) {
+        const here = ys[i & 3];
+        const away = ys.find(y => y !== here);
+        if (away !== undefined)
+          svg.appendChild(svgEl('rect', { x: cx - 7, y: away, width: 14,
+            height: 14, fill: 'none', stroke: ink, 'stroke-width': 1,
+            'stroke-dasharray': '3 3', opacity: 0.45 }));
+        svg.appendChild(svgEl('rect', { x: cx - 7, y: here, width: 14,
+          height: 14, fill: 'none', stroke: ink, 'stroke-width': 2 }));
+        return;
+      }
+
+      const r = svgEl('rect', { x: cx - 7, y: ys[0], width: 14, height: 14,
+        fill: 'none', stroke: ink, 'stroke-width': 2 });
+
+      r.appendChild(svgEl('animate', {
+        attributeName: 'y', dur: '2s', repeatCount: 'indefinite',
+        calcMode: 'spline',
+        keyTimes: '0;0.25;0.5;0.75;1',
+        keySplines: '.4 0 .2 1;.4 0 .2 1;.4 0 .2 1;.4 0 .2 1',
+        values: ys.concat(ys[0]).join(';') }));
+      svg.appendChild(r);
+
+      /* And a mark under the cell on the beat the player is there, so the
+         author can watch the two line up. */
+      const tick = svgEl('polygon', {
+        points: [cx - 4, GROUND + 12, cx + 4, GROUND + 12,
+                 cx, GROUND + 5].join(' '), fill: ink, opacity: 0 });
+      tick.appendChild(svgEl('animate', {
+        attributeName: 'opacity', dur: '2s', repeatCount: 'indefinite',
+        calcMode: 'discrete',
+        keyTimes: '0;0.25;0.5;0.75',
+        values: [0, 1, 2, 3].map(b => b === (i & 3) ? 1 : 0).join(';') }));
+      svg.appendChild(tick);
+    }
+  });
+
+  return svg;
+}
+
+/* ---------------------------------------------------- contact sheet */
+
+const SHEET_SCALE = 0.6;
+
+function drawSheet() {
+  const e = $('editor');
+  e.innerHTML = '';
+
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.innerHTML = 'Every phrase in the order the C array holds them. Click ' +
+    'one to edit it; drag one onto another to put it there. A block stands ' +
+    'where it is on the beat the player arrives, its other end dashed.';
+  e.appendChild(hint);
+
+  const sheet = document.createElement('div');
+  sheet.id = 'sheet';
+
+  patterns.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'card' + (i === sel ? ' sel' : '');
+    const r = report[i];
+    if (r) card.className += r.fault ? ' bad' : ' good';
+    card.style.width =
+      Math.round((p.length * CELL + PAD * 2) * SHEET_SCALE) + 18 + 'px';
+
+    const head = document.createElement('div');
+    head.className = 'cardhead';
+    head.innerHTML = '<b>' + i + '</b>' +
+      '<span>' + (p.tags.join(' ') || '&mdash;') + '</span>' +
+      '<span class="d">d' + p.difficulty +
+      (r ? ' &middot; ' + (r.fault ? verdictWord(r) : r.summary) : '') + '</span>';
+    card.appendChild(head);
+    card.appendChild(preview(p, true, SHEET_SCALE));
+
+    if (p.note) {
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.textContent = p.note;
+      n.title = p.note;
+      card.appendChild(n);
+    }
+
+    card.onclick = () => { sel = i; view = 'edit'; draw(); };
+    reorderable(card, i);
+    sheet.appendChild(card);
+  });
+
+  e.appendChild(sheet);
+}
+
+/* ---------------------------------------------------------- actions */
+
+/* The phrases as the file keeps them: one a line */
+function phrasesText() {
+  patterns.forEach(fit);
+  const lines = patterns.map(p => {
+    const o = { entry: p.entry, exit: p.exit, difficulty: p.difficulty,
+                tags: p.tags.join('|'),
+                cells: p.cells.slice(0, p.length).map(emitCell) };
+    if (p.note) o.note = p.note;
+    return '    ' + JSON.stringify(o);
+  });
+  return '{\n  "phrases": [\n' + lines.join(',\n') + '\n  ]\n}\n';
+}
+
+async function save() {
+  try {
+    await cart.write(FILE, phrasesText());
+  } catch (e) {
+    msg(e.message);
+    return false;
+  }
+  msg('saved ' + patterns.length + ' phrases');
+  return true;
+}
+
+/* The check: the cart's check.js, which plays each phrase by the game's own
+   rules in world.js, run by the IDE over the phrases as they stand here --
+   saved or not -- with a main.js of its own. What it prints, a line a
+   result, becomes the report each phrase is marked with. */
+const CHECK_MAIN =
+  'function init() { check.begin(data.read(DATA.phrases).phrases); }\n' +
+  'function update() { check.step(); }\n';
+
+async function check() {
+  msg('checking…');
+  let r;
+  try {
+    r = await cart.run({ 'main.js': CHECK_MAIN, 'gen.js': true, 'world.js': true, 'check.js': true,
+                         'data/phrases.json': phrasesText() }, patterns.length + 10);
+  } catch (e) {
+    msg(e.message);
+    return;
+  }
+  forget();
+  const at = n => report[n] || (report[n] = { faults: [], summary: '', best: '', fault: false });
+  for (const ln of r.lines.map(l => l.trim())) {
+    let m = /^phrase (\d+) ok (\d) ?(.*)$/.exec(ln);
+    if (m) {
+      const v = at(+m[1]);
+      v.summary = 'crosses';
+      const line = m[3] ? 'cells ' + m[3].split(',').join(', ') : 'none: it walks';
+      v.best += (v.best ? '; ' : '') + 'from level ' + m[2] + ', ' + line;
+      continue;
+    }
+    m = /^phrase (\d+) (fault|layout) (?:(\d) )?(.*)$/.exec(ln);
+    if (m) {
+      const v = at(+m[1]);
+      v.fault = true;
+      v.faults.push(m[4]);
+      continue;
+    }
+    if (ln !== 'done') leftover.push(ln);
+  }
+  if (r.error) leftover.push('The check stopped: ' + r.error);
+  $('report').hidden = !leftover.length;
+  $('report').textContent = leftover.join('\n');
+  const bad = Object.values(report).filter(x => x.fault).length;
+  msg(r.error ? 'the check stopped: ' + r.error
+      : bad ? bad + ' of ' + patterns.length + ' phrases at fault' : 'all ' + patterns.length + ' phrases cross');
+  draw();
+}
+
+/* An edit invalidates the last report, which is keyed by index. */
+function forget() { report = {}; leftover = []; }
+
+/* What a faulted phrase says in a list, where there is room for a count and
+   not for the fault itself. The whole of it is in the editor. */
+function verdictWord(r) {
+  const n = r.faults.length;
+  return n ? n + (n === 1 ? ' fault' : ' faults') : r.summary;
+}
+
+function draw() {
+  drawList();
+  if (view === 'sheet') drawSheet(); else drawEditor();
+}
+
+$('save').onclick = save;
+$('check').onclick = check;
+$('revert').onclick = load;
+$('up').onclick = () => move(sel, sel - 1);
+$('down').onclick = () => move(sel, sel + 1);
+$('add').onclick = () => {
+  patterns.splice(sel + 1, 0, blankPattern(8));
+  sel += 1; forget(); draw();
+};
+$('dup').onclick = () => {
+  if (!patterns[sel]) return;
+  patterns.splice(sel + 1, 0, JSON.parse(JSON.stringify(patterns[sel])));
+  sel += 1; forget(); draw();
+};
+$('del').onclick = () => {
+  if (patterns.length < 2) return;
+  patterns.splice(sel, 1);
+  if (sel >= patterns.length) sel = patterns.length - 1;
+  forget(); draw();
+};
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    move(sel, sel + (e.key === 'ArrowDown' ? 1 : -1));
+    return;
+  }
+  if (e.key === 'ArrowDown' && sel < patterns.length - 1) { sel++; draw(); }
+  if (e.key === 'ArrowUp' && sel > 0) { sel--; draw(); }
+  if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+});
+
+load();
+</script>
+</body>
+</html>

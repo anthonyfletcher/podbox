@@ -1,7 +1,7 @@
 /* GNU General Public License (version 2+)
  *
  * Arcade native API: the one list of functions a cart can call, read by the
- * engine as an X-macro and by the compiler (tools/arcade) as text.
+ * engine as an X-macro and by the compiler (arcade/sdk) as text.
  *
  *   API(name, slot, min, max, ret, flags, cost, level, version)
  *

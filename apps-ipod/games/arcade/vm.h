@@ -498,7 +498,7 @@ static inline struct value mk(uint32_t tag, int32_t v)
 
 /* Numbers. An integer and a fraction meet as 64-bit 16.16, where an
  * integer n is n * 65536 exactly; results wrap to 32 bits. These are the
- * rules tools/arcade/src/numbers.js states for the compiler. */
+ * rules arcade/sdk/src/numbers.js states for the compiler. */
 static inline int is_num(struct value v)
 {
     return v.tag == T_INT || v.tag == T_FIX;

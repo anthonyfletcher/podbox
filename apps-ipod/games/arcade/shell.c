@@ -12,7 +12,7 @@
  *
  * Parts, in order:
  *   - the cart file and the save file
- *   - the engine's host, and the beat: Spike's clock and the beat tracker
+ *   - the engine's host, and the beat: the music clock and the beat tracker
  *   - sound: the cart's voices on the beep channel
  *   - present: the 8-bit screen and borders, doubled onto the panel
  *   - input: the buttons and the wheel, as btn() and wheel() see them
@@ -63,9 +63,9 @@
 #include "string-extra.h"     /* strmemccpy */
 #include "audio/beat_analyse.h"
 #include "audio/beat_track.h"
-#include "games/spike/spike_bar.h"
-#include "games/spike/spike_clock.h"
-#include "games/spike/spike_music.h"
+#include "games/arcade/music_bar.h"
+#include "games/arcade/music_clock.h"
+#include "games/arcade/music_mood.h"
 #include "audio/spectrum_meter.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
@@ -280,10 +280,10 @@ static int host_playing(void *ctx)
 }
 
 /* ---- the beat ---------------------------------------------------------------
- * beat, from what Spike plays by: its clock (track time steered by the
- * audio), the beat tracker and its analyser, its downbeat and its mood.
- * Beats are the tracker's, unshifted: what Spike's grid and animation
- * land on, and what its presses are judged against. The analyser runs only
+ * beat: the music clock (track time steered by the audio, music_clock.c),
+ * the beat tracker and its analyser, the downbeat (music_bar.c) and the
+ * mood (music_mood.c). Beats are the tracker's, unshifted: what a cart's
+ * presses are judged against. The analyser runs only
  * while the cart listens. The bar is counted from the tracker's lock
  * until the cart asks for the downbeat, and from the downbeat's time
  * after. */
@@ -295,10 +295,10 @@ static int32_t beat_press[5];   /* stamped as each button went down */
 
 static void beat_start(void)
 {
-    spk_clock_reset();
+    music_clock_reset();
     beat_track_reset();
-    spk_bar_reset();
-    spk_music_reset();
+    music_bar_reset();
+    music_mood_reset();
     beat_listening = false;
     beat_bar_ms = -1;
     beat_due = -1;
@@ -311,7 +311,7 @@ static void beat_listen(void *ctx, int on)
     (void)ctx;
     if (on && !beat_listening) {
         beat_analyse_start();
-        spk_bar_reset();
+        music_bar_reset();
         beat_bar_ms = -1;
     } else if (!on && beat_listening)
         beat_analyse_stop();
@@ -362,16 +362,16 @@ static int32_t beat_downbeat(void *ctx, int32_t *margin10)
     int bar, hits;
     beat_track_get(&bt);
     *margin10 = 0;
-    if (!bt.locked || !beat_track_next(spk_clock_ms(), 0, &at, &bar))
+    if (!bt.locked || !beat_track_next(music_clock_ms(), 0, &at, &bar))
         return -1;
     /* a beat the tracker counts as the first of four, twelve bars back:
      * the bar is found from the onsets since then, which have to span 32
      * beats */
     long zero = (long)at - ((long)bar + 48) * (long)bt.period_ms;
-    int rot = spk_bar_downbeat(zero, (int)bt.period_ms);
+    int rot = music_bar_downbeat(zero, (int)bt.period_ms);
     beat_bar_ms = rot < 0 ? -1 : zero + (long)rot * (long)bt.period_ms;
     int m;
-    spk_bar_working(&hits, &m);
+    music_bar_working(&hits, &m);
     *margin10 = m;
     return rot;
 }
@@ -379,14 +379,14 @@ static int32_t beat_downbeat(void *ctx, int32_t *margin10)
 static int32_t beat_now(void *ctx)
 {
     (void)ctx;
-    return (int32_t)spk_clock_now();
+    return (int32_t)music_clock_now();
 }
 
 static void beat_mood(void *ctx, int32_t out[3])
 {
     (void)ctx;
-    struct spk_mood m;
-    spk_music_get(&m);
+    struct music_mood m;
+    music_mood_get(&m);
     out[0] = m.energy;
     out[1] = m.flux;
     out[2] = m.trend;
@@ -487,7 +487,7 @@ static void beat_stamp(struct vm *vm, long b)
             b == BUTTON_MENU && arcade_menu_is_game(vm) ? 2 :
             b == BUTTON_PLAY ? 3 : b == BUTTON_SELECT ? 4 : -1;
     if (i >= 0 && beat_press[i] < 0)
-        beat_press[i] = (int32_t)spk_clock_now();
+        beat_press[i] = (int32_t)music_clock_now();
 }
 
 /* Before each tick: the clock carried to now, the analyser fed while the
@@ -497,7 +497,7 @@ static void beat_tick(struct vm *vm)
 {
     struct arcade_music m;
     ticks_heard++;
-    m.jumped = !spk_clock_tick();
+    m.jumped = !music_clock_tick();
     m.changed = shell_tracks_tick();
     if (m.jumped) {
         /* a seek, a skip, a new track: the tempo and the bar start again */
@@ -505,23 +505,23 @@ static void beat_tick(struct vm *vm)
             beat_analyse_start();
         else
             beat_track_reset();
-        spk_bar_reset();
-        spk_music_reset();
+        music_bar_reset();
+        music_mood_reset();
         beat_bar_ms = -1;
         beat_due = -1;
     }
     if (beat_listening) {
         beat_analyse_poll();
-        spk_bar_listen();
+        music_bar_listen();
     }
-    unsigned long now = spk_clock_ms(), at;
+    unsigned long now = music_clock_ms(), at;
     if (beat_due >= 0 && (long)now >= beat_due) {
-        spk_music_beat();
+        music_mood_beat();
         beat_due = -1;
     }
     if (beat_due < 0 && beat_track_next(now + 1, 0, &at, NULL))
         beat_due = (long)at;
-    unsigned long left = spk_clock_left_ms();
+    unsigned long left = music_clock_left_ms();
     m.clock = (int32_t)now;
     m.left = left > 0x7fffffff ? 0x7fffffff : (int32_t)left;
     for (int i = 0; i < 5; i++) {
@@ -1466,7 +1466,7 @@ static int run(const char *path, void *mem, size_t size)
                 shell_tracks_hold(false);
             suspend = status == QUIT;
             shell_scores_run(true);
-            spk_clock_resume();
+            music_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = call_began = current_tick;
             continue;
@@ -1477,7 +1477,7 @@ static int run(const char *path, void *mem, size_t size)
             if (status == PLAYING)
                 shell_tracks_hold(false);
             shell_scores_run(true);
-            spk_clock_resume();
+            music_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = call_began = current_tick;
             continue;
@@ -1503,7 +1503,7 @@ static int run(const char *path, void *mem, size_t size)
                 break;
             }
             shell_tracks_hold(false);
-            spk_clock_resume();
+            music_clock_resume();
             present(vm, true);
             start = current_tick - (long)((frame * HZ) / rate);
             touched = current_tick;
@@ -1545,7 +1545,7 @@ static int run(const char *path, void *mem, size_t size)
         }
         if (dialog_shown) {
             dialog_shown = false;
-            spk_clock_resume();
+            music_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = current_tick;
             if (dialog_to_root) {
@@ -1557,7 +1557,7 @@ static int run(const char *path, void *mem, size_t size)
         int rank, board = arcade_score_shown(vm, &rank);
         if (board >= 0) {
             status = show_scores(vm, &vp, board, rank);
-            spk_clock_resume();
+            music_clock_resume();
             start = current_tick - (long)((frame * HZ) / rate);
             touched = call_began = current_tick;
             continue;

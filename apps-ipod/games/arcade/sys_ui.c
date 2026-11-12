@@ -19,7 +19,7 @@
  * The host also asks through it (the resume question) and lays the
  * achievement banner over the game's top rows with it.
  *
- * tools/arcade/lib/gui.js draws the same pieces for a cart's own screens,
+ * arcade/sdk/lib/gui.js draws the same pieces for a cart's own screens,
  * and a test checks the two give the same pixels: change the drawing here
  * and change it there.
  *

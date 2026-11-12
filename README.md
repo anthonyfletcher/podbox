@@ -867,11 +867,11 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Drawn with Galmuri (Lee Minseo), Miseki Bitmap (Mark Li), BoutiqueBitmap7x7
     (Luke Liu) and Misaki (Num Kadoma)
   - Licensed under the SIL Open Font License, Version 1.1, and Misaki under its
-    own free licence — [full text](tools/arcade/fonts/LICENSE-world.txt)
+    own free licence — [full text](arcade/sdk/fonts/LICENSE-world.txt)
 
 ### The Arcade IDE
 
-The Arcade's game editor, in `tools/arcade/`, is built with these projects. The
+The Arcade's game editor, in `arcade/sdk/`, is built with these projects. The
 licences of all the code it takes in are kept in full in the built file.
 
 - [CodeMirror](https://codemirror.net) and [Lezer](https://lezer.codemirror.net),
@@ -899,7 +899,7 @@ licences of all the code it takes in are kept in full in the built file.
     and cloudlibc (Nuxi)
   - Licensed under the MIT License, musl's parts under the MIT License and
     cloudlibc's under the BSD 2-Clause License —
-    [full text](tools/arcade/wasm/LICENSE-libc.txt)
+    [full text](arcade/sdk/wasm/LICENSE-libc.txt)
 - [esbuild](https://esbuild.github.io), which builds the editor
   - Copyright Evan Wallace
   - Licensed under the MIT License

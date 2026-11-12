@@ -76,7 +76,7 @@
 #include "rbpaths.h"
 #include "iap-library.h"
 #include "iap-core.h"
-#include "games/quiz/quiz.h"
+#include "games/arcade/shell_tracks.h"
 
 /* iAP's database categories */
 enum {
@@ -1189,7 +1189,7 @@ bool iap_library_start(int index)
 
 bool iap_library_queue_lent(void)
 {
-    return music_quiz_has_playlist();
+    return shell_tracks_owned();
 }
 
 static int claims;

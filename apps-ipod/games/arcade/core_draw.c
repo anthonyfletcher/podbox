@@ -107,7 +107,7 @@ static uint32_t region(struct vm *vm, uint32_t bytes)
 }
 
 /* ---- assets -------------------------------------------------------------- *
- * The chunks' layouts are tools/arcade/src/assets.js's. Each is checked
+ * The chunks' layouts are arcade/sdk/src/assets.js's. Each is checked
  * whole when the cart loads, so the natives below can trust them. */
 
 static uint32_t le16(const uint8_t *p)

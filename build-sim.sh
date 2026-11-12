@@ -98,6 +98,7 @@ make zip
 ../bundle-trim.sh
 ../bundle-speech.sh
 ../bundle-font.sh
+../bundle-games.sh
 
 # Install into the player's storage by unzipping over the top. What the player
 # wrote under .rockbox -- library/, logs/, config.cfg -- is kept, and so is a

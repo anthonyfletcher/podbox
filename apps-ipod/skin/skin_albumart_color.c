@@ -1390,9 +1390,10 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
 static void track_change_cb(unsigned short id, void *param)
 {
     (void)param;
-    /* Playback that is not listening -- the Music Quiz's clips -- leaves the
-     * palette alone. Asked for here, the extraction would run once the quiz
-     * gives the screen back, with playback stopped: either a clip's cover
+    /* Playback that is not listening -- a cart's own music, such as a
+     * quiz's clips -- leaves the palette alone. Asked for here, the
+     * extraction would run once the cart gives the screen back, with
+     * playback stopped: either a clip's cover
      * would become the palette, and the one the next boot comes up in, or,
      * finding no track, the theme's colours would come back. */
     if (audio_is_unrecorded())

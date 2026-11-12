@@ -1441,16 +1441,6 @@ const struct settings_list settings[] = {
                   "continue playing", NULL),
     OFFON_SETTING(0, mix_starts_with_selected, LANG_MIX_STARTS_WITH_SELECTED,
                   true, "mix starts with selected", NULL),
-    /* Year is off by default: it is the hard one, and the one that depends on
-     * the tags being right. */
-    OFFON_SETTING(F_BANFROMQS, quiz_title, LANG_QUIZ_KIND_TITLE, true,
-                  "quiz title", NULL),
-    OFFON_SETTING(F_BANFROMQS, quiz_artist, LANG_QUIZ_KIND_ARTIST, true,
-                  "quiz artist", NULL),
-    OFFON_SETTING(F_BANFROMQS, quiz_album, LANG_QUIZ_KIND_ALBUM, true,
-                  "quiz album", NULL),
-    OFFON_SETTING(F_BANFROMQS, quiz_year, LANG_QUIZ_KIND_YEAR, false,
-                  "quiz year", NULL),
     CHOICE_SETTING(0, analysis_depth, LANG_ANALYSIS_DEPTH,
                    ANALYSIS_THOROUGH, "analysis depth", "thorough,quick",
                    NULL, 2,
@@ -2425,12 +2415,6 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, spun_rank_by, LANG_SPUN_RANK_BY, 0, "spun rank by",
                    "plays,minutes", NULL, 2,
                    ID2P(LANG_SPUN_RANK_PLAYS), ID2P(LANG_SPUN_RANK_MINUTES)),
-    CHOICE_SETTING(0, spike_caption, LANG_SPIKE_CAPTION, 0, "spike caption",
-                   "off,title,title and artist", NULL, 3,
-                   ID2P(LANG_OFF), ID2P(LANG_SPIKE_CAPTION_TITLE),
-                   ID2P(LANG_SPIKE_CAPTION_BOTH)),
-    OFFON_SETTING(0, spike_caption_scroll, LANG_SPIKE_CAPTION_SCROLL, false,
-                  "spike caption scroll", NULL),
 };
 
 const int nb_settings = sizeof(settings)/sizeof(*settings);

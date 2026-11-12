@@ -2302,8 +2302,7 @@ int arcade_start(struct vm *vm)
 }
 
 /* The beat analyser's work while a cart listens to the music: about a
- * third of the 5G's time playing (Spike's measurement), at 1.6 us a unit
- * there (spec section 2). It runs in the player's game thread between
+ * third of the 5G's time playing, at 1.6 us a unit there. It runs in the player's game thread between
  * ticks, so a tick reports it with the cart's own units -- the cost the
  * IDE's meter shows -- though it counts nothing toward the ceiling. */
 #define ANALYSER_UNITS_PER_SECOND 208000

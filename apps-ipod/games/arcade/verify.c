@@ -12,7 +12,7 @@
  *     and no path runs off the end;
  *   - every native exists in this firmware and suits the music level.
  *
- * tools/arcade/src/bytecode.js verify() is the reference: the same checks,
+ * arcade/sdk/src/bytecode.js verify() is the reference: the same checks,
  * and the compiler's tests run every cart they make through it.
  ***************************************************************************/
 #include <string.h>

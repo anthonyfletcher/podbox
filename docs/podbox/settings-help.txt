@@ -405,18 +405,6 @@ song you keep restarting; minutes favours albums you sit through and anything
 long. Skips and night plays are counted either way, because neither has a
 listening time to rank by.
 
-[spike caption]
-Names the track under Spike's field, with the time remaining beside it: Title
-shows the track's title, and Title and Artist adds who it is by. The field
-rises to make room, so the game is a little smaller with this on. Off gives
-the whole panel to the game.
-
-[spike caption scroll]
-Whether a track name too long for the space travels along or is simply cut
-off. It steps a character at a time on the beat rather than gliding. Off is
-the calmer choice while you are playing, and shows as much of the name as
-fits. Off as well while Scrolling is off.
-
 [play log]
 Records what was played and when. On feeds the listening statistics; the
 Last.fm setting writes a scrobble log a computer can upload.
@@ -767,22 +755,6 @@ Whether Podcasts' search lists matching episodes or matching shows first.
 
 [search order books]
 Whether Books' search lists matching titles or matching authors first.
-
-[quiz title]
-Music Quiz rounds that play a clip and ask which track it is.
-
-[quiz artist]
-Music Quiz rounds that play a clip and ask who it is by. The wrong answers are
-artists that sound alike, or share the genre and decade, as the game goes on.
-
-[quiz album]
-Music Quiz rounds that play a clip and ask which album it is from. In the later
-rounds the wrong answers are the same artist's other albums.
-
-[quiz year]
-Music Quiz rounds that play a clip and ask what year it is from. The hardest
-kind: the answers start five years apart and end one apart, and they are only
-as right as the year tags.
 
 [segregate audiobooks]
 Auto keeps audiobooks out of the music and gives them an Audiobooks row on the
@@ -1159,8 +1131,7 @@ The loud end of the meter's range.
 [scrolling enabled]
 Whether text too long for its line scrolls. Off, it is cut short with "..."
 instead, in lists, menus, the theme's own scrolling lines and the carousel's
-captions, and the other scroll settings then have nothing to move. Spike's
-Scroll Now Playing does nothing while this is off.
+captions, and the other scroll settings then have nothing to move.
 
 [scroll speed]
 How quickly text too long for its line moves.

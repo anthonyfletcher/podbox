@@ -59,7 +59,6 @@
 #include "screens/shortcuts.h"
 #include "screens/system/beat_debug.h"
 #include "screens/system/probe_debug.h"
-#include "games/spike/spike_tap.h"
 #include "dircache.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
@@ -2083,7 +2082,6 @@ static const struct {
 #endif
         { "Buffers and CPU", dbg_buffering_thread, false, NULL },
         { "Beat analysis", beat_debug_screen, true, NULL },
-        { "Beat tap", spike_tap_screen, false, NULL },
         { "Sound probe", probe_debug_screen, false, NULL },
 #ifdef PM_DEBUG
         { "pm histogram", peak_meter_histogram, true, NULL },

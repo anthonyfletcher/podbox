@@ -7,7 +7,7 @@
 # Pixel's own licence goes beside it as LICENSE-font.txt, and those of the
 # fonts it draws on (its LICENSES folder) in LICENSES-font.
 #
-# font.bin is written by tools/arcade/gen_textfont.py from Fusion Pixel 8 px
+# font.bin is written by arcade/sdk/gen_textfont.py from Fusion Pixel 8 px
 # (proportional, Japanese forms; github.com/TakWolf/fusion-pixel-font, SIL
 # Open Font License 1.1). The release's BDF and licence are kept in
 # $FONT_DIR (default ~/.cache/podbox-font) and fetched there the first time.
@@ -48,7 +48,7 @@ fi
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox/games"
-python3 "$ROOT/tools/arcade/gen_textfont.py" "$FONT_DIR/$BDF" \
+python3 "$ROOT/arcade/sdk/gen_textfont.py" "$FONT_DIR/$BDF" \
     --file "$STAGE/.rockbox/games/font.bin"
 cp "$FONT_DIR/OFL.txt" "$STAGE/.rockbox/games/LICENSE-font.txt"
 cp -R "$FONT_DIR/LICENSES" "$STAGE/.rockbox/games/LICENSES-font"

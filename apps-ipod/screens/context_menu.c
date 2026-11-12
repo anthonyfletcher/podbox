@@ -51,7 +51,6 @@
 #include "widgets/keyboard.h"
 #include "mp3data.h"
 #include "metadata.h"
-#include "games/spike/spike.h"
 #include "database/sound_mix.h"
 #include "database/sound_index.h"
 #include "screens/playback/sound_props.h"
@@ -254,18 +253,6 @@ MENUITEM_FUNCTION(reshuffle_item, 0, ID2P(LANG_SHUFFLE_PLAYLIST),
                   shuffle_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(playing_time_item, 0, ID2P(LANG_PLAYING_TIME),
                   playing_time, NULL, Icon_NOICON);
-
-/* The game takes the playlist as it finds it, so it belongs on the WPS and
- * nowhere else: what it is played against is what is already playing. */
-static int spike_run(void)
-{
-    if (spike_screen())
-        context_menu_result = ONPLAY_MAINMENU;
-    return ONPLAY_OK;
-}
-
-MENUITEM_FUNCTION(spike_run_item, 0, ID2P(LANG_SPIKE_PLAY),
-                  spike_run, NULL, Icon_NOICON);
 
 /* Shuffle and Repeat as the Playback settings have them, at the top of
  * Now Playing's menu where they are wanted most */
@@ -2464,7 +2451,6 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
            &sleep_timer_item,
            &wps_speed_item,
            &sound_mix_item,
-           &spike_run_item,
            &wps_playlist_menu, &cat_playlist_menu,
            &theme_options_item,
            &wps_more_menu,
@@ -3212,7 +3198,7 @@ static const short now_playing_rows[] = {
     LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_GO_TO_ALBUM,
     LANG_GO_TO_ARTIST, LANG_GO_TO_PODCAST, LANG_GO_TO_AUDIOBOOK,
     LANG_GO_TO_AUTHOR, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
-    LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_THEME_OPTIONS,
+    LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_THEME_OPTIONS,
     LANG_SHOW_IN_FILES,
     LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU, LANG_BROWSE_CUESHEET,
     LANG_BROWSE_CHAPTERS, LANG_EQUALIZER, LANG_SOUND_SETTINGS, LANG_PLAYBACK,

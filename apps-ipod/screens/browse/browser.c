@@ -1716,7 +1716,6 @@ static int dirbrowse(void)
                     case GO_TO_FEATURED_ARTISTS:
                     case GO_TO_FEATURED_TRACKS:
                     case GO_TO_BOOK_SHELF:
-                    case GO_TO_MUSIC_QUIZ:
                     case GO_TO_LISTEN_STATS:
                     /* The file browser's and the catalogue's own Search rows
                      * (the FILE_ATTR_SEARCH case in browser_disk_enter()). */

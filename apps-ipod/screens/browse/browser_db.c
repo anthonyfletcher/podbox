@@ -162,7 +162,7 @@ enum table {
     TABLE_FEATURED_TRACKS,
     TABLE_BOOK_RESUME,
     TABLE_BOOK_SHELF,
-    TABLE_MUSIC_QUIZ,
+    TABLE_MUSIC_QUIZ,           /* kept for its number: the Quiz row is gone */
     TABLE_PLAY_UNPLAYED,
     TABLE_SHUFFLE_ALBUMS,
     TABLE_LISTEN_STATS,
@@ -253,7 +253,6 @@ static const struct builtin_row {
       TABLE_ALBUM_CHARTS, ARTIST_CHART_FORGOTTEN,       NULL },
     { "featured_artists", LANG_FEATURED_ARTISTS, TABLE_FEATURED_ARTISTS, 0,
       featured_artists_available },
-    { "quiz", LANG_QUIZ, TABLE_MUSIC_QUIZ, 0, NULL },
     /* The Audiobooks shelves (book_shelf.c), the list in the param */
     { "book_finished", LANG_BOOK_SHELF_ROW_FINISHED, TABLE_BOOK_SHELF,
       BOOK_SHELF_FINISHED, shelf_finished_available },
@@ -5435,8 +5434,6 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         book_shelf_arm(seek);
         return GO_TO_BOOK_SHELF;
     }
-    if (newextra == TABLE_MUSIC_QUIZ)
-        return GO_TO_MUSIC_QUIZ;
     if (newextra == TABLE_LISTEN_STATS)
     {
         listen_progress_arm(seek);

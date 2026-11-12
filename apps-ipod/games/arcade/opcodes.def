@@ -1,7 +1,7 @@
 /* GNU General Public License (version 2+)
  *
  * Arcade bytecode: the one list of instructions, read by the VM and the
- * verifier as an X-macro and by the compiler (tools/arcade) as text.
+ * verifier as an X-macro and by the compiler (arcade/sdk) as text.
  *
  *   OP(name, operands, pops, pushes)
  *

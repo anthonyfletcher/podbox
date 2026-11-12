@@ -15,3 +15,8 @@
 - **Menu now goes to the main menu from an album opened from Album Covers,
   Artist Portraits or Go to Album**, as it does in every other list. Left
   still goes back to the covers, or to Now Playing.
+- **Spike and Music Quiz are now Arcade games**, on the main menu's
+  **Arcade** with Brick Mania. Their old high scores are not carried over,
+  and Music Quiz's Quiz Questions settings and Spike's Now Playing settings
+  are gone: each game keeps its own options in its pause menu. The Music
+  menu's Quiz row and the Now Playing menu's Play Spike are gone with them.

@@ -44,8 +44,6 @@
 #define LIB_AUDIOBOOKS_FILE LIB_USER_DIR "/audiobooks.dat"
 #define LIB_BOOKMARKS_FILE  LIB_USER_DIR "/bookmarks.dat"
 #define LIB_BADGES_FILE     LIB_USER_DIR "/report_badges.dat"
-#define LIB_QUIZ_FILE       LIB_USER_DIR "/quiz_scores.dat"
-#define LIB_SPIKE_FILE      LIB_USER_DIR "/spike_scores.dat"
 #define LIB_READING_FILE    LIB_USER_DIR "/reading.dat"
 #define LIB_READING_STATS_FILE LIB_USER_DIR "/reading_stats.dat"
 #define LIB_LISTEN_STATS_FILE LIB_USER_DIR "/listen_stats.dat"
@@ -64,7 +62,6 @@
 #define LIB_IMAGES_FILE     LIB_CACHE_DIR "/images.dat"
 #define LIB_GAMES_FILE      LIB_CACHE_DIR "/games.dat"
 #define LIB_BOOK_INDEX_FILE LIB_CACHE_DIR "/books.dat"
-#define LIB_SPIKE_RUN_FILE  LIB_CACHE_DIR "/spike_run.dat"
 #define LIB_UNREADABLE_FILE LIB_CACHE_DIR "/unreadable.dat"
 #define LIB_UNREADABLE_LIST LIB_CACHE_DIR "/unreadable.txt"
 #define LIB_COVERS_EMPTY_FILE LIB_ART_DIR "/covers_empty.pfraw"
@@ -101,11 +98,6 @@
 #define LIB_BOOK_INDEX_VERSION 3   /* 2: no series; 1: no subjects */
 #define LIB_MARKS_MAGIC     0x4b52414du     /* "MARK" */
 #define LIB_MARKS_VERSION   1
-#define LIB_QUIZ_MAGIC      0x5a495551u     /* "QUIZ" */
-#define LIB_QUIZ_VERSION    1
-#define LIB_SPIKE_MAGIC     0x534b5053u     /* "SPKS"; and the run, "SPKR" */
-#define LIB_SPIKE_RUN_MAGIC 0x524b5053u
-#define LIB_SPIKE_VERSION   1
 #define LIB_READING_MAGIC   0x44414552u     /* "READ" */
 #define LIB_READING_VERSION 3       /* 2: no flags; 1: no parts */
 #define LIB_READING_STATS_MAGIC 0x41545352u  /* "RSTA" */

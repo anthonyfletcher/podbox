@@ -98,7 +98,7 @@ Ordered by how much they own, as above:
 | `widgets/` | Reusable controls. Called by someone else, hand control back. list, dialog, dialog_prose, yesno, splash, option_select, colour picker, folder select, keyboard, menu, text_box. |
 | `screens/` | Full screens. Navigated *to*; run their own loop until the user leaves. |
 | `viewers/` | File-format applications: their own model, view and input. `text_viewer/` (streaming document engine), `image_viewer/`, `lyric_viewer/`, `playback_viewer/` (the Playback Report), properties, playing_time, and the text reel behind the credits and About pages. |
-| `games/` | Games. One directory each: `spike/`, `quiz/`. A game owns the screen and the whole keymap the way a viewer owns a file format, and runs on a clock of its own rather than on user input, which is why it is not a `screens/` entry. |
+| `games/` | The Arcade, `arcade/`: the game engine, the player's side of it (`shell*.c`, the shelf) and the music clock its beat calls read (`music_*.c`). A cart owns the screen and the whole keymap the way a viewer owns a file format, and runs on a clock of its own rather than on user input, which is why it is not a `screens/` entry. The games themselves are carts, in the repository's `arcade/games/`. |
 | `skin/` | The skin interpreter, backdrops, and the skinned status bar. |
 
 `screens/` is subdivided:

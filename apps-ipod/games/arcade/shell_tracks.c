@@ -154,6 +154,11 @@ static bool owned;
 static char wanted_path[MAX_PATH];
 static int32_t wanted_ms;
 
+bool shell_tracks_owned(void)
+{
+    return owned;
+}
+
 /* The owner's music stopped: a book's place written down first, as every
  * other stop does */
 static void stop_owners(void)
@@ -633,9 +638,9 @@ static int music_enqueue(void *ctx, int32_t id, int next)
                                  false, true) >= 0;
 }
 
-/* What dynamic colours makes of the playing album, as Spike takes it: the
- * theme's background and text through the resolver, and the vivid colour,
- * which without an album palette is the text's */
+/* What dynamic colours makes of the playing album: the theme's background
+ * and text through the resolver, and the vivid colour, which without an
+ * album palette is the text's */
 static uint32_t rgb_of(unsigned c)
 {
     return (uint32_t)RGB_UNPACK_RED(c) << 16 |

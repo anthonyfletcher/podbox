@@ -57,12 +57,12 @@ enum current_activity {
     ACTIVITY_PLAYBACKVIEWER,
     ACTIVITY_SETTINGS_SEARCH,
     ACTIVITY_FEATUREDARTISTS,
-    ACTIVITY_SPIKE,
+    ACTIVITY_SPIKE,             /* the C game, gone: kept for its number */
     ACTIVITY_FILE_SEARCH,
     ACTIVITY_PLAYLIST_SEARCH,
     ACTIVITY_LISTENPROGRESS,
     ACTIVITY_BOOKSHELF,
-    ACTIVITY_MUSICQUIZ,
+    ACTIVITY_MUSICQUIZ,         /* the C game, gone: kept for its number */
     ACTIVITY_ARCADE
 };
 

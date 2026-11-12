@@ -1,0 +1,30 @@
+GIMP Palette
+Name: Spike
+Columns: 8
+#
+  0   0   0	black
+ 26  34  68	dark blue
+107  42  94	dark purple
+ 15 102  64	dark green
+138  82  54	brown
+ 79  74  82	dark grey
+184 180 188	light grey
+246 242 234	white
+232  48  74	red
+245 150  42	orange
+248 228  60	yellow
+ 60 210  80	green
+ 47 156 240	blue
+126 122 168	lavender
+242 122 180	pink
+249 200 154	peach
+ 20  40  60	background
+ 35  55  76	background, shade 2
+ 51  72  94	background, shade 3
+232 240 248	foreground
+207 214 222	foreground, shade 2
+182 190 198	foreground, shade 3
+159 167 174	foreground, shade 4
+ 60 200 160	accent
+ 16 177 138	accent, toward the background
+ 91 225 184	accent, toward the foreground

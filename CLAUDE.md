@@ -192,7 +192,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-speech.sh && ../bundle-font.sh && ../bundle-tools.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-speech.sh && ../bundle-font.sh && ../bundle-games.sh && ../bundle-tools.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -210,19 +210,19 @@ make clean / make veryclean
 close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Scrim, no first-boot `config.cfg`, no
 setting explanations, no title trimming patterns, no speech
-dictionary and no Arcade text font**. Follow it with the bundle scripts --
-`../bundle-theme.sh`, `../bundle-help.sh`, `../bundle-trim.sh`,
-`../bundle-speech.sh`, `../bundle-font.sh`, and for the player
-`../bundle-tools.sh`, which adds the desktop tools as
-`.rockbox/tools/soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`.
-`./build-hw.sh` runs all six and `./build-sim.sh` the first five; a bare
-`make zip` runs none.
+dictionary, no Arcade text font and no Arcade games**. Follow it with the
+bundle scripts -- `../bundle-theme.sh`, `../bundle-help.sh`,
+`../bundle-trim.sh`, `../bundle-speech.sh`, `../bundle-font.sh`,
+`../bundle-games.sh`, and for the player `../bundle-tools.sh`, which adds the
+desktop tools as `.rockbox/tools/soundscan.exe`, `database_pb.exe` and
+`artcache_pb.exe`. `./build-hw.sh` runs all seven and `./build-sim.sh` the
+first six; a bare `make zip` runs none.
 
 Scrim is the only theme in the build. The others in `themes/` are published
 as their own release by `release.sh`, one zip each.
 
-`bundle-help.sh`, `bundle-trim.sh`, `bundle-speech.sh` and `bundle-font.sh`
-are the four whose absence is silent.
+`bundle-help.sh`, `bundle-trim.sh`, `bundle-speech.sh`, `bundle-font.sh` and
+`bundle-games.sh` are the five whose absence is silent.
 The first ships `docs/podbox/settings-help.txt` as
 `.rockbox/docs/settings-help.txt`, and without it every **Explain** entry in a
 setting's context menu finds no file and shows nothing. The second ships
@@ -234,10 +234,14 @@ setting switches on and does nothing. The third ships the synthesiser's
 `.rockbox/langs/english.vstrings`; without them the Built-in voice says
 nothing. The fourth ships `.rockbox/games/font.bin`, the Arcade's
 `FONT.WORLD` kana, Hangul and ideographs (written by
-`tools/arcade/gen_textfont.py` from Fusion Pixel, fetched into
+`arcade/sdk/gen_textfont.py` from Fusion Pixel, fetched into
 `~/.cache/podbox-font` the first time); without it a cart's Japanese,
-Chinese and Korean text shows as `?`. None makes anything else misbehave, so
-a zip built by hand without them looks finished.
+Chinese and Korean text shows as `?`. The fifth builds each cart in
+`arcade/games/` into `.rockbox/games/<folder>.pbg` with the SDK's compiler,
+which needs Node (on the build server, `~/.local/node`) and installs the
+SDK's npm packages the first time; without it the main menu's Arcade has no
+games. None makes anything else misbehave, so a zip built by hand without
+them looks finished.
 
 `bundle-theme.sh` also deletes the `classic_statusbar` theme, which
 `buildzip.pl` copies straight out of `wps/` without consulting `WPSLIST`. It
@@ -251,8 +255,9 @@ written beside it -- a `wps/classic_statusbar/*` pattern does not match those.
 `rockboxui`, storage in `simdisk/` beside it. A Windows `.exe` cross-compiles
 with `--type=as6` (that is **(A)dvanced** plus `s` and `6`; plain `--type=s6`
 silently gives a *normal* build). Follow either with `make zip` and
-`bundle-theme.sh`, `bundle-help.sh`, `bundle-trim.sh`, `bundle-speech.sh` and
-`bundle-font.sh`, then unzip into `simdisk/`, or it starts themeless.
+`bundle-theme.sh`, `bundle-help.sh`, `bundle-trim.sh`, `bundle-speech.sh`,
+`bundle-font.sh` and `bundle-games.sh`, then unzip into `simdisk/`, or it
+starts themeless.
 Read `apps-ipod/sim/README.md` before touching any of it.
 
 ```bash
@@ -494,8 +499,14 @@ hand-built zip with every **Explain** entry silently empty looks finished.
 
 ## Changing the Arcade API
 
+`arcade/` holds the Arcade's side beside the firmware: `arcade/games/`, the
+carts the firmware ships (Spike, Music Quiz and Brick Mania, one folder
+each); `arcade/sdk/`, the compiler, runners, IDE and tests; and
+`arcade/manual/`, the manual and its skill. The engine itself is firmware,
+in `apps-ipod/games/arcade/`.
+
 The Arcade -- the game engine in `apps-ipod/games/arcade/` and its SDK in
-`tools/arcade/` -- runs one engine in four places: the player, `pbgvm`, the
+`arcade/sdk/` -- runs one engine in four places: the player, `pbgvm`, the
 WebAssembly build behind `pbgrun` and the IDE, and the ARM rig. A change to
 what a cart can call, or to what a call does, is finished only when every
 one of these agrees. Most of them fail silently when stale: the IDE shows
@@ -508,13 +519,13 @@ in this order:
 1. **The engine.** The native in its file; `arcade_api.def` (argument counts;
    a new native also takes `natives_impl.h`); `vm.h` for anything shared.
    A change to `struct arcade_host` or one of its tables (`arcade_tracks`,
-   `arcade_store`, ...) also takes `shell*.c`, `tools/arcade/host/pbgvm.c` and
-   `fakemusic.c`, `tools/arcade/wasm/web.c` and `tools/arcade/src/runner.js`.
-2. **`tools/arcade/api.md`**, one entry. The IDE's hints are built from it, and
+   `arcade_store`, ...) also takes `shell*.c`, `arcade/sdk/host/pbgvm.c` and
+   `fakemusic.c`, `arcade/sdk/wasm/web.c` and `arcade/sdk/src/runner.js`.
+2. **`arcade/sdk/api.md`**, one entry. The IDE's hints are built from it, and
    `test/reference.test.js` fails when its signatures disagree with
    `arcade_api.def`. `README.md` too, if `cart.json`, a tool or an option
    changes.
-3. **Tests** in `tools/arcade/test/` for the new behaviour, then `sh
+3. **Tests** in `arcade/sdk/test/` for the new behaviour, then `sh
    host/build.sh` and `node --test test/*.test.js`.
 4. **Builds**: the WebAssembly (`wasm/build.sh`, on the build server; the wasm
    tests refuse a module older than the engine), and both players. A new
@@ -523,7 +534,7 @@ in this order:
 5. **The IDE**: rebuild `ide/dist/` (`node ide/build.js`, see the README), so
    it carries the new hints and the new engine; and anything the IDE does in
    the player's place (`ide/main.js`, `ide/game.js`) for a host change.
-6. **The manual** in `docs/podbox/arcade/`: the reference page, with any
+6. **The manual** in `arcade/manual/`: the reference page, with any
    example run and its picture and cost measured rather than guessed; its
    skill in `skill/SKILL.md`. A picture from `pbgvm --shot` is stored
    uncompressed, about 230 KB: save it as an indexed PNG.

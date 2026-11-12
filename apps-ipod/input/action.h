@@ -96,8 +96,8 @@ enum {
     CONTEXT_USB_HID_MODE_PRESENTATION,
     CONTEXT_USB_HID_MODE_BROWSER,
     CONTEXT_USB_HID_MODE_MOUSE,
-    CONTEXT_SPIKE, /* uses the ACTION_SPIKE_ defines below */
-    CONTEXT_MUSIC_QUIZ, /* uses the ACTION_QUIZ_ defines below */
+    CONTEXT_SPIKE,      /* the C games' contexts, gone: kept for the */
+    CONTEXT_MUSIC_QUIZ, /* numbers after them, which keymaps may hold */
     CONTEXT_LIST_SELECT, /* a list in selecting mode: ACTION_LS_ */
     LAST_CONTEXT_PLACEHOLDER,
 };
@@ -296,8 +296,8 @@ enum {
     ACTION_USB_HID_MOUSE_WHEEL_SCROLL_DOWN,
     ACTION_USB_HID_LAST, /* Place holder */
 
-    /* Spike. One verb, and the jump is bound to the press rather than
-       the release: how long a button is held is not the player's timing. */
+    /* The C games' actions, gone: kept for the numbers after them, which a
+       keymap file may hold. */
     ACTION_SPIKE_JUMP,
     ACTION_SPIKE_PAUSE,
     ACTION_SPIKE_EXIT,
@@ -306,8 +306,6 @@ enum {
     ACTION_SPIKE_NEXT,
     ACTION_SPIKE_PREV,
     ACTION_SPIKE_OPTIONS,
-
-    /* The Music Quiz. */
     ACTION_QUIZ_UP,
     ACTION_QUIZ_DOWN,
     ACTION_QUIZ_PICK,

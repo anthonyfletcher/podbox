@@ -1,0 +1,46 @@
+{
+  "id": "0000000000009a12",
+  "name": "Music Quiz",
+  "author": "PodBox",
+  "version": "1",
+  "help": "A track from your library plays from partway in. Turn the wheel to the right answer and press Select before the points drain away. Ten rounds, each harder than the last. Pausing loses the round you are in.",
+  "rate": 25,
+  "music": "own",
+  "suspend": false,
+  "boards": [
+    {
+      "name": "points",
+      "title": "Best scores"
+    }
+  ],
+  "options": [
+    {
+      "name": "titles",
+      "title": "Name the Track",
+      "type": "onoff",
+      "default": true,
+      "help": "Rounds that ask for the playing track's title"
+    },
+    {
+      "name": "artists",
+      "title": "Name the Artist",
+      "type": "onoff",
+      "default": true,
+      "help": "Rounds that ask who the playing track is by"
+    },
+    {
+      "name": "albums",
+      "title": "Name the Album",
+      "type": "onoff",
+      "default": true,
+      "help": "Rounds that ask which album the playing track is from"
+    },
+    {
+      "name": "years",
+      "title": "Name the Year",
+      "type": "onoff",
+      "default": false,
+      "help": "Rounds that ask the year the playing track came out. With every kind off, the quiz asks for titles"
+    }
+  ]
+}

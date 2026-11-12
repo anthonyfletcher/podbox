@@ -60,7 +60,6 @@
 #include "screens/browse/album_charts.h"
 #include "screens/browse/book_shelf.h"
 #include "screens/browse/listen_progress.h"   /* every book's stats */
-#include "games/quiz/quiz.h"
 #include "screens/browse/featured_artists.h"
 #include "screens/browse/browser_flat.h"
 #include "speech/language.h"
@@ -509,7 +508,6 @@ static int browser(void* param)
                 || ret_val == GO_TO_BOOK_SHELF || ret_val == GO_TO_ALBUM_CHARTS
                 || ret_val == GO_TO_DB_SEARCH
                 || ret_val == GO_TO_FEATURED_ARTISTS
-                || ret_val == GO_TO_MUSIC_QUIZ
                 || ret_val == GO_TO_LISTEN_STATS)
             {
                 row_slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
@@ -639,8 +637,9 @@ static int browser(void* param)
  * change, and an unlisted items[] entry silently zero-initializes to a
  * NULL function pointer -- load_screen() would call through it and crash.
  * This stub exists purely so that stale reference redirects safely to the
- * root menu instead. GO_TO_RECENTBMARKS, Rockbox's Recent Bookmarks, is gone
- * the same way and takes the same stub. */
+ * root menu instead. GO_TO_RECENTBMARKS, Rockbox's Recent Bookmarks, and
+ * GO_TO_MUSIC_QUIZ, the Music Quiz before it was a cart, are gone the same
+ * way and take the same stub. */
 static int plugins_browser_removed(void* param)
 {
     (void)param;
@@ -936,14 +935,6 @@ static int listen_stats_scrn(void* param)
     return listen_progress_show_all();
 }
 
-static int music_quiz_scrn(void* param)
-{
-    (void)param;
-    if (!wait_for_tagcache_ready())
-        return GO_TO_PREVIOUS;
-    return music_quiz_screen();
-}
-
 /* These are all static const'd from apps/menus/ *.c
    so little hack so we can use them */
 /* system_menu is not here: exported_settings.h declares it properly, and this
@@ -1003,7 +994,7 @@ static const struct root_items items[] = {
     [GO_TO_ARCADE] = { arcade_scrn, NULL, NULL },
     [GO_TO_PODCASTS] = { browser, (void*)GO_TO_PODCASTS, &tagcache_menu },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
-    [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
+    [GO_TO_MUSIC_QUIZ] = { plugins_browser_removed, NULL, NULL },
     [GO_TO_LISTEN_STATS] = { listen_stats_scrn, NULL, &tagcache_menu },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
 /* One reserved slot per tagnavi.config root-menu tag-browse row (see
@@ -1071,8 +1062,6 @@ MENUITEM_RETURNVALUE(arcade_item, ID2P(LANG_ARCADE), GO_TO_ARCADE,
 MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
                         NULL, Icon_Audio);
 MENUITEM_RETURNVALUE(podcasts_item, ID2P(LANG_PODCASTS), GO_TO_PODCASTS,
-                        NULL, Icon_Audio);
-MENUITEM_RETURNVALUE(quiz_item, ID2P(LANG_QUIZ), GO_TO_MUSIC_QUIZ,
                         NULL, Icon_Audio);
 
 /* Dynamic-text menu items for the reserved GO_TO_TAGNAVI_FIRST.. slots: the
@@ -1184,7 +1173,6 @@ static struct menu_table menu_table[] = {
     { "podcasts", &podcasts_item },
     { "playlists", &playlists },
     { "currentplaylist", &current_playlist },
-    { "quiz", &quiz_item },
     { "shortcuts", &shortcut_menu },
     { "settings", &menu_ },
     { "system_menu", &system_menu_ },
@@ -1234,7 +1222,7 @@ static void root_menu_apply_canonical_order(void)
     static const struct menu_item_ex * const after_tagnavi[] = {
         &current_playlist, &playlists, &spun_item,
         &file_browser, &books_item, &documents_item, &images_item,
-        &arcade_item, &shortcut_menu, &quiz_item,
+        &arcade_item, &shortcut_menu,
         &menu_, &system_menu_,
     };
     struct menu_item_ex *reordered[MAX_MENU_ITEMS];
@@ -1848,7 +1836,6 @@ void root_menu_set_default(void* setting, void* defaultval)
             || menu_table[i].item == &documents_item
             || menu_table[i].item == &images_item
             || menu_table[i].item == &current_playlist
-            || menu_table[i].item == &quiz_item
             || menu_table[i].item == &podcasts_item)
             continue;
         root_menu__[out++] = (struct menu_item_ex *)menu_table[i].item;
@@ -2100,10 +2087,6 @@ static int root_menu_setup_screens(void)
         || (new_screen >= 0 && new_screen != GO_TO_PLUGIN
             && !items[new_screen].function))
         new_screen = GO_TO_ROOT;
-    /* A game is not a place to wake up in: a quiz switched off mid-round
-       reopens on the Music menu it was started from, not on a new game. */
-    else if (new_screen == GO_TO_MUSIC_QUIZ)
-        new_screen = GO_TO_DBBROWSER;
     else if (new_screen == GO_TO_PLUGIN)
     {
         if (global_status.last_screen == GO_TO_SHORTCUTMENU)

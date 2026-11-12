@@ -698,10 +698,6 @@ struct user_settings
     int mix_length;           /* tracks in a generated playlist */
     bool continue_playing;    /* extend a playlist that runs out */
     bool mix_starts_with_selected; /* Play Similar/Wind Down lead with it */
-    bool quiz_title;          /* the Music Quiz's kinds of question */
-    bool quiz_artist;
-    bool quiz_album;
-    bool quiz_year;
 
     unsigned char backdrop_file[MAX_PATHNAME+1];  /* backdrop bitmap file */
 
@@ -1087,14 +1083,6 @@ struct user_settings
     int usb_mode;
     int playback_log; /* 0=off, 1=generic (ROCKBOX_DIR/playback.log),
                          2=Audioscrobbler (/.scrobbler.log) */
-
-    /* Spike. The caption is a display preference and the offset is
-       calibration: both belong to the player rather than to the run, which
-       is why they are here and the tempo shift is not -- that one is per
-       track, and remembering it would be remembering it for the wrong
-       track. */
-    int spike_caption;  /* 0 off, 1 title, 2 title and artist */
-    bool spike_caption_scroll;  /* ...and whether it travels or is cropped */
 };
 
 /* global settings */

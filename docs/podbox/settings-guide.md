@@ -240,10 +240,6 @@ Settings
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | No |  |
 | Segregate Audiobooks | Auto keeps audiobooks out of the music and gives them an Audiobooks row on the main menu, whenever the library has any; albums, artists, the carousel and search then show music only. Off lists them with the music. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "speech" and the like. Podcasts have their own setting. Books keep their place either way: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track stays with the music. | Auto |  |
 | Segregate Podcasts | Auto keeps podcasts out of the music and gives them a Podcasts row on the main menu, listing each show with its newest episode first, whenever the library has any. Off lists them with the music. A podcast is a track whose genre is exactly "Podcast" or "Podcasts". Either way, each episode keeps its place. | Auto |  |
-| Quiz Questions ▸ Name the Track | Music Quiz rounds that play a clip and ask which track it is. | Yes |  |
-| Quiz Questions ▸ Name the Artist | Music Quiz rounds that play a clip and ask who it is by. The wrong answers are artists that sound alike, or share the genre and decade, as the game goes on. | Yes |  |
-| Quiz Questions ▸ Name the Album | Music Quiz rounds that play a clip and ask which album it is from. In the later rounds the wrong answers are the same artist's other albums. | Yes |  |
-| Quiz Questions ▸ Name the Year | Music Quiz rounds that play a clip and ask what year it is from. The hardest kind: the answers start five years apart and end one apart, and they are only as right as the year tags. | No |  |
 
 **Appearance** opens Art Rows, from
 `Settings > Appearance > Interface Elements`.
@@ -492,7 +488,7 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | Yes |  |
+| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. | Yes |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
 | Vertical Scroll Speed | How quickly a box of text too long for it moves up, such as a podcast episode's notes, apart from Scroll Speed's sideways lines. | 10 | **Adv** |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1 s |  |
@@ -720,18 +716,6 @@ off, and how much space their files take. A log file that reaches 256 KB is
 renamed with `.1` before its extension, replacing the last one, and a new file
 starts; send both when asked for a log. While any log is on, a message at
 startup says so, and how long is left.
-
----
-
-## Spike
-
-Held Menu inside the game, not Settings — but they are settings like any
-other, so they survive leaving the game and survive the session.
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Now Playing | Names the track under Spike's field, with the time remaining beside it: Title shows the track's title, and Title and Artist adds who it is by. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off |  |
-| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding. Off is the calmer choice while you are playing, and shows as much of the name as fits. Off as well while Scrolling is off. | No |  |
 
 ---
 

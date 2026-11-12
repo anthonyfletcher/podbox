@@ -5,7 +5,7 @@
  * at whatever rate its mixer runs.
  *
  * An effect was rendered by sfxr when the cart was compiled and arrives as
- * 8-bit samples at 22,050 Hz with a scale (tools/arcade/src/assets.js
+ * 8-bit samples at 22,050 Hz with a scale (arcade/sdk/src/assets.js
  * writes them); a voice steps through it in 16.16, so sfxp's pitch and the
  * mixer's rate are one resampling. A tone is made live.
  *

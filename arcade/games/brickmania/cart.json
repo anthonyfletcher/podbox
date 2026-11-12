@@ -1,0 +1,33 @@
+{
+  "id": "f7fb9270e3d42830",
+  "name": "Brick Mania",
+  "author": "PodBox",
+  "version": "2",
+  "rate": 33,
+  "help": "Break every brick to clear the level. Turn the wheel to move the paddle, or hold Prev and Next. Select serves the ball, lets go of a caught one, and fires the laser. Catch the capsules that fall for power-ups. Breaking bricks without touching the paddle builds a combo that multiplies the score.",
+  "boards": [
+    {
+      "name": "points",
+      "title": "Brick Mania"
+    }
+  ],
+  "options": [
+    {
+      "name": "lives",
+      "title": "Lives",
+      "type": "number",
+      "min": 1,
+      "max": 5,
+      "default": 3,
+      "help": "How many balls each game starts with."
+    },
+    {
+      "name": "control",
+      "title": "Steering",
+      "type": "choice",
+      "choices": ["Spin", "Dial"],
+      "default": 0,
+      "help": "Spin: turning the wheel pushes the paddle, faster the faster you turn. Dial: the paddle goes where your finger is on the top half of the wheel."
+    }
+  ]
+}

@@ -192,20 +192,9 @@ screens/covers/artist_portraits.c
 screens/covers/carousel.c
 #endif
 
-games/spike/spike.c
-games/spike/spike_bar.c
-games/spike/spike_clock.c
-games/spike/spike_draw.c
-games/spike/spike_gen.c
-games/spike/spike_menu.c
-games/spike/spike_music.c
-games/spike/spike_pose.c
-games/spike/spike_score.c
-games/spike/spike_tap.c
-games/spike/spike_text.c
-games/spike/spike_world.c
-games/quiz/quiz.c
-games/quiz/quiz_pick.c
+games/arcade/music_bar.c
+games/arcade/music_clock.c
+games/arcade/music_mood.c
 games/arcade/shell.c
 games/arcade/shell_tracks.c
 games/arcade/shell_score.c

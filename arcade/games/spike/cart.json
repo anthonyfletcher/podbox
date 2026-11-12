@@ -1,0 +1,41 @@
+{
+  "id": "000000000005b1ce",
+  "name": "Spike",
+  "author": "PodBox",
+  "version": "1",
+  "help": "Spike steps and jumps on the beat of whatever is playing. Press Select on the beat to jump: over gaps and creatures, onto platforms, switches and springs. Play some music first.",
+  "rate": 33,
+  "music": "control",
+  "suspend": false,
+  "boards": [
+    {
+      "name": "points",
+      "title": "Best runs"
+    }
+  ],
+  "options": [
+    {
+      "name": "tempo",
+      "title": "Tempo",
+      "type": "choice",
+      "choices": [
+        "Half",
+        "As heard",
+        "Double"
+      ],
+      "default": 1,
+      "help": "The grid against the tempo found: half or double it when Spike walks at the wrong speed for the music"
+    },
+    {
+      "name": "caption",
+      "title": "Track name",
+      "type": "choice",
+      "choices": [
+        "Scrolls",
+        "Still"
+      ],
+      "default": 0,
+      "help": "A name too long for the band either scrolls along, a character a beat, or stays still, cut short with ..."
+    }
+  ]
+}

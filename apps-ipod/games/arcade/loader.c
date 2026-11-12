@@ -8,7 +8,7 @@
  * building the tables from them; the error's source position from LINE;
  * arcade_load() itself.
  *
- * The byte layouts are the ones tools/arcade/src/compiler.js writes; its
+ * The byte layouts are the ones arcade/sdk/src/compiler.js writes; its
  * bytecode.js load() is the reference this follows.
  ***************************************************************************/
 #include <string.h>
