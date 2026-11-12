@@ -3498,11 +3498,22 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) *
                        (plain ? PLAIN256 : PER16_COPY * 16) / 256;
         int32_t ua = (int32_t)u0, ub = (int32_t)u1;
-        for (int32_t v = (int32_t)v0; v < (int32_t)v1; v++) {
+        /* A surface copied onto itself: each row read whole before it is
+         * written, and the rows taken from the bottom when the copy moves
+         * down, so every host draws the source as it was */
+        static uint8_t bounce[IMG_MAX];
+        const int self = src == p->s.px;
+        const int up = self && !fy && dy > sy;
+        for (int32_t k = (int32_t)v0; k < (int32_t)v1; k++) {
+            int32_t v = up ? (int32_t)v1 - 1 - (k - (int32_t)v0) : k;
             int32_t yy = (int32_t)sy + (fy ? (int32_t)h - 1 - v : v);
             if (yy < 0 || yy >= sh_img)
                 continue;
             const uint8_t *srow = src + yy * sw_img;
+            if (self) {
+                memcpy(bounce, srow, (size_t)sw_img);
+                srow = bounce;
+            }
             uint8_t *drow = p->s.px + ((int32_t)dy + v) * stride + (int32_t)dx;
             uint32_t n;
             if (fx)
