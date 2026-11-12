@@ -1337,7 +1337,9 @@ static int root_menu_off_find(const struct menu_item_ex *item)
  * default, or new since the order was saved: turned off, after the first of
  * its anchors that is on, else before Settings. Customize Main Menu then
  * shows it there, and turning it on leaves it there. Podcasts and the tagnavi
- * rows are left out: their settings and tagnavi.config place them. */
+ * rows are left out: their settings and tagnavi.config place them. The
+ * Arcade joins turned on instead: it shows itself only once a game is found
+ * (item_callback()), so it costs an order saved before it nothing. */
 static const struct {
     const struct menu_item_ex *item;
     const struct menu_item_ex *after[3];
@@ -1382,6 +1384,18 @@ static void root_menu_place(int idx, int home)
             at = i + 1;
             break;
         }
+    }
+    if (item == &arcade_item)
+    {
+        if (count < MAX_MENU_ITEMS)
+        {
+            memmove(&root_menu__[at + 1], &root_menu__[at],
+                    (count - at) * sizeof(root_menu__[0]));
+            root_menu__[at] = (struct menu_item_ex *)item;
+            root_menu_off_shift(at, 1);
+            root_menu_set_count(count + 1);
+        }
+        return;
     }
     root_menu_off[root_menu_off_count].idx = idx;
     root_menu_off[root_menu_off_count].after = at;

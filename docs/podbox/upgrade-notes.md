@@ -20,3 +20,6 @@
   and Music Quiz's Quiz Questions settings and Spike's Now Playing settings
   are gone: each game keeps its own options in its pause menu. The Music
   menu's Quiz row and the Now Playing menu's Play Spike are gone with them.
+- **Arcade** now appears on the main menu even where you have arranged the
+  menu yourself, in its usual place. Turn it off in Settings > Appearance >
+  Menus > Edit Main Menu if you do not want it.
