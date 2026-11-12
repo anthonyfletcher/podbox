@@ -1,5 +1,5 @@
 name: Build a PodBox Arcade cart
-description: Compiles a PodBox Arcade cart folder into a .pbg the iPod's Arcade plays
+description: Compiles a PodBox Arcade cart folder into a .pbg the iPod's Arcade plays, and optionally a web page to play it in
 author: PodBox
 
 inputs:
@@ -9,11 +9,17 @@ inputs:
   output:
     description: Where to write the .pbg; the folder's name with .pbg when left out
     default: ''
+  page:
+    description: true to write the cart as a web page too, beside the .pbg with .html
+    default: 'false'
 
 outputs:
   pbg:
     description: The .pbg written
     value: ${{ steps.build.outputs.pbg }}
+  page:
+    description: The web page written, when page is true
+    value: ${{ steps.build.outputs.page }}
 
 runs:
   using: composite
@@ -26,9 +32,22 @@ runs:
       env:
         CART: ${{ inputs.cart }}
         OUTPUT: ${{ inputs.output }}
+        PAGE: ${{ inputs.page }}
       run: |
         set -e
+        pbgc="$GITHUB_ACTION_PATH/pbgc.mjs"
         dir="${CART%/}"
         out="${OUTPUT:-$(basename "$(cd "$dir" && pwd)").pbg}"
-        node "$GITHUB_ACTION_PATH/pbgc.mjs" build "$dir" -o "$out"
+        node "$pbgc" build "$dir" -o "$out"
         echo "pbg=$out" >> "$GITHUB_OUTPUT"
+        if [ "$PAGE" = true ]; then
+          page="${out%.pbg}.html"
+          # the text font goes in only for a cart whose text needs it: it
+          # makes the page much larger
+          node "$pbgc" html "$dir" -o "$page" 2> "$RUNNER_TEMP/page.err" ||
+            { cat "$RUNNER_TEMP/page.err" >&2; exit 1; }
+          if grep -q 'font.bin' "$RUNNER_TEMP/page.err"; then
+            node "$pbgc" html "$dir" -o "$page" --font "$GITHUB_ACTION_PATH/font.bin"
+          fi
+          echo "page=$page" >> "$GITHUB_OUTPUT"
+        fi

@@ -21,6 +21,14 @@ kept under it) and commits that change, so pull before your next push.
 To publish a version, push a tag -- `git tag v1 && git push --tags` -- and
 the `.pbg` is attached to a release of that name.
 
+Each push to the main branch also puts the game on the web, playable in a
+browser with the keys or a phone's touch wheel: turn on **Settings > Pages**
+with the `gh-pages` branch as its source, once, and it is at
+`https://<you>.github.io/<this repository>/`. GitHub serves Pages free for
+a public repository; a private one needs a paid plan. A game that plays the
+owner's music cannot be a web page: set `PAGE` to `false` in
+`.github/workflows/build.yml` for one.
+
 To rename the game, change `name` in `mygame/cart.json`. To rename the
 folder, change `CART` in `.github/workflows/build.yml` to match.
 

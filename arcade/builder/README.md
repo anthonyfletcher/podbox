@@ -20,10 +20,12 @@ file an iPod running PodBox plays from its Arcade.
 |---|---|
 | `cart` | the cart's folder; the repository's top when left out |
 | `output` | where to write the `.pbg`; the folder's name with `.pbg` when left out |
+| `page` | `true` to write the cart as a web page too, beside the `.pbg` with `.html`: the click wheel on a touch screen, the keys on a computer. A cart that plays the owner's music cannot be one, and fails the step |
 
 | Output | |
 |---|---|
 | `pbg` | the `.pbg` written |
+| `page` | the web page written, when `page` is `true` |
 
 A mistake in the cart fails the step, with the file, line and message, as
 the IDE shows it.

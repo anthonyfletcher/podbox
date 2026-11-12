@@ -62,15 +62,16 @@ git -c core.autocrlf=false -c core.eol=lf archive "$SHA" arcade apps-ipod/games/
 
 say "The engine and font from the release's build"
 ssh "$SERVER" "cd '$REMOTE_DIR' && sh arcade/sdk/wasm/build.sh >/dev/null &&
-    unzip -o -q -j build-hw-ipodvideo/rockbox.zip .rockbox/games/font.bin -d /tmp/release-arcade-font"
+    rm -rf /tmp/release-arcade-font &&
+    unzip -o -q build-hw-ipodvideo/rockbox.zip '.rockbox/games/font.bin'         '.rockbox/games/LICENSE-font.txt' '.rockbox/games/LICENSES-font/*' -d /tmp/release-arcade-font"
 scp -q "$SERVER:$REMOTE_DIR/arcade/sdk/wasm/arcade.wasm" "$WORK/src/arcade/sdk/wasm/arcade.wasm"
-scp -q "$SERVER:/tmp/release-arcade-font/font.bin" "$WORK/font.bin"
+scp -q -r "$SERVER:/tmp/release-arcade-font/.rockbox/games" "$WORK/font"
 
 say "The IDE"
-(cd "$WORK/src/arcade/sdk" && node ide/build.js --font "$WORK/font.bin")
+(cd "$WORK/src/arcade/sdk" && node ide/build.js --font "$WORK/font/font.bin")
 
 say "The build action"
-node "$WORK/src/arcade/builder/build.mjs" "$WORK/builder"
+node "$WORK/src/arcade/builder/build.mjs" "$WORK/builder" "$WORK/font/font.bin"
 
 say "The template"
 node "$WORK/src/arcade/builder/template.mjs" "$WORK/template"

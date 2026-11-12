@@ -1,6 +1,7 @@
 # Builds the game into a .pbg on every push, and attaches it to a release
-# for every tag pushed. The game's folder is mygame; rename it and change
-# CART below to match.
+# for every tag pushed. With PAGE true, a push to the main branch also puts
+# the game on GitHub Pages as a web page to play it in. The game's folder is
+# mygame; rename it and change CART below to match.
 
 name: Build
 
@@ -10,6 +11,9 @@ on:
 
 env:
   CART: mygame
+  # A game that plays the owner's music cannot be a web page: set this
+  # false for one.
+  PAGE: true
 
 permissions:
   contents: write
@@ -38,6 +42,7 @@ jobs:
         id: cart
         with:
           cart: ${{ env.CART }}
+          page: ${{ env.PAGE }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -49,3 +54,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" "${{ steps.cart.outputs.pbg }}" --generate-notes
+
+      # The page as the whole of the gh-pages branch, replaced each time
+      - name: Put it on GitHub Pages
+        if: env.PAGE == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site"
+          cp "${{ steps.cart.outputs.page }}" "$site/index.html"
+          touch "$site/.nojekyll"
+          cd "$site"
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "The game, from ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
