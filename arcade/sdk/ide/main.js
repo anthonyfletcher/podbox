@@ -8,7 +8,9 @@
  * menus. */
 
 import { EditorView, basicSetup } from 'codemirror';
-import { undo, redo } from '@codemirror/commands';
+import { undo, redo, indentWithTab } from '@codemirror/commands';
+import { keymap } from '@codemirror/view';
+import { indentUnit } from '@codemirror/language';
 import { openSearchPanel } from '@codemirror/search';
 import { EditorState } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
@@ -199,9 +201,12 @@ function stateFor(file) {
     const lang = code ? [javascript()] : /\.json$/.test(file) ? [json()] : [];
     /* the API's hints and completions are for code only */
     const api = code ? [...hints(() => folder), autocompletion({ override: [completions] })] : [];
+    /* Tab indents, by the carts' four spaces, rather than leaving the
+     * editor; Escape then Tab still leaves it */
     states[file] = EditorState.create({
         doc: String(folder[file]),
-        extensions: [basicSetup, findPanel, ...lang, ...dark, lintGutter(), ...api,
+        extensions: [basicSetup, keymap.of([indentWithTab]), indentUnit.of('    '),
+                     findPanel, ...lang, ...dark, lintGutter(), ...api,
                      EditorView.updateListener.of((u) => {
                          if (!u.docChanged) return;
                          folder[current] = u.state.doc.toString();
