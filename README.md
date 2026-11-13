@@ -663,6 +663,11 @@ they can be installed in any order and on their own.
 **Update your themes whenever you update PodBox.** Themes are rebuilt for each release, and a
 theme made for new firmware can fail on old firmware.
 
+Themes made by others are shared in
+[Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes), each with
+screenshots, a download link and the PodBox release it was tested with. Their authors keep them
+up to date, so check that date before you install one.
+
 ---
 
 # Connectivity

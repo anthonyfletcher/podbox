@@ -1235,8 +1235,8 @@ never match.
 Two are worth knowing about before you write a branch for them:
 
 - **21, the USB screen, is never reached.** The firmware draws that screen
-  itself and your `.sbs` is not rendered at all while the cable is in. See §6 of
-  [`theme-guide.md`](theme-guide.md).
+  itself and your `.sbs` is not rendered at all while the cable is in. A theme
+  can give it a picture instead: see §6 of [`theme-guide.md`](theme-guide.md).
 - **22, the album covers carousel, draws only your status bar** — and only
   while `Settings > Appearance > Carousel > Status Bar` is on. The rest of the screen is the
   carousel's, coloured from the `.cfg` rather than from your skin.

@@ -50,7 +50,7 @@ default, never whatever the previous theme chose.
 looks right only because the previous one set something, it will not look right
 on a clean player.
 
-The reset covers 72 settings:
+The reset covers 73 settings:
 
 | Group | Settings |
 |---|---|
@@ -58,7 +58,7 @@ The reset covers 72 settings:
 | Colours | `foreground color`, `background color`, the three `line selector …` colours, `list separator color` |
 | Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
 | Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
-| Backdrop | `backdrop` |
+| Backdrop and USB | `backdrop`, `usb image` |
 | Artwork | `database album art`, `database artist art`, `database audiobook art`, `database author art`, `database art row height`, `dynamic colors`, `dynamic colors background` |
 | Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
 | Carousel | `album covers background`, `album covers background color`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, `album covers filter`, and the 3D and Flat geometry |
@@ -525,20 +525,47 @@ needs one of each, in the same colour.
 
 ## 6. The USB screen
 
-**Themes cannot draw this screen.** When USB is connected the firmware draws its
-own message box over whatever was on screen. Your `.sbs` is not rendered at all
-for the whole session, so a `%cs` 21 branch never runs and none of your status
-bar shows. (`custom-skin-tags.md` has the whole `%cs` table, including which
-other numbers can never come up here.)
+**Skins cannot draw this screen.** When USB is connected the firmware draws it
+itself. Your `.sbs` is not rendered at all for the whole session, so a `%cs` 21
+branch never runs and none of your status bar shows. (`custom-skin-tags.md` has
+the whole `%cs` table, including which other numbers can never come up here.)
 
 Upstream Rockbox does the opposite — it keeps the theme up and repaints it a
 couple of times a second — so themes ported from upstream often carry a USB
 screen, sometimes with a clock on it. Expect none of it to appear.
 
+### A picture of your own
+
+What a theme can give this screen is one picture, named in its `.cfg`:
+
+```
+usb image: /.rockbox/wps/mytheme/usb.bmp
+```
+
+The screen is then filled with your background colour, the picture is centred
+on it, and **USB Connected** and **Eject before disconnecting** go under it in
+the UI font. Without the setting, or with `usb image: -`, the player shows its
+usual message box instead.
+
+- **It is drawn in two colours.** Dark pixels take the foreground colour and
+  the rest the background, so with album-derived colours on, the picture
+  follows the album like the rest of the screen. Save it as a 1-bit BMP; a
+  colour one is split into the two by brightness.
+- **Leave room for the text.** The picture and two and a half lines of the UI
+  font are centred together. A picture taller than that leaves the text running
+  off the bottom; one larger than the screen is not shown at all.
+- **It is read when the theme loads**, since the computer has the disk for the
+  whole USB session. Replacing the file over USB shows the new one from the
+  next connection.
+
+A picture that cannot be read or is too large shows the message box, and
+**Theme Log** (§8) says why.
+
 ### If your theme has one
 
-You can leave it. A `%cs` 21 branch parses fine and is simply never reached, so
-it costs nothing but confusion. To take it out, remove three things:
+If your upstream USB screen is a picture, move it to `usb image`. Either way the
+`%cs` 21 branch can stay: it parses fine and is simply never reached, so it
+costs nothing but confusion. To take it out, remove three things:
 
 - the `%?if(%cs, =, 21)<…>` branch
 - the viewport group it selected
@@ -622,7 +649,7 @@ default = Now Playing
 
 `format = 1` is required, before the first option. `title` names the file's
 row when a theme has more than one options file; `help` there is shown by
-**Explain** on that row.
+**Explain** on that row. `toggle` is below.
 
 Each option starts with its key in brackets. That is the `.preferences` line it
 sets, `auto-hide: 5`, and the text your skin passes to `%ft`:
@@ -680,6 +707,19 @@ The owner can also put one `choice` option on a Now Playing button: **Assign
 to Button** in its context menu, then **Theme Toggle** as the button's action.
 Each press moves it to the next choice, wrapping after the last, so a
 two-choice option becomes a switch. The same three limits apply.
+
+To choose that option for them, name it with `toggle` before the first option:
+
+```ini
+format = 1
+title  = My Theme
+toggle = view
+```
+
+**Theme Toggle** then changes `view` until the owner assigns one of your
+options themselves; an assignment made for another theme does not count. The
+owner still has to set a button to Theme Toggle. A `toggle` that names no good
+`choice` option is ignored, with a line in the Theme Log.
 
 ### Ship `.preferences`, or not
 

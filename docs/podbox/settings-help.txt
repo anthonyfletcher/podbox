@@ -1395,8 +1395,8 @@ of the now-playing menu's other actions. Go to Album opens the playing
 track's album on that track, where Go to Album Via says; a podcast or book
 kept apart opens in its own menu. Theme Options says Unavailable when the
 theme has none. Theme Toggle is offered once a theme option has been
-assigned to a button in Theme Options. Holding Select always opens the
-now-playing menu.
+assigned to a button in Theme Options, or the theme names one. Holding
+Select always opens the now-playing menu.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: any
@@ -1793,7 +1793,8 @@ reload to show a change, since reloading stops the music.
 
 To change an option from a button, choose Assign to Button in its context
 menu, then set a button to Theme Toggle in Playback > Now Playing Screen.
-Each press moves the option to its next choice.
+Each press moves the option to its next choice. A theme can name one for
+you; assigning your own replaces it.
 
 [action: Clear Backdrop]
 Removes the background image, leaving the background colour showing through.
