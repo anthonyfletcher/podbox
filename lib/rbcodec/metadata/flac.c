@@ -173,8 +173,10 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
 #ifdef HAVE_ALBUMART
         else if (type == 6) /* 6 is the PICTURE block */
         {
-            /* only use the first PICTURE; a bad one is skipped */
-            if (!id3->has_embedded_albumart && i > 0)
+            /* the first good PICTURE, or a later front cover in its place;
+               a bad one is skipped */
+            if (i > 0 && (!id3->has_embedded_albumart ||
+                          id3->albumart_picture_type != AA_PICTURE_FRONT))
             {
                 unsigned int buf_size = MIN(sizeof(id3->path), i);
                 unsigned long block_size = i;
@@ -214,9 +216,14 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
                     }
 
                     /* and the picture data too */
+                    uint32_t kind = get_long_be(buf);
                     if (aa_size > 0 &&
-                        aa_size <= block_size - (picframe_pos + 4))
+                        aa_size <= block_size - (picframe_pos + 4) &&
+                        (!id3->has_embedded_albumart ||
+                         kind == AA_PICTURE_FRONT))
                     {
+                        id3->albumart_picture_type =
+                            kind < 256 ? (unsigned char)kind : 0;
                         id3->has_embedded_albumart = true;
                         id3->albumart.type = aa_type;
                         id3->albumart.size = aa_size;

@@ -306,7 +306,7 @@ const signed char b64_codes[] =
 size_t base64_decode(const char *in, size_t in_len, unsigned char *out)
 {
     size_t i = 0;
-    int val = 0;
+    uint32_t val = 0;
     size_t len = 0;
 
     while (i < in_len)
@@ -424,7 +424,9 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
 
         logf("Vorbis comment %d: %s=%s", i, name, value);
 #ifdef HAVE_ALBUMART
-        if (!id3->has_embedded_albumart /* only use the first PICTURE */
+        /* the first good PICTURE, or a later front cover in its place */
+        if ((!id3->has_embedded_albumart ||
+             id3->albumart_picture_type != AA_PICTURE_FRONT)
             && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
         {
             int after_block_pos = lseek(fd, 0, SEEK_CUR);
@@ -438,12 +440,17 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
                 && aa_type != AA_TYPE_UNKNOWN
                 /* the picture must start inside the comment */
                 && base64_encoded_size(picframe_pos + 4) <
-                   (size_t)(after_block_pos - before_block_pos))
+                   (size_t)(after_block_pos - before_block_pos)
+                && (!id3->has_embedded_albumart ||
+                    get_long_be(buf) == AA_PICTURE_FRONT))
             {
                 //NOTE: This is not exact location due to padding in base64 (up to 3 chars)!!
                 // But it's OK with our jpeg decoder if we add or miss few bytes in jpeg header
                 const int picframe_pos_b64 = base64_encoded_size(picframe_pos + 4);
 
+                uint32_t kind = get_long_be(buf);
+                id3->albumart_picture_type =
+                    kind < 256 ? (unsigned char)kind : 0;
                 id3->has_embedded_albumart = true;
                 id3->albumart.type = aa_type | AA_FLAG_VORBIS_BASE64;
                 id3->albumart.pos = picframe_pos_b64 + before_block_pos;

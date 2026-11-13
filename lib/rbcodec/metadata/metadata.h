@@ -217,6 +217,10 @@ struct mp3_albumart {
     int size;
     off_t pos;
 };
+
+/* The ID3 and FLAC picture type of a front cover, which is preferred to any
+   other picture a file holds */
+#define AA_PICTURE_FRONT 3
 #endif
 
 enum character_encoding {
@@ -321,6 +325,7 @@ struct mp3entry {
 #ifdef HAVE_ALBUMART
     bool has_embedded_albumart;
     struct mp3_albumart albumart;
+    unsigned char albumart_picture_type; /* ID3/FLAC picture type */
 #endif
 
     /* Cuesheet support */

@@ -352,7 +352,8 @@ static int parsealbumart( struct mp3entry* entry, char* tag, int bufferpos )
 
     if (entry->albumart.type != AA_TYPE_UNKNOWN)
     {
-        /* skip picture type */
+        /* the picture type */
+        entry->albumart_picture_type = tag <= end ? (unsigned char)*tag : 0;
         tag += 1;
         /* skip description: in UTF-16 (encodings 1 and 2) it ends with
          * two nils at an even offset, otherwise with one */
@@ -1290,16 +1291,37 @@ retry_with_limit:
                     *ptag = tag;
 
 #ifdef HAVE_ALBUMART
-                /* albumart */
-                if ((!entry->has_embedded_albumart) &&
-                    ((tr->tag_length == 4 && !memcmp( header, "APIC", 4)) ||
-                     (tr->tag_length == 3 && !memcmp( header, "PIC" , 3))))
+                /* albumart: the first picture, or a later front cover in
+                   its place. None of the frame is kept in id3v2buf, so a
+                   large picture leaves the frames after it room. */
+                if ((tr->tag_length == 4 && !memcmp( header, "APIC", 4)) ||
+                    (tr->tag_length == 3 && !memcmp( header, "PIC" , 3)))
                 {
-                    entry->albumart.pos = frame_pos;
-                    entry->albumart.size = totframelen;
-                    entry->albumart.type = (unsynch || (global_unsynch && version <= ID3_VER_2_3))
-                                           ? AA_FLAG_ID3_UNSYNC
-                                           : AA_TYPE_UNKNOWN;
+                    if (!entry->has_embedded_albumart ||
+                        entry->albumart_picture_type != AA_PICTURE_FRONT)
+                    {
+                        struct mp3_albumart had = entry->albumart;
+                        unsigned char had_kind = entry->albumart_picture_type;
+                        bool had_one = entry->has_embedded_albumart;
+
+                        entry->has_embedded_albumart = false;
+                        entry->albumart.pos = frame_pos;
+                        entry->albumart.size = totframelen;
+                        entry->albumart.type = (unsynch || (global_unsynch && version <= ID3_VER_2_3))
+                                               ? AA_FLAG_ID3_UNSYNC
+                                               : AA_TYPE_UNKNOWN;
+                        parsealbumart(entry, tag, bufferpos);
+                        if (had_one && !(entry->has_embedded_albumart &&
+                                         entry->albumart_picture_type ==
+                                         AA_PICTURE_FRONT))
+                        {
+                            entry->albumart = had;
+                            entry->albumart_picture_type = had_kind;
+                            entry->has_embedded_albumart = true;
+                        }
+                    }
+                    bufferpos -= bytesread + 1;
+                    break;
                 }
 #endif
                 if( tr->ppFunc )

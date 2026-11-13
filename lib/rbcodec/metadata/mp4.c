@@ -525,7 +525,9 @@ static bool read_mp4_tags(int fd, struct mp3entry* id3,
                 if (read_mp4_tag(fd, size, buffer, 8) >= 4)
                 {
 
-                    if (memcmp(buffer, "\xff\xd8\xff\xe0", 4) == 0)
+                    /* a JPEG's first segment can be EXIF (APP1) as well as
+                       JFIF (APP0) */
+                    if (memcmp(buffer, "\xff\xd8\xff", 3) == 0)
                     {
                         id3->albumart.type = AA_TYPE_JPG;
                     }
