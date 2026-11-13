@@ -742,13 +742,14 @@ static bool tv_picture_decode(const char *href, int w, int h)
     tv_pic_start = current_tick;
     tv_pic_held = button_status();
     tv_pic_drawn = -1;
-    image_row_hook = tv_picture_row;
+    struct custom_format decode_format = format_native;
+    decode_format.progress = tv_picture_row;
     cpu_boost(true);
     rc = image_load(&src, &tv_pic_bm, TV_PIC_BYTES,
                     FORMAT_NATIVE | FORMAT_RESIZE | FORMAT_KEEP_ASPECT
-                    | FORMAT_DITHER, &format_native);
+                    | FORMAT_DITHER, &decode_format);
     cpu_boost(false);
-    image_row_hook = NULL;
+
     if (tv_pic_drawn >= 0)
     {   /* the bar, which a picture smaller than the page leaves showing */
         struct screen *d = &screens[SCREEN_MAIN];

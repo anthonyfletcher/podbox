@@ -324,7 +324,7 @@ static inline bool scale_v_area(struct rowset *rset, struct scaler_context *ctx)
                 rowacc_px++, rowtmp_px++)
                 *rowacc_px += mul * *rowtmp_px;
             ctx->output_row(oy, (void*)rowacc, ctx);
-            if (image_row_hook && !image_row_hook(++done, ctx->bm->height))
+            if (!image_progress(ctx->format, ++done, ctx->bm->height))
                 return false;
             /* clear accumulator row, store partial coverage for next row */
             memset((void *)rowacc, 0, ctx->bm->width * sizeof(uint32_t) * CHANNEL_BYTES);
@@ -479,7 +479,7 @@ static inline bool scale_v_linear(struct rowset *rset,
                 rowinc_px++, rowval_px++)
                 *rowval_px += *rowinc_px;
         ctx->output_row(oy, (void*)rowval, ctx);
-        if (image_row_hook && !image_row_hook(++done, ctx->bm->height))
+        if (!image_progress(ctx->format, ++done, ctx->bm->height))
             return false;
         iye += v_i_val;
     }
@@ -569,8 +569,6 @@ unsigned int get_size_native(struct bitmap *bm)
     return BM_SIZE(bm->width,bm->height,FORMAT_NATIVE,0);
 }
 
-bool (*image_row_hook)(int done, int rows);
-
 const struct custom_format format_native = {
     .output_row_8 = output_row_8_native,
     .output_row_32 = {
@@ -604,6 +602,7 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
 
     struct scaler_context ctx;
     cpu_boost(true);
+    ctx.format = format;
     ctx.store_part = store_part;
     ctx.args = args;
     ctx.buf = buf;
@@ -706,7 +705,7 @@ bool image_store_rows(struct bitmap *bm, bool dither, struct dim *src,
     {
         struct img_part *part;
 
-        if (image_row_hook && !image_row_hook(row, bm->height))
+        if (!image_progress(cformat, row, bm->height))
             return false;
         part = store_part(args);
         if (!part)

@@ -49,6 +49,7 @@ struct png_hdr {
 };
 
 struct png {
+    const struct custom_format *format;
     struct png_hdr h;
     bs_stream *in;          /* the file's bytes */
     bs_stream *z;           /* the inflated rows */
@@ -540,7 +541,7 @@ static bool assemble(struct png *p, int passes, int step, uint8_t *grid,
 
             if (!next_row(p))
                 return false;
-            if (image_row_hook && !image_row_hook(++done, rows))
+            if (!image_progress(p->format, ++done, rows))
                 return false;
             for (i = 0; i < pw; i += PART_PIXELS)
             {
@@ -657,6 +658,7 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
 
     if (!p || !idat)
         return -1;
+    p->format = cformat;
     p->in = in;
     if (!read_header(p))
         return -3;
