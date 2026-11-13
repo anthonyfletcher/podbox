@@ -1,8 +1,5 @@
 # The Arcade manual
 
-For anyone who has written a little code and wants to make a game for
-the iPod's Arcade.
-
 Start with the tutorial: six chapters that build one game, a bat-and-ball
 game, from an empty cart to something on your iPod. Then use the
 reference for whatever your own game needs.
