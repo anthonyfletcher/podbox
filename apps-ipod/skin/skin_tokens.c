@@ -682,9 +682,10 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
 }
 
 
-/* Holds a track two or more ahead while one tag is drawn. Playback's
- * temporary entry cannot: it is the first unbuffered track, which becomes the
- * next track at the coming track change. */
+/* Holds a track ahead while one tag is drawn: two or more ahead, or the next
+ * one before playback has its tags. Playback's temporary entry cannot: it is
+ * the first unbuffered track, which becomes the next track at the coming
+ * track change. */
 static struct mp3entry offset_id3;
 
 static struct mp3entry* get_mp3entry_from_offset(int offset, char **filename)
@@ -698,7 +699,7 @@ static struct mp3entry* get_mp3entry_from_offset(int offset, char **filename)
         pid3 = state->id3;
     else if (offset == 0)
         pid3 = state->id3;
-    else if (offset == 1)
+    else if (offset == 1 && state->nid3)
         pid3 = state->nid3;
     else if (audio_status() & AUDIO_STATUS_PLAY)
     {
