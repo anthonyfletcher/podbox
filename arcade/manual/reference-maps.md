@@ -134,7 +134,8 @@ hold, and each kind's properties, with a default and a line of help:
 - A map with a kind or a property the file does not list, or a value of
   the wrong type, fails the build with the map and the object named.
 
-Without the file, any kind and any property go.
+Without the file, any kind and any property go. In the IDE, **File > New
+file > The kinds of map object** makes one to start from.
 
 ---
 

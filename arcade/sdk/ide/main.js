@@ -1856,6 +1856,7 @@ const KINDS = {
     code: { label: 'Code', path: (n) => n + '.js' },
     sheet: { label: 'The sprite sheet', path: () => 'sheet.png' },
     logo: { label: 'The logo, 44x44, for lists of games', path: () => 'logo.png' },
+    objects: { label: 'The kinds of map object', path: () => 'objects.json' },
     image: { label: 'An image', path: (n) => 'images/' + n + '.png' },
     palette: { label: 'A palette', path: (n) => 'palettes/' + n + '.gpl' },
     map: { label: 'A map', path: (n) => 'maps/' + n + '.json' },
@@ -1880,6 +1881,13 @@ function gpl(name, rgb) {
         rgb.map((c) => [c >> 16, c >> 8 & 255, c & 255].map((v) => String(v).padStart(3)).join(' ')).join('\n') + '\n';
 }
 
+/* the kinds with one file each, by a name of their own */
+const SINGLE = ['sheet', 'logo', 'objects'];
+
+/* a start for objects.json: one kind, with one property */
+const OBJECTS_JSON = '{\n  "coin": { "help": "A coin to collect",\n' +
+    '            "props": { "value": { "default": 10, "help": "Points it is worth" } } }\n}\n';
+
 /* what a new file of each kind holds */
 function fresh(kind, name, a) {
     const rgb = palette(folder);
@@ -1887,6 +1895,7 @@ function fresh(kind, name, a) {
     case 'code': return '// ' + name + '.js: its functions are ' + name + '.name() elsewhere\n';
     case 'sheet': return writePicture(128, 128, new Uint8Array(128 * 128), rgb);
     case 'logo': return writePicture(44, 44, new Uint8Array(44 * 44), rgb);
+    case 'objects': return OBJECTS_JSON;
     case 'image': return writePicture(+a.w, +a.h, new Uint8Array(a.w * a.h), rgb);
     case 'palette': return gpl(name, rgb);
     case 'map': return JSON.stringify({ width: +a.mw, height: +a.mh,
@@ -1904,10 +1913,10 @@ function fresh(kind, name, a) {
 
 async function newFile() {
     const kinds = Object.entries(KINDS).filter(([k, v]) =>
-        (k !== 'sheet' && k !== 'logo') || folder[v.path()] === undefined);
+        !SINGLE.includes(k) || folder[v.path()] === undefined);
     const a = await ask('New file', [
         { name: 'kind', label: 'What', options: kinds.map(([k, v]) => [k, v.label]) },
-        { name: 'name', label: 'Name', value: '', when: (v) => v.kind !== 'sheet' && v.kind !== 'logo',
+        { name: 'name', label: 'Name', value: '', when: (v) => !SINGLE.includes(v.kind),
           note: 'Letters, digits and _: the name the code calls it by',
           check: (n, v) => !NAME.test(n.trim()) ? 'Letters, digits and _, not starting with a digit'
               : folder[KINDS[v.kind].path(n.trim())] !== undefined ? KINDS[v.kind].path(n.trim()) + ' is there already'
@@ -1924,7 +1933,7 @@ async function newFile() {
           check: (n) => n >= 1 && n <= 256 && Number.isInteger(+n) ? null : '1 to 256' }
     ], 'Make it');
     if (!a) return;
-    const name = a.kind === 'sheet' || a.kind === 'logo' ? a.kind : a.name.trim();
+    const name = SINGLE.includes(a.kind) ? a.kind : a.name.trim();
     const path = KINDS[a.kind].path(name);
     folder[path] = fresh(a.kind, name, a);
     if (a.kind === 'editor') authored.add(path);
@@ -1948,7 +1957,7 @@ function placeFor(file, text) {
     case 'json': {
         let v = null;
         try { v = JSON.parse(text); } catch (e) { /* data, to show its error */ }
-        if (base === 'flags') return 'flags.json';
+        if (base === 'flags' || base === 'objects') return base + '.json';
         if (v && v.width && v.height && Array.isArray(v.rows)) return 'maps/' + base + '.json';
         if (v && ('wave_type' in v || 'p_base_freq' in v)) return 'sounds/' + base + '.json';
         return 'data/' + base + '.json';
@@ -2004,7 +2013,7 @@ const KEPT = ['main.js', 'cart.json'];
 
 async function renameFile() {
     const f = current;
-    if (KEPT.includes(f) || f === 'sheet.png' || f === 'logo.png' || f === 'flags.json') {
+    if (KEPT.includes(f) || ['sheet.png', 'logo.png', 'flags.json', 'objects.json'].includes(f)) {
         say('error', f + ' keeps its name: the engine looks for it by it.');
         return;
     }
