@@ -10,8 +10,8 @@ photos sit beside every list, and the whole interface takes its colours from wha
 playing.
 
 It goes further than the iPod ever did: build playlists from how your music actually sounds,
-look back on a year of listening, read lyrics as they are sung, and keep your place in every
-audiobook - all on the player.
+look back on a year of listening, read lyrics as they are sung, keep your place in every
+audiobook, and play games made for the click wheel - all on the player.
 
 <a href='https://ko-fi.com/P3J3200FZY' target='_blank'><img height='36' style='border:0px;height:36px;' src='docs/podbox/images/support_me_on_kofi_dark.png' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
@@ -24,6 +24,10 @@ audiobook - all on the player.
 The interface re-colours itself from the art of what is playing. PodBox ships with
 [Scrim](themes/scrim/README.md), a new theme built around it, with art filters, translucent
 panels and a spectrum visualiser. It comes in two variants with different Now Playing screens.
+
+> **Find more themes in [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes)**,
+> where people share the themes they make. The [extra themes](#installing-themes) made for PodBox
+> are a separate download.
 
 - Dynamic colours from the album or artist art, applied to every colour the theme uses
   - Theme dependent
@@ -41,6 +45,8 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   - `Settings > Appearance > Menus`
 - Change a theme's configuration on the player
   - `Settings > Appearance > Theme Options`, when the theme offers them.
+  - Put an option on a Now Playing button: hold `Select` on it, select `Assign to Button`, then
+    set a button to `Theme Toggle`. Each press moves it to its next choice
 - Show album art or artist art on the Now Playing screen
   - Theme dependent (the theme must show album art)
   - `Settings > Appearance > Now Playing Screen > Now Playing Artwork`
@@ -50,9 +56,12 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   screen
   - Off by default. `Settings > Appearance > Now Playing Screen > Trim Titles`
   - Add your own patterns in `.rockbox/library/user/trim.txt`, which an update leaves alone
-- Choose what Select, and Select and Play pressed together, do on the Now Playing screen: open
-  the queue, the lyrics, Music, Album Covers and more
-  - `Settings > Playback > Now Playing Screen > Select Action` and `Select + Play`
+- Choose what Select, Menu, a long press of Play, and Select and Play together do on the Now
+  Playing screen: go back to where the music was started, open the queue, the lyrics, Music or
+  Album Covers, go to the playing album, add the track to a playlist, stop, and more
+  - `Settings > Playback > Now Playing Screen > Select Action`, `Menu Action`,
+    `Long Press Play Action` and `Select + Play Action`
+  - `Go to Album Via` chooses whether the album opens on its own or inside Music
 - Message, input, confirmation, search, colour, date and time and folder dialogs share one
   themed design
   - `Settings > Appearance > Dialogs`
@@ -63,6 +72,7 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
     playlist; in the Queue, `Move Here` puts them after the selected track and `Remove` takes
     them out; in `Files`, `Cut`, `Copy` and `Delete`
   - `Menu` leaves without doing anything
+- `Back` and `Menu` behave the same way in every menu
 
 ## Music
 
@@ -211,6 +221,8 @@ their albums. Both run much faster than Rockbox's PictureFlow, particularly on t
 - Spin to a random album or artist
   - Hold `Play`
   - `Settings > Library > Carousel > Random Spin Length` sets how far it spins
+- Show an artist's latest album cover when you have no photo of them
+  - Off by default. `Settings > Appearance > Interface Elements > Art Rows > Album Cover If No Photo`
 
 ## Featured Artists
 
@@ -370,23 +382,39 @@ Q and type as well.
   - `Settings > Sound > Equalizer > EQ Presets`
 - Boosting does not clip: Auto Headroom (on by default) turns the equalizer down by its highest
   boost, and shows by how much
+- Play 16-bit files bit for bit: with `Settings > Sound > Dithering` on `Auto` and
+  `Settings > Playback > Replaygain > Replaygain Type` on `Off` (both the default on a new
+  install), a 16-bit file reaches the DAC exactly as it is in the file
 
 ## Games
 
 <img src="docs/podbox/images/ss_grid_games.png" alt="Screenshot"/>
 
-**Spike** turns the song you are listening to into a game. It analyses each track's rhythm and
-builds a level that moves with the beat, getting harder as you go.
-[Watch it](docs/podbox/videos/spike_game.mp4).
+The main menu's **Arcade** holds the games, each with its logo, and every game's high scores.
+
+> **Find more games in [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/games)**,
+> where players share the games they make. Download a game's `.pbg` file and copy it anywhere onto
+> the iPod; it appears in the Arcade once the iPod is ejected.
+
+**Spike** turns the song you are listening to into a game. It finds the beat of whatever is
+playing and builds a level that moves with it: press `Select` on the beat to jump gaps and
+creatures, onto platforms and springs.
 
 The **Music Quiz** tests how well you know your library. A clip plays from partway through a
 song, and you name the track, artist, album or year from five options before the points drain
 away.
 
-- Spike: on the Now Playing screen, hold `Select` and select `Play with Spike`
-- Music Quiz: `Music > Quiz`
-  - Choose which questions it asks in `Settings > Library > Music > Quiz Questions`
-  - Remove it from the menu with `Settings > Appearance > Menus > Edit Music Menu`
+**Brick Mania** is a bat-and-ball game for the click wheel: ten levels of bricks, power-ups to
+catch, and a combo for every brick broken without touching the paddle.
+
+- Play: `Arcade`, then the game
+  - Hold `Select` on a game for its high scores, its help, or to delete a saved game
+- Press `Menu` to quit. A game you quit is marked `Paused` and starts again where you left it
+- Hold `Menu` to pause: the game's own options, its high scores and help, and the music's
+  controls
+  - Turn `Game Sound` off there to hear only your music
+- See every game's best scores and achievements in `Arcade > High Scores`
+- Remove the Arcade from the main menu with `Settings > Appearance > Menus > Edit Main Menu`
 
 ## Settings
 
@@ -441,7 +469,7 @@ for the full list.
   - Choose one with `Settings > System > Language & Text > Voice > Voice`: `Voice File for Menus`
     speaks the menus in it and names in the built-in voice, `Voice File Only` uses it alone
 
-## Behind the scenes
+## Performance improvements
 
 - Faster decoding with more ARM assembly resulting in less CPU usage - particularly beneficial for the iPod Video
 - Faster equalizer, Auditory Fatigue Reduction and Perceptual Bass Enhancement with more ARM
@@ -454,11 +482,6 @@ for the full list.
   the CPU to the decoder
 - Album and artist lists come straight from the database held in memory, so Album Covers, the
   charts and Random Album open quickly
-- `Back` and `Menu` behave the same way in every menu
-- PodBox works as a DAC, soundcard, and can even pretend to be an iPhone to connect to modern cars -
-  see [Connectivity](#connectivity)
-- New theme tags for richer graphics and easier theme building
-  - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
 
 ---
 
@@ -506,8 +529,8 @@ a window on a Windows PC.
 
 ## Coming from Rockbox or RockPod
 
-- **There are no plugins.** The viewers you need are built in; the games and other plugins are
-  gone
+- **There are no plugins.** The viewers you need are built in, and PodBox has its own games, in
+  the [Arcade](#games); Rockbox's games and other plugins are gone
 - **PodBox builds its own library database** in `.rockbox/library/`, the first time it starts.
   Rockbox's desktop database tool does not write it - use `database_pb.exe` (see
   [First run](#first-run))
@@ -663,10 +686,8 @@ they can be installed in any order and on their own.
 **Update your themes whenever you update PodBox.** Themes are rebuilt for each release, and a
 theme made for new firmware can fail on old firmware.
 
-Themes made by others are shared in
-[Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes), each with
-screenshots, a download link and the PodBox release it was tested with. Their authors keep them
-up to date, so check that date before you install one.
+> **Find more themes in [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes)**,
+> where people share the themes they make.
 
 ---
 
@@ -688,6 +709,7 @@ Your iPod can act as a sound card - the computer plays through the iPod, out of 
 socket, using the iPod's DAC.
 - Tested on Windows, macOS and Ubuntu
 - `Settings > System > USB > USB Sound Card` - off by default; turning it on can need a restart
+- The click wheel sets the iPod's volume while the computer plays through it
 
 ### USB Host (New)
 
@@ -946,17 +968,6 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
 - pymobiledevice3 by doronz88 (https://github.com/doronz88/pymobiledevice3)
   - Fetched the iPhone's logs of its conversation with the car
 
-### Other improvements
-
-- ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
-  - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
-    the CPU decodes music
-  - The design of automatic dither and its bit-perfect test
-- RockWheel by Sergei Sarkisian aka [@ssarkisy](https://github.com/ssarkisy)
-  (https://github.com/ssarkisy/RockWheel), GPL v2 or later
-  - Faster seeks in long files, smooth volume fades, the directory cache's name space,
-    an MP3 lead-in fix and lighter AAC decoding
-
 ### Speech
 
 - NV Speech Player by NV Access (https://github.com/nvaccess/NVSpeechPlayer), GPL v2
@@ -971,12 +982,16 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
   transcription
   - How the words the dictionary lacks are said
 
-### Spike Video
+### Other improvements
 
-- Song: Gabriawll - Recall
-- Music provided by NoCopyrightSounds
-- Free Download/Stream: http://ncs.io/Recall
-- Watch: http://ncs.lnk.to/RecallAT/youtube
+- ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
+  - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
+    the CPU decodes music
+  - The design of automatic dither and its bit-perfect test
+- RockWheel by Sergei Sarkisian aka [@ssarkisy](https://github.com/ssarkisy)
+  (https://github.com/ssarkisy/RockWheel), GPL v2 or later
+  - Faster seeks in long files, smooth volume fades, the directory cache's name space,
+    an MP3 lead-in fix and lighter AAC decoding
 
 ### Album Artwork
 
