@@ -51,10 +51,10 @@ export class MemoryView {
         this.head.title = 'The rest of the arena, ' + kb(m.tables) +
             ', is the engine\'s state and the loaded cart: its code, constants, sheet, map and images.';
         this.bar.innerHTML = '';
-        for (const [k, cls, what] of [['held', 'held', 'held'], ['garbage', 'garbage', 'garbage, freed at the next collection'],
-                                      ['free', 'free', 'free']]) {
+        for (const [k, what] of [['held', 'held'], ['garbage', 'garbage, freed at the next collection'],
+                                 ['free', 'free']]) {
             const s = document.createElement('span');
-            s.className = 'mem-' + cls;
+            s.className = 'mem-' + k;
             s.style.flexGrow = String(m[k]);
             s.title = kb(m[k]) + ' ' + what;
             this.bar.append(s);
@@ -86,7 +86,7 @@ export class MemoryView {
         this.table.innerHTML = '';
         for (const [cls, text, share] of rows) {
             const d = document.createElement('div');
-            d.className = cls === 'th' ? 'prof-th' : 'prof-' + cls.split(' ').join(' ');
+            d.className = 'prof-' + cls;
             d.textContent = text;
             if (share !== undefined) d.style.setProperty('--share', (share * 100).toFixed(1) + '%');
             this.table.append(d);

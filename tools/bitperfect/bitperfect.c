@@ -144,7 +144,7 @@ static int run(int16_t *dst, int mode, int depth, int freq, long gain)
 
             d.remcount = 0;
             d.p16out = dst + 2 * done;
-            d.bufcount = (2 * FRAMES - 2 * done) / 2;
+            d.bufcount = FRAMES - done;
             dsp_process(dsp, &src, &d, true);
             done += d.remcount;
             if (d.remcount <= 0 && src.remcount <= 0)

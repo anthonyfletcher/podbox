@@ -3540,11 +3540,16 @@ static enum bg_result aa_task_run(void)
     debug_log(DEBUG_LOG_ARTCACHE, "starting pass");
     aa_offer_posted = false;
     result = aa_run_pass();
-    debug_log(DEBUG_LOG_ARTCACHE,
-              result == BG_DONE   ? "pass complete, idle" :
-              result == BG_FAILED ? (aa_io_failed ? "pass failed: artwork write"
-                                                  : "pass failed: database unreadable") :
-                                    "pass interrupted");
+    const char *how;
+    if (result == BG_DONE)
+        how = "pass complete, idle";
+    else if (result != BG_FAILED)
+        how = "pass interrupted";
+    else if (aa_io_failed)
+        how = "pass failed: artwork write";
+    else
+        how = "pass failed: database unreadable";
+    debug_log(DEBUG_LOG_ARTCACHE, "%s", how);
     return result;
 }
 

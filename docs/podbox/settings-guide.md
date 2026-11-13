@@ -59,7 +59,7 @@ Settings
 | Balance | Shifts the output towards one ear. Meant for correcting a hearing difference or a worn earphone, not for effect. | 0% |  |
 | Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. Mono is the useful one if you often listen with a single earbud. | Stereo |  |
 | Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100% |  |
-| Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. Inaudible on almost all material through headphones. Automatic adds it only where it is needed. A 16-bit file plays exactly as it is in the file, bit for bit, unless Replaygain or a sound effect changes it; 24-bit and lossy files are dithered. A USB DAC gets the same, with the volume at 0 dB or above. Always dithers everything. | Off | **Adv** |
+| Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. Inaudible on almost all material through headphones. Automatic adds it only where it is needed. A 16-bit file plays exactly as it is in the file, bit for bit, unless Replaygain or a sound effect changes it; 24-bit and lossy files are dithered. A USB DAC gets the same, with the volume at 0 dB or above. Always dithers everything. | Auto on a new install | **Adv** |
 | Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. If you can hear it working, it is set too high. | Off |  |
 
 ### Sound Settings — Crossfeed
@@ -157,7 +157,7 @@ Settings
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. Album gain keeps the balance between tracks on one record; track gain levels everything, which suits shuffling. Off plays each file at its own level, which a file needs to play bit for bit. | Track Gain If Shuffling |  |
+| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. Album gain keeps the balance between tracks on one record; track gain levels everything, which suits shuffling. Off plays each file at its own level, which a file needs to play bit for bit. | Off on a new install |  |
 | Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | No | **Adv** |
 | Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. Useful if the whole library ends up quieter than you want once levelling is applied. | 0 dB | **Adv** |
 
