@@ -526,17 +526,14 @@ static void toggle_find(const struct theme_option *opt, void *data)
     t->found = true;
 }
 
-/* The assigned option, if the loaded theme has it and it changes without a
- * reload. Reads its files. */
-static bool toggle_lookup(struct toggle *t)
+/* t->key of the .preferences file at `path`, if the loaded theme has it and
+ * it changes without a reload. Reads its files. */
+static bool toggle_try(struct toggle *t, const char *path)
 {
     char opts_path[MAX_PATH];
-    const char *path;
 
     t->found = false;
     t->prefs = NULL;
-    if (!toggle_split(t->key, &path))
-        return false;
     for (int i = 0; i < theme_options_count(); i++)
         if (!strcmp(theme_options_path(i), path))
             t->prefs = theme_options_path(i);
@@ -547,6 +544,27 @@ static bool toggle_lookup(struct toggle *t)
         t->value[0] = '\0';
     theme_options_parse(opts_path, NULL, toggle_find, t);
     return t->found;
+}
+
+/* The owner's assignment while it is the loaded theme's, otherwise the
+ * option the theme's options file names with `toggle` */
+static bool toggle_lookup(struct toggle *t)
+{
+    const char *path;
+
+    if (toggle_split(t->key, &path) && toggle_try(t, path))
+        return true;
+    for (int i = 0; i < theme_options_count(); i++)
+    {
+        const char *key = theme_options_toggle(i);
+
+        if (!*key)
+            continue;
+        strcpy(t->key, key);
+        if (toggle_try(t, theme_options_path(i)))
+            return true;
+    }
+    return false;
 }
 
 const char *theme_toggle_label(void)

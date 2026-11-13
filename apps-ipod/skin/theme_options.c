@@ -130,6 +130,9 @@ static struct
     unsigned fields;
     char seen[THEME_OPTIONS_MAX][THEME_OPTION_KEY_MAX + 1];
     int count;                  /* headings met */
+    char toggle[THEME_OPTION_KEY_MAX + 1];  /* the file's `toggle` */
+    int toggle_line;
+    bool toggle_found;          /* ...is a good choice option */
 } p;
 
 /* An error goes to the theme log, or to CheckWPS's output */
@@ -302,6 +305,8 @@ static bool hand_over(void (*each)(const struct theme_option *opt,
 {
     if (!finish())
         return false;
+    if (p.opt.type == THEME_OPTION_CHOICE && !strcmp(p.opt.key, p.toggle))
+        p.toggle_found = true;
     if (each)
         each(&p.opt, data);
     return true;
@@ -396,12 +401,27 @@ int theme_options_parse(const char *path, struct theme_options_head *head,
             if (head)
                 add_help(head->help, value);
         }
+        else if (!strcmp(field, "toggle"))
+        {
+            if (good_key(value))
+            {
+                strcpy(p.toggle, value);
+                p.toggle_line = p.line;
+            }
+            else
+                error("toggle is not a key");
+        }
     }
     close(fd);
 
     if (!p.open)
         return format == 1 && !head_bad ? 0 : -1;
-    return good + hand_over(each, data);
+    good += hand_over(each, data);
+    if (p.toggle[0] && !p.toggle_found)
+        report(p.toggle_line, "toggle names no good choice option");
+    else if (head)
+        strcpy(head->toggle, p.toggle);
+    return good;
 }
 
 /* --- read ---------------------------------------------------------------- */
@@ -655,6 +675,7 @@ static struct
 {
     char path[MAX_PATH];
     char title[THEME_OPTION_NAME_MAX + 1];
+    char toggle[THEME_OPTION_KEY_MAX + 1];
     bool good;                  /* its options file has a good option */
     bool fixed;                 /* ...and a %ft that reads it is not live */
 } rec[THEME_OPTIONS_FILES];
@@ -778,6 +799,7 @@ void theme_options_met(const char *path)
         snprintf(title, THEME_OPTION_NAME_MAX + 1, "%.*s",
                  (int)(strlen(name) - PREFS_EXT_LEN), name);
     }
+    strcpy(rec[recs - 1].toggle, head.toggle);
     rec[recs - 1].good = true;
 }
 
@@ -810,6 +832,13 @@ const char *theme_options_title(int n)
     int i = nth_good(n);
 
     return i < 0 ? NULL : rec[i].title;
+}
+
+const char *theme_options_toggle(int n)
+{
+    int i = nth_good(n);
+
+    return i < 0 ? "" : rec[i].toggle;
 }
 
 /* --- live ---------------------------------------------------------------- */

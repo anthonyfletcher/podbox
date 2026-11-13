@@ -49,6 +49,7 @@ struct theme_options_head
 {
     char title[THEME_OPTION_NAME_MAX + 1];
     char help[THEME_OPTION_HELP_MAX + 1];
+    char toggle[THEME_OPTION_KEY_MAX + 1];  /* a good choice option, or "" */
 };
 
 /* Calls `each` for every good option in the options file at `path`, in file
@@ -105,6 +106,9 @@ bool theme_options_live_only(const char *path);
 int theme_options_count(void);
 const char *theme_options_path(int n);
 const char *theme_options_title(int n);
+/* The n-th one's choice option for Theme Toggle, from its options file's
+ * `toggle`, or "" */
+const char *theme_options_toggle(int n);
 
 /* The .options path for a .preferences path, into `buf` */
 bool theme_options_options_path(const char *prefs, char *buf, int bufsize);
