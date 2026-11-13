@@ -641,7 +641,6 @@ static void tv_picture_free(void)
 #define TV_PIC_BAR_AFTER (HZ / 4)
 static bool tv_side;
 static void tv_side_push(void);
-static unsigned int tv_pic_thread;
 static long tv_pic_start;
 static int tv_pic_held, tv_pic_drawn;
 static bool tv_pic_stopped;
@@ -658,8 +657,6 @@ static bool tv_picture_row(int done, int rows)
     struct screen *d = &screens[SCREEN_MAIN];
     int held, w, x, y, fill;
 
-    if (thread_self() != tv_pic_thread)
-        return true;                    /* the art cache, on its own thread */
     held = button_status();
     if (held & ~tv_pic_held)
     {
@@ -738,7 +735,6 @@ static bool tv_picture_decode(const char *href, int w, int h)
     tv_pic_bm.width = w;
     tv_pic_bm.height = h;
     tv_pic_bm.data = buf;
-    tv_pic_thread = thread_self();
     tv_pic_start = current_tick;
     tv_pic_held = button_status();
     tv_pic_drawn = -1;

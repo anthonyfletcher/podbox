@@ -428,14 +428,9 @@ void cb_progress(int current, int total)
 
 int iv_decode_stop;
 
-/* The hook is global, and the art cache decodes on its own thread while the
- * viewer's decode yields: its rows pass straight through. */
-static unsigned int iv_decode_thread;
-
 void iv_decode_begin(void)
 {
     iv_decode_stop = 0;
-    iv_decode_thread = thread_self();
 }
 
 /* A press of Menu stops a decode in either key map: nothing else can be
@@ -444,8 +439,6 @@ bool iv_decode_row(int done, int rows)
 {
     long button;
 
-    if (thread_self() != iv_decode_thread)
-        return true;
     cb_progress(done, rows);
     button = button_get(false);
     if (button == SYS_USB_CONNECTED)

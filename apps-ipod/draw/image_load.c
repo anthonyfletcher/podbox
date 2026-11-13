@@ -256,10 +256,22 @@ static int jpeg_orientation(bs_stream *s, int skip)
     return 1;
 }
 
+/* Enough arena for any of image_stream()'s streams, base64 the largest:
+ * where the PNG reader's does not fit, a JPEG's orientation is read with
+ * this much, so a small decode is turned as its size probe said */
+#define ORIENT_ARENA 1024
+
 /* The scratch a quarter turn needs past the bitmap: one bit a pixel */
 static size_t orient_marks(int w, int h)
 {
     return ((size_t)w * h + 7) / 8;
+}
+
+static inline void swap_pixel(fb_data *a, fb_data *b)
+{
+    fb_data t = *a;
+    *a = *b;
+    *b = t;
 }
 
 /* The bitmap turned or mirrored in place for an EXIF orientation: 1 done,
@@ -288,7 +300,7 @@ static int image_orient(struct bitmap *bm, int maxsize, int orientation,
             case 2:                         /* each row end for end */
                 for (b = a + w - 1; a < b; a++, b--)
                 {
-                    fb_data t = *a; *a = *b; *b = t;
+                    swap_pixel(a, b);
                 }
                 break;
             case 3:                         /* the whole, end for end */
@@ -298,12 +310,12 @@ static int image_orient(struct bitmap *bm, int maxsize, int orientation,
                 if (2 * y + 1 == h)         /* the middle row with itself */
                     for (; a < b; a++, b--)
                     {
-                        fb_data t = *a; *a = *b; *b = t;
+                        swap_pixel(a, b);
                     }
                 else
                     for (int x = 0; x < w; x++, a++, b--)
                     {
-                        fb_data t = *a; *a = *b; *b = t;
+                        swap_pixel(a, b);
                     }
                 break;
             case 4:                         /* the rows top for bottom */
@@ -312,7 +324,7 @@ static int image_orient(struct bitmap *bm, int maxsize, int orientation,
                 b = pixels + (size_t)(h - 1 - y) * w;
                 for (int x = 0; x < w; x++, a++, b++)
                 {
-                    fb_data t = *a; *a = *b; *b = t;
+                    swap_pixel(a, b);
                 }
                 break;
             default:
@@ -328,7 +340,7 @@ static int image_orient(struct bitmap *bm, int maxsize, int orientation,
         if (orientation == 6 || orientation == 7)
             for (fb_data *a = pixels, *b = pixels + h - 1; a < b; a++, b--)
             {
-                fb_data t = *a; *a = *b; *b = t;
+                swap_pixel(a, b);
             }
         bm->width = h;
         bm->height = 1;
@@ -406,8 +418,20 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
             kind = sniff(head, tries, &at);
     }
 
+    bool jpeg = kind == IMAGE_JPEG;
+    if (maxsize < (int)(PNG_DECODE_OVERHEAD + 8) &&
+        maxsize >= (int)(ORIENT_ARENA + 8))
+    {
+        a.base = (uint8_t *)((uintptr_t)(end - ORIENT_ARENA) & ~7);
+        a.size = end - a.base;
+        a.used = 0;
+        s = image_stream(&a, src);
+        jpeg = s && bs_read(s, head, 11 + tries) == BS_OK &&
+               sniff(head, tries, &at) == IMAGE_JPEG;
+    }
+
     int orientation = 1;
-    if (kind == IMAGE_JPEG && maxsize >= (int)(PNG_DECODE_OVERHEAD + 8))
+    if (jpeg)
     {
         a.used = 0;
         s = image_stream(&a, src);

@@ -10,8 +10,8 @@
  * drawn the same way.
  *
  * A page a board, then the achievements, then how much the cart was played
- * with Clear High Scores; the wheel or Right turns the pages. Left goes
- * back, Menu out to the root.
+ * with Clear High Scores; the wheel or Right turns the pages, and only
+ * Select clears. Left goes back, Menu out to the root.
  *
  * The CAPS font holds ASCII only: a character beyond it draws as '?'.
  *
@@ -218,6 +218,19 @@ static void draw_page(const struct pages *p, int page, int rank, bool clearable)
     lcd_update();
 }
 
+/* Which button the last ACTION_STD_OK came from: Right and the remote's
+ * Right turn a page, Select and the remote's Select clear, and the
+ * remote's Play, OK too, does neither */
+static bool ok_was(unsigned buttons)
+{
+    int button;
+    get_action_statuscode(&button);
+    return (button & buttons) != 0;
+}
+
+#define RIGHTS (BUTTON_RIGHT | BUTTON_RC_RIGHT)
+#define SELECTS (BUTTON_SELECT | BUTTON_RC_SELECT)
+
 /* Clear's question over the page: true for yes */
 static bool ask_clear(void)
 {
@@ -228,7 +241,7 @@ static bool ask_clear(void)
     lcd_update();
     for (;;) {
         int a = get_action(CONTEXT_LIST, TIMEOUT_BLOCK);
-        if (a == ACTION_STD_OK)
+        if (a == ACTION_STD_OK && ok_was(SELECTS))
             return true;
         if (a == ACTION_STD_CANCEL || a == ACTION_STD_MENU)
             return false;
@@ -269,12 +282,11 @@ bool shell_table(struct arcade_scores *s, int board, int rank,
             to_root = true;
             break;
         } else if (a == ACTION_STD_OK) {
-            int button;
-            get_action_statuscode(&button);
-            if (button & BUTTON_RIGHT) {
+            if (ok_was(RIGHTS)) {
                 if (page < p.total - 1)
                     page++;
-            } else if (clearable && page == p.total - 1 && ask_clear()) {
+            } else if (ok_was(SELECTS) && clearable && page == p.total - 1
+                       && ask_clear()) {
                 clear(s, ctx);
             }
         } else if (default_event_handler(a) == SYS_USB_CONNECTED) {

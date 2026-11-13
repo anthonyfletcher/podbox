@@ -225,17 +225,21 @@ fill_frame:
     if (LIKELY(*chan_p))
     {
         struct mixer_channel *chan = *chan_p++;
+        /* The last channel's amplitude, read once: a fade can change it
+         * between reads, and written_amp must be what was written */
+        unsigned int amp;
 
         if (LIKELY(!*chan_p))
         {
-            if (LIKELY(chan->amplitude == chan->written_amp))
+            amp = chan->amplitude;
+            if (LIKELY(amp == chan->written_amp))
             {
-                write_samples(mixptr, chan->start, chan->amplitude, mixsize);
+                write_samples(mixptr, chan->start, amp, mixsize);
             }
             else
             {
                 write_samples_ramp(mixptr, chan->start, chan->written_amp,
-                                   chan->amplitude, mixsize);
+                                   amp, mixsize);
             }
         }
         else
@@ -269,9 +273,10 @@ fill_frame:
                 src1 = chan->start;
                 amp1 = chan->amplitude;
             }
+            amp = amp1;
         }
 
-        chan->written_amp = chan->amplitude;
+        chan->written_amp = amp;
         chan->last_size = mixsize;
         next_size += mixsize;
 
