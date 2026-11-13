@@ -83,6 +83,7 @@
 #include "widgets/option_select.h"
 #include "screens/playback/wps.h"
 #include "skin/skin_engine.h"
+#include "screens/system/usb_screen.h"
 #include "draw/viewport.h"
 #include "skin/statusbar_skinned.h"
 #include "bootchart.h"
@@ -1471,6 +1472,7 @@ void settings_apply(bool read_disk)
         CHART(">icons_init");
         icons_init();
         CHART("<icons_init");
+        usb_screen_image_init();
 
         CHART(">read_color_theme_file");
         read_color_theme_file();

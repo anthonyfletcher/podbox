@@ -4,11 +4,12 @@
  * Copyright (C) 2002 Björn Stenberg
  * GNU General Public License (version 2+)
  *
- * The USB connection screen shown while the device is mounted: a plain message
- * box over whatever was on screen, plus HID keypad handling, and the wheel as
+ * The USB connection screen shown while the device is mounted: the theme's
+ * "usb image" with the message under it, or without one a plain message box
+ * over whatever was on screen; plus HID keypad handling, and the wheel as
  * volume while the player is a sound card.
  *
- * Themes do not get to draw this screen. See usb_screen_fix_viewports().
+ * The skin never draws this screen. See usb_screen_fix_viewports().
  ****************************************************************************/
 
 #include <stdio.h>
@@ -31,9 +32,39 @@
 #include "system/shutdown.h"
 #include "widgets/splash.h"
 #include "system/volume.h"      /* adjust_volume */
+#include "system/app_util.h"    /* core_load_bmp */
+#include "system/debug_log.h"
+#include "core_alloc.h"
+#include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
 
 int usb_keypad_mode;
 static bool usb_hid;
+
+/* The theme's image, loaded with the theme because the disk is the host's
+ * for the whole session. Movable: its address is fetched at each draw, never
+ * kept. */
+static int usb_image = CLB_ALOC_ERR;
+static struct bitmap usb_image_bm;
+
+void usb_screen_image_init(void)
+{
+    const char *file = global_settings.usb_image_file;
+    ssize_t size;
+
+    usb_image = core_free(usb_image);
+    if (!file[0] || file[0] == '-')
+        return;
+    usb_image = core_load_bmp(file, &usb_image_bm, FORMAT_MONO, &size, NULL);
+    if (usb_image <= 0)
+        debug_log(DEBUG_LOG_SKIN, "usb image %s: cannot load", file);
+    else if (usb_image_bm.width > LCD_WIDTH
+             || usb_image_bm.height > LCD_HEIGHT)
+    {
+        debug_log(DEBUG_LOG_SKIN, "usb image %s: larger than the screen",
+                  file);
+        usb_image = core_free(usb_image);
+    }
+}
 
 static int handle_usb_events(void)
 {
@@ -136,21 +167,67 @@ static void usb_screen_fix_viewports(struct screen *screen,
     }
 }
 
-/* The message in a centred box, the same one every other modal in the UI uses,
- * drawn over whatever was on screen. The screen is not blanked first: neither
- * clearing the full-screen parent viewport nor dropping the backdrop before
- * clear_display() blanks it on hardware. So a device left plugged in wakes
- * with fragments of the screen it came from around the message.
+/* The image centred on a screen filled with the background, the message's two
+ * lines under it, and its dark pixels in the foreground: both colours as the
+ * dynamic colours give them. The whole screen is sent, where a splash sends
+ * only its box. */
+static void usb_image_draw(struct screen *screen)
+{
+    static const int lines[] = { LANG_USB_CONNECTED,
+                                 LANG_USB_EJECT_BEFORE_DISCONNECT };
+    struct viewport vp, *last;
+    int w, h, y;
+
+    /* Trap: viewport_set_fullscreen() reads buffer before setting it */
+    vp.buffer = NULL;                   /* the default framebuffer */
+    vp.flags  = VP_DEFAULT_FLAGS;
+    viewport_set_fullscreen(&vp, screen->screen_type);
+    last = screen->set_viewport(&vp);
+    h = font_get(vp.font)->height;
+
+    screen->set_drawmode(DRMODE_SOLID);
+    screen->set_foreground(dynamic_colors_resolve(global_settings.bg_color));
+    screen->fillrect(0, 0, vp.width, vp.height);
+    screen->set_foreground(dynamic_colors_resolve(global_settings.fg_color));
+    screen->set_drawmode(DRMODE_FG);
+
+    y = MAX(0, (vp.height - usb_image_bm.height - h / 2 - 2 * h) / 2);
+    screen->mono_bitmap(core_get_data(usb_image),
+                        (vp.width - usb_image_bm.width) / 2, y,
+                        usb_image_bm.width, usb_image_bm.height);
+    y += usb_image_bm.height + h / 2;
+    for (unsigned i = 0; i < ARRAYLEN(lines); i++, y += h)
+    {
+        const char *s = str(lines[i]);
+
+        font_getstringsize(s, &w, NULL, vp.font);
+        screen->putsxy((vp.width - w) / 2, y, s);
+    }
+
+    screen->set_drawmode(DRMODE_SOLID);
+    screen->update();
+    screen->set_viewport(last);
+}
+
+/* Without an image, the message in a centred box, the same one every other
+ * modal in the UI uses, drawn over whatever was on screen: a device left
+ * plugged in wakes with fragments of the screen it came from around it.
  *
- * Plain fill and text drawing, never the skin engine, so this is safe to repeat
- * after the storage handover. */
+ * Plain fill, bitmap and text drawing, never the skin engine or the disk, so
+ * this is safe to repeat after the storage handover. */
 static void usb_screens_draw(void)
 {
     FOR_NB_SCREENS(i)
         screens[i].backlight_on();
 
-    splashf(0, "%s\n%s", str(LANG_USB_CONNECTED),
-                         str(LANG_USB_EJECT_BEFORE_DISCONNECT));
+    if (usb_image > 0)
+    {
+        FOR_NB_SCREENS(i)
+            usb_image_draw(&screens[i]);
+    }
+    else
+        splashf(0, "%s\n%s", str(LANG_USB_CONNECTED),
+                             str(LANG_USB_EJECT_BEFORE_DISCONNECT));
 }
 
 void gui_usb_screen_run(bool early_usb, intptr_t seqnum)

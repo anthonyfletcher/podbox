@@ -701,6 +701,7 @@ struct user_settings
     bool mix_starts_with_selected; /* Play Similar/Wind Down lead with it */
 
     unsigned char backdrop_file[MAX_PATHNAME+1];  /* backdrop bitmap file */
+    unsigned char usb_image_file[MAX_PATHNAME+1]; /* the USB screen's image */
 
     int bg_color; /* background color native format */
     int fg_color; /* foreground color native format */

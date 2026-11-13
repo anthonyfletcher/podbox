@@ -13,5 +13,9 @@
 
 extern void gui_usb_screen_run(bool early_usb, intptr_t seqnum);
 
+/* Loads the theme's "usb image", or drops the last one. From
+ * settings_apply(), while the disk is the player's. */
+void usb_screen_image_init(void);
+
 #endif
 

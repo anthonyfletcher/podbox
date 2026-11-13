@@ -1913,6 +1913,8 @@ const struct settings_list settings[] = {
      * the last theme's image showing through everything it draws. */
     TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY,backdrop_file,"backdrop",
                      DEFAULT_BACKDROP, NULL, NULL),
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY, usb_image_file,
+                 "usb image", "-", NULL, NULL),
     TEXT_SETTING(0,kbd_file,"kbd","-",ROCKBOX_DIR "/",".kbd"),
     CHOICE_SETTING(0, usb_charging, LANG_USB_CHARGING, TARGET_USB_CHARGING_DEFAULT, "usb charging",
                    "off,on,force", NULL, 3, ID2P(LANG_SET_BOOL_NO),
