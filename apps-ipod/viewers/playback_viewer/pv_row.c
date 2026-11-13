@@ -212,6 +212,14 @@ static bool art_read_square(unsigned key, fb_data *dst)
  * not there. A key that has never been tried is what keeps the loop awake. */
 static bool art_resolved(unsigned key)
 {
+    static unsigned generation;
+    unsigned current = art_cache_generation();
+    if (generation != current && !art_cache_is_busy())
+    {
+        memset(art_key, 0, sizeof(art_key));
+        memset(hue_key, 0, sizeof(hue_key));
+        generation = current;
+    }
     for (int i = 0; i < ART_SLOTS; i++)
         if (art_key[i] == key)
             return true;
