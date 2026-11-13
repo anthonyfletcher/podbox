@@ -50,6 +50,7 @@
 #include "games/arcade/arcade.h"
 #include "games/arcade/shell.h"
 #include "games/arcade/shell_score.h"
+#include "games/arcade/shell_table.h"
 #include "games/arcade/shelf.h"
 
 #define CARTS_MAX 64
@@ -365,8 +366,8 @@ static bool game_menu(int c)
 
 /* ---- every cart's high scores -------------------------------------------- */
 
-/* Each scores file by its cart's name, which the file keeps, so a cart no
- * longer on the player still has its scores listed */
+/* Each scores file of a cart on the player, by the cart's name, which the
+ * file keeps */
 struct scored { char file[24]; char name[32]; };
 static struct scored scored[CARTS_MAX];
 static int scored_ct;
@@ -375,6 +376,14 @@ static int by_scored_name(const void *a, const void *b)
 {
     return strnatcasecmp(((const struct scored *)a)->name,
                          ((const struct scored *)b)->name);
+}
+
+static bool on_player(const uint8_t *id)
+{
+    for (int i = 0; i < cart_ct; i++)
+        if (!memcmp(carts[i].id, id, sizeof(carts[i].id)))
+            return true;
+    return false;
 }
 
 static void scan_scores(void)
@@ -391,7 +400,7 @@ static void scan_scores(void)
             strcasecmp(e->d_name + len - 4, ".sco"))
             continue;
         snprintf(path, sizeof(path), "%s/%s", SCORES_DIR, e->d_name);
-        if (!shell_scores_read(path, &record))
+        if (!shell_scores_read(path, &record) || !on_player(record.id))
             continue;
         strmemccpy(scored[scored_ct].file, e->d_name, sizeof(scored[0].file));
         strmemccpy(scored[scored_ct].name, record.cart,
@@ -402,44 +411,28 @@ static void scan_scores(void)
     qsort(scored, scored_ct, sizeof(scored[0]), by_scored_name);
 }
 
-static const char *scored_row(int row, void *data, char *buf, size_t len)
+static const char *scored_name(int row)
 {
-    (void)data; (void)buf; (void)len;
     return scored[row].name[0] ? scored[row].name : scored[row].file;
 }
 
-static enum themable_icons scored_icon(int row, void *data)
+static bool scored_open(int row)
 {
-    (void)row; (void)data;
-    return Icon_Plugin;
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s/%s", SCORES_DIR, scored[row].file);
+    return shell_scores_read(path, &record) && shell_scores_show(&record);
 }
 
 /* Open until backed out of; true for out to the root */
 static bool all_scores(void)
 {
-    struct simplelist_info info;
-    char path[MAX_PATH];
-    int selection = 0;
     scan_scores();
     if (!scored_ct) {
         splash(HZ, ID2P(LANG_NO_HIGH_SCORES));
         return false;
     }
-    for (;;) {
-        simplelist_info_init(&info, str(LANG_HIGH_SCORES), scored_ct, NULL);
-        info.get_name = scored_row;
-        info.get_icon = scored_icon;
-        info.selection = selection;
-        if (simplelist_show_list(&info))
-            return true;
-        selection = info.selection;
-        if (selection < 0)
-            return false;
-        snprintf(path, sizeof(path), "%s/%s", SCORES_DIR,
-                 scored[selection].file);
-        if (shell_scores_read(path, &record) && shell_scores_show(&record))
-            return true;
-    }
+    return shell_table_list(str(LANG_HIGH_SCORES), scored_name, scored_ct,
+                            scored_open);
 }
 
 /* ---- the list, and the way in -------------------------------------------- */

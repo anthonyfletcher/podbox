@@ -6,11 +6,12 @@
  * vivid colour marking the score just set when dynamic colours are on.
  * One screen for every way to them -- score.show() in a game, the pause
  * menu's High Scores, and the Arcade's -- so a ranked table looks like one
- * wherever it is opened.
+ * wherever it is opened. The Arcade's list of every cart with scores is
+ * drawn the same way.
  *
  * A page a board, then the achievements, then how much the cart was played
- * with Clear High Scores; the wheel turns the pages. Left goes back, Menu
- * out to the root.
+ * with Clear High Scores; the wheel or Right turns the pages. Left goes
+ * back, Menu out to the root.
  *
  * The CAPS font holds ASCII only: a character beyond it draws as '?'.
  *
@@ -18,6 +19,7 @@
  *   - drawing
  *   - the pages
  *   - the way in
+ *   - a list of carts
  ****************************************************************************/
 #include <stdbool.h>
 #include <stdio.h>
@@ -267,8 +269,80 @@ bool shell_table(struct arcade_scores *s, int board, int rank,
             to_root = true;
             break;
         } else if (a == ACTION_STD_OK) {
-            if (clearable && page == p.total - 1 && ask_clear())
+            int button;
+            get_action_statuscode(&button);
+            if (button & BUTTON_RIGHT) {
+                if (page < p.total - 1)
+                    page++;
+            } else if (clearable && page == p.total - 1 && ask_clear()) {
                 clear(s, ctx);
+            }
+        } else if (default_event_handler(a) == SYS_USB_CONNECTED) {
+            to_root = true;
+            break;
+        }
+    }
+    viewportmanager_theme_undo(SCREEN_MAIN, true);
+    return to_root;
+}
+
+/* ---- a list of carts ----------------------------------------------------- */
+
+#define LIST_TOP 15
+#define LIST_ROWS 11
+
+static void list_page(const char *title, const char *(*name)(int row),
+                      int count, int sel, int top)
+{
+    char where[24];
+    box(0, 0, W, 120, c_bg);
+    box(0, 0, W, 11, c_accent);
+    text(title, 4, 3, 100, c_bg);
+    snprintf(where, sizeof(where), "%d OF %d", sel + 1, count);
+    text_right(where, 156, 3, c_bg);
+    for (int k = 0; k < LIST_ROWS && top + k < count; k++) {
+        int y = LIST_TOP + k * ROW_H;
+        bool on = top + k == sel;
+        if (on)
+            box(2, y - 2, 156, ROW_H, c_accent);
+        text(name(top + k), 4, y, W - 4, on ? c_bg : c_fg);
+    }
+    lcd_update();
+}
+
+bool shell_table_list(const char *title, const char *(*name)(int row),
+                      int count, bool (*pick)(int row))
+{
+    struct viewport vp;
+    int sel = 0, top = 0;
+    bool to_root = false;
+    viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
+    lcd_set_viewport(NULL);
+    for (;;) {
+        int a;
+        if (sel < top)
+            top = sel;
+        else if (sel >= top + LIST_ROWS)
+            top = sel - LIST_ROWS + 1;
+        colours();
+        list_page(title, name, count, sel, top);
+        a = get_action(CONTEXT_LIST, TIMEOUT_BLOCK);
+        if (a == ACTION_STD_NEXT || a == ACTION_STD_NEXTREPEAT) {
+            if (sel < count - 1)
+                sel++;
+        } else if (a == ACTION_STD_PREV || a == ACTION_STD_PREVREPEAT) {
+            if (sel > 0)
+                sel--;
+        } else if (a == ACTION_STD_OK) {
+            if (pick(sel)) {
+                to_root = true;
+                break;
+            }
+        } else if (a == ACTION_STD_CANCEL) {
+            break;
+        } else if (a == ACTION_STD_MENU) {
+            to_root = true;
+            break;
         } else if (default_event_handler(a) == SYS_USB_CONNECTED) {
             to_root = true;
             break;

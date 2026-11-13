@@ -146,7 +146,7 @@ Shows the iPod's own table for a board, over the game, after this tick.
 - The table is the Arcade's own, drawn in its CAPS font in the iPod's
   theme colours: the same screen as the pause menu's High Scores, a page
   a board, then the achievements and how much the game was played, turned
-  with the wheel. Left closes it.
+  with the wheel or Right. Left closes it.
 - The game is paused while the table is open; it carries on with the next
   tick once the owner closes it.
 - Several calls in one tick show the last.
