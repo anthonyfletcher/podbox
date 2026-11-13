@@ -256,53 +256,132 @@ static int jpeg_orientation(bs_stream *s, int skip)
     return 1;
 }
 
-/* Permute the scaled pixels in place. One bit per pixel marks each cycle. */
-static bool image_orient(struct bitmap *bm, int maxsize, int orientation,
-                         const struct custom_format *format)
+/* The scratch a quarter turn needs past the bitmap: one bit a pixel */
+static size_t orient_marks(int w, int h)
 {
-    int w = bm->width, h = bm->height;
-    size_t count = (size_t)w * h, bytes = count * sizeof(fb_data);
-    size_t marks = (count + 7) / 8;
-    if (w < 1 || h < 1 || bytes + marks > (size_t)maxsize)
-        return false;
-    uint8_t *seen = bm->data + bytes;
-    fb_data *pixels = (fb_data *)bm->data;
+    return ((size_t)w * h + 7) / 8;
+}
+
+/* The bitmap turned or mirrored in place for an EXIF orientation: 1 done,
+   0 left as it is for want of room, -1 cancelled part way. A mirror or a
+   half turn swaps pixels in pairs; a quarter turn follows each cycle of the
+   transpose, marking where it has been in a bit a pixel past the bitmap. */
+static int image_orient(struct bitmap *bm, int maxsize, int orientation,
+                        const struct custom_format *format)
+{
+    const int w = bm->width, h = bm->height;
+    const size_t count = (size_t)w * h, bytes = count * sizeof(fb_data);
+    fb_data *const pixels = (fb_data *)bm->data;
+
+    if (w < 1 || h < 1 || bytes > (size_t)maxsize)
+        return 0;
+
+    if (orientation < 5)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            if (!image_progress(format, y, h))
+                return -1;
+            fb_data *a = pixels + (size_t)y * w, *b;
+            switch (orientation)
+            {
+            case 2:                         /* each row end for end */
+                for (b = a + w - 1; a < b; a++, b--)
+                {
+                    fb_data t = *a; *a = *b; *b = t;
+                }
+                break;
+            case 3:                         /* the whole, end for end */
+                if (2 * y >= h)
+                    return 1;
+                b = pixels + (size_t)(h - 1 - y) * w + w - 1;
+                if (2 * y + 1 == h)         /* the middle row with itself */
+                    for (; a < b; a++, b--)
+                    {
+                        fb_data t = *a; *a = *b; *b = t;
+                    }
+                else
+                    for (int x = 0; x < w; x++, a++, b--)
+                    {
+                        fb_data t = *a; *a = *b; *b = t;
+                    }
+                break;
+            case 4:                         /* the rows top for bottom */
+                if (2 * y + 1 >= h)
+                    return 1;
+                b = pixels + (size_t)(h - 1 - y) * w;
+                for (int x = 0; x < w; x++, a++, b++)
+                {
+                    fb_data t = *a; *a = *b; *b = t;
+                }
+                break;
+            default:
+                return 1;
+            }
+        }
+        return 1;
+    }
+
+    if (w == 1)
+    {
+        /* a column turned is a row in the same order, or the reverse */
+        if (orientation == 6 || orientation == 7)
+            for (fb_data *a = pixels, *b = pixels + h - 1; a < b; a++, b--)
+            {
+                fb_data t = *a; *a = *b; *b = t;
+            }
+        bm->width = h;
+        bm->height = 1;
+        return 1;
+    }
+
+    const size_t marks = orient_marks(w, h);
+    if (bytes + marks > (size_t)maxsize || (uint64_t)count * w > 0xffffffffu)
+        return 0;
+    uint8_t *const seen = bm->data + bytes;
     memset(seen, 0, marks);
+
+    /* x and y of a place without dividing, which ARM does in software: a
+       multiply by 2^32 / w rounded up gives at / w exactly while at * w is
+       under 2^32, which every bitmap here is far inside */
+    const uint32_t recip = 0xffffffffu / (uint32_t)w + 1;
+    size_t row_end = 0;
+    int row = 0;
+
     for (size_t start = 0; start < count; start++)
     {
-        if (seen[start / 8] & (1u << (start % 8)))
+        if (start == row_end)
+        {
+            if (!image_progress(format, row++, h))
+                return -1;
+            row_end += w;
+        }
+        if (seen[start >> 3] & (1u << (start & 7)))
             continue;
-        if (!image_progress(format, start / w, h))
-            return false;
         size_t at = start;
         fb_data held = pixels[at];
         do
         {
-            int x = at % w, y = at / w, nx = x, ny = y;
+            int y = (int)(((uint64_t)at * recip) >> 32);
+            int x = (int)at - y * w, nx, ny;
             switch (orientation)
             {
-            case 2: nx = w - 1 - x; break;
-            case 3: nx = w - 1 - x; ny = h - 1 - y; break;
-            case 4: ny = h - 1 - y; break;
-            case 5: nx = y; ny = x; break;
-            case 6: nx = h - 1 - y; ny = x; break;
-            case 7: nx = h - 1 - y; ny = w - 1 - x; break;
-            case 8: nx = y; ny = w - 1 - x; break;
+            case 5:  nx = y;         ny = x;         break;
+            case 6:  nx = h - 1 - y; ny = x;         break;
+            case 7:  nx = h - 1 - y; ny = w - 1 - x; break;
+            default: nx = y;         ny = w - 1 - x; break;  /* 8 */
             }
-            size_t next = (size_t)ny * (orientation >= 5 ? h : w) + nx;
+            size_t next = (size_t)ny * h + nx;
             fb_data displaced = pixels[next];
             pixels[next] = held;
             held = displaced;
-            seen[at / 8] |= 1u << (at % 8);
+            seen[at >> 3] |= 1u << (at & 7);
             at = next;
         } while (at != start);
     }
-    if (orientation >= 5)
-    {
-        bm->width = h;
-        bm->height = w;
-    }
-    return true;
+    bm->width = h;
+    bm->height = w;
+    return 1;
 }
 
 int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
@@ -380,9 +459,12 @@ int image_load(const struct image_src *src, struct bitmap *bm, int maxsize,
                     int w = bm->width;
                     bm->width = bm->height;
                     bm->height = w;
+                    /* and the scratch the turn needs */
+                    rc += orient_marks(w, bm->width);
                 }
             }
-            else if (!image_orient(bm, maxsize, orientation, cformat))
+            /* without room to turn it, the image is shown as it was taken */
+            else if (image_orient(bm, maxsize, orientation, cformat) < 0)
                 return -1;
         }
         return rc;
