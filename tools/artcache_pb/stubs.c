@@ -285,6 +285,11 @@ void timeout_register(struct timeout *tmo, timeout_cb_type callback,
     (void)tmo; (void)callback; (void)ticks; (void)data;
 }
 
+void timeout_cancel(struct timeout *tmo)
+{
+    (void)tmo;
+}
+
 /* Asked for every track: nothing outranks the only pass there is */
 bool bg_task_should_stop(const struct bg_task *task)
 {
