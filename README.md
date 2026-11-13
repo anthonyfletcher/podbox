@@ -941,11 +941,16 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
 - pymobiledevice3 by doronz88 (https://github.com/doronz88/pymobiledevice3)
   - Fetched the iPhone's logs of its conversation with the car
 
-### iPod Video display
+### Other improvements
 
 - ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
   - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
     the CPU decodes music
+  - The design of automatic dither and its bit-perfect test
+- RockWheel by Sergei Sarkisian aka [@ssarkisy](https://github.com/ssarkisy)
+  (https://github.com/ssarkisy/RockWheel), GPL v2 or later
+  - Faster seeks in long files, smooth volume fades, the directory cache's name space,
+    an MP3 lead-in fix and lighter AAC decoding
 
 ### Speech
 
