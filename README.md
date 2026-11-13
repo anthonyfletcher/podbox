@@ -416,6 +416,23 @@ catch, and a combo for every brick broken without touching the paddle.
 - See every game's best scores and achievements in `Arcade > High Scores`
 - Remove the Arcade from the main menu with `Settings > Appearance > Menus > Edit Main Menu`
 
+### Making your own
+
+Games are written in a small part of JavaScript, with their sprites, maps and sound effects
+made alongside the code.
+
+- [The Arcade IDE](https://anthonyfletcher.github.io/podbox/ide/) runs in a browser with nothing
+  to install: write, draw, run and save a game, and share it as a web page
+  - Chrome or Edge edit a game's folder in place; other browsers save a copy
+- Keep a game on GitHub by making a repository from the
+  [podbox-game](https://github.com/anthonyfletcher/podbox-game) template: every push builds it
+  into a `.pbg`
+- [The manual](arcade/manual/README.md) teaches it a chapter at a time, and describes every
+  function
+- The command-line compiler and runners are in [`arcade/sdk`](arcade/sdk/README.md)
+- Share what you make in
+  [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/games)
+
 ## Settings
 
 <img src="docs/podbox/images/ss_grid_settings.png"/>
