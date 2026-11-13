@@ -539,7 +539,7 @@ in this order:
    skill in `skill/SKILL.md`. A picture from `pbgvm --shot` is stored
    uncompressed, about 230 KB: save it as an indexed PNG.
    `test/manual.test.js` checks the links and the pictures' size.
-7. **`.specifications/game-engine.md`**, the design, and any cart in
+7. **`.specifications/COMPLETED/game-engine.md`**, the design, and any cart in
    `.build/arcade_source/` that uses what changed.
 
 ## Code Style
