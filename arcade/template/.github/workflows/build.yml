@@ -14,6 +14,9 @@ env:
   # A game that plays the owner's music cannot be a web page: set this
   # false for one.
   PAGE: true
+  # The web page's size: 3 draws the game at 480 by 360, or smaller where
+  # the window is; 1 to 4 likewise, or fit to fill the window
+  SCALE: 3
 
 permissions:
   contents: write
@@ -54,6 +57,7 @@ jobs:
         with:
           cart: ${{ env.CART }}
           page: ${{ env.PAGE }}
+          scale: ${{ env.SCALE }}
 
       - uses: actions/upload-artifact@v4
         with:

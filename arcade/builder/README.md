@@ -21,6 +21,7 @@ file an iPod running PodBox plays from its Arcade.
 | `cart` | the cart's folder; the repository's top when left out |
 | `output` | where to write the `.pbg`; the folder's name with `.pbg` when left out |
 | `page` | `true` to write the cart as a web page too, beside the `.pbg` with `.html`: the click wheel on a touch screen, the keys on a computer. A cart that plays the owner's music cannot be one, and fails the step |
+| `scale` | the web page's size: `3` (the default) draws the game at 480 by 360, `1` to `4` that many times 160 by 120, each smaller where the window is; `fit` fills the window, and `whole` fills it in whole pixels |
 
 | Output | |
 |---|---|

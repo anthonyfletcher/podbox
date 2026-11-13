@@ -674,7 +674,9 @@ function layout() {
         h -= size + 16;
     }
     const fit = Math.max(0.5, Math.min(w / 160, h / 120));
-    const s = data.scale === 'fit' ? fit : data.scale === 'whole' ? Math.max(1, Math.floor(fit)) : +data.scale;
+    /* a fixed size is the most it is drawn at: smaller where the window is */
+    const s = data.scale === 'fit' ? fit : data.scale === 'whole' ? Math.max(1, Math.floor(fit))
+        : Math.min(+data.scale, fit);
     $('stage').style.width = $('screen').style.width = 160 * s + 'px';
     $('stage').style.height = $('screen').style.height = 120 * s + 'px';
 }

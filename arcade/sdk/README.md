@@ -450,7 +450,7 @@ second, as on the player.
 | Option | Values |
 |---|---|
 | `--wheel` | where the click wheel is drawn under the screen: `touch` (the default) on touch screens only, `always`, or `never`. The keys are as in the IDE either way |
-| `--scale` | `fit` (the default) fills the window; `whole` fills it in whole pixels; `1` to `4` a fixed size, 160 by 120 times that |
+| `--scale` | `fit` (the default) fills the window; `whole` fills it in whole pixels; `1` to `4` a fixed size, 160 by 120 times that, or smaller where the window is |
 | `--font` | `font.bin` (the file `bundle-font.sh` makes), for Japanese, Chinese and Korean text; without it they show as `?`, and `pbgc` warns when the cart has them |
 | `-o` | the file to write: the cart's name with `.html` by default |
 

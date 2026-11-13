@@ -12,6 +12,9 @@ inputs:
   page:
     description: true to write the cart as a web page too, beside the .pbg with .html
     default: 'false'
+  scale:
+    description: "The web page's size: fit or whole to fill the window, or 1 to 4 times 160 by 120, smaller where the window is"
+    default: '3'
 
 outputs:
   pbg:
@@ -33,6 +36,7 @@ runs:
         CART: ${{ inputs.cart }}
         OUTPUT: ${{ inputs.output }}
         PAGE: ${{ inputs.page }}
+        SCALE: ${{ inputs.scale }}
       run: |
         set -e
         pbgc="$GITHUB_ACTION_PATH/pbgc.mjs"
@@ -44,10 +48,11 @@ runs:
           page="${out%.pbg}.html"
           # the text font goes in only for a cart whose text needs it: it
           # makes the page much larger
-          node "$pbgc" html "$dir" -o "$page" 2> "$RUNNER_TEMP/page.err" ||
+          node "$pbgc" html "$dir" -o "$page" --scale "$SCALE" 2> "$RUNNER_TEMP/page.err" ||
             { cat "$RUNNER_TEMP/page.err" >&2; exit 1; }
           if grep -q 'font.bin' "$RUNNER_TEMP/page.err"; then
-            node "$pbgc" html "$dir" -o "$page" --font "$GITHUB_ACTION_PATH/font.bin"
+            node "$pbgc" html "$dir" -o "$page" --scale "$SCALE" \
+                --font "$GITHUB_ACTION_PATH/font.bin"
           fi
           echo "page=$page" >> "$GITHUB_OUTPUT"
         fi
