@@ -562,7 +562,8 @@ pga_process:
     ldmpc   regs=r4-r8
     .size   pga_process, .-pga_process
 
-#ifndef CPU_ARM_MICRO
+/* Only tone controls done in software use it, and on CPU_PP it takes IRAM */
+#if !defined(CPU_ARM_MICRO) && defined(HAVE_SW_TONE_CONTROLS)
 /****************************************************************************
  * void filter_process(struct dsp_filter *f, int32_t *buf[], int count,
  *                     unsigned int channels)
@@ -702,7 +703,7 @@ filter_process:
     FP_LOOP 5
     FP_LOOP 6
     .size   filter_process, .-filter_process
-#endif /* CPU_ARM_MICRO */
+#endif /* !CPU_ARM_MICRO && HAVE_SW_TONE_CONTROLS */
 
 #if ARM_ARCH < 6
 /****************************************************************************
