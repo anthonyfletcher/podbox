@@ -1555,6 +1555,7 @@ static void write_playbacklog(struct mp3entry *id3)
     else
         id3 = NULL;
 
+    unsigned int unwritten = 0;
     if (buf && used > 0) /* flush, each line to the file of its mode */
     {
         /* write() can yield, and buflib may compact the pool while we are
@@ -1563,7 +1564,6 @@ static void write_playbacklog(struct mp3entry *id3)
          * core_put_data_pinned() or the pool can never compact again. */
         buf = core_get_data_pinned(playback_log_handle);
         DEBUGF("%s Writing %lu bytes of buf:\n%s\n", __func__, used, buf);
-        unsigned int unwritten = 0;
         if (!flush_buffered(buf, used, PLAYBACK_LOG_GENERIC))
             unwritten |= 1u << PLAYBACK_LOG_GENERIC;
         if (!flush_buffered(buf, used, PLAYBACK_LOG_LASTFM))
@@ -1571,20 +1571,27 @@ static void write_playbacklog(struct mp3entry *id3)
         keep_buffered(buf, used, unwritten);
         core_put_data_pinned(buf);
     }
+    /* A file whose buffered lines would not flush goes without this play:
+     * it would not open a moment ago, and written now the play would land
+     * ahead of older ones. A file that will not open leaves the other to be
+     * written. */
     for (int mode = PLAYBACK_LOG_GENERIC; id3 && mode <= PLAYBACK_LOG_LASTFM;
          mode++)
     {
-        if (!(playback_log_files() & 1u << mode))
+        if (!(playback_log_files() & 1u << mode) || unwritten & 1u << mode)
             continue;
         int fd = open_playbacklog(mode);
         if (fd < 0)
-            return; /* failure */
+            continue;
         /* we have the timestamp from when we tried to add to buffer */
         char entry[MAX_PATH + 128];
         int len = format_playbacklog(entry, sizeof(entry), id3, timestamp,
                                      mode);
         if (len > (int)sizeof(entry) - 1) /* snprintf returns untruncated len */
+        {
             len = sizeof(entry) - 1;
+            entry[len - 1] = '\n';  /* or the next line joins this one */
+        }
         if (len > 0)
             write(fd, entry, len);
         close(fd);
