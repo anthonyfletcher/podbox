@@ -3,7 +3,10 @@
  *
  * A cart's high scores as tables, drawn the way the Arcade draws: its CAPS
  * font at the game's 160x120, doubled, in the theme's colours, the album's
- * vivid colour marking the score just set when dynamic colours are on.
+ * vivid colour marking the score just set when dynamic colours are on. The
+ * mark and the header's bar carry text in the background colour, so the
+ * accent is moved to ACCENT_CONTRAST from it: a sleeve whose vivid colour is
+ * its background's would otherwise blank them.
  * One screen for every way to them -- score.show() in a game, the pause
  * menu's High Scores, and the Arcade's -- so a ranked table looks like one
  * wherever it is opened. The Arcade's list of every cart with scores is
@@ -33,6 +36,7 @@
 #include "settings/settings.h"
 #include "system/shutdown.h"          /* default_event_handler */
 #include "draw/viewport.h"
+#include "draw/color.h"
 #include "skin/skin_albumart_color.h"
 #include "games/arcade/arcade.h"
 #include "games/arcade/core_font.h"
@@ -44,6 +48,7 @@
 #define DOT 2
 #define CHAR_W 4                /* 3 wide and a space */
 #define ROW_H 9
+#define ACCENT_CONTRAST 300     /* hundredths: 3:1, for blocky capitals */
 
 static unsigned c_bg, c_fg, c_dim, c_faint, c_accent;
 
@@ -65,6 +70,7 @@ static void colours(void)
     c_fg = dynamic_colors_resolve(global_settings.fg_color);
     c_accent = dynamic_colors_roles(&dominant, &vivid)
                ? vivid : dynamic_colors_resolve(global_settings.lss_color);
+    c_accent = color_fit_contrast(c_accent, c_bg, ACCENT_CONTRAST);
     c_dim = mix(c_fg, c_bg, 3);
     c_faint = mix(c_fg, c_bg, 5);
 }
@@ -228,8 +234,13 @@ static bool ok_was(unsigned buttons)
     return (button & buttons) != 0;
 }
 
+#if BUTTON_REMOTE != 0
 #define RIGHTS (BUTTON_RIGHT | BUTTON_RC_RIGHT)
 #define SELECTS (BUTTON_SELECT | BUTTON_RC_SELECT)
+#else
+#define RIGHTS BUTTON_RIGHT
+#define SELECTS BUTTON_SELECT
+#endif
 
 /* Clear's question over the page: true for yes */
 static bool ask_clear(void)
