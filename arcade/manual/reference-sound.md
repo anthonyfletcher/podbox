@@ -36,7 +36,7 @@ loudness, set when it is made; the owner's volume is the music's, which a
 cart with `"music": "control"` can turn with
 [`playback.adjust`](reference-music.md#controlling-it).
 
-**Game Sound.** The pause menu's **Game Sound** row mutes a game's own
+**Game Sound.** **Game Sound**, in the pause menu's **Settings**, mutes a game's own
 effects and tones -- not the owner's music, not speech -- and the iPod
 remembers it for that game. A muted game plays on as before: each effect
 still lasts as long, and `sfxat` still reports it; only silence is heard.

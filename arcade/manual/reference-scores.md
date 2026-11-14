@@ -31,7 +31,7 @@ The iPod then:
 - keeps each board's ten best scores, with the date and an optional name;
 - shows the boards in the pause menu's **High Scores**, with the
   achievements earned;
-- shows the options in the pause menu, lets the owner change them, and
+- shows the options in the pause menu's **Settings**, lets the owner change them, and
   remembers the owner's choices;
 - announces an achievement across the top of the screen the first time it
   is earned.
@@ -291,12 +291,14 @@ if (points == 100) ach.earn(ACH.hundred);
 
 Holding Menu for a second pauses the game and opens the pause menu (a
 short press asks whether to quit, or with `"menu_button": "game"` in
-`cart.json` reaches the cart). Its rows, top to bottom:
+`cart.json` reaches the cart). It is headed with the cart's `name`, and
+its rows, top to bottom, are:
 
 1. **Resume**
 2. the cart's own items, from `menuitem`
-3. the cart's options, each showing its value, then **Game Sound**, which
-   mutes the game's own effects ([Sound](reference-sound.md#how-sound-works))
+3. **Settings**: the cart's options, each showing its value, then **Game
+   Sound**, which mutes the game's own effects
+   ([Sound](reference-sound.md#how-sound-works))
 4. **High Scores**, when the cart has boards or achievements
 5. **Help**, when the cart has `help` text or options with help
 6. **Now Playing**: play, pause and skip the owner's music -- the way to

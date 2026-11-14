@@ -17,15 +17,15 @@ Hold **Menu** for a second on the iPod while a cart runs, and the game
 stops and the pause menu comes up (a short press asks whether to quit).
 It always has:
 
-- **Resume**, back to the game;
-- **Game Sound**, to mute the game's own sounds;
+- **Resume**, back to the game (so does Menu);
+- **Settings**, with **Game Sound** to mute the game's own sounds;
 - **Now Playing**, to see and change the music;
 - **Restart**, to start the cart again from the beginning;
 - **Quit**, back to the iPod's menus.
 
 and it adds rows of the cart's own when it has them: its items, its
-settings, **High Scores** when it has a table, and **Help** when it has
-help text. This chapter gives it all of those.
+settings in **Settings** above Game Sound, **High Scores** when it has a
+table, and **Help** when it has help text. This chapter gives it all of those.
 
 In the IDE, Menu (Esc) just pauses. What the pause menu holds is in the
 IDE's **Game** menu instead, while the cart runs: your items, **Options...**

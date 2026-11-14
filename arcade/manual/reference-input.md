@@ -153,8 +153,8 @@ function draw() {
 and shows its pause menu -- the cart's options, high scores, help, and
 items of its own from `menuitem()`. The cart carries on where it was when
 the menu closes, and [`resumed()`](reference-time.md#resumed) tells it the
-game was paused. Menu pressed in the pause menu leaves the game, as its
-Quit does, back to the list the game was started from.
+game was paused. Menu pressed in the pause menu, or in a list it opened,
+goes back to the game, as Resume does; Quit is its own row.
 
 **A short press of Menu** asks over the game, in its dialog style, whether
 to quit. A cart that needs a fifth button can take the short press for

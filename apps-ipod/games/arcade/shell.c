@@ -1094,11 +1094,12 @@ void shell_power_off(void)
         shell_suspend_write(vm);
 }
 
-/* The pause menu's rows: Resume, the cart's own (menuitem), its options,
+/* The pause menu's rows: Resume, the cart's own (menuitem), Settings,
  * High Scores when it has boards, Help when it has any, Now Playing,
- * Restart, Quit. An option row is a setting, the rest plain. */
-enum { ROW_RESUME, ROW_ITEM, ROW_OPTION, ROW_SOUND, ROW_SCORES, ROW_HELP,
-       ROW_MUSIC, ROW_RESTART, ROW_QUIT };
+ * Restart, Quit; Settings holds the cart's options and Game Sound. A row
+ * that opens a list is a menu row, an option a setting, the rest plain. */
+enum { ROW_RESUME, ROW_ITEM, ROW_SETTINGS, ROW_OPTION, ROW_SOUND,
+       ROW_SCORES, ROW_HELP, ROW_MUSIC, ROW_RESTART, ROW_QUIT };
 static char item_label[5][32];
 static int item_index[5];
 static int row_kind[1 + 5 + ARCADE_OPTIONS + 5], row_item[ARRAYLEN(row_kind)];
@@ -1110,6 +1111,7 @@ static const char *menu_row(int row, void *data, char *buf, size_t len)
     switch (row_kind[row]) {
     case ROW_RESUME:  return str(LANG_CHESSBOX_MENU_RESUME_GAME);
     case ROW_ITEM:    return item_label[row_item[row]];
+    case ROW_SETTINGS: return str(LANG_SETTINGS);
     case ROW_OPTION:  return shell_option_title(data, row_item[row]);
     case ROW_SOUND:   return str(LANG_ARCADE_GAME_SOUND);
     case ROW_SCORES:  return str(LANG_HIGH_SCORES);
@@ -1124,6 +1126,9 @@ static enum list_row_kind menu_kind(int row, void *data)
 {
     if (row_kind[row] == ROW_SOUND)
         return LIST_ROW_TOGGLE;
+    if (row_kind[row] == ROW_SETTINGS || row_kind[row] == ROW_SCORES ||
+        row_kind[row] == ROW_HELP || row_kind[row] == ROW_MUSIC)
+        return LIST_ROW_MENU;
     return row_kind[row] == ROW_OPTION
         ? shell_option_kind(data, row_item[row]) : LIST_ROW_PLAIN;
 }
@@ -1189,13 +1194,43 @@ static bool music_menu(void)
     }
 }
 
-/* MENU in the pause menu, or in a list it opened, leaves the game as Quit
- * does, back to the list the game was started from: for a game, that list
- * is the root. A USB connection, which closes a list the same way, goes on
- * to the root. */
+/* Settings: the cart's options, then Game Sound, in the pause menu's
+ * rows, which it builds again when this closes. Open until backed out of;
+ * true for out to the root (MENU or USB). */
+static bool settings_menu(struct vm *vm)
+{
+    struct simplelist_info info;
+    int selection = 0;
+    for (;;) {
+        row_count = 0;
+        for (int i = 0; i < arcade_options(vm)->count; i++)
+            add_row(ROW_OPTION, i);
+        add_row(ROW_SOUND, 0);
+        simplelist_info_init(&info, str(LANG_SETTINGS), row_count, vm);
+        info.get_name = menu_row;
+        info.get_kind = menu_kind;
+        info.get_value = menu_value;
+        info.get_range = menu_range;
+        info.selection = selection;
+        if (shell_list(&info))
+            return true;
+        if (info.selection < 0)
+            return false;
+        selection = info.selection;
+        if (row_kind[selection] == ROW_SOUND)
+            shell_mute_toggle(vm);
+        else if (shell_option_edit(vm, row_item[selection]))
+            return true;
+    }
+}
+
+/* MENU in the pause menu, or in a list it opened, goes back to the game,
+ * as Resume does: the game is the root here, and Quit is a row of its
+ * own. A USB connection, which closes a list the same way, goes on to the
+ * player's root. */
 static int menu_out(void)
 {
-    return usb_inserted() ? USB : QUIT;
+    return usb_inserted() ? USB : PLAYING;
 }
 
 /* An item's function returning true keeps the menu up, relabelled, so a
@@ -1211,6 +1246,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
     shell_scores_run(false);
     shell_scores_write(vm, false);
     give_screen();
+    int out = PLAYING;
     for (;;) {
         int items = 0;
         row_count = 0;
@@ -1221,9 +1257,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
                 item_index[items] = i;
                 add_row(ROW_ITEM, items++);
             }
-        for (int i = 0; i < arcade_options(vm)->count; i++)
-            add_row(ROW_OPTION, i);
-        add_row(ROW_SOUND, 0);
+        add_row(ROW_SETTINGS, 0);
         if (arcade_scores(vm, NULL)->count || arcade_scores(vm, NULL)->nach)
             add_row(ROW_SCORES, 0);
         if (shell_has_help(vm))
@@ -1231,38 +1265,47 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         add_row(ROW_MUSIC, 0);
         add_row(ROW_RESTART, 0);
         add_row(ROW_QUIT, 0);
-        simplelist_info_init(&info, str(LANG_PLUGIN_GAMES), row_count, vm);
+        const char *name = arcade_scores(vm, NULL)->cart;
+        simplelist_info_init(&info, name[0] ? (char *)name
+                                            : (char *)str(LANG_PLUGIN_GAMES),
+                             row_count, vm);
         info.get_name = menu_row;
         info.get_kind = menu_kind;
         info.get_value = menu_value;
         info.get_range = menu_range;
         info.selection = selection;
-        if (shell_list(&info))
-            return menu_out();
+        if (shell_list(&info)) {
+            out = menu_out();
+            break;
+        }
         selection = info.selection;
         int kind = selection < 0 ? ROW_RESUME : row_kind[selection];
-        if (kind == ROW_OPTION) {
-            if (shell_option_edit(vm, row_item[selection]))
-                return menu_out();
-            continue;
-        }
-        if (kind == ROW_SOUND) {
-            shell_mute_toggle(vm);
+        if (kind == ROW_SETTINGS) {
+            if (settings_menu(vm)) {
+                out = menu_out();
+                break;
+            }
             continue;
         }
         if (kind == ROW_HELP) {
-            if (shell_help(vm))
-                return menu_out();
+            if (shell_help(vm)) {
+                out = menu_out();
+                break;
+            }
             continue;
         }
         if (kind == ROW_SCORES) {
-            if (shell_scores_menu(vm))
-                return menu_out();
+            if (shell_scores_menu(vm)) {
+                out = menu_out();
+                break;
+            }
             continue;
         }
         if (kind == ROW_MUSIC) {
-            if (music_menu())
-                return menu_out();
+            if (music_menu()) {
+                out = menu_out();
+                break;
+            }
             continue;
         }
         if (kind == ROW_RESTART)
@@ -1280,6 +1323,8 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         if (r == 0)
             break;
     }
+    if (out != PLAYING)
+        return out;
     take_screen(vp);
     present(vm, true);
     return PLAYING;
