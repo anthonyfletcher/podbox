@@ -399,11 +399,13 @@ body:not(.running) #music { opacity: 0.45; pointer-events: none; }
 .pal-swatch.unused::after { content: ""; position: absolute; right: 3px; top: 3px; width: 6px;
               height: 6px; border-radius: 3px; background: var(--dim); opacity: 0.8; }
 .pal-swatch.drop { box-shadow: -4px 0 0 0 var(--accent); }
-.pal-panel { display: flex; gap: 16px; margin: 18px 0 12px; align-items: flex-start; }
-.pal-big { width: 96px; height: 96px; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.pal-panel { display: flex; flex-wrap: wrap; gap: 16px; margin: 18px 0 12px; align-items: flex-start; }
+.pal-panel hex-color-picker { width: 220px; height: 200px; flex: none; }
+.pal-big { width: 48px; height: 200px; border-radius: 8px; border: 1px solid var(--line); flex: none; }
+.pal-hexrow { display: flex; gap: 6px; align-items: center; }
 .pal-fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .pal-hex { width: 100px; }
-.pal-slider { display: grid; grid-template-columns: 50px 220px 64px; align-items: center; gap: 8px; }
+.pal-slider { display: grid; grid-template-columns: 50px 160px 64px; align-items: center; gap: 8px; }
 .pal-slider input[type=number], .pal-hex { font: 13px ui-monospace, Consolas, monospace; padding: 3px 6px;
               border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 .pal-note { color: var(--dim); font-size: 12px; max-width: 420px; }
@@ -573,6 +575,8 @@ code (MIT)</li>
 <li><a href="https://github.com/101arrowz/fflate" target="_blank" rel="noopener">fflate</a>, compression
 (MIT, Arjun Barrett)</li>
 <li><a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, the icons (ISC)</li>
+<li><a href="https://github.com/web-padawan/vanilla-colorful" target="_blank" rel="noopener">vanilla-colorful</a>,
+the colour picker (MIT, Serhii Kulykov)</li>
 <li><a href="https://www.drpetter.se/project_sfxr.html" target="_blank" rel="noopener">sfxr</a>'s sound
 generators (MIT, Tomas Pettersson)</li>
 <li><a href="https://github.com/TakWolf/fusion-pixel-font" target="_blank" rel="noopener">Fusion Pixel</a>,

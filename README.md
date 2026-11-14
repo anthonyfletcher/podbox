@@ -934,6 +934,9 @@ licences of all the code it takes in are kept in full in the built file.
 - [Lucide](https://lucide.dev), the icons
   - Copyright Lucide Contributors, and Cole Bemis for the Feather icons it began from
   - Licensed under the ISC License
+- [vanilla-colorful](https://github.com/web-padawan/vanilla-colorful), the colour picker
+  - Copyright 2020 Serhii Kulykov
+  - Licensed under the MIT License
 - [sfxr](https://www.drpetter.se/project_sfxr.html), the sound generators
   - Copyright 2007 Tomas Pettersson
   - Licensed under the MIT License

@@ -1,6 +1,7 @@
-/* The palette editor: a palette's entries as swatches, each set by hex or
- * by red, green and blue, and shown as the iPod shows it (its screen has
- * 65,536 colours: RGB565). A swatch dragged onto another moves there; +
+/* The palette editor: a palette's entries as swatches, each set on a
+ * saturation square and hue strip (vanilla-colorful), by hex, by red, green
+ * and blue, or picked off the screen where the browser has an eyedropper,
+ * and shown as the iPod shows it (its screen has 65,536 colours: RGB565). A swatch dragged onto another moves there; +
  * adds one, and Delete removes the chosen one. The
  * cart's first palette is the one its pictures' numbers mean; the others
  * recolour the same numbers. Moving or deleting entries rewrites the
@@ -11,8 +12,9 @@
  * Parts: the palette and its pictures; the swatches, dragged; the chosen
  * entry; rearranging. */
 
+import 'vanilla-colorful/hex-color-picker.js';
 import { shown, hex } from './pixels.js';
-import { icon } from './icons.js';
+import { icon, iconButton } from './icons.js';
 
 export class PaletteEditor {
     /* opts: rgb (this palette), first (whether it is the cart's own),
@@ -120,14 +122,22 @@ export class PaletteEditor {
         const i = this.at, c = this.rgb[i];
         const p = this.panel;
         p.innerHTML = '';
+        /* a drag on the square or the strip moves the colour; letting go
+         * redraws the rest, as a slider's does */
+        const picker = this.picker = document.createElement('hex-color-picker');
+        picker.color = hex(c);
+        picker.addEventListener('color-changed', (e) => this.set(parseInt(e.detail.value.slice(1), 16), true));
+        picker.addEventListener('pointerdown', () =>
+            document.addEventListener('pointerup', () => this.draw(), { once: true }));
         const big = document.createElement('div');
         big.className = 'pal-big';
+        big.title = 'As the iPod shows it';
         big.style.background = hex(shown(c));
         const fields = document.createElement('div');
         fields.className = 'pal-fields';
         const title = document.createElement('div');
         title.innerHTML = '<b>Colour ' + i + '</b>' + (i === 0 ? ' (clear in sprites, the map and images)' : '');
-        const hexIn = document.createElement('input');
+        const hexIn = this.hexIn = document.createElement('input');
         hexIn.className = 'pal-hex';
         hexIn.value = hex(c);
         hexIn.spellcheck = false;
@@ -136,7 +146,13 @@ export class PaletteEditor {
             if (m) this.set(parseInt(m[1], 16));
             else hexIn.value = hex(this.rgb[this.at]);
         };
-        fields.append(title, hexIn);
+        const hexRow = document.createElement('div');
+        hexRow.className = 'pal-hexrow';
+        hexRow.append(hexIn);
+        if ('EyeDropper' in window)
+            hexRow.append(iconButton('pick', 'Pick a colour from anywhere on the screen', () => this.dropper()));
+        fields.append(title, hexRow);
+        this.sliders = [];
         ['Red', 'Green', 'Blue'].forEach((name, k) => {
             const shift = 16 - 8 * k;
             const row = document.createElement('label');
@@ -162,6 +178,7 @@ export class PaletteEditor {
             };
             row.append(name, r, n);
             fields.append(row);
+            this.sliders.push([r, n]);
         });
         const note = document.createElement('div');
         note.className = 'pal-note';
@@ -171,17 +188,29 @@ export class PaletteEditor {
             (others.length ? ' On the iPod it looks the same as colour ' + others.join(' and ') + '.' : '');
         if (twins) note.classList.add('warn');
         fields.append(note);
-        p.append(big, fields);
+        p.append(picker, big, fields);
     }
 
-    /* the chosen entry's colour; while a slider moves, only it is redrawn */
+    /* the chosen entry's colour; while the picker or a slider moves, only
+     * it and the panel's numbers are redrawn */
     set(c, moving) {
         this.rgb[this.at] = c;
         this.o.changed(this.rgb.slice(), null);
         if (moving) {
             this.grid.children[this.at].style.background = hex(shown(c));
             this.panel.querySelector('.pal-big').style.background = hex(shown(c));
+            this.picker.color = hex(c);
+            this.hexIn.value = hex(c);
+            this.sliders.forEach(([r, n], k) => { r.value = n.value = c >> 16 - 8 * k & 255; });
         } else this.draw();
+    }
+
+    /* the browser's eyedropper: a colour from anywhere on the screen */
+    async dropper() {
+        try {
+            const m = /^#([0-9a-f]{6})$/i.exec((await new EyeDropper().open()).sRGBHex);
+            if (m) this.set(parseInt(m[1], 16));
+        } catch (e) { /* given up with Escape */ }
     }
 
     /* entries in a new order: order[k] the old entry that becomes k. The

@@ -303,8 +303,11 @@ show as `?`.
 - **Maps**: open one to paint it with the sheet's sprites. Choose a
   sprite, or drag across a block of them, in the picker, or from the tile
   bar under the map, which holds the ones in use (drag from the picker to
-  add one, right-click to take it off). Paint, draw a line, a rectangle or
-  an oval (Shift fills it), fill an area, and erase (or paint with the
+  add one, right-click to take it off). Ctrl+click sprites in the picker,
+  or Ctrl+drag a block, for a mix: each cell painted then takes one of them
+  at random, for grass or rubble that does not repeat. Paint, draw a line,
+  a rectangle or an oval (filled, or only its edge, as the Filled button
+  says; Shift the other way), fill an area, and erase (or paint with the
   right button). Select cells to clear them or fill all of them at once. Mark
   the cells whose sprites have a flag to check the solid ones line up.
   With the Objects tool, drag on the map to place an object, drag one to

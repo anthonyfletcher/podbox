@@ -18,7 +18,8 @@
     "codemirror": "6.0.2",
     "dockview-core": "8.8.3",
     "fflate": "0.8.3",
-    "lucide": "1.70.0"
+    "lucide": "1.70.0",
+    "vanilla-colorful": "0.7.2"
   },
   "devDependencies": {
     "esbuild": "0.28.2"
