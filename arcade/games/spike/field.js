@@ -56,6 +56,12 @@ const ACCENT = 23, ACCENT2 = 24, ACCENT3 = 25;
 
 const SHADE = 8;            // tones between one shade and the next
 
+// A paper under INK_CHROMA colourful is a dull tint (a brown, a mauve)
+// that the ink's shades turn to mud against: it is made grey at its tone,
+// its shades GREY_SHADE tones apart, and the ink given CLEARER more of its
+// own colour, so the album's colour is in the ink and the accent.
+const GREY_SHADE = 12, CLEARER = 0.25;
+
 // An accent reads as one when it is at least ACCENT_CHROMA colourful and
 // ACCENT_APART turns of hue from a paper or ink at least INK_CHROMA
 // colourful; else it is mud on mud, and one of ACCENTS takes its place,
@@ -111,15 +117,31 @@ function pickAccent(vivid, paper, ink) {
     return best;
 }
 
+// Colour c, of tone k, CLEARER farther from the grey of its tone
+function clearer(c, k) {
+    var g = color.toned(0x808080, k), out = 0;
+    for (var sh = 16; sh >= 0; sh -= 8) {
+        var v = (c >> sh) & 255, w = (g >> sh) & 255;
+        out = out * 256 + mid(0, flr(v + (v - w) * CLEARER), 255);
+    }
+    return color.toned(out, k);
+}
+
 // Set from what is playing; about 8,000 units, once a track
 function colours() {
     playback.colors(heard);
     var paper = heard[0], ink = heard[1];
     var t = color.tone(paper), k = color.tone(ink);
-    var away = t < k ? SHADE : -SHADE;
+    var away = t < k ? SHADE : -SHADE, step = away;
+    opponent(paper);
+    if (oppA * oppA + oppB * oppB < INK_CHROMA * INK_CHROMA) {
+        paper = color.toned(0x808080, t);
+        step = t < k ? GREY_SHADE : -GREY_SHADE;
+        ink = clearer(ink, k);
+    }
     setpal(PAPER, paper);
-    setpal(PAPER2, color.toned(paper, t + away));
-    setpal(PAPER3, color.toned(paper, t + away * 2));
+    setpal(PAPER2, color.toned(paper, t + step));
+    setpal(PAPER3, color.toned(paper, t + step * 2));
     setpal(INK, ink);
     setpal(INK2, color.toned(ink, k - away));
     setpal(INK3, color.toned(ink, k - away * 2));
