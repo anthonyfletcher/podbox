@@ -296,8 +296,10 @@ its rows, top to bottom, are:
 
 1. **Resume**
 2. the cart's own items, from `menuitem`
-3. **Settings**: the cart's options, each showing its value, then **Game
-   Sound**, which mutes the game's own effects
+3. **Settings**: the cart's options, then **Game Sound**, which mutes the
+   game's own effects. The theme decides which values show on the row:
+   Scrim draws an on/off option as a switch and a number as a meter, but
+   shows most choices' words only once the row is opened
    ([Sound](reference-sound.md#how-sound-works))
 4. **High Scores**, when the cart has boards or achievements
 5. **Help**, when the cart has `help` text or options with help
