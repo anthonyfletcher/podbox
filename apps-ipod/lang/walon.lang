@@ -1845,16 +1845,16 @@
 </phrase>
 <phrase>
   id: LANG_AUDIOSCROBBLER
-  desc: "Last.fm Log" in the playback menu
+  desc: Logging: On, and the Last.fm scrobble log too
   user: core
   <source>
-    *: "Last.fm Log"
+    *: "On + Last.fm"
   </source>
   <dest>
-    *: "Djornå Last.fm"
+    *: "Oyi + Last.fm"
   </dest>
   <voice>
-    *: "Djornå Last.fm"
+    *: "Oyi + Last.fm"
   </voice>
 </phrase>
 <phrase>

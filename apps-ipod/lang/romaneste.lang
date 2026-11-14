@@ -8694,16 +8694,16 @@
 </phrase>
 <phrase>
   id: LANG_AUDIOSCROBBLER
-  desc: "Last.fm Logger" in Plugin/apps/scrobbler
+  desc: Logging: On, and the Last.fm scrobble log too
   user: core
   <source>
-    *: "Last.fm Logger"
+    *: "On + Last.fm"
   </source>
   <dest>
-    *: "Raport Last.fm"
+    *: "Activat + Last.fm"
   </dest>
   <voice>
-    *: "Raport Last.fm"
+    *: "Activat + Last.fm"
   </voice>
 </phrase>
 <phrase>

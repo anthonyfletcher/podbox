@@ -8615,16 +8615,16 @@
 </phrase>
 <phrase>
   id: LANG_AUDIOSCROBBLER
-  desc: "Last.fm Logger" in Plugin/apps/scrobbler
+  desc: Logging: On, and the Last.fm scrobble log too
   user: core
   <source>
-    *: "Last.fm Logger"
+    *: "On + Last.fm"
   </source>
   <dest>
-    *: "Last.fm日志"
+    *: "开启 + Last.fm"
   </dest>
   <voice>
-    *: "开启Last.fm日志"
+    *: "开启 + Last.fm"
   </voice>
 </phrase>
 <phrase>

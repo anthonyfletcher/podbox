@@ -1847,16 +1847,16 @@
 </phrase>
 <phrase>
   id: LANG_AUDIOSCROBBLER
-  desc: "Last.fm Log" in the playback menu
+  desc: Logging: On, and the Last.fm scrobble log too
   user: core
   <source>
-    *: "Last.fm Log"
+    *: "On + Last.fm"
   </source>
   <dest>
-    *: "Logovací soubor pro Last.fm"
+    *: "Zapnuto + Last.fm"
   </dest>
   <voice>
-    *: "Logovací soubor pro Last tečka efem"
+    *: "Zapnuto + Last tečka efem"
   </voice>
 </phrase>
 <phrase>

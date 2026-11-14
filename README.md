@@ -299,8 +299,8 @@ Your year in listening, like the summaries streaming services send at the end of
 out on the player from what it has logged. Based on [Spun](https://github.com/majorsiebe/Stats_for_iPod).
 
 - `Playback Report` on the main menu
-  - It reads the log that `Settings > Playback > Logging` writes, on by default: the standard
-    playback log, or the Last.fm scrobbler log if you log that instead
+  - It reads the log that `Settings > Playback > Logging` writes, on by default. With
+    `On + Last.fm`, the scrobble log is read only while it holds plays the iPod's own log lacks
   - It counts your whole history, from the first entry of the log.
 - The report is a row of cards in sections. The wheel scrolls along a section, and `Left`/`Right`
   move between sections

@@ -1656,16 +1656,16 @@
 </phrase>
 <phrase>
   id: LANG_AUDIOSCROBBLER
-  desc: "Last.fm Logger" in Plugin/apps/scrobbler
+  desc: Logging: On, and the Last.fm scrobble log too
   user: core
   <source>
-    *: "Last.fm Logger"
+    *: "On + Last.fm"
   </source>
   <dest>
-    *: "Звiт по Last.fm"
+    *: "Вкл + Last.fm"
   </dest>
   <voice>
-    *: "Звiт по Last.fm"
+    *: "Ввiмкнути + Last.fm"
   </voice>
 </phrase>
 <phrase>
