@@ -431,6 +431,16 @@ static int open_playbacklog(int mode)
     return fd;
 }
 
+/* Spaces for the tabs and line breaks in the 'n' bytes from 'at' of a line
+ * whose first 'end' were written: a tag carrying one would split a scrobbler
+ * line into fields or lines it does not have. */
+static void scrub_tag(char *buf, size_t at, size_t n, size_t end)
+{
+    for (size_t i = at; i < at + n && i < end; i++)
+        if (buf[i] == '\t' || buf[i] == '\n' || buf[i] == '\r')
+            buf[i] = ' ';
+}
+
 /* Format one log line for a mode. Returns snprintf's return value. */
 static int format_playbacklog(char *buf, size_t sz, struct mp3entry *id3,
                               unsigned long timestamp, int mode)
@@ -446,13 +456,26 @@ static int format_playbacklog(char *buf, size_t sz, struct mp3entry *id3,
         int track = id3->tracknum;
         if (track < -1)
             track = -1;
-        return snprintf(buf, sz, "%s\t%s\t%s\t%d\t%ld\t%c\t%lu\t%s\n",
-                        (artist && artist[0]) ? artist : SCROBBLER_UNTAGGED,
-                        id3->album ? id3->album : "",
-                        (id3->title && id3->title[0]) ? id3->title : name,
-                        track, (long)(id3->length / 1000),
-                        rating, timestamp,
-                        id3->mb_track_id ? id3->mb_track_id : "");
+        if (!artist || !artist[0])
+            artist = SCROBBLER_UNTAGGED;
+        const char *album = id3->album ? id3->album : "";
+        const char *title = (id3->title && id3->title[0]) ? id3->title : name;
+        const char *mbid = id3->mb_track_id ? id3->mb_track_id : "";
+        int len = snprintf(buf, sz, "%s\t%s\t%s\t%d\t%ld\t%c\t%lu\t%s\n",
+                           artist, album, title,
+                           track, (long)(id3->length / 1000),
+                           rating, timestamp, mbid);
+        if (len > 0 && sz > 0)
+        {
+            size_t end = (size_t)len < sz ? (size_t)len : sz - 1;
+            size_t a = strlen(artist), b = strlen(album), t = strlen(title);
+            size_t m = strlen(mbid);
+            scrub_tag(buf, 0, a, end);
+            scrub_tag(buf, a + 1, b, end);
+            scrub_tag(buf, a + b + 2, t, end);
+            scrub_tag(buf, (size_t)len - 1 - m, m, end);
+        }
+        return len;
     }
     return snprintf(buf, sz, "%lu:%ld:%ld:%s\n",
                     timestamp, (long)id3->elapsed, (long)id3->length, id3->path);
@@ -1441,8 +1464,9 @@ static size_t format_buffered(char *buf, size_t sz, struct mp3entry *id3,
     return n;
 }
 
-/* Write the buffered lines of one mode to its file, without their digit */
-static void flush_buffered(const char *buf, size_t len, int mode)
+/* Write the buffered lines of one mode to its file, without their digit.
+ * False when the file would not open, leaving them all unwritten. */
+static bool flush_buffered(const char *buf, size_t len, int mode)
 {
     const char *end = buf + len;
     int fd = -1;
@@ -1453,13 +1477,35 @@ static void flush_buffered(const char *buf, size_t len, int mode)
         if (*buf == '0' + mode)
         {
             if (fd < 0 && (fd = open_playbacklog(mode)) < 0)
-                return;
+                return false;
             write(fd, buf + 1, next - buf - 1);
         }
         buf = next;
     }
     if (fd >= 0)
         close(fd);
+    return true;
+}
+
+/* Keep only the buffered lines of the modes in 'unwritten', a bit
+ * (1 << mode) each, for the next flush to try again */
+static void keep_buffered(char *buf, size_t len, unsigned int unwritten)
+{
+    const char *from = buf, *end = buf + len;
+    char *to = buf;
+    while (from < end)
+    {
+        const char *nl = memchr(from, '\n', end - from);
+        size_t n = (nl ? nl + 1 : end) - from;
+        unsigned int mode = (unsigned char)*from - '0';
+        if (mode <= PLAYBACK_LOG_LASTFM && unwritten & 1u << mode)
+        {
+            memmove(to, from, n);
+            to += n;
+        }
+        from += n;
+    }
+    *to = '\0';
 }
 
 static void write_playbacklog(struct mp3entry *id3)
@@ -1517,9 +1563,12 @@ static void write_playbacklog(struct mp3entry *id3)
          * core_put_data_pinned() or the pool can never compact again. */
         buf = core_get_data_pinned(playback_log_handle);
         DEBUGF("%s Writing %lu bytes of buf:\n%s\n", __func__, used, buf);
-        flush_buffered(buf, used, PLAYBACK_LOG_GENERIC);
-        flush_buffered(buf, used, PLAYBACK_LOG_LASTFM);
-        buf[0] = '\0';
+        unsigned int unwritten = 0;
+        if (!flush_buffered(buf, used, PLAYBACK_LOG_GENERIC))
+            unwritten |= 1u << PLAYBACK_LOG_GENERIC;
+        if (!flush_buffered(buf, used, PLAYBACK_LOG_LASTFM))
+            unwritten |= 1u << PLAYBACK_LOG_LASTFM;
+        keep_buffered(buf, used, unwritten);
         core_put_data_pinned(buf);
     }
     for (int mode = PLAYBACK_LOG_GENERIC; id3 && mode <= PLAYBACK_LOG_LASTFM;
