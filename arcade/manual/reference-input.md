@@ -151,9 +151,9 @@ function draw() {
 
 **Holding Menu for a second pauses the game**: the iPod stops the cart
 and shows its pause menu -- items of its own from `menuitem()`,
-Settings (the cart's options and Game Sound), high scores and help. The cart carries on where it was when
-the menu closes, and [`resumed()`](reference-time.md#resumed) tells it the
-game was paused. Menu pressed in the pause menu, or in a list it opened,
+Settings (the cart's options and Game Sound), high scores and help. The
+cart carries on where it was when the menu closes, and
+[`resumed()`](reference-time.md#resumed) tells it the game was paused. Menu pressed in the pause menu, or in a list it opened,
 goes back to the game, as Resume does; Quit is its own row.
 
 **A short press of Menu** asks over the game, in its dialog style, whether
