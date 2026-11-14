@@ -413,10 +413,9 @@ listening time to rank by.
 
 [play log]
 Records what was played and when. On feeds the listening statistics; the
-Last.fm setting writes a scrobble log a computer can upload.
-
-In Last.fm mode the Playback Report reads that log, so an uploader that empties
-it after sending also restarts the Report's totals and streaks.
+Last.fm setting writes a scrobble log a computer can upload, and the
+statistics' own log beside it, so an uploader that empties the scrobble log
+after sending leaves the Playback Report's totals and streaks as they were.
 
 [scan min step]
 How far the first press of fast forward or rewind moves. Smaller is better for

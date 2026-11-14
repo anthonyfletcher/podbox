@@ -25,9 +25,9 @@
  * It counts as a data line and as nothing else -- not a play, not a skip. */
 #define PV_TAP_MS 5000
 
-/* Which log the figures came from. The setting decides which one the core is
- * writing (settings > playback > logging), and the two are never written at
- * once, so whichever is chosen holds a whole history rather than half of one.
+/* Which log the figures came from. The setting decides which the core is
+ * writing (settings > playback > logging), Last.fm both, every play to each,
+ * so whichever is chosen holds a whole history rather than half of one.
  *
  * They do not say quite the same thing, and the difference is not a bug:
  *
@@ -79,15 +79,15 @@ struct pv_entry
 
 typedef void (*pv_entry_fn)(const struct pv_entry *e, void *ctx);
 
-/* Which log to read: the one the current setting writes if it holds any
- * entries, otherwise the other if it does, otherwise PV_SRC_NONE.
+/* Which log to read: playback.log if it holds any entries, otherwise the
+ * scrobbler log if it does, otherwise PV_SRC_NONE. Under Last.fm, which
+ * writes both, the scrobbler log is read instead when its first entry is the
+ * older, since it then holds plays logged to it alone, which playback.log
+ * does not have.
  *
- * Preferring the setting matters. A user who logged normally for a year and
- * then switched to last.fm still has the old playback.log sitting there, and
- * reading it would show a year of statistics frozen at the moment they
- * switched -- plausible, wrong, and impossible to spot from the screen.
- * Falling back only when the preferred log is empty keeps the other history
- * reachable without letting it masquerade.
+ * Under On, the scrobbler log is a leftover, and reading it would show
+ * statistics frozen at the moment the setting was changed -- plausible, wrong,
+ * and impossible to spot from the screen.
  *
  * Decide this once and pass it to everything below, so a later read cannot
  * disagree with an earlier one. */

@@ -424,43 +424,43 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
     return got;
 }
 
-/* Does this source hold anything but headers? Stops at the first data line,
- * so an established log costs one buffer's worth of reading. */
-static bool has_data(enum pv_source src)
+/* Does this source hold anything but headers, and when was its first entry?
+ * Stops at the first data line, so an established log costs one buffer's
+ * worth of reading. */
+static bool first_entry(enum pv_source src, unsigned long *ts)
 {
     char line[PV_LINE_MAX];
+    struct pv_entry e;
     bool found = false;
 
     if (!rd_open(src))
         return false;
 
-    while (rd_line(line, sizeof(line)))
+    while (!found && rd_line(line, sizeof(line)))
     {
-        if (line[0] != '#' && line[0] != '\0')
-        {
-            found = true;
-            break;
-        }
+        if (line[0] == '#' || line[0] == '\0')
+            continue;
+        found = src == PV_SRC_SCROBBLER ? parse_scrobbler_line(line, &e)
+                                        : parse_playback_line(line, &e);
     }
 
     rd_close();
+    if (found)
+        *ts = e.ts;
     return found;
 }
 
 enum pv_source pv_log_pick_source(void)
 {
-    enum pv_source preferred, other;
+    unsigned long play_ts, scrob_ts;
+    bool play = first_entry(PV_SRC_PLAYBACK, &play_ts);
+    bool scrob = first_entry(PV_SRC_SCROBBLER, &scrob_ts);
 
-    preferred = (global_settings.playback_log == PV_SETTING_LASTFM)
-              ? PV_SRC_SCROBBLER : PV_SRC_PLAYBACK;
-    other = (preferred == PV_SRC_SCROBBLER)
-          ? PV_SRC_PLAYBACK : PV_SRC_SCROBBLER;
-
-    if (has_data(preferred))
-        return preferred;
-    if (has_data(other))
-        return other;
-    return PV_SRC_NONE;
+    if (global_settings.playback_log == PV_SETTING_LASTFM && play && scrob)
+        return play_ts <= scrob_ts ? PV_SRC_PLAYBACK : PV_SRC_SCROBBLER;
+    if (play)
+        return PV_SRC_PLAYBACK;
+    return scrob ? PV_SRC_SCROBBLER : PV_SRC_NONE;
 }
 
 long pv_log_read(enum pv_source src, pv_entry_fn cb, void *ctx)

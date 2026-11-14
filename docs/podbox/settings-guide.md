@@ -128,7 +128,7 @@ Settings
 | Spoken Word Speed | Plays audiobooks and podcasts faster or slower without changing the voice's pitch; music always plays at its own speed. Also in Now Playing's menu while spoken word plays. The first change from 100% restarts the playing track once. | 100% |  |
 | Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | No | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | Auto | **Adv** |
-| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | On | **Adv** |
+| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload, and the statistics' own log beside it, so an uploader that empties the scrobble log after sending leaves the Playback Report's totals and streaks as they were. | On | **Adv** |
 
 ### Playback — Fast-Forward/Rewind
 
