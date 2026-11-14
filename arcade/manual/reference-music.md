@@ -99,8 +99,18 @@ None of these return anything but `adjust` and `enqueue`. `playback.volume()`
 reads the volume, 0 to 100, at any level.
 
 - A game that uses the wheel for itself takes the volume from the owner:
-  give it back on the wheel, `playback.adjust(wheel())`, while nothing else
-  wants it, and show the level for a moment after it moves.
+  give it back on the wheel while nothing else wants it, and show the level
+  for a moment after it moves. The iPod's screens turn it a step every 4
+  clicks; a step a click is too quick, and a brush of the wheel moves it:
+
+  ```js
+  clicks += wheel();
+  var steps = clicks / 4;           // whole steps; the rest waits
+  if (steps != 0) {
+      clicks -= steps * 4;
+      shown = playback.adjust(steps);
+  }
+  ```
 
 - The pause menu's **Now Playing** always offers play, pause and skip, so
   a game that takes Prev, Next and Play for itself does not need

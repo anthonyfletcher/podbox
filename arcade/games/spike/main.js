@@ -92,11 +92,15 @@ var silent = false;                 // no music moving: nothing to play to
 var crossed = false;                // this tick crossed a beat
 var volume = -1;                    // the volume, 0-100, while it is shown; else -1
 var volumeUntil = 0;                // ...until then, in t()
+var volumeClicks = 0;               // the wheel's clicks toward the next step
 
 // How long the volume holds the caption's room after the wheel turns: long
 // enough to read after a run of clicks, short enough that a brush of the
 // wheel does not hide the track for the rest of the phrase
 const VOLUME_SHOWN = 1.5;
+
+// The clicks a step of volume takes, as on the player's screens
+const VOLUME_CLICKS = 4;
 
 // ---- the tempo ---------------------------------------------------------------
 
@@ -478,10 +482,12 @@ function update() {
         }
     } else
         stoppedFor = 0;
-    // the wheel is the volume, a step a click, as on the player's screens
-    var w = wheel();
-    if (w != 0) {
-        volume = playback.adjust(w);
+    // the wheel is the volume, a step every VOLUME_CLICKS clicks
+    volumeClicks += wheel();
+    var steps = volumeClicks / VOLUME_CLICKS;
+    if (steps != 0) {
+        volumeClicks -= steps * VOLUME_CLICKS;
+        volume = playback.adjust(steps);
         volumeUntil = t() + VOLUME_SHOWN;
     } else if (volume >= 0 && t() >= volumeUntil)
         volume = -1;

@@ -56,7 +56,60 @@ const ACCENT = 23, ACCENT2 = 24, ACCENT3 = 25;
 
 const SHADE = 8;            // tones between one shade and the next
 
+// An accent reads as one when it is at least ACCENT_CHROMA colourful and
+// ACCENT_APART turns of hue from a paper or ink at least INK_CHROMA
+// colourful; else it is mud on mud, and one of ACCENTS takes its place,
+// the farthest in hue from both. Chroma and hue are an opponent pair,
+// red against green and yellow against blue, in RGB units.
+const ACCENT_CHROMA = 48, INK_CHROMA = 24, ACCENT_APART = 0.1;
+var ACCENTS = [0xe8304a, 0xf5962a, 0xf8e43c, 0x3cd250, 0x2f9cf0, 0xf27ab4];
+
 var heard = new Int32Array(3);
+var oppA = 0, oppB = 0;     // opponent()'s answer
+
+function opponent(c) {
+    var r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+    oppA = r - g;
+    oppB = (r + g) / 2 - b;
+}
+
+// How far apart two hues are, 0 to 0.5 turns
+function hueGap(h, k) {
+    var d = abs(h - k);
+    return d > 0.5 ? 1 - d : d;
+}
+
+// How far hue h is from the paper's and the ink's, those colourful enough
+// to have one; 0.5 when neither is
+function apart(h, paper, ink) {
+    var gap = 0.5;
+    opponent(paper);
+    if (oppA * oppA + oppB * oppB >= INK_CHROMA * INK_CHROMA)
+        gap = min(gap, hueGap(h, atan2(oppA, oppB)));
+    opponent(ink);
+    if (oppA * oppA + oppB * oppB >= INK_CHROMA * INK_CHROMA)
+        gap = min(gap, hueGap(h, atan2(oppA, oppB)));
+    return gap;
+}
+
+// The album's vivid colour when it stands apart from the paper and the
+// ink, else the one of ACCENTS that stands farthest
+function pickAccent(vivid, paper, ink) {
+    opponent(vivid);
+    if (oppA * oppA + oppB * oppB >= ACCENT_CHROMA * ACCENT_CHROMA &&
+        apart(atan2(oppA, oppB), paper, ink) >= ACCENT_APART)
+        return vivid;
+    var best = ACCENTS[0], bestGap = -1;
+    for (var i = 0; i < ACCENTS.length; i++) {
+        opponent(ACCENTS[i]);
+        var gap = apart(atan2(oppA, oppB), paper, ink);
+        if (gap > bestGap) {
+            bestGap = gap;
+            best = ACCENTS[i];
+        }
+    }
+    return best;
+}
 
 // Set from what is playing; about 8,000 units, once a track
 function colours() {
@@ -72,7 +125,7 @@ function colours() {
     setpal(INK3, color.toned(ink, k - away * 2));
     setpal(INK4, color.toned(ink, k - away * 3));
     // the vivid colour, unless it would vanish against the paper
-    var accent = heard[2];
+    var accent = pickAccent(heard[2], paper, ink);
     if (color.contrast(accent, paper) < 2.0)
         accent = color.toned(accent, t < 50 ? 75 : 30);
     var a = color.tone(accent);
