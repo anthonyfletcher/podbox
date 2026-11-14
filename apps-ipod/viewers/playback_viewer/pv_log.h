@@ -81,9 +81,10 @@ typedef void (*pv_entry_fn)(const struct pv_entry *e, void *ctx);
 
 /* Which log to read: playback.log if it holds any entries, otherwise the
  * scrobbler log if it does, otherwise PV_SRC_NONE. Under Last.fm, which
- * writes both, the scrobbler log is read instead when its first entry is the
- * older, since it then holds plays logged to it alone, which playback.log
- * does not have.
+ * writes both, the scrobbler log is read instead unless playback.log has a
+ * play at the scrobbler log's first entry: without one, the scrobbler log
+ * holds plays logged to it alone, and playback.log would show a gap where
+ * they were.
  *
  * Under On, the scrobbler log is a leftover, and reading it would show
  * statistics frozen at the moment the setting was changed -- plausible, wrong,
