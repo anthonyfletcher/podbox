@@ -425,10 +425,11 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
     return got;
 }
 
-/* Does this source hold anything but headers, and when was its first entry?
- * Stops at the first data line, so an established log costs one buffer's
- * worth of reading. */
-static bool first_entry(enum pv_source src, unsigned long *ts)
+/* Does this source hold anything but headers, and when was its first entry
+ * and how long its track? Stops at the first data line, so an established
+ * log costs one buffer's worth of reading. */
+static bool first_entry(enum pv_source src, unsigned long *ts,
+                        unsigned long *length_ms)
 {
     char line[PV_LINE_MAX];
     struct pv_entry e;
@@ -447,12 +448,17 @@ static bool first_entry(enum pv_source src, unsigned long *ts)
 
     rd_close();
     if (found)
+    {
         *ts = e.ts;
+        *length_ms = e.length_ms;
+    }
     return found;
 }
 
-/* Is there a play in playback.log logged at 'ts'? */
-static bool playback_has(unsigned long ts)
+/* Is there a play in playback.log logged at 'ts', of a track 'length_s'
+ * seconds long? The length tells a play logged to both files from one at
+ * the same moment of a clock that was reset since. */
+static bool playback_has(unsigned long ts, unsigned long length_s)
 {
     char line[PV_LINE_MAX];
     struct pv_entry e;
@@ -462,7 +468,7 @@ static bool playback_has(unsigned long ts)
         return false;
     while (!found && rd_line(line, sizeof(line)))
         found = line[0] != '#' && parse_playback_line(line, &e)
-                && e.ts == ts;
+                && e.ts == ts && e.length_ms / 1000 == length_s;
     rd_close();
     return found;
 }
@@ -472,7 +478,8 @@ static bool playback_has(unsigned long ts)
  * both with one timestamp, and the scrobbler log is only appended to or
  * emptied. The answer is saved with the two first entries it was found for,
  * so the search runs again only when one of them changes. */
-static bool playback_covers(unsigned long play_ts, unsigned long scrob_ts)
+static bool playback_covers(unsigned long play_ts, unsigned long scrob_ts,
+                            unsigned long scrob_length_ms)
 {
     unsigned long rec[3];
     int fd;
@@ -492,7 +499,7 @@ static bool playback_covers(unsigned long play_ts, unsigned long scrob_ts)
 
     rec[0] = scrob_ts;
     rec[1] = play_ts;
-    rec[2] = playback_has(scrob_ts);
+    rec[2] = playback_has(scrob_ts, scrob_length_ms / 1000);
     fd = open(PV_COVER_PATH, O_WRONLY|O_CREAT|O_TRUNC, 0666);
     if (fd >= 0)
     {
@@ -504,12 +511,12 @@ static bool playback_covers(unsigned long play_ts, unsigned long scrob_ts)
 
 enum pv_source pv_log_pick_source(void)
 {
-    unsigned long play_ts, scrob_ts;
-    bool play = first_entry(PV_SRC_PLAYBACK, &play_ts);
-    bool scrob = first_entry(PV_SRC_SCROBBLER, &scrob_ts);
+    unsigned long play_ts, scrob_ts, play_ms, scrob_ms;
+    bool play = first_entry(PV_SRC_PLAYBACK, &play_ts, &play_ms);
+    bool scrob = first_entry(PV_SRC_SCROBBLER, &scrob_ts, &scrob_ms);
 
     if (global_settings.playback_log == PV_SETTING_LASTFM && play && scrob
-        && !playback_covers(play_ts, scrob_ts))
+        && !playback_covers(play_ts, scrob_ts, scrob_ms))
         return PV_SRC_SCROBBLER;
     if (play)
         return PV_SRC_PLAYBACK;
