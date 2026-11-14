@@ -6801,13 +6801,6 @@ static int browser_db_play_folder(struct browser_context* c)
 {
     logf( "%s", __func__);
 
-    /* An episode plays alone, so playback stops at its end */
-    struct tagentry *picked = browser_db_get_entry(c, c->selected_item);
-
-    if (picked && picked->newtable == TABLE_PLAYTRACK
-        && browser_db_episode_percent(picked->idx_id) >= 0)
-        return play_episodes(c, &picked->idx_id, 1);
-
     /* c->selected_item indexes the displayed list, whose head is the special
      * rows (<Random> on a track list). insert_all_playlist() drops those --
      * their extraseek doesn't resolve to a track -- so playlist position is the
