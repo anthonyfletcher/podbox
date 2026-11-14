@@ -1224,13 +1224,21 @@ static bool settings_menu(struct vm *vm)
     }
 }
 
+/* The screen back to the game, drawn as it was when paused */
+static int resume_game(struct vm *vm, struct viewport *vp)
+{
+    take_screen(vp);
+    present(vm, true);
+    return PLAYING;
+}
+
 /* MENU in the pause menu, or in a list it opened, goes back to the game,
  * as Resume does: the game is the root here, and Quit is a row of its
  * own. A USB connection, which closes a list the same way, goes on to the
  * player's root. */
-static int menu_out(void)
+static int menu_out(struct vm *vm, struct viewport *vp)
 {
-    return usb_inserted() ? USB : PLAYING;
+    return usb_inserted() ? USB : resume_game(vm, vp);
 }
 
 /* An item's function returning true keeps the menu up, relabelled, so a
@@ -1246,7 +1254,6 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
     shell_scores_run(false);
     shell_scores_write(vm, false);
     give_screen();
-    int out = PLAYING;
     for (;;) {
         int items = 0;
         row_count = 0;
@@ -1274,38 +1281,28 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         info.get_value = menu_value;
         info.get_range = menu_range;
         info.selection = selection;
-        if (shell_list(&info)) {
-            out = menu_out();
-            break;
-        }
+        if (shell_list(&info))
+            return menu_out(vm, vp);
         selection = info.selection;
         int kind = selection < 0 ? ROW_RESUME : row_kind[selection];
         if (kind == ROW_SETTINGS) {
-            if (settings_menu(vm)) {
-                out = menu_out();
-                break;
-            }
+            if (settings_menu(vm))
+                return menu_out(vm, vp);
             continue;
         }
         if (kind == ROW_HELP) {
-            if (shell_help(vm)) {
-                out = menu_out();
-                break;
-            }
+            if (shell_help(vm))
+                return menu_out(vm, vp);
             continue;
         }
         if (kind == ROW_SCORES) {
-            if (shell_scores_menu(vm)) {
-                out = menu_out();
-                break;
-            }
+            if (shell_scores_menu(vm))
+                return menu_out(vm, vp);
             continue;
         }
         if (kind == ROW_MUSIC) {
-            if (music_menu()) {
-                out = menu_out();
-                break;
-            }
+            if (music_menu())
+                return menu_out(vm, vp);
             continue;
         }
         if (kind == ROW_RESTART)
@@ -1323,11 +1320,7 @@ static int pause_menu(struct vm *vm, struct viewport *vp)
         if (r == 0)
             break;
     }
-    if (out != PLAYING)
-        return out;
-    take_screen(vp);
-    present(vm, true);
-    return PLAYING;
+    return resume_game(vm, vp);
 }
 
 /* score.show(): the board's table over the game, which resumes when it is
