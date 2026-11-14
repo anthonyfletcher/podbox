@@ -410,9 +410,9 @@ catch, and a combo for every brick broken without touching the paddle.
 - Play: `Arcade`, then the game
   - Hold `Select` on a game for its high scores, its help, or to delete a saved game
 - Press `Menu` to quit. A game you quit is marked `Paused` and starts again where you left it
-- Hold `Menu` to pause: the game's own options, its high scores and help, and the music's
-  controls
-  - Turn `Game Sound` off there to hear only your music
+- Hold `Menu` to pause: the game's settings, its high scores and help, and the music's
+  controls. `Menu` there goes back to the game
+  - Turn `Game Sound` off in `Settings` to hear only your music
 - See every game's best scores and achievements in `Arcade > High Scores`
 - Remove the Arcade from the main menu with `Settings > Appearance > Menus > Edit Main Menu`
 

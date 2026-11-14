@@ -150,8 +150,8 @@ function draw() {
 ## The Menu button
 
 **Holding Menu for a second pauses the game**: the iPod stops the cart
-and shows its pause menu -- the cart's options, high scores, help, and
-items of its own from `menuitem()`. The cart carries on where it was when
+and shows its pause menu -- items of its own from `menuitem()`,
+Settings (the cart's options and Game Sound), high scores and help. The cart carries on where it was when
 the menu closes, and [`resumed()`](reference-time.md#resumed) tells it the
 game was paused. Menu pressed in the pause menu, or in a list it opened,
 goes back to the game, as Resume does; Quit is its own row.
