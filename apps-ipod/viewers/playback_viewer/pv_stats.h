@@ -117,9 +117,7 @@ enum pv_rank
  * caller can keep it after the working memory has been handed back. */
 struct pv_totals
 {
-    /* Which log these came from. Worth showing rather than assuming: the two
-     * formats measure "minutes" and "skips" differently (see enum pv_source),
-     * so a figure only means something once you know its source. */
+    /* Whether there was a log to read */
     enum pv_source source;
 
     /* what the log held */
@@ -148,12 +146,11 @@ struct pv_totals
      * own span so the card works for a month of history as well as a year. */
     int  redis_days;
 
-    /* Where the names came from. With a playback log they are resolved from
-     * the path, and from_db being 0 on a device that has a database means the
-     * path forms disagree -- artwork, keyed off the same strings, will miss
-     * everything too. A scrobbler log carries tagged names itself, so it is
-     * all from_log and the other two stay 0. */
-    long from_db, from_path, from_log;
+    /* Where the names came from. They are resolved from the path, and
+     * from_db being 0 on a device that has a database means the path forms
+     * disagree -- artwork, keyed off the same strings, will miss everything
+     * too. */
+    long from_db, from_path;
     int  db_entries, db_mapped;
     char sample[3][PV_NAME_MAX * 2];
     int  samples;

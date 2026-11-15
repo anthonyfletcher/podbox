@@ -600,6 +600,7 @@ static const char *const dead[] = {
     LIB_CACHE_DIR "/albums.dat",
     LIB_CACHE_DIR "/albums.dat.new",
     LIB_CACHE_DIR "/album_plays.dat",
+    LIB_CACHE_DIR "/report_source.dat",
     ROCKBOX_DIR "/database_state.tcd",
     ROCKBOX_DIR "/stage0.log",
     ROCKBOX_DIR "/docs.lst",

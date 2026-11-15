@@ -778,18 +778,9 @@ static void wk_entry(const struct pv_entry *e, void *ctx)
     /* Names are resolved only for entries inside the week, which is what
      * keeps this affordable: the read is one week, the naming is what is in
      * it. */
-    if (e->artist)
-    {
-        wk_add(wk_art, &wk_art_n, e->artist);
-        wk_add(wk_trk, &wk_trk_n, e->title);
-    }
-    else
-    {
-        pv_names_resolve(pv_names_locate(e->path), artist, title, album,
-                         NULL);
-        wk_add(wk_art, &wk_art_n, artist);
-        wk_add(wk_trk, &wk_trk_n, title);
-    }
+    pv_names_resolve(pv_names_locate(e->path), artist, title, album, NULL);
+    wk_add(wk_art, &wk_art_n, artist);
+    wk_add(wk_trk, &wk_trk_n, title);
 }
 
 /* The byte range of the log covering days [d_lo, d_hi).

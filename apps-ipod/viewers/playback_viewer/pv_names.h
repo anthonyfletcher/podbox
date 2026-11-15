@@ -62,8 +62,7 @@ const char *pv_names_locate(const char *path);
 enum pv_name_src
 {
     PV_NAME_PATH,
-    PV_NAME_DB,
-    PV_NAME_LOG     /* the log carried the name itself; nothing resolved it */
+    PV_NAME_DB
 };
 
 /* Artist and title for a logged path, and the album when it is known.

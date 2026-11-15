@@ -25,47 +25,24 @@
  * It counts as a data line and as nothing else -- not a play, not a skip. */
 #define PV_TAP_MS 5000
 
-/* Which log the figures came from. The setting decides which the core is
- * writing (settings > playback > logging), Last.fm both, every play to each,
- * so whichever is chosen holds a whole history rather than half of one.
- *
- * They do not say quite the same thing, and the difference is not a bug:
- *
- *   PLAYBACK  records how long each track was actually heard, so "minutes"
- *             means minutes of audio and a few seconds' tap is visible as
- *             such.
- *   SCROBBLER records only the verdict -- played or skipped -- and the
- *             track's full length. So "minutes" means the total length of
- *             the tracks that counted as played, which runs a little high,
- *             and a browsing tap is indistinguishable from a real skip.
- *
- * In exchange, the scrobbler log carries proper tag names and needs no
- * database lookup at all -- but it carries no file paths, so nothing keyed
- * off a path (artwork, most obviously) can work from it. */
+/* Whether there is a log to read. playback.log is the only one: both On and
+ * On + Last.fm write it, every play. */
 enum pv_source
 {
     PV_SRC_NONE = 0,
-    PV_SRC_PLAYBACK,     /* ROCKBOX_DIR/playback.log and its rotations */
-    PV_SRC_SCROBBLER     /* /.scrobbler.log, Audioscrobbler format     */
+    PV_SRC_PLAYBACK      /* ROCKBOX_DIR/playback.log and its rotations */
 };
 
 /* One data line, already decided.
  *
- * The reader owns every string here and reuses the memory for the next line,
- * so anything needed afterwards must be copied.
- *
- * 'path' is empty and 'artist'/'album'/'title' are NULL when the source does
- * not carry them -- which is the whole difference between the two formats,
- * and why both are present. Exactly one of the two sets is populated. */
+ * The reader owns 'path' and reuses its memory for the next line, so it must
+ * be copied if it is needed afterwards. */
 struct pv_entry
 {
     unsigned long ts;
-    unsigned long elapsed_ms;   /* for a scrobbler play, the track's length */
+    unsigned long elapsed_ms;
     unsigned long length_ms;
     const char   *path;
-    const char   *artist;
-    const char   *album;
-    const char   *title;
     /* Where this line starts, counted through the family as one stream.
      * Rotation renames files but never changes those bytes, so an offset
      * stays meaningful across one -- and anything that recorded an offset
@@ -79,16 +56,7 @@ struct pv_entry
 
 typedef void (*pv_entry_fn)(const struct pv_entry *e, void *ctx);
 
-/* Which log to read: playback.log if it holds any entries, otherwise the
- * scrobbler log if it does, otherwise PV_SRC_NONE. Under Last.fm, which
- * writes both, the scrobbler log is read instead unless playback.log has a
- * play at the scrobbler log's first entry: without one, the scrobbler log
- * holds plays logged to it alone, and playback.log would show a gap where
- * they were.
- *
- * Under On, the scrobbler log is a leftover, and reading it would show
- * statistics frozen at the moment the setting was changed -- plausible, wrong,
- * and impossible to spot from the screen.
+/* PV_SRC_PLAYBACK if playback.log holds any entries, otherwise PV_SRC_NONE.
  *
  * Decide this once and pass it to everything below, so a later read cannot
  * disagree with an earlier one. */
@@ -115,7 +83,7 @@ long pv_log_read_range(enum pv_source src, unsigned long from,
  * and a seek per file. */
 unsigned long pv_log_size(enum pv_source src);
 
-/* "playback log" / "scrobbler log" / "none", for saying which was used. */
+/* "playback log" / "none", for saying which was used. */
 const char *pv_log_source_name(enum pv_source src);
 
 /* The 'len' bytes ending at 'offset'. Returns how many were read.

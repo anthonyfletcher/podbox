@@ -62,14 +62,12 @@ use warnings;
 
 my $OUT = 'spun_testlog';
 my $TRACKFILE;
-my $SCROB = 0;
 for (my $i = 0; $i < @ARGV; $i++) {
     if    ($ARGV[$i] eq '--out'    && $i + 1 < @ARGV) { $OUT = $ARGV[++$i]; }
     elsif ($ARGV[$i] eq '--tracks' && $i + 1 < @ARGV) { $TRACKFILE = $ARGV[++$i]; }
-    elsif ($ARGV[$i] eq '--scrobbler') { $SCROB = 1; }
-    else { die "usage: $0 --tracks FILE [--out DIR] [--scrobbler]\n"; }
+    else { die "usage: $0 --tracks FILE [--out DIR]\n"; }
 }
-die "usage: $0 --tracks FILE [--out DIR] [--scrobbler]\n" unless defined $TRACKFILE;
+die "usage: $0 --tracks FILE [--out DIR]\n" unless defined $TRACKFILE;
 
 # Matches PLAYBACK_LOG_MAX_FILESZ_BYTES in apps-ipod/audio/playback.c. The
 # real rotation happens at boot, when the file is ALREADY over the cap, so
@@ -208,16 +206,6 @@ my @TRACKS;
 # assumption for a tidy library and stated as one -- a folder whose tags
 # disagree moves a play from one predicted bucket to another without making
 # anything wrong.
-# The title a tagged file would carry: its filename, stripped of extension and
-# track number.
-sub filename_title {
-    my ($path) = @_;
-    my $fname = (split m{/}, $path)[-1];
-    my $dot = rindex($fname, '.');
-    my $stem = $dot > 0 ? substr($fname, 0, $dot) : $fname;
-    return clip(strip_tracknum($stem));
-}
-
 sub folder_meta {
     my ($path) = @_;
     my @seg = split m{/}, $path;
@@ -289,8 +277,7 @@ sub tally {
     }
     else {
         # Under 5s heard: a browsing tap. Counted as a data line and nothing
-        # else -- not a play, not a skip, no title record. The scrobbler
-        # format cannot express this, so it never lands here.
+        # else -- not a play, not a skip, no title record.
         $taps++;
     }
 }
@@ -302,8 +289,6 @@ my $cur = '';
 my $cur_is_live = 0;
 
 sub rotate_if_needed {
-    # The scrobbler log is never rotated; the core appends to it forever.
-    return if $SCROB;
     # Real rotation happens at boot, when the file is already over the cap --
     # so a rotated file is slightly LARGER than $ROTATE_AT, never smaller.
     if (length($cur) > $ROTATE_AT) {
@@ -314,9 +299,6 @@ sub rotate_if_needed {
 
 sub emit_header {
     my ($ts) = @_;
-    # The scrobbler log carries one preamble, written when the file is
-    # created, and nothing per boot. It is emitted up front instead.
-    return if $SCROB;
     my ($y, $m, $d) = civil_from_days(int($ts / 86400));
     my $h  = int(($ts % 86400) / 3600);
     my $mi = int(($ts % 3600) / 60);
@@ -328,30 +310,6 @@ sub emit_header {
 
 sub emit {
     my ($ts, $el_ms, $len_ms, $path) = @_;
-
-    if ($SCROB) {
-        # The writer's own rule, integer division and all (playback.c's
-        # format_playbacklog): elapsed >= length/100 * SCROBBLER_LISTENED_PCT.
-        # It is NOT the reader's rule, so the same play can be a listen in one
-        # format and a skip in the other -- a long track heard for five
-        # minutes passes the reader's four-minute clause and fails this one.
-        my $listened = $el_ms >= int($len_ms / 100) * 50;
-        my ($artist, $album) = folder_meta($path);
-        my $title = filename_title($path);
-
-        # Tags the file would carry. A track number is written but nothing
-        # reads it, and the MusicBrainz field is empty -- as it is for
-        # everything this fork logs.
-        $cur .= sprintf("%s\t%s\t%s\t%d\t%d\t%s\t%d\t\n",
-                        $artist, $album, $title, 0,
-                        int($len_ms / 1000), $listened ? 'L' : 'S', $ts);
-
-        # A play is credited with the whole track; a skip with nothing. There
-        # is no elapsed time in the file to do better with.
-        tally($ts, $listened, !$listened,
-              $listened ? int($len_ms / 1000) : 0, $artist, $album, $title);
-        return;
-    }
 
     $cur .= sprintf("%d:%d:%d:%s\n", $ts, $el_ms, $len_ms, $path);
 
@@ -375,15 +333,6 @@ sub emit {
 }
 
 # ----------------------------------------------------------------- the shape
-
-# The Audioscrobbler preamble, written once when the core creates the file
-# (allocate_playback_log). Every line of it starts with '#', so a reader that
-# skips comments needs to know nothing about it.
-if ($SCROB) {
-    $cur .= "#AUDIOSCROBBLER/1.1\n#TZ/UNKNOWN\n#CLIENT/Rockbox ipodvideo\n"
-          . "#ARTIST\t#ALBUM\t#TITLE\t#TRACKNUM\t#LENGTH\t#RATING\t"
-          . "#TIMESTAMP\t#MUSICBRAINZ_TRACKID\n";
-}
 
 my $DAY0 = days_from_civil(2025, 3, 1);
 my $DAY1 = days_from_civil(2026, 8, 1);
@@ -480,8 +429,7 @@ mkdir $OUT unless -d $OUT;
 
 my @names;
 for (my $i = 0; $i < @files; $i++) {
-    my $name = $SCROB ? '.scrobbler.log'
-             : ($i == $#files) ? 'playback.log'
+    my $name = ($i == $#files) ? 'playback.log'
                                : sprintf('playback_%04d.log', $i + 1);
     push @names, $name;
     open(my $fh, '>', "$OUT/$name") or die "$OUT/$name: $!\n";
@@ -564,37 +512,6 @@ printf $x "      least one listened play and a valid timestamp)\n";
 printf $x "  first play                                 %s (ts %d)\n", fmt_day(int($ts_min/86400)), $ts_min;
 printf $x "  last play                                  %s (ts %d)\n", fmt_day(int($ts_max/86400)), $ts_max;
 
-if ($SCROB) {
-    printf $x <<"SNAMES", scalar keys %artist_plays, scalar keys %album_plays, scalar keys %title_plays;
-
-Names
------
-The scrobbler format carries tagged names in the file, so there is no database
-join to test and no fallback to fall back to. These are simply what the log
-says, and the device must match them exactly:
-
-    unique artists   %d
-    unique albums    %d
-    unique titles    %d
-
-Note what this format cannot do: it records a played/skipped verdict and the
-track's full length, with no elapsed time. So "minutes" above is the total
-length of the tracks that counted as played -- higher than the playback log's
-figure for the same listening -- and every browsing tap is indistinguishable
-from a real skip, so taps is 0 and skips absorbs them.
-
-The played/skipped decision is also made by the WRITER here, using its own
-rule (elapsed >= length/100 * 50), not by the reader's. The reader's rule has
-a four-minute clause the writer's lacks, so a track over eight minutes heard
-for five is a play in the playback log and a skip in this one.
-
-That divergence is NOT exercised by this fixture -- no track in it is long
-enough for the four-minute clause to apply -- so plays here match the playback
-log's exactly. The differences you should see are confined to minutes (higher)
-and skips (which absorb the taps). It is not a code path either way: this
-reader takes the verdict already in the file.
-SNAMES
-} else {
 print $x <<"NAMES";
 
 Names -- the discriminating figures
@@ -626,7 +543,6 @@ roughly one "artist" per album.
 Also worth checking on the device: the debug screen's own "from db" and "from
 path" counters, which say the same thing directly.
 NAMES
-}
 
 print $x "\nPer calendar year\n-----------------\n";
 for my $y (sort keys %year) {

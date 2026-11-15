@@ -4,25 +4,15 @@
  * Copyright (C) 2026 Siebe Majoor
  * GNU General Public License (version 2+)
  *
- * Reads whichever log the core is writing, and decides what each line means.
+ * Reads playback.log, and decides what each line means.
  *
- * There are two, chosen by settings > playback > logging; Last.fm writes
- * both, each play to each with one timestamp:
- *
- *   playback.log      one line per finished track, "ts:elapsed:length:path",
- *                     rotated to playback_0001.log, playback_0002.log, ...
- *                     once it passes 511 KB. Read oldest first, and the
- *                     concatenation is what consumers see -- rotation renames
- *                     files but never changes those bytes, which is why a
- *                     byte offset into the family survives one.
- *
- *   /.scrobbler.log   Audioscrobbler 1.1: tab-separated, tagged names, a
- *                     played/skipped verdict instead of an elapsed time, and
- *                     no file path. Never rotated -- the core appends to it
- *                     forever and only writes the header when creating it.
- *
- * Both are written by add_playbacklog() in audio/playback.c; see enum
- * pv_source in the header for what the two formats can and cannot say.
+ * One line per finished track, "ts:elapsed:length:path", rotated to
+ * playback_0001.log, playback_0002.log, ... once it passes 511 KB. Read oldest
+ * first, and the concatenation is what consumers see -- rotation renames files
+ * but never changes those bytes, which is why a byte offset into the family
+ * survives one. Written by add_playbacklog() in audio/playback.c under both On
+ * and On + Last.fm; the /.scrobbler.log that On + Last.fm also writes is the
+ * uploader's, and is not read here: it carries no file paths, so no artwork.
  *
  * This knows nothing about statistics. It hands each line to a callback and
  * lets the caller decide what to count.
@@ -35,28 +25,10 @@
 #include "config.h"
 #include "system/library_files.h"
 #include "rbpaths.h"
-#include "settings/settings.h"
 #include "pv_log.h"
 
 #define PV_LOG_PATH LIB_PLAYBACK_LOG
 #define PV_LOG_STEM LIB_PLAYBACK_STEM
-#define PV_SCROBBLER_PATH "/.scrobbler.log"
-#define PV_COVER_PATH LIB_REPORT_SOURCE_FILE
-
-/* global_settings.playback_log, as audio/playback.c defines it. Not exported
- * from there, and not worth exporting for one comparison. */
-#define PV_SETTING_LASTFM 2
-
-/* Audioscrobbler 1.1 field order, and the marker the core writes for a track
- * with no artist tag. */
-#define SCROB_F_ARTIST    0
-#define SCROB_F_ALBUM     1
-#define SCROB_F_TITLE     2
-#define SCROB_F_LENGTH    4    /* seconds, not milliseconds */
-#define SCROB_F_RATING    5    /* 'L' listened, 'S' skipped */
-#define SCROB_F_TIMESTAMP 6
-#define SCROB_FIELDS_MIN  7
-#define SCROB_UNTAGGED    "<UNTAGGED>"
 
 /* The numbered run is scanned from 1 until one is missing; the live log is
  * the link after it. Matches how create_numbered_filename() names them. */
@@ -116,18 +88,10 @@ static bool rd_advance(void)
     return rd.fd >= 0;
 }
 
-static bool rd_open(enum pv_source src)
+static bool rd_open(void)
 {
     rd.pos = rd.len = 0;
     rd.consumed = 0;
-
-    if (src == PV_SRC_SCROBBLER)
-    {
-        rd.next = -1;       /* one file, never rotated */
-        rd.fd = open(PV_SCROBBLER_PATH, O_RDONLY);
-        return rd.fd >= 0;
-    }
-
     rd.next = 1;
     return rd_advance();
 }
@@ -135,22 +99,12 @@ static bool rd_open(enum pv_source src)
 /* Open the family positioned at byte 'offset' of the concatenation: find the
  * file that offset falls in, seek into it, and leave the chain pointing at
  * whatever follows so reading simply carries on. */
-static bool rd_open_at(enum pv_source src, unsigned long offset)
+static bool rd_open_at(unsigned long offset)
 {
     unsigned long left = offset;
 
     rd.pos = rd.len = 0;
     rd.consumed = offset;
-
-    if (src == PV_SRC_SCROBBLER)
-    {
-        rd.next = -1;
-        rd.fd = open(PV_SCROBBLER_PATH, O_RDONLY);
-        if (rd.fd < 0)
-            return false;
-        lseek(rd.fd, (off_t)left, SEEK_SET);
-        return true;
-    }
 
     for (int n = 1; n <= PV_LOG_MAX_NUMBERED; n++)
     {
@@ -257,26 +211,6 @@ static char *next_colon(char *s)
     return *s ? s + 1 : NULL;
 }
 
-/* Split a tab-separated line in place, filling up to maxf field pointers.
- * Trailing empty fields are real fields -- a track with no MusicBrainz id
- * still ends with a tab and nothing after it. */
-static int split_tabs(char *line, char **f, int maxf)
-{
-    int n = 0;
-
-    f[n++] = line;
-    while (*line && n < maxf)
-    {
-        if (*line == '\t')
-        {
-            *line = '\0';
-            f[n++] = line + 1;
-        }
-        line++;
-    }
-    return n;
-}
-
 /* "ts:elapsed:length:path". False if the line is not one. */
 static bool parse_playback_line(char *line, struct pv_entry *e)
 {
@@ -295,9 +229,6 @@ static bool parse_playback_line(char *line, struct pv_entry *e)
         return false;
 
     e->path   = p;
-    e->artist = NULL;
-    e->album  = NULL;
-    e->title  = NULL;
 
     /* The Last.fm rule: half the track, or four minutes, is a play. A track
      * of unknown length is taken at its word. */
@@ -308,59 +239,14 @@ static bool parse_playback_line(char *line, struct pv_entry *e)
     return true;
 }
 
-/* Audioscrobbler: the verdict is already in the file, so there is no rule to
- * apply and no elapsed time to apply it to. */
-static bool parse_scrobbler_line(char *line, struct pv_entry *e)
-{
-    char *f[8];
-    char rating;
-
-    if (split_tabs(line, f, 8) < SCROB_FIELDS_MIN)
-        return false;
-
-    e->ts        = parse_ul(f[SCROB_F_TIMESTAMP]);
-    e->length_ms = parse_ul(f[SCROB_F_LENGTH]) * 1000UL;
-
-    rating = f[SCROB_F_RATING][0];
-    e->listened = (rating == 'L' || rating == 'l');
-
-    /* No elapsed time is recorded. A play is credited with the whole track,
-     * which is the closest honest answer -- the writer's own threshold was
-     * half of it. A skip is credited with nothing. */
-    e->elapsed_ms = e->listened ? e->length_ms : 0;
-
-    /* With no elapsed time there is no way to tell a two-second browsing tap
-     * from a track genuinely given up on, so every non-play is a skip. This
-     * format simply cannot make the distinction the other one can. */
-    e->skipped = !e->listened;
-
-    e->path   = "";
-    e->artist = f[SCROB_F_ARTIST];
-    e->album  = f[SCROB_F_ALBUM];
-    e->title  = f[SCROB_F_TITLE];
-
-    if (!e->artist[0] || !strcmp(e->artist, SCROB_UNTAGGED))
-        e->artist = "(unknown)";
-    if (!e->title[0])
-        e->title = "(unknown)";
-    return true;
-}
-
 unsigned long pv_log_size(enum pv_source src)
 {
     unsigned long total = 0;
     char path[MAX_PATH];
     int fd;
 
-    if (src == PV_SRC_SCROBBLER)
-    {
-        fd = open(PV_SCROBBLER_PATH, O_RDONLY);
-        if (fd < 0)
-            return 0;
-        total = (unsigned long)ffilesize(fd);
-        close(fd);
-        return total;
-    }
+    if (src == PV_SRC_NONE)
+        return 0;
 
     for (int n = 1; n <= PV_LOG_MAX_NUMBERED; n++)
     {
@@ -386,7 +272,6 @@ const char *pv_log_source_name(enum pv_source src)
     switch (src)
     {
     case PV_SRC_PLAYBACK:  return "playback log";
-    case PV_SRC_SCROBBLER: return "scrobbler log";
     default:               return "none";
     }
 }
@@ -395,9 +280,9 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
 {
     int got = 0;
 
-    if (len <= 0 || offset < (unsigned long)len)
+    if (src == PV_SRC_NONE || len <= 0 || offset < (unsigned long)len)
         return 0;
-    if (!rd_open_at(src, offset - (unsigned long)len))
+    if (!rd_open_at(offset - (unsigned long)len))
         return 0;
 
     /* Straight out of the stream rather than through the line reader: this
@@ -425,102 +310,21 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
     return got;
 }
 
-/* Does this source hold anything but headers, and when was its first entry
- * and how long its track? Stops at the first data line, so an established
- * log costs one buffer's worth of reading. */
-static bool first_entry(enum pv_source src, unsigned long *ts,
-                        unsigned long *length_ms)
-{
-    char line[PV_LINE_MAX];
-    struct pv_entry e;
-    bool found = false;
-
-    if (!rd_open(src))
-        return false;
-
-    while (!found && rd_line(line, sizeof(line)))
-    {
-        if (line[0] == '#' || line[0] == '\0')
-            continue;
-        found = src == PV_SRC_SCROBBLER ? parse_scrobbler_line(line, &e)
-                                        : parse_playback_line(line, &e);
-    }
-
-    rd_close();
-    if (found)
-    {
-        *ts = e.ts;
-        *length_ms = e.length_ms;
-    }
-    return found;
-}
-
-/* Is there a play in playback.log logged at 'ts', of a track 'length_s'
- * seconds long? The length tells a play logged to both files from one at
- * the same moment of a clock that was reset since. */
-static bool playback_has(unsigned long ts, unsigned long length_s)
-{
-    char line[PV_LINE_MAX];
-    struct pv_entry e;
-    bool found = false;
-
-    if (!rd_open(PV_SRC_PLAYBACK))
-        return false;
-    while (!found && rd_line(line, sizeof(line)))
-        found = line[0] != '#' && parse_playback_line(line, &e)
-                && e.ts == ts && e.length_ms / 1000 == length_s;
-    rd_close();
-    return found;
-}
-
-/* Does playback.log hold every play the scrobbler log does? It does when it
- * has the scrobbler log's first entry, 'scrob_ts': Last.fm logs a play to
- * both with one timestamp, and the scrobbler log is only appended to or
- * emptied. The answer is saved with the two first entries it was found for,
- * so the search runs again only when one of them changes. */
-static bool playback_covers(unsigned long play_ts, unsigned long scrob_ts,
-                            unsigned long scrob_length_ms)
-{
-    unsigned long rec[3];
-    int fd;
-
-    if (scrob_ts < play_ts)
-        return false;
-
-    fd = open(PV_COVER_PATH, O_RDONLY);
-    if (fd >= 0)
-    {
-        bool known = read(fd, rec, sizeof(rec)) == (ssize_t)sizeof(rec)
-                     && rec[0] == scrob_ts && rec[1] == play_ts;
-        close(fd);
-        if (known)
-            return rec[2] != 0;
-    }
-
-    rec[0] = scrob_ts;
-    rec[1] = play_ts;
-    rec[2] = playback_has(scrob_ts, scrob_length_ms / 1000);
-    fd = open(PV_COVER_PATH, O_WRONLY|O_CREAT|O_TRUNC, 0666);
-    if (fd >= 0)
-    {
-        write(fd, rec, sizeof(rec));
-        close(fd);
-    }
-    return rec[2] != 0;
-}
-
+/* Stops at the first data line, so an established log costs one buffer's
+ * worth of reading. */
 enum pv_source pv_log_pick_source(void)
 {
-    unsigned long play_ts, scrob_ts, play_ms, scrob_ms;
-    bool play = first_entry(PV_SRC_PLAYBACK, &play_ts, &play_ms);
-    bool scrob = first_entry(PV_SRC_SCROBBLER, &scrob_ts, &scrob_ms);
+    char line[PV_LINE_MAX];
+    struct pv_entry e;
+    bool found = false;
 
-    if (global_settings.playback_log == PV_SETTING_LASTFM && play && scrob
-        && !playback_covers(play_ts, scrob_ts, scrob_ms))
-        return PV_SRC_SCROBBLER;
-    if (play)
-        return PV_SRC_PLAYBACK;
-    return scrob ? PV_SRC_SCROBBLER : PV_SRC_NONE;
+    if (!rd_open())
+        return PV_SRC_NONE;
+    while (!found && rd_line(line, sizeof(line)))
+        found = line[0] != '#' && line[0] != '\0'
+                && parse_playback_line(line, &e);
+    rd_close();
+    return found ? PV_SRC_PLAYBACK : PV_SRC_NONE;
 }
 
 long pv_log_read(enum pv_source src, pv_entry_fn cb, void *ctx)
@@ -536,7 +340,7 @@ long pv_log_read_range(enum pv_source src, unsigned long from,
 
     if (src == PV_SRC_NONE)
         return -1;
-    if (!(from ? rd_open_at(src, from) : rd_open(src)))
+    if (!(from ? rd_open_at(from) : rd_open()))
         return -1;
 
     for (;;)
@@ -549,20 +353,11 @@ long pv_log_read_range(enum pv_source src, unsigned long from,
         if (!rd_line(line, sizeof(line)))
             break;
 
-        /* '#' starts a header line in both formats: the per-boot marker in
-         * one, the Audioscrobbler preamble in the other. */
+        /* '#' starts the per-boot marker line */
         if (line[0] == '#' || line[0] == '\0')
             continue;
-
-        if (src == PV_SRC_SCROBBLER)
-        {
-            if (!parse_scrobbler_line(line, &e))
-                continue;
-        }
-        else if (!parse_playback_line(line, &e))
-        {
+        if (!parse_playback_line(line, &e))
             continue;
-        }
 
         e.valid_ts = (e.ts >= PV_MIN_VALID_TS);
         e.offset = line_at;

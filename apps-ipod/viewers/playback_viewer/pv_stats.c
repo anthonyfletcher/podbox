@@ -418,7 +418,7 @@ static void index_identity(struct pv_index_id *id, enum pv_source src,
     id->totals_size = sizeof(struct pv_totals);
     id->state_size  = sizeof(struct pv_badge_state);
     id->year        = (unsigned long)year;
-    id->names       = (src == PV_SRC_PLAYBACK) ? pv_names_identity() : 0;
+    id->names       = pv_names_identity();
 }
 
 /* Whether the database has said what it holds. While it is still loading, or
@@ -547,7 +547,7 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
         goto fail;
 
     /* Every logged file still named as it was, or the rows are not */
-    if (out->source == PV_SRC_PLAYBACK && !logged_check())
+    if (!logged_check())
         goto fail;
 
     pv_index_read_end();
@@ -633,7 +633,7 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
         && pv_index_write(t_album.items,
                           (size_t)t_album.n * sizeof(struct pv_agg))
         && pv_index_write(days, (size_t)day_n * sizeof(struct pv_day))
-        && (out->source != PV_SRC_PLAYBACK || logged_save(&index_db)))
+        && logged_save(&index_db))
         pv_index_write_end();
     else
         pv_index_write_abort();
@@ -670,7 +670,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     struct pv_totals *t = ctx;
     char artist[PV_NAME_MAX], title[PV_NAME_MAX], album[PV_NAME_MAX];
     char album_artist[PV_NAME_MAX];
-    const char *path = e->path;
+    uint64_t key = path_key(e->path);
+    const char *path;
     enum pv_name_src src;
     unsigned elapsed;
     bool night, year;
@@ -679,30 +680,14 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
 
     replay_progress(e->offset);
 
-    if (e->artist)
-    {
-        /* The scrobbler format carries tagged names already, so there is
-         * nothing to resolve and no database to consult. */
-        strlcpy(artist, e->artist, sizeof(artist));
-        strlcpy(title, e->title, sizeof(title));
-        strlcpy(album, e->album ? e->album : "", sizeof(album));
-        album_artist[0] = '\0';
-        src = PV_NAME_LOG;
-        t->from_log++;
-    }
+    path = pv_names_locate(e->path);
+    if (tagcache_find_key(key) < 0)
+        logged_add(key, path == e->path ? key : path_key(path));
+    src = pv_names_resolve(path, artist, title, album, album_artist);
+    if (src == PV_NAME_DB)
+        t->from_db++;
     else
-    {
-        uint64_t key = path_key(e->path);
-
-        path = pv_names_locate(e->path);
-        if (tagcache_find_key(key) < 0)
-            logged_add(key, path == e->path ? key : path_key(path));
-        src = pv_names_resolve(path, artist, title, album, album_artist);
-        if (src == PV_NAME_DB)
-            t->from_db++;
-        else
-            t->from_path++;
-    }
+        t->from_path++;
 
     elapsed = (unsigned)(e->elapsed_ms / 1000);
     year = in_year(e);
@@ -1435,9 +1420,6 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     overflowed = false;
     day_n = 0;
 
-    /* Decide the source before anything else: a scrobbler log names its own
-     * entries, so there are no paths to resolve and no moved-folder table to
-     * load. */
     /* Plays still in the audio thread's buffer count too */
     playback_log_flush();
     {
@@ -1451,15 +1433,6 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     /* The moved-folder table claims the bottom of the buffer; the tables live
      * above it and never move, so the two never have to know about each other.
      * Names take no buffer: they come from the database's path index. */
-    if (out->source != PV_SRC_PLAYBACK)
-    {
-        /* Not merely zero for tidiness: pv_names_info() would otherwise hand
-         * back whatever a previous crunch left behind, which would both
-         * misreport on screen and mis-size the tables below. */
-        names_used = 0;
-        out->db_entries = out->db_mapped = 0;
-    }
-    else
     {
         long t0 = current_tick;
 
@@ -1642,10 +1615,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
          * to say, or not yet in RAM. */
         db_whole(&whole_end);
         index_db = whole_start;
-        if (out->source == PV_SRC_PLAYBACK
-            && (!names_ready || !pv_names_complete() || !names_settled()
-                || pv_names_identity() != names_id
-                || memcmp(&whole_start, &whole_end, sizeof(whole_end)) != 0))
+        if (!names_ready || !pv_names_complete() || !names_settled()
+            || pv_names_identity() != names_id
+            || memcmp(&whole_start, &whole_end, sizeof(whole_end)) != 0)
             save_wanted = false;
 
         save_covered = log_size;
