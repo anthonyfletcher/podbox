@@ -6,7 +6,13 @@
 - Created by: Humberto Santana
 - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
-Modified to support dynamic colours and album/artist art.
+Modified to support dynamic colours and album/artist art, and redrawn after
+the iPod classic: a 20px title bar with the play state on the left and a
+glass battery on the right, gradient selection, the cover's reflection and a
+glass progress bar on the playing screen, menus beside the cover and every
+other list across the whole screen, a header over an album's tracks, a book's
+chapters and a podcast's episodes, the iPod's blue dot for what is left to
+hear of an episode or chapter, and Cover Flow full screen.
 
 Three versions come in the one zip:
 
@@ -45,12 +51,20 @@ do.
 <img src="ss_light_1.png"/>
 <img src="ss_light_2.png"/>
 
-## Preferences (Dark and Light)
+## Preferences
 
-Edit `/.rockbox/themes/iclassic_square_dark.preferences` or
-`iclassic_square_light.preferences` on the player, then load the theme again to
-pick the change up. `yes` gives a part the album's colour and `no` keeps it
-white in Dark, black in Light.
+Choose them in `Settings > Appearance > Theme Options`.
+
+All three versions have these:
+
+| Preference | Values | Default | What it does |
+|---|---|---|---|
+| `menu_cover` | `full`, `framed` | `full` | The cover beside the menus. `full` fills the right half of the screen, as the iPod does; `framed` shows it smaller, with the song playing under it. |
+| `album_header` | `on`, `off` | `on` | The cover, name and counts above an album's tracks, a book's chapters and a podcast's episodes. `off` gives the list all its rows. |
+| `episode_notes` | `on`, `off` | `on` | The selected podcast episode's notes in a box below its list. `off` gives the list all its rows. |
+
+Dark and Light also choose which parts take the album's colour. `yes` gives a
+part the album's colour and `no` keeps it white in Dark, black in Light.
 
 | Preference | Values | Default | What it colours |
 |---|---|---|---|
@@ -58,7 +72,6 @@ white in Dark, black in Light.
 | `vivid_volume_icons` | `yes`, `no` | `yes` | The speaker icons either side of the volume bar. |
 | `vivid_volume_bar` | `yes`, `no` | `yes` | The volume bar, shown in place of the progress bar while the volume changes. |
 | `vivid_transport_icon` | `yes`, `no` | `no` | The play, pause, fast-forward, rewind and hold icon in the title bar. |
-| `vivid_battery_icon` | `yes`, `no` | `no` | The battery icon in the title bar. |
 | `vivid_title_bar` | `yes`, `no` | `no` | The bar along the top of the screen. `no` keeps it grey. |
 | `vivid_title_text` | `yes`, `no` | `no` | The title bar's text: the list's name, or Now Playing. |
 | `vivid_song_text` | `yes`, `no` | `no` | The song's title, on the playing screen and in the pane beside lists. |

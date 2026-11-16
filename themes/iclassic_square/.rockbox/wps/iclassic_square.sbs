@@ -12,86 +12,177 @@
 %Fl(3,18-noto-sans-bold.fnt)
 %Fl(4,16-noto-sans-bold.fnt)
 %Fl(5,16-noto-sans.fnt)
+%Fl(6,19-iclassic-icons.fnt)
+#
+#Battery: a frame per charge level, and the same while charging
+%xl(battery,battery.bmp,0,4,8)
+%xl(charging,battery_charging.bmp,0,4,8)
 #
 #Background layer
 #
-#- Title bar and list rule
+#- Title bar, 20px as on the iPod, and the list rule
 %V(0,0,-,-,-)%VB%Vb(ffffff)%Vf(000000)
-%dr(0,0,320,23,f5f5f5,c8c8c8)
-%dr(0,23,320,1,707070)
-%dr(160,24,1,216,d8d8d8)
+%dr(0,0,320,19,e4e4e4,a8a8a8)
+%dr(0,19,320,1,707070)
 #
 #Foreground layer
 #
-#- Empty pane: its clear repaints the margins after Cover Flow
-%Vl(Pane,160,24,160,216,-)
+#- Empty pane and its rule: its clear repaints the margins after
+#  Cover Flow
+%Vl(Pane,160,20,160,220,-)
+%dr(0,0,1,220,d8d8d8)
 #
 #- Cover or grey tile. Not in %VB, which nothing here copies to screen
-%Vl(Pane,166,30,150,150,2)%Vy%Vg(d8d8d8,a0a0a0,ffffff)
+%Vl(Pane,166,26,150,150,2)%Vy%Vg(d8d8d8,a0a0a0,ffffff)
 %?C<|%ac%Vs(gradient)b>
 %Cl(0,0,150,150,c,c)%Cd
 #
+#- Or the cover filling the pane, its middle 160 of 220 columns, as the
+#  iPod shows it. Its %Cl claims a second art size whether shown or not
+%Vl(Bleed,160,20,160,220,2)%Vy%Vg(d8d8d8,a0a0a0,ffffff)
+%?C<|%ac%Vs(gradient)b>
+%Cl(-30,0,220,220,c,c,-,-,bleed)%Cd(bleed)
+#- The menu's shadow on it, darkest at the edge
+%dr(0,0,1,220,!000000,!000000,1)%dr(0,0,2,220,!000000,!000000,1)%dr(0,0,3,220,!000000,!000000,1)%dr(0,0,4,220,!000000,!000000,1)
+#
 #- Screen switches. 1x1 because a flip clears its line
 %V(319,239,1,1,-)
-%Vd(Chrome)
+%?if(%cs,=,22)<|%Vd(Chrome)>
 %?if(%cs,=,10)<%Vd(QuickBg)%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
-%?if(%cs,=,22)<|%Vd(Pane)>
+%?if(%cs,=,22)<|%?Ld<|%?and(%LH,%if(%ft(themes/iclassic_square.preferences,album_header:),!=,off))<%Vd(AlbumHead)|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%?if(%ft(themes/iclassic_square.preferences,menu_cover:),=,framed)<%Vd(Pane)|%Vd(Bleed)>|>>>>
+%?and(%LD,%if(%ft(themes/iclassic_square.preferences,episode_notes:),!=,off))<%Vd(Notes)>
 #
-#Rows: plain 24, art 46
-%Lb(Rows,160,24,-,46)
+#Rows, as the iPod's: art 44 across the whole screen, five full covers
+#to the page; an album's tracks 24, numbered, under its header; any
+#other list 24, a menu's beside the pane and the rest across the screen,
+#each row choosing as it draws: the title it goes by is a draw behind
+#when %Lb renders. A menu is the main menu, settings and the library's
+#Music, Audiobooks, Podcasts and custom menus; in the library, Rockbox
+#too, the main menu's title, which the library's first draw still has
+%?Ld<%Lb(Rows,320,24,-,44)|%?if(%LH,=,album)<%Lb(Tracks,320,24)|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%Lb(Rows,160,24,-,44)|%Lb(Rows,320,24,-,44)>>>
 #
 #Set up list
-%Vi(list,0,24,160,216,3)%Vb(ffffff)%Vf(000000)
+%Vi(list,0,20,160,220,3)%Vb(ffffff)%Vf(000000)
+%Vi(full,0,20,320,220,3)%Vb(ffffff)%Vf(000000)
+%Vi(album,0,72,320,168,3)%Vb(ffffff)%Vf(000000)
+#- Under the header, over the notes: five rows
+%Vi(albumnotes,0,72,320,120,3)%Vb(ffffff)%Vf(000000)
+#- Over the notes: seven rows
+%Vi(notes,0,20,320,168,3)%Vb(ffffff)%Vf(000000)
+#- Cover Flow takes the whole screen, title bar and all
+%Vi(covers,0,0,320,240,-)
 #
 #- Hidden list for the quick screen
 %Vi(qsblank,0,0,1,1,-)
 #
-%V(318,239,1,1,-)%Vb(ffffff)%Vf(000000)%?if(%cs,=,10)<%VI(qsblank)|%VI(list)>
+%V(318,239,1,1,-)%Vb(ffffff)%Vf(000000)%?if(%cs,=,10)<%VI(qsblank)|%?if(%cs,=,22)<%VI(covers)|%?Ld<%VI(full)|%?and(%LH,%if(%ft(themes/iclassic_square.preferences,album_header:),!=,off))<%?and(%LD,%if(%ft(themes/iclassic_square.preferences,episode_notes:),!=,off))<%VI(albumnotes)|%VI(album)>|%?and(%LD,%if(%ft(themes/iclassic_square.preferences,episode_notes:),!=,off))<%VI(notes)|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%VI(list)|%VI(full)>>>>>>
 #
-#- Title
-%Vl(Chrome,6,3,196,19,4)%Vf(000000)
-%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%s%Lt>>
+#- Empty title bar: its clear repaints what the three below leave,
+#  once dynamic colours have recoloured the backdrop
+%Vl(Chrome,0,0,320,20,-)
 #
-#- Status icons
-%Vl(Chrome,222,0,96,23,2)%Vf(000000)
-%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#- Play state, on the left as on the iPod
+%Vl(Chrome,4,0,48,19,6)%Vf(accent<50:2f7fd6)
+%?mh<À|%?mp<|A|B|G|F>>
+#
+#- Title, centred between the two
+%Vl(Chrome,56,1,208,17,4)%Vf(000000)
+%ac%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%?and(%LH,%if(%ft(themes/iclassic_square.preferences,album_header:),!=,off))<%sel(%LH,book,%Sx(Audiobooks),show,%Sx(Podcasts),%Sx(Album))|%s%Lt>>>
+#
+#- Busy spinner, beside the battery
+%Vl(Chrome,264,0,26,19,6)%Vf(000000)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+#
+#- Battery
+%Vl(Chrome,292,0,26,19,-)
+%?bc<%xd(charging,%bl)|%xd(battery,%bl)>
 #
 #- Plain row, the full width where there is no chevron
 %Vl(Rows,0,0,160,24,3)%Vy
-%?La<|%?and(%or(%if(%cs,!=,6),%if(%Lk,!=,1)),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%Lk,!=,6)),%or(%if(%cs,!=,13),%if(%Lk,!=,8)))<%?Lc<%Vf(accent:186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>>
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%?and(%or(%if(%cs,!=,6),%if(%Lk,!=,1)),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%Lk,!=,6)),%or(%if(%cs,!=,13),%if(%Lk,!=,8)))<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)>|>>
 #
 #- Plain row beside a chevron. Only one of the two draws a
 #  given row, so neither clears the other's text
 %Vl(Rows,0,0,136,24,3)%Vy
-%?La<|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%Vf(accent:186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>>>
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)>|>>
 #
-#- Plain row chevron
-%Vl(Rows,136,0,24,24,2)%Vy
-%?La<|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%Vf(accent:186dbd)%Vs(invert)|%Vf(000000)>Þ>>
+#- Plain row chevron, on the selected row only
+%Vl(Rows,136,0,24,24,6)%Vy
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%Lk,=,6)),%and(%if(%cs,=,13),%if(%Lk,=,8)))<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)Þ|>>|>>
 #
-#- Art row special icon. Must stay above the cover
-%Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(accent:186dbd)|%Vf(000000)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Finished),Ē,%Sx(Not Started),đ,%Sx(In Progress),ē,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx(Search),®)>
+#- Art row under the cover: the selection bar, a game's cartridge where it
+#  has no logo (%LI 9, which the cover line leaves alone), and a special row's
+#  icon. The no-break space keeps the bar on a row with a cover
+%Vl(Rows,0,0,48,44,2)%Vy
+%?La<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%ac%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Shuffle Albums]),H,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Finished),Ē,%Sx(Not Started),đ,%Sx(In Progress),ē,%Sx(All Episodes),Ė,%Sx([Play Unplayed]),A,%Sx(Search),®,%Sx(High Scores),Ĕ,%sel(%cs,40,%sel(%LI,9,ĥ, ), ))>
 #
 #- Art row cover
-%Vl(Rows,1,1,44,44,-)
-%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Shuffle Albums])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx(Finished)),%if(%LT,!=,%Sx(Not Started)),%if(%LT,!=,%Sx(In Progress)),%if(%LT,!=,%Sx(All Episodes)),%if(%LT,!=,%Sx([Play Unplayed])),%if(%LT,!=,%Sx(Search)))<%La>
+%Vl(Rows,0,0,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Shuffle Albums])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx(Finished)),%if(%LT,!=,%Sx(Not Started)),%if(%LT,!=,%Sx(In Progress)),%if(%LT,!=,%Sx(All Episodes)),%if(%LT,!=,%Sx([Play Unplayed])),%if(%LT,!=,%Sx(Search)),%if(%LT,!=,%Sx(High Scores)),%if(%LI,!=,9))<%La>
 #
 #- Art row text
-%Vl(Rows,46,0,114,46,3)%Vy
-%?La<%?Lc<%Vf(accent:186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)%?and(%Lr,%if(%Lk,!=,3))< - %Lr%%>|>
+%Vl(Rows,48,0,248,44,3)%Vy
+%?La<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)|>
+#
+#- Art row chevron, on the selected row only, or the dot of a book of
+#  one file
+%Vl(Rows,296,0,24,44,6)%Vy
+%?La<%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(accent<50:2f7fd6)>%?if(%Lr,!=,100)<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))| >|%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)Þ|>>|>
+#
+#- An album's track: its number, then its title. A row with no number
+#  shows what it does there instead, shuffle or play, in the icon font,
+#  which carries the digits so the one column draws both
+%Vl(Tracks,0,0,32,24,6)%Vy
+%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(888888)>%ac%?Lp<%Lp|%sel(%LT,%Sx([Random]),H,%Sx([Resume]),A,%Sx(Resume),A,%Sx([Play Unplayed]),A, )>
+%Vl(Tracks,32,0,288,24,3)%Vy
+%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)
+#
+#- Any other list's row across the screen, as the iPod's: the text, then
+#  in the last column the dot for what is left to hear, or the chevron
+#  on the selected row where it opens a list. Both drawn on every row,
+#  so neither clears the other
+%Vl(Rows,0,0,296,24,3)%Vy
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<|%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)>>
+%Vl(Rows,296,0,24,24,6)%Vy
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<|%?Lc<%Vg(accent<50:3c8cde,accent<50.70:1a64b4,!ffffff)%Vs(gradient)|%Vf(accent<50:2f7fd6)>%ac%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))|%?and(%Lc,%or(%if(%Lk,=,1),%if(%Lk,=,6),%if(%Lk,=,10),%if(%Lk,=,11)))<Þ| >>>>
+#
+#An album's header over its tracks, a book's over its chapters and a
+#show's over its episodes: the cover, then the name, the artist or
+#author, and the year and count
+%Vl(AlbumHead,0,20,320,52,-)
+%Vl(AlbumHead,4,24,44,44,-)
+%LH(art)
+%Vl(AlbumHead,56,20,260,17,4)%Vf(000000)
+%s%LH(name)
+%Vl(AlbumHead,56,37,260,17,5)%Vf(888888)
+%s%LH(artist)
+%Vl(AlbumHead,56,54,260,17,5)%Vf(888888)
+%s%?if(%LH,=,show)<%LH(tracks) %Sx(episodes)|%?LH(year)<%LH(year) · >%?if(%LH,=,book)<%LH(tracks) %Sx(chapters)%?LH(length)< · %LH(length)>|%LH(tracks) %Sx(tracks)>>
+#- The rule under it, in a row of its own: each scroll step of a line
+#  above clears that line's box, so none of them reaches row 71
+%Vl(AlbumHead,0,71,320,1,-)
+%dr(0,0,320,1,d8d8d8)
+#
+#A podcast episode's notes, two lines under a shorter list, scrolled
+#up through when they do not fit
+%Vl(Notes,0,194,320,46,-)
+%Vl(Notes,8,197,304,40,5)%Vf(888888)
+%s%wt(%LD,tl)
+#- The rule over it, in a row of its own, as the header's
+%Vl(Notes,0,193,320,1,-)
+%dr(0,0,320,1,d8d8d8)
 #
 #Now-playing pane
-%Vl(Pane,166,184,150,22,3)%Vf(000000)
+%Vl(Pane,166,180,150,22,3)%Vf(000000)
 %s%?it<%it|%fn>
-%Vl(Pane,166,206,150,20,4)%Vf(888888)
+%Vl(Pane,166,202,150,20,4)%Vf(888888)
 %s%?ia<%ia|%?d(2)<%d(2)|>>
 #
 #Quick screen
 #
 #- Background
-%Vl(QuickBg,0,24,160,216,-)
-%dr(0,0,160,216,ffffff)
+%Vl(QuickBg,0,20,160,220,-)
+%dr(0,0,160,220,ffffff)
 #
 #- Up
 %Vl(QuickT,4,30,24,24,2)%Vf(186dbd)

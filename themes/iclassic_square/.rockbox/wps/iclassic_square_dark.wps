@@ -25,49 +25,55 @@
 %Fl(3,18-noto-sans-bold.fnt)
 %Fl(4,16-noto-sans-bold.fnt)
 %Fl(5,16-noto-sans.fnt)
+%Fl(6,19-iclassic-icons.fnt)
+#
+#Battery: a frame per charge level, and the same while charging
+%xl(battery,battery.bmp,0,4,8)
+%xl(charging,battery_charging.bmp,0,4,8)
 #
 #Background layer
 #
 #- Title bar
 %V(0,0,-,-,-)%VB%Vb(!000000)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid<40:0056a5,vivid<40.50:002b52)|%dr(0,0,320,23,!2c2c2c,!141414)>
-%dr(0,23,320,1,!505050)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,19,vivid<40:0056a5,vivid<40.50:002b52)|%dr(0,0,320,19,!4a4a4a,!161616)>
+%dr(0,19,320,1,!505050)
 #
-#- Progress track. Here, not %Vb: %pb clears to the backdrop
-%dr(60,214,200,6,!2a2a2a)
-%dr(60,220,200,6,!202020)
-#
-#- Reflection fade under the cover
-%dr(8,184,150,22,!1c1c1c,!000000)
+#- Progress track, glass: a light upper half over a darker lower one.
+#  Here, not %Vb: %pb clears to the backdrop
+%dr(60,214,200,6,!3a3a3a,!2a2a2a)
+%dr(60,220,200,6,!161616,!202020)
 #
 #Foreground layer
 #
 #- Volume or progress. 1x1 because a flip clears its line
 %V(319,239,1,1,-)
 %?mv(2)<%Vd(Volume)|%Vd(Progress)>
-%?mh<%Vd(Status)|%?mp<%Vd(StatusWide)|%Vd(Status)|%Vd(Status)|%Vd(Status)|%Vd(Status)>>
 #
-#- Title
-%V(6,3,190,19,4)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50:2e7cc6)|>%Sx(Now Playing)
-#
-#- Status icons, in 24px slots: battery rightmost, then hold or
-#  transport, then the rest, which close up when there is no
-#  transport icon. Split so the two can take their own colours
-%Vl(Status,198,0,72,23,2)%Vf(!ffffff)
-%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
-%Vl(StatusWide,198,0,96,23,2)%Vf(!ffffff)
-%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
-%V(270,0,24,23,2)%Vf(!ffffff)
+#- Play state, on the left as on the iPod
+%V(4,0,48,19,6)%Vf(!ffffff)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid>50:2e7cc6)|>%?mh<À|%?mp<|A|B|G|F>>
-%V(294,0,24,23,2)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid>50:2e7cc6)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Title, centred
+%V(100,1,120,17,4)%Vf(!ffffff)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50:2e7cc6)|>%ac%Sx(Now Playing)
+#
+#- Shuffle, repeat and the busy spinner
+%V(222,0,68,19,6)%Vf(!ffffff)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+#
+#- Battery
+%V(292,0,26,19,-)
+%?bc<%xd(charging,%bl)|%xd(battery,%bl)>
 #
 #- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
 #  nothing here copies to screen once the art arrives
 %V(8,32,150,150,2)%Vy%Vg(!3a3a3a,!202020,!909090)
 %?C<|%ac%Vs(gradient)b>
 %Cl(0,0,150,150,c,c)%Cd
+#
+#- Its reflection, fading into the page
+%V(8,182,150,24,-)
+%Cd(-,-,-,-,-,reflect,35)
 #
 #Track
 #
@@ -87,23 +93,30 @@
 %V(170,128,146,20,5)%Vf(!909090)
 %pp %Sx(of) %pe
 #
-#Progress, in two tones: vivid over a shade of it, or white
-#over grey
-%Vl(Progress,2,210,52,20,4)%Vf(!ffffff)
+#Progress, glass
+%Vl(Progress,2,212,52,20,4)%Vf(!ffffff)
 %ar%pc
-%Vl(Progress,60,214,200,6,-)%Vf(vivid>40:186dbd)
+%Vl(Progress,60,214,200,2,-)%Vf(vivid>60:76aef0)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!ffffff)|>%pb(0,0,-,-,noborder)
-%Vl(Progress,60,220,200,6,-)%Vf(vivid>40.75:12528e)
+%Vl(Progress,60,216,200,4,-)%Vf(vivid>40:186dbd)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!e6e6e6)|>%pb(0,0,-,-,noborder)
+%Vl(Progress,60,220,200,4,-)%Vf(vivid>40.75:12528e)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!bfbfbf)|>%pb(0,0,-,-,noborder)
-%Vl(Progress,266,210,52,20,4)%Vf(!ffffff)
+%Vl(Progress,60,224,200,2,-)%Vf(vivid>40.90:1662aa)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!cfcfcf)|>%pb(0,0,-,-,noborder)
+%Vl(Progress,266,212,52,20,4)%Vf(!ffffff)
 %al-%pr
 #
 #Volume
 %Vl(Volume,32,208,24,24,2)%Vf(vivid>50:2e7cc6)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>N
-%Vl(Volume,60,214,200,6,-)%Vf(vivid>40:186dbd)
+%Vl(Volume,60,214,200,2,-)%Vf(vivid>60:76aef0)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!ffffff)|>%pv(0,0,-,-,noborder)
-%Vl(Volume,60,220,200,6,-)%Vf(vivid>40.75:12528e)
+%Vl(Volume,60,216,200,4,-)%Vf(vivid>40:186dbd)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!e6e6e6)|>%pv(0,0,-,-,noborder)
+%Vl(Volume,60,220,200,4,-)%Vf(vivid>40.75:12528e)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!bfbfbf)|>%pv(0,0,-,-,noborder)
+%Vl(Volume,60,224,200,2,-)%Vf(vivid>40.90:1662aa)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!cfcfcf)|>%pv(0,0,-,-,noborder)
 %Vl(Volume,264,208,24,24,2)%Vf(vivid>50:2e7cc6)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>O

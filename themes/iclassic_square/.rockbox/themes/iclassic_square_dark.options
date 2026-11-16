@@ -35,14 +35,6 @@ choice  = yes | Album Colour
 choice  = no  | White
 default = no
 
-[vivid_battery_icon]
-name    = Battery Icon
-help    = The battery icon in the title bar.
-type    = choice
-choice  = yes | Album Colour
-choice  = no  | White
-default = no
-
 [vivid_title_bar]
 name    = Title Bar
 help    = The bar along the top of the screen.
@@ -74,3 +66,32 @@ type    = choice
 choice  = yes | Album Colour
 choice  = no  | White
 default = yes
+
+[menu_cover]
+name    = Menu Cover
+help    = The album cover beside the menus. Full fills the right half of the
+help    = screen, as the iPod does; Framed shows it smaller, with the song
+help    = playing under it.
+type    = choice
+choice  = full   | Full
+choice  = framed | Framed
+default = full
+
+[album_header]
+name    = Album Header
+help    = The cover, name and counts above an album's tracks, a book's
+help    = chapters and a podcast's episodes, which then show fewer rows. Off,
+help    = the lists keep all their rows.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = on
+
+[episode_notes]
+name    = Episode Notes
+help    = The selected podcast episode's notes in a box below its list, which
+help    = is shorter for it. Off, the lists keep all their rows.
+type    = choice
+choice  = on  | On
+choice  = off | Off
+default = on

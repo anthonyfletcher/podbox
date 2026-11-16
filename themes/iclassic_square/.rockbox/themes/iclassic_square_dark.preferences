@@ -27,11 +27,6 @@ vivid_volume_bar: yes
 # Possible Values: yes, no
 vivid_transport_icon: no
 #
-#-- Battery icon --#
-# The battery icon in the title bar.
-# Possible Values: yes, no
-vivid_battery_icon: no
-#
 #-- Title bar --#
 # The bar along the top of the screen. no keeps it grey.
 # Possible Values: yes, no
@@ -51,3 +46,22 @@ vivid_song_text: no
 # The bar behind the selected row in lists. no makes it white.
 # Possible Values: yes, no
 vivid_selection: yes
+#
+#-- Menu cover --#
+# The album cover beside the menus. full fills the right half of the
+# screen, as the iPod does; framed shows it smaller, with the song
+# playing under it.
+# Possible Values: full, framed
+menu_cover: full
+#
+#-- Album header --#
+# The cover, name and counts above an album's tracks, a book's chapters
+# and a podcast's episodes. off keeps all the list's rows.
+# Possible Values: on, off
+album_header: on
+#
+#-- Episode notes --#
+# The selected podcast episode's notes in a box below its list. off keeps
+# all the list's rows.
+# Possible Values: on, off
+episode_notes: on
