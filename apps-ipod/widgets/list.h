@@ -339,6 +339,9 @@ struct listitem_viewport_cfg;
 
 bool skinlist_get_item(struct screen *display, struct gui_synclist *list, int x, int y, int *item);
 bool skinlist_draw(struct screen *display, struct gui_synclist *list);
+/* Before a list's draw: render the bar first where the row layout it sets
+ * has been dropped since */
+void skinlist_settle(enum screen_type screen, struct gui_synclist *list);
 bool skinlist_is_selected_item(void);
 void skinlist_set_cfg(enum screen_type screen,
                       struct listitem_viewport_cfg *cfg);

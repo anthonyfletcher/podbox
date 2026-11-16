@@ -59,12 +59,12 @@ preceding group repeats.
 | [`%Lk`](#lk--what-kind-of-row-this-is) | kind of row |
 | [`%Lp`](#lp--the-rows-number-among-the-tracks) | row's number among the tracks |
 | [`%Lv`](#lv--a-setting-rows-value) | a setting row's value |
-| [`%Lr`](#lr--where-a-number-setting-sits-in-its-range) | where a number setting sits in its range |
+| [`%Lr`](#lr--how-far-along-a-row-is) | how far along a number setting, book or episode is |
 | [`%LP`](#lp--is-this-row-playing) | is this row playing |
 | [`%Lm`](#lm--is-this-row-ticked) | is this row ticked |
-| [`%LH([field])`](#lhfield--the-lists-header) | the album over its track list |
+| [`%LH([field])`](#lhfield--the-lists-header) | the album, book or show over its tracks |
 | [`%Cl(...[, filters, radius, label])`](#changed-behaviour-cl-album-art-filters-rounded-corners-and-names) | changed: art filters, corners, names |
-| [`%Cd([name][, x, y, width, height])`](#showing-part-of-an-artwork) | changed: named art, a window of it |
+| [`%Cd([name][, x, y, width, height][, reflect, strength])`](#showing-part-of-an-artwork) | changed: named art, a window of it, a reflection |
 | [`%dr(...[, opacity, radius])`](#changed-behaviour-dr-opacity-and-rounded-corners) | changed: tint, rounded corners |
 | [`!rrggbb`](#changed-behaviour-fixed-colours-rrggbb) | a colour dynamic colours leave alone |
 | [`accent`, `dominant`, `vivid`](#palette-colours-accent-dominant-and-vivid) | the album's colours |
@@ -689,15 +689,23 @@ The current value of a toggle or setting row, as that setting's own screen
 words it: "On", "All", "-6 dB". Empty on every other row, and on a setting
 that names a file.
 
-### `%Lr` — where a number setting sits in its range
+### `%Lr` — how far along a row is
 
 How far a number setting's value is from its least to its greatest, from `0`
 to `100`: Volume, Bass, Sleep Timer and the like. A setting picked from a
 list of numbers, such as Maximum Results, counts by its place in the list, so
 each step moves it the same distance. A value that is a word reads empty --
 Sleep Timer at Off, Playback Frequency at Auto -- though it still counts as a
-step, so the numbers either side of it keep their places. Toggles, choices and
-every other row read empty too. So `%?Lr<…|…>` asks "is this a number".
+step, so the numbers either side of it keep their places. Toggles and choices
+read empty.
+
+On a podcast episode, a book's chapter, a book of one file in Audiobooks, and
+the books on Audiobooks' In Progress and Finished shelves and on the Books
+shelf, it is how far through: `0` not started, `100` heard or read to the
+end. A book in several files reads empty
+on its own row and gives the figure on each of its chapters. Every other row
+reads empty, so `%?Lr<…|…>` asks "is this a number or a place", and
+`%Lk` tells the two apart: a setting is `3`.
 
 ```
 %?Lr<%Lr%%|>                                # "40%" on a number row
@@ -737,23 +745,25 @@ means a comparison of `%LT` with a row's name does not match then.
 
 What an album's track list says about the album, for a header above it. Bare,
 `%LH` is the kind of header the list has: `album` on an album's tracks in the
-library, empty everywhere else (Audiobooks and Podcasts included). Choose the
-layout with `%?if(%LH,=,album)<…>`.
+library, `book` on a book's chapters in Audiobooks, `show` on a show's
+episodes in Podcasts, and empty everywhere else. Choose the layout with
+`%?if(%LH,=,album)<…>`; a skin that tests for `album` alone shows no header
+over books and shows.
 
 With a word it gives one field:
 
 | Field | |
 |---|---|
-| `name` | the album |
-| `artist` | its album artist; empty where several albums share the name |
+| `name` | the album, book or show |
+| `artist` | its album artist, which is a book's author; empty where several albums share the name |
 | `year` | empty when untagged |
-| `tracks` | the tracks this list shows |
+| `tracks` | the tracks this list shows: chapters, episodes |
 | `length` | their total, `m:ss` or `h:mm:ss` |
 | `discs` | the highest disc number; empty for one disc |
 | `art` | draws the cover in the middle of the viewport; `%LH(art, 6)` rounds its corners, as `%La` does a row's |
 
 A word it does not know fails the skin. A skin that uses `%LH` anywhere draws
-its own header; any other skin gets the year in the album's list title instead,
+its own header; any other skin gets the year in an album's list title instead,
 as `Abbey Road (1969)`. The header needs the database in RAM, and is empty
 until it is.
 
@@ -973,6 +983,33 @@ then split the result: blurred across x=80–240, crisp across 240–320.
 - **One `%Cd` per artwork per viewport.** A second in the same viewport
   replaces the first rather than drawing as well, which is how a repeated
   `%Cd` has always behaved. Give each window its own viewport.
+
+### A reflection
+
+```
+%Cd([name], -, -, -, -, reflect [, strength])
+```
+
+Draws the artwork's bottom rows upside down from the top of the viewport,
+fading out towards its foot — the reflection under a cover. Put it in a
+viewport of its own directly below the cover's: **the viewport's height is the
+reflection's height**, and the artwork keeps the x it has in `%Cl`, so give the
+two viewports the same x and width.
+
+`strength` is how opaque the top row is, `1` to `100`; leave it out for `35`.
+The fade blends with whatever the viewport clears to, so it reaches the page
+colour however dynamic colours have set it, and draws nothing at all when there
+is no artwork.
+
+```
+%V(8,32,150,150,-)
+%Cl(0,0,150,150,c,c)%Cd
+%V(8,182,150,24,-)
+%Cd(-,-,-,-,-,reflect,35)
+```
+
+It reuses the cover's own pixels, so it costs no second artwork size. A
+reflection has no window: write the four as `-`.
 
 ## Changed behaviour: `%dr` opacity and rounded corners
 

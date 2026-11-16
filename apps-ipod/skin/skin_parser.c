@@ -1954,8 +1954,9 @@ static int parse_albumart_load(struct skin_element* element,
     return 0;
 }
 
-/* %Cd([label][,x,y,w,h]): draw one of the skin's %Cl declarations, optionally
- * through a window -- see struct skin_albumart_draw.
+/* %Cd([label][,x,y,w,h][,reflect[,strength]]): draw one of the skin's %Cl
+ * declarations, optionally through a window or as a reflection -- see struct
+ * skin_albumart_draw.
  *
  * A bare %Cd draws the nearest %Cl above it, which is what the load-then-draw
  * pairing reads as and what skins written before labels existed rely on --
@@ -1977,6 +1978,7 @@ static int parse_albumart_display(struct skin_element* element,
         return -1;
 
     ad->x = ad->y = ad->w = ad->h = 0;   /* w == 0: the whole art box */
+    ad->reflect = 0;
 
     if (element->params_count > 0 && !isdefault(get_param(element, 0)))
     {
@@ -2015,6 +2017,25 @@ static int parse_albumart_display(struct skin_element* element,
     {
         DEBUGF("%%Cd: a window needs all of x, y, width and height\n");
         return WPS_ERROR_INVALID_PARAM;
+    }
+
+    if (element->params_count > 5 && !isdefault(get_param(element, 5)))
+    {
+        int strength = 35;
+
+        if (strcmp(get_param_text(element, 5), "reflect") || given)
+        {
+            DEBUGF("%%Cd: the sixth argument is reflect, with no window\n");
+            return WPS_ERROR_INVALID_PARAM;
+        }
+        if (element->params_count > 6 && !isdefault(get_param(element, 6)))
+            strength = get_param(element, 6)->data.number;
+        if (strength < 1 || strength > 100)
+        {
+            DEBUGF("%%Cd: reflection strength runs 1 to 100\n");
+            return WPS_ERROR_INVALID_PARAM;
+        }
+        ad->reflect = strength;
     }
 
     ad->art = PTRTOSKINOFFSET(skin_buffer, aa);
@@ -2717,8 +2738,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_LIST_TITLE_TEXT:
                     sb_skin_has_title(curr_screen);
                     break;
-                /* Only the statusbar skin's parse resets these two flags, so
-                 * only it may set them. */
+                /* Only the statusbar skin's parse resets these three flags,
+                 * so only it may set them. */
                 case SKIN_TOKEN_LIST_HEADER:
                     if (curr_skin == CUSTOM_STATUSBAR)
                         sb_skin_uses_header(curr_screen);
@@ -2811,6 +2832,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     function = parse_image_load;
                     break;
                 case SKIN_TOKEN_LIST_ITEM_CFG:
+                    if (curr_skin == CUSTOM_STATUSBAR)
+                        sb_skin_uses_rows(curr_screen);
                     function = parse_listitemviewport;
                     break;
                 case SKIN_TOKEN_ALBUMART_LOAD:

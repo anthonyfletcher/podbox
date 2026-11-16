@@ -72,10 +72,11 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sssis", 0|NOBREAK),
 
     /* Shadows upstream's %Cd (""): the same token, now able to name which %Cl
-     * it draws and to reveal only a window of it. Bare, it draws the nearest
-     * %Cl above it whole, which is what every existing theme means by it.
-     * The window's four are lowercase so each accepts '-'. */
-    TAG(SKIN_TOKEN_ALBUMART_DISPLAY, "Cd", "|s[ip][ip][ip][ip]",
+     * it draws, to reveal only a window of it, or to draw its reflection.
+     * Bare, it draws the nearest %Cl above it whole, which is what every
+     * existing theme means by it. The window's four are lowercase so each
+     * accepts '-', which is how a reflection reaches past them. */
+    TAG(SKIN_TOKEN_ALBUMART_DISPLAY, "Cd", "|s[ip][ip][ip][ip]si",
         SKIN_REFRESH_STATIC),
 
     /* Shadows upstream's %dr ("[IP][IP][ip][ip]|ss"): the same token with two

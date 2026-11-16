@@ -397,6 +397,9 @@ void gui_synclist_layout(struct gui_synclist *gui_list)
 
 void gui_synclist_draw(struct gui_synclist *gui_list)
 {
+    /* First, as it can move the UI viewport the layout is taken from */
+    FOR_NB_SCREENS(i)
+        skinlist_settle(i, gui_list);
     gui_synclist_layout(gui_list);
     FOR_NB_SCREENS(i)
     {

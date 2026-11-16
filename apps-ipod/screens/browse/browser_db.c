@@ -6572,7 +6572,8 @@ bool browser_db_album_header(struct browser_context *c,
     if (c->currtable != TABLE_NAVIBROWSE || level < 1
         || csi->tagorder[level] != tag_title
         || csi->tagorder[level - 1] != tag_album
-        || csi_mentions_spoken() || tagcache_album_count() <= 0)
+        || (csi_mentions_spoken() && csi_spoken_kind() == 0)
+        || tagcache_album_count() <= 0)
         return false;
 
     /* An album name several albums share, reached without an album artist
@@ -6587,6 +6588,7 @@ bool browser_db_album_header(struct browser_context *c,
         return false;
 
     memset(h, 0, sizeof(*h));
+    h->kind = csi_mentions_spoken() ? csi_spoken_kind() : 0;
     h->album_row = row;
     h->year = al.year > 0 ? al.year : 0;
     h->art_hash = al.art_hash;
@@ -7535,14 +7537,118 @@ const char *browser_db_get_entry_value(struct browser_context *c, int id,
     return buf;
 }
 
+/* Where a book was left, by album-table row. The resume file is read to
+ * answer, so a few books' answers are kept until it is next written. */
+struct book_left_cache {
+    int row;                    /* -1 for an empty slot */
+    long album_seek;            /* with row, so a reloaded table misses */
+    unsigned writes;            /* book_resume_writes() when read */
+    bool found;
+    struct book_resume pos;
+    int idx_id;                 /* pos.track's, or -1 */
+};
+static struct book_left_cache book_left[8] = {
+    [0 ... 7] = { .row = -1 },
+};
+
+static const struct book_left_cache *book_left_of(int row,
+                                                  const struct tagcache_album *al)
+{
+    struct book_left_cache *b = &book_left[row % ARRAYLEN(book_left)];
+    char id[BOOK_ID_MAX];
+
+    if (b->row == row && b->album_seek == al->album_seek
+        && b->writes == book_resume_writes())
+        return b;
+    b->row = row;
+    b->album_seek = al->album_seek;
+    b->writes = book_resume_writes();
+    b->found = book_resume_id_of(al->album_seek, al->artist_seek, id,
+                                 sizeof(id))
+               && book_resume_find(id, &b->pos);
+    b->idx_id = b->found && b->pos.track ? tagcache_find_key(b->pos.track)
+                                         : -1;
+    return b;
+}
+
+/* %Lr of a book's track: how far through, 0 not started and 100 heard. From
+ * the resume file, which keeps a book's place whatever Auto-Resume says:
+ * the track it was left in by how far into it, a mark by hand for every
+ * track, and any other track by whether it has been played. */
+static int book_track_percent(int row, const struct tagcache_album *al,
+                              int idx_id)
+{
+    const struct book_left_cache *b = book_left_of(row, al);
+    long length, plays;
+
+    if (!tagcache_entry_numeric(idx_id, tag_length, &length)
+        || !tagcache_entry_numeric(idx_id, tag_playcount, &plays))
+        return -1;
+    if (b->found)
+    {
+        if (b->pos.left == BOOK_LEFT_FINISHED)
+            return 100;
+        if (b->pos.left == BOOK_LEFT_UNSTARTED)
+            return 0;
+        if (idx_id == b->idx_id)
+        {
+            if (b->pos.left == BOOK_LEFT_ENDED)
+                return 100;
+            if (length > 0)
+                return MAX(1, MIN(99, (int)((int64_t)b->pos.elapsed * 100
+                                            / length)));
+        }
+    }
+    return plays > 0 ? 100 : 0;
+}
+
+/* The album-table row of a book kept apart by Segregate Audiobooks, or -1 */
+static int book_row(int row, struct tagcache_album *al)
+{
+    if (row < 0 || !db_spoken_kind_apart(1) || !tagcache_album_get(row, al)
+        || db_spoken_album_kind(al) != 1)
+        return -1;
+    return row;
+}
+
+/* A book row's only track, or -1: a book in chapters says how far through
+ * on its chapters instead */
+static int book_single_track(int row, const struct tagcache_album *al)
+{
+    int i, idx_id = -1;
+
+    for (i = al->first; i <= al->last; i++)
+        if (tagcache_album_of(i) == row)
+        {
+            if (idx_id >= 0)
+                return -1;
+            idx_id = i;
+        }
+    return idx_id;
+}
+
 int browser_db_get_entry_range(struct browser_context *c, int id)
 {
+    struct tagcache_album al;
     struct tagentry *entry;
+    int row, idx_id;
 
-    if (browser_db_get_entry_kind(c, id) != LIST_ROW_TRACK
-        || !(entry = loaded_entry(c, id)))
+    if (id < c->special_entry_count || !(entry = loaded_entry(c, id)))
         return -1;
-    return browser_db_episode_percent(entry->idx_id);
+    if (browser_db_get_entry_kind(c, id) == LIST_ROW_TRACK)
+    {
+        row = book_row(tagcache_album_of(entry->idx_id), &al);
+        return row >= 0 ? book_track_percent(row, &al, entry->idx_id)
+                        : browser_db_episode_percent(entry->idx_id);
+    }
+    if (c->currtable != TABLE_NAVIBROWSE
+        || csi->tagorder[c->currextra] != tag_album
+        || csi_spoken_kind() != 1
+        || (row = book_row(table_album_row(c->currextra, entry->extraseek),
+                           &al)) < 0
+        || (idx_id = book_single_track(row, &al)) < 0)
+        return -1;
+    return book_track_percent(row, &al, idx_id);
 }
 
 int browser_db_get_icon(struct browser_context* c)

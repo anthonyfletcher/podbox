@@ -246,10 +246,15 @@ struct playlistviewer {
  * the art stays anchored where %Cl put it. So the window opens onto the
  * composition rather than onto the bitmap: slide it and a different part of
  * the cover shows through, which is what lets one buffered art serve several
- * cut-outs without a second slot. w == 0 means no window. */
+ * cut-outs without a second slot. w == 0 means no window.
+ *
+ * reflect, when not 0, draws the art's bottom rows upside down from the top of
+ * the viewport instead, starting at that percentage of opacity and fading to
+ * nothing at the viewport's foot. It never has a window. */
 struct skin_albumart_draw {
     OFFSETTYPE(struct skin_albumart *) art;
     int16_t x, y, w, h;
+    uint8_t reflect;
 };
 
 struct skin_albumart {

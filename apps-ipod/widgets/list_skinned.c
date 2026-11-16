@@ -63,9 +63,15 @@ static int current_row;
 static int current_column;
 static bool needs_scrollbar[NB_SCREENS];
 
+/* Times the row layout has been dropped, which skinlist_settle() asks after */
+static unsigned cfg_drops[NB_SCREENS];
+static unsigned cfg_settled[NB_SCREENS];
+
 void skinlist_set_cfg(enum screen_type screen,
                       struct listitem_viewport_cfg *cfg)
 {
+    if (!cfg)
+        cfg_drops[screen]++;
     if (listcfg[screen] != cfg)
     {
         if (listcfg[screen])
@@ -84,6 +90,30 @@ static bool skinlist_is_configured(enum screen_type screen,
 {
     return (listcfg[screen] != NULL) &&
             (!list || (list && list->selected_size == 1));
+}
+
+/* The row layout is dropped by every theme toggle -- a screen pushed or
+ * popped, a dialog, a UI viewport switch -- and only a render of the bar sets
+ * it again, which can come after the list's next draw: that draw is then
+ * unskinned, at the font's row height. So a list about to draw with none, on
+ * a bar that has one, renders the bar first, with the list's own title for
+ * a skin that chooses by %Lt. Once per drop: a skin that leaves this list
+ * plain leaves it unset again, and is not rendered for it on every draw. */
+void skinlist_settle(enum screen_type screen, struct gui_synclist *list)
+{
+    static bool settling;
+
+    if (settling || listcfg[screen] || list->selected_size != 1
+        || cfg_settled[screen] == cfg_drops[screen]
+        || !viewportmanager_theme_enabled(screen)
+        || !sb_skin_has_rows(screen))
+        return;
+    cfg_settled[screen] = cfg_drops[screen];
+    settling = true;
+    if (list->title)
+        sb_set_title_text(list->title, list->title_icon, screen);
+    sb_skin_settle(screen);
+    settling = false;
 }
 static int current_drawing_line;
 static int offset_to_item(int offset, bool wrap)

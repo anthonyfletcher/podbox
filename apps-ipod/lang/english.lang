@@ -27746,3 +27746,31 @@
     *: "Unassign Button"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_CHAPTERS
+  desc: a theme's header over a book's chapters, the word after their count
+  user: core
+  <source>
+    *: "chapters"
+  </source>
+  <dest>
+    *: "chapters"
+  </dest>
+  <voice>
+    *: "chapters"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_EPISODES
+  desc: a theme's header over a podcast show's episodes, the word after their count
+  user: core
+  <source>
+    *: "episodes"
+  </source>
+  <dest>
+    *: "episodes"
+  </dest>
+  <voice>
+    *: "episodes"
+  </voice>
+</phrase>

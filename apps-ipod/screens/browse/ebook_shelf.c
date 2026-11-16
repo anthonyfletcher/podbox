@@ -765,8 +765,9 @@ static int show(char *path, size_t size, int *selection, int *list)
         else if (global_settings.db_ebookauthorart
                  && showing == SHOW_AUTHORS)
             info.get_albumart = get_author_art;
-        browser_set_showing_art(global_settings.db_ebookart
-                                || info.get_albumart != NULL);
+        /* %Ld: only a list that draws covers, not the top or a list of
+         * names, which a skin would lay out for covers that never come */
+        browser_set_showing_art(info.get_albumart != NULL);
         if (info.get_albumart)
             info.row_height = global_settings.db_art_row_height;
         info.action_callback = action_cb;

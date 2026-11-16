@@ -49,6 +49,10 @@ bool sb_skin_has_header(enum screen_type screen);
  * the rows' text must carry [x] */
 void sb_skin_uses_mark(enum screen_type screen);
 bool sb_skin_has_mark(enum screen_type screen);
+/* Whether the skin lays out list rows (%Lb): a list finding no row layout
+ * set has the bar render first, which sets one */
+void sb_skin_uses_rows(enum screen_type screen);
+bool sb_skin_has_rows(enum screen_type screen);
 const char* sb_get_title(enum screen_type screen);
 const char* sb_get_persistent_title(enum screen_type screen);
 enum themable_icons sb_get_icon(enum screen_type screen);

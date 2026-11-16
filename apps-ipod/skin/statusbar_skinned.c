@@ -44,6 +44,7 @@ static int update_delay = DEFAULT_UPDATE_DELAY;
 static bool sbs_has_title[NB_SCREENS];
 static bool sbs_has_header[NB_SCREENS];     /* uses %LH */
 static bool sbs_has_mark[NB_SCREENS];       /* uses %Lm */
+static bool sbs_has_rows[NB_SCREENS];       /* uses %Lb */
 static const char* sbs_title[NB_SCREENS];
 static char sbs_persistent_title[NB_SCREENS][80];
 static enum themable_icons sbs_icon[NB_SCREENS];
@@ -93,6 +94,16 @@ bool sb_skin_has_mark(enum screen_type screen)
     return sbs_has_mark[screen];
 }
 
+void sb_skin_uses_rows(enum screen_type screen)
+{
+    sbs_has_rows[screen] = true;
+}
+
+bool sb_skin_has_rows(enum screen_type screen)
+{
+    return sbs_loaded[screen] && sbs_has_rows[screen];
+}
+
 const char* sb_get_title(enum screen_type screen)
 {
     return sbs_has_title[screen] ? sbs_title[screen] : NULL;
@@ -119,6 +130,7 @@ void sb_process(enum screen_type screen, struct wps_data *data, bool preprocess)
         sbs_has_title[screen] = false;
         sbs_has_header[screen] = false;
         sbs_has_mark[screen] = false;
+        sbs_has_rows[screen] = false;
         viewportmanager_theme_enable(screen, false, NULL);
         return;
     }
@@ -149,6 +161,22 @@ void sb_process(enum screen_type screen, struct wps_data *data, bool preprocess)
 
 static OFFSETTYPE(char*) infovp_label[NB_SCREENS];
 static OFFSETTYPE(char*) oldinfovp_label[NB_SCREENS];
+
+/* Take a UI viewport switch: the theme is toggled, which clears the title.
+ * The list on screen keeps it, so put it back, or a skin choosing its viewport
+ * by %Lt chooses again from no title and switches once more on the next draw,
+ * which draws unskinned. */
+static void sb_switch_info_vp(enum screen_type screen)
+{
+    const char *title = sbs_title[screen];
+    enum themable_icons icon = sbs_icon[screen] - 2;
+
+    oldinfovp_label[screen] = infovp_label[screen];
+    viewportmanager_theme_enable(screen, false, NULL);
+    viewportmanager_theme_undo(screen, true);
+    sb_set_title_text(title, icon, screen);
+}
+
 void sb_set_info_vp(enum screen_type screen, OFFSETTYPE(char*) label)
 {
     infovp_label[screen] = label;
@@ -165,9 +193,7 @@ struct viewport *sb_skin_get_info_vp(enum screen_type screen)
         (oldinfovp_label[screen] != infovp_label[screen]))
     {
         /* UI viewport changed, so force a redraw */
-        oldinfovp_label[screen] = infovp_label[screen];
-        viewportmanager_theme_enable(screen, false, NULL);
-        viewportmanager_theme_undo(screen, true);
+        sb_switch_info_vp(screen);
     }
     if (infovp_label[screen] == VP_DEFAULT_LABEL)
         label = VP_DEFAULT_LABEL_STRING;
@@ -196,9 +222,7 @@ void sb_skin_settle(enum screen_type screen)
     if (oldinfovp_label[screen] &&
         (oldinfovp_label[screen] != infovp_label[screen]))
     {
-        oldinfovp_label[screen] = infovp_label[screen];
-        viewportmanager_theme_enable(screen, false, NULL);
-        viewportmanager_theme_undo(screen, true);
+        sb_switch_info_vp(screen);
         sb_skin_update(screen, true);
     }
 }

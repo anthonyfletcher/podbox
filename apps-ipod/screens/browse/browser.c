@@ -833,7 +833,8 @@ static void browser_set_showing_episodes(bool on)
     }
 }
 
-/* And for an album's tracks, whose skin can draw the album over them (%LH) */
+/* And for an album's tracks, a book's or a show's, whose skin can draw the
+ * album over them (%LH) */
 static bool db_showing_header;
 static struct browser_db_header db_header;
 
@@ -855,7 +856,8 @@ const char *browser_header_text(int field, char *buf, size_t size)
     switch (field)
     {
         case BROWSER_HEADER_KIND:
-            return "album";
+            return db_header.kind == 1 ? "book"
+                 : db_header.kind == 2 ? "show" : "album";
         case BROWSER_HEADER_NAME:
             return db_header.name[0] ? db_header.name : NULL;
         case BROWSER_HEADER_ARTIST:
@@ -981,8 +983,8 @@ static int update_dir(void)
             icon = filetype_get_icon(ATTR_DIRECTORY);
 
             /* A skin without %LH still gets the year, in the title */
-            if (db_showing_header && db_header.year > 0
-                && !sb_skin_has_header(SCREEN_MAIN))
+            if (db_showing_header && db_header.kind == 0
+                && db_header.year > 0 && !sb_skin_has_header(SCREEN_MAIN))
             {
                 static char title_year[MAX_PATH];
 
@@ -1036,6 +1038,24 @@ static int update_dir(void)
      * with NULL and icon as NOICON as the list is reused */
     gui_synclist_scroll_stop(list); /*ADDED*/
     gui_synclist_set_title(list, P2STR((unsigned char*)title), icon);
+
+    /* A skin can choose a level's UI viewport by its title (%Lt), which a
+     * level changes without any of the flags below: settle the bar on a new
+     * one, or the level opens in the last one's viewport */
+    if (id3db)
+    {
+        static char last_title[64];
+        const char *t = P2STR((unsigned char *)title);
+
+        if (!t)
+            t = "";
+        if (strncmp(t, last_title, sizeof(last_title) - 1))
+        {
+            strlcpy(last_title, t, sizeof(last_title));
+            FOR_NB_SCREENS(i)
+                sb_skin_settle(i);
+        }
+    }
 
     gui_synclist_set_nb_items(list, tc.filesindir);
     gui_synclist_set_icon_callback(list,

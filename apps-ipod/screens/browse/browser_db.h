@@ -146,9 +146,11 @@ bool browser_db_row_path(struct browser_context *c,
                          struct tagcache_search *tcs, int row,
                          char *buf, size_t size);
 
-/* What an album's track list shows above itself, for the skin's %LH. Strings
- * are empty where the database names nothing; year and discs are 0. */
+/* What an album's track list shows above itself, for the skin's %LH, and a
+ * book's chapters or a podcast show's episodes theirs. Strings are empty
+ * where the database names nothing; year and discs are 0. */
 struct browser_db_header {
+    int kind;           /* as db_spoken counts: 0 album, 1 book, 2 show */
     char name[128];
     char artist[128];
     int year;
@@ -158,8 +160,8 @@ struct browser_db_header {
     unsigned int art_hash;
     int album_row;      /* tagcache_album_get()'s, which the art is keyed by */
 };
-/* False unless the level on screen is an album's tracks in a music browse
- * and the album table is in RAM. A track list longer than the loaded page is
+/* False unless the level on screen is an album's tracks, a book's or a
+ * show's, and the album table is in RAM. A track list longer than the loaded page is
  * read from disk to count its tracks. */
 bool browser_db_album_header(struct browser_context *c,
                              struct browser_db_header *h);
@@ -260,7 +262,8 @@ int browser_db_get_main_menu_tag_row_count(void);
 int browser_db_spoken_main_menu_slot(void);
 /* %Lr of a podcast episode, kept apart by Segregate Podcasts: how far
  * through it is, 0 not started and 100 heard to its end; -1 for any other
- * row. The episode by its database index, or by its list row. */
+ * row. The episode by its database index; by its list row, a book's
+ * chapter too, and the row of a book in one file. */
 int browser_db_episode_percent(int idx_id);
 int browser_db_get_entry_range(struct browser_context *c, int id);
 /* %Lv of row 'id': a podcast show's episodes not started, or NULL with

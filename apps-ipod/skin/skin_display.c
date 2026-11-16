@@ -951,6 +951,51 @@ void draw_peakmeters(struct gui_wps *gwps, int line_number,
     }
 }
 
+/* %Cd(...,reflect): the art's bottom rows upside down from the top of the
+ * viewport, `strength` per cent opaque at the top and fading to nothing at its
+ * foot. The fade is a 4bpp alpha mask, ordered-dithered so a short reflection
+ * does not band, and it blends over whatever the rectangle clears to -- so it
+ * clears first, or a second draw would thicken the first. */
+static void draw_reflection(struct screen *display, const fb_data *pixels,
+                            int stride, int x, int width, int height,
+                            int strength, bool clear)
+{
+    static const unsigned char bayer[4][4] = {
+        {  0,  8,  2, 10 }, { 12,  4, 14,  6 },
+        {  3, 11,  1,  9 }, { 15,  7, 13,  5 },
+    };
+    static unsigned char mask[LCD_WIDTH / 2];
+    int rows = MIN(display->getheight(), height);
+
+    width = MIN(width, LCD_WIDTH);
+
+    display->set_drawmode(DRMODE_SOLID|DRMODE_INVERSEVID);
+    display->fillrect(x, 0, width, rows);
+    display->set_drawmode(DRMODE_SOLID);
+    if (clear || rows <= 0)
+        return;
+
+    display->set_drawmode(DRMODE_FG);
+    for (int r = 0; r < rows; r++)
+    {
+        /* Opacity in sixteenths of a mask level, 240 being opaque */
+        int o = strength * 240 * (rows - r) / (100 * rows);
+        int level = o >> 4, frac = o & 15;
+        const unsigned char *dither = bayer[r & 3];
+
+        for (int i = 0; i < width; i += 2)
+        {
+            int a0 = level + (frac > dither[i & 3]);
+            int a1 = level + (frac > dither[(i + 1) & 3]);
+            mask[i >> 1] = (15 - a0) | ((15 - a1) << 4);
+        }
+        display->alpha_bitmap_part_img(pixels + (size_t)(height - 1 - r) * stride,
+                                       mask, 0, 0, x, r, width, 1,
+                                       stride, ALIGN_UP(width, 2));
+    }
+    display->set_drawmode(DRMODE_SOLID);
+}
+
 /* Draw the album art bitmap from the given handle ID onto the given WPS.
    Call with clear = true to clear the bitmap instead of drawing it. */
 void draw_album_art(struct gui_wps *gwps, struct skin_albumart *aa,
@@ -1024,6 +1069,14 @@ void draw_album_art(struct gui_wps *gwps, struct skin_albumart *aa,
     short sx = 0, sy = 0;
     struct skin_albumart_draw *win =
             SKINOFFSETTOPTR(get_skin_buffer(data), aa->draw_win);
+
+    if (win && win->reflect)
+    {
+        draw_reflection(gwps->display, pixels,
+                        STRIDE(gwps->display->screen_type, src_w, src_h),
+                        x, width, height, win->reflect, clear);
+        return;
+    }
 
     if (win && win->w > 0 && win->h > 0)
     {
