@@ -27,11 +27,13 @@
 #
 # A podcast episode's notes, under a shorter list, unless episode notes is off
 # in scrim.preferences
-%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%dr(5,172,310,62,ffffff,-,3,6)>
+%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%dr(5,192,310,42,ffffff,-,3,6)>
 #
-# An album's header, over its tracks, unless album header is off in
-# scrim.preferences
-%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%dr(5,40,310,70,ffffff,-,3,6)>
+# An album's header, over its tracks, a book's over its chapters and a
+# show's over its episodes, unless album header is off in
+# scrim.preferences. A show's is short when its notes are on, so three
+# rows fit between the two.
+%?and(%LH,%if(%ft(themes/scrim.preferences,album header:),!=,off))<%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%dr(5,40,310,58,ffffff,-,3,6)|%dr(5,40,310,70,ffffff,-,3,6)>>
 #
 # Quick settings boxes
 %?if(%cs,=,10)<%?if(%QL,!=,ERR)<%dr(12,62,144,72,ffffff,-,3,10)>%?if(%QT,!=,ERR)<%dr(164,62,144,72,ffffff,-,3,10)>%?if(%QR,!=,ERR)<%dr(12,142,144,72,ffffff,-,3,10)>%?if(%QB,!=,ERR)<%dr(164,142,144,72,ffffff,-,3,10)>>
@@ -48,7 +50,7 @@
 # Quick settings. Cover Flow's %VI rides this line because a conditional
 # that flips clears its line's rect, and so does the shorter list a podcast's
 # episodes take for their notes.
-%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>%?if(%cs,=,22)<%VI(covers)>%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%Vd(Notes)%VI(notes)>%?Ld<%VI(art)>%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Vd(AlbumHead)%VI(album)>
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>%?if(%cs,=,22)<%VI(covers)>%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%Vd(Notes)%VI(notes)>%?Ld<%VI(art)>%?and(%LH,%if(%ft(themes/scrim.preferences,album header:),!=,off))<%?and(%LD,%if(%ft(themes/scrim.preferences,episode notes:),!=,off))<%Vd(ShowHead)%VI(shownotes)|%Vd(AlbumHead)%VI(album)>>
 #
 # Setup rows
 %Lb(Rows,300,30,-,48)
@@ -60,9 +62,9 @@
 # - Title
 %Vl(Chrome,0,0,320,35,3)
 %Vl(ChromeG,10,8,200,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Sx(Album)|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%LH,%if(%ft(themes/scrim.preferences,album header:),!=,off))<%sel(%LH,book,%Sx(Audiobooks),show,%Sx(Podcasts),%Sx(Album))|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
 %Vl(ChromeN,10,8,152,20,3)%Vf(000000)
-%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),!=,off))<%Sx(Album)|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%?and(%LH,%if(%ft(themes/scrim.preferences,album header:),!=,off))<%sel(%LH,book,%Sx(Audiobooks),show,%Sx(Podcasts),%Sx(Album))|%s%Lt%?and(%if(%LH,=,album),%if(%ft(themes/scrim.preferences,album header:),=,off),%LH(year))< %(%LH(year)%)>>>>
 #
 # - Status icons. The charging glyphs mirror the level glyphs band for
 #   band; one covers levels 2 to 5, so it stands in four places.
@@ -86,8 +88,13 @@
 # A podcast's episodes: four rows, and the selected one's notes below them
 %Vi(notes,10,46,300,122,-)
 #
-# An album's tracks: four rows under its header
+# An album's tracks: four rows under its header, as a book's chapters
+# and a show's episodes
 %Vi(album,10,114,300,120,-)
+#
+# A show's episodes with their notes: three rows between a short header
+# and the notes
+%Vi(shownotes,10,100,300,90,-)
 #
 # Album and artist art rows: four of them at 48px, the list a little
 # taller than the others for it
@@ -233,13 +240,15 @@
 %Vl(QuickB,202,183,98,20,-)%Vf(!ffffff)
 %s%Qb
 #
-# A podcast episode's notes, scrolled up through when they do not fit
-%Vl(Notes,13,177,294,52,4)%Vf(!ffffff)
+# A podcast episode's notes, two lines, scrolled up through when they do
+# not fit
+%Vl(Notes,13,194,294,38,4)%Vf(!ffffff)
 %s%wt(%LD,tl)
 #
 # An album's header: the cover, then its name, artist, and year, tracks and
-# length, the last two in the unselected rows' colour. With it on, the title
-# reads Album rather than the name the header shows.
+# length, the last two in the unselected rows' colour; a book's counts
+# chapters, a show's episodes alone. With it on, the title reads Album,
+# Audiobooks or Podcasts rather than the name the header shows.
 %Vl(AlbumHead,18,40,44,70,-)
 %LH(art,2)
 %Vl(AlbumHead,74,46,233,20,3)%Vf(!ffffff)
@@ -247,7 +256,15 @@
 %Vl(AlbumHead,74,66,233,20,4)%Vf(vivid>85:bdbdbd)
 %s%LH(artist)
 %Vl(AlbumHead,74,86,233,20,4)%Vf(vivid>85:bdbdbd)
-%s%?LH(year)<%LH(year) · >%LH(tracks) %Sx(tracks)%?LH(length)< · %LH(length)>
+%s%?if(%LH,=,show)<%LH(tracks) %Sx(episodes)|%?LH(year)<%LH(year) · >%LH(tracks) %?if(%LH,=,book)<%Sx(chapters)|%Sx(tracks)>%?LH(length)< · %LH(length)>>
+#
+# A show's short header: the cover, then its name and episode count
+%Vl(ShowHead,12,47,44,44,-)
+%LH(art,2)
+%Vl(ShowHead,68,49,239,20,3)%Vf(!ffffff)
+%s%LH(name)
+%Vl(ShowHead,68,70,239,20,4)%Vf(vivid>85:bdbdbd)
+%s%LH(tracks) %Sx(episodes)
 #
 # Volume overlay
 %Vl(Volume,0,0,320,35,3)%Vg(000000,000000,ffffff)

@@ -55,8 +55,9 @@ default = on
 
 [album header]
 name    = Album Header
-help    = An album's cover, artist, year, track count and length above its
-help    = tracks, which then show four rows. Off, the list keeps all its rows.
+help    = The cover, name and counts above an album's tracks, a book's
+help    = chapters and a podcast's episodes, which then show fewer rows. Off,
+help    = the lists keep all their rows.
 type    = choice
 choice  = on  | On
 choice  = off | Off
