@@ -6666,6 +6666,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_MOVING_TITLE
+  desc: list title while a row is carried to a new place
+  user: core
+  <source>
+    *: "Moving"
+  </source>
+  <dest>
+    *: "Flyttar"
+  </dest>
+  <voice>
+    *: "Flyttar"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_DELETED
   desc: A file has beed deleted
   user: core

@@ -139,6 +139,10 @@ struct menu_row_hiding {
     void (*hide)(const struct menu_item_ex *row);
 };
 void menu_set_row_hiding(const struct menu_row_hiding *hiding);
+/* The root menu, next shown, carries 'item': scrolling moves it, OK drops it
+ * and calls dropped(item) to keep the order, and BACK puts it back */
+void menu_carry(const struct menu_item_ex *item,
+                void (*dropped)(const struct menu_item_ex *item));
 void do_setting_screen(const struct settings_list *setting, const char * title,
                         struct viewport parent[NB_SCREENS]);
 

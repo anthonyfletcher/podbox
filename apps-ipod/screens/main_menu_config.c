@@ -94,11 +94,7 @@ static const char * menu_get_name(int selected_item, void * data,
      * types have to agree, so settle on const char * for both. */
     const char *label = (id != -1) ? (const char *)str(id) : (const char *)p;
 
-    /* The carried item is marked in the row text as well as by its icon: a
-     * theme need never map Icon_Moving, and a move you cannot see is a move
-     * you cannot finish. Same reasoning as the playlist viewer's '>'. */
-    snprintf(buffer, buffer_len, "%s%s: %s",
-             selected_item == moving_item ? ">" : "", label,
+    snprintf(buffer, buffer_len, "%s: %s", label,
              menu_items[selected_item].enabled ?
              str(LANG_ON) : str(LANG_OFF));
 
@@ -329,8 +325,31 @@ bool main_menu_hide_item(const struct menu_item_ex *item)
     return true;
 }
 
-/* This screen, carrying the row at 'carry' if it is not -1 */
-static int config_screen(const struct menu_item_ex *carry)
+void main_menu_place_item(const struct menu_item_ex *item,
+                          const struct menu_item_ex *after)
+{
+    int n, to = 0;
+
+    menu_table = root_menu_get_options(&menu_item_count);
+    load_from_cfg();
+    n = find_item(item);
+    if (n < 0)
+        return;
+    if (after)
+    {
+        int m = find_item(after);
+
+        if (m < 0)
+            return;
+        to = m < n ? m + 1 : m;
+    }
+    move_item(n, to);
+    save_to_cfg();
+    global_settings.root_menu_customized = true;
+    settings_save();
+}
+
+int main_menu_config(void)
 {
     bool show_icons = global_settings.show_icons;
     global_settings.show_icons = true;
@@ -342,7 +361,7 @@ static int config_screen(const struct menu_item_ex *carry)
 
     menu_table = root_menu_get_options(&menu_item_count);
     load_from_cfg();
-    moving_item = moving_from = carry ? find_item(carry) : -1;
+    moving_item = moving_from = -1;
 
     /* This screen builds its own gui_synclist directly instead of going
      * through do_menu() (it needs custom OK-to-toggle and a move mode, which
@@ -357,8 +376,6 @@ static int config_screen(const struct menu_item_ex *carry)
         gui_synclist_set_voice_callback(&list, menu_speak_item);
     gui_synclist_set_icon_callback(&list, menu_get_icon);
     gui_synclist_set_nb_items(&list, menu_item_count);
-    if (moving_item >= 0)
-        gui_synclist_select_item(&list, moving_item);
     gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
     gui_synclist_draw_settled(&list);
     gui_synclist_speak_item(&list);
@@ -439,7 +456,6 @@ static int config_screen(const struct menu_item_ex *carry)
                     default:
                         gui_synclist_speak_item(&list);
                 }
-                gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
                 break;
             }
             case ACTION_STD_CANCEL:
@@ -466,7 +482,14 @@ static int config_screen(const struct menu_item_ex *carry)
         }
 
         if (!done)
+        {
+            /* The carried row is the selected one; the title says so */
+            gui_synclist_set_title(&list, moving_item >= 0 ?
+                                   str(LANG_MOVING_TITLE) :
+                                   str(LANG_MAIN_MENU_SETTINGS),
+                                   Icon_Menu_setting);
             gui_synclist_draw(&list);
+        }
     }
 
     if (changed)
@@ -481,14 +504,4 @@ static int config_screen(const struct menu_item_ex *carry)
         viewportmanager_theme_undo(i, false);
 
     return ret;
-}
-
-int main_menu_config(void)
-{
-    return config_screen(NULL);
-}
-
-int main_menu_move_item(const struct menu_item_ex *item)
-{
-    return config_screen(item);
 }

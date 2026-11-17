@@ -8785,6 +8785,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_MOVING_TITLE
+  desc: list title while a row is carried to a new place
+  user: core
+  <source>
+    *: "Moving"
+  </source>
+  <dest>
+    *: "Moviendo"
+  </dest>
+  <voice>
+    *: "Moviendo"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_VOICE_DIR_TALK
   desc: Item of voice menu, whether to use directory .talk clips
   user: core

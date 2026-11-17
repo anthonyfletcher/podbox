@@ -2049,6 +2049,14 @@ static const struct menu_item_ex row_menu =
     { MT_RETURN_ID|MENU_DYNAMIC_DESC|MENU_ITEM_COUNT(ROW_COUNT),
       { .strings = NULL }, { .menu_get_name_and_icon = &row_menu_desc } };
 
+/* A row Move carried, kept where it was dropped */
+static void row_dropped(const struct menu_item_ex *item)
+{
+    unsigned i = root_menu_find(item, MENU_GET_COUNT(root_menu_.flags));
+
+    main_menu_place_item(item, i > 0 ? root_menu__[i - 1] : NULL);
+}
+
 /* A main menu row's long press: Move, Hide, and the settings of the screen
  * it opens */
 static int load_context_screen(int selection)
@@ -2067,12 +2075,10 @@ static int load_context_screen(int selection)
     switch (do_menu(&row_menu, NULL, NULL, false))
     {
         case ROW_MOVE:
-            if (main_menu_move_item(ctx_row) == SYS_USB_CONNECTED)
-                retval = GO_TO_ROOT;
+            menu_carry(ctx_row, row_dropped);
             break;
         case ROW_HIDE:
-            if (main_menu_hide_item(ctx_row))
-                splash(HZ, ID2P(LANG_ROW_HIDDEN));
+            main_menu_hide_item(ctx_row);
             break;
         case ROW_SETTINGS:
             retval = do_menu(ctx_settings, NULL, NULL, false);

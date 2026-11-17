@@ -605,19 +605,11 @@ static const char * shortcut_label(int selected_item, char * buffer,
     return sc->name[0] ? sc->name : ret;
 }
 
-/* The carried shortcut is marked in its text as well as by its icon, as the
- * main menu's editor marks it: a theme need never map Icon_Moving. */
 static const char * shortcut_menu_get_name(int selected_item, void * data,
                                            char * buffer, size_t buffer_len)
 {
-    char label[MAX_PATH];
-
     (void)data;
-    if (selected_item != moving_item)
-        return shortcut_label(selected_item, buffer, buffer_len);
-    snprintf(buffer, buffer_len, ">%s",
-             shortcut_label(selected_item, label, sizeof(label)));
-    return buffer;
+    return shortcut_label(selected_item, buffer, buffer_len);
 }
 
 static int shortcut_menu_speak_item(int selected_item, void * data)
@@ -747,6 +739,14 @@ static void carry_to(int to)
     }
 }
 
+/* The carried shortcut is the selected one; the title says so */
+static void moving_title(struct gui_synclist *lists)
+{
+    gui_synclist_set_title(lists, moving_item >= 0 ?
+                           str(LANG_MOVING_TITLE) : str(LANG_SHORTCUTS),
+                           lists->title_icon);
+}
+
 /* The list has already moved the cursor for whatever was pressed by the time
  * this sees it, so the shortcut follows the cursor rather than the button */
 static int moving_action(int action, struct gui_synclist *lists)
@@ -763,6 +763,7 @@ static int moving_action(int action, struct gui_synclist *lists)
             carry_to(moving_from);
             gui_synclist_select_item(lists, moving_from);
             moving_item = -1;
+            moving_title(lists);
         }
         return action;
     }
@@ -778,12 +779,14 @@ static int moving_action(int action, struct gui_synclist *lists)
         case ACTION_STD_OK:
             moving_item = -1;
             shortcuts_changed();
+            moving_title(lists);
             return ACTION_REDRAW;
         case ACTION_STD_CANCEL:
             /* Put back where it was */
             carry_to(moving_from);
             gui_synclist_select_item(lists, moving_from);
             moving_item = -1;
+            moving_title(lists);
             return ACTION_REDRAW;
         case ACTION_NONE:
         case ACTION_REDRAW:
@@ -867,7 +870,7 @@ static int shortcut_menu_get_action(int action, struct gui_synclist *lists)
                 break;
         }
 
-        gui_synclist_set_title(lists, lists->title, lists->title_icon);
+        moving_title(lists);
         if (global_settings.talk_menu)
             shortcut_menu_speak_item(gui_synclist_get_sel_pos(lists), NULL);
         return ACTION_REDRAW;

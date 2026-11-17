@@ -457,6 +457,41 @@ void menu_set_row_hiding(const struct menu_row_hiding *hiding)
     row_hiding = hiding;
 }
 
+/* The root menu row being moved, and the list position it was picked up at */
+static const struct menu_item_ex *carried;
+static void (*carry_dropped)(const struct menu_item_ex *item);
+static int carry_from;
+
+void menu_carry(const struct menu_item_ex *item,
+                void (*dropped)(const struct menu_item_ex *item))
+{
+    carried = item;
+    carry_dropped = dropped;
+}
+
+static bool is_carried(int selected_item, const struct menu_item_ex *menu)
+{
+    return carried && (menu->flags&MENU_TYPE_MASK) == MT_MENU
+        && menu->submenus[get_menu_selection(selected_item, menu)] == carried;
+}
+
+/* The row at list position 'from' moved to 'to', the rows between stepping
+ * aside; rows the list leaves out keep their places */
+static void carry_step(const struct menu_item_ex *menu, int from, int to)
+{
+    const struct menu_item_ex **sub = menu->submenus;
+
+    while (from != to)
+    {
+        int next = from < to ? from + 1 : from - 1;
+        const struct menu_item_ex *t = sub[current_subitems[from]];
+
+        sub[current_subitems[from]] = sub[current_subitems[next]];
+        sub[current_subitems[next]] = t;
+        from = next;
+    }
+}
+
 static int init_menu_lists(const struct menu_item_ex *menu,
                      struct gui_synclist *lists, int selected, bool callback,
                      struct viewport parent[NB_SCREENS], char* buf, size_t buf_sz)
@@ -725,6 +760,12 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
     /* load the callback, and only reload it if menu changes */
     get_menu_callback(menu, &menu_callback);
 
+    carry_from = gui_synclist_get_sel_pos(&lists);
+    if (menu != &root_menu_ || !is_carried(carry_from, menu))
+        carried = NULL;
+    else
+        gui_synclist_set_title(&lists, str(LANG_MOVING_TITLE), icon);
+
     gui_synclist_draw_settled(&lists);
     gui_synclist_speak_item(&lists);
 
@@ -753,6 +794,51 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
             redraw_lists = true;
         else
             action = new_action;
+
+        /* Carrying a row: scrolling moves it, OK drops it, CANCEL puts it
+         * back, and anything else puts it back and goes on as usual */
+        if (UNLIKELY(carried) && action != ACTION_NONE
+            && action != ACTION_UNKNOWN && action != ACTION_REDRAW)
+        {
+            const struct menu_item_ex *item = carried;
+            int at = gui_synclist_get_sel_pos(&lists);
+            int i;
+
+            switch (action)
+            {
+                case ACTION_STD_PREV:
+                case ACTION_STD_PREVREPEAT:
+                case ACTION_STD_NEXT:
+                case ACTION_STD_NEXTREPEAT:
+                    gui_synclist_do_button(&lists, &action);
+                    carry_step(menu, at, gui_synclist_get_sel_pos(&lists));
+                    gui_synclist_draw(&lists);
+                    continue;
+                case ACTION_STD_CONTEXT:
+                    continue;
+                case ACTION_STD_OK:
+                    carried = NULL;
+                    carry_dropped(item);
+                    /* Saving built the menu again, in this order */
+                    for (i = 0; i < (int)MENU_GET_COUNT(menu->flags)
+                                && menu->submenus[i] != item; i++);
+                    init_menu_lists(menu, &lists, i, false, vps,
+                                    buf, sizeof buf);
+                    gui_synclist_draw(&lists);
+                    continue;
+                default:
+                    carried = NULL;
+                    carry_step(menu, at, carry_from);
+                    gui_synclist_select_item(&lists, carry_from);
+                    title = init_title(menu, &icon, buf, sizeof buf);
+                    gui_synclist_set_title(&lists, title, icon);
+                    gui_synclist_draw(&lists);
+                    if (action == ACTION_STD_CANCEL
+                        || action == ACTION_STD_MENU)
+                        continue;
+                    break;
+            }
+        }
 
         if (LIKELY(gui_synclist_do_button(&lists, &action)))
             continue;

@@ -77,10 +77,11 @@ int theme_options_from_wps(void);
 const char *theme_toggle_label(void);
 int theme_toggle_press(void);
 /* The main menu's own long press on 'item': whether it can be hidden (all
- * but Settings, the way back to this), hiding it, and the editor opened
- * carrying it for Move. The last returns as main_menu_config() does. */
+ * but Settings, the way back to this), hiding it, and keeping it where Move
+ * dropped it, straight after 'after' (first for NULL). */
 bool main_menu_item_hideable(const struct menu_item_ex *item);
 bool main_menu_hide_item(const struct menu_item_ex *item);
-int main_menu_move_item(const struct menu_item_ex *item);
+void main_menu_place_item(const struct menu_item_ex *item,
+                          const struct menu_item_ex *after);
 
 #endif /*_EXPORTED_MENUS_H */
