@@ -457,10 +457,9 @@ void menu_set_row_hiding(const struct menu_row_hiding *hiding)
     row_hiding = hiding;
 }
 
-/* The root menu row being moved, and the list position it was picked up at */
+/* The root menu row being moved */
 static const struct menu_item_ex *carried;
 static void (*carry_dropped)(const struct menu_item_ex *item);
-static int carry_from;
 
 void menu_carry(const struct menu_item_ex *item,
                 void (*dropped)(const struct menu_item_ex *item))
@@ -725,6 +724,7 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
 
     bool in_stringlist, done = false;
     bool redraw_lists;
+    int carry_from;                 /* where a carried row was picked up */
 
     int old_audio_status = audio_status();
 
@@ -818,10 +818,12 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                     continue;
                 case ACTION_STD_OK:
                     carried = NULL;
-                    carry_dropped(item);
+                    if (at != carry_from)
+                        carry_dropped(item);
                     /* Saving built the menu again, in this order */
                     for (i = 0; i < (int)MENU_GET_COUNT(menu->flags)
-                                && menu->submenus[i] != item; i++);
+                                && menu->submenus[i] != item; i++)
+                        ;
                     init_menu_lists(menu, &lists, i, false, vps,
                                     buf, sizeof buf);
                     gui_synclist_draw(&lists);

@@ -523,21 +523,12 @@ static void action_cb(unsigned short id, void *data)
     }
 }
 
-void debug_log_notice(bool boot)
+void debug_log_notice(void)
 {
     if (expired_notice)
     {
         expired_notice = false;
         splash(2*HZ, ID2P(LANG_DEBUG_LOG_EXPIRED));
-    }
-    else if (boot && debug_log_any_on())
-    {
-        int left = debug_log_minutes_left();
-
-        if (left >= 0)
-            splashf(2*HZ, str(LANG_DEBUG_LOG_BOOT), left / 60, left % 60);
-        else
-            splash(2*HZ, ID2P(LANG_DEBUG_LOG_BOOT_NEVER));
     }
 }
 

@@ -80,7 +80,7 @@ int theme_toggle_press(void);
  * but Settings, the way back to this), hiding it, and keeping it where Move
  * dropped it, straight after 'after' (first for NULL). */
 bool main_menu_item_hideable(const struct menu_item_ex *item);
-bool main_menu_hide_item(const struct menu_item_ex *item);
+void main_menu_hide_item(const struct menu_item_ex *item);
 void main_menu_place_item(const struct menu_item_ex *item,
                           const struct menu_item_ex *after);
 

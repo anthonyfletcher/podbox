@@ -87,8 +87,8 @@ int debug_log_minutes_left(void);
 unsigned long debug_log_files_size(void);
 
 /* From the root menu: the splash for logs that have just switched themselves
- * off, or at `boot`, the reminder that some are on. */
-void debug_log_notice(bool boot);
+ * off */
+void debug_log_notice(void);
 
 /* After settings_load(), before anything logs. */
 void debug_log_init(void);

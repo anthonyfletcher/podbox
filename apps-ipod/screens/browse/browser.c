@@ -1350,8 +1350,8 @@ static int music_row_menu(void)
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
 
-    if (ret == 0 && music_menu_hide_row(index))
-        splash(HZ, ID2P(LANG_ROW_HIDDEN));
+    if (ret == 0)
+        music_menu_hide_row(index);
     return ret;
 }
 

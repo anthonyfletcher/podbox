@@ -2055,6 +2055,10 @@ static void row_dropped(const struct menu_item_ex *item)
     unsigned i = root_menu_find(item, MENU_GET_COUNT(root_menu_.flags));
 
     main_menu_place_item(item, i > 0 ? root_menu__[i - 1] : NULL);
+    /* Saving lists a Segregate row with nothing in it; out again, as the
+     * root loop takes it out on its way into the menu */
+    audiobooks_row(global_settings.segregate_audiobooks, false);
+    podcasts_row(global_settings.segregate_podcasts, false);
 }
 
 /* A main menu row's long press: Move, Hide, and the settings of the screen
@@ -2175,11 +2179,10 @@ void root_menu(void)
     podcasts_row(global_settings.segregate_podcasts, false);
     push_current_activity(ACTIVITY_MAINMENU);
     next_screen = root_menu_setup_screens();
-    debug_log_notice(true);
 
     while (true)
     {
-        debug_log_notice(false);
+        debug_log_notice();
         /* A playlist that ran out, extended here rather than where it ended:
          * this is the UI thread, and the work is seconds of disk. Silent
          * either way -- nobody is looking at the screen when the music

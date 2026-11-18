@@ -308,7 +308,7 @@ bool main_menu_item_hideable(const struct menu_item_ex *item)
     return n >= 0 && !item_is_locked(n);
 }
 
-bool main_menu_hide_item(const struct menu_item_ex *item)
+void main_menu_hide_item(const struct menu_item_ex *item)
 {
     int n;
 
@@ -316,13 +316,12 @@ bool main_menu_hide_item(const struct menu_item_ex *item)
     load_from_cfg();
     n = find_item(item);
     if (n < 0 || item_is_locked(n))
-        return false;
+        return;
 
     menu_items[n].enabled = false;
     save_to_cfg();
     global_settings.root_menu_customized = true;
     settings_save();
-    return true;
 }
 
 void main_menu_place_item(const struct menu_item_ex *item,

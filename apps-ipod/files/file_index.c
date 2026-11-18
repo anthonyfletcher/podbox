@@ -326,7 +326,8 @@ static void fi_run_scan(void)
     path_list_write_close(&fi_games, completed);
 
     fi_busy = false;
-    fi_wants_scan = !completed;   /* interrupted: try again later */
+    /* interrupted, or asked for again while walking: walk again later */
+    fi_wants_scan = fi_wants_scan || !completed;
 }
 
 /* ---- the tick, and what wakes it --------------------------------------- */

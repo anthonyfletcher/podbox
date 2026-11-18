@@ -3412,7 +3412,6 @@ static void row_hide(const struct menu_item_ex *row)
 
     global_settings.context_hidden[ctx_kind] |= 1u << bit;
     settings_save();
-    splash(HZ, ID2P(LANG_ROW_HIDDEN));
 }
 
 static const struct menu_row_hiding row_hiding = {
