@@ -1018,6 +1018,19 @@ static bool read_folder_palette(unsigned int hash, int dim,
     return got;
 }
 
+bool dynamic_colors_palette_of(unsigned int hash, unsigned int *dominant,
+                               unsigned int *vivid)
+{
+    struct found_palette p;
+    int dim = palette_dim();
+
+    if (!dim || !read_folder_palette(hash, dim, &p))
+        return false;
+    *dominant = p.dominant;
+    *vivid = p.has_vivid ? p.vivid : p.accent;
+    return true;
+}
+
 static bool prefetched_find(unsigned int hash, struct found_palette *out)
 {
     for (int i = 0; i < PREFETCH_SLOTS; i++)

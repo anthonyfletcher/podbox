@@ -75,6 +75,7 @@ enum hotkey_action {
     HOTKEY_STOP,
     HOTKEY_ADD_TO_PLAYLIST,
     HOTKEY_THEME_TOGGLE,
+    HOTKEY_NOTES,
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
        time into the saved hotkey integers, so renumbering one repoints every
        hotkey the user has already configured. */
@@ -153,6 +154,12 @@ void wps_context_menu_set_default(void *setting, void *defaultval);
 char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len);
 void wps_context_menu_load_from_cfg(void *setting, char *value);
 bool wps_context_menu_is_changed(void *setting, void *defaultval);
+
+/* The name of a notes row for what an album has: NOTES_* bits */
+int context_menu_notes_label(int have);
+
+/* The ONPLAY_* value for where the notes screen's GO_TO_* code goes */
+int context_menu_notes_result(int go_to);
 
 /* Returns ONPLAY_START_PLAY when a row started playback. 'in_order' leaves
  * out the shuffled rows, for something heard in order, such as a book. */

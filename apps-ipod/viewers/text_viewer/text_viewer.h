@@ -64,6 +64,9 @@ enum
     TV_COLOUR_CUSTOM,        /* text_viewer_fg on text_viewer_bg */
 };
 
+/* The text and page colours text_viewer_colour_mode gives */
+void text_viewer_colours(unsigned *fg, unsigned *bg);
+
 /* The reading places, newest first: each document's path, how far through
  * it the page left on ends in percent (-1 when not known) and whether it was
  * read to its end, until `fn` returns false */

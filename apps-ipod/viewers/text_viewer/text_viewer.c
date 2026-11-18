@@ -44,6 +44,7 @@
 #include "widgets/dialog_prose.h"     /* dialog_prose_show */
 #include "reading_stats.h"
 #include "draw/viewport.h"
+#include "draw/color.h"           /* color_blend, dim text */
 #include "font.h"
 #include "system/activity.h"
 #include "system/shutdown.h"
@@ -53,6 +54,7 @@
 #include "widgets/list.h"            /* simplelist */
 #include "screens/settings/exported_settings.h" /* text_viewer_menu */
 #include "txt_source.h"
+#include "text_layout.h"
 #include "ts_io_core.h"
 #include "text_viewer.h"
 #include "speech/talk.h"
@@ -207,299 +209,6 @@ static bool tv_ensure(off_t from, size_t len)
 }
 
 /* ---- layout ----------------------------------------------------------- */
-
-/* Width of the `n` bytes at `s`.
- *
- * font_getstringnsize()'s "maxbytes" is really a codepoint count -- it
- * decrements once per utf8decode() and leans on unsigned underflow to stop
- * (firmware/font.c) -- and it halts at a NUL either way, so it cannot bound a
- * byte range. The window is ours and single-threaded, so a temporary NUL is
- * both simpler and cheaper than counting codepoints first. The window is
- * allocated with a spare byte so s[n] is always in bounds. */
-static int tv_width(unsigned char *s, size_t n)
-{
-    unsigned char save = s[n];
-    int w;
-
-    s[n] = '\0';
-    font_getstringsize(s, &w, NULL, tv.font);
-    s[n] = save;
-    return w;
-}
-
-/* A soft hyphen, U+00AD, is two bytes in UTF-8. It is invisible and takes
- * no width, and a line may break at it with a '-' drawn. */
-static bool tv_is_shy(const unsigned char *s, size_t n)
-{
-    return n >= 2 && s[0] == 0xc2 && s[1] == 0xad;
-}
-
-/* A heading's marks, TS_HEADING_OPEN and TS_HEADING_CLOSE: the text between
- * them is underlined */
-#define TV_HEAD_OPEN  "\xee\x80\x82"
-
-static bool tv_is_mark(const unsigned char *s, size_t n)
-{
-    return n >= 3 && s[0] == 0xee && s[1] == 0x80
-           && (s[2] == 0x82 || s[2] == 0x83);
-}
-
-/* A note's mark -- TS_NOTE_OPEN, its href, TS_NOTE_CLOSE -- at `s`: its
- * length, all of `n` when they end inside it, or 0 */
-static size_t tv_note_mark(const unsigned char *s, size_t n)
-{
-    if (n < 3 || s[0] != 0xee || s[1] != 0x80 || s[2] != 0x84)
-        return 0;
-    for (size_t i = 3; i + 3 <= n; i++)
-        if (s[i] == 0xee && s[i + 1] == 0x80 && s[i + 2] == 0x85)
-            return i + 3;
-    return n;
-}
-
-/* The bytes of what is invisible and takes no width at `s`, a soft hyphen,
- * a heading's mark or a note's, or 0 */
-static size_t tv_hidden(const unsigned char *s, size_t n)
-{
-    return tv_is_shy(s, n) ? 2 : tv_is_mark(s, n) ? 3 : tv_note_mark(s, n);
-}
-
-/* tv_width() of `n` bytes at `s`, what is hidden left out */
-static int tv_text_width(unsigned char *s, size_t n)
-{
-    size_t i = 0, start = 0;
-    int w = 0;
-
-    while (i < n)
-    {
-        size_t h = tv_hidden(s + i, n - i);
-
-        if (h)
-        {
-            w += tv_width(s + start, i - start);
-            i += h;
-            start = i;
-        }
-        else
-            i++;
-    }
-    return w + tv_width(s + start, n - start);
-}
-
-/* Width of a string constant, which tv_width() cannot be given: it writes
- * past the end of what it measures */
-static int tv_literal_width(const char *s)
-{
-    int w;
-
-    font_getstringsize((const unsigned char *)s, &w, NULL, tv.font);
-    return w;
-}
-
-/* One line of the page, as tv_line_break() found it */
-struct tv_line
-{
-    size_t used;    /* bytes the line consumes, its break included */
-    size_t draw;    /* bytes it draws */
-    int width;      /* pixels they take */
-    bool hyphen;    /* broken at a soft hyphen: a '-' follows */
-    bool full;      /* ended because the next word did not fit */
-    int indent;     /* pixels before it: a paragraph's first line */
-};
-
-/* The bytes of `s` that fit in `width`, breaking at the last space, or at a
- * soft hyphen inside the word that does not fit. Rockbox bitmap fonts have no
- * kerning -- font_getstringnsize() just sums per-glyph widths -- so
- * accumulating word widths is exact and avoids re-measuring the line prefix
- * per word. */
-static void tv_line_break(unsigned char *s, size_t avail, int width,
-                          struct tv_line *ln)
-{
-    size_t i = 0;
-    int used = 0;
-
-    ln->used = ln->draw = 0;
-    ln->width = ln->indent = 0;
-    ln->hyphen = ln->full = false;
-
-    if (avail == 0)
-        return;
-
-    if (s[0] == '\n')                        /* explicit blank line */
-    {
-        ln->used = 1;
-        return;
-    }
-
-    while (i < avail)
-    {
-        size_t word_end = i;
-        int word_w;
-
-        while (word_end < avail && s[word_end] != ' ' && s[word_end] != '\n')
-            word_end++;
-
-        word_w = tv_text_width(s + i, word_end - i);
-
-        if (used + word_w > width)
-        {
-            int dash_w = tv_literal_width("-");
-            size_t p;
-
-            ln->full = true;
-
-            /* The last soft hyphen in the word whose part fits, dash and
-             * all */
-            for (p = word_end; p-- > i; )
-            {
-                int part_w;
-
-                if (!tv_is_shy(s + p, word_end - p))
-                    continue;
-                part_w = tv_text_width(s + i, p - i);
-                if (used + part_w + dash_w <= width)
-                {
-                    ln->draw = p;
-                    ln->used = p + 2;
-                    ln->width = used + part_w + dash_w;
-                    ln->hyphen = true;
-                    return;
-                }
-            }
-
-            if (i == 0)
-            {
-                /* A single word too wide for the line: break inside it at the
-                 * last codepoint that fits, never mid-sequence. */
-                size_t j = 0;
-                int w = 0;
-
-                while (j < word_end)
-                {
-                    size_t k = j + 1;
-                    int cw;
-
-                    while (k < word_end && (s[k] & 0xc0) == 0x80)
-                        k++;                 /* to the next codepoint start */
-
-                    cw = tv_text_width(s + j, k - j);
-                    if (w + cw > width && j > 0)
-                        break;
-                    w += cw;
-                    j = k;
-                }
-                ln->draw = ln->used = j;
-                ln->width = w;
-                return;
-            }
-            break;                           /* line ends before this word */
-        }
-
-        used += word_w;
-        i = word_end;
-        ln->width = used;
-
-        if (i >= avail)
-            break;
-
-        if (s[i] == '\n')                    /* hard break ends the line */
-        {
-            ln->draw = i;
-            ln->used = i + 1;
-            return;
-        }
-
-        /* s[i] is a space: it only stays if a word follows it on this line */
-        used += tv_width(s + i, 1);
-        i++;
-    }
-
-    /* Trim the trailing space from what is drawn, but still consume it. */
-    ln->draw = (i > 0 && s[i - 1] == ' ') ? i - 1 : i;
-    ln->used = i;
-}
-
-/* Draws `n` bytes of one word at x, what is hidden left out; returns the x
- * after it */
-static int tv_put_word(unsigned char *s, size_t n, int x, int y)
-{
-    size_t i = 0, start = 0;
-
-    while (i <= n)
-    {
-        size_t h = i < n ? tv_hidden(s + i, n - i) : 0;
-
-        if (i == n || h)
-        {
-            unsigned char save = s[i];
-
-            s[i] = '\0';
-            screens[SCREEN_MAIN].putsxy(x, y, s + start);
-            s[i] = save;
-            x += tv_width(s + start, i - start);
-            i += h ? h : 1;
-            start = i;
-        }
-        else
-            i++;
-    }
-    return x;
-}
-
-/* Draws a line at y. With Alignment Justified, a full line's leftover pixels
- * are shared out between its spaces; a paragraph's last line stays left.
- * A line with neither that nor anything hidden in it is drawn in one call. */
-static void tv_draw_line(unsigned char *s, const struct tv_line *ln, int y)
-{
-    bool justify = global_settings.text_viewer_align == TV_ALIGN_JUSTIFIED
-                   && ln->full;
-    bool hidden = false;
-    int gaps = 0, gap = 0, extra = 0, space_w, x = ln->indent;
-    size_t i;
-
-    for (i = 0; i < ln->draw; i++)
-    {
-        if (s[i] == ' ')
-            gaps++;
-        else if (tv_hidden(s + i, ln->draw - i))
-            hidden = true;
-    }
-
-    if (!hidden && !ln->hyphen && (!justify || gaps == 0))
-    {
-        unsigned char save = s[ln->draw];
-
-        s[ln->draw] = '\0';
-        screens[SCREEN_MAIN].putsxy(x, y, s);
-        s[ln->draw] = save;
-        return;
-    }
-
-    space_w = tv_literal_width(" ");
-    if (justify)
-        extra = tv.vp.width - ln->indent - ln->width;
-
-    i = 0;
-    while (i < ln->draw)
-    {
-        size_t j = i;
-
-        if (s[i] == ' ')
-        {
-            x += space_w;
-            if (justify)
-                x += extra * (gap + 1) / gaps - extra * gap / gaps;
-            gap++;
-            i++;
-            continue;
-        }
-        while (j < ln->draw && s[j] != ' ')
-            j++;
-        x = tv_put_word(s + i, j - i, x, y);
-        i = j;
-    }
-    if (ln->hyphen)
-        screens[SCREEN_MAIN].putsxy(x, y, (unsigned char *)"-");
-}
 
 /* The footer's font: the small one where it is smaller than the page's */
 static int tv_footer_fid(void)
@@ -805,7 +514,7 @@ static bool tv_paragraph_start(off_t off)
 static bool tv_heading_after(const unsigned char *s, size_t n, bool open)
 {
     for (size_t i = 0; i + 3 <= n; i++)
-        if (tv_is_mark(s + i, n - i))
+        if (tl_is_heading_mark(s + i, n - i))
             open = s[i + 2] == 0x82;
     return open;
 }
@@ -814,20 +523,31 @@ static bool tv_heading_after(const unsigned char *s, size_t n, bool open)
  * browse */
 static bool tv_heads_seen;
 
+/* A pull line's rule, pixels wide */
+#define TV_QUOTE_RULE 2
+
 /* Lays out one page from `start`, drawing it when `render` is set. Returns the
  * offset of the next page. A heading that runs over from the page before is
- * not underlined on this one. */
+ * not underlined on this one, nor dim text or a pull line continued. */
 static off_t tv_page(off_t start, bool render)
 {
     off_t off = start;
     int y = 0;
-    bool heading = false;
+    bool heading = false, quote = false;
+    struct text_layout tl = {
+        .font = tv.font,
+        .bold = -1,
+        .width = tv.vp.width,
+        .justify = global_settings.text_viewer_align == TV_ALIGN_JUSTIFIED,
+        .fg = tv.vp.fg_pattern,
+        .dim = color_blend(tv.vp.fg_pattern, tv.vp.bg_pattern, 108),
+    };
 
     while (y + tv.line_height <= tv.vp.height - tv_footer_height())
     {
         unsigned char *s;
         size_t avail;
-        struct tv_line ln;
+        struct tl_line ln = { .bold = false };
 
         if (!tv_ensure(off, TV_PAGE_MAX))
             break;
@@ -889,12 +609,14 @@ static off_t tv_page(off_t start, bool render)
 
         {
             bool head = heading
-                        || (avail >= 3 && !memcmp(s, TV_HEAD_OPEN, 3));
+                        || (avail >= 3 && !memcmp(s, TL_HEAD_OPEN, 3));
+            bool pull = quote || (avail >= 3 && !memcmp(s, TL_QUOTE, 3));
 
             tv_heads_seen |= head;
-            int indent = global_settings.text_viewer_indent && !head
-                         && s[0] != '\n' && tv_paragraph_start(off)
-                         ? tv_literal_width("M") : 0;
+            int indent = pull ? tl_literal_width(&tl, "M")
+                         : global_settings.text_viewer_indent && !head
+                           && s[0] != '\n' && tv_paragraph_start(off)
+                         ? tl_literal_width(&tl, "M") : 0;
 
             /* A heading starts a page that has room for it, the blank line
              * after it and a line of what it heads */
@@ -902,7 +624,7 @@ static off_t tv_page(off_t start, bool render)
                 && y + 3 * tv.line_height > tv.vp.height - tv_footer_height())
                 break;
 
-            tv_line_break(s, avail, tv.vp.width - indent, &ln);
+            tl_line_break(&tl, s, avail, tv.vp.width - indent, &ln);
             if (ln.used == 0)
                 break;
             ln.indent = indent;
@@ -911,22 +633,37 @@ static off_t tv_page(off_t start, bool render)
 
             if (render && ln.draw > 0)
             {
-                tv_draw_line(s, &ln, y);
+                tl_draw_line(&tl, s, &ln, y);
                 if (head)
                 {
-                    int uy = MIN(y + font_get(tv.font)->ascent + 1,
+                    int uy = MIN(y + font_get(tv.font)->ascent + 2,
                                  y + tv.line_height - 1);
+                    unsigned now = tv.vp.fg_pattern;  /* dim may run on */
 
+                    screens[SCREEN_MAIN].set_foreground(tl.fg);
                     screens[SCREEN_MAIN].hline(0, ln.width - 1, uy);
+                    screens[SCREEN_MAIN].set_foreground(now);
                 }
             }
+            if (render && pull)
+            {
+                unsigned now = tv.vp.fg_pattern;
+
+                screens[SCREEN_MAIN].set_foreground(tl.fg);
+                screens[SCREEN_MAIN].fillrect(0, y, TV_QUOTE_RULE,
+                                              tv.line_height);
+                screens[SCREEN_MAIN].set_foreground(now);
+            }
             heading = tv_heading_after(s, ln.used, heading);
+            quote = pull && !(ln.used > 0 && s[ln.used - 1] == '\n');
         }
 
         off += ln.used;
         y += tv.line_height;
     }
 
+    if (render)
+        screens[SCREEN_MAIN].set_foreground(tl.fg);
     return off;
 }
 
@@ -1214,7 +951,7 @@ static size_t tv_strip_shy(unsigned char *s, size_t n)
 
     while (r < n)
     {
-        size_t h = tv_hidden(s + r, n - r);
+        size_t h = tl_hidden(s + r, n - r);
 
         if (h)
             r += h;
@@ -1715,7 +1452,7 @@ static off_t tv_past_heads(off_t at, off_t end)
 
         if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
             at++;
-        else if (end - at >= 3 && !memcmp(&TV_AT(at), TV_HEAD_OPEN, 3))
+        else if (end - at >= 3 && !memcmp(&TV_AT(at), TL_HEAD_OPEN, 3))
         {
             for (at += 3; at + 3 <= end && !(TV_AT(at) == 0xee
                      && TV_AT(at + 1) == 0x80 && TV_AT(at + 2) == 0x83); at++)
@@ -1732,7 +1469,7 @@ static off_t tv_past_heads(off_t at, off_t end)
 static off_t tv_head_in(off_t from, off_t to)
 {
     for (off_t i = from; i + 3 <= to; i++)
-        if (!memcmp(&TV_AT(i), TV_HEAD_OPEN, 3))
+        if (!memcmp(&TV_AT(i), TL_HEAD_OPEN, 3))
             return i;
     return -1;
 }
@@ -2389,7 +2126,7 @@ static bool tv_open(const char *file)
     core_pin(tv.arena_handle);
     arena = core_get_data(tv.arena_handle);
 
-    /* One spare byte: tv_width() and tv_draw() NUL-terminate in place, and
+    /* One spare byte: tl_width() and tv_draw() NUL-terminate in place, and
      * that write lands one past the end when the window is full. */
     tv.window_handle = core_alloc(TV_WINDOW_SIZE + 1);
     if (tv.window_handle <= 0)
@@ -2508,6 +2245,58 @@ static void tv_apply_font(void)
         tv.footer_font = font_load(TV_FOOTER_FONT);
 }
 
+void text_viewer_colours(unsigned *fg, unsigned *bg)
+{
+    switch (global_settings.text_viewer_colour_mode)
+    {
+        case TV_COLOUR_INVERTED:
+            *fg = global_settings.bg_color;
+            *bg = global_settings.fg_color;
+            break;
+        case TV_COLOUR_BOW:
+            *fg = LCD_BLACK;
+            *bg = LCD_WHITE;
+            break;
+        case TV_COLOUR_WOB:
+            *fg = LCD_WHITE;
+            *bg = LCD_BLACK;
+            break;
+        /* The reading schemes. Cream is the British Dyslexia Association's
+         * dark-on-cream; Peach and Yellow read fastest in Rello and Bigham
+         * (ASSETS 2017); Sepia is the usual e-reader pair; Night is dim
+         * amber for a dark room. */
+        case TV_COLOUR_CREAM:
+            *fg = LCD_RGBPACK(0x33, 0x33, 0x33);
+            *bg = LCD_RGBPACK(0xfa, 0xf3, 0xdc);
+            break;
+        case TV_COLOUR_PEACH:
+            *fg = LCD_BLACK;
+            *bg = LCD_RGBPACK(0xed, 0xd1, 0xb0);
+            break;
+        case TV_COLOUR_YELLOW:
+            *fg = LCD_BLACK;
+            *bg = LCD_RGBPACK(0xf8, 0xfd, 0x89);
+            break;
+        case TV_COLOUR_SEPIA:
+            *fg = LCD_RGBPACK(0x5b, 0x46, 0x36);
+            *bg = LCD_RGBPACK(0xf4, 0xec, 0xd8);
+            break;
+        case TV_COLOUR_NIGHT:
+            *fg = LCD_RGBPACK(0xc8, 0xa0, 0x60);
+            *bg = LCD_BLACK;
+            break;
+        case TV_COLOUR_CUSTOM:
+            *fg = global_settings.text_viewer_fg;
+            *bg = global_settings.text_viewer_bg;
+            break;
+        case TV_COLOUR_THEME:
+        default:
+            *fg = global_settings.fg_color;
+            *bg = global_settings.bg_color;
+            break;
+    }
+}
+
 /* (Re)reads the viewer settings into the viewport: font, colours, page margin
  * and line height. Page starts are byte offsets into the extracted text, which
  * are stable across all of these, so a page just re-flows from tv.pos -- no
@@ -2515,6 +2304,7 @@ static void tv_apply_font(void)
 static void tv_apply_settings(void)
 {
     struct screen *d = &screens[SCREEN_MAIN];
+    unsigned fg, bg;
     int margin;
 
     tv_apply_font();
@@ -2536,54 +2326,9 @@ static void tv_apply_settings(void)
             global_settings.backlight_timeout_plugged);
     }
 
-    switch (global_settings.text_viewer_colour_mode)
-    {
-        case TV_COLOUR_INVERTED:
-            tv.vp.fg_pattern = global_settings.bg_color;
-            tv.vp.bg_pattern = global_settings.fg_color;
-            break;
-        case TV_COLOUR_BOW:
-            tv.vp.fg_pattern = LCD_BLACK;
-            tv.vp.bg_pattern = LCD_WHITE;
-            break;
-        case TV_COLOUR_WOB:
-            tv.vp.fg_pattern = LCD_WHITE;
-            tv.vp.bg_pattern = LCD_BLACK;
-            break;
-        /* The reading schemes. Cream is the British Dyslexia Association's
-         * dark-on-cream; Peach and Yellow read fastest in Rello and Bigham
-         * (ASSETS 2017); Sepia is the usual e-reader pair; Night is dim
-         * amber for a dark room. */
-        case TV_COLOUR_CREAM:
-            tv.vp.fg_pattern = LCD_RGBPACK(0x33, 0x33, 0x33);
-            tv.vp.bg_pattern = LCD_RGBPACK(0xfa, 0xf3, 0xdc);
-            break;
-        case TV_COLOUR_PEACH:
-            tv.vp.fg_pattern = LCD_BLACK;
-            tv.vp.bg_pattern = LCD_RGBPACK(0xed, 0xd1, 0xb0);
-            break;
-        case TV_COLOUR_YELLOW:
-            tv.vp.fg_pattern = LCD_BLACK;
-            tv.vp.bg_pattern = LCD_RGBPACK(0xf8, 0xfd, 0x89);
-            break;
-        case TV_COLOUR_SEPIA:
-            tv.vp.fg_pattern = LCD_RGBPACK(0x5b, 0x46, 0x36);
-            tv.vp.bg_pattern = LCD_RGBPACK(0xf4, 0xec, 0xd8);
-            break;
-        case TV_COLOUR_NIGHT:
-            tv.vp.fg_pattern = LCD_RGBPACK(0xc8, 0xa0, 0x60);
-            tv.vp.bg_pattern = LCD_BLACK;
-            break;
-        case TV_COLOUR_CUSTOM:
-            tv.vp.fg_pattern = global_settings.text_viewer_fg;
-            tv.vp.bg_pattern = global_settings.text_viewer_bg;
-            break;
-        case TV_COLOUR_THEME:
-        default:
-            tv.vp.fg_pattern = global_settings.fg_color;
-            tv.vp.bg_pattern = global_settings.bg_color;
-            break;
-    }
+    text_viewer_colours(&fg, &bg);
+    tv.vp.fg_pattern = fg;
+    tv.vp.bg_pattern = bg;
 
     /* Sideways where memory allows it; upright otherwise */
     tv_side = global_settings.text_viewer_orientation != TV_ORIENT_UPRIGHT
@@ -2697,7 +2442,7 @@ static void tv_toc_heads(struct tv_toc *t)
 {
     char buf[512], title[TV_TOC_TITLE + 4];
     long got, at = 0, start = -1, run_end = -1;
-    int in = 0, tl = 0;
+    int in = 0, tl = 0, hide = 0;
 
     tv_splash_loading(false);
     tv_restart_text();
@@ -2738,7 +2483,21 @@ static void tv_toc_heads(struct tv_toc *t)
                 }
                 continue;
             }
-            if (in && tl < TV_TOC_TITLE + 2 && c != '\n')
+            if (c == 0xee && i + 2 < got && (unsigned char)buf[i + 1] == 0x80
+                && (unsigned char)buf[i + 2] >= TL_DIM_OPEN
+                && (unsigned char)buf[i + 2] <= TL_HIDE_CLOSE)
+            {
+                /* A Markdown mark: not the title's, and nor is a name's
+                 * qualifier, between the hide marks */
+                if ((unsigned char)buf[i + 2] == TL_HIDE_OPEN)
+                    hide = 1;
+                else if ((unsigned char)buf[i + 2] == TL_HIDE_CLOSE)
+                    hide = 0;
+                i += 2;
+                at += 2;
+                continue;
+            }
+            if (in && !hide && tl < TV_TOC_TITLE + 2 && c != '\n')
                 title[tl++] = c;
             else if (!in && at == run_end && (c == '\n' || c == ' '))
                 run_end = at + 1;       /* white space keeps the run going */
@@ -3278,7 +3037,7 @@ static int tv_notes(void)
 
     for (size_t i = 0; i < n && nh < TV_NOTES_MAX; i++)
     {
-        size_t m = tv_note_mark(s + i, n - i);
+        size_t m = tl_note_mark(s + i, n - i);
 
         if (m > 6 && m - 6 < TS_NOTE_HREF)
         {
@@ -3433,9 +3192,10 @@ static void tv_mark_label(char *buf, size_t size)
         ucschar_t c;
 
         p = utf8decode(p, &c);
-        if (c == TS_PICTURE_OPEN || c == TS_NOTE_OPEN)
+        if (c == TS_PICTURE_OPEN || c == TS_NOTE_OPEN || c == TS_HIDE_OPEN)
             hidden = true;
-        else if (c == TS_PICTURE_CLOSE || c == TS_NOTE_CLOSE)
+        else if (c == TS_PICTURE_CLOSE || c == TS_NOTE_CLOSE
+                 || c == TS_HIDE_CLOSE)
             hidden = false;
         if (hidden || (c >= 0xE000 && c <= 0xF8FF))
             continue;

@@ -27471,3 +27471,311 @@
     *: "ボタンの割り当てを解除"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_CHAPTERS
+  desc: a theme's header over a book's chapters, the word after their count
+  user: core
+  <source>
+    *: "chapters"
+  </source>
+  <dest>
+    *: "チャプター"
+  </dest>
+  <voice>
+    *: "チャプター"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_EPISODES
+  desc: a theme's header over a podcast show's episodes, the word after their count
+  user: core
+  <source>
+    *: "episodes"
+  </source>
+  <dest>
+    *: "エピソード"
+  </dest>
+  <voice>
+    *: "エピソード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BIOGRAPHY
+  desc: a row opening a person's bio, from an artist or from a track or album with no liner notes
+  user: core
+  <source>
+    *: "Biography"
+  </source>
+  <dest>
+    *: "バイオグラフィー"
+  </dest>
+  <voice>
+    *: "バイオグラフィー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_LINER_NOTES
+  desc: a row opening an album's liner notes, with its artist's bio beside them; also a Now Playing button's action
+  user: core
+  <source>
+    *: "Liner Notes"
+  </source>
+  <dest>
+    *: "ライナーノーツ"
+  </dest>
+  <voice>
+    *: "ライナーノーツ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_NONE
+  desc: notes screen, when there is no page to show
+  user: core
+  <source>
+    *: "No bio or notes to show"
+  </source>
+  <dest>
+    *: "表示するバイオやノーツはありません"
+  </dest>
+  <voice>
+    *: "表示するバイオやノーツはありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MOVE_BANNER
+  desc: bio screen's menu: choose which band of the person's picture the banner shows
+  user: core
+  <source>
+    *: "Move Banner"
+  </source>
+  <dest>
+    *: "バナーを移動"
+  </dest>
+  <voice>
+    *: "バナーを移動"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_RESET_BANNER
+  desc: bio screen's menu: put the banner back to the top third of the picture
+  user: core
+  <source>
+    *: "Reset Banner"
+  </source>
+  <dest>
+    *: "バナーをリセット"
+  </dest>
+  <voice>
+    *: "バナーをリセット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONS
+  desc: an artist's menu in the library: their bio, albums and where the bios and liner notes name them
+  user: core
+  <source>
+    *: "Mentions"
+  </source>
+  <dest>
+    *: "言及"
+  </dest>
+  <voice>
+    *: "言及"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONED_IN
+  desc: a person's list in the bio and notes screen: the heading over the places they are named
+  user: core
+  <source>
+    *: "Mentioned In"
+  </source>
+  <dest>
+    *: "言及箇所"
+  </dest>
+  <voice>
+    *: "言及箇所"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_SETTING
+  desc: the setting that turns liner notes and biographies on
+  user: core
+  <source>
+    *: "Liner Notes and Biographies"
+  </source>
+  <dest>
+    *: "ライナーノーツとバイオグラフィー"
+  </dest>
+  <voice>
+    *: "ライナーノーツとバイオグラフィー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS
+  desc: liner notes setting: where a page's colours come from
+  user: core
+  <source>
+    *: "Colours"
+  </source>
+  <dest>
+    *: "色"
+  </dest>
+  <voice>
+    *: "色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_ART
+  desc: liner notes colours option: each page from its own picture
+  user: core
+  <source>
+    *: "Page's Art"
+  </source>
+  <dest>
+    *: "ページの画像"
+  </dest>
+  <voice>
+    *: "ページの画像"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_TEXT_VIEWER
+  desc: liner notes colours option: the text viewer's colours
+  user: core
+  <source>
+    *: "Text Viewer's"
+  </source>
+  <dest>
+    *: "テキストビューアと同じ"
+  </dest>
+  <voice>
+    *: "テキストビューアと同じ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BANNERS
+  desc: liner notes setting: the picture at the top of a page
+  user: core
+  <source>
+    *: "Banners"
+  </source>
+  <dest>
+    *: "バナー"
+  </dest>
+  <voice>
+    *: "バナー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_N_PLAYS
+  desc: liner notes list detail: how many times something was played
+  user: core
+  <source>
+    *: "%d plays"
+  </source>
+  <dest>
+    *: "%d回再生"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DISC
+  desc: liner notes track list: the heading over a disc's tracks
+  user: core
+  <source>
+    *: "Disc %d"
+  </source>
+  <dest>
+    *: "ディスク%d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_GUEST
+  desc: liner notes album list detail: an album the artist only features on
+  user: core
+  <source>
+    *: "guest"
+  </source>
+  <dest>
+    *: "ゲスト"
+  </dest>
+  <voice>
+    *: "ゲスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DECADE
+  desc: liner notes: a decade, from its first year, such as 1970s
+  user: core
+  <source>
+    *: "%ds"
+  </source>
+  <dest>
+    *: "%d年代"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MINUTES
+  desc: liner notes: a running time in whole minutes
+  user: core
+  <source>
+    *: "%d min"
+  </source>
+  <dest>
+    *: "%d分"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_PEOPLE
+  desc: liner notes mentions: the heading over people's pages
+  user: core
+  <source>
+    *: "People"
+  </source>
+  <dest>
+    *: "人物"
+  </dest>
+  <voice>
+    *: "人物"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_OTHER
+  desc: liner notes mentions: the heading over pages that are neither people nor albums
+  user: core
+  <source>
+    *: "Other Pages"
+  </source>
+  <dest>
+    *: "その他のページ"
+  </dest>
+  <voice>
+    *: "その他のページ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_ONE_PLAY
+  desc: liner notes list detail: played once
+  user: core
+  <source>
+    *: "1 play"
+  </source>
+  <dest>
+    *: "1回再生"
+  </dest>
+  <voice>
+    *: "1回再生"
+  </voice>
+</phrase>

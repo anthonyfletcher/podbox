@@ -479,14 +479,34 @@ int db_summary_album_tracks(const struct album_data *album,
     return album_tracks_from(&tcs, album, sink, data);
 }
 
+/* The playlist being filled, and where in it the track to start on went */
+struct insert_at
+{
+    struct playlist_insert_context *context;
+    const char *start;
+    int count, at;
+};
+
 static bool insert_sink(const char *path, void *data)
 {
-    return playlist_insert_context_add(data, path) >= 0;
+    struct insert_at *ia = data;
+
+    if (ia->start && ia->at < 0 && !strcmp(path, ia->start))
+        ia->at = ia->count;
+    ia->count++;
+    return playlist_insert_context_add(ia->context, path) >= 0;
 }
 
 int db_summary_play_album(const struct album_data *album)
 {
+    return db_summary_play_album_at(album, NULL);
+}
+
+int db_summary_play_album_at(const struct album_data *album,
+                             const char *start)
+{
     struct playlist_insert_context context;
+    struct insert_at ia = { &context, start, 0, -1 };
     struct tagcache_search tcs;
     int added;
 
@@ -514,13 +534,13 @@ int db_summary_play_album(const struct album_data *album)
         return -1;
     }
 
-    added = album_tracks_from(&tcs, album, insert_sink, &context);
+    added = album_tracks_from(&tcs, album, insert_sink, &ia);
     playlist_insert_context_release(&context);
 
     if (added <= 0)
         return -1;
 
-    playlist_start(0, 0, 0);
+    playlist_start(MAX(ia.at, 0), 0, 0);
     return added;
 }
 

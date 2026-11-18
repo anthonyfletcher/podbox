@@ -27472,3 +27472,311 @@
     *: "取消按键分配"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_CHAPTERS
+  desc: a theme's header over a book's chapters, the word after their count
+  user: core
+  <source>
+    *: "chapters"
+  </source>
+  <dest>
+    *: "章节"
+  </dest>
+  <voice>
+    *: "章节"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_EPISODES
+  desc: a theme's header over a podcast show's episodes, the word after their count
+  user: core
+  <source>
+    *: "episodes"
+  </source>
+  <dest>
+    *: "集"
+  </dest>
+  <voice>
+    *: "集"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BIOGRAPHY
+  desc: a row opening a person's bio, from an artist or from a track or album with no liner notes
+  user: core
+  <source>
+    *: "Biography"
+  </source>
+  <dest>
+    *: "人物简介"
+  </dest>
+  <voice>
+    *: "人物简介"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_LINER_NOTES
+  desc: a row opening an album's liner notes, with its artist's bio beside them; also a Now Playing button's action
+  user: core
+  <source>
+    *: "Liner Notes"
+  </source>
+  <dest>
+    *: "唱片内页说明"
+  </dest>
+  <voice>
+    *: "唱片内页说明"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_NONE
+  desc: notes screen, when there is no page to show
+  user: core
+  <source>
+    *: "No bio or notes to show"
+  </source>
+  <dest>
+    *: "没有可显示的简介或说明"
+  </dest>
+  <voice>
+    *: "没有可显示的简介或说明"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MOVE_BANNER
+  desc: bio screen's menu: choose which band of the person's picture the banner shows
+  user: core
+  <source>
+    *: "Move Banner"
+  </source>
+  <dest>
+    *: "移动横幅"
+  </dest>
+  <voice>
+    *: "移动横幅"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_RESET_BANNER
+  desc: bio screen's menu: put the banner back to the top third of the picture
+  user: core
+  <source>
+    *: "Reset Banner"
+  </source>
+  <dest>
+    *: "重置横幅"
+  </dest>
+  <voice>
+    *: "重置横幅"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONS
+  desc: an artist's menu in the library: their bio, albums and where the bios and liner notes name them
+  user: core
+  <source>
+    *: "Mentions"
+  </source>
+  <dest>
+    *: "提及"
+  </dest>
+  <voice>
+    *: "提及"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONED_IN
+  desc: a person's list in the bio and notes screen: the heading over the places they are named
+  user: core
+  <source>
+    *: "Mentioned In"
+  </source>
+  <dest>
+    *: "提及于"
+  </dest>
+  <voice>
+    *: "提及于"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_SETTING
+  desc: the setting that turns liner notes and biographies on
+  user: core
+  <source>
+    *: "Liner Notes and Biographies"
+  </source>
+  <dest>
+    *: "唱片内页说明与人物简介"
+  </dest>
+  <voice>
+    *: "唱片内页说明与人物简介"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS
+  desc: liner notes setting: where a page's colours come from
+  user: core
+  <source>
+    *: "Colours"
+  </source>
+  <dest>
+    *: "颜色"
+  </dest>
+  <voice>
+    *: "颜色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_ART
+  desc: liner notes colours option: each page from its own picture
+  user: core
+  <source>
+    *: "Page's Art"
+  </source>
+  <dest>
+    *: "页面图片"
+  </dest>
+  <voice>
+    *: "页面图片"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_TEXT_VIEWER
+  desc: liner notes colours option: the text viewer's colours
+  user: core
+  <source>
+    *: "Text Viewer's"
+  </source>
+  <dest>
+    *: "与文本查看器相同"
+  </dest>
+  <voice>
+    *: "与文本查看器相同"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BANNERS
+  desc: liner notes setting: the picture at the top of a page
+  user: core
+  <source>
+    *: "Banners"
+  </source>
+  <dest>
+    *: "横幅"
+  </dest>
+  <voice>
+    *: "横幅"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_N_PLAYS
+  desc: liner notes list detail: how many times something was played
+  user: core
+  <source>
+    *: "%d plays"
+  </source>
+  <dest>
+    *: "播放 %d 次"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DISC
+  desc: liner notes track list: the heading over a disc's tracks
+  user: core
+  <source>
+    *: "Disc %d"
+  </source>
+  <dest>
+    *: "光盘 %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_GUEST
+  desc: liner notes album list detail: an album the artist only features on
+  user: core
+  <source>
+    *: "guest"
+  </source>
+  <dest>
+    *: "客串"
+  </dest>
+  <voice>
+    *: "客串"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DECADE
+  desc: liner notes: a decade, from its first year, such as 1970s
+  user: core
+  <source>
+    *: "%ds"
+  </source>
+  <dest>
+    *: "%d 年代"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MINUTES
+  desc: liner notes: a running time in whole minutes
+  user: core
+  <source>
+    *: "%d min"
+  </source>
+  <dest>
+    *: "%d 分钟"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_PEOPLE
+  desc: liner notes mentions: the heading over people's pages
+  user: core
+  <source>
+    *: "People"
+  </source>
+  <dest>
+    *: "人物"
+  </dest>
+  <voice>
+    *: "人物"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_OTHER
+  desc: liner notes mentions: the heading over pages that are neither people nor albums
+  user: core
+  <source>
+    *: "Other Pages"
+  </source>
+  <dest>
+    *: "其他页面"
+  </dest>
+  <voice>
+    *: "其他页面"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_ONE_PLAY
+  desc: liner notes list detail: played once
+  user: core
+  <source>
+    *: "1 play"
+  </source>
+  <dest>
+    *: "播放 1 次"
+  </dest>
+  <voice>
+    *: "播放 1 次"
+  </voice>
+</phrase>

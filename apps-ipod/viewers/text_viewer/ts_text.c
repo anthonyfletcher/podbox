@@ -9,6 +9,13 @@
 
 #define TIN 256
 
+/* The most one input byte can make the filter emit: a held `[name]` with
+ * its two marks, and the word held after its `:`, replayed. flt_pull() feeds
+ * a byte only with this much room. */
+#define FLT_ROOM   192
+#define MD_NAME_MAX 64
+#define MD_DEF_MAX  16
+
 /* ===================== shared filter scaffolding ====================== */
 
 typedef struct flt_st flt_st;
@@ -23,6 +30,14 @@ struct flt_st {
     int  started, eos_done;
     /* markdown */
     int at_bol, fence, info, tick, link, esc;
+    int code, hashes, heading, quote, dim, bold, stars, unders, bang, image;
+    uint8_t prev;                   /* the last byte emitted, 0 at the start */
+    size_t nlen;
+    uint8_t name[MD_NAME_MAX];      /* a [label] until what follows it shows
+                                     * whether it is a link or a name */
+    size_t dlen;
+    uint8_t def[MD_DEF_MAX];        /* what follows `[label]:` until its first
+                                     * word shows whether it is a link */
     /* rtf */
     int depth, skip_depth, ctrl, ctrl_len, uc_skip, hexd, hexv;
     int uc_pend;                    /* fallback chars a \uN has still to eat */
@@ -53,7 +68,7 @@ static int flt_pull(bs_stream *st, uint8_t *buf, size_t n, size_t *out)
         int rc;
         done += ts_pend_take(&s->out, buf + done, n - done);
         if (done == n) break;
-        if (ts_pend_free(&s->out) < 16) continue;
+        if (ts_pend_free(&s->out) < FLT_ROOM) continue;
 
         rc = flt_fill(s);
         if (rc != BS_OK) return rc;
@@ -111,14 +126,170 @@ static void plain_feed(flt_st *s, uint8_t c)
 
 /* ===================== markdown ======================================= */
 
-/* Light-touch: drop the marks that only make sense to a renderer, keep the
- * prose and the layout. Code fences pass through verbatim. */
-enum { LK_NONE = 0, LK_AFTER_BRACKET, LK_IN_TARGET };
+/* What the screens can show of Markdown, as the marks in txt_source.h:
+ * headings, dim emphasis, bold, pull lines and bracketed names. The rest is
+ * dropped to its words, and code passes through as it is. Lines are kept as
+ * written: a paragraph is a line. */
+enum { LK_NONE = 0, LK_IN_LABEL, LK_AFTER_BRACKET, LK_IN_TARGET, LK_SKIP_LINE,
+       LK_AFTER_COLON };
 
 static void md_emit(flt_st *s, uint8_t c)
 {
     ts_emit(&s->out, &c, 1);
     s->at_bol = (c == '\n');
+    s->prev = c;
+}
+
+static int md_word(uint8_t c)
+{
+    return c >= 0x80 || (c >= '0' && c <= '9') || ((c | 0x20) >= 'a' &&
+                                                   (c | 0x20) <= 'z');
+}
+
+static int md_space(uint8_t c)
+{
+    return c == 0 || c == ' ' || c == '\t' || c == '\n';
+}
+
+/* A run of `n` emphasis characters `ch`, now that `next` follows it. An odd
+ * run opens or closes dim, and one of two or more bold. A run that can do neither is literal: `snake_case`, `2 * 3`. An
+ * underscore opens only after a space or an opening bracket, so one inside a
+ * word or an HTML attribute (`target='_blank'`) stays: the stream cannot look
+ * ahead for the closer that CommonMark would want. */
+static void md_run(flt_st *s, uint8_t ch, int n, uint8_t next)
+{
+    int dim = n & 1, bold = n >= 2, can_open, can_close, close;
+
+    if (ch == '_')
+    {
+        can_open = (md_space(s->prev) || s->prev == '(' || s->prev == '[')
+                   && !md_space(next);
+        can_close = !md_space(s->prev) && !md_word(next);
+    }
+    else
+    {
+        can_open = !md_space(next);
+        can_close = !md_space(s->prev);
+    }
+    close = can_close && ((dim && s->dim) || (bold && s->bold));
+
+    if (!close && !can_open)
+    {
+        while (n--)
+            md_emit(s, ch);
+        return;
+    }
+    if (dim)
+    {
+        ts_emit_cp(&s->out, close ? TS_DIM_CLOSE : TS_DIM_OPEN);
+        s->dim = !close;
+    }
+    if (bold)
+    {
+        ts_emit_cp(&s->out, close ? TS_BOLD_CLOSE : TS_BOLD_OPEN);
+        s->bold = !close;
+    }
+}
+
+/* A name is a label with a letter in it, not a task box's `[x]` or a
+ * footnote's `[^1]` */
+static int md_is_name(const flt_st *s)
+{
+    size_t i;
+
+    if (s->image || s->nlen < 2 || s->name[0] == '^')
+        return 0;
+    for (i = 0; i < s->nlen; i++)
+        if (md_word(s->name[i]) && !(s->name[i] >= '0' && s->name[i] <= '9'))
+            return 1;
+    return 0;
+}
+
+/* The held label: as a name, as plain words, or as it was written -- with
+ * its `[`, and its `]` when it has one */
+enum { MD_WORDS = 0, MD_OPENED, MD_BRACKETED };
+
+static void md_label(flt_st *s, int as_name, int brackets)
+{
+    size_t i, shown = s->nlen;
+
+    /* A name's trailing "(...)" with words before it is its qualifier */
+    if (as_name && s->nlen > 2 && s->name[s->nlen - 1] == ')')
+    {
+        for (i = s->nlen - 1; i > 0 && s->name[i] != '('; i--)
+            ;
+        while (i > 0 && s->name[i - 1] == ' ')
+            i--;
+        if (i > 0 && s->name[i] == ' ')
+            shown = i;
+    }
+    if (as_name)
+        ts_emit_cp(&s->out, TS_NAME_OPEN);
+    if (brackets != MD_WORDS)
+        md_emit(s, '[');
+    for (i = 0; i < s->nlen; i++)
+    {
+        if (i == shown)
+            ts_emit_cp(&s->out, TS_HIDE_OPEN);
+        if (i >= shown && s->name[i] == ' ')
+        {
+            md_emit(s, 0xc2);           /* U+00A0 */
+            md_emit(s, 0xa0);
+        }
+        else if (brackets != MD_WORDS
+                 || (s->name[i] != '*' && s->name[i] != '_'
+                     && s->name[i] != '`'))
+            md_emit(s, s->name[i]);
+    }
+    if (shown < s->nlen)
+        ts_emit_cp(&s->out, TS_HIDE_CLOSE);
+    if (brackets == MD_BRACKETED)
+        md_emit(s, ']');
+    if (as_name)
+        ts_emit_cp(&s->out, TS_NAME_CLOSE);
+    s->nlen = 0;
+    s->image = 0;
+    s->link = LK_NONE;
+}
+
+/* The held label, with nothing after it that makes it a link: a name, or
+ * as it was written */
+static void md_label_alone(flt_st *s)
+{
+    if (md_is_name(s))
+        md_label(s, 1, MD_WORDS);
+    else
+        md_label(s, 0, s->image ? MD_WORDS : MD_BRACKETED);
+}
+
+/* Whether the word after `[label]:` is a link's address, which makes the
+ * line a reference definition */
+static int md_def_is_link(const flt_st *s)
+{
+    const uint8_t *d = s->def;
+    size_t i = 0, j, n = s->dlen;
+
+    while (i < n && (d[i] == ' ' || d[i] == '\t'))
+        i++;
+    if (i < n && (d[i] == '<' || d[i] == '/' || d[i] == '#'))
+        return 1;
+    if (n - i >= 4 && !strncasecmp((const char *)d + i, "www.", 4))
+        return 1;
+    for (j = i; j + 2 < n; j++)
+        if (d[j] == ':' && d[j + 1] == '/' && d[j + 2] == '/')
+            return 1;
+    return 0;
+}
+
+static void md_feed(flt_st *s, uint8_t c);
+
+/* The end of the input: what is held is let go, and the marks closed, as a
+ * line's end does */
+static void md_eos(flt_st *s)
+{
+    if (!s->at_bol || s->link || s->stars || s->unders || s->esc || s->bang
+        || s->tick || s->hashes)
+        md_feed(s, '\n');
 }
 
 static void md_feed(flt_st *s, uint8_t c)
@@ -131,8 +302,73 @@ static void md_feed(flt_st *s, uint8_t c)
         s->info = 0;
     }
 
+    /* A label is held whole, backticks and all, until its `]` */
+    if (s->link == LK_IN_LABEL) {
+        if (c == ']') { s->link = LK_AFTER_BRACKET; return; }
+        if (c != '\n' && s->nlen < MD_NAME_MAX) {
+            s->name[s->nlen++] = c;
+            return;
+        }
+        md_label(s, 0, MD_OPENED);              /* too long for a name */
+    }
+
+    /* `[label]:` at a line's start is a reference definition only when an
+     * address follows; `[Name]: vocals` is a name and its words. The first
+     * word after the colon is held until it shows which. */
+    if (s->link == LK_AFTER_COLON) {
+        size_t i, n;
+        uint8_t last = s->dlen ? s->def[s->dlen - 1] : ' ';
+
+        if (c != '\n' && s->dlen < MD_DEF_MAX
+            && !((c == ' ' || c == '\t') && last != ' ' && last != '\t')) {
+            s->def[s->dlen++] = c;
+            return;
+        }
+        if (md_def_is_link(s)) {
+            s->nlen = 0;
+            s->image = 0;
+            s->dlen = 0;
+            s->link = LK_SKIP_LINE;
+        } else {
+            md_label_alone(s);
+            n = s->dlen;
+            s->dlen = 0;
+            md_feed(s, ':');
+            for (i = 0; i < n; i++)
+                md_feed(s, s->def[i]);
+        }
+    }
+
+    if (s->link == LK_AFTER_BRACKET) {
+        if (c == '(' || c == '[') {             /* [label](url), [label][ref] */
+            md_label(s, 0, MD_WORDS);
+            s->link = LK_IN_TARGET;
+            return;
+        }
+        if (c == ':' && (s->prev == '\n' || !s->prev) && !s->heading
+            && !s->quote) {
+            s->dlen = 0;
+            s->link = LK_AFTER_COLON;
+            return;
+        }
+        md_label_alone(s);
+    }
+
+    /* An emphasis run ends at the first byte that is not its own: code's
+     * backtick included, so `**`code`**` is bold */
+    if (s->stars && c != '*') {
+        int n = s->stars;
+        s->stars = 0;
+        md_run(s, '*', n, c);
+    }
+    if (s->unders && c != '_') {
+        int n = s->unders;
+        s->unders = 0;
+        md_run(s, '_', n, c);
+    }
+
     /* Backtick runs: three or more at the start of a line open or close a
-     * fenced block, anything shorter is an inline code mark and vanishes. */
+     * fenced block; a shorter run opens or closes inline code, and vanishes. */
     if (c == '`') { s->tick++; return; }
     if (s->tick) {
         int run = s->tick;
@@ -140,39 +376,81 @@ static void md_feed(flt_st *s, uint8_t c)
         if (run >= 3 && s->at_bol) {
             s->fence = !s->fence;
             if (c != '\n') { s->info = 1; return; }
+        } else if (!s->fence) {
+            s->code = !s->code;
         }
     }
 
     if (s->fence) { md_emit(s, c); return; }
+    if (s->code) {
+        if (c != '\n') { md_emit(s, c); return; }
+        s->code = 0;
+    }
 
-    if (s->esc) { s->esc = 0; md_emit(s, c); return; }
-    if (c == '\n') { s->link = LK_NONE; md_emit(s, c); return; }
+    if (s->link == LK_SKIP_LINE) {              /* a reference definition */
+        if (c != '\n') return;
+        s->link = LK_NONE;
+    }
+
+    /* `!` is an image's only before `[` */
+    if (s->bang) {
+        s->bang = 0;
+        if (c == '[') { s->image = 1; s->link = LK_IN_LABEL; return; }
+        md_emit(s, '!');
+    }
+
+    if (s->link == LK_IN_TARGET) {              /* swallow (url) or [ref] */
+        if (c == ')' || c == ']' || c == '\n') s->link = LK_NONE;
+        if (c != '\n') return;
+    }
+
+    /* An escaped line end is a line end all the same */
+    if (s->esc) {
+        s->esc = 0;
+        if (c != '\n') { md_emit(s, c); return; }
+    }
+
+    if (c == '\n') {
+        if (s->dim) { ts_emit_cp(&s->out, TS_DIM_CLOSE); s->dim = 0; }
+        if (s->bold) { ts_emit_cp(&s->out, TS_BOLD_CLOSE); s->bold = 0; }
+        if (s->heading) { ts_emit_cp(&s->out, TS_HEADING_CLOSE); s->heading = 0; }
+        s->hashes = 0;
+        s->quote = 0;
+        md_emit(s, c);
+        return;
+    }
 
     if (s->at_bol) {
-        if (c == '#' || c == '>' || c == ' ' || c == '\t') return;
+        if (c == '#' && s->hashes < 7) { s->hashes++; return; }
+        if (s->hashes) {
+            int level = s->hashes;
+            s->hashes = 0;
+            if (c == ' ' && level <= 6) {
+                ts_emit_cp(&s->out, TS_HEADING_OPEN);
+                s->heading = 1;
+                s->at_bol = 0;
+                return;
+            }
+            while (level--)                     /* `#1 hit` is text */
+                md_emit(s, '#');
+        }
+        if (c == '>') {
+            if (!s->quote) { ts_emit_cp(&s->out, TS_QUOTE); s->quote = 1; }
+            return;
+        }
+        if (c == ' ' || c == '\t') return;
         if (c == '=' || c == '-') { /* setext rules pass through as-is */ }
         s->at_bol = 0;
     }
 
-    if (s->link == LK_IN_TARGET) {              /* swallow (url) or [ref] */
-        if (c == ')' || c == ']') s->link = LK_NONE;
-        return;
-    }
-
-    if (s->link == LK_AFTER_BRACKET && (c == '(' || c == '[')) {
-        s->link = LK_IN_TARGET;                 /* [label](url) or [label][ref] */
-        return;
-    }
-
     switch (c) {
     case '\\': s->esc = 1; return;
-    case '*': case '_': return;                 /* emphasis marks */
-    case '[':  s->link = LK_NONE; return;       /* keep the label only */
-    case ']':  s->link = LK_AFTER_BRACKET; return;
-    case '!':  s->link = LK_NONE; return;       /* image marker */
+    case '*':  s->stars++; return;
+    case '_':  s->unders++; return;
+    case '[':  s->nlen = 0; s->image = 0; s->link = LK_IN_LABEL; return;
+    case '!':  s->bang = 1; return;
     default:   break;
     }
-    s->link = LK_NONE;
     md_emit(s, c);
 }
 
@@ -368,6 +646,8 @@ int ts_open_text(ts_ctx *c, ts_format fmt, bs_stream **out)
     st = flt_new(c->arena, st,
                  (fmt == TS_FMT_MARKDOWN) ? md_feed : plain_feed, &s);
     if (!st) return BS_ERR_NOMEM;
+    if (fmt == TS_FMT_MARKDOWN)
+        s->eos = md_eos;
     *out = st;
     return BS_OK;
 }

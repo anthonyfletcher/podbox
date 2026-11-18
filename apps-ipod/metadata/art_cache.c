@@ -45,6 +45,7 @@
 #include "art_cache.h"
 #include "art_name.h"
 #include "art_sizes.h"
+#include "art_banner.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
@@ -265,6 +266,9 @@ static volatile bool aa_offer_posted;
 /* Queue event id: Check a File's Art, for the file in aa_chk.path; unique
  * on the thread, for bg_task_queued() (iap-artwork.c has 2) */
 #define AA_EVENT_CHECK 3
+
+/* Queue event id: sweep /Notes for banner art (art_cache_banners_changed) */
+#define AA_EVENT_BANNERS 4
 
 enum { AA_CHECK_IDLE, AA_CHECK_POSTED, AA_CHECK_RUNNING, AA_CHECK_DONE };
 
@@ -636,6 +640,9 @@ static void aa_purge_thumbs(void)
     remove(AA_NOART_ALBUMS);
     remove(AA_NOART_ARTISTS);
     remove(AA_STAMP_FILE);
+#ifndef DBTOOL
+    art_banner_forget();
+#endif
 
     debug_log(DEBUG_LOG_ARTCACHE, "purge: start");
 
@@ -2993,6 +3000,11 @@ static enum bg_result aa_run_pass(void)
         else
             aa_people_pass(workbuf, worksz, &aborted);
     }
+#ifndef DBTOOL
+    /* Banner art is in no database, so each pass looks for it */
+    if (!aborted && !art_banner_sweep(workbuf, worksz, aa_check_abort))
+        aborted = true;
+#endif
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
@@ -3553,6 +3565,36 @@ static enum bg_result aa_task_run(void)
     return result;
 }
 
+#ifndef DBTOOL
+/* A sweep of the banners between passes, from free memory as an offer is:
+ * taking it from the audio buffer would stop the track playing. Without the
+ * memory it waits for the next pass, or the next request. */
+static void aa_handle_banners(void)
+{
+    size_t worksz = aa_work_bytes();
+    int wh;
+
+    if (cache_busy || core_allocatable() < worksz)
+        return;
+    wh = core_alloc(worksz);
+    if (wh <= 0)
+        return;
+    cache_busy = true;
+    cpu_boost(true);
+    art_banner_sweep(core_get_data_pinned(wh), worksz, aa_check_abort);
+    cpu_boost(false);
+    core_unpin(wh);
+    core_free(wh);
+    cache_busy = false;
+}
+
+void art_cache_banners_changed(void)
+{
+    if (!bg_task_queued(&art_cache_task, AA_EVENT_BANNERS))
+        bg_task_post(&art_cache_task, AA_EVENT_BANNERS);
+}
+#endif
+
 /* bg_task.handle_event: everything on the queue that is ours rather than the
  * tick's -- the offer posted by the track-change hook, and a check. */
 static void aa_task_event(const struct queue_event *ev)
@@ -3561,6 +3603,10 @@ static void aa_task_event(const struct queue_event *ev)
         aa_handle_offer();
     else if (ev->id == AA_EVENT_CHECK)
         aa_run_check();
+#ifndef DBTOOL
+    else if (ev->id == AA_EVENT_BANNERS)
+        aa_handle_banners();
+#endif
 }
 
 /* The scheme the stamp file's first record names, 0 for none: see AA_SCHEME */

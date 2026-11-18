@@ -798,6 +798,24 @@ unless an album is under it. List such names one per line in
 /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured
 Artists off and on.
 
+[liner notes]
+A page for every artist and album, with the liner notes and biographies you
+write as Markdown files in /Notes or beside the music, and links between
+them. Opened from the Now Playing, album and artist menus. On, a background
+task reads /Notes after each change, and /Notes is left out of Books.
+
+[liner notes colours]
+Where a page's colours come from. Page's Art tints each page from its own
+album cover or artist picture, links in its most vivid colour; a
+page with no picture keeps the last page's. Theme follows the theme and its
+dynamic colours, so pages take the playing album's. Text Viewer's uses the
+text viewer's colour mode, Custom included.
+
+[liner notes banners]
+Shows a picture at the top of each page: your own, or a band of the
+artist's picture or the album's cover. Off, every page starts with its name,
+and opens a little faster.
+
 [art cache album source]
 Where covers of albums, books and podcasts come from: the image in the folder,
 the art embedded in the files, or both, the first named taking precedence. An
@@ -1389,13 +1407,13 @@ Playlists.
 [wps select action]
 What a press of Select does on the now-playing screen: go back to the
 previous screen as Menu Action does, or to the browser last used, to Music,
-Album Covers or Files, open the lyrics, the queue or Theme Options, or one
-of the now-playing menu's other actions. Go to Album opens the playing
-track's album on that track, where Go to Album Via says; a podcast or book
-kept apart opens in its own menu. Theme Options says Unavailable when the
-theme has none. Theme Toggle is offered once a theme option has been
-assigned to a button in Theme Options, or the theme names one. Holding
-Select always opens the now-playing menu.
+Album Covers or Files, open the lyrics, the liner notes, the queue or
+Theme Options, or one of the now-playing menu's other actions. Go to Album
+opens the playing track's album on that track, where Go to Album Via says;
+a podcast or book kept apart opens in its own menu. Theme Options says
+Unavailable when the theme has none. Theme Toggle is offered once a theme
+option has been assigned to a button in Theme Options, or the theme names
+one. Holding Select always opens the now-playing menu.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: any

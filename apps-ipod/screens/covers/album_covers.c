@@ -59,6 +59,10 @@
 #include "system/shutdown.h"
 #include "system/strutil.h"
 #include "screens/context_menu.h"           /* a cover's menu */
+#include "viewers/notes_viewer/notes_files.h"   /* its bio and notes */
+#include "viewers/notes_viewer/notes_viewer.h"
+#include "metadata/name_index.h"
+#include "metadata/art_name.h"
 #include "metadata/art_cache.h"   /* shared database-driven thumbnail cache */
 #include "metadata.h"         /* struct mp3entry, get_metadata */
 #include "dir.h"
@@ -435,11 +439,11 @@ static int compare_albums(const void *a_v, const void *b_v)
                 return name_order(tag_album, album_a, album_b);
             break;
         case SORT_BY_ARTIST_AND_YEAR:
-            if (artist_a - artist_b == 0)
+            if (artist_a - artist_b == 0 && year_a - year_b != 0)
                 return year_a - year_b;
             break;
         case SORT_BY_ARTIST_AND_YEAR_DESC:
-            if (artist_a - artist_b == 0)
+            if (artist_a - artist_b == 0 && year_a - year_b != 0)
                 return year_b - year_a;
             break;
         case SORT_BY_YEAR:
@@ -456,7 +460,11 @@ static int compare_albums(const void *a_v, const void *b_v)
             break;
     }
 
-    return name_order(tag_albumartist, artist_a, artist_b);
+    /* Ties fall to artist, then album name: qsort is not stable, so anything
+     * left equal lands in whatever order the database built it. */
+    if (artist_a - artist_b != 0)
+        return name_order(tag_albumartist, artist_a, artist_b);
+    return name_order(tag_album, album_a, album_b);
 }
 
 /* carousel_model.build_index for the album model: the whole index, into the
@@ -937,16 +945,57 @@ void carousel_cover_arm(const struct album_data *album, const char *name)
     snprintf(cover_name, sizeof(cover_name), "/%s", name);
 }
 
+/* The cover's album, read when its menu opens, for its bio and notes */
+static struct notes_album cover_notes_album;
+
+static int cover_notes(void)
+{
+    return context_menu_notes_result(notes_album(&cover_notes_album));
+}
+
+static int cover_biography(void)
+{
+    return context_menu_notes_result(notes_bio(cover_name + 1));
+}
+
+static int cover_mentions(void)
+{
+    return context_menu_notes_result(notes_person(cover_name + 1));
+}
+
 int carousel_cover_menu(void)
 {
-    static const struct context_menu_row rows[] = {
-        { LANG_GO_TO_ARTIST, cover_go_to_artist, false },
-    };
+    struct context_menu_row rows[3];
+    struct notes_pages pages;
+    const char *name = cover_name + 1;
+    int n = 0;
 
-    /* An artist's own cover opens their albums already */
+    /* An artist's own cover opens their albums already, and offers their
+     * Biography and Mentions where an album offers its notes */
+    if (cover_album.seek >= 0)
+    {
+        rows[n++] = (struct context_menu_row){ LANG_GO_TO_ARTIST,
+                                               cover_go_to_artist, false };
+        if (notes_album_of(cover_album.seek, cover_album.artist_seek,
+                           &cover_notes_album)
+            && notes_find_album(&cover_notes_album, &pages))
+            rows[n++] = (struct context_menu_row){
+                context_menu_notes_label(pages.have), cover_notes, false };
+    }
+    else
+    {
+        /* Both open the artist's page: one row or the other */
+        if (notes_has_bio(name))
+            rows[n++] = (struct context_menu_row){ LANG_NOTES_BIOGRAPHY,
+                                                   cover_biography, false };
+        else if (name_index_named(art_name_hash(name),
+                                  art_name_alt_hash(name)))
+            rows[n++] = (struct context_menu_row){ LANG_NOTES_MENTIONS,
+                                                   cover_mentions, false };
+    }
+
     switch (context_menu_show_item(cover_name, ATTR_DIRECTORY, false, false,
-                                   cover_insert, cover_write, rows,
-                                   cover_album.seek >= 0 ? 1 : 0))
+                                   cover_insert, cover_write, rows, n))
     {
         case ONPLAY_START_PLAY:
             return GO_TO_WPS;

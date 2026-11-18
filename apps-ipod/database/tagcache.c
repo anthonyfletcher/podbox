@@ -1113,6 +1113,7 @@ static void albums_note_path(int idx_id, const char *filename)
         return;
     *sep = '\0';                     /* track file -> album folder */
     r->art_hash = art_cache_dir_hash(dir);
+    r->dir_key = path_key(dir);
 }
 
 /* The name at 'seek' in the RAM copy of tag file 'tag', or NULL for none or

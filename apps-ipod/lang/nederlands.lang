@@ -27473,3 +27473,311 @@
     *: "Knoptoewijzing opheffen"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_CHAPTERS
+  desc: a theme's header over a book's chapters, the word after their count
+  user: core
+  <source>
+    *: "chapters"
+  </source>
+  <dest>
+    *: "hoofdstukken"
+  </dest>
+  <voice>
+    *: "hoofdstukken"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIN_HEADER_EPISODES
+  desc: a theme's header over a podcast show's episodes, the word after their count
+  user: core
+  <source>
+    *: "episodes"
+  </source>
+  <dest>
+    *: "afleveringen"
+  </dest>
+  <voice>
+    *: "afleveringen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BIOGRAPHY
+  desc: a row opening a person's bio, from an artist or from a track or album with no liner notes
+  user: core
+  <source>
+    *: "Biography"
+  </source>
+  <dest>
+    *: "Biografie"
+  </dest>
+  <voice>
+    *: "Biografie"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_LINER_NOTES
+  desc: a row opening an album's liner notes, with its artist's bio beside them; also a Now Playing button's action
+  user: core
+  <source>
+    *: "Liner Notes"
+  </source>
+  <dest>
+    *: "Hoestekst"
+  </dest>
+  <voice>
+    *: "Hoestekst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_NONE
+  desc: notes screen, when there is no page to show
+  user: core
+  <source>
+    *: "No bio or notes to show"
+  </source>
+  <dest>
+    *: "Geen bio of hoestekst om te tonen"
+  </dest>
+  <voice>
+    *: "Geen bio of hoestekst om te tonen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MOVE_BANNER
+  desc: bio screen's menu: choose which band of the person's picture the banner shows
+  user: core
+  <source>
+    *: "Move Banner"
+  </source>
+  <dest>
+    *: "Banner verplaatsen"
+  </dest>
+  <voice>
+    *: "Banner verplaatsen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_RESET_BANNER
+  desc: bio screen's menu: put the banner back to the top third of the picture
+  user: core
+  <source>
+    *: "Reset Banner"
+  </source>
+  <dest>
+    *: "Banner herstellen"
+  </dest>
+  <voice>
+    *: "Banner herstellen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONS
+  desc: an artist's menu in the library: their bio, albums and where the bios and liner notes name them
+  user: core
+  <source>
+    *: "Mentions"
+  </source>
+  <dest>
+    *: "Vermeldingen"
+  </dest>
+  <voice>
+    *: "Vermeldingen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MENTIONED_IN
+  desc: a person's list in the bio and notes screen: the heading over the places they are named
+  user: core
+  <source>
+    *: "Mentioned In"
+  </source>
+  <dest>
+    *: "Vermeld in"
+  </dest>
+  <voice>
+    *: "Vermeld in"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_SETTING
+  desc: the setting that turns liner notes and biographies on
+  user: core
+  <source>
+    *: "Liner Notes and Biographies"
+  </source>
+  <dest>
+    *: "Hoesteksten en biografieën"
+  </dest>
+  <voice>
+    *: "Hoesteksten en biografieën"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS
+  desc: liner notes setting: where a page's colours come from
+  user: core
+  <source>
+    *: "Colours"
+  </source>
+  <dest>
+    *: "Kleuren"
+  </dest>
+  <voice>
+    *: "Kleuren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_ART
+  desc: liner notes colours option: each page from its own picture
+  user: core
+  <source>
+    *: "Page's Art"
+  </source>
+  <dest>
+    *: "Afbeelding van de pagina"
+  </dest>
+  <voice>
+    *: "Afbeelding van de pagina"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_COLOURS_TEXT_VIEWER
+  desc: liner notes colours option: the text viewer's colours
+  user: core
+  <source>
+    *: "Text Viewer's"
+  </source>
+  <dest>
+    *: "Zoals tekstviewer"
+  </dest>
+  <voice>
+    *: "Zoals tekstviewer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BANNERS
+  desc: liner notes setting: the picture at the top of a page
+  user: core
+  <source>
+    *: "Banners"
+  </source>
+  <dest>
+    *: "Banners"
+  </dest>
+  <voice>
+    *: "Banners"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_N_PLAYS
+  desc: liner notes list detail: how many times something was played
+  user: core
+  <source>
+    *: "%d plays"
+  </source>
+  <dest>
+    *: "%d keer gespeeld"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DISC
+  desc: liner notes track list: the heading over a disc's tracks
+  user: core
+  <source>
+    *: "Disc %d"
+  </source>
+  <dest>
+    *: "Disc %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_GUEST
+  desc: liner notes album list detail: an album the artist only features on
+  user: core
+  <source>
+    *: "guest"
+  </source>
+  <dest>
+    *: "gast"
+  </dest>
+  <voice>
+    *: "gast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DECADE
+  desc: liner notes: a decade, from its first year, such as 1970s
+  user: core
+  <source>
+    *: "%ds"
+  </source>
+  <dest>
+    *: "Jaren %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_MINUTES
+  desc: liner notes: a running time in whole minutes
+  user: core
+  <source>
+    *: "%d min"
+  </source>
+  <dest>
+    *: "%d min"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_PEOPLE
+  desc: liner notes mentions: the heading over people's pages
+  user: core
+  <source>
+    *: "People"
+  </source>
+  <dest>
+    *: "Personen"
+  </dest>
+  <voice>
+    *: "Personen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_OTHER
+  desc: liner notes mentions: the heading over pages that are neither people nor albums
+  user: core
+  <source>
+    *: "Other Pages"
+  </source>
+  <dest>
+    *: "Overige pagina's"
+  </dest>
+  <voice>
+    *: "Overige pagina's"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_ONE_PLAY
+  desc: liner notes list detail: played once
+  user: core
+  <source>
+    *: "1 play"
+  </source>
+  <dest>
+    *: "1 keer gespeeld"
+  </dest>
+  <voice>
+    *: "1 keer gespeeld"
+  </voice>
+</phrase>

@@ -244,6 +244,11 @@ GIF, WebP and BMP pictures.
 - See the lyrics of what is playing
   - Press `Select + Play` on the Now Playing screen
   - `Settings > Library > Viewers > Lyrics Viewer` for how they are shown
+- Read your music as a wiki: a page for every artist and album, the liner notes and
+  biographies you write, and links between them to follow and play from
+  - Turn on `Settings > Library > Music > Liner Notes and Biographies > Enabled`
+  - Write pages as Markdown files in `/Notes`, then hold `Select` on the Now Playing screen
+  - See [`notes-guide.md`](docs/podbox/notes-guide.md) for more
 - Choose how documents look: font, text size, margin, line spacing, justification, paragraph
   indent and colours
   - `Settings > Library > Viewers > Text Viewer`

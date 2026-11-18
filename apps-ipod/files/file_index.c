@@ -11,7 +11,8 @@
  * extension (filetype_get_attr()), so having found a file it is as cheap to
  * ask every question as one; walking again would repeat the only expensive
  * part. The same walk keeps the book index (book_index.c) current, handing
- * it each book with the size and time its directory entry already gave.
+ * it each book with the size and time its directory entry already gave, and
+ * the table of where the bios and liner notes are (notes_files.c).
  *
  * The walk passes over every folder whose name starts with a dot, but for
  * one: /.rockbox/games, where the release puts its own carts, is walked for
@@ -56,6 +57,8 @@
 #include "files/path_list.h"
 #include "files/book_index.h"
 #include "metadata/art_cache.h"     /* new covers want a pass */
+#include "viewers/notes_viewer/notes_files.h"   /* where the notes are */
+#include "settings/settings.h"
 #include "file_index.h"
 
 #define FILE_INDEX_DOCS   LIB_DOCUMENTS_FILE
@@ -83,6 +86,10 @@ static struct path_list_writer fi_games;
 
 /* Walking /.rockbox/games: carts only, its saves and data passed over */
 static bool fi_games_only;
+
+/* Walking /Notes while Liner Notes and Biographies is on: for the notes
+ * table alone, its files being no books then */
+static bool fi_notes_only;
 
 /* One path buffer, reused down the recursion rather than one per level:
  * MAX_PATH per frame times the depth limit is far more stack than the thread
@@ -236,10 +243,26 @@ static void fi_walk(int depth)
         info = dir_get_info(dir, entry);
         if (info.attribute & ATTR_DIRECTORY)
         {
-            /* /Artwork holds the art cache's pictures, as cover.* does */
-            if (depth > 0 || strcasecmp((char *)entry->d_name, "Artwork"))
+            /* /Artwork holds the art cache's pictures, as cover.* does,
+             * and /Notes the bios and liner notes, which are no books --
+             * while Liner Notes and Biographies is on to read them, and
+             * walked then for the notes table alone */
+            if (depth > 0 || !global_settings.liner_notes
+                || strcasecmp((char *)entry->d_name, "Notes"))
+            {
+                if (depth > 0
+                    || strcasecmp((char *)entry->d_name, "Artwork"))
+                    fi_walk(depth + 1);
+            }
+            else
+            {
+                fi_notes_only = true;
                 fi_walk(depth + 1);
+                fi_notes_only = false;
+            }
         }
+        else if (fi_notes_only)
+            notes_where_found(fi_path, info.size, info.mtime);
         else if (fi_games_only)
         {
             if ((filetype_get_attr(fi_path) & FILE_ATTR_MASK)
@@ -248,6 +271,7 @@ static void fi_walk(int depth)
         }
         else
         {
+            notes_where_found(fi_path, info.size, info.mtime);
             switch (filetype_get_attr(fi_path) & FILE_ATTR_MASK)
             {
                 case FILE_ATTR_TXT:
@@ -301,6 +325,7 @@ static void fi_run_scan(void)
     debug_log(DEBUG_LOG_TASKS, "%s: walk started", file_index_task.name);
     started = current_tick;
     book_index_begin();
+    notes_where_begin();
     strcpy(fi_path, "/");
     fi_games_only = false;
     fi_walk(0);
@@ -312,6 +337,7 @@ static void fi_run_scan(void)
     }
 
     completed = !fi_abort;
+    notes_where_end(completed);
     if (book_index_end(completed))
     {
         debug_log(DEBUG_LOG_TASKS, "%s: book index changed",
@@ -373,12 +399,16 @@ struct bg_task file_index_task =
 
 void file_index_init(void)
 {
+    bool notes;
+
     bg_task_init(&file_index_task);
+    notes = notes_where_load();
 
     /* Nothing to read on a first boot, or after the lists were deleted; or
      * a book index an older version wrote, which only a walk replaces; or
-     * no list of games, which a walk before the games were indexed left. */
+     * no list of games, or of where the notes are, which a walk before
+     * they were indexed left. */
     if ((!file_exists(FILE_INDEX_DOCS) && !file_exists(FILE_INDEX_IMAGES))
-        || !file_exists(FILE_INDEX_GAMES) || book_index_stale())
+        || !file_exists(FILE_INDEX_GAMES) || book_index_stale() || !notes)
         fi_wants_scan = true;
 }

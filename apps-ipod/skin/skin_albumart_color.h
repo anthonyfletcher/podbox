@@ -93,5 +93,11 @@ bool dynamic_colors_pending(void);
  * use. */
 bool dynamic_colors_roles(unsigned int *dominant, unsigned int *vivid);
 
+/* The same pair worked out from the art the cache keeps under `hash` (an
+ * album's cover, a person's picture), whatever is playing: one small
+ * thumbnail read. False when the cache has none. UI thread only. */
+bool dynamic_colors_palette_of(unsigned int hash, unsigned int *dominant,
+                               unsigned int *vivid);
+
 
 #endif /* SKIN_ALBUMART_COLOR_H */

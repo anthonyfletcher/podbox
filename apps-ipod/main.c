@@ -66,6 +66,7 @@
 #include "hang_catch.h"
 #include "system/output_pause.h"
 #include "files/file_index.h"
+#include "metadata/name_index.h"
 #include "system/bg_task.h"
 #include "screens/browse/browser_db.h"
 #include "lang.h"
@@ -540,6 +541,7 @@ static void init_tagcache(void)
 
     tagcache_init();
     file_index_init();
+    name_index_init();
     art_cache_init();
     book_resume_idle_init();
     bg_task_start();

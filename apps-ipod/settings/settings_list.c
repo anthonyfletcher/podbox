@@ -2089,6 +2089,17 @@ const struct settings_list settings[] = {
      * crawl, not one that only hides its result. */
     OFFON_SETTING(F_BANFROMQS, featured_artists, LANG_FEATURED_ARTISTS, false,
                   "featured artists", NULL),
+    /* Off by default: most owners never write a notes file, and on, a
+     * background task reads /Notes and the art cache sweeps its pictures */
+    OFFON_SETTING(F_BANFROMQS, liner_notes, LANG_ACTION_ENABLED, false,
+                  "liner notes", NULL),
+    CHOICE_SETTING(F_BANFROMQS, liner_notes_colours, LANG_NOTES_COLOURS, 0,
+                   "liner notes colours", "art,theme,text viewer", NULL, 3,
+                   ID2P(LANG_NOTES_COLOURS_ART),
+                   ID2P(LANG_TEXT_VIEWER_COLOUR_THEME),
+                   ID2P(LANG_NOTES_COLOURS_TEXT_VIEWER)),
+    OFFON_SETTING(F_BANFROMQS, liner_notes_banners, LANG_NOTES_BANNERS, true,
+                  "liner notes banners", NULL),
     /* Named by the rows themselves, so the setting reads as what it hides */
     OFFON_SETTING(F_BANFROMQS, show_all_tracks_row, LANG_TAGNAVI_ALL_TRACKS,
                   true, "show all tracks row", NULL),

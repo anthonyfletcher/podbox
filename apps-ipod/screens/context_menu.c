@@ -68,6 +68,10 @@
 #include "files/filetypes.h"
 #include "viewers/image_viewer/image_viewer_pub.h"
 #include "viewers/lyric_viewer/lyric_viewer.h"
+#include "viewers/notes_viewer/notes_viewer.h"
+#include "viewers/notes_viewer/notes_files.h"
+#include "metadata/name_index.h"
+#include "metadata/art_name.h"
 #include "viewers/properties.h"
 #include "viewers/playing_time.h"
 #include "files/file_ops.h"
@@ -242,6 +246,204 @@ static int lyrics_run(void)
 
 MENUITEM_FUNCTION(lyrics_item, 0, ID2P(LANG_LYRICS),
                   lyrics_run, NULL, Icon_NOICON);
+
+/* The playing track's bio and liner notes: the row is there only when it
+ * has one, and is named for what it has. Found when the menu asks whether
+ * to show the row, and remembered for its name, which is asked on every
+ * draw. */
+static int notes_have;
+
+/* The screen's GO_TO_* as the menu's ONPLAY_* */
+int context_menu_notes_result(int ret)
+{
+    if (ret == GO_TO_ROOT)
+        return ONPLAY_MAINMENU;
+    if (ret == GO_TO_DBBROWSER)             /* a person's albums */
+        return ONPLAY_GO_TO_LIBRARY;
+    if (ret == GO_TO_WPS)                   /* an album from Related */
+        return ONPLAY_START_PLAY;
+    return ONPLAY_OK;
+}
+
+static int notes_run(void)
+{
+    int ret = context_menu_notes_result(notes_viewer());
+
+    if (ret != ONPLAY_OK)
+        context_menu_result = ret;
+    return 0;
+}
+
+/* Now Playing's button action */
+static int hotkey_notes(void)
+{
+    return context_menu_notes_result(notes_viewer());
+}
+
+int context_menu_notes_label(int have)
+{
+    return have & NOTES_ALBUM ? LANG_NOTES_LINER_NOTES
+                              : LANG_NOTES_BIOGRAPHY;
+}
+
+static char *notes_name(int selected_item, void *data, char *buffer,
+                        size_t buffer_len)
+{
+    (void)selected_item;
+    (void)data;
+    (void)buffer;
+    (void)buffer_len;
+    return (char *)str(context_menu_notes_label(notes_have));
+}
+
+static bool notes_label_hidden(int lang_id);
+
+/* Every album has a page, written or made up: the row is there whenever a
+ * track is */
+static int notes_callback(int action, const struct menu_item_ex *this_item,
+                          struct gui_synclist *this_list)
+{
+    struct mp3entry *id3 = audio_current_track();
+
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        notes_have = global_settings.liner_notes && id3 && id3->path[0]
+                     ? NOTES_ALBUM : 0;
+        if (!notes_have
+            || notes_label_hidden(context_menu_notes_label(notes_have)))
+            return ACTION_EXIT_MENUITEM;
+    }
+    return action;
+}
+
+MENUITEM_FUNCTION_DYNTEXT(notes_item, 0, notes_run, notes_name, NULL, NULL,
+                          notes_callback, Icon_NOICON);
+
+/* An album row's bio and notes, named as Now Playing's row is. The album is
+ * read from the row when the menu asks whether to show it, before the screen
+ * claims the buffer a fresh page of the list would borrow. */
+static struct notes_album notes_row_album;
+
+static int album_notes_run(void)
+{
+    int ret = context_menu_notes_result(notes_album(&notes_row_album));
+
+    if (ret != ONPLAY_OK)
+        context_menu_result = ret;
+    return 0;
+}
+
+static char *album_notes_name(int selected_item, void *data, char *buffer,
+                              size_t buffer_len)
+{
+    return notes_name(selected_item, data, buffer, buffer_len);
+}
+
+static int album_notes_callback(int action,
+                                const struct menu_item_ex *this_item,
+                                struct gui_synclist *this_list)
+{
+    static struct notes_pages pages;
+    struct browser_db_filters f;
+    struct tagcache_search tcs;
+    bool found = false;
+
+    (void)this_item;
+    (void)this_list;
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+    if (!global_settings.liner_notes
+        || selected_file.context != CONTEXT_ID3DB
+        || browser_db_current_scope() != BROWSER_DB_SCOPE_ALBUM
+        || !browser_db_current_filters(&f) || !tagcache_is_usable()
+        || !tagcache_search(&tcs, tag_filename))
+        return ACTION_EXIT_MENUITEM;
+    if (browser_db_add_filters(&tcs, &f))
+        found = notes_album_read(&tcs, &notes_row_album);
+    tagcache_search_finish(&tcs);
+    notes_have = found ? notes_find_album(&notes_row_album, &pages) : 0;
+    return notes_have
+           && !notes_label_hidden(context_menu_notes_label(notes_have))
+           ? action : ACTION_EXIT_MENUITEM;
+}
+
+MENUITEM_FUNCTION_DYNTEXT(album_notes_item, 0, album_notes_run,
+                          album_notes_name, NULL, NULL, album_notes_callback,
+                          Icon_NOICON);
+
+/* An artist row's Biography, for an artist with a bio, and Mentions: the
+ * person's list from the bios and notes -- their albums, where they are
+ * named -- for an artist the notes name. */
+/* The artist row's name: the browser hands it over as a path, "/Name" */
+static const char *mentions_name(void)
+{
+    const char *name = selected_file.path;
+
+    return name && name[0] == '/' ? name + 1 : name;
+}
+
+static int mentions_run(void)
+{
+    int ret = context_menu_notes_result(notes_person(mentions_name()));
+
+    if (ret != ONPLAY_OK)
+        context_menu_result = ret;
+    return 0;
+}
+
+static int biography_run(void)
+{
+    int ret = context_menu_notes_result(notes_bio(mentions_name()));
+
+    if (ret != ONPLAY_OK)
+        context_menu_result = ret;
+    return 0;
+}
+
+/* Visible on an artist list's row only */
+static bool artist_row(void)
+{
+    const char *name = mentions_name();
+
+    return selected_file.context == CONTEXT_ID3DB && name && name[0]
+           && browser_db_is_artist_list(browser_get_context());
+}
+
+static int biography_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(artist_row() && notes_has_bio(mentions_name())))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(biography_item, 0, ID2P(LANG_NOTES_BIOGRAPHY), biography_run,
+                  biography_callback, Icon_NOICON);
+
+static int mentions_callback(int action, const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    const char *name = mentions_name();
+
+    (void)this_item;
+    (void)this_list;
+    /* The same page as Biography's: one row or the other */
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(artist_row() && !notes_has_bio(name)
+             && name_index_named(art_name_hash(name),
+                                 art_name_alt_hash(name))))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_FUNCTION(mentions_item, 0, ID2P(LANG_NOTES_MENTIONS), mentions_run,
+                  mentions_callback, Icon_NOICON);
 
 MENUITEM_FUNCTION(wps_view_cur_playlist_item, 0, ID2P(LANG_VIEW_DYNAMIC_PLAYLIST),
                   wps_view_cur_playlist, NULL, Icon_NOICON);
@@ -2448,6 +2650,7 @@ MAKE_ONPLAYMENU_TITLED( wps_context_menu,
            &go_to_album_item, &go_to_artist_item,
            &go_to_podcast_item, &go_to_audiobook_item, &go_to_author_item,
            &lyrics_item,
+           &notes_item,
            &sleep_timer_item,
            &wps_speed_item,
            &sound_mix_item,
@@ -2474,6 +2677,7 @@ MAKE_ONPLAYMENU_TITLED( browser_context_menu,
            &go_to_album_item, &go_to_artist_item,
            &go_to_podcast_item, &go_to_audiobook_item, &go_to_author_item,
            &properties_item, &track_info_item,
+           &album_notes_item, &biography_item, &mentions_item,
            &clipboard_paste_item,
            &more_menu,
            &manage_menu,
@@ -2814,6 +3018,12 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_OK,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
+    { .action = HOTKEY_NOTES,
+      .lang_id = LANG_NOTES_LINER_NOTES,
+      .func = HOTKEY_FUNC(hotkey_notes, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
       .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),
@@ -2912,6 +3122,9 @@ static int hotkey_list(intptr_t flag, bool execute, int current_action,
          * still has it */
         if (hotkey_items[i].action == HOTKEY_THEME_TOGGLE && !toggle_label
             && current_action != HOTKEY_THEME_TOGGLE)
+            continue;
+        if (hotkey_items[i].action == HOTKEY_NOTES
+            && !global_settings.liner_notes && current_action != HOTKEY_NOTES)
             continue;
         if ((hotkey_items[i].flags & flag) == flag)
         {
@@ -3215,7 +3428,8 @@ MAKE_ONPLAYMENU_TITLED( item_menu,
 static const short now_playing_rows[] = {
     LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_GO_TO_ALBUM,
     LANG_GO_TO_ARTIST, LANG_GO_TO_PODCAST, LANG_GO_TO_AUDIOBOOK,
-    LANG_GO_TO_AUTHOR, LANG_LYRICS, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
+    LANG_GO_TO_AUTHOR, LANG_LYRICS, LANG_NOTES_LINER_NOTES,
+    LANG_NOTES_BIOGRAPHY, LANG_SLEEP_TIMER, LANG_SOUND_MIX,
     LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL, LANG_THEME_OPTIONS,
     LANG_SHOW_IN_FILES,
     LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU, LANG_BROWSE_CUESHEET,
@@ -3231,12 +3445,14 @@ static const short track_rows[] = {
 };
 static const short album_rows[] = {
     LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_MENU_SET_ALBUM_RATING,
-    LANG_GO_TO_ARTIST, LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
+    LANG_GO_TO_ARTIST, LANG_NOTES_LINER_NOTES, LANG_NOTES_BIOGRAPHY,
+    LANG_NOTES_MENTIONS, LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
     LANG_QUEUE_MENU, LANG_SOUND_ALBUM, LANG_LISTEN_PROGRESS,
     LANG_SHOW_IN_FILES,
 };
 static const short artist_rows[] = {
-    LANG_ADD_TO_PL, LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
+    LANG_ADD_TO_PL, LANG_NOTES_BIOGRAPHY, LANG_NOTES_MENTIONS,
+    LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
     LANG_QUEUE_MENU, LANG_LISTEN_PROGRESS, LANG_SHOW_IN_FILES,
 };
 static const short folder_rows[] = {
@@ -3360,6 +3576,8 @@ static int row_lang_id(const struct menu_item_ex *row)
 
         if (row == &sleep_timer_item)
             return LANG_SLEEP_TIMER;
+        if (row == &notes_item || row == &album_notes_item)
+            return context_menu_notes_label(notes_have);
         if (d->list_get_name == item_row_name)
         {
             int i = item_row_index(d->list_get_name_data);
@@ -3393,9 +3611,20 @@ bool context_menu_row_hidden(int kind, int lang_id)
     return false;
 }
 
+/* A notes row is named for what the selection has, which its own callback
+ * finds out: it asks notes_label_hidden() then, and is let through here */
+static bool notes_label_hidden(int lang_id)
+{
+    return ctx_kind >= 0 && context_menu_row_hidden(ctx_kind, lang_id);
+}
+
 static bool row_hidden(const struct menu_item_ex *row)
 {
-    int bit = row_bit(ctx_kind, row);
+    int bit;
+
+    if (row == &notes_item || row == &album_notes_item)
+        return false;
+    bit = row_bit(ctx_kind, row);
 
     return bit >= 0 && (global_settings.context_hidden[ctx_kind] & (1u << bit));
 }

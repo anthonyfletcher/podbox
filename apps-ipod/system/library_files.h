@@ -50,12 +50,14 @@
 #define LIB_KNOWN_ARTISTS_FILE LIB_USER_DIR "/known_artists.txt"
 #define LIB_PLAYER_NAME_FILE   LIB_USER_DIR "/player_name.txt"
 #define LIB_TRIM_FILE       LIB_USER_DIR "/trim.txt"
+#define LIB_BANNER_OFFSETS_FILE LIB_USER_DIR "/banners.dat"
 
 /* Export and Import Modifications: Rockbox's own name and place, which its
  * Import reads, so a copy goes to other firmware and comes back */
 #define LIB_EXPORT_FILE     ROCKBOX_DIR "/database_changelog.txt"
 
 #define LIB_COVERS_FILE     LIB_CACHE_DIR "/covers.cfg"
+#define LIB_NAMES_FILE      LIB_CACHE_DIR "/names.dat"
 #define LIB_REPORT_INDEX_FILE LIB_CACHE_DIR "/report_index.dat"
 #define LIB_REPORT_MOVES_FILE LIB_CACHE_DIR "/report_moves.dat"
 #define LIB_DOCUMENTS_FILE  LIB_CACHE_DIR "/documents.dat"
@@ -108,6 +110,10 @@
 #define LIB_PATHS_VERSION   1
 #define LIB_UNREADABLE_MAGIC 0x44524e55u    /* "UNRD" */
 #define LIB_UNREADABLE_VERSION 1
+#define LIB_BANNERS_MAGIC   0x524e4e42u     /* "BNNR"; version: the art format */
+#define LIB_BANNER_OFFSETS_MAGIC 0x46464f42u /* "BOFF" */
+#define LIB_BANNER_OFFSETS_VERSION 1
+#define LIB_NAMES_MAGIC     0x454d414eu     /* "NAME" */
 
 /* One line in logs/upgrade.log, for a carry-over made outside the steps */
 void library_files_log(const char *fmt, ...);

@@ -1181,6 +1181,13 @@ MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
                   music_menu_config, NULL, Icon_NOICON);
 MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
+MENUITEM_SETTING(liner_notes, &global_settings.liner_notes, NULL);
+MENUITEM_SETTING(liner_notes_colours, &global_settings.liner_notes_colours,
+                 NULL);
+MENUITEM_SETTING(liner_notes_banners, &global_settings.liner_notes_banners,
+                 NULL);
+MAKE_MENU(liner_notes_menu, ID2P(LANG_NOTES_SETTING), 0, Icon_NOICON,
+          &liner_notes, &liner_notes_colours, &liner_notes_banners);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
 MENUITEM_SETTING(segregate_podcasts, &global_settings.segregate_podcasts,
@@ -1189,7 +1196,8 @@ MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
           &album_show_year,
           &extra_rows_menu,
-          &featured_artists, &segregate_audiobooks, &segregate_podcasts,
+          &featured_artists, &liner_notes_menu,
+          &segregate_audiobooks, &segregate_podcasts,
           &music_appearance_menu    /* theme_settings.c */
           );
 

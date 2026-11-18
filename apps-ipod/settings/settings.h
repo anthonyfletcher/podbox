@@ -674,6 +674,11 @@ struct user_settings
     /* Read guest credits ("feat. X") out of titles and per-track artists, so
      * the browser can list them. Off, the table is never built. */
     bool featured_artists;
+    /* Liner notes and biographies from /Notes and beside the music. Off,
+     * nothing reads /Notes and no menu offers them. */
+    bool liner_notes;
+    int liner_notes_colours;        /* NOTES_COLOURS_*, notes_viewer.h */
+    bool liner_notes_banners;       /* the picture at the top of a page */
     /* Which of the rows above a Music list are shown: [All Tracks],
      * [Random] and [Shuffle Albums] */
     bool show_all_tracks_row;

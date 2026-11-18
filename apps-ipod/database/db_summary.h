@@ -138,6 +138,9 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
  * album_covers() calls db_summary_play_pending() once carousel_run() has
  * returned and released the claim. */
 int  db_summary_play_album(const struct album_data *album);
+/* The same, started on the track whose path is `start` */
+int  db_summary_play_album_at(const struct album_data *album,
+                              const char *start);
 void db_summary_play_album_on_exit(const struct album_data *album);
 int  db_summary_play_pending(void);
 

@@ -133,6 +133,10 @@ enum art_album_source
     ART_SOURCE_EMBEDDED,        /* embedded art only */
 };
 
+/* Banner art in /Notes may have been added, changed or removed: the art
+ * cache sweeps it when it next can (art_banner.h) */
+void art_cache_banners_changed(void);
+
 /* The setting's callback: a change re-resolves every folder. */
 void art_cache_album_source_callback(int source);
 

@@ -51,7 +51,7 @@ static struct bg_task *bg_tasks[BG_MAX_TASKS];   /* kept in rank order */
 static int bg_tasks_count;
 
 /* .request-only tasks with a tick to take, in registration order. */
-#define BG_MAX_STEPS 2
+#define BG_MAX_STEPS 3
 static struct bg_task *bg_steps[BG_MAX_STEPS];
 static int bg_steps_count;
 

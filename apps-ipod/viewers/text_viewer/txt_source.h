@@ -153,6 +153,25 @@ void ts_close(ts_source *s);
 #define TS_NOTE_OPEN     0xE004
 #define TS_NOTE_CLOSE    0xE005
 #define TS_NOTE_HREF     96
+/* Markdown's marks. Text between TS_DIM_OPEN and TS_DIM_CLOSE is drawn
+ * dimmed, and between TS_BOLD_OPEN and TS_BOLD_CLOSE in the theme's bold
+ * font, when a screen has one; none of them outlives its line. TS_QUOTE
+ * starts a pull line, a `>` line, and is the first thing on it. A bracketed
+ * name, `[Name]` with no link after it, lies between TS_NAME_OPEN and
+ * TS_NAME_CLOSE, and is shown as plain text. */
+#define TS_DIM_OPEN      0xE006
+#define TS_DIM_CLOSE     0xE007
+#define TS_QUOTE         0xE008
+#define TS_NAME_OPEN     0xE009
+#define TS_NAME_CLOSE    0xE00A
+#define TS_BOLD_OPEN     0xE00B
+#define TS_BOLD_CLOSE    0xE00C
+/* A name's qualifier, the "(producer)" of `[Michael McDonald (producer)]`,
+ * lies between TS_HIDE_OPEN and TS_HIDE_CLOSE, inside the name's marks: part
+ * of the name, never drawn. Its spaces are no-break spaces, so it stays one
+ * word to a layout that breaks at spaces. */
+#define TS_HIDE_OPEN     0xE00D
+#define TS_HIDE_CLOSE    0xE00E
 
 /* The text of the note `href` refers to from chapter `part`, into buf as a
  * string: the element that has the id, or the paragraph an inline one is
