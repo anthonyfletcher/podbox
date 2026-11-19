@@ -27780,3 +27780,45 @@
     *: "spelad 1 gång"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NOTES_LINK_COLOUR
+  desc: liner notes custom colours: the colour of links
+  user: core
+  <source>
+    *: "Link Colour"
+  </source>
+  <dest>
+    *: "Länkfärg"
+  </dest>
+  <voice>
+    *: "Länkfärg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_WHITE
+  desc: liner notes custom colours option: white
+  user: core
+  <source>
+    *: "White"
+  </source>
+  <dest>
+    *: "Vit"
+  </dest>
+  <voice>
+    *: "Vit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BLACK
+  desc: liner notes custom colours option: black
+  user: core
+  <source>
+    *: "Black"
+  </source>
+  <dest>
+    *: "Svart"
+  </dest>
+  <voice>
+    *: "Svart"
+  </voice>
+</phrase>

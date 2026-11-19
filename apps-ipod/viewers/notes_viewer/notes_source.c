@@ -1698,6 +1698,26 @@ static bool ns_uses(const char *text, const char *name)
     return false;
 }
 
+/* Whether `text` links to the name whose key is `key` */
+static bool ns_links_to(const char *text, uint32_t key)
+{
+    const char *s, *e;
+
+    for (s = strchr(text, '['); s; s = strchr(s + 1, '['))
+    {
+        size_t len;
+
+        for (e = s + 1; *e && *e != ']' && *e != '\n'; e++)
+            ;
+        if (*e != ']')
+            continue;
+        len = notes_bare_len(s + 1, e - s - 1);
+        if (len && art_name_hash_n(s + 1, len) == key)
+            return true;
+    }
+    return false;
+}
+
 /* ---- the page ---------------------------------------------------------- */
 
 /* The file `path` into `buf`, NUL ended; its length, or -1 */
@@ -1761,7 +1781,8 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
     }
     if (ns_read(notes_page_path(pg), scratch, scratch_size) < 0)
         return 0;
-    if (d->kind == NOTES_PAGE_ALBUM)
+    if (d->kind == NOTES_PAGE_ALBUM && !ns_uses(scratch, "artist")
+        && !(d->artist && ns_links_to(scratch, d->artist)))
         ns_expand(&st, "[{{artist}}]" NS_DOT "{{year}}\n\n");
     st.head = -1;
     ns_expand(&st, scratch);

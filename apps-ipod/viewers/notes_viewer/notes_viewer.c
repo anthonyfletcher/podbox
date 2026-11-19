@@ -17,8 +17,9 @@
  *     name is set over it in the biggest font loaded that sets a name.
  *   - The page takes its own picture's colours, held to a deep or a pale
  *     tint, never the colour itself: it is read against for minutes at a
- *     time. Or the theme's, or the text viewer's (liner_notes_colours); and
- *     liner_notes_banners off leaves the banner out.
+ *     time. Or the theme's, the text viewer's, or Custom's text, link and
+ *     page colours (liner_notes_colours); and liner_notes_banners off
+ *     leaves the banner out.
  *   - Everything lives in the app buffer, never core_alloc(): the screen is
  *     used while music plays, and taking memory from the audio buffer stops
  *     the track. Two banners are kept, so going back to the page before
@@ -34,7 +35,8 @@
  * link that can only be opened -- and Left goes back along the last
  * NV_HISTORY pages, each where it was left. Play plays an album page's album
  * when it is not the one playing, and is pause and play anywhere else. Menu
- * leaves; Menu held offers the same for the page itself, and Move Banner.
+ * leaves; Menu held offers the same for the page itself, Move Banner, and
+ * the colour and banner settings.
  *
  * Parts, in order:
  *   - the buffer, colours and the screen
@@ -282,14 +284,24 @@ static int nv_luma(unsigned c)
 static bool nv_art_valid;
 static unsigned nv_art_dominant, nv_art_vivid;
 
-/* The page's picture's colours, under NOTES_COLOURS_ART: its album's cover
- * or its person's picture, from the art cache's small thumbnail */
+/* Whether the page's colours come from its picture */
+static bool nv_uses_art(void)
+{
+    return global_settings.liner_notes_colours == NOTES_COLOURS_ART
+           || (global_settings.liner_notes_colours == NOTES_COLOURS_CUSTOM
+               && (global_settings.liner_notes_text == NOTES_FROM_ART
+                   || global_settings.liner_notes_links == NOTES_FROM_ART
+                   || global_settings.liner_notes_page == NOTES_FROM_ART));
+}
+
+/* The page's picture's colours: its album's cover or its person's picture,
+ * from the art cache's small thumbnail */
 static void nv_art_palette(void)
 {
     struct tagcache_album row;
     unsigned int key = 0, dominant, vivid;
 
-    if (global_settings.liner_notes_colours != NOTES_COLOURS_ART)
+    if (!nv_uses_art())
         return;
     if (nv.doc.kind == NOTES_PAGE_ALBUM && nv.doc.album >= 0
         && tagcache_album_get(nv.doc.album, &row))
@@ -304,19 +316,60 @@ static void nv_art_palette(void)
     }
 }
 
+/* A Custom colour: NOTES_FROM_* `from`, given what Theme and Art are */
+static unsigned nv_from(int from, unsigned theme, unsigned art)
+{
+    if (from == NOTES_FROM_WHITE)
+        return LCD_WHITE;
+    if (from == NOTES_FROM_BLACK)
+        return LCD_BLACK;
+    return from == NOTES_FROM_ART && nv_art_valid ? art : theme;
+}
+
+/* The page under Custom. Art's text and links are held to tones that read
+ * on the page, and Art's page is a deep tint under light text, a pale one
+ * under dark. */
+static void nv_custom_colours(unsigned fg, unsigned bg, unsigned ac)
+{
+    int text = global_settings.liner_notes_text;
+    int links = global_settings.liner_notes_links;
+    bool dark;
+
+    fg = nv_from(text, fg, nv_art_vivid);
+    ac = nv_from(links, ac, nv_art_vivid);
+    if (global_settings.liner_notes_page == NOTES_FROM_ART && nv_art_valid)
+        bg = text == NOTES_FROM_ART || nv_luma(fg) >= 128
+             ? color_blend(color_tone_bound(nv_art_dominant, 14, -1),
+                           LCD_BLACK, 80)
+             : color_blend(color_tone_bound(nv_art_dominant, 94, 1),
+                           LCD_WHITE, 80);
+    else
+        bg = nv_from(global_settings.liner_notes_page, bg, bg);
+    dark = nv_luma(bg) < 128;
+    if (text == NOTES_FROM_ART && nv_art_valid)
+        fg = dark ? color_tone_bound(fg, 70, 1) : color_tone_bound(fg, 45, -1);
+    if (links == NOTES_FROM_ART && nv_art_valid)
+        ac = dark ? color_tone_bound(ac, 70, 1) : color_tone_bound(ac, 45, -1);
+    nv.fg = fg;
+    nv.bg = bg;
+    nv.accent = ac;
+}
+
 /* The page's colours, as liner_notes_colours says: the theme's through
  * dynamic colours, as the lyric viewer takes them, with the selector's
- * colour as the accent, or the page's picture's in their place; or the text
- * viewer's. The page keeps the art's hue but not its strength: light text
- * gets a deep tint under it and dark text a pale one, and the text and
- * accent are held to tones that read on it. */
+ * colour as the accent, or the page's picture's in their place; the text
+ * viewer's; or Custom's. The page keeps the art's hue but not its strength:
+ * light text gets a deep tint under it and dark text a pale one, and the
+ * text and accent are held to tones that read on it. */
 static void nv_colours(void)
 {
     unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
     unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
     unsigned ac = dynamic_colors_resolve(global_settings.lss_color);
 
-    if (global_settings.liner_notes_colours == NOTES_COLOURS_TEXT_VIEWER)
+    if (global_settings.liner_notes_colours == NOTES_COLOURS_CUSTOM)
+        nv_custom_colours(fg, bg, ac);
+    else if (global_settings.liner_notes_colours == NOTES_COLOURS_TEXT_VIEWER)
     {
         text_viewer_colours(&fg, &bg);
         nv.fg = fg;
@@ -1393,10 +1446,10 @@ static const struct notes_target *nv_current(void)
 }
 
 /* Whether the menu about `t` has a row: to play an album or a track, or to
- * go to a library artist; the page's, its banner's rows too */
+ * go to a library artist; the page's always has the settings */
 static bool nv_has_rows(const struct notes_target *t, bool page)
 {
-    return t->album >= 0 || t->artist_seek >= 0 || (page && nv.movable);
+    return page || t->album >= 0 || t->artist_seek >= 0;
 }
 
 /* Move Banner on the page's menu, over a band of a picture */
@@ -1487,9 +1540,54 @@ MENUITEM_FUNCTION(nv_move_item, MENU_FUNC_CHECK_RETVAL,
 MENUITEM_FUNCTION(nv_reset_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_NOTES_RESET_BANNER), nv_reset_run,
                   nv_reset_callback, Icon_NOICON);
+/* The settings, on the page's menu and not a link's */
+static int nv_setting_callback(int action, const struct menu_item_ex *this_item,
+                               struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !nv_mt_page)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+/* Custom's three rows, while Custom is chosen */
+static int nv_custom_callback(int action, const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(nv_mt_page
+             && global_settings.liner_notes_colours == NOTES_COLOURS_CUSTOM))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_SETTING(nv_colours_item, &global_settings.liner_notes_colours,
+                 nv_setting_callback);
+MENUITEM_SETTING(nv_text_item, &global_settings.liner_notes_text,
+                 nv_custom_callback);
+MENUITEM_SETTING(nv_links_item, &global_settings.liner_notes_links,
+                 nv_custom_callback);
+MENUITEM_SETTING(nv_page_item, &global_settings.liner_notes_page,
+                 nv_custom_callback);
+MENUITEM_SETTING(nv_banners_item, &global_settings.liner_notes_banners,
+                 nv_setting_callback);
 MAKE_MENU(nv_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL, Icon_NOICON,
           &nv_play_item, &nv_next_item, &nv_last_item, &nv_go_album_item,
-          &nv_go_artist_item, &nv_move_item, &nv_reset_item);
+          &nv_go_artist_item, &nv_move_item, &nv_reset_item, &nv_colours_item,
+          &nv_text_item, &nv_links_item, &nv_page_item, &nv_banners_item);
+
+/* The settings the page's menu offers, to see whether one changed */
+static int nv_settings_sum(void)
+{
+    return global_settings.liner_notes_colours
+           | global_settings.liner_notes_text << 4
+           | global_settings.liner_notes_links << 8
+           | global_settings.liner_notes_page << 12
+           | global_settings.liner_notes_banners << 16;
+}
 
 /* A menu with the theme on for it, as the lyric viewer's is. True when USB
  * was plugged in. */
@@ -1886,14 +1984,15 @@ static bool nv_reopen(void)
 }
 
 /* The menu of the current link, or of the page for `page`: play what it
- * names, go to it in the library, or move the page's banner. Nothing at
- * all when it would have no rows. A GO_TO_* code when the screen is to be
- * left, else -1. */
+ * names, go to it in the library, or move the page's banner, or change the
+ * settings. Nothing at all when it would have no rows. A GO_TO_* code when
+ * the screen is to be left, else -1. */
 static int nv_menu_run(bool page)
 {
     const struct notes_target *t = &nv_mt;
     struct tagcache_album row;
     char name[TAGCACHE_BUFSZ];
+    int sum = nv_settings_sum();
 
     if (page)
     {
@@ -1965,6 +2064,9 @@ static int nv_menu_run(bool page)
             nv.cur = nv_natural(false);
             break;
         default:
+            /* A setting changed: the page made again in it, where it was */
+            if (nv_settings_sum() != sum && !nv_reopen())
+                return GO_TO_PREVIOUS;
             break;
     }
     nv_draw();

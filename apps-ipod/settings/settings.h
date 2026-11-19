@@ -678,6 +678,9 @@ struct user_settings
      * nothing reads /Notes and no menu offers them. */
     bool liner_notes;
     int liner_notes_colours;        /* NOTES_COLOURS_*, notes_viewer.h */
+    int liner_notes_text;           /* Custom's three: NOTES_FROM_* */
+    int liner_notes_links;
+    int liner_notes_page;
     bool liner_notes_banners;       /* the picture at the top of a page */
     /* Which of the rows above a Music list are shown: [All Tracks],
      * [Random] and [Shuffle Albums] */

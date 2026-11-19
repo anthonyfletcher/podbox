@@ -97,9 +97,10 @@ album's page has a line linking its artist, with its year and genre, then
 its tracks and where it is named.
 
 A page you write gets some of this too: an album's page starts with the
-line linking its artist, and ends with its tracks unless your notes have
-sections for them; an artist's ends with their albums. Use the pieces below
-to put them somewhere else.
+line linking its artist unless your page has `{{artist}}` or a link to
+them, and ends with its tracks unless it has `{{tracks}}` or sections for
+them; an artist's ends with their albums unless it has `{{albums}}`. Use
+the pieces below to put them somewhere else.
 
 ## Pieces
 
@@ -234,7 +235,8 @@ artist in your library has `Go to Artist`. A link to anything else has no
 menu, and holding `Select` on it does nothing.
 
 The page's menu has the same rows for the album or artist the page is
-about, and `Move Banner` (below).
+about, `Move Banner` (below), and the `Colours` and `Banners` settings,
+which change the page as soon as you leave the menu.
 
 The page doesn't change with the music: it stays where you are until you
 leave, and the next time you open it from Now Playing it is the album then
@@ -248,6 +250,9 @@ with no picture keeps the colours of the last one. `Settings > Library >
 Music > Liner Notes and Biographies > Colours` changes that: `Theme` follows
 your theme, and with dynamic colours on, the album that's playing; `Text
 Viewer's` uses the text viewer's colours, your own custom pair among them.
+`Custom` sets the text, the links and the page apart, each from the
+picture, the theme, white or black: white text on black with links in the
+picture's colour, say, or the picture's colour on black with white links.
 
 ## The picture at the top
 

@@ -27781,3 +27781,45 @@
     *: "1 reproducción"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NOTES_LINK_COLOUR
+  desc: liner notes custom colours: the colour of links
+  user: core
+  <source>
+    *: "Link Colour"
+  </source>
+  <dest>
+    *: "Color de enlaces"
+  </dest>
+  <voice>
+    *: "Color de enlaces"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_WHITE
+  desc: liner notes custom colours option: white
+  user: core
+  <source>
+    *: "White"
+  </source>
+  <dest>
+    *: "Blanco"
+  </dest>
+  <voice>
+    *: "Blanco"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BLACK
+  desc: liner notes custom colours option: black
+  user: core
+  <source>
+    *: "Black"
+  </source>
+  <dest>
+    *: "Negro"
+  </dest>
+  <voice>
+    *: "Negro"
+  </voice>
+</phrase>

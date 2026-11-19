@@ -59,6 +59,7 @@
 #include "database/sound_index.h"
 #include "viewers/playback_viewer/pv_index.h"  /* the Playback Report's two */
 #include "viewers/playback_viewer/pv_names.h"  /* caches, cleared together */
+#include "viewers/notes_viewer/notes_viewer.h" /* NOTES_COLOURS_CUSTOM */
 
 
 /** Tagcache menu **/
@@ -1184,10 +1185,29 @@ MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
 MENUITEM_SETTING(liner_notes, &global_settings.liner_notes, NULL);
 MENUITEM_SETTING(liner_notes_colours, &global_settings.liner_notes_colours,
                  NULL);
+/* Custom's three rows, offered only while Custom is chosen */
+static int liner_notes_custom_callback(int action,
+                                       const struct menu_item_ex *this_item,
+                                       struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.liner_notes_colours != NOTES_COLOURS_CUSTOM)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_SETTING(liner_notes_text, &global_settings.liner_notes_text,
+                 liner_notes_custom_callback);
+MENUITEM_SETTING(liner_notes_links, &global_settings.liner_notes_links,
+                 liner_notes_custom_callback);
+MENUITEM_SETTING(liner_notes_page, &global_settings.liner_notes_page,
+                 liner_notes_custom_callback);
 MENUITEM_SETTING(liner_notes_banners, &global_settings.liner_notes_banners,
                  NULL);
 MAKE_MENU(liner_notes_menu, ID2P(LANG_NOTES_SETTING), 0, Icon_NOICON,
-          &liner_notes, &liner_notes_colours, &liner_notes_banners);
+          &liner_notes, &liner_notes_colours, &liner_notes_text,
+          &liner_notes_links, &liner_notes_page, &liner_notes_banners);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
 MENUITEM_SETTING(segregate_podcasts, &global_settings.segregate_podcasts,

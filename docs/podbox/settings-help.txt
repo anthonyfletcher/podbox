@@ -809,7 +809,20 @@ Where a page's colours come from. Page's Art tints each page from its own
 album cover or artist picture, links in its most vivid colour; a
 page with no picture keeps the last page's. Theme follows the theme and its
 dynamic colours, so pages take the playing album's. Text Viewer's uses the
-text viewer's colour mode, Custom included.
+text viewer's colour mode, Custom included. Custom sets the text, the links
+and the page apart, each from the art, the theme, white or black.
+
+[liner notes text colour]
+The colour of a page's text under Custom. Page's Art is the picture's most
+vivid colour, held to a tone that reads on the page.
+
+[liner notes link colour]
+The colour of a page's links under Custom; the current one is drawn in the
+page's colour on it. Page's Art is the picture's most vivid colour.
+
+[liner notes page colour]
+The colour of the page under Custom. Page's Art is a deep tint of the
+picture's main colour under light text, a pale one under dark.
 
 [liner notes banners]
 Shows a picture at the top of each page: your own, or a band of the

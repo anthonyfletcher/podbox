@@ -27780,3 +27780,45 @@
     *: "播放 1 次"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NOTES_LINK_COLOUR
+  desc: liner notes custom colours: the colour of links
+  user: core
+  <source>
+    *: "Link Colour"
+  </source>
+  <dest>
+    *: "链接颜色"
+  </dest>
+  <voice>
+    *: "链接颜色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_WHITE
+  desc: liner notes custom colours option: white
+  user: core
+  <source>
+    *: "White"
+  </source>
+  <dest>
+    *: "白色"
+  </dest>
+  <voice>
+    *: "白色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BLACK
+  desc: liner notes custom colours option: black
+  user: core
+  <source>
+    *: "Black"
+  </source>
+  <dest>
+    *: "黑色"
+  </dest>
+  <voice>
+    *: "黑色"
+  </voice>
+</phrase>

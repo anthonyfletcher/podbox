@@ -27791,3 +27791,45 @@
     *: "1-mal gespielt"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NOTES_LINK_COLOUR
+  desc: liner notes custom colours: the colour of links
+  user: core
+  <source>
+    *: "Link Colour"
+  </source>
+  <dest>
+    *: "Linkfarbe"
+  </dest>
+  <voice>
+    *: "Linkfarbe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_WHITE
+  desc: liner notes custom colours option: white
+  user: core
+  <source>
+    *: "White"
+  </source>
+  <dest>
+    *: "Weiß"
+  </dest>
+  <voice>
+    *: "Weiß"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_BLACK
+  desc: liner notes custom colours option: black
+  user: core
+  <source>
+    *: "Black"
+  </source>
+  <dest>
+    *: "Schwarz"
+  </dest>
+  <voice>
+    *: "Schwarz"
+  </voice>
+</phrase>

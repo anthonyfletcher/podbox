@@ -15,6 +15,18 @@ enum
                                    tint; a page without one keeps the last */
     NOTES_COLOURS_THEME,        /* the theme's, through dynamic colours */
     NOTES_COLOURS_TEXT_VIEWER,  /* the text viewer's colour mode */
+    NOTES_COLOURS_CUSTOM,       /* text, links and page each chosen */
+};
+
+/* Under Custom, where the text, the links or the page take their colour */
+enum
+{
+    NOTES_FROM_ART = 0,         /* the page's picture: its vivid colour for
+                                   text and links, a deep or pale tint of
+                                   its main one for the page */
+    NOTES_FROM_THEME,
+    NOTES_FROM_WHITE,
+    NOTES_FROM_BLACK,
 };
 
 /* The page of the playing track's album, at the track. Each of these
