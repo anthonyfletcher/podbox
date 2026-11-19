@@ -925,6 +925,13 @@ first, or by album artist and then name or year.
 [album covers sort artists by]
 The order artist portraits appear in: by name, or most played first.
 
+[album covers portraits show]
+Who Artist Portraits shows. Album Artists is one portrait per album artist.
+Adding Artists also shows each name in the Artist tag that is not an album
+artist, such as a guest on one track, and their portrait opens the albums
+they appear on. With Photos adds only those with a picture in /Artwork/People;
+a picture added there shows once the art cache next updates.
+
 [album covers sort ignoring articles]
 Sorts covers and portraits as if a leading "The", "A" or "An" were not there,
 so The Beatles sits among the Bs. The names still show in full.

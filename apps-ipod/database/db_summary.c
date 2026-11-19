@@ -104,6 +104,7 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
         d->seek = r.seek;
         d->art_hash = r.art_hash;
         d->cover_hash = r.cover_hash;
+        d->tag = tag_albumartist;
         n++;
     }
     t->artist_ct = n;
@@ -477,6 +478,29 @@ int db_summary_album_tracks(const struct album_data *album,
     if (!album_search(&tcs, album))
         return -1;
     return album_tracks_from(&tcs, album, sink, data);
+}
+
+int db_summary_artist_tracks(int tag, long seek,
+                             bool (*sink)(const char *path, void *data),
+                             void *data)
+{
+    struct tagcache_search tcs;
+    char buf[MAX_PATH];
+    int added = 0;
+
+    cpu_boost(true);
+    if (!tagcache_search(&tcs, tag_filename))
+    {
+        cpu_boost(false);
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return -1;
+    }
+    tagcache_search_add_filter(&tcs, tag, seek);
+    while (tagcache_get_next(&tcs, buf, sizeof(buf)) && sink(buf, data))
+        added++;
+    tagcache_search_finish(&tcs);
+    cpu_boost(false);
+    return added;
 }
 
 /* The playlist being filled, and where in it the track to start on went */

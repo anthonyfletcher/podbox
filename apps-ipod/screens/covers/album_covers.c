@@ -865,10 +865,22 @@ static void album_prepare(void)
  * album. Copied: the carousel's index goes when the carousel does. */
 static struct album_data cover_album;
 static char cover_name[TAGCACHE_BUFSZ + 1];
+/* The tag cover_album.artist_seek is in: tag_albumartist, or for a track
+ * artist's portrait tag_virt_canonicalartist */
+static int cover_artist_tag = tag_albumartist;
 
 static bool cover_insert_sink(const char *path, void *data)
 {
     return playlist_insert_context_add(data, path) >= 0;
+}
+
+/* The cover's tracks to 'sink', by album or by artist */
+static int cover_tracks(bool (*sink)(const char *path, void *data), void *data)
+{
+    if (cover_artist_tag != tag_albumartist)
+        return db_summary_artist_tracks(cover_artist_tag,
+                                        cover_album.artist_seek, sink, data);
+    return db_summary_album_tracks(&cover_album, sink, data);
 }
 
 static bool cover_insert(int position, bool queue, bool create_new)
@@ -882,7 +894,7 @@ static bool cover_insert(int position, bool queue, bool create_new)
         playlist_insert_context_release(&ctx);
         return false;
     }
-    added = db_summary_album_tracks(&cover_album, cover_insert_sink, &ctx);
+    added = cover_tracks(cover_insert_sink, &ctx);
     playlist_insert_context_release(&ctx);
     return added > 0;
 }
@@ -918,7 +930,7 @@ static int cover_write(const char *playlist, bool new_playlist)
         return -1;
     if (!new_playlist)
         start = lseek(ctx.fd, 0, SEEK_END);
-    n = db_summary_album_tracks(&cover_album, cover_write_sink, &ctx);
+    n = cover_tracks(cover_write_sink, &ctx);
     if (ctx.failed && !new_playlist)
         ftruncate(ctx.fd, start);
     if (close(ctx.fd) < 0)
@@ -942,7 +954,16 @@ static int cover_go_to_artist(void)
 void carousel_cover_arm(const struct album_data *album, const char *name)
 {
     cover_album = *album;
+    cover_artist_tag = tag_albumartist;
     snprintf(cover_name, sizeof(cover_name), "/%s", name);
+}
+
+void carousel_cover_arm_artist(int tag, long seek, const char *name)
+{
+    const struct album_data artist = { .seek = -1, .artist_seek = seek };
+
+    carousel_cover_arm(&artist, name);
+    cover_artist_tag = tag;
 }
 
 /* The cover's album, read when its menu opens, for its bio and notes */

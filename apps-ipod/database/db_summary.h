@@ -47,9 +47,12 @@ struct artist_data {
      * guest appearance counts towards the record's artist, not the guest */
     int playcount;
     long lastplayed;
-    long seek;    /* album artist taglist position */
+    long seek;    /* taglist position in 'tag' */
     unsigned int art_hash;  /* art_name_hash() of its name */
     unsigned int cover_hash; /* art_hash of its latest album, 0 for none */
+    /* tag_albumartist; tag_virt_canonicalartist for a track artist who is no
+     * album artist, added by a caller */
+    int tag;
 };
 
 /* The lists, and the database commit they were copied at. Seeks are seeks
@@ -152,5 +155,11 @@ int  db_summary_play_pending(void);
 int  db_summary_album_tracks(const struct album_data *album,
                              bool (*sink)(const char *path, void *data),
                              void *data);
+
+/* The same for every track whose 'tag' is the name at 'seek', in search
+ * order: an artist's tracks by the Artist tag rather than by album artist */
+int  db_summary_artist_tracks(int tag, long seek,
+                              bool (*sink)(const char *path, void *data),
+                              void *data);
 
 #endif /* _DB_SUMMARY_H */

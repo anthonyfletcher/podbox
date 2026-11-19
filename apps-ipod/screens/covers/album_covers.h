@@ -53,6 +53,15 @@ enum sort_artists_by_values {
     SORT_ARTISTS_BY_PLAYS,
 };
 
+/* Values for global_settings.album_covers_portraits_show: who Artist
+ * Portraits shows besides the album artists -- the Artist tag's other names,
+ * all of them or those with a picture in /Artwork/People */
+enum portraits_show_values {
+    PORTRAITS_SHOW_ALBUM_ARTISTS = 0,
+    PORTRAITS_SHOW_ARTISTS,
+    PORTRAITS_SHOW_ARTISTS_WITH_PHOTOS,
+};
+
 /* Values for global_settings.album_covers_year_sort_order, which is read only
  * to carry an old "descending" into the sort list above. */
 enum year_sort_order_values {
@@ -101,6 +110,9 @@ int carousel_settings_menu(void);
  * GO_TO_PREVIOUS to open the carousel again. */
 struct album_data;
 void carousel_cover_arm(const struct album_data *album, const char *name);
+/* An artist's every track by 'tag' rather than by album artist: a track
+ * artist's, by tag_virt_canonicalartist */
+void carousel_cover_arm_artist(int tag, long seek, const char *name);
 int carousel_cover_menu(void);
 
 /* The orders the carousels sort by: their own settings, or under Sort Same as

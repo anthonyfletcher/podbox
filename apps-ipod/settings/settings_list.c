@@ -2161,6 +2161,12 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
+    CHOICE_SETTING(0, album_covers_portraits_show, LANG_PORTRAITS_SHOW,
+                  0, "album covers portraits show",
+                  "album artists,artists,artists with photos", NULL, 3,
+                  ID2P(LANG_ID3_ALBUMARTISTS),
+                  ID2P(LANG_PORTRAITS_ALBUM_ARTISTS_AND_ARTISTS),
+                  ID2P(LANG_PORTRAITS_ARTISTS_WITH_PHOTOS)),
     /* No menu row: marks that settings_load() has carried Music's Sort
      * Ignoring The/A/An into the carousel's own. */
     OFFON_SETTING(F_BANFROMQS, album_covers_articles_carried,

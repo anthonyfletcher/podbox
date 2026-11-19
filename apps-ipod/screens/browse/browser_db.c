@@ -4325,9 +4325,10 @@ bool browser_db_take_walk_fallback(void)
     return fell_back;
 }
 
-/* Set by browser_db_enter_artist_albums_on_next_load(); consumed on the next fresh
- * root load. -1 means none armed. */
+/* Set by browser_db_enter_artist_on_next_load(); consumed on the next fresh
+ * root load. -1 means none armed. The tag is the root row's to enter by. */
 static long pending_artist_seek = -1;
+static int pending_artist_tag;
 static char pending_artist_title[MENUENTRY_MAX_NAME];
 
 /* Arms a direct jump from the root into a specific album-artist's own album
@@ -4340,11 +4341,19 @@ static char pending_artist_title[MENUENTRY_MAX_NAME];
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title)
 {
-    pending_artist_seek = albumartist_seek;
+    browser_db_enter_artist_on_next_load(tag_albumartist, albumartist_seek,
+                                         artist_title);
+}
+
+void browser_db_enter_artist_on_next_load(int tag, long seek,
+                                          const char *artist_title)
+{
+    pending_artist_seek = seek;
+    pending_artist_tag = tag;
     browse_picked_by_name = true;
     strlcpy(pending_artist_title, artist_title ? artist_title : "",
             sizeof(pending_artist_title));
-    browser_db_enter_by_tag_on_next_load(tag_albumartist);
+    browser_db_enter_by_tag_on_next_load(tag);
 }
 
 /* Finds the row in the currently-loaded root ("main") menu whose first tag
@@ -4441,18 +4450,18 @@ static bool enter_album_tracks_directly(struct browser_context *c, long album_se
     return true;
 }
 
-/* Consumes pending_artist_seek: points csi at the root's "Album Artist" row's
- * search_instruction and jumps straight to its second level, filtered by the
- * album-artist's seek, without displaying the album-artist grouping itself.
- * That level is the albums in the shipped albumartist -> album -> title, or
- * whatever a custom tagnavi puts first under the artist (grouping, say); any
- * level above the tracks will do. Leaves dirlevel at 0 (see
- * enter_album_tracks_directly for why). Returns false if the root has no
- * albumartist row of at least three levels. */
-static bool enter_artist_albums_directly(struct browser_context *c,
+/* Consumes pending_artist_seek: points csi at the root's row for 'tag' --
+ * "Album Artist", or "Artist" for a track artist -- and jumps straight to its
+ * second level, filtered by the artist's seek, without displaying the artist
+ * grouping itself. That level is the albums in the shipped albumartist ->
+ * album -> title, or whatever a custom tagnavi puts first under the artist
+ * (grouping, say); any level above the tracks will do. Leaves dirlevel at 0
+ * (see enter_album_tracks_directly for why). Returns false if the root has no
+ * row for 'tag' of at least three levels. */
+static bool enter_artist_albums_directly(struct browser_context *c, int tag,
                                          long artist_seek, const char *artist_title)
 {
-    int idx = browser_db_find_root_entry_by_tag(tag_albumartist);
+    int idx = browser_db_find_root_entry_by_tag(tag);
     struct search_instruction *si;
 
     if (idx < 0)
@@ -4969,18 +4978,19 @@ int browser_db_load(struct browser_context* c)
              * customized away from the shipped shape) -- fall through to
              * the root menu instead of a dead end. */
         }
-        else if (target_tag == tag_albumartist && pending_artist_seek != -1)
+        else if (target_tag == pending_artist_tag && pending_artist_seek != -1)
         {
-            /* Artist portraits' jump: straight to a specific album-artist's
+            /* Artist portraits' jump: straight to a specific artist's
              * album listing, mirroring the tag_album case above. */
             long artist_seek = pending_artist_seek;
             char artist_title[MENUENTRY_MAX_NAME];
             strlcpy(artist_title, pending_artist_title, sizeof(artist_title));
             pending_artist_seek = -1;
 
-            if (enter_artist_albums_directly(c, artist_seek, artist_title))
+            if (enter_artist_albums_directly(c, target_tag, artist_seek,
+                                             artist_title))
                 return browser_db_load(c);
-            /* No albumartist row to anchor on -- fall through. */
+            /* No row for the artist's tag to anchor on -- fall through. */
         }
         else
         {
@@ -7185,6 +7195,13 @@ static bool artist_by_name(int tag, long seek, struct tagcache_artist *ar)
             hi = mid - 1;
     }
     return false;
+}
+
+long browser_db_album_artist_seek(int tag, long seek)
+{
+    struct tagcache_artist ar;
+
+    return artist_by_name(tag, seek, &ar) ? ar.seek : -1;
 }
 
 /* The plays of the album artist row 'seek' of a 'tag' list names. An artist

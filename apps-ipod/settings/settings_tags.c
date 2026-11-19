@@ -255,6 +255,7 @@ static const struct tag_row tag_rows[] = {
 { "album covers statusbar",       TAG_APPEARANCE,                "carousel status bar" },
 { "album covers sort albums by",  TAG_LIBRARY,                   "carousel sorting year artist" },
 { "album covers sort artists by", TAG_LIBRARY,                   "carousel sorting" },
+{ "album covers portraits show", TAG_LIBRARY,                    "carousel artist portraits album artists photo" },
 { "album covers sort ignoring articles", TAG_LIBRARY,            "carousel sorting ignore the a an" },
 { "album covers sort same as music", TAG_LIBRARY,                "carousel sorting music" },
 { "album covers view mode",       TAG_APPEARANCE,                "carousel 3d flat" },

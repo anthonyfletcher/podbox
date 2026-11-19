@@ -294,6 +294,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Sort ▸ Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | Artist + Name |  |
 | Sort ▸ Artists By | The order artist portraits appear in: by name, or most played first. | Name |  |
 | Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | No |  |
+| Portraits Show | Who Artist Portraits shows. Album Artists is one portrait per album artist. Adding Artists also shows each name in the Artist tag that is not an album artist, such as a guest on one track, and their portrait opens the albums they appear on. With Photos adds only those with a picture in /Artwork/People; a picture added there shows once the art cache next updates. | Album Artists |  |
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | Show tracks |  |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175% |  |
 | Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | Medium |  |

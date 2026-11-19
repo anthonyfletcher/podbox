@@ -778,6 +778,7 @@ struct user_settings
     int  album_covers_on_select;  /* ON_SELECT_*: browse the album, or play it */
     int  album_covers_sort_albums_by;
     int  album_covers_sort_artists_by; /* SORT_ARTISTS_*: portraits ordering */
+    int  album_covers_portraits_show;  /* PORTRAITS_SHOW_*: who has a portrait */
     /* The carousel's own Sort Ignoring The/A/An */
     bool album_covers_sort_ignore_articles;
     /* The carousel takes the Music lists' three sort settings instead of its

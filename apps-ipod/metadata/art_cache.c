@@ -47,6 +47,7 @@
 #include "art_sizes.h"
 #include "art_banner.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
+#include "screens/covers/album_covers.h"  /* PORTRAITS_SHOW_* */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"   /* which albums are books */
@@ -1847,13 +1848,16 @@ static size_t aa_work_bytes(void)
  * root or a library folder. A library folder holds the folders named for
  * two or more people, as Music/ does; Prince/ holding folders named for
  * Prince and for Prince & The Revolution is still Prince's. Only cover.*
- * and folder.* in the folder itself count.
+ * and folder.* in the folder itself count. A track's artist who is no album
+ * artist has only the first: the folders around a guest's track are the
+ * album artist's.
  *
  * So a pass takes three walks for people: one notes every track's named
  * folders and library folders, which the album walk does when it sees the
  * whole library, one settles pictures, and one, only when needed, gives the
  * people whose named folder had no image their fallback -- which cannot be
- * tried before every named folder has been.
+ * tried before every named folder has been. Then one crawl of the track
+ * artists' names settles those who are no album artist.
  *
  * The first walk also notes which folders hold more than one book of a kind,
  * whose images are then no book's cover, so a book's own cover is settled on
@@ -2173,6 +2177,15 @@ static void aa_central_load(bool covers)
     closedir(d);
 }
 
+/* Whether /Artwork/People holds any file at all */
+static bool aa_central_people(void)
+{
+    for (int i = 0; i < aa_central_count; i++)
+        if (!aa_central[i].covers)
+            return true;
+    return false;
+}
+
 /* The first file of /Artwork/People named for 'p', into aa_artpath */
 static bool aa_central_find(const struct aa_person *p)
 {
@@ -2446,10 +2459,46 @@ static bool aa_author_spare(const struct book_entry *e, void *data)
     return true;
 }
 
+/* The track artists' pictures, kept on a pass without the RAM copy. Only
+ * those already tabled are kept, so the rest of the library's names cost
+ * nothing. Which of them are album artists needs the RAM copy, so none is
+ * added to the missing list here. */
+static void aa_track_artists_spare(bool *aborted)
+{
+    struct tagcache_search tcs;
+    int since_yield = 0;
+
+    if (!tagcache_search(&tcs, tag_virt_canonicalartist))
+    {
+        aa_unreached = true;
+        return;
+    }
+    while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
+    {
+        unsigned int key = art_name_hash(tcs.result);
+
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            *aborted = true;
+            break;
+        }
+        if (key)
+            aa_spare(key);
+        if (++since_yield >= 16)
+        {
+            since_yield = 0;
+            yield();
+        }
+    }
+    if (tcs.failed && !*aborted)
+        aa_unreached = true;
+    tagcache_search_finish(&tcs);
+}
+
 /* The people step without the RAM copy, which the album rows it settles
  * pictures through need: no picture is looked for, but those of the album
- * artists and authors still in the library are kept, and the artists with
- * none are listed */
+ * artists, track artists and authors still in the library are kept, and the
+ * album artists with none are listed */
 static void aa_people_spare(bool *aborted)
 {
     struct tagcache_search tcs;
@@ -2494,6 +2543,8 @@ static void aa_people_spare(bool *aborted)
     if (tcs.failed && !*aborted)
         aa_unreached = true;
     tagcache_search_finish(&tcs);
+    if (!*aborted)
+        aa_track_artists_spare(aborted);
     if (!*aborted)
         book_index_each(aa_author_spare, aborted, &aa_book_text);
 }
@@ -2585,6 +2636,73 @@ static void aa_people_report(void)
     }
 }
 
+/* The pictures of track artists who are no album artist, after the walks
+ * have settled everyone they note. Only a name with a file in /Artwork/People
+ * takes a person and a table slot, so the tables grow with the pictures added
+ * rather than with the library. While Artist Portraits shows them, those
+ * without one join the missing list. */
+static void aa_track_artists(const struct aa_people_ctx *c)
+{
+    struct tagcache_search tcs;
+    int since_yield = 0;
+    bool list_missing = global_settings.album_covers_portraits_show
+                        != PORTRAITS_SHOW_ALBUM_ARTISTS;
+
+    if (!list_missing && !aa_central_people())
+        return;                         /* no picture to make, no list */
+    if (!tagcache_search(&tcs, tag_virt_canonicalartist))
+    {
+        aa_unreached = true;
+        return;
+    }
+    while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
+    {
+        struct aa_person probe = { 0 };
+        struct aa_person *p;
+        struct aa_stamp *slot;
+
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            *c->aborted = true;
+            break;
+        }
+        if (++since_yield >= 16)
+        {
+            since_yield = 0;
+            yield();
+        }
+        probe.key = art_name_hash(tcs.result);
+        probe.alt = art_name_alt_hash(tcs.result);
+        if (!probe.key || !strcmp(tcs.result, UNTAGGED)
+            || aa_person_get(probe.key, false))
+            continue;
+        if (!aa_central_find(&probe))
+        {
+            if (list_missing)
+                path_list_write_record(&noart_artists, tcs.result);
+            continue;
+        }
+        if (!(p = aa_person_get(probe.key, true)))
+            break;
+        p->alt = probe.alt;
+        p->flags |= AA_PERSON_SEEN;
+        if (aa_was_visited(p->key) || !(slot = aa_slot(p->key)))
+            p->flags |= AA_PERSON_DONE;     /* a work's key, or no room */
+        else if (!aa_check_all && slot->stamp != AA_STAMP_NONE
+                 && aa_thumbs_exist(p->key))
+            aa_person_settled(p, true);
+        else
+            aa_person_fill(p, slot, "", 1, c);  /* no folder to take over */
+        if (*c->aborted)
+            break;
+        if (list_missing && !(p->flags & AA_PERSON_ART))
+            path_list_write_record(&noart_artists, tcs.result);
+    }
+    if (tcs.failed && !*c->aborted)
+        aa_unreached = true;
+    tagcache_search_finish(&tcs);
+}
+
 /* Every person's picture, once the album walk and the books are done */
 static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
 {
@@ -2613,8 +2731,11 @@ static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
         if (*aborted)
             return false;
     }
+    /* The album artists first: the missing list stops at PATH_LIST_MAX, and
+     * a library's guests would otherwise fill it */
     aa_people_report();
-    return true;
+    aa_track_artists(&c);
+    return !*aborted;
 }
 
 /* ---- books ---- */

@@ -207,6 +207,11 @@ static void pf_update_dynamic_colors(void)
 #define DISPLAY_HEIGHT (LCD_HEIGHT * 2 / 3)
 #define DISPLAY_WIDTH MAX((LCD_HEIGHT * LCD_PIXEL_ASPECT_HEIGHT / \
     LCD_PIXEL_ASPECT_WIDTH / 2), (LCD_WIDTH * 2 / 5))
+/* The scratch the placeholder is drawn into, and the largest slide
+ * read_aat() accepts */
+#define PLACEHOLDER_SZ ALIGN_UP((size_t)DISPLAY_WIDTH * DISPLAY_WIDTH \
+                                * sizeof(pix_t), sizeof(long))
+#define SLIDE_MAX ((size_t)DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(pix_t))
 #define CAM_DIST MAX(MIN(LCD_HEIGHT,LCD_WIDTH),120)
 #define CAM_DIST_R (CAM_DIST << PFREAL_SHIFT)
 #define DISPLAY_LEFT_R (PFREAL_HALF - LCD_WIDTH * PFREAL_HALF)
@@ -3722,6 +3727,13 @@ static void error_wait(const char *message)
     sleep(2 * HZ);
 }
 
+/* The placeholder and two covers, as init() checks below, and the alignment
+ * it takes first */
+size_t carousel_slide_reserve(void)
+{
+    return PLACEHOLDER_SZ + 2 * SLIDE_MAX + sizeof(long);
+}
+
 static bool init(void)
 {
     int ret = SUCCESS;
@@ -3926,11 +3938,10 @@ static bool init(void)
      * writes that back out. Cover art never passes through here -- the
      * thumbnails belong to the shared cache (metadata/art_cache.c) and
      * read_aat() reads them straight into buflib. */
-    size_t placeholder_sz = ALIGN_UP((size_t)DISPLAY_WIDTH * DISPLAY_WIDTH
-                                   * sizeof(pix_t), sizeof(long));
+    size_t placeholder_sz = PLACEHOLDER_SZ;
     /* The largest slide read_aat() will accept, and so what one costs the
      * cache below. */
-    size_t slide_max = (size_t)DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(pix_t);
+    size_t slide_max = SLIDE_MAX;
 
     ALIGN_BUFFER(carousel_idx.buf, carousel_idx.buf_sz, sizeof(long));
 

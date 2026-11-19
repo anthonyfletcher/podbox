@@ -28068,3 +28068,45 @@
     *: "1 play"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PORTRAITS_SHOW
+  desc: in Carousel settings: who Artist Portraits shows
+  user: core
+  <source>
+    *: "Portraits Show"
+  </source>
+  <dest>
+    *: "Portraits Show"
+  </dest>
+  <voice>
+    *: "Portraits Show"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PORTRAITS_ALBUM_ARTISTS_AND_ARTISTS
+  desc: Portraits Show option: album artists and every artist the Artist tag names
+  user: core
+  <source>
+    *: "Album Artists and Artists"
+  </source>
+  <dest>
+    *: "Album Artists and Artists"
+  </dest>
+  <voice>
+    *: "Album Artists and Artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PORTRAITS_ARTISTS_WITH_PHOTOS
+  desc: Portraits Show option: album artists, and the Artist tag's other names that have a photo
+  user: core
+  <source>
+    *: "Album Artists and Artists with Photos"
+  </source>
+  <dest>
+    *: "Album Artists and Artists with Photos"
+  </dest>
+  <voice>
+    *: "Album Artists and Artists with Photos"
+  </voice>
+</phrase>
