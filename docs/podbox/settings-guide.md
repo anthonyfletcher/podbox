@@ -423,6 +423,7 @@ Separator set above zero.
 | Volume Display | Whether the status bar shows the volume as a bar or as a number. | Graphic |  |
 | Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | Bar (Gradient Colour) |  |
 | Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | Off | **Adv** |
+| Screen Transitions | How one screen gives way to the next when you go into a menu, a list or Now Playing and back. Slide moves the new screen in from the side, as an iPod does; Off changes it at once. It works with every theme. | Off |  |
 
 ### Appearance — Interface Elements — Activity Indicators
 

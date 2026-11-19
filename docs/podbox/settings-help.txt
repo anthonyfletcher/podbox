@@ -1026,6 +1026,11 @@ bar rather than against the background.
 The thickness of the rule between rows, in pixels. Auto follows the font, and
 off draws none.
 
+[screen transitions]
+How one screen gives way to the next when you go into a menu, a list or Now
+Playing and back. Slide moves the new screen in from the side, as an iPod
+does; Off changes it at once. It works with every theme.
+
 [list separator color]
 The colour of the rule drawn between rows in lists. Only visible where the
 separator has a height to draw.

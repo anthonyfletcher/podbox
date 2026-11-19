@@ -636,6 +636,7 @@ struct user_settings
     bool show_background_tasks;
     bool show_working;
     bool show_icons;   /* 0=hide 1=show */
+    int screen_transitions; /* 0=off 1=slide */
     bool show_debug_menu; /* show the Debug entry in the System menu */
     int settings_mode; /* SETTINGS_MODE_* enum values */
     int statusbar;    /* STATUSBAR_* enum values */

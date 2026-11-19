@@ -24,6 +24,7 @@
 #include "button-sdl.h"
 #include "lcd-sdl.h"
 #include "screendump.h"
+#include "lcd-slide.h"
 
 SDL_Surface* lcd_surface;
 
@@ -132,6 +133,8 @@ void lcd_update(void)
 
 void lcd_update_rect(int x_start, int y_start, int width, int height)
 {
+    if (lcd_hold_rect(x_start, y_start, width, height))
+        return;
 #ifdef HAVE_LCD_FLIP
     if (sim_lcd_flipped)
     {

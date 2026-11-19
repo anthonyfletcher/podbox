@@ -286,6 +286,7 @@ static const struct tag_row tag_rows[] = {
 { "ui viewport",         TAG_ADVANCED|TAG_THEMEAUTHOR,           "viewport layout" },
 { "progress bar radius", TAG_ADVANCED|TAG_THEMEAUTHOR,           "progress bar corner" },
 { "show icons",          TAG_APPEARANCE,                         "icons list" },
+{ "screen transitions",  TAG_APPEARANCE,                         "animation slide" },
 { "foreground color",    TAG_APPEARANCE,                         "colour text" },
 { "background color",    TAG_APPEARANCE,                         "colour" },
 { "selector type",       TAG_APPEARANCE,                         "line selector cursor highlight" },

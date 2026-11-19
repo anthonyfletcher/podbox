@@ -28152,3 +28152,31 @@
     *: "Black"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SCREEN_TRANSITIONS
+  desc: in Appearance > Interface Elements: how one screen gives way to the next
+  user: core
+  <source>
+    *: "Screen Transitions"
+  </source>
+  <dest>
+    *: "Screen Transitions"
+  </dest>
+  <voice>
+    *: "Screen Transitions"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRANSITION_SLIDE
+  desc: Screen Transitions option: the next screen slides in from the side
+  user: core
+  <source>
+    *: "Slide"
+  </source>
+  <dest>
+    *: "Slide"
+  </dest>
+  <voice>
+    *: "Slide"
+  </voice>
+</phrase>

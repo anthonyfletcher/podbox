@@ -40,6 +40,7 @@
 #if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
 #include "videoout.h"
 #endif
+#include "lcd-slide.h"
 
 
 // TODO TODO TODO: HAVE_LCD_ENABLE
@@ -431,6 +432,8 @@ void lcd_update_rect(int x, int y, int width, int height)
     /* the lock's holder cannot run with interrupts off */
     bool lock = irq_enabled();
 
+    if (lcd_hold_rect(x, y, width, height))
+        return;
     if (lock)
         mutex_lock(&lcd_mutex);
     if (lcd_ispowered)
@@ -466,6 +469,43 @@ void lcd_update_rect(int x, int y, int width, int height)
     }
     if (lock)
         mutex_unlock(&lcd_mutex);
+}
+
+/* A screen transition's frame (lcd-slide.h): its rows put together in the
+ * DMA buffer, one run from each screen, and sent as lcd_update_rect()
+ * sends a rectangle. */
+bool lcd_slide_rect(int x, int y, int width, int height, int split,
+                    const fb_data *left, int left_x,
+                    const fb_data *right, int right_x)
+{
+    if (width <= 0 || height <= 0)
+        return true;
+
+    const fb_data *l = left + LCD_WIDTH * y + left_x;
+    const fb_data *r = right + LCD_WIDTH * y + right_x;
+    uint16_t *out = lcd_dblbuf[0];
+
+    mutex_lock(&lcd_mutex);
+    bool sent = lcd_ispowered;
+    if (sent)
+    {
+        displaylcd_wait_dma();
+        displaylcd_setup(x, y, width, height);
+        for (int row = 0; row < height; row++)
+        {
+            memcpy(out, l, split * 2);
+            memcpy(out + split, r, (width - split) * 2);
+            out += width;
+            l += LCD_WIDTH;
+            r += LCD_WIDTH;
+        }
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
+        videoout_mirror_rgb565(lcd_dblbuf[0], x, y, width, height, width);
+#endif
+        displaylcd_dma(width * height);
+    }
+    mutex_unlock(&lcd_mutex);
+    return sent;
 }
 
 /* Line write helper function for lcd_yuv_blit. Writes two lines of yuv420. */
@@ -622,7 +662,9 @@ void lcd_awake(void)
     lcd_run_seq(lcd_info->seq_awake);
     lcd_ispowered = true;       // XXX: we have to put the lcd_ispowered before the lcd_update()
 
-    lcd_update();               // XXX: update the display and wait for the update to finish before returning,
+    /* A transition's hold would keep this update off the panel */
+    lcd_release_updates();
+    lcd_update();              // XXX: update the display and wait for the update to finish before returning,
 
     displaylcd_wait_dma();      //      we should really do sleep_out + lcd_update + display_on,
                                 //      we can put a command in the sequence to do it

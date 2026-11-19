@@ -61,6 +61,7 @@
 #include "screens/context_menu.h"
 #include "core_alloc.h"
 #include "draw/img_filter.h"   /* the row chain the skin hands down */
+#include "draw/transition.h"
 #include "system/format_time.h"   /* %LH(length) */
 #include "skin/custom_tokens.h"   /* %LH's fields */
 #include "metadata/art_cache.h"
@@ -1695,6 +1696,7 @@ static int dirbrowse(void)
         }
         int customaction = ONPLAY_NO_CUSTOMACTION;
         bool do_restore_display = true;
+        int level;                  /* tc.dirlevel before an enter or exit */
             if (id3db && (button == ACTION_STD_OK || button == ACTION_STD_CONTEXT))
             {
                 customaction = browser_db_get_custom_action(&tc);
@@ -1726,6 +1728,7 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_PREVIOUS);
                     }
                 }
+                level = tc.dirlevel;
                 enter_rc = id3db ? browser_db_enter(&tc, true)
                                  : browser_disk_enter(&tc);
                 switch (enter_rc)
@@ -1753,6 +1756,9 @@ static int dirbrowse(void)
                     default:
                         break;
                 }
+                /* A level down: the list redrawn below slides in */
+                if (!exit_func && tc.dirlevel > level)
+                    transition_begin(TRANSITION_FORWARD);
                 restore = do_restore_display;
                 break;
 
@@ -1775,11 +1781,14 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_ROOT);
                 }
 
+                level = tc.dirlevel;
                 if (id3db)
                     browser_db_exit(&tc, true);
                 else
                     if (browser_disk_exit(&tc) == 3)
                         exit_func = true;
+                if (!exit_func && tc.dirlevel < level)
+                    transition_begin(TRANSITION_BACK);
 
                 restore = do_restore_display;
                 break;

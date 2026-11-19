@@ -26,6 +26,7 @@
 #include "system/appevents.h"
 #include "usb_screen.h"
 #include "draw/viewport.h"
+#include "draw/transition.h"
 #include "skin/skin_engine.h"   /* skin_inhibit_flush, skin_flush_dirty */
 #include "playlist/playlist.h"
 #include "system/activity.h"
@@ -235,6 +236,8 @@ void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
 
     struct usb_screen_vps_t usb_screen_vps_ar[NB_SCREENS];
 
+    /* Shown at once: nothing here waits in get_action() to slide to it */
+    transition_cancel();
     push_current_activity(ACTIVITY_USBSCREEN);
 
     usb_hid = global_settings.usb_hid;

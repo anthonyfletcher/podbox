@@ -75,6 +75,7 @@
 #include "screens/shortcuts.h"
 #include "system/appevents.h"
 #include "draw/viewport.h"
+#include "draw/transition.h"
 #include "audio/pcmbuf.h"
 #include "widgets/option_select.h"
 #include "playlist/viewer.h"
@@ -602,8 +603,19 @@ static void gwps_enter_wps(bool theme_enabled)
     send_event(GUI_EVENT_ACTIONUPDATE, (void*)1);
 }
 
+/* Leaving for a list: the slide away is begun while the skin still shows,
+ * as gwps_leave_wps() takes it down */
+static void leave_for_list(void)
+{
+    transition_begin(TRANSITION_BACK);
+    transition_whole_screen();
+    gwps_leave_wps(true);
+}
+
 static long do_wps_exit(long action)
 {
+    transition_begin(TRANSITION_BACK);
+    transition_whole_screen();
     audio_pause();
     update_non_static();
     book_resume_save();
@@ -837,7 +849,7 @@ long gui_wps_show(void)
                         exit = true;
                     else if (button == ACTION_WPS_MENU)
                     {
-                        gwps_leave_wps(true);
+                        leave_for_list();
                         return GO_TO_PREVIOUS;
                     }
                     break;
@@ -857,7 +869,7 @@ long gui_wps_show(void)
                 if (button == ACTION_WPS_MENU
                     && !(get_hotkey(act)->flags & HOTKEY_FLAG_LEAVES))
                 {
-                    gwps_leave_wps(true);
+                    leave_for_list();
                     return GO_TO_PREVIOUS;
                 }
                 if (act == HOTKEY_OFF)
@@ -872,7 +884,10 @@ long gui_wps_show(void)
                 /* A NOSBS action's screen owns the display and turns the
                  * theme off itself, so leave without re-enabling it */
                 theme_enabled = !(get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS);
-                gwps_leave_wps(theme_enabled);
+                if (get_hotkey(act)->flags & HOTKEY_FLAG_LEAVES)
+                    leave_for_list();
+                else
+                    gwps_leave_wps(theme_enabled);
                 ret = context_menu_wps_hotkey(state->id3->path, act);
                 if (ret == ONPLAY_STOP)   /* Stop, from the actions' menu */
                 {
@@ -1115,7 +1130,7 @@ long gui_wps_show(void)
                 ffwd_rew(button, false); /* hopefully fix the ffw/rwd bug */
                 break;
             case ACTION_WPS_VIEW_PLAYLIST:
-                gwps_leave_wps(true);
+                leave_for_list();
                 return GO_TO_PLAYLIST_VIEWER;
                 break;
             default:

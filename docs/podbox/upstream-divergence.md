@@ -75,6 +75,9 @@ fork's USB work; the `tools/` changes are this fork's.
 | `kernel/include/timeout.h` | `MAX_NUM_TIMEOUTS` 24, from 8 | About 15 timeouts can be registered at once with the fork's USB, iAP, DAC search and log timeouts, and a full table drops a registration silently, so that timeout never fires. |
 | `events.c` | `MAX_SYS_EVENTS` 48, from 28 | The fork's resident handlers (debug logs, battery log, palette prefetch), queued storage-idle callbacks and the four the theme turns on when leaving Now Playing filled the table, and a full table panics. |
 | `kernel/hang_catch.c`, `export/hang_catch.h` (new); `SOURCES` | A tick task that, when a timed wait is ten seconds overdue, sends the thread holding the core to a *HANG* screen: its name, the interrupted pc, lr and sp, a backtrace, and the return addresses on its stack, then the clock and disk left as a panic leaves them; the same report goes to the USB log first, waiting up to three seconds for it to reach the disk. It also catches a deadlock, which lets the core switch: the UI thread blocked with no time limit while key presses wait unread for twenty seconds, reported as every thread's state, saved return address and first caller. Started at the end of boot; `powermgmt.c` stops it before powering off or rebooting, whose last step spins; `hang_catch_hold()` keeps it off while `apps-ipod/skin/skin_engine.c` loads a theme | A thread that never yields freezes a cooperative player with no panic. The screen is drawn by that thread, not the tick, as the report waits on the log's writer. It is drawn with interrupts off, so nothing draws over it. A hang with interrupts off is not caught. |
+| `drivers/lcd-slide.c`, `export/lcd-slide.h` (new); `SOURCES` | The hold behind **Screen Transitions** (`apps-ipod/draw/transition.c`): while it is in force, every update from the main core is folded into one deferred rectangle, sent when the hold ends or on the first update after its time is up. Nothing drawn with interrupts off is held. Each driver's `lcd_slide_rect()` sends a rectangle whose rows come from two whole-screen buffers | The slide reads the new screen from the framebuffer and the old one from a copy, so the framebuffer is never written during it and one 150 KB copy is enough. |
+| `target/arm/ipod/video/lcd-video.c` | `lcd_update_rect()` and `lcd_update_start()` first ask `lcd_hold_rect()`. New `lcd_slide_rect()` after `lcd_update()`: under the port lock, each row two `lcd_write_data()` runs by CPU; nothing while the LCD sleeps or the TV runs. `lcd_awake()` ends a hold before its first update | The engine-2 push takes one source. `lcd_awake()` waits for its first update to reach the BCM, so a held one would hang it. |
+| `target/arm/s5l8702/lcd-s5l8702.c` | `lcd_update_rect()` first asks `lcd_hold_rect()`. New `lcd_slide_rect()` puts each row together in `lcd_dblbuf` and sends it as `lcd_update_rect()` does, mirrored to the TV. `lcd_awake()` ends a hold before its first update | Every update already goes through that buffer, so a frame from two screens costs only the two copies a row. |
 
 ## firmware/ — USB, device side
 
@@ -383,7 +386,7 @@ build.
 
 Everything it needed to build is inside `apps-ipod/`; see
 `apps-ipod/sim/README.md`. Three files outside it carry one addition, for
-screenshots, and three a fix for a crash at boot:
+screenshots, three a fix for a crash at boot, and two Screen Transitions:
 
 | File | What changed | Why |
 | --- | --- | --- |
@@ -391,6 +394,7 @@ screenshots, and three a fix for a crash at boot:
 | `firmware/target/hosted/sdl/system-sdl.c`, `kernel-sdl.c`, `system-sdl.h` | `system_init()` calls `sim_kernel_init()`, no longer static, before it starts the event thread; `tick_start()` no longer does | The event thread enters the irq handler for every event. In upstream, an event that arrives before `tick_start()` waits on a condition not yet created, which in SDL 2.30 jumps to address 0: on Windows, 1 boot in 3 to 8 crashes with 0xC0000005. |
 | `firmware/target/hosted/rtc.c` | Under `SIMULATOR`, `sim_screenshot` makes `rtc_read_datetime()` return Monday 2024-01-01 09:00:00 | Every clock and date in the UI reads it. |
 | `uisimulator/common/powermgmt-sim.c` | `sim_screenshot` stops `battery_status_update()`, so the battery stays at 4300 mV, 100 %, not charging | Otherwise the simulated battery drains 1 % a second and cycles through charging. |
+| `firmware/target/hosted/sdl/lcd-bitmap.c`; `lcd-slide-sdl.c` (new), `firmware/SOURCES` | `lcd_update_rect()` first asks `lcd_hold_rect()`; `lcd_slide_rect()` blits its two parts into the LCD surface and shows the rectangle | Screen Transitions in the simulator, as on the players (`drivers/lcd-slide.c` above). |
 
 Two upstream files reach the app layer by bare include name, through `api/` stubs:
 

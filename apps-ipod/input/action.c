@@ -51,6 +51,7 @@
 #include "audio/sound_feedback.h"
 #include "system/shutdown.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
+#include "draw/transition.h"
 
 
 #include "backlight.h"
@@ -745,6 +746,10 @@ static inline int do_backlight(action_last_t *last, action_cur_t *cur, int actio
     return action;
 }
 
+/* True inside action_userabort(): a long operation polling for Cancel has
+ * not finished drawing its screen */
+static bool polling_abort;
+
 /********************************************************************
 * get_action_worker() searches the button list of the passed context
 * for the just pressed button. If there is a match it returns the
@@ -766,6 +771,9 @@ static inline int do_backlight(action_last_t *last, action_cur_t *cur, int actio
 static int get_action_worker(action_last_t *last, action_cur_t *cur)
 {
     send_event(GUI_EVENT_ACTIONUPDATE, NULL);
+    /* The screen and its status bar are drawn: slide to them */
+    if (!polling_abort)
+        transition_run();
 
     /*if button = none/special; returns immediately*/
     if (action_poll_button(last, cur))
@@ -809,7 +817,9 @@ bool action_userabort(int timeout)
      * holding the inhibit keeps it afterwards. */
     bool inhibited = skin_flush_inhibited();
     skin_inhibit_flush(true);
+    polling_abort = true;
     int  action = get_custom_action(CONTEXT_STD, timeout, NULL);
+    polling_abort = false;
     skin_inhibit_flush(inhibited);
     bool ret    = (action == ACTION_STD_CANCEL);
     if (!ret)

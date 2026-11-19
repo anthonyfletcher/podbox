@@ -91,6 +91,7 @@ draw/screen_access.c
 draw/scrollbar.c
 draw/text_shadow.c
 draw/text_wrap.c
+draw/transition.c
 draw/viewport.c
 #if defined(HAVE_ALBUMART) || defined(HAVE_JPEG)
 draw/resize.c

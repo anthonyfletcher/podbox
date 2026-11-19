@@ -24,6 +24,7 @@
 #include "skin/statusbar_skinned.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
 #include "skin/skin_albumart_color.h" /* dynamic_colors_* */
+#include "draw/transition.h"
 #include "dialog.h"
 
 #define DIALOG_MARGIN 10   /* default content inset inside the box */
@@ -697,6 +698,8 @@ int dialog_run(struct dialog *d, int poll_ticks)
 {
     int disp = DIALOG_CONTINUE;
 
+    /* A dialog opens over the screen at once, never slid to */
+    transition_cancel();
     d->poll_ticks = poll_ticks;
 
     skin_hold_scrolling(true);

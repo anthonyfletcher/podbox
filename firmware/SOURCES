@@ -77,6 +77,7 @@ common/devicedata.c
 target/hosted/sdl/button-sdl.c
 target/hosted/sdl/kernel-sdl.c
 target/hosted/sdl/lcd-bitmap.c
+target/hosted/sdl/lcd-slide-sdl.c
 #ifdef HAVE_REMOTE_LCD
 target/hosted/sdl/lcd-remote-bitmap.c
 #endif
@@ -394,6 +395,7 @@ drivers/lcd-2bit-vi.c
 drivers/lcd-16bit-vert.c
 #else
 drivers/lcd-16bit.c
+drivers/lcd-slide.c
 #endif
 #elif (LCD_DEPTH == 24) || (LCD_PIXELFORMAT == XRGB8888)
 drivers/lcd-24bit.c

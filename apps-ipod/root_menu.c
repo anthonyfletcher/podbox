@@ -39,6 +39,7 @@
 #include "input/action.h"
 #include "widgets/yesno.h"
 #include "draw/viewport.h"
+#include "draw/transition.h"
 
 #include "screens/browse/browser.h"
 #include "screens/browse/browser_db.h"
@@ -290,6 +291,14 @@ static bool wait_for_album_tables(void)
     return true;
 }
 
+/* The way a screen leaving with `ret_val` slides: back to the root or the
+ * screen before, on to any other */
+static enum transition_dir leaving_to(int ret_val)
+{
+    return ret_val >= 0 || ret_val == GO_TO_PREVIOUS_MUSIC
+           ? TRANSITION_FORWARD : TRANSITION_BACK;
+}
+
 static int browser(void* param)
 {
     int ret_val;
@@ -468,6 +477,9 @@ static int browser(void* param)
         browse.flags |= BROWSE_SEARCH_ROW;
 
     ret_val = rockbox_browse(&browse);
+
+    /* Ahead of the activity's pop, which clears the list */
+    transition_begin(leaving_to(ret_val));
 
     if (ret_val == GO_TO_WPS
         || ret_val == GO_TO_PREVIOUS_MUSIC
@@ -745,6 +757,29 @@ static int wps_back_to(int screen)
     }
 }
 
+/* The screens that slide in and out with Screen Transitions: lists, which
+ * draw once and wait for a button. Now Playing slides too, the whole screen,
+ * its exits to a list beginning the slide away from it in wps.c. */
+static bool slides(int screen)
+{
+    if (screen >= GO_TO_TAGNAVI_FIRST && screen <= GO_TO_TAGNAVI_LAST)
+        return true;
+    switch (screen)
+    {
+        case GO_TO_FILEBROWSER:
+        case GO_TO_DBBROWSER:
+        case GO_TO_PODCASTS:
+        case GO_TO_MAINMENU:
+        case GO_TO_SYSTEM_SCREEN:
+        case GO_TO_PLAYLISTS_SCREEN:
+        case GO_TO_PLAYLIST_VIEWER:
+        case GO_TO_ALBUM_COVERS_TRACKS:
+            return true;
+        default:
+            return false;
+    }
+}
+
 /* Which of do_menu()'s return codes the root menu passes on, and which it
  * treats as "we are done with that menu". */
 static int menu_result(int result)
@@ -774,6 +809,8 @@ static int playlist_view_catalog(void * param)
     push_current_activity(ACTIVITY_PLAYLISTBROWSER);
     bool item_was_selected = catalog_view_playlists();
 
+    /* Ahead of the activity's pop, which clears the list */
+    transition_begin(item_was_selected ? TRANSITION_FORWARD : TRANSITION_BACK);
     if (item_was_selected)
     {
         pop_current_activity_without_refresh();
@@ -1951,6 +1988,10 @@ static inline int load_screen(int screen)
     enum current_activity activity = ACTIVITY_UNKNOWN;
     if (screen <= GO_TO_ROOT)
         return screen;
+    if (screen == GO_TO_WPS)
+        transition_whole_screen();
+    else if (!slides(screen))
+        transition_cancel();
     if (screen == old_previous)
         old_previous = GO_TO_ROOT;
     global_status.last_screen = screen;
@@ -1973,6 +2014,9 @@ static inline int load_screen(int screen)
         push_current_activity(activity);
 
     ret_val = items[screen].function(items[screen].param);
+
+    if (slides(screen))
+        transition_begin(leaving_to(ret_val));
 
     if (activity != ACTIVITY_UNKNOWN)
     {
@@ -2215,6 +2259,8 @@ void root_menu(void)
                 ignore_back_button_stub(true);
 
                 next_screen = do_menu(&root_menu_, &selected, NULL, false);
+                if (next_screen >= 0)
+                    transition_begin(TRANSITION_FORWARD);
 
                 ignore_back_button_stub(false);
                 came_back = false;

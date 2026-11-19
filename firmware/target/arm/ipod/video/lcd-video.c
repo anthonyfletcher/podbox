@@ -41,6 +41,7 @@
 #include "videoout.h"
 #endif
 #include "lcd-e2-video.h"
+#include "lcd-slide.h"
 
 /* The BCM bus width is 16 bits. But since the low address bits aren't decoded
  * by the chip (the 3 BCM address bits are mapped to address bits 16..18 of the
@@ -529,6 +530,8 @@ void lcd_update_rect(int x, int y, int width, int height)
 {
     bool locked;
 
+    if (lcd_hold_rect(x, y, width, height))
+        return;
 #ifdef HAVE_LCD_UPDATE_ASYNC
     if (!lcd_port_held_elsewhere())
         lcd_update_finish();
@@ -550,6 +553,59 @@ void lcd_update(void)
     lcd_update_rect(0, 0, LCD_WIDTH, LCD_HEIGHT);
 }
 
+/* A screen transition's frame (lcd-slide.h): each row is two runs to the
+ * BCM, one from each screen. By CPU, as the engine takes one source. */
+bool lcd_slide_rect(int x, int y, int width, int height, int split,
+                    const fb_data *left, int left_x,
+                    const fb_data *right, int right_x)
+{
+    if (width <= 0 || height <= 0)
+        return true;
+#ifdef HAVE_LCD_UPDATE_ASYNC
+    if (!lcd_port_held_elsewhere())
+        lcd_update_finish();
+#endif
+    bool locked = lcd_port_lock();
+
+    if (false
+#ifdef HAVE_LCD_SLEEP
+        || !lcd_state.display_on
+#endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+        || tv_on || tv_starting
+#endif
+       )
+    {
+        port_unlock(locked);
+        return false;
+    }
+
+    const fb_data *l = left + LCD_WIDTH * y + left_x;
+    const fb_data *r = right + LCD_WIDTH * y + right_x;
+    unsigned bcmaddr = BCMA_CMDPARAM + (LCD_WIDTH*2) * y + (x << 1);
+
+    lcd_block_tick();
+    /* A whole-width rectangle is one run on the BCM's side */
+    if (width == LCD_WIDTH)
+        bcm_write_addr(bcmaddr);
+    do
+    {
+        if (width != LCD_WIDTH)
+            bcm_write_addr(bcmaddr);
+        if (split > 0)
+            lcd_write_data(l, split);
+        if (split < width)
+            lcd_write_data(r, width - split);
+        bcmaddr += LCD_WIDTH*2;
+        l += LCD_WIDTH;
+        r += LCD_WIDTH;
+    }
+    while (--height > 0);
+    lcd_unblock_and_update();
+    port_unlock(locked);
+    return true;
+}
+
 #ifdef HAVE_LCD_UPDATE_ASYNC
 /* A band sent in the background by lcd_update_start(): the port is held,
  * and the tick blocked, until lcd_update_finish(). */
@@ -564,6 +620,8 @@ static struct
 void lcd_update_start(int y, int height)
 {
     lcd_update_finish();
+    if (lcd_hold_rect(0, y, LCD_WIDTH, height))
+        return;
     if (y + height > LCD_HEIGHT)
         height = LCD_HEIGHT - y;
     if (y < 0 || height <= 0 || lcd_port_held_elsewhere()
@@ -1175,6 +1233,9 @@ void lcd_awake(void)
         /* Start the first LCD update, which also initializes the LCD */
         lcd_state.state = LCD_INITIAL;
         lcd_state.display_on = true;
+        /* Under a transition's hold this update would be deferred, and the
+         * wait below never end */
+        lcd_release_updates();
         lcd_update();
         lcd_state.update_timeout = current_tick + BCM_LCDINIT_TIMEOUT;
 

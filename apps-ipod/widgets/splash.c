@@ -20,6 +20,7 @@
 #include "draw/viewport.h"
 #include "draw/text_wrap.h"
 #include "draw/progress_bar.h"
+#include "draw/transition.h"
 #include "font.h"
 #include "system/activity.h"
 #include "dialog.h"
@@ -42,6 +43,9 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
     static int max_width[NB_SCREENS] = {2*RECT_SPACING};
     static enum current_activity last_act = ACTIVITY_UNKNOWN;
     enum current_activity act = get_current_activity();
+
+    /* A splash shows at once: no slide waits for it */
+    transition_cancel();
 
     if (last_act != act) /* changed activities reset max_width */
     {

@@ -60,6 +60,7 @@
 #include "root_menu.h"
 #include "audio.h"
 #include "draw/viewport.h"
+#include "draw/transition.h"
 #include "dialog_prose.h"                  /* Explain */
 #include "splash.h"
 #include "screens/settings/settings_help.h"
@@ -1068,7 +1069,10 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                 if (!exiting_menu && (menu->flags&MENU_EXITAFTERTHISMENU))
                     done = true;
                 else
+                {
+                    transition_begin(TRANSITION_BACK);
                     init_menu_lists(menu, &lists, msel, false, vps, buf, sizeof buf);
+                }
                 redraw_lists = true;
                 /* new menu, so reload the callback */
                 get_menu_callback(menu, &menu_callback);
@@ -1109,6 +1113,7 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                         mstack[stack_top].selected = selected;
                         stack_top++;
                         menu = temp;
+                        transition_begin(TRANSITION_FORWARD);
                         init_menu_lists(menu, &lists, 0, true, vps, buf, sizeof buf);
                     }
                     break;

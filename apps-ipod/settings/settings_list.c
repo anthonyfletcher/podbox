@@ -993,6 +993,9 @@ const struct settings_list settings[] = {
         "time format", "24hour,12hour", NULL, 2,
         ID2P(LANG_24_HOUR_CLOCK), ID2P(LANG_12_HOUR_CLOCK)),
     OFFON_SETTING(F_THEMESETTING,show_icons, LANG_SHOW_ICONS ,true,"show icons", NULL),
+    CHOICE_SETTING(0, screen_transitions, LANG_SCREEN_TRANSITIONS, 0,
+                   "screen transitions", "off,slide", NULL, 2,
+                   ID2P(LANG_OFF), ID2P(LANG_TRANSITION_SLIDE)),
     OFFON_SETTING(0,show_debug_menu, LANG_SHOW_DEBUG_MENU, false,
                   "show debug menu", NULL),
     /* How much of the settings tree is shown. F_BANFROMQS because the

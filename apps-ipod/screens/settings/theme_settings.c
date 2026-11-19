@@ -502,6 +502,8 @@ MENUITEM_FUNCTION_W_PARAM(browse_themes, 0, ID2P(LANG_CUSTOM_THEME),
                           browse_folder, (void*)&themes, NULL, Icon_Config);
 MENUITEM_SETTING(cursor_style, &global_settings.cursor_style, NULL);
 MENUITEM_SETTING(sep_menu, &global_settings.list_separator_height, NULL);
+MENUITEM_SETTING(screen_transitions, &global_settings.screen_transitions,
+                 NULL);
 MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
 MENUITEM_SETTING(dynamic_colors_background,
                  &global_settings.dynamic_colors_background, NULL);
@@ -562,7 +564,8 @@ MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
 /* The bars sit here directly rather than in a Bars submenu: most are one-line
    choices, and only the scroll bar, with two settings, earns a submenu.
    Most often changed first -- the art, then the icons and bars, then the
-   marks drawn between and around the rows. */
+   marks drawn between and around the rows, then how one screen gives way
+   to the next. */
 MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &art_rows_menu,
             &show_icons,
@@ -572,7 +575,8 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &volume_type,
             &activity_indicators_menu,
             &cursor_style,
-            &sep_menu);
+            &sep_menu,
+            &screen_transitions);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 extern const struct menu_item_ex music_menu_config_item;  /* general_settings.c */
