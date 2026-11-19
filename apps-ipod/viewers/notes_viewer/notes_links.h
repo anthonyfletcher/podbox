@@ -49,6 +49,11 @@ void notes_links_end(void);
 bool notes_link_find(const char *name, size_t len, uint32_t artist,
                      int album, struct notes_target *t);
 
+/* The library album `len` bytes of `name` give, "Artist - Title" or a
+ * title alone: of a title, `artist`'s (a name key, or 0) else the oldest.
+ * -1 for none. */
+int notes_album_named(const char *name, size_t len, uint32_t artist);
+
 /* The library album a written album page is about: by its folder beside
  * the music, else by its artist and title. -1 for none. */
 int notes_page_album(int page);

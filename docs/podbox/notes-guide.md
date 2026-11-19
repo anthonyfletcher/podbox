@@ -99,8 +99,8 @@ its tracks and where it is named.
 A page you write gets some of this too: an album's page starts with the
 line linking its artist unless your page has `{{artist}}` or a link to
 them, and ends with its tracks unless it has `{{tracks}}` or sections for
-them; an artist's ends with their albums unless it has `{{albums}}`. Use
-the pieces below to put them somewhere else.
+them; an artist's ends with their albums unless it has `{{albums}}` or a
+link to one of them. Use the pieces below to put them somewhere else.
 
 ## Pieces
 
@@ -136,7 +136,7 @@ And each its own:
 | Piece | Properties |
 |---|---|
 | `{{albums}}` | `artist=Name`; `genre=Jazz`; `year=1970-1979`; `guest=true` adds the albums they only feature on (once Featured Artists has read your library); `sort=year` (the order it starts in), `name`, `plays` (most played first), `played` (last played first) or `added` (newest first); `group=decade` or `genre` for a heading over each; `show=year,tracks,length,plays` |
-| `{{tracks}}` | `album=Name`, or `artist=Name` for all their tracks; `disc=2`; `group=disc` for a heading over each disc; `sort=plays`, `played` or `title`; `numbers=false`; `show=length,plays,artist` |
+| `{{tracks}}` | `album=Name`, or `artist=Name` for all their tracks, or `composer=Name` for every track whose composer tag names them (names in the tag parted by `,` `;` `/` `&` or `and`); `disc=2`; `group=disc` for a heading over each disc; `sort=plays`, `played` or `title`; `numbers=false`; `show=length,plays,artist` |
 | `{{mentions}}` | `name=Name`; `filter=artists`, `albums`, `people` or `other`, for the kind of page that does the naming; `headings=true` to show the section of the page each is named in; `group=kind` for a heading over albums, people and other pages |
 | `{{pages}}` | `folder=People`, `Albums` or the name of any other folder of `/Notes` |
 
@@ -155,7 +155,11 @@ One the album doesn't have is left out, along with a ` · ` beside it.
 `{{length|format=minutes}}` gives `42 min`, and `{{year|format=decade}}` `2010s`.
 `{{track|number=5}}` is a link to the album's fifth track, so notes can
 name a track without spelling it: `The single, {{track|number=2}}, ...`
-(`disc=2` for a second disc, `album=Name` for another album).
+(`disc=2` for a second disc). For another album, `album=` takes
+`Artist - Album` or the title alone, as `{{track|number=1|album=ABBA - Ring
+Ring}}` or `{{track|number=1|album=Ring Ring|artist=ABBA}}`. A title alone,
+with no `artist=`, is the page's artist's album of that name, else the
+oldest.
 
 ### Changing the made-up pages
 

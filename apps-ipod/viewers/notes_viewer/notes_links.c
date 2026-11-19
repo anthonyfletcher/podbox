@@ -17,7 +17,9 @@
  * the four that say what kind of thing is meant: (album), (person),
  * (track), which finds a track by its title -- on the page's album, then
  * the page's artist's, then anywhere -- and (section), a heading of the page
- * the link is on.
+ * the link is on. A piece's track is written "(track N)", N its database
+ * entry, as titles repeat across albums and a search for one reads every
+ * title in the library.
  *
  * The library's side comes from the database's RAM copy alone: its album
  * table, with each album's keys worked out once for a screen into the
@@ -226,8 +228,10 @@ bool notes_album_artist(int album, char *buf, size_t size)
 #define NL_TRACK  3
 #define NL_SECTION 4
 
-/* The reserved qualifier `len` bytes of `name` end with, NL_ANY for none */
-static int nl_reserved(const char *name, size_t len, size_t bare)
+/* The reserved qualifier `len` bytes of `name` end with, NL_ANY for none;
+ * a list's "(track N)" is NL_TRACK with the database entry N in `entry`,
+ * else -1 */
+static int nl_reserved(const char *name, size_t len, size_t bare, int *entry)
 {
     static const char *const words[] = { "album", "person", "track",
                                          "section" };
@@ -235,11 +239,24 @@ static int nl_reserved(const char *name, size_t len, size_t bare)
     size_t qlen = len - bare - 3;
     unsigned i;
 
+    *entry = -1;
     if (bare == len)
         return NL_ANY;
     for (i = 0; i < ARRAYLEN(words); i++)
         if (qlen == strlen(words[i]) && !strncasecmp(q, words[i], qlen))
             return i + 1;
+    if (qlen > 6 && qlen <= 6 + 9 && !strncasecmp(q, "track ", 6))
+    {
+        int n = 0;
+
+        for (i = 6; i < qlen && q[i] >= '0' && q[i] <= '9'; i++)
+            n = n * 10 + q[i] - '0';
+        if (i == qlen)
+        {
+            *entry = n;
+            return NL_TRACK;
+        }
+    }
     return NL_ANY;
 }
 
@@ -254,6 +271,19 @@ static const char *nl_dash(const char *name, size_t len)
     return NULL;
 }
 
+/* Whether entry `idx` is titled `key`, as tagged or through Trim Titles */
+static bool nl_titled(int idx, uint32_t key)
+{
+    const char *t;
+
+    if (!tagcache_entry_string(idx, tag_title, nl_buf, sizeof(nl_buf)))
+        return false;
+    if (art_name_hash(nl_buf) == key)
+        return true;
+    t = tag_trim(nl_buf, nl_trim, sizeof(nl_trim));
+    return t != nl_buf && art_name_hash(t) == key;
+}
+
 /* The track of album row `album` titled `key`, or -1 */
 static int nl_track_in(int album, uint32_t key)
 {
@@ -263,18 +293,8 @@ static int nl_track_in(int album, uint32_t key)
     if (album < 0 || !tagcache_album_get(album, &row))
         return -1;
     for (idx = row.first; idx <= row.last; idx++)
-    {
-        const char *t;
-
-        if (tagcache_album_of(idx) != album
-            || !tagcache_entry_string(idx, tag_title, nl_buf, sizeof(nl_buf)))
-            continue;
-        if (art_name_hash(nl_buf) == key)
+        if (tagcache_album_of(idx) == album && nl_titled(idx, key))
             return idx;
-        t = tag_trim(nl_buf, nl_trim, sizeof(nl_trim));
-        if (t != nl_buf && art_name_hash(t) == key)
-            return idx;
-    }
     return -1;
 }
 
@@ -416,7 +436,7 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
                      int album, struct notes_target *t)
 {
     size_t bare = notes_bare_len(name, len);
-    int kind = nl_reserved(name, len, bare), i;
+    int entry, kind = nl_reserved(name, len, bare, &entry), i;
     const char *dash;
     struct nl_keys k;
 
@@ -440,9 +460,15 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
     }
     if (kind == NL_TRACK)
     {
-        /* The whole name first: a title may hold " - " of its own, as
-         * "Pink Up - Live" does; then "Artist - Title" */
-        if (!nl_track(k.key, artist, album, !dash, t)
+        /* The entry a list named, while it still has that title; else the
+         * whole name: a title may hold " - " of its own, as "Pink Up -
+         * Live" does; then "Artist - Title" */
+        if ((i = tagcache_album_of(entry)) >= 0 && nl_titled(entry, k.key))
+        {
+            t->track = entry;
+            t->album = nl_last_album = i;
+        }
+        else if (!nl_track(k.key, artist, album, !dash, t)
             && !(dash && nl_track(art_name_hash_n(dash + 3,
                                                   name + len - dash - 3),
                                   art_name_hash_n(name, dash - name), -1,
@@ -511,4 +537,21 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
         return true;
     }
     return false;
+}
+
+int notes_album_named(const char *name, size_t len, uint32_t artist)
+{
+    static char a[256], b[256];
+    const char *dash = nl_dash(name, len);
+    int i;
+
+    if (dash)
+    {
+        snprintf(a, sizeof(a), "%.*s", (int)(dash - name), name);
+        snprintf(b, sizeof(b), "%.*s", (int)(name + len - dash - 3),
+                 dash + 3);
+        if ((i = nl_album_work(art_name_work_hash(a, b))) >= 0)
+            return i;
+    }
+    return nl_album_titled(art_name_hash_n(name, len), artist);
 }

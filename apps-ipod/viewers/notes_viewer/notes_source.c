@@ -7,7 +7,7 @@
  * pieces, which are filled in here before the Markdown back end reads them:
  *
  *   {{albums}}     an artist's albums, or a genre's or some years'
- *   {{tracks}}     an album's tracks, or an artist's
+ *   {{tracks}}     an album's tracks, an artist's, or a composer's
  *   {{played}}     the tracks of either played last
  *   {{mentions}}   the pages that name it
  *   {{pages}}      the pages of a folder of /Notes
@@ -28,7 +28,7 @@
  *
  * A written album page gets the line of its artist and year above it, and
  * its tracks below when it does not list them; a written artist's page its
- * albums. Everything here comes from the database's RAM copy and the names
+ * albums when it links none of them. Everything here comes from the database's RAM copy and the names
  * index: nothing but the page and its template is read from the disk.
  *
  * Parts, in order:
@@ -422,19 +422,31 @@ static bool ns_album_length(int album, char *buf, size_t size)
     return true;
 }
 
-/* The album a piece's `album` property names, else the page's */
+/* The album a piece's `album` property names, "Artist - Title" or a title
+ * (with `artist` beside it, or else the page's artist's), else the page's:
+ * the library's album of that name, else the one a page of that name is
+ * about */
 static int ns_album_of(const struct ns_piece *pc, const struct notes_doc *d)
 {
-    static char name[NS_VALUE_MAX + 8];
+    static char name[NS_VALUE_MAX * 2 + 16];
     struct notes_target t;
-    size_t len;
+    size_t len, alen;
     const char *v = ns_get(pc, "album", &len);
+    const char *a = ns_get(pc, "artist", &alen);
+    int album;
 
     if (!v)
         return d->album;
+    len = MIN(len, (size_t)NS_VALUE_MAX - 1);
+    if (a)
+        snprintf(name, sizeof(name), "%.*s - %.*s",
+                 (int)MIN(alen, (size_t)NS_VALUE_MAX - 1), a, (int)len, v);
+    else
+        snprintf(name, sizeof(name), "%.*s", (int)len, v);
+    if ((album = notes_album_named(name, strlen(name), d->artist)) >= 0)
+        return album;
     /* the qualifier kept, however long the name */
-    snprintf(name, sizeof(name), "%.*s (album)",
-             (int)MIN(len, (size_t)NS_VALUE_MAX - 1), v);
+    strlcat(name, " (album)", sizeof(name));
     return notes_link_find(name, strlen(name), d->artist, -1, &t)
            ? t.album : -1;
 }
@@ -1011,18 +1023,59 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
     return ni.count;
 }
 
-/* Track `idx` as a link */
+/* Track `idx` as a link, which names its entry: a title alone finds the
+ * first album holding it */
 static void ns_track_label(char *buf, size_t size, int idx)
 {
     struct ns_out o = { buf, size, 0 };
+    char qual[24];
 
     buf[0] = '\0';
+    snprintf(qual, sizeof(qual), " (track %d)", idx);
     if (tagcache_entry_string(idx, tag_title, ns_buf, sizeof(ns_buf)))
-        ns_label(&o, tag_trim(ns_buf, ns_trim, sizeof(ns_trim)), " (track)");
+        ns_label(&o, tag_trim(ns_buf, ns_trim, sizeof(ns_trim)), qual);
 }
 
-/* {{tracks}}: an album's tracks, or an artist's; for `played`, {{played}},
- * those played, the last played first */
+/* The composer tag ns_composed() read last, and whether it credited */
+static long ns_comp_seek;
+static bool ns_comp_has;
+
+/* Whether track `idx`'s composer tag credits the name whose key is `key`,
+ * among names parted by , ; / & or " and " */
+static bool ns_composed(int idx, uint32_t key)
+{
+    static char c[NS_VALUE_MAX];
+    long seek = tagcache_entry_seek(idx, tag_composer);
+    const char *p, *e, *and;
+
+    if (seek < 0)
+        return false;
+    if (seek == ns_comp_seek)
+        return ns_comp_has;
+    ns_comp_seek = seek;
+    ns_comp_has = false;
+    if (!tagcache_entry_string(idx, tag_composer, c, sizeof(c)))
+        return false;
+    for (p = c; *p; p = e)
+    {
+        size_t n;
+
+        e = p + strcspn(p, ",;/&");
+        if ((and = strstr(p, " and ")) && and < e)
+            e = and;
+        while (p < e && *p == ' ')
+            p++;
+        for (n = e - p; n && p[n - 1] == ' '; n--)
+            ;
+        if (n && art_name_hash_n(p, n) == key)
+            return ns_comp_has = true;
+        e += *e == ' ' ? 5 : *e != '\0';
+    }
+    return false;
+}
+
+/* {{tracks}}: an album's tracks, an artist's, or a composer's; for
+ * `played`, {{played}}, those played, the last played first */
 static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
                      bool played)
 {
@@ -1033,16 +1086,19 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
     char sort[16], v1[16], v2[24];
     size_t len;
     const char *v;
-    uint32_t artist = 0;
+    uint32_t artist = 0, composer = 0;
     long only_disc = ns_int(pc, "disc", 0);
     bool rev = ns_sort(pc, sort, sizeof(sort)), by_name, by_plays, in_order;
-    bool numbers, group, by_played;
+    bool numbers, group, by_played, all;
     int a, only, n = 0, i, last_disc = 0, count = tagcache_album_count();
     bool multi = false;
     long first_disc = 0;
 
     if ((v = ns_get(pc, "artist", &len)))
         artist = art_name_hash_n(v, len);
+    if ((v = ns_get(pc, "composer", &len)))
+        composer = art_name_hash_n(v, len);
+    ns_comp_seek = -1;
     by_name = !strcasecmp(sort, "title");
     by_plays = !strcasecmp(sort, "plays");
     by_played = played || !strcasecmp(sort, "played");
@@ -1053,11 +1109,12 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
     in_order = !by_name && !by_plays && !by_played;
     numbers = in_order && !ns_has(pc, "numbers", "false");
     group = in_order && ns_has(pc, "group", "disc");
-    only = artist ? -1 : ns_album_of(pc, d);
-    if (!artist && only < 0)
+    all = artist || composer;
+    only = all ? -1 : ns_album_of(pc, d);
+    if (!all && only < 0)
         return 0;
 
-    for (a = artist ? 0 : only; a < count; a = artist ? a + 1 : count)
+    for (a = all ? 0 : only; a < count; a = all ? a + 1 : count)
     {
         int idx;
 
@@ -1070,7 +1127,8 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
             int32_t r[2] = { 0, 0 };
             int at;
 
-            if (tagcache_album_of(idx) != a)
+            if (tagcache_album_of(idx) != a
+                || (composer && !ns_composed(idx, composer)))
                 continue;
             tagcache_entry_numeric(idx, tag_discnumber, &dn);
             tagcache_entry_numeric(idx, tag_tracknumber, &tn);
@@ -1718,6 +1776,27 @@ static bool ns_links_to(const char *text, uint32_t key)
     return false;
 }
 
+/* Whether `text` links to an album of the library album artist at `seek`,
+ * whose key is `artist` */
+static bool ns_links_album_of(const char *text, long seek, uint32_t artist)
+{
+    struct notes_target t;
+    struct tagcache_album row;
+    const char *s, *e;
+
+    for (s = strchr(text, '['); s; s = strchr(s + 1, '['))
+    {
+        for (e = s + 1; *e && *e != ']' && *e != '\n'; e++)
+            ;
+        if (*e == ']'
+            && notes_link_find(s + 1, e - s - 1, artist, -1, &t)
+            && (t.to == NOTES_TO_ALBUM || t.to == NOTES_TO_PAGE)
+            && tagcache_album_get(t.album, &row) && row.artist_seek == seek)
+            return true;
+    }
+    return false;
+}
+
 /* ---- the page ---------------------------------------------------------- */
 
 /* The file `path` into `buf`, NUL ended; its length, or -1 */
@@ -1793,7 +1872,8 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
         snprintf(tail, sizeof(tail), "\n## %s\n{{tracks|group=disc}}\n",
                  str(LANG_TRACKS));
     else if (d->kind == NOTES_PAGE_PERSON && d->artist_seek >= 0
-             && !ns_uses(scratch, "albums"))
+             && !ns_uses(scratch, "albums")
+             && !ns_links_album_of(scratch, d->artist_seek, d->artist))
         snprintf(tail, sizeof(tail), "\n## %s\n{{albums|guest=true}}\n",
                  str(LANG_ALBUMS));
     ns_expand(&st, tail);
