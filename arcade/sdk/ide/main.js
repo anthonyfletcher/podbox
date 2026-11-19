@@ -1485,24 +1485,46 @@ async function openFolder() {
     }
     if (!dir) return openFolderPlain();
     const files = {};
+    let found;
+    try {
+        found = await dirFiles(dir);
+        for (const [name, f] of Object.entries(found)) files[name] = await fileValue(name, f);
+    } catch (e) { say('error', 'Could not read that folder: ' + e.message); return; }
+    if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
+    if (!(await mayReplace())) return;
+    load(files);
+    saveTo = { dir };
+    disk = {};
+    diskHash = {};
+    for (const [name, f] of Object.entries(found)) {
+        disk[name] = copyOf(files[name]);
+        diskHash[name] = stamp(f);
+    }
+    watchFolder();
+    say('print', 'Opened the folder ' + dir.name + ': Save writes its files back, and files changed ' +
+        'there are taken in as they change.');
+}
+
+/* the cart's files in a folder the browser gave access to, by path */
+async function dirFiles(dir) {
+    const files = {};
     async function walk(d, prefix, depth) {
         for await (const [name, h] of d.entries()) {
             if (h.kind === 'directory' && depth === 0 &&
                 ['palettes', 'maps', 'images', 'sounds', 'data', 'fonts', 'editors'].includes(name))
                 await walk(h, name + '/', 1);
-            else if (h.kind === 'file' && (CART_FILE.test(prefix + name) || isEditor(prefix + name))) {
-                const f = await h.getFile();
-                files[prefix + name] = isBinary(name) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
-            }
+            else if (h.kind === 'file' && (CART_FILE.test(prefix + name) || isEditor(prefix + name)))
+                files[prefix + name] = await h.getFile();
         }
     }
-    try { await walk(dir, '', 0); } catch (e) { say('error', 'Could not read that folder: ' + e.message); return; }
-    if (!files['cart.json']) { say('error', 'That folder has no cart.json: it is not a cart.'); return; }
-    if (!(await mayReplace())) return;
-    load(files);
-    saveTo = { dir };
-    say('print', 'Opened the folder ' + dir.name + ': Save writes its files back.');
+    await walk(dir, '', 0);
+    return files;
 }
+
+const fileValue = async (name, f) => isBinary(name) ? new Uint8Array(await f.arrayBuffer()) : await f.text();
+
+/* a file's fingerprint where there is no server to hash it */
+const stamp = (f) => f.lastModified + ':' + f.size;
 
 function openFolderPlain() {
     const i = document.createElement('input');
@@ -1541,11 +1563,12 @@ async function canWrite(handle) {
  * it reads and writes on the page's behalf: the page's address carries the
  * token every request about the folder has to send back.
  *
- * The folder is looked at again every SYNC_MS, and a file changed there --
- * by another editor, or another program -- is taken in where it has not
- * been changed here as well since it was last read or saved; where it has,
- * the owner is asked which to keep. disk holds each file as last read or
- * saved, and diskHash the server's fingerprint of it. */
+ * That folder, or one opened with the browser's folder access, is looked at
+ * again every SYNC_MS, and a file changed there -- by another editor, or
+ * another program -- is taken in where it has not been changed here as well
+ * since it was last read or saved; where it has, the owner is asked which to
+ * keep. disk holds each file as last read or saved, and diskHash its
+ * fingerprint: the server's hash, or the file's time and size. */
 
 const SERVED = new URLSearchParams(location.search).get('token');
 const SYNC_MS = 1500;
@@ -1605,22 +1628,52 @@ async function openServed() {
     saveTo = { served: list.name };
     say('print', 'Opened the folder ' + list.name + ' through pbgide: Save writes its files back, and ' +
         'files changed there are taken in as they change.');
-    setInterval(syncServed, SYNC_MS);
+    watchFolder();
     return true;
 }
 
+let watching = false;
+
+function watchFolder() {
+    if (!watching) setInterval(syncFolder, SYNC_MS);
+    watching = true;
+}
+
+/* the folder's cart files now: each one's fingerprint, and how to read it */
+async function listFolder() {
+    const now = {};
+    if (saveTo.served) {
+        const list = await (await fromServer('/cart/list')).json();
+        for (const { path, hash } of list.files)
+            if (CART_FILE.test(path) || isEditor(path)) now[path] = { hash, read: () => readServed(path) };
+    } else {
+        for (const [path, f] of Object.entries(await dirFiles(saveTo.dir)))
+            now[path] = { hash: stamp(f), read: () => fileValue(path, f) };
+    }
+    return now;
+}
+
+/* what was just saved, the disk's as far as the next look is concerned */
+async function rememberSaved() {
+    const now = await listFolder();
+    disk = {};
+    diskHash = {};
+    for (const [path, { hash }] of Object.entries(now)) {
+        if (folder[path] === undefined) continue;
+        disk[path] = copyOf(folder[path]);
+        diskHash[path] = hash;
+    }
+}
+
 /* The folder looked at again: what changed there taken in */
-async function syncServed() {
-    if (syncing || !saveTo || !saveTo.served) return;
+async function syncFolder() {
+    if (syncing || !saveTo || !(saveTo.served || saveTo.dir)) return;
     syncing = true;
     try {
-        const list = await (await fromServer('/cart/list')).json();
-        const now = {}, took = [];
-        for (const { path, hash } of list.files)
-            if (CART_FILE.test(path) || isEditor(path)) now[path] = hash;
+        const now = await listFolder(), took = [];
         for (const name of Object.keys(now)) {
-            if (diskHash[name] === now[name]) continue;
-            const v = await readServed(name);
+            if (diskHash[name] === now[name].hash) continue;
+            const v = await now[name].read();
             const mine = folder[name];
             /* unchanged here since it was last read: the disk's, as it is */
             if (mine === undefined && !gone.has(name) || mine !== undefined && same(mine, disk[name]) ||
@@ -1633,7 +1686,7 @@ async function syncServed() {
                 took.push(name);
             }
             disk[name] = copyOf(v);
-            diskHash[name] = now[name];
+            diskHash[name] = now[name].hash;
         }
         /* gone from the disk: gone here too, unless changed here since */
         for (const name of Object.keys(diskHash)) {
@@ -1657,14 +1710,13 @@ async function syncServed() {
             say('print', 'Taken in from the folder: ' + took.join(', ') + '.');
         }
     } catch (e) {
-        /* pbgide stopped, or busy: looked at again next time */
+        /* pbgide stopped or busy, or the folder mid-write: looked at again next time */
     }
     syncing = false;
 }
 
 /* Save through pbgide: each file written, and the ones renamed or deleted
- * removed; what was written is then the disk's as far as the next look is
- * concerned */
+ * removed */
 async function saveServed() {
     try {
         for (const [name, v] of Object.entries(folder))
@@ -1672,14 +1724,7 @@ async function saveServed() {
         for (const name of gone)
             if (folder[name] === undefined)
                 await fromServer('/cart/file?path=' + encodeURIComponent(name), { method: 'DELETE' });
-        const list = await (await fromServer('/cart/list')).json();
-        disk = {};
-        diskHash = {};
-        for (const { path, hash } of list.files) {
-            if (folder[path] === undefined) continue;
-            disk[path] = copyOf(folder[path]);
-            diskHash[path] = hash;
-        }
+        await rememberSaved();
     } catch (e) {
         say('error', 'Could not save through pbgide (' + e.message + '): is it still running? ' +
             'The cart is kept here; Save as .pbg writes it out instead.');
@@ -1709,25 +1754,34 @@ async function save() {
     }
     try {
         if (saveTo && saveTo.dir) {
-            for (const [name, v] of Object.entries(folder)) {
-                let d = saveTo.dir;
-                const parts = name.split('/');
-                for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
-                const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
-                await w.write(v);
-                await w.close();
-            }
-            /* the files renamed or deleted since, deleted there too */
-            for (const name of gone) {
-                if (folder[name] !== undefined) continue;
-                const parts = name.split('/');
-                try {
+            /* the folder not looked at while it is written, or the IDE's
+             * own files would be taken in as changed there */
+            while (syncing) await new Promise((r) => setTimeout(r, 20));
+            syncing = true;
+            try {
+                for (const [name, v] of Object.entries(folder)) {
                     let d = saveTo.dir;
-                    for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
-                    await d.removeEntry(parts[parts.length - 1]);
-                } catch (e) {
-                    if (e.name !== 'NotFoundError') throw e;
+                    const parts = name.split('/');
+                    for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p, { create: true });
+                    const w = await (await d.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
+                    await w.write(v);
+                    await w.close();
                 }
+                /* the files renamed or deleted since, deleted there too */
+                for (const name of gone) {
+                    if (folder[name] !== undefined) continue;
+                    const parts = name.split('/');
+                    try {
+                        let d = saveTo.dir;
+                        for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+                        await d.removeEntry(parts[parts.length - 1]);
+                    } catch (e) {
+                        if (e.name !== 'NotFoundError') throw e;
+                    }
+                }
+                await rememberSaved();
+            } finally {
+                syncing = false;
             }
             gone.clear();
             saved();
