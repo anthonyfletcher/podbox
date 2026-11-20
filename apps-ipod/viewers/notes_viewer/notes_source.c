@@ -378,8 +378,8 @@ static void ns_plays(char *buf, size_t size, long n)
         snprintf(buf, size, str(LANG_NOTES_N_PLAYS), (int)n);
 }
 
-/* An album's running time in seconds */
-static long ns_album_secs(int album)
+/* An album row's running time in milliseconds */
+static long ns_album_ms(int album)
 {
     struct tagcache_album row;
     long ms = 0, len;
@@ -391,14 +391,18 @@ static long ns_album_secs(int album)
         if (tagcache_album_of(idx) == album
             && tagcache_entry_numeric(idx, tag_length, &len))
             ms += len;
-    return ms / 1000;
+    return ms;
 }
 
-/* An album's running time into `buf` */
-static bool ns_album_length(int album, char *buf, size_t size)
+/* An album's running time in seconds */
+static long ns_album_secs(int album)
 {
-    long s = ns_album_secs(album);
+    return ns_album_ms(album) / 1000;
+}
 
+/* A running time of `s` seconds into `buf` */
+static bool ns_secs_text(long s, char *buf, size_t size)
+{
     if (s <= 0)
         return false;
     if (s >= 3600)
@@ -553,7 +557,7 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
             snprintf(buf, size, str(LANG_NOTES_MINUTES), (int)((s + 30) / 60));
             return true;
         }
-        return ns_album_length(d->album, buf, size);
+        return ns_secs_text(ns_album_secs(d->album), buf, size);
     }
     for (i = 0; i < ARRAYLEN(strings); i++)
         if (ns_is(name, n, strings[i].name))
@@ -877,6 +881,46 @@ static void ns_item_heading(const char *text)
     ns_item_done(true);
 }
 
+/* A split artist's album can be a row under each string naming them, one
+ * after another as an album name's rows are; the browser shows them as one
+ * album. Whether row `album` follows another of its name that is `by`'s. */
+static bool ns_split_dup(int album, long by)
+{
+    struct tagcache_album a, b;
+    int k;
+
+    if (by == -1 || !tagcache_album_get(album, &a))
+        return false;
+    for (k = album - 1; k >= 0 && tagcache_album_get(k, &b)
+                        && b.album_seek == a.album_seek; k--)
+        if (notes_album_by(k, by))
+            return true;
+    return false;
+}
+
+/* Row `album` with the rows of its name after it that are `by`'s added in:
+ * plays, tracks and the latest play into `row`; with `secs`, its seconds
+ * returned, else 0 */
+static long ns_split_sum(int album, long by, struct tagcache_album *row,
+                         bool secs)
+{
+    struct tagcache_album b;
+    long ms = secs ? ns_album_ms(album) : 0;
+    int k;
+
+    for (k = album + 1; by != -1 && tagcache_album_get(k, &b)
+                        && b.album_seek == row->album_seek; k++)
+        if (notes_album_by(k, by))
+        {
+            row->playcount += b.playcount;
+            row->tracks += b.tracks;
+            row->lastplayed = MAX(row->lastplayed, b.lastplayed);
+            if (secs)
+                ms += ns_album_ms(k);
+        }
+    return ms / 1000;
+}
+
 /* {{albums}}: an artist's albums -- with guest=true the ones they feature
  * on as well -- or those of a genre or some years */
 static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
@@ -949,6 +993,8 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
                 continue;
             guest = true;
         }
+        if (!guest && ns_split_dup(i, by))
+            continue;
         if (from && (row.year < from || row.year > to))
             continue;
         if (genre && !(tagcache_entry_string(row.first, tag_genre, ns_buf,
@@ -968,9 +1014,15 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
                 ns_spare[0] = '\0';
         }
         else if (!strcasecmp(sort, "plays"))
+        {
+            ns_split_sum(i, guest ? -1 : by, &row, false);
             r[1] = row.playcount;
+        }
         else if (!strcasecmp(sort, "played"))
+        {
+            ns_split_sum(i, guest ? -1 : by, &row, false);
             r[1] = row.lastplayed;
+        }
         else if (!strcasecmp(sort, "added"))
         {
             tagcache_entry_numeric(row.first, tag_mtime, &added);
@@ -1001,8 +1053,11 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
         bool guest = rows[i][0] & NS_GUEST;
         const char *parts[5] = { NULL, NULL, NULL, NULL, NULL };
         struct ns_out *o;
+        long secs;
 
         tagcache_album_get(a, &row);
+        secs = ns_split_sum(a, guest ? -1 : by, &row,
+                            ns_show(pc, "length", false));
         if (by_genre && (i == 0 || strcasecmp(ns_names[rows[i][1]],
                                               ns_names[rows[i - 1][1]])))
             ns_item_heading(ns_names[rows[i][1]]);
@@ -1024,7 +1079,7 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
             snprintf(v2, sizeof(v2), str(LANG_N_TRACKS_TITLE), row.tracks);
             parts[1] = v2;
         }
-        if (ns_show(pc, "length", false) && ns_album_length(a, v3, sizeof(v3)))
+        if (ns_show(pc, "length", false) && ns_secs_text(secs, v3, sizeof(v3)))
             parts[2] = v3;
         if (ns_show(pc, "plays", false) && row.playcount > 0)
         {
