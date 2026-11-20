@@ -6723,6 +6723,16 @@ bool browser_db_album_header(struct browser_context *c,
                                         h->artist, sizeof(h->artist)))
         h->artist[0] = '\0';
 
+    /* Under a split artist, an album whose tracks name them in different
+     * Album Artist strings is listed whole: the artist it was reached by
+     * stands for it */
+    for (i = 0; shared && i < level - 1; i++)
+        if (csi->tagorder[i] == tag_albumartist
+            && db_names_is_handle(csi->result_seek[i])
+            && !tagcache_seek_string(tag_albumartist, csi->result_seek[i],
+                                     h->artist, sizeof(h->artist)))
+            h->artist[0] = '\0';
+
     /* The list's own rows, not the table's count: a view's clauses can leave
      * some of the album out */
     for (i = c->special_entry_count; i < c->filesindir; i++)
