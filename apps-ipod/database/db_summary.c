@@ -34,6 +34,7 @@
 #include "settings/settings.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
+#include "database/db_names.h"
 #include "widgets/splash.h"
 #include "system/app_buffer.h"        /* scratch for ordering an album */
 #include "system/app_util.h"          /* warn_on_pl_erase */
@@ -74,16 +75,42 @@ char *db_summary_name(const struct db_summary_t *t, int tag, long seek,
 
 /* ---- the artist and album lists ---------------------------------------- */
 
-/* The artist half into *buf, advancing it */
+/* Under Split Album Artists, a string naming several artists has no entry of
+ * its own, and one that is a split artist's name alone stands for them */
+static bool artist_split(const struct tagcache_artist *r, bool split)
+{
+    return split && db_names_is_joint(r->seek);
+}
+
+static void artist_record(struct artist_data *d,
+                          const struct tagcache_artist *r)
+{
+    d->playcount = r->playcount;
+    d->lastplayed = r->lastplayed;
+    d->seek = r->seek;
+    d->art_hash = r->art_hash;
+    d->cover_hash = r->cover_hash;
+}
+
+/* The artist half into *buf, advancing it. Under Split Album Artists a split
+ * artist's entry, by their own string or after the rest when they have none,
+ * holds their figures over every string naming them, and its seek is their
+ * handle (db_names.h), which the names and the browser understand. */
 static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
 {
     struct tagcache_artist r;
     int nr = tagcache_artist_count(), n = 0;
     char *p = ALIGN_UP(*buf, sizeof(long));
     size_t left = *bufsz - (p - *buf);
+    bool split = db_names_active();
+    int np = split ? db_names_count() : 0;
 
     for (int i = 0; i < nr; i++)
-        if (tagcache_artist_get(i, &r) && !artist_hidden(&r))
+        if (tagcache_artist_get(i, &r) && !artist_hidden(&r)
+            && !artist_split(&r, split))
+            n++;
+    for (int k = 0; k < np; k++)
+        if (db_names_own_seek(k) < 0 && db_names_artist(k, artist_hidden, &r))
             n++;
     if (n == 0)
         return ERROR_NO_ARTISTS;
@@ -96,17 +123,19 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
     for (int i = 0; i < nr; i++)
     {
         struct artist_data *d = &t->artist_index[n];
+        int k;
 
-        if (!tagcache_artist_get(i, &r) || artist_hidden(&r))
+        if (!tagcache_artist_get(i, &r) || artist_hidden(&r)
+            || artist_split(&r, split))
             continue;
-        d->playcount = r.playcount;
-        d->lastplayed = r.lastplayed;
-        d->seek = r.seek;
-        d->art_hash = r.art_hash;
-        d->cover_hash = r.cover_hash;
-        d->tag = tag_albumartist;
+        if (split && (k = db_names_index(db_names_browse_seek(r.seek))) >= 0)
+            db_names_artist(k, artist_hidden, &r);
+        artist_record(d, &r);
         n++;
     }
+    for (int k = 0; k < np; k++)
+        if (db_names_own_seek(k) < 0 && db_names_artist(k, artist_hidden, &r))
+            artist_record(&t->artist_index[n++], &r);
     t->artist_ct = n;
     p += n * sizeof(struct artist_data);
     *bufsz -= p - *buf;
@@ -478,29 +507,6 @@ int db_summary_album_tracks(const struct album_data *album,
     if (!album_search(&tcs, album))
         return -1;
     return album_tracks_from(&tcs, album, sink, data);
-}
-
-int db_summary_artist_tracks(int tag, long seek,
-                             bool (*sink)(const char *path, void *data),
-                             void *data)
-{
-    struct tagcache_search tcs;
-    char buf[MAX_PATH];
-    int added = 0;
-
-    cpu_boost(true);
-    if (!tagcache_search(&tcs, tag_filename))
-    {
-        cpu_boost(false);
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        return -1;
-    }
-    tagcache_search_add_filter(&tcs, tag, seek);
-    while (tagcache_get_next(&tcs, buf, sizeof(buf)) && sink(buf, data))
-        added++;
-    tagcache_search_finish(&tcs);
-    cpu_boost(false);
-    return added;
 }
 
 /* The playlist being filled, and where in it the track to start on went */

@@ -140,6 +140,10 @@ void art_cache_banners_changed(void);
 /* The setting's callback: a change re-resolves every folder. */
 void art_cache_album_source_callback(int source);
 
+/* Split Album Artists' callback: a change re-files the people's pictures
+ * and the missing list. */
+void art_cache_split_artists_callback(bool on);
+
 /* From settings_apply(): the same for a change a loaded .cfg made, which
  * runs no setting's callback. */
 void art_cache_settings_applied(void);

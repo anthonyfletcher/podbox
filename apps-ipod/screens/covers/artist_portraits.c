@@ -5,8 +5,7 @@
  * the album-artist list, showing artist photos from <artist>/folder.jpg. A
  * second carousel_model beside album_covers.c, whose data is the album-artist
  * index; selecting an artist opens that album-artist's own album listing.
- * Portraits Show adds the Artist tag's names that are no album artist's, each
- * opening the albums that name has tracks on, as Music > Artist does.
+ * Under Split Album Artists the list is split as Music > Album Artist is.
  ****************************************************************************/
 
 #include <string.h>
@@ -20,7 +19,7 @@
 #include "draw/screen_access.h"   /* screens[], SCREEN_MAIN */
 #include "lcd.h"
 #include "font.h"
-#include "screens/browse/browser_db.h"         /* entering an artist; album artists by name */
+#include "screens/browse/browser_db.h"         /* browser_db_enter_artist_albums_on_next_load */
 #include "root_menu.h"       /* GO_TO_* screen codes, MENU_ATTACHED_USB */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
@@ -28,11 +27,8 @@
 #include "lang.h"
 #include "speech/talk.h"
 #include "database/db_summary.h" /* build_artist_index() */
-#include "database/db_spoken.h"
-#include "metadata/art_cache.h"
-#include "metadata/art_name.h"
-#include "file.h"
-#include "logf.h"
+#include "database/db_featured.h"   /* db_names_split() */
+#include "database/db_names.h"
 
 /* "Resume to this slide on next open", set by artist_enter() and consumed by
  * artist_set_initial(). The album model's pf_resume_* pair is deliberately not
@@ -45,7 +41,7 @@ static bool artist_resume_valid = false;
 
 static char *entry_name(const struct artist_data *d, char *buf, size_t size)
 {
-    return db_summary_name(&carousel_idx, d->tag, d->seek, buf, size);
+    return db_summary_name(&carousel_idx, tag_albumartist, d->seek, buf, size);
 }
 
 static char *artist_name(int index, char *buf, size_t size)
@@ -61,20 +57,33 @@ static int artist_find_index(const struct mp3entry *id3)
 {
     const char *current = UNTAGGED;
     char name[TAGCACHE_BUFSZ];
+    struct db_featured_names parts;
+    int len;
 
     if (!id3)
         return -1;
 
-    /* Every album artist has a slide, so prefer that; a file carrying only a
-     * track artist is filed under that instead. */
+    /* This list is built from the album-artist tag, so prefer that; a file
+     * carrying only a track artist is filed under that instead. */
     if (id3->albumartist)
         current = id3->albumartist;
     else if (id3->artist)
         current = id3->artist;
+    len = strlen(current);
+
+    /* A split album artist's album is the first artist's */
+    if (db_names_active() && db_names_split(current, &parts) > 0)
+    {
+        current = parts.name[0];
+        len = parts.len[0];
+    }
 
     for (int i = 0; i < carousel_idx.artist_ct; i++)
-        if (!strcasecmp(artist_name(i, name, sizeof(name)), current))
+    {
+        artist_name(i, name, sizeof(name));
+        if (db_featured_name_eq(name, strlen(name), current, len))
             return i;
+    }
 
     return -1;
 }
@@ -100,89 +109,16 @@ static int compare_artists_by_plays(const void *a_v, const void *b_v)
     return compare_artists_by_name(a_v, b_v);
 }
 
-/* Whether the art cache made a picture of the person keyed 'key', at the
- * size the carousel shows: one file's existence, read on every open */
-static bool has_picture(unsigned int key, int size)
-{
-    char path[MAX_PATH];
-
-    art_cache_thumb_path(key, size, path, sizeof(path));
-    return file_exists(path);
-}
-
-/* Whether the name at 'seek' already has a slide as an album artist: one is
- * hidden as books' only when every album of theirs is one, and their music
- * as a track artist then still has its own */
-static bool album_artist_shown(long seek)
-{
-    long album_artist = browser_db_album_artist_seek(tag_virt_canonicalartist,
-                                                     seek);
-
-    return album_artist >= 0
-           && !db_spoken_group_is_book(tag_albumartist, album_artist);
-}
-
-/* After the album artists, the Artist tag's names that are none of theirs,
- * as far as the buffer goes short of what the slides need. A track artist
- * has no plays and no cover of their own in the database's figures, as in
- * Music > Artist. Under Segregate Audiobooks a name that is only a book's is
- * left out, as that list leaves it out. */
-static void add_track_artists(void **buf, size_t *buf_size)
-{
-    struct artist_data *d = *buf;
-    size_t reserve = carousel_slide_reserve();
-    size_t room = *buf_size > reserve
-                  ? (*buf_size - reserve) / sizeof(*d) : 0;
-    bool photos = global_settings.album_covers_portraits_show
-                  == PORTRAITS_SHOW_ARTISTS_WITH_PHOTOS;
-    int size = art_cache_size_index("coverflow");
-    bool books = db_spoken_apart()
-                 && db_spoken_group_ensure(tag_virt_canonicalartist);
-    struct tagcache_search tcs;
-    char name[TAGCACHE_BUFSZ];
-    int n = 0;
-
-    if (!tagcache_search(&tcs, tag_virt_canonicalartist))
-        return;
-    while (tagcache_get_next(&tcs, name, sizeof(name)))
-    {
-        unsigned int key = art_name_hash(name);
-
-        if (!strcmp(name, UNTAGGED)
-            || album_artist_shown(tcs.result_seek)
-            || (books && db_spoken_group_is_book(tag_virt_canonicalartist,
-                                                 tcs.result_seek))
-            || (photos && !has_picture(key, size)))
-            continue;
-        if ((size_t)n == room)
-        {
-            logf("artist portraits: no room for every artist");
-            break;
-        }
-        d[n++] = (struct artist_data){
-            .seek = tcs.result_seek,
-            .art_hash = key,
-            .tag = tag_virt_canonicalartist,
-        };
-    }
-    tagcache_search_finish(&tcs);
-
-    carousel_idx.artist_ct += n;
-    *buf = d + n;
-    *buf_size -= n * sizeof(*d);
-}
-
-/* carousel_model.build_index: the album-artist list, and under Portraits
- * Show the track artists after it, into the shared buffer, built again on
- * every open. The database's own order is by name, so album artists alone
- * need sorting only for plays or articles. */
+/* carousel_model.build_index: the album-artist list into the shared buffer,
+ * built again on every open. The database's own order is by name, so it
+ * needs sorting only for plays or articles, or when split artists with no
+ * string of their own have been added after it. */
 static int artist_build_index(void)
 {
     void *buf = carousel_idx.buf;
     size_t buf_size = carousel_idx.buf_sz;
     bool by_plays = carousel_artist_order() == SORT_ARTISTS_BY_PLAYS;
-    bool added = global_settings.album_covers_portraits_show
-                 != PORTRAITS_SHOW_ALBUM_ARTISTS;
+    bool added = db_names_ensure();
     int res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
@@ -190,8 +126,6 @@ static int artist_build_index(void)
     res = db_summary_load_artists(&carousel_idx, &buf, &buf_size);
     if (res < SUCCESS)
         return res;
-    if (added)
-        add_track_artists(&buf, &buf_size);
 
     carousel_idx.buf = buf;
     carousel_idx.buf_sz = buf_size;
@@ -226,19 +160,19 @@ static unsigned int artist_fallback_key(int index)
            ? carousel_idx.artist_index[index].cover_hash : 0;
 }
 
-/* Select an artist: open their album listing in the database browser (armed
- * for the next load; BACK returns here) -- an album artist's own albums, or
- * the albums a track artist is on. Records the slide to resume to, so backing
- * out lands on the artist just visited rather than on the first one. */
+/* Select an artist: open that album-artist's own album listing in the database
+ * browser (armed for the next load; BACK returns here). Records the slide to
+ * resume to, so backing out lands on the artist just visited rather than on
+ * the first one. */
 static int artist_enter(int index)
 {
-    const struct artist_data *d = &carousel_idx.artist_index[index];
     char name[TAGCACHE_BUFSZ];
 
     artist_resume_index = index;
     artist_resume_valid = true;
-    browser_db_enter_artist_on_next_load(d->tag, d->seek,
-                                         artist_name(index, name, sizeof(name)));
+    browser_db_enter_artist_albums_on_next_load(
+                                carousel_idx.artist_index[index].seek,
+                                artist_name(index, name, sizeof(name)));
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
 
@@ -328,11 +262,9 @@ static int artist_on_menu(void)
     bool old_statusbar = global_settings.album_covers_statusbar;
     int old_sort = carousel_artist_order();
     bool old_articles = carousel_skips_articles();
-    int old_show = global_settings.album_covers_portraits_show;
     int old_filter[CAROUSEL_FILTER_SLOTS];
     char old_chain[CAROUSEL_FILTER_MAX];
     long seek = carousel_idx.artist_index[center_index].seek;
-    int tag = carousel_idx.artist_index[center_index].tag;
     int32_t commitid = carousel_idx.commitid;
     uint32_t generation = carousel_idx.generation;
 
@@ -350,8 +282,7 @@ static int artist_on_menu(void)
     if (global_settings.album_covers_show_album_name != old_show_name
         || global_settings.album_covers_statusbar != old_statusbar
         || carousel_artist_order() != old_sort
-        || carousel_skips_articles() != old_articles
-        || global_settings.album_covers_portraits_show != old_show)
+        || carousel_skips_articles() != old_articles)
     {
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;
@@ -362,8 +293,7 @@ static int artist_on_menu(void)
         if (carousel_idx.commitid == commitid
             && carousel_idx.generation == generation)
             for (i = 0; i < carousel_idx.artist_ct; i++)
-                if (carousel_idx.artist_index[i].seek == seek
-                    && carousel_idx.artist_index[i].tag == tag)
+                if (carousel_idx.artist_index[i].seek == seek)
                     break;
         if (i < carousel_idx.artist_ct)
             set_current_slide(i);
@@ -403,18 +333,19 @@ static void artist_set_initial(const char *selected_file)
     set_current_slide(index >= 0 ? index : 0);
 }
 
-/* carousel_model.on_context: the artist's every album -- a track artist's
- * every track -- played or queued as one, through the album carousel's cover
- * menu */
+/* carousel_model.on_context: the artist's every album, played or queued as
+ * one, through the album carousel's cover menu */
 static int artist_on_context(int index)
 {
-    const struct artist_data *d = &carousel_idx.artist_index[index];
     char name[TAGCACHE_BUFSZ];
+    struct album_data artist = {
+        .seek = -1,
+        .artist_seek = carousel_idx.artist_index[index].seek,
+    };
 
     artist_resume_index = index;
     artist_resume_valid = true;
-    carousel_cover_arm_artist(d->tag, d->seek,
-                              artist_name(index, name, sizeof(name)));
+    carousel_cover_arm(&artist, artist_name(index, name, sizeof(name)));
     return CAROUSEL_CONTEXT;
 }
 

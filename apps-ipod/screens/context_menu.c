@@ -92,6 +92,9 @@
 #include "screens/browse/listen_progress.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
+#include "database/db_featured.h"  /* DB_FEATURED_MAX_GUESTS */
+#include "database/db_names.h"
+#include "widgets/list.h"          /* simplelist */
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
 #include "draw/viewport.h"
@@ -1769,18 +1772,65 @@ static int go_to_album(void)
     return 0;
 }
 
+/* The artists of a split album artist (db_names.h), for Go to Artist to ask
+ * which */
+static int split_parts[DB_FEATURED_MAX_GUESTS];
+
+static const char *split_part_name(int selected_item, void *data,
+                                   char *buffer, size_t buffer_len)
+{
+    (void)data;
+    strmemccpy(buffer, db_names_name(split_parts[selected_item]), buffer_len);
+    return buffer;
+}
+
+bool context_menu_pick_artist(long *seek)
+{
+    struct simplelist_info info;
+    int check[DB_FEATURED_MAX_GUESTS];
+    int n, pick = 0;
+
+    if (!db_names_ensure())
+        return true;
+    n = db_names_joint_parts(*seek, split_parts, ARRAYLEN(split_parts));
+    if (n == 0)
+    {
+        /* A solo string brings its artist's joint albums too */
+        *seek = db_names_browse_seek(*seek);
+        return true;
+    }
+    if (n > 1)
+    {
+        simplelist_info_init(&info, str(LANG_GO_TO_WHICH_ARTIST), n, NULL);
+        info.get_name = split_part_name;
+        if (simplelist_show_list(&info) || info.selection < 0)
+            return false;
+        pick = info.selection;
+        /* The table is rebuilt by a database change, which may come while
+         * the list is up, and renumbers the artists */
+        if (db_names_joint_parts(*seek, check, ARRAYLEN(check)) != n
+            || check[pick] != split_parts[pick])
+            return false;
+    }
+    *seek = db_names_handle(split_parts[pick]);
+    return true;
+}
+
 static int go_to_artist(void)
 {
     struct tagcache_album album;
     char name[MAX_PATH];
+    long seek;
 
     if (!selected_track_album(&album))
         return 0;
-    if (!tagcache_seek_string(tag_albumartist, album.artist_seek,
-                              name, sizeof(name)))
+    seek = album.artist_seek;
+    if (!context_menu_pick_artist(&seek))
+        return 0;
+    if (!tagcache_seek_string(tag_albumartist, seek, name, sizeof(name)))
         name[0] = '\0';
 
-    browser_db_enter_artist_albums_on_next_load(album.artist_seek, name);
+    browser_db_enter_artist_albums_on_next_load(seek, name);
     context_menu_result = ONPLAY_GO_TO_LIBRARY;
     return 0;
 }

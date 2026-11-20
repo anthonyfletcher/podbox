@@ -161,6 +161,12 @@ int context_menu_notes_label(int have);
 /* The ONPLAY_* value for where the notes screen's GO_TO_* code goes */
 int context_menu_notes_result(int go_to);
 
+/* Go to Artist under Split Album Artists: makes *seek, an album-artist seek,
+ * the handle of the artist to browse -- asking which, for a joint string --
+ * so the artist's joint albums come too. Leaves the seek as it is with the
+ * setting off. False if the list was left without a choice. */
+bool context_menu_pick_artist(long *seek);
+
 /* Returns ONPLAY_START_PLAY when a row started playback. 'in_order' leaves
  * out the shuffled rows, for something heard in order, such as a book. */
 int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb),

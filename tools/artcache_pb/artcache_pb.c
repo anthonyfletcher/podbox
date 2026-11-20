@@ -118,14 +118,13 @@ static int layout(void)
  * ------------------------------------------------------------------ */
 
 /* The three that change what a pass makes: where an album's art comes from,
- * whether small sizes are made from the large one, and whether the missing
- * list names track artists. The defaults are the player's. */
+ * whether small sizes are made from the large one, and whether an album
+ * artist naming several artists is split among them. The defaults are the
+ * player's. */
 static void read_settings(void)
 {
     static const char *const sources[] =
         { "files", "files then embedded", "embedded then files", "embedded" };
-    static const char *const portraits[] =
-        { "album artists", "artists", "artists with photos" };
     static char text[64 * 1024];
     int fd = open("/.rockbox/config.cfg", O_RDONLY);
     char *line, *next;
@@ -133,7 +132,7 @@ static void read_settings(void)
 
     global_settings.art_cache_album_source = ART_SOURCE_FILES_FIRST;
     global_settings.art_cache_fast_build = false;
-    global_settings.album_covers_portraits_show = 0;
+    global_settings.split_album_artists = false;
     if (fd < 0)
         return;
     /* open() is the simulator's, whose descriptors are its own: a stdio
@@ -169,12 +168,8 @@ static void read_settings(void)
         }
         else if (!strcmp(line, "art cache fast build"))
             global_settings.art_cache_fast_build = !strcmp(v, "on");
-        else if (!strcmp(line, "album covers portraits show"))
-        {
-            for (int i = 0; i < 3; i++)
-                if (!strcmp(v, portraits[i]))
-                    global_settings.album_covers_portraits_show = i;
-        }
+        else if (!strcmp(line, "split album artists"))
+            global_settings.split_album_artists = !strcmp(v, "on");
     }
 }
 

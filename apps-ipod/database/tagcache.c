@@ -95,6 +95,8 @@
 #include "database/sound_index.h"
 #include "database/unreadable.h"
 #include "db_spoken.h"
+#include "db_names.h"
+#include "db_featured.h"            /* DB_FEATURED_MAX_GUESTS */
 #include "database/db_episode.h"
 #include "metadata/art_cache.h"   /* art_cache_dir_hash */
 #include "metadata/art_name.h"    /* art_name_hash */
@@ -1235,6 +1237,25 @@ bool tagcache_album_get(int n, struct tagcache_album *out)
 
 int tagcache_album_find(long album_seek, long artist_seek)
 {
+    /* A split album artist's album is under any string naming them. Rows
+     * of one album name are adjacent, by artist seek. An album name under
+     * two of their strings is two rows, and neither is the whole album, so
+     * it has none, as a name shared by two albums has none. */
+    if (db_names_is_handle(artist_seek))
+    {
+        int n = tagcache_album_find_name(album_seek);
+        int found = -1;
+
+        for (; n >= 0 && n < tagcache_album_count()
+               && tcrc_albums[n].album_seek == album_seek; n++)
+            if (db_names_match(artist_seek, tcrc_albums[n].artist_seek))
+            {
+                if (found >= 0)
+                    return -1;
+                found = n;
+            }
+        return found;
+    }
     return tagcache_album_count() ? album_row(album_seek, artist_seek) : -1;
 }
 
@@ -2141,6 +2162,48 @@ static bool check_against_clause(long numeric, const char *str,
     return false;
 }
 
+/* check_against_clause(), and under Split Album Artists an album-artist
+ * clause passes a joint string when one of the artists it names would */
+static bool clause_passes(long seek, const char *str,
+                          const struct tagcache_search_clause *clause)
+{
+    int parts[DB_FEATURED_MAX_GUESTS];
+    int n;
+
+    if (check_against_clause(seek, str, clause))
+        return true;
+    if (clause->tag != tag_albumartist || clause->numeric
+        || !db_names_active())
+        return false;
+    n = db_names_joint_parts(seek, parts, ARRAYLEN(parts));
+    for (int i = 0; i < n; i++)
+        if (check_against_clause(seek, db_names_name(parts[i]), clause))
+            return true;
+    return false;
+}
+
+bool tagcache_name_passes(const struct tagcache_search *tcs, int tag,
+                          const char *name)
+{
+    bool group = true;
+
+    for (int i = 0; i < tcs->clause_count; i++)
+    {
+        const struct tagcache_search_clause *clause = tcs->clause[i];
+
+        if (clause->type == clause_logical_or)
+        {
+            if (group)
+                return true;
+            group = true;
+        }
+        else if (clause->tag == tag && !clause->numeric
+                 && !check_against_clause(0, name, clause))
+            group = false;
+    }
+    return group;
+}
+
 static bool check_clauses(struct tagcache_search *tcs,
                           struct index_entry *idx,
                           struct tagcache_search_clause **clauses, int count)
@@ -2242,7 +2305,7 @@ static bool check_clauses(struct tagcache_search *tcs,
             }
         }
 
-        if (!check_against_clause(seek, str, clause))
+        if (!clause_passes(seek, str, clause))
         {
             /* Clause failed -- try finding a logical-or clause */
             while (++i < count)
@@ -2318,6 +2381,19 @@ static bool add_uniqbuf(struct tagcache_search *tcs, uint32_t id)
     return true;
 }
 
+/* Whether 'entry' passes filter j: its seek, or under Split Album Artists a
+ * part's handle, which every album-artist string naming that part passes */
+static inline bool filter_matches(const struct tagcache_search *tcs, int j,
+                                  const struct index_entry *entry)
+{
+    int32_t have = entry->tag_seek[tcs->filter_tag[j]];
+    int32_t want = tcs->filter_seek[j];
+
+    return have == want
+           || (tcs->filter_tag[j] == tag_albumartist
+               && db_names_is_handle(want) && db_names_match(want, have));
+}
+
 static bool build_lookup_list(struct tagcache_search *tcs)
 {
     struct index_entry entry;
@@ -2359,7 +2435,7 @@ static bool build_lookup_list(struct tagcache_search *tcs)
             /* Go through all filters.. */
             for (j = 0; j < tcs->filter_count; j++)
             {
-                if (idx->tag_seek[tcs->filter_tag[j]] != tcs->filter_seek[j])
+                if (!filter_matches(tcs, j, idx))
                 {
                     break ;
                 }
@@ -2444,7 +2520,7 @@ static bool build_lookup_list(struct tagcache_search *tcs)
         /* Go through all filters.. */
         for (j = 0; j < tcs->filter_count; j++)
         {
-            if (entry.tag_seek[tcs->filter_tag[j]] != tcs->filter_seek[j])
+            if (!filter_matches(tcs, j, &entry))
                 break ;
         }
 
@@ -3093,6 +3169,14 @@ static bool genre_by_key(uint64_t key, char *buf, size_t size)
 bool tagcache_seek_string(int tag, long seek, char *buf, size_t size)
 {
     const struct tagfile_entry *ep;
+    int part;
+
+    /* A part of a split album artist names itself */
+    if (tag == tag_albumartist && (part = db_names_index(seek)) >= 0)
+    {
+        strmemccpy(buf, db_names_name(part), size);
+        return true;
+    }
 
     if (!tc_stat.ramcache || tag < 0 || tag >= TAG_COUNT
         || TAGCACHE_IS_NUMERIC(tag) || tag == tag_filename || seek < 0

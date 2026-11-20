@@ -28069,45 +28069,31 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_PORTRAITS_SHOW
-  desc: in Carousel settings: who Artist Portraits shows
+  id: LANG_SPLIT_ALBUM_ARTISTS
+  desc: in Music settings: list an album under each artist its Album Artist tag names, separated by ;
   user: core
   <source>
-    *: "Portraits Show"
+    *: "Split Album Artists"
   </source>
   <dest>
-    *: "Portraits Show"
+    *: "Split Album Artists"
   </dest>
   <voice>
-    *: "Portraits Show"
+    *: "Split Album Artists"
   </voice>
 </phrase>
 <phrase>
-  id: LANG_PORTRAITS_ALBUM_ARTISTS_AND_ARTISTS
-  desc: Portraits Show option: album artists and every artist the Artist tag names
+  id: LANG_GO_TO_WHICH_ARTIST
+  desc: title of the list Go to Artist shows for an album filed under several artists
   user: core
   <source>
-    *: "Album Artists and Artists"
+    *: "Which Artist?"
   </source>
   <dest>
-    *: "Album Artists and Artists"
+    *: "Which Artist?"
   </dest>
   <voice>
-    *: "Album Artists and Artists"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_PORTRAITS_ARTISTS_WITH_PHOTOS
-  desc: Portraits Show option: album artists, and the Artist tag's other names that have a photo
-  user: core
-  <source>
-    *: "Album Artists and Artists with Photos"
-  </source>
-  <dest>
-    *: "Album Artists and Artists with Photos"
-  </dest>
-  <voice>
-    *: "Album Artists and Artists with Photos"
+    *: "Which Artist?"
   </voice>
 </phrase>
 <phrase>

@@ -42,6 +42,7 @@ database/sound_cal.c
 playlist/mood_screen.c
 database/db_featured.c
 database/db_featured_parse.c
+database/db_names.c
 database/db_spoken.c
 database/db_episode.c
 database/unreadable.c

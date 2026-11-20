@@ -20,7 +20,7 @@ answers out of a fixed list at the top of `dbfeat.c` instead of the tag
 database.
 
 ```sh
-gcc -O2 -W -Wall -Wextra -std=gnu11 -Iapps-ipod/database \
+gcc -O2 -W -Wall -Wextra -std=gnu11 -Iapps-ipod/database -Iapps-ipod \
     -o dbfeat tools/dbfeat/dbfeat.c apps-ipod/database/db_featured_parse.c
 
 ./dbfeat            # the table; exit status 0 only if every case matched
@@ -32,11 +32,16 @@ On Windows there is no `gcc` on `PATH`, but CLion ships one — put
 `…\CLion <version>\bin\mingw\bin` at the front of `PATH` first, or it exits 1
 and prints nothing at all.
 
-## The two noted cases
+The same file holds `db_names_split()`, which cuts an Album Artist at its
+semicolons for Split Album Artists, with the same trimming and limits; its
+cases follow the guest ones, and need no pretend library.
 
-A clean run still prints two cases under **expected, and worth arguing
+## The noted cases
+
+A clean run still prints three cases under **expected, and worth arguing
 about**. They pass: what they record is that the answer the parser gives is a
-choice someone made, not the only possible one.
+choice someone made, not the only possible one. The third is an Album Artist
+ending in a semicolon, which is read as its one artist.
 
 Only the first marker in a string is read, so "Song (feat. A) (feat. B)"
 credits A alone. And a credit the library can say nothing at all about is

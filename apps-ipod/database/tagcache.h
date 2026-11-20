@@ -199,6 +199,11 @@ const char *tagcache_skip_article(const char *name);
 bool tagcache_tag_skips_articles(int tag);
 
 bool tagcache_find_index(struct tagcache_search *tcs, const char *filename);
+/* Whether 'name' passes the search's string clauses on 'tag', the clauses
+ * on other tags taken as passed: a split album artist named in a joint
+ * string that passed */
+bool tagcache_name_passes(const struct tagcache_search *tcs, int tag,
+                          const char *name);
 bool tagcache_check_clauses(struct tagcache_search *tcs,
                             struct tagcache_search_clause **clause, int count);
 bool tagcache_search(struct tagcache_search *tcs, int tag);

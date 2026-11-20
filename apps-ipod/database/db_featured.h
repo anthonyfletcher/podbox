@@ -48,6 +48,17 @@ int db_featured_parse(const char *s, db_featured_known_fn known, void *ctx,
  * lower case. ASCII case only -- no accent folding, no "The " prefix. */
 bool db_featured_name_eq(const char *a, int alen, const char *b, int blen);
 
+/* A hash of the identity db_featured_name_eq() compares: trimmed and folded
+ * to lower case. Never 0, so a table can spend 0 on "empty". */
+uint32_t db_featured_name_hash(const char *s, int len);
+
+/* The artists an Album Artist names, for Split Album Artists: 's' cut at each
+ * ';' and trimmed, with the length limits above. 0 for a string with no ';'.
+ * One of DB_NAMES_CUT_LEN bytes or more may have been cut short when the tag
+ * was read, so its last name is dropped rather than kept as half a name. */
+#define DB_NAMES_CUT_LEN 499
+int db_names_split(const char *s, struct db_featured_names *out);
+
 /* ---- the table ---------------------------------------------------------
  *
  * db_featured.c, over the database: every guest the library credits, and the
@@ -104,7 +115,8 @@ int db_featured_guest_tracks(const char *artist, int32_t *out, int max);
 
 /* Where guest n can be browsed to as an album artist in their own right, or
  * -1 if the library holds no albums under that name -- which is the usual
- * case, and the reason the feature is worth having. */
+ * case, and the reason the feature is worth having. Under Split Album
+ * Artists it may be a handle (db_names.h), which is negative. */
 long db_featured_artist_seek(int n);
 
 /* What the last build filled, for the debug screen -- enough to say whether

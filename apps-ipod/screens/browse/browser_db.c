@@ -61,6 +61,7 @@
 #include "database/tagcache.h"
 #include "database/db_summary.h"
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
+#include "database/db_names.h"     /* split album artists */
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
 #include "metadata/art_cache.h"    /* art keys of album and artist rows */
@@ -3013,6 +3014,82 @@ static int add_episode_clauses(struct tagcache_search *tcs, long state)
     return -1;
 }
 
+/* ---- Split Album Artists' rows ------------------------------------------ */
+
+/* Under Split Album Artists a list of album artists hides each joint string
+ * ("A; B") and shows its artists instead (db_names.h): a part whose name is a
+ * string of its own takes that string's row, browsing by the part's handle so
+ * their joint albums come too, and one with no such row gets one after the
+ * list, which is then sorted. A part is listed only where one of its strings
+ * passes this list's filters. */
+#define SPLIT_PRESENT 1     /* a string naming the part is in this list */
+#define SPLIT_ROWED   2     /* the part has a row already */
+static uint8_t split_state[DB_NAMES_PARTS_MAX];
+
+/* One album-artist row of the crawl: false to leave it out, a joint string,
+ * whose parts are present if they pass the list's clauses on the tag (a
+ * letter, a search); else *seek is what the row browses by */
+static bool split_row(const struct tagcache_search *search, long *seek)
+{
+    int parts[DB_FEATURED_MAX_GUESTS];
+    int n = db_names_joint_parts(*seek, parts, ARRAYLEN(parts));
+    int p;
+
+    for (int i = 0; i < n; i++)
+        if (tagcache_name_passes(search, tag_albumartist,
+                                 db_names_name(parts[i])))
+            split_state[parts[i]] |= SPLIT_PRESENT;
+    if (n > 0)
+        return false;
+    *seek = db_names_browse_seek(*seek);
+    if ((p = db_names_index(*seek)) >= 0)
+        split_state[p] |= SPLIT_ROWED;
+    return true;
+}
+
+/* The rows of the parts present with none of their own, counted into
+ * *total and, while the page at 'offset' has room, written at dptr.
+ * Returns where the next row goes. */
+static struct tagentry *add_split_rows(struct browser_context *c,
+                                       struct tagentry *dptr, int offset,
+                                       int *total, int *namebufused,
+                                       int prefix, bool by_plays)
+{
+    for (int p = 0; p < db_names_count(); p++)
+    {
+        const char *name = db_names_name(p);
+        long seek = db_names_handle(p);
+        int need = prefix + strlen(name) + 1;
+
+        if (split_state[p] != SPLIT_PRESENT || (*total)++ < offset)
+            continue;
+        if (c->dirfull || current_entry_count >= c->cache.max_entries
+            || *namebufused + need > c->cache.name_buffer_size)
+        {
+            c->dirfull = true;
+            continue;
+        }
+        dptr->name = core_get_data(c->cache.name_buffer_handle)
+                     + *namebufused;
+        *namebufused += need;
+        if (by_plays)
+            write_field(dptr->name,
+                        PLAYS_MAX - artist_plays(tag_albumartist, seek),
+                        PLAYS_FIELD_LEN);
+        else
+            memset(dptr->name, ' ', prefix);
+        strcpy(dptr->name + prefix, name);
+        dptr->album_name = NULL;
+        dptr->newtable = TABLE_NAVIBROWSE;
+        dptr->extraseek = seek;
+        dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+        dptr->idx_id = -1;
+        dptr++;
+        current_entry_count++;
+    }
+    return dptr;
+}
+
 static struct tagentry *add_head_row(struct browser_context *c,
                                      struct tagentry *dptr, int offset,
                                      int *sidx, int newtable,
@@ -3123,6 +3200,13 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         keep = KEEP_BOOK_TRACKS;
 
     int dir_count = dir_ids_fill(level);
+
+    /* Before the search, which the table's own build cannot run inside */
+    bool split = tag == tag_albumartist && c->currtable == TABLE_NAVIBROWSE
+                 && db_names_ensure();
+
+    if (split)
+        memset(split_state, 0, sizeof(split_state));
 
     if (!tagcache_search(&tcs, tag))
         return -1;
@@ -3299,6 +3383,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         sort_inverse = false;
     }
 
+    /* The split artists' own rows go after the list, so it is sorted, by the
+     * database's own comparison when nothing else asked for one */
+    if (split && !sort)
+    {
+        sort = true;
+        articles_only = true;
+    }
+
     /* lock buflib out due to possible yields */
     browser_lock_cache(c);
     struct tagentry *dptr = core_get_data(c->cache.entries_handle);
@@ -3390,9 +3482,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
+        long row_seek = tcs.result_seek;
+
         /* Ahead of the offset count, or a page would be short by however
          * many rows fell inside it. */
-        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id))
+        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id)
+            || (split && !split_row(&tcs, &row_seek)))
             continue;
 
         if (total_count++ < offset)
@@ -3405,7 +3500,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             dptr->extraseek = tcs.idx_id;
         }
         else
-            dptr->extraseek = tcs.result_seek;
+            dptr->extraseek = row_seek;
         dptr->customaction = ONPLAY_NO_CUSTOMACTION;
         dptr->idx_id = tcs.idx_id;
 
@@ -3521,8 +3616,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                                ? '~' : ' ', order_prefix);
                     else if (artist_by_plays)
                         write_field(dptr->name,
-                                    PLAYS_MAX - artist_plays(tag,
-                                                    tcs.result_seek),
+                                    PLAYS_MAX - artist_plays(tag, row_seek),
                                     PLAYS_FIELD_LEN);
                     else if (order_prefix)
                         write_order_prefix(dptr->name, order_tab, order_count,
@@ -3555,6 +3649,15 @@ entry_skip_formatter:
             sort = false;
             break ;
         }
+    }
+
+    /* The crawl read whole, so every part present is known */
+    if (split && !c->dirfull)
+    {
+        dptr = add_split_rows(c, dptr, offset, &total_count, &namebufused,
+                              order_prefix, artist_by_plays);
+        if (c->dirfull)
+            sort = false;
     }
 
     /* [Shuffle Albums] has nothing to shuffle on a list of one album. Its row
@@ -3630,11 +3733,20 @@ entry_skip_formatter:
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
-        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id))
+        long row_seek = tcs.result_seek;
+
+        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id)
+            || (split && !split_row(&tcs, &row_seek)))
             continue;
 
         total_count++;
     }
+
+    /* A list too long to hold whole: the split artists' rows are counted at
+     * its end, and written when a page reaches them */
+    if (split && c->dirfull)
+        add_split_rows(c, NULL, INT_MAX, &total_count, &namebufused,
+                       order_prefix, artist_by_plays);
 
     tagcache_search_finish(&tcs);
     browser_unlock_cache(c);
@@ -4325,10 +4437,10 @@ bool browser_db_take_walk_fallback(void)
     return fell_back;
 }
 
-/* Set by browser_db_enter_artist_on_next_load(); consumed on the next fresh
- * root load. -1 means none armed. The tag is the root row's to enter by. */
+/* Set by browser_db_enter_artist_albums_on_next_load(); consumed on the next
+ * fresh root load. -1 means none armed; a split artist's handle is negative
+ * too. */
 static long pending_artist_seek = -1;
-static int pending_artist_tag;
 static char pending_artist_title[MENUENTRY_MAX_NAME];
 
 /* Arms a direct jump from the root into a specific album-artist's own album
@@ -4341,19 +4453,11 @@ static char pending_artist_title[MENUENTRY_MAX_NAME];
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title)
 {
-    browser_db_enter_artist_on_next_load(tag_albumartist, albumartist_seek,
-                                         artist_title);
-}
-
-void browser_db_enter_artist_on_next_load(int tag, long seek,
-                                          const char *artist_title)
-{
-    pending_artist_seek = seek;
-    pending_artist_tag = tag;
+    pending_artist_seek = albumartist_seek;
     browse_picked_by_name = true;
     strlcpy(pending_artist_title, artist_title ? artist_title : "",
             sizeof(pending_artist_title));
-    browser_db_enter_by_tag_on_next_load(tag);
+    browser_db_enter_by_tag_on_next_load(tag_albumartist);
 }
 
 /* Finds the row in the currently-loaded root ("main") menu whose first tag
@@ -4450,18 +4554,18 @@ static bool enter_album_tracks_directly(struct browser_context *c, long album_se
     return true;
 }
 
-/* Consumes pending_artist_seek: points csi at the root's row for 'tag' --
- * "Album Artist", or "Artist" for a track artist -- and jumps straight to its
- * second level, filtered by the artist's seek, without displaying the artist
- * grouping itself. That level is the albums in the shipped albumartist ->
- * album -> title, or whatever a custom tagnavi puts first under the artist
- * (grouping, say); any level above the tracks will do. Leaves dirlevel at 0
- * (see enter_album_tracks_directly for why). Returns false if the root has no
- * row for 'tag' of at least three levels. */
-static bool enter_artist_albums_directly(struct browser_context *c, int tag,
+/* Consumes pending_artist_seek: points csi at the root's "Album Artist" row's
+ * search_instruction and jumps straight to its second level, filtered by the
+ * album-artist's seek, without displaying the album-artist grouping itself.
+ * That level is the albums in the shipped albumartist -> album -> title, or
+ * whatever a custom tagnavi puts first under the artist (grouping, say); any
+ * level above the tracks will do. Leaves dirlevel at 0 (see
+ * enter_album_tracks_directly for why). Returns false if the root has no
+ * albumartist row of at least three levels. */
+static bool enter_artist_albums_directly(struct browser_context *c,
                                          long artist_seek, const char *artist_title)
 {
-    int idx = browser_db_find_root_entry_by_tag(tag);
+    int idx = browser_db_find_root_entry_by_tag(tag_albumartist);
     struct search_instruction *si;
 
     if (idx < 0)
@@ -4813,9 +4917,20 @@ static bool walk_to_track(struct browser_context *c, int root_row, int track,
             select_playing_row(c, *rows);
             return true;
         }
-        seek = tagcache_entry_seek(track,
-                                   csi->tagorder[shown_level(c->currextra)]);
+        int tag = csi->tagorder[shown_level(c->currextra)];
+
+        seek = tagcache_entry_seek(track, tag);
         row = seek < 0 ? -1 : loaded_row_for_seek(c, *rows, seek);
+        if (row < 0 && seek >= 0 && tag == tag_albumartist)
+        {
+            /* A split album artist's row browses by their handle; a joint
+             * string's album is walked through its first artist */
+            int parts[DB_FEATURED_MAX_GUESTS];
+
+            seek = db_names_joint_parts(seek, parts, ARRAYLEN(parts)) > 0
+                   ? db_names_handle(parts[0]) : db_names_browse_seek(seek);
+            row = loaded_row_for_seek(c, *rows, seek);
+        }
         if (row < 0)
             break;
         *rows = walk_into(c, row);
@@ -4978,19 +5093,18 @@ int browser_db_load(struct browser_context* c)
              * customized away from the shipped shape) -- fall through to
              * the root menu instead of a dead end. */
         }
-        else if (target_tag == pending_artist_tag && pending_artist_seek != -1)
+        else if (target_tag == tag_albumartist && pending_artist_seek != -1)
         {
-            /* Artist portraits' jump: straight to a specific artist's
+            /* Artist portraits' jump: straight to a specific album-artist's
              * album listing, mirroring the tag_album case above. */
             long artist_seek = pending_artist_seek;
             char artist_title[MENUENTRY_MAX_NAME];
             strlcpy(artist_title, pending_artist_title, sizeof(artist_title));
             pending_artist_seek = -1;
 
-            if (enter_artist_albums_directly(c, target_tag, artist_seek,
-                                             artist_title))
+            if (enter_artist_albums_directly(c, artist_seek, artist_title))
                 return browser_db_load(c);
-            /* No row for the artist's tag to anchor on -- fall through. */
+            /* No albumartist row to anchor on -- fall through. */
         }
         else
         {
@@ -7166,12 +7280,16 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
  * without regard to case, as the database matches names. The artist table is
  * in seek order, which is name order because the album-artist tag file is
  * sorted that way, <Untagged> first. False when no album artist has the name,
- * and always without the RAM copy. */
+ * and always without the RAM copy. A split album artist's row is all of
+ * theirs (db_names_artist()). */
 static bool artist_by_name(int tag, long seek, struct tagcache_artist *ar)
 {
     char name[MAX_PATH], other[MAX_PATH];
     int lo = 0, hi = tagcache_artist_count() - 1;
+    int part;
 
+    if (tag == tag_albumartist && (part = db_names_index(seek)) >= 0)
+        return db_names_artist(part, NULL, ar);
     if (tag == tag_albumartist)
         return tagcache_artist_get(tagcache_artist_find(seek), ar);
     if (!tagcache_seek_string(tag, seek, name, sizeof(name)))
@@ -7195,13 +7313,6 @@ static bool artist_by_name(int tag, long seek, struct tagcache_artist *ar)
             hi = mid - 1;
     }
     return false;
-}
-
-long browser_db_album_artist_seek(int tag, long seek)
-{
-    struct tagcache_artist ar;
-
-    return artist_by_name(tag, seek, &ar) ? ar.seek : -1;
 }
 
 /* The plays of the album artist row 'seek' of a 'tag' list names. An artist

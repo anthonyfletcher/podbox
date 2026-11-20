@@ -2092,6 +2092,9 @@ const struct settings_list settings[] = {
      * crawl, not one that only hides its result. */
     OFFON_SETTING(F_BANFROMQS, featured_artists, LANG_FEATURED_ARTISTS, false,
                   "featured artists", NULL),
+    OFFON_SETTING(F_BANFROMQS, split_album_artists, LANG_SPLIT_ALBUM_ARTISTS,
+                  false, "split album artists",
+                  art_cache_split_artists_callback),
     /* Off by default: most owners never write a notes file, and on, a
      * background task reads /Notes and the art cache sweeps its pictures */
     OFFON_SETTING(F_BANFROMQS, liner_notes, LANG_ACTION_ENABLED, false,
@@ -2183,12 +2186,6 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
-    CHOICE_SETTING(0, album_covers_portraits_show, LANG_PORTRAITS_SHOW,
-                  0, "album covers portraits show",
-                  "album artists,artists,artists with photos", NULL, 3,
-                  ID2P(LANG_ID3_ALBUMARTISTS),
-                  ID2P(LANG_PORTRAITS_ALBUM_ARTISTS_AND_ARTISTS),
-                  ID2P(LANG_PORTRAITS_ARTISTS_WITH_PHOTOS)),
     /* No menu row: marks that settings_load() has carried Music's Sort
      * Ignoring The/A/An into the carousel's own. */
     OFFON_SETTING(F_BANFROMQS, album_covers_articles_carried,

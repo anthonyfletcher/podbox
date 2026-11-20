@@ -97,8 +97,6 @@ MAKE_MENU(album_covers_sort_menu, ID2P(LANG_SORT_MENU), NULL, Icon_NOICON,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,
             &album_covers_sort_ignore_articles);
-MENUITEM_SETTING(album_covers_portraits_show,
-                 &global_settings.album_covers_portraits_show, NULL);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
 /* Custom needs a colour, so moving to it opens the picker, and the Custom
  * Colour row under it, shown only then, changes the colour afterwards. */
@@ -240,7 +238,6 @@ MAKE_MENU(carousel_appearance_link, ID2P(LANG_APPEARANCE), NULL, Icon_NOICON,
 
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_sort_menu,
-            &album_covers_portraits_show,
             &album_covers_on_select,
             &album_covers_scroll_speed,
             &album_covers_random_spin,

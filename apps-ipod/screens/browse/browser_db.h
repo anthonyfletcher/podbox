@@ -245,14 +245,6 @@ bool browser_db_take_walk_fallback(void);
  * selecting an album descends into its tracks. */
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title);
-/* The same through the root row whose first level is 'tag': with
- * tag_virt_canonicalartist, Music > Artist's albums for a track artist */
-void browser_db_enter_artist_on_next_load(int tag, long seek,
-                                          const char *artist_title);
-/* The album artist's seek for the name at 'seek' of 'tag', matched as the
- * database matches names, or -1 when no album artist has it. Always -1
- * without the RAM copy. */
-long browser_db_album_artist_seek(int tag, long seek);
 /* A submenu's row ("podcasts", "Podcasts") opened at one value of its first
  * level -- a show, a book, an author -- by seek, titled 'title'. A single
  * BACK leaves. Where the row is gone, the submenu or its row opens instead. */

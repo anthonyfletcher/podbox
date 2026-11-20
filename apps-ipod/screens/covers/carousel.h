@@ -30,11 +30,6 @@
 
 typedef fb_data pix_t;
 
-/* What the index must leave of the buffer for the slides, or init() refuses
- * to open: a model that fills the buffer as far as it goes stops this short
- * of the end. */
-size_t carousel_slide_reserve(void);
-
 /* Fixed-point type used for slide positions and angles throughout the engine.
  * See carousel.c for the shift and the arithmetic helpers. */
 #define PFreal long

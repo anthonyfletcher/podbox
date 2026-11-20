@@ -389,7 +389,7 @@ static int guest_menu(int g)
     return menu_go_to(context_menu_show_item(name, ATTR_DIRECTORY, false,
                                              false, insert_tracks,
                                              write_tracks, rows,
-                                             db_featured_artist_seek(g) >= 0
+                                             db_featured_artist_seek(g) != -1
                                              ? 1 : 0));
 }
 

@@ -798,6 +798,13 @@ unless an album is under it. List such names one per line in
 /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured
 Artists off and on.
 
+[split album artists]
+Files an album under each artist its Album Artist tag names, separated by a
+semicolon: "Madonna; Charli XCX" lists the album, whole, under both, in the
+Album Artist list, Artist Portraits, the artist charts and Search. Only ";"
+splits, never "&". The first name is the album's artist for sorting and
+folder pictures. Needs the database loaded to RAM.
+
 [liner notes]
 A page for every artist and album, with the liner notes and biographies you
 write as Markdown files in /Notes or beside the music, and links between
@@ -937,13 +944,6 @@ first, or by album artist and then name or year.
 
 [album covers sort artists by]
 The order artist portraits appear in: by name, or most played first.
-
-[album covers portraits show]
-Who Artist Portraits shows. Album Artists is one portrait per album artist.
-Adding Artists also shows each name in the Artist tag that is not an album
-artist, such as a guest on one track, and their portrait opens the albums
-they appear on. With Photos adds only those with a picture in /Artwork/People;
-a picture added there shows once the art cache next updates.
 
 [album covers sort ignoring articles]
 Sorts covers and portraits as if a leading "The", "A" or "An" were not there,

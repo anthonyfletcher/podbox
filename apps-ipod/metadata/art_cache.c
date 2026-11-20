@@ -47,7 +47,7 @@
 #include "art_sizes.h"
 #include "art_banner.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
-#include "screens/covers/album_covers.h"  /* PORTRAITS_SHOW_* */
+#include "database/db_names.h"     /* split album artists */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"   /* which albums are books */
@@ -2097,6 +2097,10 @@ static void aa_people_note(const char *path, unsigned int key, unsigned int alt)
     }
 }
 
+/* Whether Split Album Artists' table is in use for this pass: taken once,
+ * at its start, so the walks and the report agree */
+static bool aa_split;
+
 /* The album row of the track idx_id into aa_row */
 static void aa_track_row(int idx_id)
 {
@@ -2113,8 +2117,16 @@ static void aa_track_row(int idx_id)
     if (tagcache_seek_string(tag_albumartist, aa_row.al.artist_seek,
                              aa_name, sizeof(aa_name)))
     {
-        aa_row.key = art_name_hash(aa_name);
-        aa_row.alt = art_name_alt_hash(aa_name);
+        /* A split album artist's album is the first artist's, and so is a
+         * picture in the folders around it */
+        int first;
+        const char *who = aa_split
+                          && db_names_joint_parts(aa_row.al.artist_seek,
+                                                  &first, 1)
+                          ? db_names_name(first) : aa_name;
+
+        aa_row.key = art_name_hash(who);
+        aa_row.alt = art_name_alt_hash(who);
     }
     if (!tagcache_seek_string(tag_album, aa_row.al.album_seek, aa_title,
                               sizeof(aa_title)))
@@ -2621,7 +2633,8 @@ static void aa_people_report(void)
     {
         const struct aa_person *p;
 
-        if (!tagcache_artist_get(i, &ar) || !ar.art_hash)
+        if (!tagcache_artist_get(i, &ar) || !ar.art_hash
+            || (aa_split && db_names_is_joint(ar.seek)))
             continue;
         aa_counts.artists++;
         p = aa_person_get(ar.art_hash, false);
@@ -2636,20 +2649,44 @@ static void aa_people_report(void)
     }
 }
 
+/* The person called 'name' whom no walk noted, settled from a file named for
+ * them in /Artwork/People and from nowhere else: the folders around their
+ * tracks are another artist's. Only a name with such a file takes a person
+ * and a table slot, so the tables grow with the pictures added rather than
+ * with the library. NULL for a name with no file, or no room. */
+static struct aa_person *aa_named_person(const char *name,
+                                         const struct aa_people_ctx *c)
+{
+    struct aa_person probe = { 0 };
+    struct aa_person *p;
+    struct aa_stamp *slot;
+
+    probe.key = art_name_hash(name);
+    probe.alt = art_name_alt_hash(name);
+    if (!probe.key || !aa_central_find(&probe)
+        || !(p = aa_person_get(probe.key, true)))
+        return NULL;
+    p->alt = probe.alt;
+    p->flags |= AA_PERSON_SEEN;
+    if (aa_was_visited(p->key) || !(slot = aa_slot(p->key)))
+        p->flags |= AA_PERSON_DONE;         /* a work's key, or no room */
+    else if (!aa_check_all && slot->stamp != AA_STAMP_NONE
+             && aa_thumbs_exist(p->key))
+        aa_person_settled(p, true);
+    else
+        aa_person_fill(p, slot, "", 1, c);  /* no folder to take over */
+    return p;
+}
+
 /* The pictures of track artists who are no album artist, after the walks
- * have settled everyone they note. Only a name with a file in /Artwork/People
- * takes a person and a table slot, so the tables grow with the pictures added
- * rather than with the library. While Artist Portraits shows them, those
- * without one join the missing list. */
+ * have settled everyone they note */
 static void aa_track_artists(const struct aa_people_ctx *c)
 {
     struct tagcache_search tcs;
     int since_yield = 0;
-    bool list_missing = global_settings.album_covers_portraits_show
-                        != PORTRAITS_SHOW_ALBUM_ARTISTS;
 
-    if (!list_missing && !aa_central_people())
-        return;                         /* no picture to make, no list */
+    if (!aa_central_people())
+        return;                         /* no picture to make */
     if (!tagcache_search(&tcs, tag_virt_canonicalartist))
     {
         aa_unreached = true;
@@ -2657,9 +2694,7 @@ static void aa_track_artists(const struct aa_people_ctx *c)
     }
     while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
     {
-        struct aa_person probe = { 0 };
-        struct aa_person *p;
-        struct aa_stamp *slot;
+        unsigned int key = art_name_hash(tcs.result);
 
         if (aa_check_abort() || tagcache_is_busy())
         {
@@ -2671,36 +2706,38 @@ static void aa_track_artists(const struct aa_people_ctx *c)
             since_yield = 0;
             yield();
         }
-        probe.key = art_name_hash(tcs.result);
-        probe.alt = art_name_alt_hash(tcs.result);
-        if (!probe.key || !strcmp(tcs.result, UNTAGGED)
-            || aa_person_get(probe.key, false))
-            continue;
-        if (!aa_central_find(&probe))
-        {
-            if (list_missing)
-                path_list_write_record(&noart_artists, tcs.result);
-            continue;
-        }
-        if (!(p = aa_person_get(probe.key, true)))
-            break;
-        p->alt = probe.alt;
-        p->flags |= AA_PERSON_SEEN;
-        if (aa_was_visited(p->key) || !(slot = aa_slot(p->key)))
-            p->flags |= AA_PERSON_DONE;     /* a work's key, or no room */
-        else if (!aa_check_all && slot->stamp != AA_STAMP_NONE
-                 && aa_thumbs_exist(p->key))
-            aa_person_settled(p, true);
-        else
-            aa_person_fill(p, slot, "", 1, c);  /* no folder to take over */
+        if (key && strcmp(tcs.result, UNTAGGED)
+            && !aa_person_get(key, false))
+            aa_named_person(tcs.result, c);
         if (*c->aborted)
             break;
-        if (list_missing && !(p->flags & AA_PERSON_ART))
-            path_list_write_record(&noart_artists, tcs.result);
     }
     if (tcs.failed && !*c->aborted)
         aa_unreached = true;
     tagcache_search_finish(&tcs);
+}
+
+/* Split Album Artists' artists past the first of a joint album artist, who
+ * no walk notes: their picture from their own albums, settled already, or
+ * from /Artwork/People. Those with none join the missing list, as album
+ * artists do; one with a string of their own is there already. */
+static void aa_split_artists(const struct aa_people_ctx *c)
+{
+    for (int n = 0; aa_split && n < db_names_count() && !*c->aborted; n++)
+    {
+        const char *name = db_names_name(n);
+        const struct aa_person *p = aa_person_get(art_name_hash(name), false);
+
+        if (!p)
+            p = aa_named_person(name, c);
+        if (db_names_own_seek(n) >= 0)
+            continue;
+        aa_counts.artists++;
+        if (p && (p->flags & AA_PERSON_ART))
+            aa_counts.artist_art++;
+        else
+            path_list_write_record(&noart_artists, name);
+    }
 }
 
 /* Every person's picture, once the album walk and the books are done */
@@ -2731,10 +2768,9 @@ static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
         if (*aborted)
             return false;
     }
-    /* The album artists first: the missing list stops at PATH_LIST_MAX, and
-     * a library's guests would otherwise fill it */
     aa_people_report();
     aa_track_artists(&c);
+    aa_split_artists(&c);
     return !*aborted;
 }
 
@@ -2932,6 +2968,7 @@ static enum bg_result aa_run_pass(void)
                 || art_cache_task.done_marks.entries < 0;
     aa_reread_tags = art_cache_task.done_marks.entries < 0
                      && aa_scheme_began >= AA_SCHEME;
+    aa_split = db_names_ensure();
     wh = core_alloc(worksz);
     if (wh <= 0)
         return BG_INTERRUPTED; /* not enough free memory right now */
@@ -3398,6 +3435,7 @@ static void aa_run_check(void)
     const char *dir_end = strrchr(dir, '/');
 
     aa_io_failed = false;
+    aa_split = db_names_active();
     aa_chk.state = AA_CHECK_RUNNING;
     aa_chk.walked = 0;
     aa_chk.total = tagcache_get_stat()->total_entries;
@@ -3652,6 +3690,17 @@ void art_cache_album_source_callback(int source)
     bg_task_update(&art_cache_task);
 }
 
+/* The same for Split Album Artists, which files a joint album's folder
+ * picture and the missing list differently */
+static int aa_applied_split = -1;
+
+void art_cache_split_artists_callback(bool on)
+{
+    if (aa_applied_split >= 0 && aa_applied_split != on)
+        bg_task_update(&art_cache_task);
+    aa_applied_split = on;
+}
+
 void art_cache_settings_applied(void)
 {
     int source = global_settings.art_cache_album_source;
@@ -3659,6 +3708,7 @@ void art_cache_settings_applied(void)
     if (aa_applied_source >= 0 && aa_applied_source != source)
         art_cache_album_source_callback(source);
     aa_applied_source = source;
+    art_cache_split_artists_callback(global_settings.split_album_artists);
 }
 
 /* bg_task.run: one pass, with the tracing the pass itself does not do. */

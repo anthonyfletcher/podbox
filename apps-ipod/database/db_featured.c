@@ -28,7 +28,6 @@
 #include <string.h>
 #include "config.h"
 #include "system/library_files.h"
-#include "system/hash.h"
 #include "system.h"
 #include "kernel.h"
 #include "rbpaths.h"
@@ -37,6 +36,7 @@
 #include "system/strutil.h"         /* read_line */
 #include "database/tagcache.h"
 #include "db_featured.h"
+#include "db_names.h"
 
 /* ------------------------------------------------------------------ *
  * the table                                                          *
@@ -84,31 +84,10 @@ static void timed_yield(void)
     }
 }
 
-/* FNV-1a over a name, folded to lower case and trimmed, so that it stands for
- * the same identity db_featured_name_eq() does. Never returns 0: the artist
- * set below spends that value on "empty slot".
- *
- * A collision merges two guests, showing one name against the other's tracks.
+/* A collision merges two guests, showing one name against the other's tracks.
  * At a few hundred names in 32 bits that is a one-in-fifty-thousand event, and
  * the compare that follows a hash match makes it nothing at all. */
-static uint32_t name_hash(const char *s, int len)
-{
-    uint32_t h = FNV1A_BASIS;
-    const char *e = s + len;
-
-    while (s < e && (*s == ' ' || *s == '\t'))
-        s++;
-    while (e > s && (e[-1] == ' ' || e[-1] == '\t'))
-        e--;
-
-    for (; s < e; s++)
-    {
-        char c = (*s >= 'A' && *s <= 'Z') ? (char)(*s + ('a' - 'A')) : *s;
-        h = fnv1a_byte(h, (unsigned char)c);
-    }
-
-    return h ? h : 1;
-}
+#define name_hash db_featured_name_hash
 
 /* ------------------------------------------------------------------ *
  * the album-artist set                                               *
@@ -601,9 +580,20 @@ int db_featured_guest_tracks(const char *artist, int32_t *out, int max)
     return g < 0 ? 0 : collect(g, key, out, max);
 }
 
+/* Under Split Album Artists a guest who is one of a joint album artist's
+ * artists ("A; B") is an album artist too, browsed by their handle, and one
+ * with a string of their own brings their joint albums with it */
 long db_featured_artist_seek(int n)
 {
-    return guests[n].artist_seek;
+    long seek = guests[n].artist_seek;
+    int p;
+
+    if (!db_names_active())
+        return seek;
+    if (seek >= 0)
+        return db_names_browse_seek(seek);
+    p = db_names_find(db_featured_name(n));
+    return p >= 0 ? db_names_handle(p) : -1;
 }
 
 void db_featured_get_stats(struct db_featured_stats *out)

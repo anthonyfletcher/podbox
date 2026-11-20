@@ -49,6 +49,7 @@
 #include "system/app_buffer.h"        /* where the index is read into */
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* the index, and SUCCESS/ERROR_* */
+#include "database/db_names.h"
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
 #include "root_menu.h"
@@ -302,6 +303,7 @@ static int acquire(void)
     int res;
 
     memset(&idx, 0, sizeof(idx));
+    db_names_ensure();          /* the artist charts split as the lists do */
     res = db_summary_build_into(&idx, buf, bufsz);
 
     if (res < SUCCESS)

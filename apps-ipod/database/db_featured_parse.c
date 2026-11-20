@@ -20,11 +20,15 @@
  *   - how far past a marker the guest list runs
  *   - cutting that list into names
  *   - db_featured_parse() driving the three, and name identity
+ *   - an Album Artist naming several artists, for Split Album Artists, which
+ *     shares the trimming, the limits and the identity above
  ****************************************************************************/
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
+#include "system/hash.h"
 #include "db_featured.h"
 
 /* ------------------------------------------------------------------ *
@@ -385,4 +389,47 @@ bool db_featured_name_eq(const char *a, int alen, const char *b, int blen)
             return false;
 
     return true;
+}
+
+uint32_t db_featured_name_hash(const char *s, int len)
+{
+    uint32_t h = FNV1A_BASIS;
+    const char *e = s + len;
+
+    trim(&s, &e);
+    for (; s < e; s++)
+        h = fnv1a_byte(h, (unsigned char)lower_byte(*s));
+
+    return h ? h : 1;
+}
+
+/* ------------------------------------------------------------------ *
+ * album artists                                                      *
+ * ------------------------------------------------------------------ */
+
+int db_names_split(const char *s, struct db_featured_names *out)
+{
+    const char *start = s, *end = s + strlen(s), *semi;
+    int len = (int)(end - s);
+
+    out->count = 0;
+    if (memchr(s, ';', len) == NULL)
+        return 0;
+
+    while (out->count < DB_FEATURED_MAX_GUESTS)
+    {
+        semi = memchr(start, ';', end - start);
+        if (semi == NULL)
+        {
+            /* A tag is cut short when it is read, without a sign: the last
+             * name of one that reached the limit may be half a name */
+            if (len < DB_NAMES_CUT_LEN)
+                add_name(out, start, end);
+            break;
+        }
+        add_name(out, start, semi);
+        start = semi + 1;
+    }
+
+    return out->count;
 }

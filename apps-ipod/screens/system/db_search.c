@@ -42,6 +42,8 @@
 #include "widgets/splash.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"       /* which albums and artists are books */
+#include "database/db_featured.h"      /* DB_FEATURED_MAX_GUESTS */
+#include "database/db_names.h"         /* split album artists */
 #include "playlist/playlist.h"
 #include "screens/browse/browser_db.h"   /* the two enter_..._on_next_load */
 #include "system/activity.h"
@@ -226,6 +228,42 @@ static bool text_matches(const char *text, const char *query)
     return false;
 }
 
+/* Under Split Album Artists an album-artist row is an artist, as the lists
+ * show them: a joint string ("A; B") gives each of its artists whose name
+ * matches, and a split artist's own string browses by their handle. Each
+ * split artist once, however many strings name them. */
+static uint8_t part_found[(DB_NAMES_PARTS_MAX + 7) / 8];
+
+static bool part_once(int p)
+{
+    bool seen = part_found[p / 8] & (1 << (p % 8));
+
+    part_found[p / 8] |= 1 << (p % 8);
+    return !seen;
+}
+
+/* False once the results are full */
+static bool add_artist_match(const char *name, long seek, const char *query)
+{
+    int parts[DB_FEATURED_MAX_GUESTS];
+    int n = db_names_joint_parts(seek, parts, ARRAYLEN(parts));
+
+    for (int i = 0; i < n; i++)
+    {
+        const char *part = db_names_name(parts[i]);
+
+        if (text_matches(part, query) && part_once(parts[i])
+            && !add_match(tag_albumartist, part, db_names_handle(parts[i]), -1))
+            return false;
+    }
+    if (n > 0 || !text_matches(name, query))
+        return true;
+    seek = db_names_browse_seek(seek);
+    if (db_names_index(seek) >= 0 && !part_once(db_names_index(seek)))
+        return true;
+    return add_match(tag_albumartist, name, seek, -1);
+}
+
 static int run_search(const char *query, void *ctx)
 {
     char buf[TAGCACHE_BUFSZ];
@@ -236,11 +274,13 @@ static int run_search(const char *query, void *ctx)
                                     ? global_settings.audiobook_search_order
                                     : global_settings.db_search_order];
     unsigned int i;
+    bool split = db_names_active();
 
     (void)ctx;
 
     match_count = 0;
     arena_used = 0;
+    memset(part_found, 0, sizeof(part_found));
 
     /* The setting is a second, lower ceiling; MAX_MATCHES and NAME_ARENA stay
      * the hard array bounds, so no setting can overrun them. */
@@ -260,9 +300,15 @@ static int run_search(const char *query, void *ctx)
 
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
         {
-            if (text_matches(buf, query)
-                && match_in_scope(tags[i], &tcs)
-                && !add_match(tags[i], buf, tcs.result_seek, tcs.idx_id))
+            if (split && tags[i] == tag_albumartist)
+            {
+                if (match_in_scope(tags[i], &tcs)
+                    && !add_artist_match(buf, tcs.result_seek, query))
+                    break;
+            }
+            else if (text_matches(buf, query)
+                     && match_in_scope(tags[i], &tcs)
+                     && !add_match(tags[i], buf, tcs.result_seek, tcs.idx_id))
                 break;
         }
 
@@ -353,6 +399,7 @@ int db_search_run(void)
     /* Spend the arming, whether or not this screen goes on to open. */
     active_scope = armed_scope;
     armed_scope = DB_SEARCH_ALL;
+    db_names_ensure();      /* the scans only read the table */
 
     /* Both gates the real feature would need. A commit refuses every
      * tagcache_search() for its whole length, so a search screen opened then

@@ -8,6 +8,10 @@ compilation rip leaves *Somebody feat. Someone Else*.
 can browse. It is off until you turn it on:
 `Settings > Library > Music > Featured Artists`.
 
+A guest belongs in a credit. An album made by two artists together belongs
+in Album Artist, with the names separated by `;` (*Madonna; Charli XCX*), and
+**Split Album Artists**, beside this setting, lists it under each of them.
+
 ---
 
 ## Where it appears

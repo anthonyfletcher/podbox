@@ -158,6 +158,28 @@ static const struct testcase cases[] = {
 
 #define CASE_COUNT ((int)(sizeof(cases) / sizeof(cases[0])))
 
+/* Album Artist strings for Split Album Artists, db_names_split(): only ';'
+ * splits, and the library is never asked */
+static const struct testcase split_cases[] = {
+{ "Madonna; Charli XCX",              { "Madonna", "Charli XCX", NULL }, NULL },
+{ "Robyn;Charli XCX ;  Madonna",      { "Robyn", "Charli XCX", "Madonna",
+                                        NULL }, NULL },
+{ "Madonna & Charli XCX",             { NULL }, NULL },
+{ "Simon & Garfunkel",                { NULL }, NULL },
+{ "Earth, Wind & Fire",               { NULL }, NULL },
+{ "Madonna",                          { NULL }, NULL },
+{ "Madonna;",                         { "Madonna", NULL },
+  "one name left: another spelling of that artist" },
+{ "; Madonna",                        { "Madonna", NULL }, NULL },
+{ "A; Charli XCX",                    { "Charli XCX", NULL }, NULL },
+{ "Madonna;;Charli XCX",              { "Madonna", "Charli XCX", NULL }, NULL },
+{ "1;2;3;4;5;6;7;8;9",                { NULL }, NULL },
+{ "Aa;Bb;Cc;Dd;Ee;Ff;Gg;Hh;Ii",       { "Aa", "Bb", "Cc", "Dd", "Ee", "Ff",
+                                        "Gg", "Hh", NULL }, NULL },
+};
+
+#define SPLIT_COUNT ((int)(sizeof(split_cases) / sizeof(split_cases[0])))
+
 /* ------------------------------------------------------------------ *
  * running them                                                       *
  * ------------------------------------------------------------------ */
@@ -171,14 +193,18 @@ static void print_names(const struct db_featured_names *n)
         printf("%s[%.*s]", i ? " " : "", n->len[i], n->name[i]);
 }
 
-/* Whether the parse of 'c' matched, printing it if not or if 'verbose'. */
-static bool run_case(const struct testcase *c, bool verbose)
+/* Whether the parse of 'c' matched, printing it if not or if 'verbose'.
+ * 'split' runs db_names_split() instead of the guest parse. */
+static bool run_case(const struct testcase *c, bool verbose, bool split)
 {
     struct db_featured_names got;
     int want = 0;
     bool ok = true;
 
-    db_featured_parse(c->in, known, NULL, &got);
+    if (split)
+        db_names_split(c->in, &got);
+    else
+        db_featured_parse(c->in, known, NULL, &got);
 
     while (c->out[want] != NULL)
         want++;
@@ -209,6 +235,36 @@ static bool run_case(const struct testcase *c, bool verbose)
         printf("\n");
     }
 
+    return ok;
+}
+
+/* An Album Artist at the length a tag is cut to loses its last name, which
+ * may be half of one; one byte shorter keeps it */
+static bool run_cut_short(bool verbose)
+{
+    char s[8 * 63 + 1];
+    struct db_featured_names got;
+    int cut, kept;
+    bool ok;
+
+    /* eight names of 62 letters, ';' between: 503 bytes in all */
+    for (int i = 0; i < 8; i++)
+    {
+        memset(s + i * 63, 'a' + i, 62);
+        s[i * 63 + 62] = ';';
+    }
+    s[8 * 63 - 1] = '\0';
+
+    s[DB_NAMES_CUT_LEN] = '\0';
+    cut = db_names_split(s, &got);
+    s[DB_NAMES_CUT_LEN - 1] = '\0';
+    kept = db_names_split(s, &got);
+
+    ok = cut == 7 && kept == 8;
+    if (verbose || !ok)
+        printf("%s cut-short Album Artist: %d names at %d bytes, %d at %d;"
+               " want 7 and 8\n", ok ? "  ok  " : "FAIL  ", cut,
+               DB_NAMES_CUT_LEN, kept, DB_NAMES_CUT_LEN - 1);
     return ok;
 }
 
@@ -249,8 +305,13 @@ int main(int argc, char **argv)
     }
 
     for (int i = 0; i < CASE_COUNT; i++)
-        if (!run_case(&cases[i], verbose))
+        if (!run_case(&cases[i], verbose, false))
             failed++;
+    for (int i = 0; i < SPLIT_COUNT; i++)
+        if (!run_case(&split_cases[i], verbose, true))
+            failed++;
+    if (!run_cut_short(verbose))
+        failed++;
 
     for (int i = 0; i < CASE_COUNT; i++)
     {
@@ -260,8 +321,12 @@ int main(int argc, char **argv)
             printf("\nexpected, and worth arguing about:\n");
         printf("  \"%s\"\n      %s\n", cases[i].in, cases[i].note);
     }
+    for (int i = 0; i < SPLIT_COUNT; i++)
+        if (split_cases[i].note != NULL)
+            printf("  \"%s\"\n      %s\n", split_cases[i].in,
+                   split_cases[i].note);
 
-    printf("\n%d cases, %d failed\n", CASE_COUNT, failed);
+    printf("\n%d cases, %d failed\n", CASE_COUNT + SPLIT_COUNT + 1, failed);
 
     return failed != 0;
 }
