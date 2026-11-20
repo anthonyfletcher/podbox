@@ -314,7 +314,8 @@ void do_sbs_update_callback(unsigned short id, void *param)
  * tick below needs the same question answered. */
 bool sb_background_busy(void)
 {
-    return tagcache_is_busy() || art_cache_is_busy() || file_index_is_busy();
+    return tagcache_is_busy() || tagcache_is_loading() || art_cache_is_busy()
+           || file_index_is_busy();
 }
 
 /* Each indicator off means off everywhere: the tag shows nothing, and the busy

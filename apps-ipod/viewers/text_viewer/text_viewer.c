@@ -532,7 +532,7 @@ static bool tv_heads_seen;
 static off_t tv_page(off_t start, bool render)
 {
     off_t off = start;
-    int y = 0;
+    int y = 0, item = -1;       /* a list item's indent, while it wraps */
     bool heading = false, quote = false;
     struct text_layout tl = {
         .font = tv.font,
@@ -542,6 +542,7 @@ static off_t tv_page(off_t start, bool render)
         .fg = tv.vp.fg_pattern,
         .dim = color_blend(tv.vp.fg_pattern, tv.vp.bg_pattern, 108),
     };
+    int m = tl_literal_width(&tl, "M");     /* a pull line's, a level's */
 
     while (y + tv.line_height <= tv.vp.height - tv_footer_height())
     {
@@ -613,10 +614,30 @@ static off_t tv_page(off_t start, bool render)
             bool pull = quote || (avail >= 3 && !memcmp(s, TL_QUOTE, 3));
 
             tv_heads_seen |= head;
-            int indent = pull ? tl_literal_width(&tl, "M")
+            int first, bullet = -1;
+            int indent = pull ? m
                          : global_settings.text_viewer_indent && !head
                            && s[0] != '\n' && tv_paragraph_start(off)
-                         ? tl_literal_width(&tl, "M") : 0;
+                         ? m : 0;
+
+            /* a list item's lines hang under its first word */
+            if (item >= 0)
+                indent = (pull ? m : 0) + item;
+            else
+            {
+                int skip = pull && !quote ? 3 : 0;
+
+                item = tl_item_indent(&tl, s + skip, avail - skip, m, &first,
+                                      &bullet);
+                if (item)
+                {
+                    indent = (pull ? m : 0) + first;
+                    if (bullet >= 0)
+                        bullet += pull ? m : 0;
+                }
+                else
+                    item = -1;
+            }
 
             /* A heading starts a page that has room for it, the blank line
              * after it and a line of what it heads */
@@ -631,6 +652,8 @@ static off_t tv_page(off_t start, bool render)
             if (head)
                 ln.full = false;        /* a heading is never justified */
 
+            if (render && bullet >= 0)
+                tl_draw_bullet(&ln, bullet, y);
             if (render && ln.draw > 0)
             {
                 tl_draw_line(&tl, s, &ln, y);
@@ -656,6 +679,8 @@ static off_t tv_page(off_t start, bool render)
             }
             heading = tv_heading_after(s, ln.used, heading);
             quote = pull && !(ln.used > 0 && s[ln.used - 1] == '\n');
+            if (ln.used > 0 && s[ln.used - 1] == '\n')
+                item = -1;
         }
 
         off += ln.used;
@@ -2485,7 +2510,7 @@ static void tv_toc_heads(struct tv_toc *t)
             }
             if (c == 0xee && i + 2 < got && (unsigned char)buf[i + 1] == 0x80
                 && (unsigned char)buf[i + 2] >= TL_DIM_OPEN
-                && (unsigned char)buf[i + 2] <= TL_HIDE_CLOSE)
+                && (unsigned char)buf[i + 2] <= TL_MINOR)
             {
                 /* A Markdown mark: not the title's, and nor is a name's
                  * qualifier, between the hide marks */

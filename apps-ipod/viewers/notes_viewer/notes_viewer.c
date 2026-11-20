@@ -17,9 +17,11 @@
  *     name is set over it in the biggest font loaded that sets a name.
  *   - The page takes its own picture's colours, held to a deep or a pale
  *     tint, never the colour itself: it is read against for minutes at a
- *     time. Or the theme's, the text viewer's, or Custom's text, link and
- *     page colours (liner_notes_colours); and liner_notes_banners off
- *     leaves the banner out.
+ *     time. Or the theme's, the text viewer's, or Custom's text, link,
+ *     page, dim text, heading and pull line colours (liner_notes_colours);
+ *     a picture with no colour in it gives its links the theme's. And
+ *     liner_notes_banners off leaves the banner out, liner_notes_progress
+ *     off the progress line.
  *   - Everything lives in the app buffer, never core_alloc(): the screen is
  *     used while music plays, and taking memory from the audio buffer stops
  *     the track. Two banners are kept, so going back to the page before
@@ -72,6 +74,7 @@
 #include "skin/skin_albumart_color.h"   /* dynamic_colors_resolve */
 #include "widgets/splash.h"
 #include "widgets/menu.h"
+#include "widgets/color_picker.h"       /* Chosen Colour */
 #include "input/action.h"
 #include "audio/sound_feedback.h"   /* the wheel's click */
 #include "system/activity.h"
@@ -105,10 +108,10 @@
 #define NV_THUMB        300         /* the art cache's largest size */
 #define NV_TEXT_MAX     (40 * 1024)
 #define NV_LINES_MAX    1024
-#define NV_LINKS_MAX    256
+#define NV_LINKS_MAX    512
 #define NV_SRC_MAX      (40 * 1024) /* the Markdown, pieces filled in */
 #define NV_FILE_MAX     (32 * 1024) /* the written file, or the template */
-#define NV_NAME_MAX     128         /* a link's name */
+#define NV_NAME_MAX     224         /* a link's name, qualifier and all */
 #define NV_HISTORY      8
 #define NV_READ         (LCD_HEIGHT / 3)    /* the reading line */
 #define NV_NEAR         3           /* lines from it a link is current */
@@ -121,12 +124,14 @@
 #define NV_HEAD     1       /* part of a heading */
 #define NV_PULL     2       /* part of a pull line: the rule beside it */
 #define NV_DIM      4       /* starts inside dim text */
+#define NV_MINOR    8       /* part of a `##` heading or deeper: underlined */
 
 struct nv_line
 {
     uint32_t off;
     int y;                      /* its top, down from the text's */
     int16_t link;               /* the link it starts inside, or -1 */
+    int16_t bullet;             /* where a list item's bullet is, or -1 */
     uint8_t flags;
     struct tl_line ln;
 };
@@ -171,6 +176,7 @@ static struct
     int bold;                   /* the theme's bold font, or -1 */
     int name_font, name_h;      /* the large name's font, and its height */
     unsigned fg, bg, dim, accent, rule, track;
+    unsigned head, quote;       /* headings, and a pull line's rule */
 
     /* the app buffer, carved up */
     char *work;                 /* a page while it is made, then a picture */
@@ -291,7 +297,22 @@ static bool nv_uses_art(void)
            || (global_settings.liner_notes_colours == NOTES_COLOURS_CUSTOM
                && (global_settings.liner_notes_text == NOTES_FROM_ART
                    || global_settings.liner_notes_links == NOTES_FROM_ART
-                   || global_settings.liner_notes_page == NOTES_FROM_ART));
+                   || global_settings.liner_notes_page == NOTES_FROM_ART
+                   || global_settings.liner_notes_dim == NOTES_FROM_ART + 1
+                   || global_settings.liner_notes_heads == NOTES_FROM_ART + 1
+                   || global_settings.liner_notes_quote
+                      == NOTES_FROM_ART + 1));
+}
+
+/* The picture's vivid colour, or `theme` when the picture has none: a
+ * black-and-white cover's most vivid colour is a grey, which links in it
+ * would not stand out from the text in */
+#define NV_GREY_CHROMA 4588     /* 0.07 in color_chroma()'s units */
+
+static unsigned nv_vivid(unsigned theme)
+{
+    return color_chroma(nv_art_vivid) >= NV_GREY_CHROMA ? nv_art_vivid
+                                                        : theme;
 }
 
 /* The page's picture's colours: its album's cover or its person's picture,
@@ -316,14 +337,24 @@ static void nv_art_palette(void)
     }
 }
 
-/* A Custom colour: NOTES_FROM_* `from`, given what Theme and Art are */
-static unsigned nv_from(int from, unsigned theme, unsigned art)
+/* A Custom colour: NOTES_FROM_* `from`, given what Theme, Art and Chosen
+ * Colour are */
+static unsigned nv_from(int from, unsigned theme, unsigned art,
+                        unsigned chosen)
 {
     if (from == NOTES_FROM_WHITE)
         return LCD_WHITE;
     if (from == NOTES_FROM_BLACK)
         return LCD_BLACK;
+    if (from == NOTES_FROM_CHOSEN)
+        return chosen;
     return from == NOTES_FROM_ART && nv_art_valid ? art : theme;
+}
+
+/* `c` held to a tone that reads on the page */
+static unsigned nv_readable(unsigned c, bool dark)
+{
+    return dark ? color_tone_bound(c, 70, 1) : color_tone_bound(c, 45, -1);
 }
 
 /* The page under Custom. Art's text and links are held to tones that read
@@ -331,12 +362,13 @@ static unsigned nv_from(int from, unsigned theme, unsigned art)
  * under dark. */
 static void nv_custom_colours(unsigned fg, unsigned bg, unsigned ac)
 {
+    const int *rgb = global_settings.liner_notes_rgb;
     int text = global_settings.liner_notes_text;
     int links = global_settings.liner_notes_links;
     bool dark;
 
-    fg = nv_from(text, fg, nv_art_vivid);
-    ac = nv_from(links, ac, nv_art_vivid);
+    fg = nv_from(text, fg, nv_art_vivid, rgb[0]);
+    ac = nv_from(links, ac, nv_vivid(ac), rgb[1]);
     if (global_settings.liner_notes_page == NOTES_FROM_ART && nv_art_valid)
         bg = text == NOTES_FROM_ART || nv_luma(fg) >= 128
              ? color_blend(color_tone_bound(nv_art_dominant, 14, -1),
@@ -344,15 +376,28 @@ static void nv_custom_colours(unsigned fg, unsigned bg, unsigned ac)
              : color_blend(color_tone_bound(nv_art_dominant, 94, 1),
                            LCD_WHITE, 80);
     else
-        bg = nv_from(global_settings.liner_notes_page, bg, bg);
+        bg = nv_from(global_settings.liner_notes_page, bg, bg, rgb[2]);
     dark = nv_luma(bg) < 128;
     if (text == NOTES_FROM_ART && nv_art_valid)
-        fg = dark ? color_tone_bound(fg, 70, 1) : color_tone_bound(fg, 45, -1);
+        fg = nv_readable(fg, dark);
     if (links == NOTES_FROM_ART && nv_art_valid)
-        ac = dark ? color_tone_bound(ac, 70, 1) : color_tone_bound(ac, 45, -1);
+        ac = nv_readable(ac, dark);
     nv.fg = fg;
     nv.bg = bg;
     nv.accent = ac;
+}
+
+/* One of Custom's dim text, heading and pull line rows: `v` is
+ * NOTES_STYLE_AUTO for `own`, else a NOTES_FROM_* one more than its value */
+static unsigned nv_style(int v, unsigned theme, unsigned own, unsigned chosen)
+{
+    int from = v - 1;
+
+    if (v == NOTES_STYLE_AUTO)
+        return own;
+    if (from == NOTES_FROM_ART && nv_art_valid)
+        return nv_readable(nv_vivid(theme), nv_luma(nv.bg) < 128);
+    return nv_from(from, theme, theme, chosen);
 }
 
 /* The page's colours, as liner_notes_colours says: the theme's through
@@ -385,7 +430,7 @@ static void nv_colours(void)
             && nv_art_valid)
         {
             bg = nv_art_dominant;
-            ac = nv_art_vivid;
+            ac = nv_vivid(ac);
         }
         if (dark)
         {
@@ -401,6 +446,18 @@ static void nv_colours(void)
         }
     }
     nv.dim = color_blend(nv.fg, nv.bg, 108);
+    nv.head = nv.fg;
+    nv.quote = nv.accent;
+    if (global_settings.liner_notes_colours == NOTES_COLOURS_CUSTOM)
+    {
+        const int *rgb = global_settings.liner_notes_rgb;
+
+        nv.dim = nv_style(global_settings.liner_notes_dim, fg, nv.dim, rgb[3]);
+        nv.head = nv_style(global_settings.liner_notes_heads, fg, nv.head,
+                           rgb[4]);
+        nv.quote = nv_style(global_settings.liner_notes_quote, ac, nv.quote,
+                            rgb[5]);
+    }
     nv.rule = color_blend(nv.fg, nv.bg, 218);
     nv.track = color_blend(nv.fg, nv.bg, 210);
     nv.vp.fg_pattern = nv.tvp.fg_pattern = nv.fg;
@@ -746,7 +803,8 @@ static void nv_layout_init(struct text_layout *tl)
     tl->width = nv.tvp.width;
     tl->fg = nv.fg;
     tl->dim = nv.dim;
-    /* Headings bold, or underlined when the theme has no bold font */
+    /* `#` headings bold, or underlined when the theme has no bold font;
+     * `##` and deeper underlined */
     tl->head_bold = nv.bold >= 0;
     tl->links = true;
     tl->link = nv.accent;
@@ -759,8 +817,9 @@ static void nv_layout(void)
 {
     struct text_layout tl;
     uint32_t off = 0;
-    int y = 0;
+    int y = 0, item = -1;       /* a list item's indent, while it wraps */
     bool heading = false, quote = false, dim = false, bold = false;
+    bool minor = false;
 
     nv.cur = -1;
     nv_layout_init(&tl);
@@ -772,10 +831,27 @@ static void nv_layout(void)
         size_t avail = nv.text_len - off, i;
         struct nv_line *l = &nv.lines[nv.nlines];
         bool head = heading || (avail >= 3 && !memcmp(s, TL_HEAD_OPEN, 3));
-        bool pull = quote || (avail >= 3 && !memcmp(s, TL_QUOTE, 3));
-        int indent = pull ? nv.quote_indent : 0;
+        bool lesser = heading ? minor
+                      : head && avail >= 6 && s[3] == 0xee && s[4] == 0x80
+                        && s[5] == TL_MINOR;
+        bool opens = avail >= 3 && !memcmp(s, TL_QUOTE, 3);
+        bool pull = quote || opens;
+        int indent = pull ? nv.quote_indent : 0, first, bullet = -1;
 
-        l->ln.bold = bold || (heading && tl.head_bold);
+        if (item >= 0)
+            indent += item;
+        else
+        {
+            int skip = opens ? 3 : 0;
+
+            item = tl_item_indent(&tl, s + skip, avail - skip,
+                                  nv.quote_indent, &first, &bullet);
+            item = item ? item : -1;
+            if (bullet >= 0)
+                bullet += indent;
+            indent += first;
+        }
+        l->ln.bold = bold || (heading && !minor && tl.head_bold);
         tl_line_break(&tl, s, avail, nv.tvp.width - indent, &l->ln);
         if (l->ln.used == 0)
             break;
@@ -785,15 +861,21 @@ static void nv_layout(void)
         l->off = off;
         l->y = y;
         l->link = -1;
+        l->bullet = bullet;
         y += l->ln.height;
         l->flags = (head ? NV_HEAD : 0) | (pull ? NV_PULL : 0)
-                   | (dim ? NV_DIM : 0);
+                   | (dim ? NV_DIM : 0) | (lesser ? NV_MINOR : 0);
 
         for (i = 0; i + 3 <= l->ln.used; i++)
             if (s[i] == 0xee && s[i + 1] == 0x80)
             {
                 if (s[i + 2] == 0x82 || s[i + 2] == 0x83)
+                {
                     heading = s[i + 2] == 0x82;
+                    minor = false;
+                }
+                else if (s[i + 2] == TL_MINOR)
+                    minor = true;
                 else if (s[i + 2] == TL_DIM_OPEN || s[i + 2] == TL_DIM_CLOSE)
                     dim = s[i + 2] == TL_DIM_OPEN;
                 else if (s[i + 2] == TL_BOLD_OPEN
@@ -801,6 +883,8 @@ static void nv_layout(void)
                     bold = s[i + 2] == TL_BOLD_OPEN;
             }
         quote = pull && s[l->ln.used - 1] != '\n';
+        if (s[l->ln.used - 1] == '\n')
+            item = -1;
         off += l->ln.used;
         nv.nlines++;
     }
@@ -826,15 +910,77 @@ static int nv_line_of(uint32_t off)
 /* The line the page's heading whose name key is `key` starts on, or -1 */
 static int nv_section_line(uint32_t key);
 
+/* The lines each link starts and ends on, after the page is laid out */
+static void nv_link_lines(void)
+{
+    int k, l;
+
+    for (k = 0; k < nv.nlinks; k++)
+    {
+        struct nv_link *lk = &nv.links[k];
+
+        lk->line = nv_line_of(lk->off);
+        lk->last = nv_line_of(lk->end - 3);
+        for (l = lk->line + 1; l <= lk->last; l++)
+            nv.lines[l].link = k;
+    }
+}
+
 /* Every name in the text laid out found: a link where it goes somewhere,
  * else plain text, its mark made one that draws nothing. A page longer than
- * NV_LINES_MAX lines has its names past the last line left alone. */
-static void nv_find_links(void)
+ * NV_LINES_MAX lines has its names past the last line left alone, and names
+ * past the NV_LINKS_MAX-th are plain. True when plain text was made wider,
+ * and the page needs laying out again. */
+#define NV_SHOWN_MAX 64
+
+/* The no-break spaces of the qualifiers shown again, at `shown` (`n` of
+ * them, in order), made spaces: the text closed up in one pass, the links
+ * after them moved with it */
+static void nv_unhide_spaces(const size_t *shown, int n)
 {
     unsigned char *t = nv.text;
-    char name[NV_NAME_MAX];
+    size_t r = shown[0], w = r;
+    int j = 0, k = 0;
+    bool in = false;
+
+    while (k < nv.nlinks && nv.links[k].off < r)
+        k++;
+    while (r <= nv.text_len)            /* the NUL too */
+    {
+        if (k < nv.nlinks && nv.links[k].off == r)
+        {
+            nv.links[k].end = w + (nv.links[k].end - nv.links[k].off);
+            nv.links[k].off = w;
+            k++;
+        }
+        if (j < n && r == shown[j])
+        {
+            in = true;
+            j++;
+            t[w++] = t[r++];            /* past the mark's first byte */
+            continue;
+        }
+        if (in && t[r] == 0xee && r + 1 < nv.text_len && t[r + 1] == 0x80)
+            in = false;
+        if (in && t[r] == 0xc2 && t[r + 1] == 0xa0)
+        {
+            t[w++] = ' ';
+            r += 2;
+            continue;
+        }
+        t[w++] = t[r++];
+    }
+    nv.text_len = w - 1;
+}
+
+static bool nv_find_links(void)
+{
+    static char name[NV_NAME_MAX];
+    static size_t shown[NV_SHOWN_MAX];  /* where qualifiers were unhidden */
+    unsigned char *t = nv.text;
     size_t off, i, end = 0;
-    int l;
+    int nshown = 0;
+    bool wider = false;
 
     nv.nlinks = 0;
     if (nv.nlines)
@@ -875,16 +1021,28 @@ static void nv_find_links(void)
         {
             k->off = off;
             k->end = close + 3;
-            k->line = nv_line_of(off);
-            k->last = nv_line_of(close);
-            for (l = k->line + 1; l <= k->last; l++)
-                nv.lines[l].link = nv.nlinks;
             nv.nlinks++;
         }
         else
+        {
+            /* plain text, and a trailing "(...)" shown with it: it was
+             * not a qualifier that found anything */
             t[off + 2] = TL_NAME_CLOSE;
+            for (i = off + 3; i + 3 <= close; i++)
+                if (t[i] == 0xee && t[i + 1] == 0x80
+                    && (t[i + 2] == TL_HIDE_OPEN || t[i + 2] == TL_HIDE_CLOSE))
+                {
+                    if (t[i + 2] == TL_HIDE_OPEN && nshown < NV_SHOWN_MAX)
+                        shown[nshown++] = i;
+                    t[i + 2] = TL_NAME_CLOSE;
+                    wider = true;
+                }
+        }
         off = close + 2;
     }
+    if (nshown)
+        nv_unhide_spaces(shown, nshown);
+    return wider;
 }
 
 /* A heading's text from line `i`, its marks left out, into `buf` */
@@ -955,6 +1113,12 @@ static int nv_disc_heading(const char *p)
 
 /* ---- drawing ----------------------------------------------------------- */
 
+/* The rows the progress line takes along the foot, 0 with it off */
+static int nv_foot(void)
+{
+    return global_settings.liner_notes_progress ? NV_PROGRESS : 0;
+}
+
 static void nv_clamp_scroll(void)
 {
     int content = nv.text_top + 8;
@@ -962,7 +1126,7 @@ static void nv_clamp_scroll(void)
     if (nv.nlines > 0)
         content += nv.lines[nv.nlines - 1].y
                    + nv.lines[nv.nlines - 1].ln.height;
-    nv.max_scroll = MAX(0, content - (LCD_HEIGHT - NV_PROGRESS));
+    nv.max_scroll = MAX(0, content - (LCD_HEIGHT - nv_foot()));
     nv.scroll = MAX(0, MIN(nv.scroll, nv.max_scroll));
 }
 
@@ -972,6 +1136,8 @@ static void nv_draw_progress(bool update)
     struct mp3entry *id3 = audio_current_track();
     int w = 0, y = LCD_HEIGHT - NV_PROGRESS;
 
+    if (!nv_foot())
+        return;
     if (id3 && id3->length > 0)
         w = (int)((long long)id3->elapsed * LCD_WIDTH / id3->length);
     w = MAX(0, MIN(w, LCD_WIDTH));
@@ -1001,6 +1167,12 @@ static void nv_put(const char *text, int font, int x, int y, int right,
     d->set_viewport(&nv.vp);
 }
 
+/* Whether the large name has gone off the top, for the slim bar */
+static bool nv_bar_shown(void)
+{
+    return nv.name_y - nv.scroll + nv.name_h <= NV_ROW - 4;
+}
+
 /* The large name, scrolled with the text; or, once it has gone off the top,
  * the slim bar */
 static void nv_draw_title(void)
@@ -1008,7 +1180,7 @@ static void nv_draw_title(void)
     struct screen *d = &screens[SCREEN_MAIN];
     int y = nv.name_y - nv.scroll;
 
-    if (y + nv.name_h > NV_ROW - 4)
+    if (!nv_bar_shown())
     {
         nv_put(nv.doc.title, nv.name_font, NV_MARGIN_L, y,
                LCD_WIDTH - NV_MARGIN_R, nv.fg);
@@ -1054,29 +1226,37 @@ static void nv_draw_lines(void)
     {
         struct nv_line *l = &nv.lines[i];
         int y = nv.text_top + l->y - nv.scroll;
-        unsigned colour = (l->flags & NV_DIM) ? nv.dim : nv.fg;
+        unsigned colour;
 
+        tl.fg = (l->flags & NV_HEAD) ? nv.head : nv.fg;
+        colour = (l->flags & NV_DIM) ? nv.dim : tl.fg;
         if (y + l->ln.height <= 0)
             continue;
-        if (y >= LCD_HEIGHT - NV_PROGRESS)
+        if (y >= LCD_HEIGHT - nv_foot())
             break;
         if (nv.cur >= 0 && i >= nv.links[nv.cur].line
             && i <= nv.links[nv.cur].last)
             nv_draw_current(&tl, i, y);
         if (l->link >= 0)
             colour = l->link == nv.cur ? nv.bg : nv.accent;
+        if (l->bullet >= 0)
+        {
+            d->set_foreground((l->flags & NV_DIM) ? nv.dim : tl.fg);
+            tl_draw_bullet(&l->ln, l->bullet, y);
+        }
         d->set_foreground(colour);
         if (l->ln.draw > 0)
             tl_draw_line(&tl, nv.text + l->off, &l->ln, y);
-        if ((l->flags & NV_HEAD) && l->ln.draw > 0 && !tl.head_bold)
+        if ((l->flags & NV_HEAD) && l->ln.draw > 0
+            && (!tl.head_bold || (l->flags & NV_MINOR)))
         {
-            d->set_foreground(nv.fg);
+            d->set_foreground(nv.head);
             d->hline(l->ln.indent, l->ln.indent + l->ln.width - 1,
                      MIN(y + l->ln.ascent + 2, y + l->ln.height - 1));
         }
         if (l->flags & NV_PULL)
         {
-            d->set_foreground(nv.accent);
+            d->set_foreground(nv.quote);
             d->fillrect(0, y, 2, l->ln.height);
         }
     }
@@ -1174,10 +1354,13 @@ static int nv_link_bottom(int i)
     return nv.text_top + l->y + l->ln.height - nv.scroll;
 }
 
+/* Link `i` whole on the screen: below the slim bar, above the progress
+ * line */
 static bool nv_link_shown(int i)
 {
-    return i >= 0 && i < nv.nlinks && nv_link_bottom(i) > 0
-           && nv_link_top(i) < LCD_HEIGHT - NV_PROGRESS;
+    return i >= 0 && i < nv.nlinks
+           && nv_link_top(i) >= (nv_bar_shown() ? NV_ROW : 0)
+           && nv_link_bottom(i) <= LCD_HEIGHT - nv_foot();
 }
 
 /* The link the reading line falls on, or the nearest within NV_NEAR lines
@@ -1449,7 +1632,7 @@ static const struct notes_target *nv_current(void)
  * go to a library artist; the page's always has the settings */
 static bool nv_has_rows(const struct notes_target *t, bool page)
 {
-    return page || t->album >= 0 || t->artist_seek >= 0;
+    return page || t->album >= 0 || notes_is_artist(t->artist_seek);
 }
 
 /* Move Banner on the page's menu, over a band of a picture */
@@ -1517,7 +1700,7 @@ static int nv_go_artist_callback(int action,
     (void)this_item;
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM
-        && !(t && t->album < 0 && t->artist_seek >= 0))
+        && !(t && t->album < 0 && notes_is_artist(t->artist_seek)))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -1551,7 +1734,7 @@ static int nv_setting_callback(int action, const struct menu_item_ex *this_item,
     return action;
 }
 
-/* Custom's three rows, while Custom is chosen */
+/* Custom's rows, while Custom is chosen */
 static int nv_custom_callback(int action, const struct menu_item_ex *this_item,
                               struct gui_synclist *this_list)
 {
@@ -1572,21 +1755,84 @@ MENUITEM_SETTING(nv_links_item, &global_settings.liner_notes_links,
                  nv_custom_callback);
 MENUITEM_SETTING(nv_page_item, &global_settings.liner_notes_page,
                  nv_custom_callback);
+MENUITEM_SETTING(nv_dim_item, &global_settings.liner_notes_dim,
+                 nv_custom_callback);
+MENUITEM_SETTING(nv_heads_item, &global_settings.liner_notes_heads,
+                 nv_custom_callback);
+MENUITEM_SETTING(nv_quote_item, &global_settings.liner_notes_quote,
+                 nv_custom_callback);
 MENUITEM_SETTING(nv_banners_item, &global_settings.liner_notes_banners,
+                 nv_setting_callback);
+MENUITEM_SETTING(nv_progress_item, &global_settings.liner_notes_progress,
                  nv_setting_callback);
 MAKE_MENU(nv_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL, Icon_NOICON,
           &nv_play_item, &nv_next_item, &nv_last_item, &nv_go_album_item,
           &nv_go_artist_item, &nv_move_item, &nv_reset_item, &nv_colours_item,
-          &nv_text_item, &nv_links_item, &nv_page_item, &nv_banners_item);
+          &nv_text_item, &nv_links_item, &nv_page_item, &nv_dim_item,
+          &nv_heads_item, &nv_quote_item, &nv_banners_item,
+          &nv_progress_item);
 
 /* The settings the page's menu offers, to see whether one changed */
-static int nv_settings_sum(void)
+static uint32_t nv_settings_sum(void)
 {
-    return global_settings.liner_notes_colours
-           | global_settings.liner_notes_text << 4
-           | global_settings.liner_notes_links << 8
-           | global_settings.liner_notes_page << 12
-           | global_settings.liner_notes_banners << 16;
+    const struct user_settings *s = &global_settings;
+    uint32_t sum = s->liner_notes_colours
+                   | s->liner_notes_text << 3 | s->liner_notes_links << 6
+                   | s->liner_notes_page << 9 | s->liner_notes_dim << 12
+                   | s->liner_notes_heads << 15 | s->liner_notes_quote << 18
+                   | s->liner_notes_banners << 21
+                   | s->liner_notes_progress << 22;
+    unsigned i;
+
+    for (i = 0; i < ARRAYLEN(s->liner_notes_rgb); i++)
+        sum = sum * 31 + s->liner_notes_rgb[i];
+    return sum;
+}
+
+/* Chosen Colour's picker for Custom's row `which` (liner_notes_rgb's
+ * order), when `chosen` */
+static void nv_choose(int which, bool chosen)
+{
+    static const int titles[] = {
+        LANG_TEXT_VIEWER_TEXT_COLOUR, LANG_NOTES_LINK_COLOUR,
+        LANG_TEXT_VIEWER_PAGE_COLOUR, LANG_NOTES_DIM_COLOUR,
+        LANG_NOTES_HEADING_COLOUR, LANG_NOTES_QUOTE_COLOUR,
+    };
+
+    if (chosen && !set_color(str(titles[which]),
+                             (unsigned *)&global_settings.liner_notes_rgb[which],
+                             (unsigned)-1))
+        settings_save();
+}
+
+void notes_chose_text(int value)
+{
+    nv_choose(0, value == NOTES_FROM_CHOSEN);
+}
+
+void notes_chose_links(int value)
+{
+    nv_choose(1, value == NOTES_FROM_CHOSEN);
+}
+
+void notes_chose_page(int value)
+{
+    nv_choose(2, value == NOTES_FROM_CHOSEN);
+}
+
+void notes_chose_dim(int value)
+{
+    nv_choose(3, value == NOTES_FROM_CHOSEN + 1);
+}
+
+void notes_chose_heads(int value)
+{
+    nv_choose(4, value == NOTES_FROM_CHOSEN + 1);
+}
+
+void notes_chose_quote(int value)
+{
+    nv_choose(5, value == NOTES_FROM_CHOSEN + 1);
 }
 
 /* A menu with the theme on for it, as the lyric viewer's is. True when USB
@@ -1709,7 +1955,9 @@ static bool nv_build(const struct nv_req *r)
     nv_utf8_cut(nv.doc.title);
     nv_markdown(src, len, arena);
     nv_layout();
-    nv_find_links();
+    if (nv_find_links())
+        nv_layout();
+    nv_link_lines();
 
     /* A track: its section of the notes, else its row in the track list */
     nv.scroll = 0;
@@ -1970,6 +2218,24 @@ static void nv_release(void)
 /* The page on screen made again, where it was: after the buffer was let go
  * for the queue, or a banner was moved. False when it can no longer be
  * made -- its file gone, say -- and the screen is to be left. */
+/* Whether a page made while the library was out can be made with it now:
+ * once the database is in RAM, or has done nothing for NV_QUIET polls, as
+ * it does not go straight from scanning to loading. Asked once a poll. */
+#define NV_QUIET 4
+
+static bool nv_library_back(void)
+{
+    static int quiet;
+
+    if (tagcache_is_in_ram())
+        return true;
+    quiet = notes_library_waiting() ? 0 : quiet + 1;
+    if (quiet < NV_QUIET)
+        return false;
+    quiet = 0;
+    return true;
+}
+
 static bool nv_reopen(void)
 {
     int scroll = nv.scroll, cur = nv.cur;
@@ -1992,7 +2258,7 @@ static int nv_menu_run(bool page)
     const struct notes_target *t = &nv_mt;
     struct tagcache_album row;
     char name[TAGCACHE_BUFSZ];
-    int sum = nv_settings_sum();
+    uint32_t sum = nv_settings_sum();
 
     if (page)
     {
@@ -2204,6 +2470,15 @@ static int nv_run(const struct nv_req *r)
                 if (nv_dirty)
                 {
                     nv_dirty = false;
+                    nv_draw();
+                }
+                else if (nv.doc.waiting && nv_library_back())
+                {
+                    /* the database done: the page with its library, its
+                     * current link found again, as the links have moved */
+                    if (!nv_reopen())
+                        goto done;
+                    nv.cur = nv_natural(false);
                     nv_draw();
                 }
                 else

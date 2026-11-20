@@ -60,7 +60,8 @@ static bool tl_bold_after(const struct text_layout *tl, const unsigned char *s,
     {
         if (s[2] == TL_BOLD_OPEN || (tl->head_bold && s[2] == 0x82))
             return true;
-        if (s[2] == TL_BOLD_CLOSE || (tl->head_bold && s[2] == 0x83))
+        if (s[2] == TL_BOLD_CLOSE
+            || (tl->head_bold && (s[2] == 0x83 || s[2] == TL_MINOR)))
             return false;
     }
     return bold;
@@ -108,12 +109,63 @@ bool tl_is_style_mark(const unsigned char *s, size_t n)
            && s[2] >= TL_DIM_OPEN && s[2] <= TL_MD_LAST;
 }
 
+/* TS_BULLET and TS_NUMBERED */
+static bool tl_is_item_mark(const unsigned char *s, size_t n)
+{
+    return n >= 3 && s[0] == 0xee && s[1] == 0x80
+           && (s[2] == TL_BULLET || s[2] == TL_NUMBERED);
+}
+
+static bool tl_is_minor_mark(const unsigned char *s, size_t n)
+{
+    return n >= 3 && s[0] == 0xee && s[1] == 0x80 && s[2] == TL_MINOR;
+}
+
 size_t tl_hidden(const unsigned char *s, size_t n)
 {
     return tl_is_shy(s, n) ? 2
-           : tl_is_heading_mark(s, n) || tl_is_style_mark(s, n) ? 3
+           : tl_is_heading_mark(s, n) || tl_is_style_mark(s, n)
+             || tl_is_item_mark(s, n) || tl_is_minor_mark(s, n) ? 3
            : tl_note_mark(s, n) ? tl_note_mark(s, n)
            : tl_span(s, n, TL_HIDE_OPEN, TL_HIDE_CLOSE);
+}
+
+int tl_item_indent(const struct text_layout *tl, unsigned char *s, size_t n,
+                   int step, int *first, int *bullet)
+{
+    size_t i = 0, w;
+    int levels = 0;
+
+    *first = 0;
+    *bullet = -1;
+    while (i + 3 <= n && tl_is_item_mark(s + i, n - i) && s[i + 2] == s[2])
+    {
+        levels++;
+        i += 3;
+    }
+    if (!levels)
+        return 0;
+    *first = (levels - 1) * step;
+    if (s[2] == TL_BULLET)
+    {
+        *bullet = *first + step / 4;
+        *first += step;
+        return *first;
+    }
+    /* the number, and the space after it */
+    for (w = i; w < n && s[w] != ' ' && s[w] != '\n'; w++)
+        ;
+    if (w < n && s[w] == ' ')
+        w++;
+    return *first + tl_width(tl, s + i, w - i);
+}
+
+void tl_draw_bullet(const struct tl_line *ln, int x, int y)
+{
+    int d = MAX(4, ln->ascent / 3), top = y + ln->ascent * 2 / 3 - d / 2;
+
+    screens[SCREEN_MAIN].fillrect(x + 1, top, d - 2, d);
+    screens[SCREEN_MAIN].fillrect(x, top + 1, d, d - 2);
 }
 
 int tl_text_width(const struct text_layout *tl, unsigned char *s, size_t n,

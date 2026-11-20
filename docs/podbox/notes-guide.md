@@ -65,13 +65,16 @@ for, in order:
    player makes up
 6. A name two or more pages give, whose page lists where
 
-A name none of these finds stays plain text.
+A name none of these finds stays plain text. So does a name longer than
+192 bytes, and every name past the 512th on a page, counting the links
+pieces make.
 
 Two people with the same name are told apart as Wikipedia does it: add a
 word in brackets to the less known one, `[Michael McDonald (producer)]`,
 and name their page to match, `Michael McDonald (producer).md`. The page
 shows "Michael McDonald". Leave the name the albums are filed under as it
-is, so Now Playing still finds that page.
+is, so Now Playing still finds that page. A name that finds nothing is shown
+whole, its words in brackets too: `[Ring Ring (Swedish version)]`.
 
 Four words in brackets say what kind of thing you mean instead:
 
@@ -128,6 +131,8 @@ The first can follow a colon instead: `{{albums: Steely Dan}}` is
 | `sort=year`, `sort=-year` | The order; a `-` turns it round |
 | `show=year,tracks` | What is shown dimmed after each item |
 | `style=inline` | All on one line: `Aja · Gaucho · Pretzel Logic` |
+| `style=commas` | All on one line, parted by commas: `Aja, Gaucho, Pretzel Logic` |
+| `style=bullets` | A bullet before each |
 | `heading=Albums` | A heading above it, left out with it when it is empty |
 | `empty=Nothing yet` | A line to show when there is nothing to list |
 
@@ -136,13 +141,15 @@ And each its own:
 | Piece | Properties |
 |---|---|
 | `{{albums}}` | `artist=Name`; `genre=Jazz`; `year=1970-1979`; `guest=true` adds the albums they only feature on (once Featured Artists has read your library); `sort=year` (the order it starts in), `name`, `plays` (most played first), `played` (last played first) or `added` (newest first); `group=decade` or `genre` for a heading over each; `show=year,tracks,length,plays` |
-| `{{tracks}}` | `album=Name`, or `artist=Name` for all their tracks, or `composer=Name` for every track whose composer tag names them (names in the tag parted by `,` `;` `/` `&` or `and`); `disc=2`; `group=disc` for a heading over each disc; `sort=plays`, `played` or `title`; `numbers=false`; `show=length,plays,artist` |
+| `{{tracks}}` | `album=Name`, with `artist=Name` for whose album it is; or `artist=Name` alone for all their tracks, or `composer=Name` for every track whose composer tag names them (names in the tag parted by `,` `;` `/` `&` or `and`); `number=1,2,4` for only those tracks; `disc=2`; `group=disc` for a heading over each disc; `sort=plays`, `played` or `title`; `numbers=false`, or `numbers=true` for a list on one line or in bullets, which have none; `show=length,plays,artist` |
 | `{{mentions}}` | `name=Name`; `filter=artists`, `albums`, `people` or `other`, for the kind of page that does the naming; `headings=true` to show the section of the page each is named in; `group=kind` for a heading over albums, people and other pages |
 | `{{pages}}` | `folder=People`, `Albums` or the name of any other folder of `/Notes` |
 
 For example, an artist's ten most played tracks: `{{tracks|artist=Steely
 Dan|sort=plays|limit=10|show=plays}}`; the 1970s in your library, newest
-first: `{{albums|year=1970-1979|sort=-year}}`.
+first: `{{albums|year=1970-1979|sort=-year}}`; the tracks a session player
+is on, among the words of a credit: `Bass on
+{{tracks|album=Aja|artist=Steely Dan|number=1,2,5|style=commas}}`.
 
 These become the album's details wherever you put them, so `[{{artist}}]`
 is a link to the artist:
@@ -249,14 +256,22 @@ playing.
 ## Colours
 
 Each page is tinted from its own picture -- the album's cover, the artist's
-picture -- with its links in the picture's most vivid colour, and a page
-with no picture keeps the colours of the last one. `Settings > Library >
-Music > Liner Notes and Biographies > Colours` changes that: `Theme` follows
-your theme, and with dynamic colours on, the album that's playing; `Text
-Viewer's` uses the text viewer's colours, your own custom pair among them.
-`Custom` sets the text, the links and the page apart, each from the
-picture, the theme, white or black: white text on black with links in the
-picture's colour, say, or the picture's colour on black with white links.
+picture -- with its links in the picture's most vivid colour, or the
+theme's when the picture has no colour in it, and a page with no picture
+keeps the colours of the last one. `Settings > Library > Music > Liner
+Notes and Biographies > Colours` changes that: `Theme` follows your theme,
+and with dynamic colours on, the album that's playing; `Text Viewer's` uses
+the text viewer's colours, your own custom pair among them.
+
+`Custom` sets each part apart: the text, the links, the page, dimmed text,
+headings and the line beside a pull line. Each takes the picture's colour,
+the theme's, white, black, or one you choose with the colour picker
+(`Chosen Colour`): white text on black with links in the picture's colour,
+say, or grey text with amber links. Dimmed text, headings and pull lines
+are `Auto` until you set them, made from the text and link colours.
+
+`Progress Line` off leaves out the line along the foot of the page that
+shows how far the playing track has got.
 
 ## The picture at the top
 
@@ -281,17 +296,22 @@ picture of your own is shown as it is, and can't be moved.
 
 | You write | You see |
 |---|---|
-| `# Heading` | A bold heading, underlined when the theme has no bold font. `##` and below work too |
+| `# Heading` | A bold heading, underlined when the theme has no bold font |
+| `## Heading` | A lesser heading, underlined. `###` and below look the same |
 | `## 2. Aja` | In album notes, a heading named for a track starts that track's section |
 | `*text*` | Dimmer text, for dates, credits and asides |
 | `**text**` | Bold, when the theme has a bold font; ordinary text when it has none |
 | `> A line` | A pull line, set apart with a line of the accent colour down its side |
 | `[Steve Gadd]` | A link |
+| `- item` | A bullet, the item's lines indented beside it. `*` and `+` work too; two spaces in front put it a level in |
+| `1. item` | A numbered item, its lines indented under its first word |
+| `<!-- a note -->` | Left out, over as many lines as it runs |
+| `---` | On the first line, starts front matter, left out to the next `---` line. Its lines are `key: value` lines, lists and indented lines; at any other line it ends there and the page starts |
 
 Everything else Markdown has is shown as plain text:
 
 - A web link's label shows, and its address is left out
-- Code and lists keep their words
+- Code keeps its words
 
 The screen shows the page's name at the top in large type, so start with
 the text itself rather than a title: a first line of `# Steely Dan` would
@@ -359,6 +379,7 @@ disc 1. Notes with no disc headings are read as one disc.
 ## Markdown files in the text viewer
 
 The text viewer reads the same marks in any `.md` file: headings are
-underlined and listed under `Browse Chapters`, `*text*` is dimmer, and
-`> lines` are set apart. `**bold**` shows as ordinary text there, and a
+underlined and listed under `Browse Chapters`, `*text*` is dimmer,
+`> lines` are set apart, lists have their bullets, and comments and front
+matter are left out. `**bold**` shows as ordinary text there, and a
 `[Name]` as plain text.

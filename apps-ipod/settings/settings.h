@@ -680,10 +680,17 @@ struct user_settings
      * nothing reads /Notes and no menu offers them. */
     bool liner_notes;
     int liner_notes_colours;        /* NOTES_COLOURS_*, notes_viewer.h */
-    int liner_notes_text;           /* Custom's three: NOTES_FROM_* */
+    int liner_notes_text;           /* Custom's: NOTES_FROM_* */
     int liner_notes_links;
     int liner_notes_page;
+    int liner_notes_dim;            /* and NOTES_STYLE_AUTO or NOTES_FROM_*+1 */
+    int liner_notes_heads;
+    int liner_notes_quote;
+    int liner_notes_rgb[6];         /* each one's Chosen Colour, native, in
+                                       that order: text, links, page, dim,
+                                       heads, quote */
     bool liner_notes_banners;       /* the picture at the top of a page */
+    bool liner_notes_progress;      /* the line along the foot */
     /* Which of the rows above a Music list are shown: [All Tracks],
      * [Random] and [Shuffle Albums] */
     bool show_all_tracks_row;

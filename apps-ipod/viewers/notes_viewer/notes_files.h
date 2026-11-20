@@ -94,7 +94,8 @@ struct tagcache_search;
 bool notes_album_read(struct tagcache_search *tcs, struct notes_album *a);
 
 /* The same for the album `album_seek` by the album artist `artist_seek`
- * (-1 for any). False when the database has none. */
+ * (a seek, a split artist's handle, or -1 for any). False when the database
+ * has none. */
 bool notes_album_of(long album_seek, long artist_seek, struct notes_album *a);
 
 /* notes_find_names() of it */

@@ -12,9 +12,10 @@
 /* The most one input byte can make the filter emit: a held `[name]` with
  * its two marks, and the word held after its `:`, replayed. flt_pull() feeds
  * a byte only with this much room. */
-#define FLT_ROOM   192
-#define MD_NAME_MAX 64
+#define FLT_ROOM   448
+#define MD_NAME_MAX 192
 #define MD_DEF_MAX  16
+#define MD_FM_KEY   32              /* the longest key front matter has */
 
 /* ===================== shared filter scaffolding ====================== */
 
@@ -38,6 +39,23 @@ struct flt_st {
     size_t dlen;
     uint8_t def[MD_DEF_MAX];        /* what follows `[label]:` until its first
                                      * word shows whether it is a link */
+    int skip;                       /* MD_SKIP_*: inside what is left out */
+    int opened;                     /* bytes of "<!--" held */
+    int dashes;                     /* '-'s just seen, in a comment */
+    int eat_nl;                     /* a comment that was its line's all */
+    int front, front_done;          /* '-'s opening the file, and whether
+                                     * the file has gone past them */
+    int fm_n;                       /* a front matter line's bytes so far */
+    uint8_t fm_line[3];
+    int fm_kind;                    /* MD_FM_*: what the line is so far */
+    int fm_keyn;
+    uint8_t fm_key[MD_FM_KEY];      /* its key, until its colon shows it is
+                                     * YAML; let go when it is not */
+    int inner;                      /* brackets open inside a label */
+    int lead;                       /* spaces before a line's first word */
+    int itemn, item_skip;           /* bytes held of what may start a list
+                                     * item, and whether to let one by */
+    uint8_t item[4];                /* `-`, or `12.` */
     /* rtf */
     int depth, skip_depth, ctrl, ctrl_len, uc_skip, hexd, hexv;
     int uc_pend;                    /* fallback chars a \uN has still to eat */
@@ -283,10 +301,247 @@ static int md_def_is_link(const flt_st *s)
 
 static void md_feed(flt_st *s, uint8_t c);
 
+/* What may start a list item, held from a line's start, let go as text:
+ * the first byte is let by, or it would be held again */
+static void md_item_let_go(flt_st *s)
+{
+    int i, n = s->itemn;
+
+    s->itemn = 0;
+    s->item_skip = 1;
+    for (i = 0; i < n; i++)
+        md_feed(s, s->item[i]);
+    s->item_skip = 0;
+}
+
+/* The list item held: its marks, once a level, and a number's text */
+static void md_item_make(flt_st *s, int num)
+{
+    int level = s->lead / 2 < 3 ? s->lead / 2 : 3, i;
+
+    for (i = 0; i <= level; i++)
+        ts_emit_cp(&s->out, num ? TS_NUMBERED : TS_BULLET);
+    if (num)
+    {
+        for (i = 0; i < s->itemn; i++)
+            md_emit(s, s->item[i]);
+        md_emit(s, ' ');
+    }
+    s->itemn = 0;
+    s->at_bol = 0;
+}
+
+/* What md_item_more() made of a byte */
+enum { MD_ITEM_NOT = 0, MD_ITEM_TAKEN, MD_ITEM_MADE };
+
+/* `c` after what md_feed() holds as it may start a list item: TAKEN, held
+ * with it or making the item; MADE, the item made and `c` its text's first
+ * byte; NOT, what is held is not an item after all. A bullet waits for the
+ * byte after its space, as `- - -` and `* * *` are rules. */
+static int md_item_more(flt_st *s, uint8_t c)
+{
+    uint8_t last = s->item[s->itemn - 1];
+    int num = s->item[0] >= '0' && s->item[0] <= '9';
+
+    if (num && last >= '0' && last <= '9' && s->itemn < 4
+        && ((c >= '0' && c <= '9' && s->itemn < 3) || c == '.' || c == ')'))
+    {
+        s->item[s->itemn++] = c;
+        return MD_ITEM_TAKEN;
+    }
+    if (!num && s->itemn == 2)
+    {
+        if (c == s->item[0])
+            return MD_ITEM_NOT;
+        s->itemn = 1;
+        md_item_make(s, 0);
+        return c == ' ' ? MD_ITEM_TAKEN : MD_ITEM_MADE;
+    }
+    if (c != ' ' || (num && last != '.' && last != ')'))
+        return MD_ITEM_NOT;
+    if (!num)
+    {
+        s->item[s->itemn++] = ' ';
+        return MD_ITEM_TAKEN;
+    }
+    md_item_make(s, 1);
+    return MD_ITEM_TAKEN;
+}
+
+/* What md_take() is leaving out */
+enum { MD_SKIP_NONE = 0, MD_SKIP_COMMENT, MD_SKIP_FRONT };
+
+static const uint8_t md_open[] = "<!--";
+
+/* The bytes md_take() held, let go: they were not what it held them for */
+static void md_let_go(flt_st *s)
+{
+    int i, n = s->opened;
+
+    s->opened = 0;
+    for (i = 0; i < n; i++)
+        md_feed(s, md_open[i]);
+}
+
+/* A front matter line: at its start, inside its key, or YAML -- blank,
+ * indented, a list's or a comment's, or a key and its colon */
+enum { MD_FM_START = 0, MD_FM_IN_KEY, MD_FM_YAML };
+
+static int md_key_byte(uint8_t c)
+{
+    return md_word(c) || c == '_' || c == '-' || c == ' ' || c == '.'
+           || c == '"' || c == '\'';
+}
+
+/* Front matter that turns out not to be, at a line that is not YAML: the
+ * line so far let go, and what follows read as the page */
+static void md_take(flt_st *s, uint8_t c);
+
+static void md_front_ends(flt_st *s, uint8_t c)
+{
+    int i, n = s->fm_keyn;
+
+    s->skip = MD_SKIP_NONE;
+    s->fm_keyn = 0;
+    for (i = 0; i < n; i++)
+        md_take(s, s->fm_key[i]);
+    md_take(s, c);
+}
+
+/* `c` inside front matter */
+static void md_front(flt_st *s, uint8_t c)
+{
+    if (c == '\n')
+    {
+        if (s->fm_n == 3 && s->fm_line[0] == s->fm_line[1]
+            && s->fm_line[1] == s->fm_line[2]
+            && (s->fm_line[0] == '-' || s->fm_line[0] == '.'))
+            s->skip = MD_SKIP_NONE;     /* its closing line */
+        else if (s->fm_kind == MD_FM_IN_KEY)
+        {
+            md_front_ends(s, c);
+            return;
+        }
+        s->fm_n = 0;
+        s->fm_kind = MD_FM_START;
+        s->fm_keyn = 0;
+        return;
+    }
+    if (c != ' ' && s->fm_n < 4)
+    {
+        if (s->fm_n < 3)
+            s->fm_line[s->fm_n] = c;
+        s->fm_n++;
+    }
+    if (s->fm_kind == MD_FM_START)
+    {
+        if (c == ' ' || c == '\t' || c == '-' || c == '#' || c == '.')
+            s->fm_kind = MD_FM_YAML;
+        else if (md_key_byte(c))
+        {
+            s->fm_kind = MD_FM_IN_KEY;
+            s->fm_key[s->fm_keyn++] = c;
+        }
+        else
+            md_front_ends(s, c);
+    }
+    else if (s->fm_kind == MD_FM_IN_KEY)
+    {
+        if (c == ':')
+            s->fm_kind = MD_FM_YAML;
+        else if (md_key_byte(c) && s->fm_keyn < MD_FM_KEY)
+            s->fm_key[s->fm_keyn++] = c;
+        else
+            md_front_ends(s, c);
+    }
+}
+
+/* Whether the byte arriving now is code: a backtick run still held decides
+ * whether it opens or closes code before that byte is read */
+static int md_in_code(const flt_st *s)
+{
+    if (!s->tick)
+        return s->fence || s->code;
+    if (s->tick >= 3 && s->at_bol)
+        return !s->fence;
+    return s->fence || !s->code;
+}
+
+/* Markdown less its comments, <!-- to -->, and its front matter: a ---
+ * line opening the file, to the next --- or ... line, for as long as its
+ * lines are YAML. A comment that is all of its line takes the line with
+ * it. Inside code they are code. */
+static void md_take(flt_st *s, uint8_t c)
+{
+    if (c == '\r')
+        return;
+    if (!s->front_done)
+    {
+        if (c == '-' && s->front < 3)
+        {
+            s->front++;
+            return;
+        }
+        s->front_done = 1;
+        if (c == '\n' && s->front == 3)
+        {
+            s->skip = MD_SKIP_FRONT;
+            return;
+        }
+        while (s->front)
+        {
+            s->front--;
+            md_take(s, '-');
+        }
+    }
+    if (s->skip == MD_SKIP_FRONT)
+    {
+        md_front(s, c);
+        return;
+    }
+    if (s->skip == MD_SKIP_COMMENT)
+    {
+        if (c == '>' && s->dashes >= 2)
+            s->skip = MD_SKIP_NONE;
+        s->dashes = c == '-' ? s->dashes + 1 : 0;
+        return;
+    }
+    if (s->eat_nl)
+    {
+        s->eat_nl = 0;
+        if (c == '\n')
+            return;
+    }
+    if (s->opened && c != md_open[s->opened])
+        md_let_go(s);
+    if (!md_in_code(s) && s->link != LK_IN_LABEL && c == md_open[s->opened])
+    {
+        if (++s->opened < 4)
+            return;
+        s->opened = 0;
+        s->skip = MD_SKIP_COMMENT;
+        s->dashes = 0;
+        s->eat_nl = s->at_bol && !s->hashes && !s->quote;
+        return;
+    }
+    md_feed(s, c);
+}
+
 /* The end of the input: what is held is let go, and the marks closed, as a
  * line's end does */
 static void md_eos(flt_st *s)
 {
+    if (!s->front_done)
+    {
+        s->front_done = 1;
+        while (s->front--)
+            md_feed(s, '-');
+    }
+    if (s->skip == MD_SKIP_FRONT && s->fm_kind == MD_FM_IN_KEY)
+        md_front_ends(s, '\n');
+    md_let_go(s);
+    if (s->itemn)
+        md_item_let_go(s);
     if (!s->at_bol || s->link || s->stars || s->unders || s->esc || s->bang
         || s->tick || s->hashes)
         md_feed(s, '\n');
@@ -296,15 +551,24 @@ static void md_feed(flt_st *s, uint8_t c)
 {
     if (c == '\r') return;
 
+    if (s->itemn) {
+        int got = md_item_more(s, c);
+
+        if (got == MD_ITEM_TAKEN) return;
+        if (got == MD_ITEM_NOT) md_item_let_go(s);
+    }
+
     /* The rest of a fence line is its info string, and is dropped. */
     if (s->info) {
         if (c != '\n') return;
         s->info = 0;
     }
 
-    /* A label is held whole, backticks and all, until its `]` */
+    /* A label is held whole, backticks and all, until its `]`: brackets
+     * inside it, `[Song [Live]]`, are its own */
     if (s->link == LK_IN_LABEL) {
-        if (c == ']') { s->link = LK_AFTER_BRACKET; return; }
+        if (c == ']' && !s->inner) { s->link = LK_AFTER_BRACKET; return; }
+        if (c == '[' || c == ']') s->inner += c == '[' ? 1 : -1;
         if (c != '\n' && s->nlen < MD_NAME_MAX) {
             s->name[s->nlen++] = c;
             return;
@@ -395,7 +659,10 @@ static void md_feed(flt_st *s, uint8_t c)
     /* `!` is an image's only before `[` */
     if (s->bang) {
         s->bang = 0;
-        if (c == '[') { s->image = 1; s->link = LK_IN_LABEL; return; }
+        if (c == '[') {
+            s->image = 1; s->inner = 0; s->link = LK_IN_LABEL;
+            return;
+        }
         md_emit(s, '!');
     }
 
@@ -416,6 +683,7 @@ static void md_feed(flt_st *s, uint8_t c)
         if (s->heading) { ts_emit_cp(&s->out, TS_HEADING_CLOSE); s->heading = 0; }
         s->hashes = 0;
         s->quote = 0;
+        s->lead = 0;
         md_emit(s, c);
         return;
     }
@@ -427,6 +695,8 @@ static void md_feed(flt_st *s, uint8_t c)
             s->hashes = 0;
             if (c == ' ' && level <= 6) {
                 ts_emit_cp(&s->out, TS_HEADING_OPEN);
+                if (level > 1)
+                    ts_emit_cp(&s->out, TS_HEADING_MINOR);
                 s->heading = 1;
                 s->at_bol = 0;
                 return;
@@ -438,7 +708,15 @@ static void md_feed(flt_st *s, uint8_t c)
             if (!s->quote) { ts_emit_cp(&s->out, TS_QUOTE); s->quote = 1; }
             return;
         }
-        if (c == ' ' || c == '\t') return;
+        /* `- `, `* `, `+ ` and `1. ` start a list item */
+        if (!s->item_skip && !s->heading
+            && (c == '-' || c == '*' || c == '+' || (c >= '0' && c <= '9'))) {
+            s->item[0] = c;
+            s->itemn = 1;
+            return;
+        }
+        s->item_skip = 0;
+        if (c == ' ' || c == '\t') { s->lead += c == '\t' ? 4 : 1; return; }
         if (c == '=' || c == '-') { /* setext rules pass through as-is */ }
         s->at_bol = 0;
     }
@@ -447,7 +725,9 @@ static void md_feed(flt_st *s, uint8_t c)
     case '\\': s->esc = 1; return;
     case '*':  s->stars++; return;
     case '_':  s->unders++; return;
-    case '[':  s->nlen = 0; s->image = 0; s->link = LK_IN_LABEL; return;
+    case '[':
+        s->nlen = 0; s->image = 0; s->inner = 0; s->link = LK_IN_LABEL;
+        return;
     case '!':  s->bang = 1; return;
     default:   break;
     }
@@ -644,7 +924,7 @@ int ts_open_text(ts_ctx *c, ts_format fmt, bs_stream **out)
     if (!st) return BS_ERR_NOMEM;
 
     st = flt_new(c->arena, st,
-                 (fmt == TS_FMT_MARKDOWN) ? md_feed : plain_feed, &s);
+                 (fmt == TS_FMT_MARKDOWN) ? md_take : plain_feed, &s);
     if (!st) return BS_ERR_NOMEM;
     if (fmt == TS_FMT_MARKDOWN)
         s->eos = md_eos;

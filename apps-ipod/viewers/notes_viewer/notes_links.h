@@ -27,7 +27,8 @@ struct notes_target
     int to;                     /* NOTES_TO_* */
     int page;                   /* the page index's, or -1 */
     int album;                  /* a row of the database's album table, or -1 */
-    long artist_seek;           /* NOTES_TO_ARTIST's, else -1 */
+    long artist_seek;           /* NOTES_TO_ARTIST's, a person page's library
+                                   album artist (notes_artist_seek()), or -1 */
     int track;                  /* NOTES_TO_TRACK's idx_id, else -1 */
     uint32_t key;               /* the name's key */
 };
@@ -57,6 +58,18 @@ int notes_album_named(const char *name, size_t len, uint32_t artist);
 /* The library album a written album page is about: by its folder beside
  * the music, else by its artist and title. -1 for none. */
 int notes_page_album(int page);
+
+/* The library album artist whose name key is `key`, `alt` or `part` (0 for
+ * none): their seek, or under Split Album Artists the handle that brings
+ * their joint albums too; -1 for none. Their key into `*art_hash`, if given. */
+long notes_artist_seek(uint32_t key, uint32_t alt, uint32_t part,
+                       uint32_t *art_hash);
+
+/* Whether `seek` is an album artist's: a seek, or a split artist's handle */
+bool notes_is_artist(long seek);
+
+/* Whether the album row `album` is by the album artist `seek` */
+bool notes_album_by(int album, long seek);
 
 /* The name of a library album row and its album artist, through Trim
  * Titles when it is on */

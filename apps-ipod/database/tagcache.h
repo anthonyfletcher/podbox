@@ -90,6 +90,7 @@ struct tagcache_stat {
     bool econ;               /* Is endianess correction enabled? */
     volatile bool syncscreen;/* Synchronous operation with debug screen? */
     volatile bool scanning;  /* Is a build/update scan currently running? */
+    volatile bool loading;   /* Is the RAM copy being read in? */
     volatile const char 
         *curentry;           /* Path of the current entry being scanned. */
 
@@ -266,6 +267,9 @@ void tagcache_screensync_event(void);
 void tagcache_screensync_enable(bool state);
 
 bool tagcache_is_in_ram(void);
+/* Whether the RAM copy is being read in: not tagcache_is_busy(), as other
+ * work need not wait for it */
+bool tagcache_is_loading(void);
 bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
 
 /* The path index: a database entry by its file, from RAM. Every call misses

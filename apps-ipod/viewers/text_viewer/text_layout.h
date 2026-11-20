@@ -22,7 +22,8 @@ struct text_layout
                          * spaces */
     unsigned fg;        /* the text's colour */
     unsigned dim;       /* dim text's colour */
-    bool head_bold;     /* headings set in `bold`, as bold text is */
+    bool head_bold;     /* headings set in `bold`, as bold text is, but for
+                         * those TS_HEADING_MINOR marks */
     bool links;         /* names drawn as links: in `link`, and the one
                          * whose TS_NAME_OPEN is at `current` in `link_on`,
                          * the caller having filled a box of `link` behind
@@ -61,6 +62,9 @@ struct tl_line
 #define TL_MD_LAST    0x8c              /* the last Markdown mark */
 #define TL_HIDE_OPEN  0x8d              /* TS_HIDE_OPEN's: never drawn */
 #define TL_HIDE_CLOSE 0x8e
+#define TL_BULLET     0x8f              /* TS_BULLET's */
+#define TL_NUMBERED   0x90
+#define TL_MINOR      0x91              /* TS_HEADING_MINOR's */
 
 /* Width of the `n` bytes at `s`, which must have a byte after them that can
  * be written: it is set to NUL while they are measured */
@@ -84,6 +88,16 @@ size_t tl_note_mark(const unsigned char *s, size_t n);
 
 /* The bytes of what is invisible and takes no width at `s`, or 0 */
 size_t tl_hidden(const unsigned char *s, size_t n);
+
+/* A list item's line at `s`: how far in its lines start, `*first` for its
+ * first and the return for those it wraps onto, with `step` pixels a level;
+ * `*bullet` where its bullet is drawn, or -1 for a numbered one. 0 and
+ * `*first` 0 for a line that starts no item. */
+int tl_item_indent(const struct text_layout *tl, unsigned char *s, size_t n,
+                   int step, int *first, int *bullet);
+
+/* A list item's bullet, at `x` on the line `ln` whose top is at y */
+void tl_draw_bullet(const struct tl_line *ln, int x, int y);
 
 /* The bytes of the `avail` at `s` that fit in `width`, into `ln` */
 void tl_line_break(const struct text_layout *tl, unsigned char *s,

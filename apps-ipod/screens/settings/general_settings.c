@@ -1187,7 +1187,7 @@ MENUITEM_SETTING(split_album_artists, &global_settings.split_album_artists,
 MENUITEM_SETTING(liner_notes, &global_settings.liner_notes, NULL);
 MENUITEM_SETTING(liner_notes_colours, &global_settings.liner_notes_colours,
                  NULL);
-/* Custom's three rows, offered only while Custom is chosen */
+/* Custom's rows, offered only while Custom is chosen */
 static int liner_notes_custom_callback(int action,
                                        const struct menu_item_ex *this_item,
                                        struct gui_synclist *this_list)
@@ -1205,11 +1205,21 @@ MENUITEM_SETTING(liner_notes_links, &global_settings.liner_notes_links,
                  liner_notes_custom_callback);
 MENUITEM_SETTING(liner_notes_page, &global_settings.liner_notes_page,
                  liner_notes_custom_callback);
+MENUITEM_SETTING(liner_notes_dim, &global_settings.liner_notes_dim,
+                 liner_notes_custom_callback);
+MENUITEM_SETTING(liner_notes_heads, &global_settings.liner_notes_heads,
+                 liner_notes_custom_callback);
+MENUITEM_SETTING(liner_notes_quote, &global_settings.liner_notes_quote,
+                 liner_notes_custom_callback);
 MENUITEM_SETTING(liner_notes_banners, &global_settings.liner_notes_banners,
+                 NULL);
+MENUITEM_SETTING(liner_notes_progress, &global_settings.liner_notes_progress,
                  NULL);
 MAKE_MENU(liner_notes_menu, ID2P(LANG_NOTES_SETTING), 0, Icon_NOICON,
           &liner_notes, &liner_notes_colours, &liner_notes_text,
-          &liner_notes_links, &liner_notes_page, &liner_notes_banners);
+          &liner_notes_links, &liner_notes_page, &liner_notes_dim,
+          &liner_notes_heads, &liner_notes_quote, &liner_notes_banners,
+          &liner_notes_progress);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
 MENUITEM_SETTING(segregate_podcasts, &global_settings.segregate_podcasts,

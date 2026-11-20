@@ -50,6 +50,7 @@
 #include "string-extra.h"
 #include "database/tagcache.h"
 #include "database/db_featured.h"   /* guest=true */
+#include "database/db_names.h"
 #include "metadata/art_name.h"
 #include "metadata/tag_trim.h"
 #include "metadata/name_index.h"
@@ -65,22 +66,6 @@
 /* ---- what a page is about ---------------------------------------------- */
 
 static char ns_buf[NS_VALUE_MAX], ns_trim[NS_VALUE_MAX];
-
-/* The library album artist with the name key `key` or `alt`, or -1 */
-static long ns_artist_seek(uint32_t key, uint32_t alt, uint32_t *art_hash)
-{
-    struct tagcache_artist ar;
-    int i, n = tagcache_artist_count();
-
-    for (i = 0; i < n; i++)
-        if (tagcache_artist_get(i, &ar) && ar.art_hash
-            && (ar.art_hash == key || (alt && ar.art_hash == alt)))
-        {
-            *art_hash = ar.art_hash;
-            return ar.seek;
-        }
-    return -1;
-}
 
 /* The written page of `kind` about the library's album `album`, or about the
  * album artist whose key is `key` */
@@ -166,9 +151,10 @@ static void ns_doc(const struct notes_target *t, struct notes_doc *d,
     pg = notes_page_get(d->page);
     if (d->kind == NOTES_PAGE_PERSON)
     {
-        if (pg && d->artist_seek < 0)
-            d->artist_seek = ns_artist_seek(pg->key, pg->alt, &d->artist);
-        else if (d->artist_seek >= 0)
+        if (pg && !notes_is_artist(d->artist_seek))
+            d->artist_seek = notes_artist_seek(pg->key, pg->alt, 0,
+                                               &d->artist);
+        else if (notes_is_artist(d->artist_seek))
         {
             if (tagcache_seek_string(tag_albumartist, d->artist_seek, ns_buf,
                                      sizeof(ns_buf)))
@@ -187,7 +173,7 @@ static void ns_doc(const struct notes_target *t, struct notes_doc *d,
         notes_album_title(d->album, d->title, sizeof(d->title));
     else if (pg)
         ns_page_title(pg, d->title, sizeof(d->title));
-    else if (d->kind == NOTES_PAGE_PERSON && d->artist_seek >= 0)
+    else if (d->kind == NOTES_PAGE_PERSON && notes_is_artist(d->artist_seek))
         tagcache_seek_string(tag_albumartist, d->artist_seek, d->title,
                              sizeof(d->title));
     else if (ix)
@@ -473,7 +459,7 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
         const struct notes_page *pg = notes_page_get(d->page);
         char *dash;
 
-        if (d->artist_seek >= 0
+        if (notes_is_artist(d->artist_seek)
             && tagcache_seek_string(tag_albumartist, d->artist_seek, buf,
                                     size)
             && strcmp(buf, UNTAGGED))
@@ -520,9 +506,15 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
         long plays = album ? row.playcount : 0;
         struct tagcache_artist ar;
 
-        for (i = 0; !album && (int)i < tagcache_artist_count(); i++)
-            if (tagcache_artist_get(i, &ar) && ar.seek == d->artist_seek)
+        if (!album && db_names_is_handle(d->artist_seek))
+        {
+            if (db_names_artist(db_names_index(d->artist_seek), NULL, &ar))
                 plays = ar.playcount;
+        }
+        else
+            for (i = 0; !album && (int)i < tagcache_artist_count(); i++)
+                if (tagcache_artist_get(i, &ar) && ar.seek == d->artist_seek)
+                    plays = ar.playcount;
         return plays > 0 && snprintf(buf, size, "%ld", plays) > 0;
     }
     if (!album)
@@ -673,26 +665,42 @@ static void ns_suffix(struct ns_out *o, const char *parts[], int n)
 /* Whether the list being made is among a line's words, inline */
 static bool ns_in_line;
 
+/* Whether the list is written on one line: among words, or for
+ * `style=inline` or `commas` */
+static bool ns_one_line(const struct ns_piece *pc)
+{
+    return ns_in_line || ns_has(pc, "style", "inline")
+           || ns_has(pc, "style", "commas");
+}
+
 /* Whether `show` names `word`; `def` says whether it does when there is no
- * `show`, which inline lists never do */
+ * `show`, which lists on one line never do */
 static bool ns_show(const struct ns_piece *pc, const char *word, bool def)
 {
     size_t len;
 
     if (ns_get(pc, "show", &len))
         return ns_has(pc, "show", word);
-    return def && !ns_in_line && !ns_has(pc, "style", "inline");
+    return def && !ns_one_line(pc);
+}
+
+/* What parts a list's items on one line: `style=commas`'s comma, else a
+ * dot */
+static const char *ns_joiner(const struct ns_piece *pc)
+{
+    return ns_has(pc, "style", "commas") ? ", " : NS_DOT;
 }
 
 /* The items written out, as the list's properties say: under `heading`, on
- * one line for `style=inline`, `empty`'s text when there are none. The
- * items written. */
+ * one line for `style=inline` or `commas`, each a bullet's for `bullets`,
+ * `empty`'s text when there are none. The items written. */
 static int ns_emit(struct ns_out *o, const struct ns_piece *pc)
 {
     size_t hl, el;
     const char *heading = ns_get(pc, "heading", &hl);
     const char *empty = ns_get(pc, "empty", &el);
-    bool inline_ = ns_has(pc, "style", "inline"), first = true;
+    bool inline_ = ns_one_line(pc);
+    bool bullets = ns_has(pc, "style", "bullets"), first = true;
     int i;
 
     if (!ni.count && !empty)
@@ -718,11 +726,13 @@ static int ns_emit(struct ns_out *o, const struct ns_piece *pc)
             if (line[0] == '#')
                 continue;
             if (!first)
-                ns_puts(o, NS_DOT);
+                ns_puts(o, ns_joiner(pc));
             first = false;
             ns_puts(o, line);
             continue;
         }
+        if (bullets && line[0] != '#')
+            ns_puts(o, "- ");
         ns_puts(o, line);
         ns_puts(o, "\n");
     }
@@ -878,7 +888,7 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
     size_t len;
     const char *v;
     uint32_t artist = 0, genre = 0;
-    long from = 0, to = 0;
+    long from = 0, to = 0, by = -1;     /* a split artist's handle */
     bool rev = ns_sort(pc, sort, sizeof(sort)), by_name, desc, mixed = false;
     bool by_genre = ns_has(pc, "group", "genre");
     bool by_decade = ns_has(pc, "group", "decade");
@@ -889,6 +899,9 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
     {
         artist = art_name_hash_n(v, len);
         snprintf(name, sizeof(name), "%.*s", (int)len, v);
+        by = notes_artist_seek(artist, 0, 0, NULL);
+        if (!db_names_is_handle(by))
+            by = -1;
     }
     if ((v = ns_get(pc, "genre", &len)))
         genre = art_name_hash_n(v, len);
@@ -902,7 +915,9 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
     if (!artist && !genre && !from)
     {
         artist = d->artist;
-        if (d->artist_seek < 0
+        if (db_names_is_handle(d->artist_seek))
+            by = d->artist_seek;
+        if (!notes_is_artist(d->artist_seek)
             || !tagcache_seek_string(tag_albumartist, d->artist_seek, name,
                                      sizeof(name)))
             name[0] = '\0';
@@ -925,7 +940,8 @@ static int ns_albums(const struct ns_piece *pc, const struct notes_doc *d)
 
         if (!tagcache_album_get(i, &row))
             continue;
-        if (artist && row.artist_art_hash != artist)
+        if (artist && (by != -1 ? !notes_album_by(i, by)
+                                : row.artist_art_hash != artist))
         {
             for (j = 0; j < ng && guests[j] != i; j++)
                 ;
@@ -1074,6 +1090,27 @@ static bool ns_composed(int idx, uint32_t key)
     return false;
 }
 
+/* Whether {{tracks}}'s `number=1,2,4` names track number `tn`, or it has
+ * no `number` */
+static bool ns_number_wanted(const struct ns_piece *pc, long tn)
+{
+    size_t len;
+    const char *v = ns_get(pc, "number", &len), *end;
+
+    if (!v)
+        return true;
+    for (end = v + len; v < end; v++)
+    {
+        while (v < end && (*v == ' ' || *v == ','))
+            v++;
+        if (v < end && atoi(v) == tn && tn > 0)
+            return true;
+        while (v < end && *v != ',')
+            v++;
+    }
+    return false;
+}
+
 /* {{tracks}}: an album's tracks, an artist's, or a composer's; for
  * `played`, {{played}}, those played, the last played first */
 static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
@@ -1107,9 +1144,16 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
     if (played && !artist && d->kind == NOTES_PAGE_PERSON)
         artist = d->artist;
     in_order = !by_name && !by_plays && !by_played;
-    numbers = in_order && !ns_has(pc, "numbers", "false");
+    /* numbered unless on one line, as other details are, or bulleted */
+    numbers = in_order && (ns_has(pc, "numbers", "true")
+                           || (!ns_has(pc, "numbers", "false")
+                               && !ns_one_line(pc)
+                               && !ns_has(pc, "style", "bullets")));
     group = in_order && ns_has(pc, "group", "disc");
-    all = artist || composer;
+    /* with album=, artist= says whose album it is */
+    all = (artist || composer) && !ns_get(pc, "album", &len);
+    if (!all)
+        artist = 0;
     only = all ? -1 : ns_album_of(pc, d);
     if (!all && only < 0)
         return 0;
@@ -1133,7 +1177,7 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
             tagcache_entry_numeric(idx, tag_discnumber, &dn);
             tagcache_entry_numeric(idx, tag_tracknumber, &tn);
             dn = MAX(dn, 1);
-            if (only_disc && dn != only_disc)
+            if ((only_disc && dn != only_disc) || !ns_number_wanted(pc, tn))
                 continue;
 
             if (by_name)
@@ -1233,15 +1277,7 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
 /* Whether the person page `pg` is about a library album artist */
 static bool ns_library_artist(const struct notes_page *pg)
 {
-    struct tagcache_artist ar;
-    int i, n = tagcache_artist_count();
-
-    for (i = 0; i < n; i++)
-        if (tagcache_artist_get(i, &ar) && ar.art_hash
-            && (ar.art_hash == pg->key || ar.art_hash == pg->alt
-                || ar.art_hash == pg->part))
-            return true;
-    return false;
+    return notes_artist_seek(pg->key, pg->alt, pg->part, NULL) != -1;
 }
 
 /* A page as a link back to it: by its whole name, a person's and an
@@ -1556,7 +1592,7 @@ static bool ns_list(struct ns_state *st, const struct ns_piece *pc)
  * came out empty left out along with its separator */
 static void ns_values(struct ns_state *st, const char *s, size_t n)
 {
-    static char line[512], value[NS_VALUE_MAX * 2];
+    static char line[4096], value[NS_VALUE_MAX * 2];
     struct ns_out lo = { line, sizeof(line), 0 };
     const char *end, *seg;
     bool first = true;
@@ -1586,7 +1622,7 @@ static void ns_values(struct ns_state *st, const char *s, size_t n)
                     if (ni.buf[ni.off[i]] != '#')
                     {
                         if (k++)
-                            ns_puts(&lo, NS_DOT);
+                            ns_puts(&lo, ns_joiner(&pc));
                         ns_puts(&lo, ni.buf + ni.off[i]);
                     }
             }
@@ -1781,7 +1817,6 @@ static bool ns_links_to(const char *text, uint32_t key)
 static bool ns_links_album_of(const char *text, long seek, uint32_t artist)
 {
     struct notes_target t;
-    struct tagcache_album row;
     const char *s, *e;
 
     for (s = strchr(text, '['); s; s = strchr(s + 1, '['))
@@ -1791,7 +1826,7 @@ static bool ns_links_album_of(const char *text, long seek, uint32_t artist)
         if (*e == ']'
             && notes_link_find(s + 1, e - s - 1, artist, -1, &t)
             && (t.to == NOTES_TO_ALBUM || t.to == NOTES_TO_PAGE)
-            && tagcache_album_get(t.album, &row) && row.artist_seek == seek)
+            && notes_album_by(t.album, seek))
             return true;
     }
     return false;
@@ -1799,7 +1834,103 @@ static bool ns_links_album_of(const char *text, long seek, uint32_t artist)
 
 /* ---- the page ---------------------------------------------------------- */
 
-/* The file `path` into `buf`, NUL ended; its length, or -1 */
+/* Whether the line at `s` is `c` three times, spaces aside */
+static bool ns_rule_line(const char *s, char c)
+{
+    int n = 0;
+
+    for (; *s && *s != '\n'; s++)
+        if (*s == c)
+            n++;
+        else if (*s != ' ' && *s != '\r')
+            return false;
+    return n == 3;
+}
+
+/* Whether the front matter line at `s` is YAML: blank, indented, a list's
+ * or a comment's, or a key of at most 32 bytes and its colon */
+static bool ns_yaml_line(const char *s)
+{
+    int n;
+
+    if (*s == '\n' || *s == '\r' || !*s || strchr(" \t-#.", *s))
+        return true;
+    for (n = 0; n < 32; n++, s++)
+    {
+        unsigned char c = *s;
+
+        if (!((c >= '0' && c <= '9')
+              || ((c | 0x20) >= 'a' && (c | 0x20) <= 'z')
+              || c >= 0x80 || (c && strchr("_- .\"'", c))))
+            break;
+    }
+    return *s == ':';
+}
+
+/* `buf` less its front matter and its comments, as the Markdown reader
+ * (ts_text.c) leaves them out, so the pieces, the headings and the links in
+ * them are not counted either. Front matter: a line of exactly --- opening
+ * it, to the next --- or ... line, for as long as its lines are YAML. A
+ * comment: <!-- to -->, outside code; one that is all of its line takes
+ * the line. */
+static void ns_strip(char *buf)
+{
+    char *w = buf, *r = buf;
+    bool fence = false, code = false;
+
+    if (!strncmp(r, "\xef\xbb\xbf", 3))
+        r += 3;
+    if (!strncmp(r, "---\n", 4) || !strncmp(r, "---\r\n", 5))
+    {
+        r = strchr(r, '\n') + 1;
+        while (*r && !ns_rule_line(r, '-') && !ns_rule_line(r, '.')
+               && ns_yaml_line(r))
+            r = strchr(r, '\n') ? strchr(r, '\n') + 1 : r + strlen(r);
+        if (*r && (ns_rule_line(r, '-') || ns_rule_line(r, '.')))
+            r = strchr(r, '\n') ? strchr(r, '\n') + 1 : r + strlen(r);
+    }
+    while (*r)
+    {
+        char *end;
+        bool bol = w == buf || w[-1] == '\n';
+
+        if (*r == '`')
+        {
+            const char *p = w;
+            int run = 0;
+
+            while (r[run] == '`')
+                run++;
+
+            /* a fence opens with three or more at a line's start, spaces
+             * before them aside */
+            while (p > buf && p[-1] == ' ')
+                p--;
+            if (run >= 3 && (p == buf || p[-1] == '\n'))
+                fence = !fence;
+            else if (!fence)
+                code = !code;
+            while (run--)
+                *w++ = *r++;
+            continue;
+        }
+        if (*r == '\n')
+            code = false;
+        if (fence || code || strncmp(r, "<!--", 4)
+            || !(end = strstr(r + 4, "-->")))
+        {
+            *w++ = *r++;
+            continue;
+        }
+        r = end + 3;
+        if (bol && (*r == '\n' || (r[0] == '\r' && r[1] == '\n')))
+            r += *r == '\r' ? 2 : 1;
+    }
+    *w = '\0';
+}
+
+/* The file `path` into `buf`, NUL ended and ns_strip()ped; its length, or
+ * -1 */
 static long ns_read(const char *path, char *buf, size_t size)
 {
     int fd = open(path, O_RDONLY);
@@ -1812,7 +1943,8 @@ static long ns_read(const char *path, char *buf, size_t size)
     if (got < 0)
         return -1;
     buf[got] = '\0';
-    return got;
+    ns_strip(buf);
+    return strlen(buf);
 }
 
 /* The template `name`: the owner's in NS_TEMPLATES, else the built-in one */
@@ -1837,6 +1969,12 @@ static void ns_template(const char *name, char *buf, size_t size)
                  str(LANG_NOTES_MENTIONED_IN));
 }
 
+bool notes_library_waiting(void)
+{
+    return !tagcache_is_in_ram()
+           && (tagcache_is_busy() || tagcache_is_loading());
+}
+
 size_t notes_source(const struct notes_target *t, struct notes_doc *d,
                     const struct name_index *ix, char *out, size_t size,
                     char *scratch, size_t scratch_size)
@@ -1849,6 +1987,13 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
     if (t->to == NOTES_TO_NONE)
         return 0;
     ns_doc(t, d, ix);
+    d->waiting = notes_library_waiting();
+    if (d->waiting)
+    {
+        ns_puts(&st.o, "*");
+        ns_puts(&st.o, str(LANG_NOTES_LIBRARY_LOADING));
+        ns_puts(&st.o, "*\n\n");
+    }
     pg = notes_page_get(d->page);
     if (!pg)
     {
@@ -1871,7 +2016,7 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
         && !ns_track_sections(scratch, d->album))
         snprintf(tail, sizeof(tail), "\n## %s\n{{tracks|group=disc}}\n",
                  str(LANG_TRACKS));
-    else if (d->kind == NOTES_PAGE_PERSON && d->artist_seek >= 0
+    else if (d->kind == NOTES_PAGE_PERSON && notes_is_artist(d->artist_seek)
              && !ns_uses(scratch, "albums")
              && !ns_links_album_of(scratch, d->artist_seek, d->artist))
         snprintf(tail, sizeof(tail), "\n## %s\n{{albums|guest=true}}\n",

@@ -21,12 +21,20 @@ struct notes_doc
     int kind;                   /* NOTES_PAGE_*, or 0 for a name's page */
     int page;                   /* the written page, or -1 */
     int album;                  /* the library album, or -1 */
-    long artist_seek;           /* the library album artist, or -1 */
+    long artist_seek;           /* the library album artist, a seek or a
+                                   split artist's handle, or -1 */
     uint32_t artist;            /* the album artist's name key: links on the
                                    page prefer their albums */
     uint32_t key;               /* the page's own name key */
     char title[128];            /* its name, set on the banner */
+    bool waiting;               /* made while notes_library_waiting():
+                                   the library's part of it is missing */
 };
+
+/* Whether the library is out while the database scans, merges or reads
+ * itself back into RAM: pages made now lack it, and are worth making again
+ * once this is false */
+bool notes_library_waiting(void);
 
 /* The Markdown of the page `t` reaches into `out` (`size` bytes, NUL
  * ended), using `scratch` for the written file and the template; what the

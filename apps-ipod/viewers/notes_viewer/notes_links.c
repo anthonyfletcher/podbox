@@ -27,6 +27,7 @@
  *
  * Parts, in order:
  *   - the library's albums, worked out for a screen
+ *   - album artists, the split ones of Split Album Artists among them
  *   - finding a link
  ****************************************************************************/
 
@@ -41,6 +42,7 @@
 #include "metadata/art_name.h"
 #include "metadata/tag_trim.h"
 #include "metadata/name_index.h"
+#include "database/db_names.h"
 #include "notes_files.h"
 #include "notes_links.h"
 
@@ -218,6 +220,60 @@ bool notes_album_artist(int album, char *buf, size_t size)
 
     return tagcache_album_get(album, &row)
            && nl_string(tag_albumartist, row.artist_seek, buf, size);
+}
+
+/* ---- album artists, the split ones of Split Album Artists among them --- */
+
+static bool nl_key_is(uint32_t h, uint32_t key, uint32_t alt, uint32_t part)
+{
+    return h && (h == key || h == alt || h == part);
+}
+
+/* A split artist with no album of their own has no row in the artist table,
+ * so the parts are looked through by name after it */
+long notes_artist_seek(uint32_t key, uint32_t alt, uint32_t part,
+                       uint32_t *art_hash)
+{
+    struct tagcache_artist ar;
+    bool split = db_names_active();
+    int i, n = tagcache_artist_count();
+
+    for (i = 0; i < n; i++)
+        if (tagcache_artist_get(i, &ar)
+            && nl_key_is(ar.art_hash, key, alt, part))
+        {
+            if (art_hash)
+                *art_hash = ar.art_hash;
+            return split ? db_names_browse_seek(ar.seek) : ar.seek;
+        }
+    for (i = 0, n = split ? db_names_count() : 0; i < n; i++)
+    {
+        const char *name = db_names_name(i);
+        uint32_t h = name ? art_name_hash(name) : 0;
+
+        if (nl_key_is(h, key, alt, part))
+        {
+            if (art_hash)
+                *art_hash = h;
+            return db_names_handle(i);
+        }
+    }
+    return -1;
+}
+
+bool notes_is_artist(long seek)
+{
+    return seek >= 0 || db_names_is_handle(seek);
+}
+
+bool notes_album_by(int album, long seek)
+{
+    struct tagcache_album row;
+
+    return tagcache_album_get(album, &row)
+           && (row.artist_seek == seek
+               || (db_names_is_handle(seek)
+                   && db_names_match(seek, row.artist_seek)));
 }
 
 /* ---- finding a link ---------------------------------------------------- */
@@ -411,24 +467,14 @@ static int nl_album_page(const struct nl_keys *k)
 static bool nl_found_page(int page, struct notes_target *t)
 {
     const struct notes_page *pg = notes_page_get(page);
-    struct tagcache_artist ar;
-    int i, n;
 
     if (!pg)
         return false;
     t->to = NOTES_TO_PAGE;
     t->page = page;
     t->album = notes_page_album(page);
-    if (pg->kind != NOTES_PAGE_PERSON)
-        return true;
-    for (i = 0, n = tagcache_artist_count(); i < n; i++)
-        if (tagcache_artist_get(i, &ar) && ar.art_hash
-            && (ar.art_hash == pg->key || ar.art_hash == pg->alt
-                || ar.art_hash == pg->part))
-        {
-            t->artist_seek = ar.seek;
-            break;
-        }
+    if (pg->kind == NOTES_PAGE_PERSON)
+        t->artist_seek = notes_artist_seek(pg->key, pg->alt, pg->part, NULL);
     return true;
 }
 
@@ -504,19 +550,11 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
         return true;
 
     /* 5: the library */
-    if (kind != NL_ALBUM)
+    if (kind != NL_ALBUM
+        && (t->artist_seek = notes_artist_seek(k.key, k.alt, 0, NULL)) != -1)
     {
-        struct tagcache_artist ar;
-        int n = tagcache_artist_count();
-
-        for (i = 0; i < n; i++)
-            if (tagcache_artist_get(i, &ar) && ar.art_hash
-                && (ar.art_hash == k.key || ar.art_hash == k.alt))
-            {
-                t->to = NOTES_TO_ARTIST;
-                t->artist_seek = ar.seek;
-                return true;
-            }
+        t->to = NOTES_TO_ARTIST;
+        return true;
     }
     if (kind != NL_PERSON)
     {

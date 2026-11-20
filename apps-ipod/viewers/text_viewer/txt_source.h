@@ -172,6 +172,15 @@ void ts_close(ts_source *s);
  * word to a layout that breaks at spaces. */
 #define TS_HIDE_OPEN     0xE00D
 #define TS_HIDE_CLOSE    0xE00E
+/* A list item's line starts with TS_BULLET, `- item`, or TS_NUMBERED,
+ * `1. item`, whose number stays the first word of its text: once, and once
+ * more for each level it is indented, two spaces a level, four levels at
+ * most */
+#define TS_BULLET        0xE00F
+#define TS_NUMBERED      0xE010
+/* Just after TS_HEADING_OPEN, a `##` heading or deeper: a lesser heading,
+ * which a screen that sets headings in bold underlines instead */
+#define TS_HEADING_MINOR 0xE011
 
 /* The text of the note `href` refers to from chapter `part`, into buf as a
  * string: the element that has the id, or the paragraph an inline one is

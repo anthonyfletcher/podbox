@@ -27,7 +27,21 @@ enum
     NOTES_FROM_THEME,
     NOTES_FROM_WHITE,
     NOTES_FROM_BLACK,
+    NOTES_FROM_CHOSEN,          /* one set with the colour picker */
 };
+
+/* Custom's dim text, headings and pull lines: NOTES_STYLE_AUTO, as the text
+ * and links make them, or a NOTES_FROM_* one more than its own value */
+#define NOTES_STYLE_AUTO 0
+
+/* The option callbacks of Custom's rows: choosing Chosen Colour opens the
+ * colour picker on that row's colour */
+void notes_chose_text(int value);
+void notes_chose_links(int value);
+void notes_chose_page(int value);
+void notes_chose_dim(int value);
+void notes_chose_heads(int value);
+void notes_chose_quote(int value);
 
 /* The page of the playing track's album, at the track. Each of these
  * returns a GO_TO_* code: GO_TO_DBBROWSER when the library browser is armed

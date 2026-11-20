@@ -27816,3 +27816,87 @@
     *: "Preto"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NOTES_LIBRARY_LOADING
+  desc: liner notes: shown atop a page while the database is read back into RAM, its library links missing until then
+  user: core
+  <source>
+    *: "Reading your library: links to it appear when it's done"
+  </source>
+  <dest>
+    *: "Lendo sua biblioteca: os links aparecerão ao terminar"
+  </dest>
+  <voice>
+    *: "Lendo sua biblioteca: os links aparecerão ao terminar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_CHOSEN_COLOUR
+  desc: liner notes custom colours option: a colour set with the colour picker
+  user: core
+  <source>
+    *: "Chosen Colour"
+  </source>
+  <dest>
+    *: "Cor escolhida"
+  </dest>
+  <voice>
+    *: "Cor escolhida"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_DIM_COLOUR
+  desc: liner notes custom colours: the colour of dimmed text, written *like this*
+  user: core
+  <source>
+    *: "Dim Text Colour"
+  </source>
+  <dest>
+    *: "Cor do texto esmaecido"
+  </dest>
+  <voice>
+    *: "Cor do texto esmaecido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_HEADING_COLOUR
+  desc: liner notes custom colours: the colour of headings
+  user: core
+  <source>
+    *: "Heading Colour"
+  </source>
+  <dest>
+    *: "Cor dos títulos"
+  </dest>
+  <voice>
+    *: "Cor dos títulos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_QUOTE_COLOUR
+  desc: liner notes custom colours: the colour of the rule beside a pull line, written > like this
+  user: core
+  <source>
+    *: "Pull Line Colour"
+  </source>
+  <dest>
+    *: "Cor da linha de citação"
+  </dest>
+  <voice>
+    *: "Cor da linha de citação"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTES_PROGRESS
+  desc: liner notes setting: the line along the foot of a page showing how far the playing track has got
+  user: core
+  <source>
+    *: "Progress Line"
+  </source>
+  <dest>
+    *: "Linha de progresso"
+  </dest>
+  <voice>
+    *: "Linha de progresso"
+  </voice>
+</phrase>

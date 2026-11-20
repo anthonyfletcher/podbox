@@ -40,6 +40,7 @@
 #include "metadata/name_index.h"   /* name_index_pages_changed */
 #include "system/debug_log.h"
 #include "notes_files.h"
+#include "notes_links.h"            /* notes_is_artist */
 
 /* ---- the index --------------------------------------------------------- */
 
@@ -548,7 +549,7 @@ bool notes_album_of(long album_seek, long artist_seek, struct notes_album *a)
         || !tagcache_search(&tcs, tag_filename))
         return false;
     tagcache_search_add_filter(&tcs, tag_album, album_seek);
-    if (artist_seek >= 0)
+    if (notes_is_artist(artist_seek))
         tagcache_search_add_filter(&tcs, tag_albumartist, artist_seek);
     found = notes_album_read(&tcs, a);
     tagcache_search_finish(&tcs);

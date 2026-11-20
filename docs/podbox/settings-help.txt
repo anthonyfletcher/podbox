@@ -813,28 +813,48 @@ task reads /Notes after each change, and /Notes is left out of Books.
 
 [liner notes colours]
 Where a page's colours come from. Page's Art tints each page from its own
-album cover or artist picture, links in its most vivid colour; a
-page with no picture keeps the last page's. Theme follows the theme and its
-dynamic colours, so pages take the playing album's. Text Viewer's uses the
-text viewer's colour mode, Custom included. Custom sets the text, the links
-and the page apart, each from the art, the theme, white or black.
+album cover or artist picture, links in its most vivid colour, or the
+theme's when the picture has no colour in it; a page with no picture keeps
+the last page's. Theme follows the theme and its dynamic colours, so pages
+take the playing album's. Text Viewer's uses the text viewer's colour mode,
+Custom included. Custom sets each part of the page apart.
 
 [liner notes text colour]
 The colour of a page's text under Custom. Page's Art is the picture's most
-vivid colour, held to a tone that reads on the page.
+vivid colour, held to a tone that reads on the page. Chosen Colour opens
+the colour picker.
 
 [liner notes link colour]
 The colour of a page's links under Custom; the current one is drawn in the
-page's colour on it. Page's Art is the picture's most vivid colour.
+page's colour on it. Page's Art is the picture's most vivid colour, or the
+theme's when the picture has no colour in it. Chosen Colour opens the
+colour picker.
 
 [liner notes page colour]
 The colour of the page under Custom. Page's Art is a deep tint of the
-picture's main colour under light text, a pale one under dark.
+picture's main colour under light text, a pale one under dark. Chosen
+Colour opens the colour picker.
+
+[liner notes dim colour]
+The colour of dimmed text under Custom. Auto is the text colour faded
+toward the page. Chosen Colour opens the colour picker.
+
+[liner notes heading colour]
+The colour of headings under Custom. Auto is the text colour. Chosen
+Colour opens the colour picker.
+
+[liner notes pull line colour]
+The colour of the line beside a pull line, written > like this, under
+Custom. Auto is the link colour. Chosen Colour opens the colour picker.
 
 [liner notes banners]
 Shows a picture at the top of each page: your own, or a band of the
 artist's picture or the album's cover. Off, every page starts with its name,
 and opens a little faster.
+
+[liner notes progress line]
+Shows how far the playing track has got, as a thin line along the foot of
+each page.
 
 [art cache album source]
 Where covers of albums, books and podcasts come from: the image in the folder,

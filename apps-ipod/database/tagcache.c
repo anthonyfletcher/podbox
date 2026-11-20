@@ -7198,7 +7198,9 @@ static void load_ramcache(void)
      * copy in use: readers fall back to the disk instead of finding an empty
      * path index and taking every miss as final */
     tc_stat.ramcache = false;
+    tc_stat.loading = true;
     tc_stat.ramcache = load_tagcache();
+    tc_stat.loading = false;
     tcramcache.current = tc_stat.ramcache;
     if (tc_stat.ramcache)
         record_loaded_sizes();
@@ -7711,6 +7713,11 @@ bool tagcache_is_usable(void)
 bool tagcache_is_in_ram(void)
 {
     return tc_stat.ramcache;
+}
+
+bool tagcache_is_loading(void)
+{
+    return tc_stat.loading;
 }
 int tagcache_get_commit_step(void)
 {

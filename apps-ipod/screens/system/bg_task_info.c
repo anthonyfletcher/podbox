@@ -35,6 +35,8 @@ static const char *tagcache_state(const struct tagcache_stat *stat)
         return "Committing";
     if (stat->scanning)
         return "Scanning";
+    if (stat->loading)
+        return "Loading into RAM";
     if (!stat->initialized)
         return "Starting";
     if (!stat->ready)
