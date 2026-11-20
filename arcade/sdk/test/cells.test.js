@@ -265,6 +265,29 @@ function update() {
         '210 96,48,111,63']);
 });
 
+test('a polyfill into a field wakes the chunks round what it drew, not round its points', () => {
+    /* a wedge whose top is far above the field: only its tip, about x 64
+     * in rows 0 to 4, is drawn; plain and patterned draw it the same */
+    const box = (fill) => run(`var R, field, box = new Int32Array(4);
+function init() {
+    R = cells.rules();
+    R.move[5] = MOVE.STATIC; R.density[5] = 255;
+    field = img(128, 64);
+}
+function update() {
+    var f = frame();
+    fill(box, -1);
+    if (f == 3) { target(field); ${fill} target(SCREEN); }
+    cells.step(field, 0, R, null, box);
+    if (f == 3) printh(box.join(","));
+}`, 3);
+    const plain = box('polyfill([0, 127, 64], [-500, -500, 5], 3, 5);');
+    const pat = box('fillp(1); polyfill([0, 127, 64], [-500, -500, 5], 3, 5 + 256 * 5); fillp();');
+    assert.equal(plain.status, 0, plain.err);
+    assert.equal(plain.out.trim(), '48,0,79,15');
+    assert.equal(pat.out.trim(), plain.out.trim());
+});
+
 /* Materials for the layers: 0 air, 5 stone, 12 water, 15 sand */
 const LAYERS = `
 function rules2() {

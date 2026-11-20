@@ -331,14 +331,16 @@ polyfill([20, 44, 44, 20], [30, 30, 54, 54], 4, 11, null, [1, 1, 1, 1]);
   point halfway between them, so four bending points at a square's
   corners make a rounded square, and a ring of them a smooth blob.
 - `fillp` patterns it, and the camera and clip apply as to any shape.
-- **What it costs.** The hill above is about 1,400 units, and the bush
-  about 670; a full-screen shape about 1,300. The cost grows with the
-  edges each row crosses and the pieces of row filled between them: a
-  ragged ground line of 100 points along the bottom third of the screen
-  is about 900. Points outside the clip cost about 8 units
-  each, so a large outline mostly off screen stays cheap -- and with
-  `boxes`, cheaper still. One `polyfill` is much cheaper than the same
-  shape cut into `trifill` triangles, each of which pays for its rows.
+- **What it costs.** The hill above is about 1,000 units, and the bush
+  about 600; a full-screen shape about 1,100. A row costs about the same
+  however few of its pixels are filled, so a tall thin shape -- a stem, a
+  pole -- costs nearly what a wide one of the same height does. Each point
+  and edge costs about 16 units: a ragged ground line of 100 points across
+  the bottom third of the screen is about 4,600. Points outside the clip
+  cost about 8 units each, so a large outline mostly off screen stays
+  cheap -- and with `boxes`, cheaper still. One `polyfill` is much cheaper
+  than the same shape cut into `trifill` triangles, each of which pays for
+  its rows.
 
 ## polyboxes(xs, ys, n, [ends])
 
@@ -391,8 +393,8 @@ function draw() {
   number of points or outlines no longer matches.
 - Plain outlines only: `polyfill` refuses `boxes` together with `bend`.
 - **What it costs.** Making the boxes above, 503 points, is about 2,100
-  units, once. Each frame's `polyfill` then costs about 2,600 units
-  against 6,000 without them. A run off the screen costs about 22 units
+  units, once. Each frame's `polyfill` then costs about 2,500 units
+  against 5,800 without them. A run off the screen costs about 22 units
   against about 130 for walking its points. An outline that is mostly
   on screen gains little.
 
@@ -577,7 +579,8 @@ print("TILT " + tilt, 2, 2, 7);
   camera), and the clip. For a turning world drawn from a map, draw its
   outlines with `polyfill`.
 - Turning costs little: about 2 units a point for `polyfill`, and nothing
-  that shows for the other calls.
+  that shows for most other calls. A turned `rectfill` is filled as a
+  polygon: about 900 units for one 120 by 80, against 270 upright.
 
 **Zooming.** A camera that comes in close when the player rests and pulls
 back while they move eases `zoom` a little each tick, about the player:
@@ -603,7 +606,7 @@ print("ZOOM " + zoom, 2, 2, 7);
 - `map`, `tline` and the 3D systems are not zoomed, as they are not
   turned.
 - A zoom costs what a turn does; a picture zoomed in fills more pixels,
-  and this one costs 2,821 units a tick against 2,427 at a zoom of 1.
+  and this one costs 1,392 units a tick against 1,056 at a zoom of 1.
 
 ## clip([x0, y0, x1, y1])
 

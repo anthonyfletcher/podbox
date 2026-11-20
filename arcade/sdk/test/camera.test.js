@@ -80,6 +80,54 @@ test('a zoom grows shapes about the pivot', () => {
     assert.equal(edge.out.trim(), '07');
 });
 
+test('a zoom grows a circle about its middle, as it does an oval', () => {
+    /* radius 10 at twice the size: radius 20, its middle (pixel 80's,
+     * 80.5) half a pixel from the pivot and so a pixel off it, zoomed */
+    const z = run('camera(0, 0, 0, 80, 60, 2); circfill(80, 60, 10, 7);', '0,0,160,120');
+    const big = run('circfill(81, 61, 20, 7);', '0,0,160,120');
+    assert.equal(z.status, 0, z.err);
+    assert.equal(z.out, big.out);
+    const half = run('camera(0, 0, 0, 80, 60, 0.5); circ(80, 60, 20, 7);', '0,0,160,120');
+    const small = run('circ(80, 60, 10, 7);', '0,0,160,120');
+    assert.equal(half.out, small.out);
+    const huge = run('camera(0, 0, 0, 80, 60, 16); circfill(80, 60, 268435457, 7);',
+                     '0,0,160,120');
+    assert.equal(count(huge.out, '7'), 160 * 120);
+});
+
+test('a polygon fills by the middles of its pixels, near the screen or far past it', () => {
+    /* a strip two pixels wide down the screen; one reaching thousands of
+     * pixels past each side, filling the screen; a wedge brought on by the
+     * camera from 20,000 away, as drawn where it lands */
+    const thin = run('polyfill([20, 22, 22, 20], [0, 0, 119, 119], 4, 7);', '0,0,160,120');
+    assert.equal(thin.status, 0, thin.err);
+    assert.equal(count(thin.out, '7'), 2 * 119);
+    const wide = run('polyfill([-31000, 31000, 31000, -31000], [0, 0, 120, 120], 4, 7);',
+                     '0,0,160,120');
+    assert.equal(count(wide.out, '7'), 160 * 120);
+    const pts = 'var xs = [10, 150, 120, 30], ys = [5, 40, 115, 90];';
+    const near = run(pts + ' polyfill(xs, ys, 4, 7);', '0,0,160,120');
+    const far = run(pts + ' for (var i = 0; i < 4; i++) xs[i] += 20000;' +
+                    ' camera(20000, 0); polyfill(xs, ys, 4, 7);', '0,0,160,120');
+    assert.equal(near.out, far.out);
+});
+
+test('a plain fill draws as a patterned one of a single colour does', () => {
+    /* a pattern of one colour twice over draws the same pixels the long
+     * way: a wedge on the screen, and one whose edge reaches 31,000 past it */
+    const shapes = ['[10, 150, 120, 30], [5, 40, 115, 90], 4',
+                    '[-31000, 80, 159], [0, 119, 0], 3',
+                    '[0, 159, 80], [-500, -500, 5], 3'];
+    for (const s of shapes) {
+        const plain = run(`polyfill(${s}, 7);`, '0,0,160,120');
+        const pat = run(`fillp(1); polyfill(${s}, 7 + 256 * 7);`,
+                        '0,0,160,120');
+        assert.equal(plain.status, 0, plain.err);
+        assert.equal(plain.out, pat.out, s);
+        assert.ok(plain.out.includes('7'), s);
+    }
+});
+
 test('a zoom of 1 draws as no zoom does', () => {
     const a = run('camera(0, 0, 0.07); circfill(60, 50, 20, 7); trifill(10, 10, 90, 20, 40, 90, 8);', '0,0,160,120');
     const b = run('camera(0, 0, 0.07, 80, 60, 1); circfill(60, 50, 20, 7); trifill(10, 10, 90, 20, 40, 90, 8);', '0,0,160,120');

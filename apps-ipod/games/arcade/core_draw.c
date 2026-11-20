@@ -715,6 +715,20 @@ static void finish(struct vm *vm, struct pen *p)
     vm_charge(vm, p->cost + p->count * p->per256 / 256);
 }
 
+/* n pixels from d in colour c: a short run written a byte at a time, as a
+ * call to memset costs a 5G about 75 cycles before its first pixel */
+#define SHORT_RUN 12
+static inline __attribute__((always_inline)) void put_run(uint8_t *d,
+                                                           uint8_t c,
+                                                           int32_t n)
+{
+    if (n > SHORT_RUN)
+        memset(d, c, (size_t)n);
+    else
+        while (n-- > 0)
+            *d++ = c;
+}
+
 /* Pixels x0..x1 of row y, in surface coordinates, clipped. */
 static void span(struct pen *p, int64_t y, int64_t x0, int64_t x1)
 {
@@ -729,7 +743,7 @@ static void span(struct pen *p, int64_t y, int64_t x0, int64_t x1)
     uint8_t *row = p->s.px + (int32_t)y * p->s.w;
     p->cost += COST_ROW;
     if (!p->pat)
-        memset(row + x0, p->c, (size_t)(x1 - x0 + 1));
+        put_run(row + x0, p->c, (int32_t)(x1 - x0 + 1));
     else {
         int shift = 12 - ((int)(y & 3) << 2);
         for (int32_t x = (int32_t)x0; x <= (int32_t)x1; x++) {
@@ -890,7 +904,7 @@ static void span32(struct pen *p, int32_t y, int32_t l, int32_t r)
         r = p->cx1 - 1;
     if (l > r)
         return;
-    memset(p->s.px + y * p->s.w + l, p->c, (size_t)(r - l + 1));
+    put_run(p->s.px + y * p->s.w + l, p->c, r - l + 1);
     p->count += (uint32_t)(r - l + 1);
     p->cost += COST_ROW;
     area_touched(p, y, l, r);
@@ -977,6 +991,11 @@ static int circle(struct vm *vm, struct value *a, int argc, int outline,
     if (r < 0)
         return 1;
     turn_px(&vm->d, &x, &y);
+    /* its middle moved, its radius zoomed */
+    if (vm->d.cam_moved) {
+        int64_t z = ((int64_t)r * vm->d.cam_zoom + 32768) >> 16;
+        r = z > FAR ? FAR : (int32_t)z;
+    }
     struct pen p;
     struct figure s = { circle_row, 0, 0, clampc(x), clampc(y),
                        r > FAR ? FAR : r, 0 };
@@ -2184,10 +2203,175 @@ static int poly_edges(struct vm *vm, struct poly *g, const struct pen *p,
     return 1;
 }
 
+/* poly_rows() in 32 bits, for an unpatterned fill whose edges all lie
+ * within NARROW pixels of the surface: an edge as 16.16 in 32 bits, made
+ * in place over the 64-bit ones, a row's spans written straight into it.
+ * The 5G steps, compares and rounds 64-bit numbers in pairs of
+ * instructions, and span()'s 64-bit arguments and clip cost more than a
+ * row's few pixels. may_alias, as it is read and written over the
+ * 64-bit edges' memory. */
+#define NARROW 30000
+struct __attribute__((may_alias)) pedge32
+{
+    int32_t x, dx;
+    int32_t y1;
+    int32_t next;
+};
+
+/* units, measured on the ARM rig (polyprobe): each edge a row crosses,
+ * each step of putting a row's crossings in order, each span, each edge
+ * made narrow */
+#define POLY32_CROSS 2
+#define POLY32_SHIFT 1
+#define POLY32_SPAN  2
+#define POLY32_EDGE  1
+
+/* g->xmin and xmax narrowed from the outline's points to where its edges
+ * cross the rows; for an outline with edges set aside past the clip's
+ * side, filled out to it, to just past that side */
+static __attribute__((noinline)) void poly_reach(const struct pen *p,
+                                                 struct poly *g)
+{
+    const struct pedge *e0 = g->e;
+    int64_t xmin = INT64_MAX, xmax = INT64_MIN;
+    for (int32_t y = g->lo; y < g->hi; y++)
+        for (int32_t i = (int32_t)((uint32_t)g->starts[y - p->cy0] &
+                                   ~POLY_LEFT); i; i = e0[i - 1].next) {
+            const struct pedge *e = &e0[i - 1];
+            int64_t last = e->x + e->dx * (e->y1 - 1 - y);
+            int64_t a = e->x < last ? e->x : last;
+            int64_t b = e->x < last ? last : e->x;
+            if (a < xmin)
+                xmin = a;
+            if (b > xmax)
+                xmax = b;
+        }
+    g->xmin = g->n && g->xmin >= g->xl ? xmin : (int64_t)(p->cx0 - 1) << 16;
+    g->xmax = g->n && g->xmax <= g->xr ? xmax : (int64_t)p->cx1 << 16;
+}
+
+/* Whether every edge in g stays within NARROW pixels across every row it
+ * crosses, its step too; if so they are made 32-bit, in place, each y1
+ * counted from the clip's top row. */
+static int poly_narrow(const struct pen *p, struct poly *g)
+{
+    const int64_t lim = (int64_t)NARROW << 16;
+    struct pedge *e0 = g->e;
+    for (int32_t y = g->lo; y < g->hi; y++)
+        for (int32_t i = (int32_t)((uint32_t)g->starts[y - p->cy0] &
+                                   ~POLY_LEFT); i; i = e0[i - 1].next) {
+            const struct pedge *e = &e0[i - 1];
+            int64_t last = e->x + e->dx * (e->y1 - 1 - y);
+            if (e->x < -lim || e->x > lim || last < -lim || last > lim ||
+                e->dx < -lim || e->dx > lim)
+                return 0;
+        }
+    /* a cart reads the box drawn into an image: kept close to the spans */
+    if (!p->s.is_screen)
+        poly_reach(p, g);
+    /* each made 32-bit no further on than it was: a write lands only on
+     * edges already read */
+    struct pedge32 *n = (struct pedge32 *)(void *)e0;
+    for (uint32_t i = 0; i < g->n; i++) {
+        struct pedge e = e0[i];
+        n[i].x = (int32_t)e.x;
+        n[i].dx = (int32_t)e.dx;
+        n[i].y1 = e.y1 - p->cy0;
+        n[i].next = e.next;
+    }
+    return 1;
+}
+
+#define E32(e) ((struct pedge32 *)(void *)(e))
+
+static uint32_t poly_rows32(struct pen *p, struct poly *g, struct pedge **act)
+{
+    struct pedge32 *e0 = E32(g->e);
+    const int32_t *starts = g->starts;
+    uint32_t nact = 0, crossings = 0, shifts = 0, spans = 0, count = 0;
+    int32_t cx0 = p->cx0, cx1 = p->cx1 - 1, w = p->s.w;
+    int32_t hi = g->hi - p->cy0;    /* rows from the clip's top, as y1 */
+    uint8_t c = p->c;
+    uint32_t left = 0;
+    for (int32_t y = 0; y < g->lo - p->cy0; y++)
+        left ^= (uint32_t)starts[y];
+    uint8_t *row = p->s.px + g->lo * w;
+    for (int32_t y = g->lo - p->cy0; y < hi; y++, row += w) {
+        uint32_t st = (uint32_t)starts[y];
+        left ^= st;
+        uint32_t m = 0;
+        for (uint32_t k = 0; k < nact; k++) {
+            struct pedge32 *e = E32(act[k]);
+            if (y < e->y1) {
+                e->x += e->dx;
+                act[m++] = (struct pedge *)(void *)e;
+            }
+        }
+        for (int32_t i = (int32_t)(st & ~POLY_LEFT); i; i = e0[i - 1].next)
+            act[m++] = (struct pedge *)(void *)&e0[i - 1];
+        nact = m;
+        for (uint32_t k = 1; k < m; k++) {
+            struct pedge *e = act[k];
+            int32_t x = E32(e)->x;
+            uint32_t at = k;
+            while (at && E32(act[at - 1])->x > x) {
+                act[at] = act[at - 1];
+                at--;
+                shifts++;
+            }
+            act[at] = e;
+        }
+        crossings += m;
+        uint32_t k = 0;
+        if (left & POLY_LEFT) {
+            int32_t r = m ? ((E32(act[0])->x + 32767) >> 16) - 1 : cx1;
+            if (r > cx1)
+                r = cx1;
+            if (cx0 <= r) {
+                put_run(row + cx0, c, r - cx0 + 1);
+                count += (uint32_t)(r - cx0 + 1);
+                spans++;
+            }
+            k = 1;
+        }
+        for (; k < m; k += 2) {
+            int32_t l = (E32(act[k])->x + 32767) >> 16;
+            int32_t r = k + 1 < m ? ((E32(act[k + 1])->x + 32767) >> 16) - 1
+                                  : cx1;
+            if (l < cx0)
+                l = cx0;
+            if (r > cx1)
+                r = cx1;
+            if (l <= r) {
+                put_run(row + l, c, r - l + 1);
+                count += (uint32_t)(r - l + 1);
+                spans++;
+            }
+        }
+    }
+    /* the box drawn in: the edges' rows and reach, clipped, which holds
+     * every span; kept per fill rather than per span, which costs a 5G
+     * its registers in this loop */
+    p->count += count;
+    if (spans) {
+        int32_t xl = (int32_t)(g->xmin >> 16), xr = (int32_t)(g->xmax >> 16);
+        if (xl < cx0)
+            xl = cx0;
+        if (xr > cx1 || xr < xl)
+            xr = cx1;
+        area_touched(p, g->lo, xl, xr);
+        area_touched(p, g->hi - 1, xl, xr);
+    }
+    return crossings * POLY32_CROSS + shifts * POLY32_SHIFT +
+           spans * POLY32_SPAN + g->n * POLY32_EDGE + g->aside * POLY_ASIDE;
+}
+
 /* The rows the edges in g cover, filled by the even-odd rule; the units
  * the walking and the spans' set-up cost, besides their pixels */
 static uint32_t poly_rows(struct pen *p, struct poly *g, struct pedge **act)
 {
+    if (!p->pat && poly_narrow(p, g))
+        return poly_rows32(p, g, act);
     /* the edges crossing the row, kept in order of where they cross: a
      * row's order is nearly the last's, so putting it right is cheap */
     uint32_t nact = 0, crossings = 0, shifts = 0, spans = 0;
@@ -2620,7 +2804,7 @@ static void rows(struct pen *p, int32_t from, int32_t to, int64_t x0,
         if (l > r)
             return;
         for (int32_t k = h; k > 0; k--, row += w)
-            memset(row + l, c, (size_t)(r - l + 1));
+            put_run(row + l, c, r - l + 1);
         dots = (uint32_t)(r - l + 1);
     } else {
         int left = x0 >= p->cx0 && x0 < p->cx1;
