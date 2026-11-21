@@ -85,7 +85,7 @@ BOOT_ASSET=podbox-bootloader.zip
 # Named rather than globbed, for the same reason bundle-theme.sh names its one
 # -- a `git merge rockbox/master` must not start publishing stock themes that
 # were never converted.
-EXTRA_THEMES="themify_2 obsede_2 bony iclassic_square jive"
+EXTRA_THEMES="themify_2 iclassic_square"
 
 # Published asset names. The build directory's own name means nothing to
 # somebody choosing a download.
@@ -353,7 +353,9 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES" "$VOICES_NOTES"'
     printf 'on top of the one already there, then pick it under\n'
     printf 'Settings > Load Theme.\n\n'
     printf 'Each zip carries the fonts its theme needs, so they can be\n'
-    printf 'installed in any order and on their own.\n'
+    printf 'installed in any order and on their own.\n\n'
+    printf 'Bony, Jive and Obsede 2 are at\n'
+    printf 'https://github.com/anthonyfletcher/podbox-themes.\n'
 } > "$THEMES_NOTES"
 
 # The voices are made for this build, so the notes say which commit; no
