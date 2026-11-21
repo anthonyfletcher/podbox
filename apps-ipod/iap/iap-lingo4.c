@@ -54,14 +54,34 @@ static void cmd_ack(const unsigned int cmd, const unsigned char status)
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
 
+/* Tells the dock the answer comes within msdelay, so that it waits for a
+ * command taking seconds rather than giving up on it */
+static void cmd_pending(const unsigned int cmd, const uint32_t msdelay)
+{
+    IAP_TX_INIT4(0x04, 0x0001);
+    IAP_TX_PUT(IAP_ACK_PENDING);
+    IAP_TX_PUT_U16(cmd);
+    IAP_TX_PUT_U32(msdelay);
+    iap_send_tx();
+}
+
 /* A song list being made into the Queue plays when it is done, and a dock
- * answered before then asks about a Queue half made */
-static void wait_for_library(void)
+ * answered before then asks about a Queue half made. Each pending answer
+ * is renewed before it runs out. */
+static void wait_for_library(const unsigned int cmd)
 {
     long until = current_tick + 15 * HZ;
+    long renew = current_tick;
 
     while (iap_library_building() && TIME_BEFORE(current_tick, until))
+    {
+        if (!TIME_BEFORE(current_tick, renew))
+        {
+            cmd_pending(cmd, 10000);
+            renew = current_tick + 9 * HZ;
+        }
         sleep(HZ / 10);
+    }
 }
 
 /* A selection, by SelectDBRecord or SelectSortDBRecord. A song from the Queue
@@ -84,9 +104,13 @@ static void select_record(const unsigned int cmd, const unsigned char *buf,
             iap_skip_to(index);
     }
     else
+    {
+        if (iap_library_loads_playlist(type, index))
+            cmd_pending(cmd, 10000);
         ok = iap_library_select(type, index, sort);
+    }
 
-    wait_for_library();
+    wait_for_library(cmd);
     cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
 }
 
@@ -1982,7 +2006,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 ok = iap_library_select(0x05, index,
                                         IAP_LIBRARY_SORT_DEFAULT);
 
-            wait_for_library();
+            wait_for_library(cmd);
             cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
             break;
         }

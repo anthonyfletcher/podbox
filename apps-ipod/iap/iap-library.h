@@ -32,6 +32,9 @@ bool iap_library_tracks_are_queue(void);
 /* Whether a chosen song list is still being made into the Queue; it plays
  * when that finishes, so there is nothing to press Play on meanwhile. */
 bool iap_library_building(void);
+/* Whether selecting this record reads a saved playlist from the disk before
+ * it answers, which can take seconds. */
+bool iap_library_loads_playlist(int type, uint32_t index);
 /* Plays the Queue from its track at index, a playlist index, on the
  * library's worker: playlist_start() waits on the playlist's lock and the
  * disk, and a thread an accessory waits on must not. Building until it has.

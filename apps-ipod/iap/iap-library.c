@@ -1178,6 +1178,15 @@ bool iap_library_building(void)
     return building;
 }
 
+bool iap_library_loads_playlist(int type, uint32_t index)
+{
+    const int *rows;
+    uint32_t folders = folders_offered(&rows);
+
+    return type == TYPE_PLAYLIST && index != INDEX_UP && !building
+           && index > PLAYLIST_QUEUE + folders;
+}
+
 bool iap_library_start(int index)
 {
     if (building || index < 0 || index >= playlist_amount()
