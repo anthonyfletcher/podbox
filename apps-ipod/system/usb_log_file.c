@@ -261,8 +261,9 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
 }
 #endif
 
-/* "handover: ack from tagcache, #3". The thread is named when the line is
- * written, so one that has since exited shows as "?". */
+/* "handover: ack from tagcache, #3". The thread is named by its slot when
+ * the line is written: an empty slot shows as "?", and a slot reused since
+ * by its new thread's name. */
 static void usb_log_format_handover(const struct usb_log_entry *e, char *p,
                                     size_t size)
 {

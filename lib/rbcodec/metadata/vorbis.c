@@ -356,17 +356,6 @@ size_t base64_encoded_size(size_t inlen)
     return ret;
 }
 
-#ifdef HAVE_ALBUMART
-/* Embedded art is decoded from JPEG and PNG only, so either outranks a
-   front cover in another format */
-static int picture_rank(unsigned long type, uint32_t kind)
-{
-    type &= AA_CLEAR_FLAGS_MASK;
-    return (type == AA_TYPE_JPG || type == AA_TYPE_PNG ? 2 : 0) +
-           (kind == AA_PICTURE_FRONT ? 1 : 0);
-}
-#endif
-
 /* Read the items in a Vorbis comment packet. For Ogg files, the file must
  * be located on a page start, for other files, the beginning of the comment
  * data (i.e., the vendor string length). Returns total size of the
@@ -437,10 +426,13 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
 #ifdef HAVE_ALBUMART
         /* the best PICTURE, ranked as a FLAC PICTURE block is: a JPEG or PNG
            over any other format, then a front cover, the first of a rank
-           winning */
+           winning. Ogg only: the art loaders reach a base64 picture through
+           Ogg pages, so one in a FLAC's comments would show nothing. */
         int had_rank = id3->has_embedded_albumart ?
-            picture_rank(id3->albumart.type, id3->albumart_picture_type) : -1;
-        if (had_rank < 3 && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
+            flac_picture_rank(id3->albumart.type,
+                              id3->albumart_picture_type) : -1;
+        if (had_rank < 3 && id3->codectype != AFMT_FLAC
+            && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
         {
             int after_block_pos = lseek(fd, 0, SEEK_CUR);
 
@@ -454,7 +446,7 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
                 /* the picture must start inside the comment */
                 && base64_encoded_size(picframe_pos + 4) <
                    (size_t)(after_block_pos - before_block_pos)
-                && picture_rank(aa_type, get_long_be(buf)) > had_rank)
+                && flac_picture_rank(aa_type, get_long_be(buf)) > had_rank)
             {
                 //NOTE: This is not exact location due to padding in base64 (up to 3 chars)!!
                 // But it's OK with our jpeg decoder if we add or miss few bytes in jpeg header

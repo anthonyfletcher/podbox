@@ -51,6 +51,7 @@ int id3_unsynchronize(char* tag, int len, bool *ff_found);
 size_t base64_decode(const char *in, size_t in_len, unsigned char *out);
 
 bool parse_flac_album_art(unsigned char *buf, int bytes_read, enum mp3_aa_type *type, int *picframe_pos);
+int flac_picture_rank(unsigned long type, uint32_t kind);
 
 int get_ogg_format_and_move_to_comments(int fd, unsigned char *buf);
 bool ogg_file_init(struct ogg_file* file, int fd, int type, int remaining);

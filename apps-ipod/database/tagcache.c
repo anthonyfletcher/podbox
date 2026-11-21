@@ -92,6 +92,7 @@
 #include "metadata.h"
 #include "tagcache.h"
 #include "database/path_key.h"
+#include "database/scan_skip.h"
 #include "database/sound_index.h"
 #include "database/unreadable.h"
 #include "db_spoken.h"
@@ -6624,17 +6625,6 @@ static bool search_root_exists(const char *path)
  * every open() in the firmware fails, including the one debug_log() makes,
  * so the player stops with nothing written anywhere that says why. */
 #define TAGCACHE_MAX_DEPTH 16
-
-/* Entries the scan walks past: anything hidden by a leading dot (macOS's ._
- * files and .Trashes, Linux's .Trash-*), a macOS archive's __MACOSX, and the
- * Windows recycle bins at the top of a search root. */
-static bool scan_skips_name(const char *name, int depth)
-{
-    if (name[0] == '.' || !strcasecmp(name, "__MACOSX"))
-        return true;
-    return depth == 0 && (!strcasecmp(name, "$RECYCLE.BIN")
-                          || !strcasecmp(name, "RECYCLED"));
-}
 
 static bool check_dir(const char *dirname, int add_files, int depth)
 {

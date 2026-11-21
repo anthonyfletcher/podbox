@@ -79,6 +79,15 @@ bool parse_flac_album_art(unsigned char *buf, int bytes_read, enum mp3_aa_type *
     return true;
 }
 
+/* Embedded art is decoded from JPEG and PNG only, so either outranks a
+   front cover in another format */
+int flac_picture_rank(unsigned long type, uint32_t kind)
+{
+    type &= AA_CLEAR_FLAGS_MASK;
+    return (type == AA_TYPE_JPG || type == AA_TYPE_PNG ? 2 : 0) +
+           (kind == AA_PICTURE_FRONT ? 1 : 0);
+}
+
 #endif /* HAVE_ALBUMART */
 
 bool get_flac_metadata(int fd, struct mp3entry* id3)
@@ -94,10 +103,6 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
     unsigned char* buf = (unsigned char *)id3->path;
     bool last_metadata = false;
     bool rc = false;
-#ifdef HAVE_ALBUMART
-    /* how good the picture in id3->albumart is, see the PICTURE block */
-    int aa_rank = id3->has_embedded_albumart ? 3 : -1;
-#endif
 
     if (!skip_id3v2(fd, id3) || (read(fd, buf, 4) < 4))
     {
@@ -182,7 +187,10 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
                (picture type 3) over any other. The first of a rank wins, a
                bad one is skipped, and none is read after a front cover in
                one of those formats. */
-            if (aa_rank < 3 && i > 0)
+            int had_rank = id3->has_embedded_albumart ?
+                flac_picture_rank(id3->albumart.type,
+                                  id3->albumart_picture_type) : -1;
+            if (had_rank < 3 && i > 0)
             {
                 unsigned int buf_size = MIN(sizeof(id3->path), i);
                 unsigned long block_size = i;
@@ -221,17 +229,12 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
                         aa_size = get_long_be(size_buf);
                     }
 
-                    int rank = (aa_type == AA_TYPE_JPG ||
-                                aa_type == AA_TYPE_PNG ? 2 : 0) +
-                               (get_long_be(buf) == 3 ? 1 : 0);
-
                     /* and the picture data too */
                     uint32_t kind = get_long_be(buf);
                     if (aa_size > 0 &&
                         aa_size <= block_size - (picframe_pos + 4) &&
-                        rank > aa_rank)
+                        flac_picture_rank(aa_type, kind) > had_rank)
                     {
-                        aa_rank = rank;
                         id3->albumart_picture_type =
                             kind < 256 ? (unsigned char)kind : 0;
                         id3->has_embedded_albumart = true;

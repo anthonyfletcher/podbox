@@ -1756,39 +1756,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
 
             data[2] = cmd + 1;
             iap_get_trackinfo(tracknum, &id3);
-            /* Return the requested track data */
-            switch(cmd)
-            {
-                /* strlcpy() returns strlen(src), not the number of bytes
-                 * it copied, so a tag longer than the 64-byte limit sends
-                 * more than was ever written: past the end of data[70]
-                 * beyond 66 characters, and past TX_BUFLEN into
-                 * panicf("IAP: TX buffer overflow") beyond about 124.
-                 * Clamp to what can actually have landed. An absent tag
-                 * is NULL, which strlcpy() would dereference.
-                 */
-                case 0x20:
-                    slen = strlcpy((char *)&data[3],
-                                  id3.title ? id3.title : "", 64);
-                    if (slen > 63)
-                        slen = 63;
-                    iap_send_pkt(data, 4+slen);
-                    break;
-                case 0x22:
-                    slen = strlcpy((char *)&data[3],
-                                  id3.artist ? id3.artist : "", 64);
-                    if (slen > 63)
-                        slen = 63;
-                    iap_send_pkt(data, 4+slen);
-                    break;
-                case 0x24:
-                    slen = strlcpy((char *)&data[3],
-                                  id3.album ? id3.album : "", 64);
-                    if (slen > 63)
-                        slen = 63;
-                    iap_send_pkt(data, 4+slen);
-                    break;
-            }
+            /* Return the requested track data, cut to 63 bytes on a whole
+             * UTF-8 character. The length is what landed in data[], never
+             * strlcpy()'s strlen(src): a long tag would send past data[70]
+             * and TX_BUFLEN. An absent tag is NULL. */
+            const char *s = cmd == 0x20 ? id3.title
+                          : cmd == 0x22 ? id3.artist : id3.album;
+            strlcpy((char *)&data[3], s ? s : "", 64);
+            iap_utf8_cut((char *)&data[3]);
+            slen = strlen((char *)&data[3]);
+            iap_send_pkt(data, 4+slen);
             break;
         }
         case 0x0025: /* ReturnIndexedPlayingTrackAlbumName. See 0x0024 Above */
@@ -2075,6 +2052,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 case 0x05: /* ffwd */
                 case 0x06: /* frwd */
                     ok = remote_seek_start(buf[3] == 0x05 ? 1 : -1);
+                    if (ok)
+                        device.pb_seek_dir = buf[3] == 0x05 ? 1 : -1;
                     break;
                 case 0x07: /* end ffwd/frwd */
                     remote_seek_stop();

@@ -35,8 +35,9 @@ iPod:
 
 The music takes the processor's time first; a cart has what is left. How
 much that is depends on the music: MP3, the heaviest, leaves the Video
-about two-thirds of its speed. The other formats are decoded on the
-Video's second processor and leave more.
+about two-thirds of its speed. Most other formats are decoded on the
+Video's second processor and leave more; NSF, AY, ASAP, KSS and VGM
+files are decoded beside the cart, as MP3 is.
 
 ### The budget
 

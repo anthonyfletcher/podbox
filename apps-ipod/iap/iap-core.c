@@ -1621,8 +1621,10 @@ void iap_periodic(void)
     device.pb_track_changed = false;
 
     /* Bit 0, every tick: a stop once it has lasted two, as a new playlist
-     * stops playback for a moment as it starts; and the end of a seek,
-     * 0x02 forward or 0x03 back, however it ended */
+     * stops playback for a moment as it starts; and the end of a seek this
+     * accessory started (pb_seek_dir, set by its handlers so one shorter
+     * than a tick is still seen), 0x02 forward or 0x03 back, however it
+     * ended */
     if (interface_state == IST_EXTENDED && device.pb_notifications) {
         bool basic = device.pb_notifications & BIT_N(0);
         int dir = remote_seek_direction();
@@ -1633,9 +1635,11 @@ void iap_periodic(void)
                  && ++device.pb_stopped_ticks == 2 && basic)
             iap_send_pb(0x00, 0, 0);
 
-        if (device.pb_seek_dir && dir != device.pb_seek_dir && basic)
-            iap_send_pb(device.pb_seek_dir > 0 ? 0x02 : 0x03, 0, 0);
-        device.pb_seek_dir = dir;
+        if (device.pb_seek_dir && dir != device.pb_seek_dir) {
+            if (basic)
+                iap_send_pb(device.pb_seek_dir > 0 ? 0x02 : 0x03, 0, 0);
+            device.pb_seek_dir = dir;
+        }
     }
 
     /* Volume: looked at every 100ms, sent only on a change */

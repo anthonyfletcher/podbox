@@ -51,6 +51,7 @@
 #include "usb.h"
 #include "core_alloc.h"
 #include "database/tagcache.h"
+#include "database/scan_skip.h"
 #include "system/bg_task.h"
 #include "system/debug_log.h"
 #include "files/filetypes.h"
@@ -227,10 +228,9 @@ static void fi_walk(int depth)
         if (fi_check_abort() || fi_lists_full())
             break;
 
-        /* "." and "..", and by the same test every dot-directory: none of
-         * them holds anything a person filed there to read, and /.rockbox in
-         * particular is full of files that would classify as documents. */
-        if (entry->d_name[0] == '.')
+        /* /.rockbox in particular is full of files that would classify as
+         * documents */
+        if (scan_skips_name((char *)entry->d_name, depth))
             continue;
 
         /* Rebuild the path at this level each time round; the previous

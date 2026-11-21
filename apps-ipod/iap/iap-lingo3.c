@@ -780,9 +780,11 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         case 0x03:
                         case 0x04:
                         {
-                            cmd_ack(cmd, remote_seek_start(
-                                buf[0x03] == 0x03 ? 1 : -1) ?
-                                IAP_ACK_OK : IAP_ACK_CMD_FAILED);
+                            int dir = buf[0x03] == 0x03 ? 1 : -1;
+                            bool ok = remote_seek_start(dir);
+                            if (ok)
+                                device.pb_seek_dir = dir;
+                            cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_CMD_FAILED);
                             break;
                         }
 

@@ -52,6 +52,7 @@
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
 #include "database/path_key.h"
+#include "database/scan_skip.h"
 #include "database/sound_index.h"
 #include "soundscan.h"
 
@@ -404,7 +405,7 @@ static bool walk(const char *dir, bool counting, int *total, int depth)
         struct dirinfo info;
         char path[MAX_PATH];
 
-        if (e->d_name[0] == '.')
+        if (scan_skips_name(e->d_name, depth))
             continue;
 
         info = dir_get_info(d, e);
