@@ -52,6 +52,7 @@ fork's USB work; the `tools/` changes are this fork's.
 | `SOURCES` | `mikey-6g.c` wrapped in `#ifdef HAVE_MIKEY_REMOTE` | So the inline remote can be switched off with one line in `export/config.h`. |
 | `export/font.h` | `MAXUSERFONTS` 12 → 16 | Screens that load their own fonts share the slots with the theme. |
 | `export/config.h` | `HAVE_MULTIMEDIA_KEYS` gated on `USB_ENABLE_IAP \|\| HAVE_MIKEY_REMOTE`, outside the `HAVE_USBSTACK` block | The 6G's inline remote produces the same key codes as USB iAP, without USB. |
+| `export/config.h` | CHECKWPS builds keep `HAVE_DIRCACHE` and `HAVE_TC_RAMCACHE` | CheckWPS compiles `apps-ipod/settings/settings_list.c`, whose directory cache settings carry no guard because both players have it. |
 | `export/rbpaths.h` | New `DEFAULTCONFIGFILE`, `.rockbox/default-config.cfg` | The shipped first-boot config, read only when no `config.cfg` exists, so an install never resets the player's settings. |
 | `drivers/lcd-16bit-common.c`, `export/lcd.h` | New `lcd_blendrect()` and `LCD_BLEND_OPAQUE` | The skin engine's `%dr` opacity. Only useful drawn into the backdrop buffer. |
 | `drivers/lcd-color-common.c`, `export/lcd.h` | New `lcd_alpha_bitmap_part_img()`; `lcd.h` declares it and `lcd_alpha_bitmap_part()` | Draws an image through an alpha mask, for rounded corners on `%dr`, `%Cl` and `%La`. |
