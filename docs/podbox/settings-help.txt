@@ -1049,7 +1049,8 @@ off draws none.
 [screen transitions]
 How one screen gives way to the next when you go into a menu, a list or Now
 Playing and back. Slide moves the new screen in from the side, as an iPod
-does; Off changes it at once. It works with every theme.
+does; Off changes it at once. A theme can set it, and a change you make is
+kept with the theme you are using.
 
 [list separator color]
 The colour of the rule drawn between rows in lists. Only visible where the
