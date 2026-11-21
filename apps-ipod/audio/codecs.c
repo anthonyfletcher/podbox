@@ -36,6 +36,7 @@
 #include "file.h"
 #include "kernel.h"
 #include "codecs.h"
+#include "audio/codec_cop.h"
 #include "lang.h"
 #include "widgets/keyboard.h"
 #include "buffering.h"
@@ -268,6 +269,18 @@ int codec_load_file(const char *plugin, struct codec_api *api)
     }
 
     return codec_load_ram(api);
+}
+
+struct codec_api *codec_set_api(struct codec_api *api)
+{
+    struct codec_api *old;
+
+    if (curr_handle == NULL)
+        return NULL;
+
+    old = *(c_hdr->api);
+    *(c_hdr->api) = api;
+    return old;
 }
 
 int codec_run_proc(void)

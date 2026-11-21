@@ -128,11 +128,20 @@ static const struct debug_log_info {
                              NULL, NULL, tasks_held },
 };
 
+/* The lines left out as repeats (repeat_check()) */
+struct repeats {
+    uint32_t last[3];           /* the last lines' texts, hashed, newest first */
+    int period;                 /* lines left out repeat the last 1 or 2; 0 */
+    unsigned long count;        /* left out since the last note */
+    long since, tick;           /* the first and last of those */
+};
+
 static struct {
     struct mutex lock;
     size_t used;                /* of held */
     unsigned long lost;         /* held lines dropped */
     bool on;                    /* the setting, as last applied */
+    struct repeats rep;
 } logs[DEBUG_LOG_COUNT];
 
 static bool ready;              /* debug_log_init() has run */
@@ -345,17 +354,125 @@ static int format_line(char *line, size_t size, const char *fmt, va_list ap)
     return len;
 }
 
-/* Below the held lines, so the file stays in order */
-static void write_through(enum debug_log_id id, const char *line, int len)
+static uint32_t text_hash(const char *s, size_t len)
 {
-    int fd = debug_log_open(id);
+    uint32_t h = 2166136261u;
+
+    while (len--)
+        h = (h ^ (unsigned char)*s++) * 16777619u;
+    return h ? h : 1;
+}
+
+/* A line, or a pair of lines, that keeps coming round -- a retry that never
+ * succeeds -- is written once and its repeats counted, the count going in
+ * when another line comes and every ten minutes while it goes on: a night of
+ * one retry leaves the files room for what came before it. With the log's
+ * lock held; whether the line is left out, and in `note` the note of those
+ * left out if one is due, its length in *note_len or 0. */
+#define REPEAT_NOTE_TICKS (10*60*HZ)
+
+static bool repeat_check(enum debug_log_id id, const char *line, int len,
+                         char *note, size_t size, int *note_len)
+{
+    struct repeats *r = &logs[id].rep;
+    const char *text = strchr(line, ']') + 2;
+    uint32_t h = text_hash(text, len - (text - line));
+    bool skip, still = false;
+
+    *note_len = 0;
+    if (r->period)
+        skip = h == r->last[r->period - 1];
+    else if (h == r->last[0])
+        skip = true, r->period = 1;
+    else if (h == r->last[1] && r->last[0] == r->last[2])
+        skip = true, r->period = 2;
+    else
+        skip = false;
+
+    if (skip)
+    {
+        if (!r->count)
+            r->since = current_tick;
+        r->count++;
+        r->tick = current_tick;
+        still = TIME_AFTER(current_tick, r->since + REPEAT_NOTE_TICKS);
+    }
+    if (r->count && (still || !skip))
+    {
+        *note_len = snprintf(note, size, "[%8ld] %lu more of the %s above, "
+                             "the last at [%ld]%s\n", (long)current_tick,
+                             r->count, r->period == 1 ? "line" : "two lines",
+                             r->tick, still ? ", and still coming" : "");
+        *note_len = MIN(*note_len, (int)size - 1);
+        r->count = 0;
+    }
+    if (!skip)
+        r->period = 0;
+
+    r->last[2] = r->last[1];
+    r->last[1] = r->last[0];
+    r->last[0] = h;
+    return skip;
+}
+
+/* With the log's lock held; below the held lines, so the file stays in
+ * order */
+static void write_through_locked(enum debug_log_id id, const char *note,
+                                 int note_len, const char *line, int len)
+{
+    int fd = open_locked(id);
 
     if (fd < 0)
         return;
     if (log_info[id].held)
         flush_into(id, fd);
-    write(fd, line, len);
-    debug_log_close(id, fd);
+    if (note_len)
+        write(fd, note, note_len);
+    if (len)
+        write(fd, line, len);
+    close(fd);
+}
+
+/* With the log's lock held */
+static void hold_locked(enum debug_log_id id, const char *line, int len)
+{
+    if (logs[id].used + len > HELD_SIZE)
+        flush_locked(id);
+    if (logs[id].used + len > HELD_SIZE)
+        logs[id].lost++;
+    else
+    {
+        memcpy(log_info[id].held + logs[id].used, line, len);
+        logs[id].used += len;
+        if (logs[id].used >= HELD_SIZE * 3 / 4)
+            flush_locked(id);
+    }
+}
+
+/* One formatted line, written through or held */
+static void log_put(enum debug_log_id id, const char *line, int len,
+                    bool sync)
+{
+    char note[96];
+    int note_len;
+
+    mutex_lock(&logs[id].lock);
+    if (repeat_check(id, line, len, note, sizeof note, &note_len))
+        len = 0;
+    /* A log with nothing held is on disk before the caller goes on */
+    if (sync || !log_info[id].held)
+    {
+        if (note_len || len)
+            write_through_locked(id, note, note_len, line, len);
+    }
+    else
+    {
+        if (note_len)
+            hold_locked(id, note, note_len);
+        if (len)
+            hold_locked(id, line, len);
+    }
+    mutex_unlock(&logs[id].lock);
 }
 
 void debug_log_sync(enum debug_log_id id, const char *fmt, ...)
@@ -371,7 +488,7 @@ void debug_log_sync(enum debug_log_id id, const char *fmt, ...)
     va_end(ap);
     if (len < 0)
         return;
-    write_through(id, line, len);
+    log_put(id, line, len, true);
 }
 
 void debug_log(enum debug_log_id id, const char *fmt, ...)
@@ -388,27 +505,7 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     va_end(ap);
     if (len < 0)
         return;
-
-    /* A log with nothing held is on disk before the caller goes on */
-    if (!log_info[id].held)
-    {
-        write_through(id, line, len);
-        return;
-    }
-
-    mutex_lock(&logs[id].lock);
-    if (logs[id].used + len > HELD_SIZE)
-        flush_locked(id);
-    if (logs[id].used + len > HELD_SIZE)
-        logs[id].lost++;
-    else
-    {
-        memcpy(log_info[id].held + logs[id].used, line, len);
-        logs[id].used += len;
-        if (logs[id].used >= HELD_SIZE * 3 / 4)
-            flush_locked(id);
-    }
-    mutex_unlock(&logs[id].lock);
+    log_put(id, line, len, false);
 }
 
 void debug_log_header(enum debug_log_id id, const char *what)

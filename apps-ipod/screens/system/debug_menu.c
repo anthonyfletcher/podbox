@@ -59,6 +59,8 @@
 #include "screens/shortcuts.h"
 #include "screens/system/beat_debug.h"
 #include "screens/system/probe_debug.h"
+#include "screens/system/eq_cop_check.h"
+#include "screens/system/codec_cop_check.h"
 #include "dircache.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
@@ -2083,6 +2085,10 @@ static const struct {
         { "Buffers and CPU", dbg_buffering_thread, false, NULL },
         { "Beat analysis", beat_debug_screen, true, NULL },
         { "Sound probe", probe_debug_screen, false, NULL },
+#if NUM_CORES > 1 && (CONFIG_PLATFORM & PLATFORM_NATIVE)
+        { "EQ on COP Check", eq_cop_check_screen, false, NULL },
+        { "Codec on COP Check", codec_cop_check_screen, false, NULL },
+#endif
 #ifdef PM_DEBUG
         { "pm histogram", peak_meter_histogram, true, NULL },
 #endif /* PM_DEBUG */

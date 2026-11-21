@@ -767,12 +767,12 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, Math.max(0, ms)));
 
 /* The players a cart can be run as, in ms on each, all measured: a unit of
  * script, a whole screen's rows changed and sent, and a whole screen's rows
- * drawn but found unchanged against the last frame. Music means FLAC, the
- * heaviest to decode. */
+ * drawn but found unchanged against the last frame. Music means MP3, the
+ * heaviest format, with the equalizer on. */
 const DEVICES = {
     '6g': { name: 'iPod Classic', unit: 0.00016, screen: 2.2, same: 0.5 },
-    '5g': { name: 'iPod Video', unit: 0.00055, screen: 5.0, same: 1.8 },
-    '5g-music': { name: 'iPod Video, playing FLAC', unit: 0.0019, screen: 6.6, same: 2.0 },
+    '5g': { name: 'iPod Video', unit: 0.00048, screen: 5.0, same: 1.8 },
+    '5g-music': { name: 'iPod Video, playing MP3', unit: 0.00076, screen: 8.7, same: 2.7 },
     'free': { name: 'this computer, no limit', unit: 0, screen: 0, same: 0 }
 };
 let device = '5g-music';

@@ -236,6 +236,14 @@
 
 #define HAVE_HARDWARE_CLICK
 
+/* The equalizer's worker on the COP, and one for a codec's run there, which
+ * MP3's synthesis thread never runs beside. ROLO stops playback first, so
+ * a sync from a screen whose loader holds a slot finds one free. 164 bytes
+ * of core IRAM each. */
+#ifndef BOOTLOADER
+#define TARGET_EXTRA_THREADS 2
+#endif
+
 /* define this if the device has larger sectors when accessed via USB */
 #define MAX_VIRT_SECTOR_SIZE 2048
 

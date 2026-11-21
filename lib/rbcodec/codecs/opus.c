@@ -524,8 +524,11 @@ enum codec_status codec_run(void)
             break;
 
     next_page:
-        /*Get the ogg buffer for writing*/
-        if (get_more_data(oy) < 1) {
+        /*Get the ogg buffer for writing; nothing more is the file's end*/
+        ret = get_more_data(oy);
+        if (ret < 1) {
+            if (ret == 0 && st != NULL)
+                error = CODEC_OK;
             goto done;
         }
 

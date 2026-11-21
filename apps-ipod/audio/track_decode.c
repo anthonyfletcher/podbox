@@ -32,6 +32,7 @@
 #include "dsp_core.h"
 #include "dsp_sample_io.h"
 #include "metadata.h"
+#include "audio/codec_cop.h"
 #include "audio/codec_thread.h"
 #include "audio/track_decode.h"
 
@@ -48,6 +49,13 @@ static size_t           window_fill;  /* Valid bytes in it */
 static struct mp3entry  id3;
 static struct codec_api dci;
 static struct track_pcm fmt;
+/* The codec announced 16 bits or fewer, so it hands over int16 samples, as
+ * dsp_sample_input.c takes them. Opus does. The sink is given int32 from
+ * every codec, so these are widened on the way through. */
+static bool             narrow;
+static int              codec_depth;  /* As the codec announced it */
+#define WIDEN_FRAMES    256
+static int32_t          widened[2][WIDEN_FRAMES];
 
 static track_decode_sink sink;
 static bool            (*want_abort)(void);
@@ -234,9 +242,9 @@ static void cb_set_elapsed(unsigned long value)
  * a DSP: the shift is all that is needed to reach int16, and taking it this
  * way keeps the samples the codec's own.
  *
- * The scale follows dsp_sample_io.c -- a sample carries frac_bits fractional
- * bits, which is WORD_FRACBITS unless the codec announces a depth above
- * NATIVE_DEPTH, in which case it is that depth. */
+ * The scale follows dsp_sample_input.c: a depth above NATIVE_DEPTH is int32
+ * samples with that many fractional bits; NATIVE_DEPTH or less is int16
+ * samples, widened before the sink sees them (cb_pcmbuf_insert()). */
 static void cb_configure(int setting, intptr_t value)
 {
     switch (setting)
@@ -246,11 +254,10 @@ static void cb_configure(int setting, intptr_t value)
         break;
 
     case DSP_SET_SAMPLE_DEPTH:
-    {
-        int frac_bits = value <= NATIVE_DEPTH ? WORD_FRACBITS : (int)value;
-        fmt.shift = frac_bits + 1 - NATIVE_DEPTH;
+        codec_depth = value;
+        narrow = value <= NATIVE_DEPTH;
+        fmt.shift = narrow ? 0 : (int)value + 1 - NATIVE_DEPTH;
         break;
-    }
 
     case DSP_SET_STEREO_MODE:
         fmt.stereo_mode = (int)value;
@@ -315,18 +322,64 @@ static void cb_strip_filesize(off_t value)
     dci.filesize = value;
 }
 
-static void cb_pcmbuf_insert(const void *ch1, const void *ch2, int count)
+/* Where the next frame sits in the track */
+static unsigned long stamp(void)
 {
     unsigned long track_ms = elapsed_ms;
-
-    if (count <= 0 || done)
-        return;
 
     if (fmt.frequency > 0)
         track_ms += (frames_since_stamp * 1000) / fmt.frequency;
 
-    sink(ch1, ch2, count, &fmt, track_ms);
-    frames_since_stamp += count;
+    return track_ms;
+}
+
+static void cb_pcmbuf_insert(const void *ch1, const void *ch2, int count)
+{
+    const int16_t *a = ch1, *b = ch2;
+    struct track_pcm wide = fmt;
+
+    if (count <= 0 || done)
+        return;
+
+    /* Playback's insert blocks when the PCM buffer is full; this one never
+     * does, and a codec that also reads no file in the window (Opus) would
+     * hold the core until the hang catcher stops it at 10 seconds */
+    yield();
+
+    if (!narrow)
+    {
+        sink(ch1, ch2, count, &fmt, stamp());
+        frames_since_stamp += count;
+        return;
+    }
+
+    if (wide.stereo_mode == STEREO_INTERLEAVED)
+        wide.stereo_mode = STEREO_NONINTERLEAVED;
+
+    while (count > 0)
+    {
+        int n = MIN(count, WIDEN_FRAMES);
+
+        for (int i = 0; i < n; i++)
+        {
+            if (fmt.stereo_mode == STEREO_INTERLEAVED)
+            {
+                widened[0][i] = *a++;
+                widened[1][i] = *a++;
+            }
+            else
+            {
+                widened[0][i] = *a++;
+                if (fmt.stereo_mode == STEREO_NONINTERLEAVED)
+                    widened[1][i] = b ? *b++ : widened[0][i];
+            }
+        }
+
+        sink(widened[0], wide.stereo_mode == STEREO_MONO ? NULL : widened[1],
+             n, &wide, stamp());
+        frames_since_stamp += n;
+        count -= n;
+    }
 }
 
 
@@ -342,8 +395,29 @@ static void cb_pcmbuf_insert(const void *ch1, const void *ch2, int count)
 static long decode_stack[(DEFAULT_STACK_SIZE + 0x2000) / sizeof(long)];
 static int decode_status;
 
+#ifdef HAVE_CODEC_COP
+static bool want_cop;       /* track_decode_on_cop() */
+static bool ran_on_cop;     /* the last run went there */
+static const char *cop_why; /* or why it did not */
+#endif
+
 static void decode_thread(void)
 {
+#ifdef HAVE_CODEC_COP
+    ran_on_cop = false;
+    cop_why = want_cop ? "playback keeps it on the CPU" : "not asked";
+    if (want_cop && codec_cop_wanted(id3.codectype))
+    {
+        struct codec_cop_result res;
+
+        decode_status = codec_cop_run(&dci, fmt.stereo_mode, codec_depth,
+                                      NULL, &res);
+        ran_on_cop = decode_status != CODEC_COP_NOT_RUN;
+        cop_why = res.why;
+        if (ran_on_cop)
+            return;
+    }
+#endif
     decode_status = codec_run_proc();
 }
 
@@ -368,6 +442,33 @@ static bool run_codec(int *status)
     return true;
 }
 #endif
+
+void track_decode_on_cop(bool on)
+{
+#ifdef HAVE_CODEC_COP
+    want_cop = on;
+#else
+    (void)on;
+#endif
+}
+
+bool track_decode_ran_on_cop(void)
+{
+#ifdef HAVE_CODEC_COP
+    return ran_on_cop;
+#else
+    return false;
+#endif
+}
+
+const char *track_decode_cop_why(void)
+{
+#ifdef HAVE_CODEC_COP
+    return cop_why ? cop_why : "";
+#else
+    return "no COP";
+#endif
+}
 
 int track_decode_run(const char *path,
                      unsigned long start_ms, unsigned long length_ms,
@@ -441,7 +542,10 @@ int track_decode_run(const char *path,
 
     fmt.frequency   = id3.frequency;
     fmt.stereo_mode = STEREO_NONINTERLEAVED;
-    fmt.shift       = WORD_FRACBITS + 1 - NATIVE_DEPTH;
+    /* As the DSP's reset leaves it, until the codec says otherwise */
+    fmt.shift       = 0;
+    narrow          = true;
+    codec_depth     = NATIVE_DEPTH;
 
     /* Everything the codec needs from the kernel and from string.h is
      * already wired into playback's own api struct, so start from a copy of

@@ -106,8 +106,8 @@ static bool vorbis_set_codec_parameters(OggVorbis_File *vf)
 enum codec_status codec_main(enum codec_entry_call_reason reason)
 {
     if (reason == CODEC_LOAD) {
-        if (codec_init())
-            return CODEC_ERROR;
+        /* Its heap is set up in codec_run() (ogg_malloc_init()), from the
+           buffer of the core that runs it */
         ci->configure(DSP_SET_SAMPLE_DEPTH, 24);
     }
 
@@ -136,7 +136,10 @@ enum codec_status codec_run(void)
 
 #if (CONFIG_PLATFORM & PLATFORM_NATIVE)
     if (setjmp(rb_jump_buf) != 0) {
-        /* malloc failed; finish with this track */
+        /* malloc failed; finish with this track, as failed: on the COP, whose
+           part of the buffer leaves a smaller heap, it is then played on the
+           CPU */
+        error = CODEC_ERROR;
         goto done;
     }
 #endif
@@ -252,14 +255,14 @@ done:
         DEBUGF("Vorbis: Memory max: %zu\n", get_max_size(buf));
     }
 #endif
-    ogg_malloc_destroy();
-
-    /* Clean things up for the next track */
+    /* Clean things up for the next track, then the pool ov_clear() frees
+       into */
     vf.dataoffsets = NULL;
     vf.offsets = NULL;
     vf.serialnos = NULL;
     vf.pcmlengths = NULL;
     ov_clear(&vf);
+    ogg_malloc_destroy();
 
     return error;
 }

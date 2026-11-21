@@ -41,7 +41,8 @@ enum debug_log_id {
 
 /* Append one tick-stamped line. Newline is added; do not pass one. When the
  * log is off a call costs a test and a return, so call sites can sit in hot
- * loops. */
+ * loops. A line that repeats the one before, or a pair that keeps coming
+ * round, is written once and its repeats counted in a note. */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
     ATTRIBUTE_PRINTF(2, 3);
 

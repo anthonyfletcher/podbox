@@ -37,7 +37,11 @@
 #include "playback.h"
 #include "buffering.h"
 #include "dsp_core.h"
+#include "dsp_sample_io.h"
+#include "eq_cop.h"
 #include "metadata.h"
+#include "audio/codec_cop.h"
+#include "system/debug_log.h"
 #include "settings/settings.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
@@ -108,6 +112,10 @@ static void codec_queue_ack(intptr_t ackme)
 
 static intptr_t codec_queue_send(long id, intptr_t data)
 {
+#ifdef HAVE_CODEC_COP
+    /* A run on the COP is hosted here, by this thread waiting for it */
+    codec_cop_kick();
+#endif
     return queue_send(&codec_queue, id, data);
 }
 
@@ -338,8 +346,17 @@ static void codec_seek_complete_callback(void)
     while (codec_check_queue__have_msg() == 0);
 }
 
+/* The codec's samples as it last said: a run on the COP passes them on as
+   they are */
+static int codec_stereo_mode = STEREO_NONINTERLEAVED;
+static int codec_depth = NATIVE_DEPTH;
+
 static void codec_configure_callback(int setting, intptr_t value)
 {
+    if (setting == DSP_SET_STEREO_MODE)
+        codec_stereo_mode = value;
+    else if (setting == DSP_SET_SAMPLE_DEPTH)
+        codec_depth = value;
     dsp_configure(ci.dsp, setting, value);
 }
 
@@ -440,6 +457,8 @@ static void load_codec(const struct codec_load_info *ev_data)
     {
         /* Do this now because codec may set some things up at load time */
         dsp_configure(ci.dsp, DSP_RESET, 0);
+        codec_stereo_mode = STEREO_NONINTERLEAVED;
+        codec_depth = NATIVE_DEPTH;
     }
 
 #if defined(HAVE_CODEC_BUFFERING)
@@ -470,6 +489,114 @@ static void load_codec(const struct codec_load_info *ev_data)
     /* Failed - get rid of it */
     unload_codec();
 }
+
+#ifdef HAVE_CODEC_COP
+static bool codec_msg_waiting(void)
+{
+    return !queue_empty(&codec_queue);
+}
+
+/* A stop is the next message: a run that failed needs no retry then */
+static bool codec_stop_waiting(void)
+{
+    struct queue_event ev;
+    return queue_peek(&codec_queue, &ev) && ev.id == Q_CODEC_STOP;
+}
+
+/* The codec's run on the COP, if it takes it: CODEC_COP_NOT_RUN if it is to
+   run here, on the CPU */
+static int run_codec_on_cop(void)
+{
+    struct codec_cop_result res;
+    const off_t start = ci.curpos;
+    const unsigned long elapsed = ci.id3->elapsed;
+    const size_t offset = ci.id3->offset;
+    const char *label = audio_formats[codec_type].label;
+    int status;
+
+    if (!codec_cop_wanted(codec_type))
+        return CODEC_COP_NOT_RUN;
+
+    debug_log(DEBUG_LOG_PLAYBACK, "cop: %s from %ld, %s", label, (long)start,
+              ci.id3->path);
+    status = codec_cop_run(&ci, codec_stereo_mode, codec_depth,
+                           codec_msg_waiting, &res);
+
+    /* An error once it has read the whole file is how some codecs end
+       (Speex, Musepack); so is one in the stream's last second, before a tag
+       or junk the codec does not read, after sound. Either is the track's
+       end here, as on the CPU. */
+    const bool at_end = res.at_end ||
+        (res.made_pcm && ci.id3->length &&
+         ci.id3->elapsed + 1000 >= ci.id3->length);
+
+    /* After sound began, the CPU takes a run over where it stopped only for
+       FLAC (by offset) and ALAC (by elapsed), FLAC's largest frames being
+       the known failure on the COP alone. Any other codec's error after
+       sound is its own and ends the track there, as it would on the CPU. */
+    const bool resumes = codec_type == AFMT_FLAC ||
+                         codec_type == AFMT_MP4_ALAC;
+
+    if (status == CODEC_COP_NOT_RUN)
+    {
+        debug_log(DEBUG_LOG_PLAYBACK, "codec: %s on the CPU: %s", label,
+                  res.why);
+        return status;
+    }
+
+    debug_log(DEBUG_LOG_PLAYBACK, "cop: %s ended %d%s%s%s, stack %lu", label,
+              status, res.made_pcm ? ", sound" : "",
+              res.commanded ? ", commanded" : "",
+              res.at_end ? ", at the end" : "",
+              (unsigned long)res.stack_used);
+
+    /* Stopped by the watchdog: the CPU plays it from where the COP had got
+       to, by the elapsed time and offset a codec resumes from, or from the
+       start if it gave no sound */
+    if (res.stalled && !codec_stop_waiting())
+    {
+        if (!res.made_pcm)
+        {
+            ci.id3->elapsed = elapsed;
+            ci.id3->offset = offset;
+        }
+        debug_log_sync(DEBUG_LOG_PLAYBACK, "codec: %s stalled on the COP; "
+                       "the CPU takes it at %lu ms", label,
+                       ci.id3->elapsed);
+        codec_seek_buffer_callback(start);
+        return CODEC_COP_NOT_RUN;
+    }
+
+    if (status == CODEC_ERROR && !at_end &&
+        (res.made_pcm || res.commanded ? resumes : true) &&
+        (!codec_msg_waiting() ||
+         /* a seek waiting that restarted it (seek_codec()), taken by the run
+            here at its first get_command */
+         (!res.made_pcm && !res.commanded && !codec_stop_waiting())))
+    {
+        /* Failed there, as when its heap was short with the COP's part of
+           the buffer taken: again on the CPU, from the start if nothing came
+           of it yet, else from where it had got to */
+        if (!res.made_pcm && !res.commanded)
+        {
+            ci.id3->elapsed = elapsed;
+            ci.id3->offset = offset;
+        }
+        debug_log(DEBUG_LOG_PLAYBACK, "codec: %s failed on the COP %s; "
+                  "the CPU takes it", label,
+                  res.made_pcm ? "after sound" : "before sound");
+        codec_seek_buffer_callback(start);
+        return CODEC_COP_NOT_RUN;
+    }
+
+    if (status == CODEC_ERROR && !at_end && (res.made_pcm || res.commanded)
+        && !codec_msg_waiting())
+        debug_log(DEBUG_LOG_PLAYBACK, "codec: %s ended on an error on the "
+                  "COP after sound", label);
+
+    return status;
+}
+#endif /* HAVE_CODEC_COP */
 
 /* Handle Q_CODEC_RUN */
 static void run_codec(void)
@@ -502,7 +629,13 @@ static void run_codec(void)
         buf_pin_handle(ci.audio_hid, true);
     }
 
+#ifdef HAVE_CODEC_COP
+    status = encoder ? CODEC_COP_NOT_RUN : run_codec_on_cop();
+    if (status == CODEC_COP_NOT_RUN)
+        status = codec_run_proc();
+#else
     status = codec_run_proc();
+#endif
 
     if (!encoder)
     {
@@ -633,6 +766,9 @@ void INIT_ATTR codec_thread_init(void)
             IF_COP(, CPU));
     queue_enable_queue_send(&codec_queue, &codec_queue_sender_list,
                             codec_thread_id);
+
+    /* The EQ runs in this thread's DSP; its bands go to the COP */
+    eq_cop_init();
 }
 
 /* Obtain codec thread's current priority */
