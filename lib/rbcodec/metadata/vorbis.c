@@ -356,6 +356,17 @@ size_t base64_encoded_size(size_t inlen)
     return ret;
 }
 
+#ifdef HAVE_ALBUMART
+/* Embedded art is decoded from JPEG and PNG only, so either outranks a
+   front cover in another format */
+static int picture_rank(unsigned long type, uint32_t kind)
+{
+    type &= AA_CLEAR_FLAGS_MASK;
+    return (type == AA_TYPE_JPG || type == AA_TYPE_PNG ? 2 : 0) +
+           (kind == AA_PICTURE_FRONT ? 1 : 0);
+}
+#endif
+
 /* Read the items in a Vorbis comment packet. For Ogg files, the file must
  * be located on a page start, for other files, the beginning of the comment
  * data (i.e., the vendor string length). Returns total size of the
@@ -424,10 +435,12 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
 
         logf("Vorbis comment %d: %s=%s", i, name, value);
 #ifdef HAVE_ALBUMART
-        /* the first good PICTURE, or a later front cover in its place */
-        if ((!id3->has_embedded_albumart ||
-             id3->albumart_picture_type != AA_PICTURE_FRONT)
-            && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
+        /* the best PICTURE, ranked as a FLAC PICTURE block is: a JPEG or PNG
+           over any other format, then a front cover, the first of a rank
+           winning */
+        int had_rank = id3->has_embedded_albumart ?
+            picture_rank(id3->albumart.type, id3->albumart_picture_type) : -1;
+        if (had_rank < 3 && !strcasecmp(name, "METADATA_BLOCK_PICTURE"))
         {
             int after_block_pos = lseek(fd, 0, SEEK_CUR);
 
@@ -441,8 +454,7 @@ long read_vorbis_tags(int fd, struct mp3entry *id3,
                 /* the picture must start inside the comment */
                 && base64_encoded_size(picframe_pos + 4) <
                    (size_t)(after_block_pos - before_block_pos)
-                && (!id3->has_embedded_albumart ||
-                    get_long_be(buf) == AA_PICTURE_FRONT))
+                && picture_rank(aa_type, get_long_be(buf)) > had_rank)
             {
                 //NOTE: This is not exact location due to padding in base64 (up to 3 chars)!!
                 // But it's OK with our jpeg decoder if we add or miss few bytes in jpeg header
