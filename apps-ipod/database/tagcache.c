@@ -6625,6 +6625,17 @@ static bool search_root_exists(const char *path)
  * so the player stops with nothing written anywhere that says why. */
 #define TAGCACHE_MAX_DEPTH 16
 
+/* Entries the scan walks past: anything hidden by a leading dot (macOS's ._
+ * files and .Trashes, Linux's .Trash-*), a macOS archive's __MACOSX, and the
+ * Windows recycle bins at the top of a search root. */
+static bool scan_skips_name(const char *name, int depth)
+{
+    if (name[0] == '.' || !strcasecmp(name, "__MACOSX"))
+        return true;
+    return depth == 0 && (!strcasecmp(name, "$RECYCLE.BIN")
+                          || !strcasecmp(name, "RECYCLED"));
+}
+
 static bool check_dir(const char *dirname, int add_files, int depth)
 {
     int success = false;
@@ -6673,7 +6684,8 @@ static bool check_dir(const char *dirname, int add_files, int depth)
             break;
         }
 
-        if (is_dotdir_name(entry->d_name))
+        if (is_dotdir_name(entry->d_name)
+            || scan_skips_name(entry->d_name, depth))
             continue;
 
         struct dirinfo info = dir_get_info(dir, entry);
