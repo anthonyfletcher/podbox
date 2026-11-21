@@ -138,26 +138,28 @@
 %?La<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)|>
 #
 #- Art row chevron, on the selected row only, or the dot of a book of
-#  one file
+#  one file; a selecting list's ring in their place
 %Vl(Rows,296,0,24,44,6)%Vy
-%?La<%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(vivid<50:186dbd)>%?if(%Lr,!=,100)<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))| >|%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)Þ|>>|>
+%?La<%?Lm<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%?if(%Lm,=,u)<%Vf(!6f6f6f)|%Vf(vivid<50:186dbd)>>%ac%?if(%Lm,=,m)<×|Ö>|%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(vivid<50:186dbd)>%?if(%Lr,!=,100)<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))| >|%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)Þ|>>>|>
 #
 #- An album's track: its number, then its title. A row with no number
 #  shows what it does there instead, shuffle or play, in the icon font,
-#  which carries the digits so the one column draws both
+#  which carries the digits so the one column draws both. A selecting
+#  list's ring takes the place of either
 %Vl(Tracks,0,0,32,24,6)%Vy
-%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!6f6f6f)>%ac%?Lp<%Lp|%sel(%LT,%Sx([Random]),H,%Sx([Resume]),A,%Sx(Resume),A,%Sx([Play Unplayed]),A, )>
+%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!6f6f6f)%?if(%Lm,=,m)<%Vf(vivid<50:186dbd)>>%ac%?Lm<%?if(%Lm,=,m)<×|Ö>|%?Lp<%Lp|%sel(%LT,%Sx([Random]),H,%Sx([Resume]),A,%Sx(Resume),A,%Sx([Play Unplayed]),A, )>>
 %Vl(Tracks,32,0,288,24,3)%Vy
 %?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)
 #
 #- Any other list's row across the screen, as the iPod's: the text, then
 #  in the last column the dot for what is left to hear, or the chevron
-#  on the selected row where it opens a list. Both drawn on every row,
+#  on the selected row where it opens a list, or a selecting list's
+#  ring. Both drawn on every row,
 #  so neither clears the other
 %Vl(Rows,0,0,296,24,3)%Vy
 %?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<|%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)>>
 %Vl(Rows,296,0,24,24,6)%Vy
-%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<|%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(vivid<50:186dbd)>%ac%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))|%?and(%Lc,%or(%if(%Lk,=,1),%if(%Lk,=,6),%if(%Lk,=,10),%if(%Lk,=,11)))<Þ| >>>>
+%?La<|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<|%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%?if(%Lm,=,u)<%Vf(!6f6f6f)|%Vf(vivid<50:186dbd)>>%ac%?Lm<%?if(%Lm,=,m)<×|Ö>|%?and(%Lr,%if(%Lk,!=,3),%if(%Lr,!=,100))<%sel(%Lr,0,h,%sel(%ma(%ma(%Lr,*,7),/,100),0,g,1,f,2,e,3,d,4,c,5,b,6,a))|%?and(%Lc,%or(%if(%Lk,=,1),%if(%Lk,=,6),%if(%Lk,=,10),%if(%Lk,=,11)))<Þ| >>>>>
 #
 #An album's header over its tracks, a book's over its chapters and a
 #show's over its episodes: the cover, then the name, the artist or
