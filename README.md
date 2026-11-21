@@ -1017,6 +1017,7 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
     an MP3 lead-in fix and lighter AAC decoding
   - Decoding on the iPod Video's second processor: the design, and the code PodBox's is
     ported from
+  - Screen Transitions: the idea, when a slide starts and how it eases
 
 ### Album Artwork
 

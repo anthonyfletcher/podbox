@@ -2,7 +2,8 @@
  * GNU General Public License (version 2+)
  *
  * Screen Transitions: the next screen slides in over the one it replaces,
- * whatever theme drew them.
+ * whatever theme drew them. The idea, the trigger and the easing are
+ * RockWheel's (github.com/ssarkisy/RockWheel, apps/gui/transition.c).
  ****************************************************************************/
 
 /* It works on finished pixels, so no theme has to know about it. Before a

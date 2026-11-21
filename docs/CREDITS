@@ -37,14 +37,10 @@ doronz88 (pymobiledevice3)
 
 For the themes and fonts:
 Evan Kenny
-Serge Fahnenstell
-Chuck Lardo
 Humberto Santana
-James Stevenson
 Douglas Vautour
 The Noto and Micro Noto Sans authors
 The League Spartan authors
-The ProFont authors
 Google (Material Design Icons)
 
 For speech:
@@ -58,6 +54,10 @@ The Piper authors (the voice files)
 
 For the iPod Video's display:
 prokopto-dev (ProkBox5g)
+
+For decoding on the iPod Video's second processor, screen transitions,
+faster seeks, volume fades and lighter AAC decoding:
+Sergei Sarkisian (RockWheel)
 
 For Rockbox:
 Björn Stenberg
