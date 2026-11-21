@@ -378,8 +378,18 @@ static int parsealbumart( struct mp3entry* entry, char* tag, int bufferpos )
 
     if (entry->albumart.type != AA_TYPE_UNKNOWN)
     {
-        /* fixup offset&size for image data */
-        entry->albumart.pos  += tag - start;
+        /* fixup offset&size for image data; in the file, an unsynchronised
+         * frame has a 0x00 after each 0xFF here that is followed by 0x00 or
+         * by 0xE0 and above */
+        int skip = tag - start;
+        if (unsync)
+        {
+            for (char *p = start; p < tag; p++)
+                if ((unsigned char)p[0] == 0xFF
+                    && ((unsigned char)p[1] >= 0xE0 || p[1] == 0))
+                    skip++;
+        }
+        entry->albumart.pos  += skip;
         entry->albumart.size -= tag - start;
         if (unsync)
         {
@@ -1176,9 +1186,11 @@ retry_with_limit:
 
                 /* found a tag matching one in tagList */
                 tag = buffer + bufferpos;
+#ifdef HAVE_ALBUMART
                 /* Where the frame's bytes start: read_unsynched() consumes
                  * more of the file than it returns, by the zeros it drops */
                 off_t frame_pos = lseek(fd, 0, SEEK_CUR);
+#endif
 
                 if(global_unsynch && version <= ID3_VER_2_3)
                     bytesread = read_unsynched(fd, tag, framelen);

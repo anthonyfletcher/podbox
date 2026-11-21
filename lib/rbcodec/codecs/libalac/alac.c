@@ -469,10 +469,20 @@ static void read_shifted_bytes(alac_file *alac, int channels, int count,
 
 #if defined(CPU_ARM_CLASSIC) && !defined(ALAC_NO_FIR_ASM)
 #define ALAC_FIR_ASM
-/* fir_adapt_n() for orders 1 to 8, but with 32-bit coefficients: see
- * fir_asm_fits() */
-void alac_fir_adapt_arm(int32_t *buffer_out, int count, int16_t *coefs,
-                        int order, int quant, int readsamplesize);
+/* fir_adapt_n() for orders 4 to 8, but with 32-bit coefficients: see
+ * fir_asm_fits(). x is the window of the first output, end the window
+ * after the last; packed holds quant in bits 0-7, 32 - readsamplesize in
+ * bits 8-15 and the rounding 1 << (quant - 1) in bits 16-31. */
+typedef void fir_adapt_arm_fn(int32_t *x, int32_t *end, int16_t *coefs,
+                              uint32_t packed);
+fir_adapt_arm_fn alac_fir_adapt_4_arm, alac_fir_adapt_5_arm,
+                 alac_fir_adapt_6_arm, alac_fir_adapt_7_arm,
+                 alac_fir_adapt_8_arm;
+
+static fir_adapt_arm_fn * const fir_adapt_arm[5] = {
+    alac_fir_adapt_4_arm, alac_fir_adapt_5_arm, alac_fir_adapt_6_arm,
+    alac_fir_adapt_7_arm, alac_fir_adapt_8_arm,
+};
 
 /* Each coefficient moves at most one step a sample, so none of them can
  * wrap at 16 bits in count samples if each is that far from the limit */
@@ -481,7 +491,7 @@ static bool fir_asm_fits(const int16_t *coefs, int n, int count,
 {
     int j;
 
-    if (quant < 1 || readsamplesize < 1 || readsamplesize > 32)
+    if (quant < 1 || quant > 15 || readsamplesize < 1 || readsamplesize > 32)
         return false;
     for (j = 0; j < n; j++)
         if (coefs[j] > 32767 - count || coefs[j] < -32768 + count)
@@ -490,7 +500,6 @@ static bool fir_asm_fits(const int16_t *coefs, int n, int count,
 }
 #endif
 
-#ifndef ALAC_FIR_ASM
 /* The adaptive filter at a constant order, so that the coefficients and the
  * sample differences are locals: from the 4th sample of a frame, buffer_out
  * is the window and error the residual of the sample it produces. */
@@ -574,7 +583,6 @@ void fir_adapt_n(const int32_t *error, int32_t *buffer_out, int count,
     for (j = 0; j < n; j++)
         coef_table[j] = c[j];
 }
-#endif
 
 static void predictor_decompress_fir_adapt(int32_t *error_buffer,
                                            int32_t *buffer_out,
@@ -644,17 +652,22 @@ static void predictor_decompress_fir_adapt(int32_t *error_buffer,
 
 #ifdef ALAC_FIR_ASM
         /* the residuals are read from the output buffer they become */
-        if (error == buffer_out + predictor_coef_num + 1 &&
+        if (predictor_coef_num >= 4 &&
+            error == buffer_out + predictor_coef_num + 1 &&
             fir_asm_fits(predictor_coef_table, predictor_coef_num, count,
                          predictor_quantitization, readsamplesize))
         {
-            alac_fir_adapt_arm(buffer_out, count, predictor_coef_table,
-                               predictor_coef_num, predictor_quantitization,
-                               readsamplesize);
+            int q = predictor_quantitization;
+            uint32_t packed = q | ((32 - readsamplesize) << 8) |
+                              ((1u << (q - 1)) << 16);
+
+            fir_adapt_arm[predictor_coef_num - 4](buffer_out,
+                                                  buffer_out + count,
+                                                  predictor_coef_table,
+                                                  packed);
             return;
         }
-        /* and the rare frame it cannot take goes to the general case */
-#else
+#endif
         switch (predictor_coef_num)
         {
 #define FIR_CASE(n)         case n:             fir_adapt_n(error, buffer_out, count, readsamplesize,                         predictor_coef_table, n, predictor_quantitization);             return;
@@ -662,7 +675,6 @@ static void predictor_decompress_fir_adapt(int32_t *error_buffer,
         FIR_CASE(5) FIR_CASE(6) FIR_CASE(7) FIR_CASE(8)
 #undef FIR_CASE
         }
-#endif
     }
 
     /* general case */

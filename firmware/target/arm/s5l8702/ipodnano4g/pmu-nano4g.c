@@ -99,13 +99,36 @@ void pmu_set_wake_condition(unsigned char condition)
     pmu_write(D1759_REG_WAKE, pmu_read(D1759_REG_WAKE) | condition);
 }
 
+static struct mutex pmu_sysctrl_mutex;
+static bool standby_requested;
+
+void pmu_set_backlight(unsigned char output, bool on)
+{
+    mutex_lock(&pmu_sysctrl_mutex);
+    if (!standby_requested)
+    {
+        /* Clear SYSCTRL bits 4..6 around the LED writes, then restore. */
+        unsigned char sysctrl = pmu_read(D1759_REG_SYSCTRL);
+        pmu_write(D1759_REG_SYSCTRL, sysctrl & 0x8f);
+        pmu_write(D1759_REG_LEDOUT, output);
+        pmu_write(D1759_REG_LEDCTL, on ? D1759_LEDCTL_ENABLE : 0);
+        pmu_write(D1759_REG_SYSCTRL, sysctrl);
+    }
+    mutex_unlock(&pmu_sysctrl_mutex);
+}
+
 void pmu_enter_standby(void)
 {
+    /* A backlight update must not restore an old SYSCTRL value over the
+     * standby request, or turn the LEDs back on during power-down. */
+    mutex_lock(&pmu_sysctrl_mutex);
+    standby_requested = true;
     /* Apple's firmware powers off with two exact writes: backlight off,
      * then 0x0a = 1 on its own. OR-ing the request into the other bits of
      * 0x0a leaves the unit on until the hold switch is toggled. */
     pmu_write(D1759_REG_LEDCTL, 0x02);
     pmu_write(D1759_REG_SYSCTRL, D1759_SYSCTRL_STBY);
+    mutex_unlock(&pmu_sysctrl_mutex);
 }
 
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
@@ -137,6 +160,10 @@ void pmu_set_usblimit(bool fast_charge)
 
     val |= fast_charge ? D1759_ILIM_500MA : D1759_ILIM_100MA;
     pmu_write(D1759_REG_ILIM, val);
+    /* Apple's running firmware follows the input-limit write with 0x04
+     * while enabled, or 0x00 while disabled. Do not retain preinit's
+     * 0x54 setting when USB takes over the power budget. */
+    pmu_write(D1759_REG_CHCTL, (val & ~D1759_ILIM_MASK) ? 0x04 : 0x00);
 }
 
 /*
@@ -181,7 +208,6 @@ unsigned short pmu_read_adc(const struct pmu_adc_channel *ch)
 
 static long pmu_thread_stack[DEFAULT_STACK_SIZE/2/sizeof(long)];
 static struct event_queue pmu_queue;
-static unsigned char ints_msk[3];
 
 static void pmu_eint_isr(struct eic_handler*);
 
@@ -314,6 +340,7 @@ static void NORETURN_ATTR pmu_thread(void)
 /* main init */
 void pmu_init(void)
 {
+    mutex_init(&pmu_sysctrl_mutex);
     mutex_init(&pmu_adc_mutex);
     queue_init(&pmu_queue, false);
 
@@ -321,21 +348,31 @@ void pmu_init(void)
             pmu_thread_stack, sizeof(pmu_thread_stack), 0,
             "PMU" IF_PRIO(, PRIORITY_SYSTEM) IF_COP(, CPU));
 
-    /* configure PMU interrutps */
-    ints_msk[0] = 0xff;
-    ints_msk[1] = 0xff;
-    ints_msk[2] = 0xff;
+    /* Copy the running-state setup performed at OF PMU thread startup:
+     * osos routines at 0x0828d306 (0x0c/0x0e) and 0x0828d2b8 (0x22).
+     * The functions of these three registers and their bits are unknown;
+     * these are observed whole-register values. */
+    pmu_write(D1759_REG_UNK0C, 0x05); /* bits 0 and 2 */
+    pmu_write(D1759_REG_UNK0E, 0xd0); /* bits 4, 6 and 7 */
+    pmu_write(D1759_REG_UNK22, 0x05); /* bits 0 and 2 */
 
-    ints_msk[0] &= ~D1759_IRQMASKA_VBUS;      /* USB */
-#ifdef IPOD_ACCESSORY_PROTOCOL
-    ints_msk[0] &= ~D1759_IRQMASKA_INPUT1;    /* Accessory */
-#endif
-    ints_msk[1] &= ~D1759_IRQMASKB_INPUT2;    /* Holdswitch */
-#if CONFIG_CHARGING
-    ints_msk[2] &= ~D1759_IRQMASKC_VADAPTOR;  /* FireWire */
-#endif
-
-    pmu_write_multiple(D1759_REG_IRQMASKA, 3, ints_msk);
+    /* OF interrupt masks from 0x0828d2b8 (1 = masked): 10 fe 2b.
+     * A: unmask USB, accessory and unidentified events 0, 1, 2, 6, 7.
+     * B: unmask Hold only; WARMBOOT stays masked.
+     * C: unmask unidentified events 2, 4, 6, 7; FireWire stays masked.
+     * With the old USB/accessory/Hold/FireWire-only setup, only Hold woke
+     * the unit after power_off(). This complete OF setup also allowed
+     * button wake; the individual bit responsible has not been isolated. */
+    static unsigned char ints_msk[] = {
+        0xff & ~(D1759_IRQMASKA_VBUS | D1759_IRQMASKA_INPUT1 |
+                 D1759_IRQMASKA_UNK0 | D1759_IRQMASKA_UNK1 |
+                 D1759_IRQMASKA_UNK2 | D1759_IRQMASKA_UNK6 |
+                 D1759_IRQMASKA_UNK7),
+        0xff & ~D1759_IRQMASKB_INPUT2,
+        0xff & ~(D1759_IRQMASKC_UNK2 | D1759_IRQMASKC_UNK4 |
+                 D1759_IRQMASKC_UNK6 | D1759_IRQMASKC_UNK7),
+    };
+    pmu_write_multiple(D1759_REG_IRQMASKA, sizeof(ints_msk), ints_msk);
 
     /* clear all interrupts */
     pmu_write_multiple(D1759_REG_EVENTA, 3, "\xFF\xFF\xFF");
@@ -475,10 +512,6 @@ void pmu_preinit(void)
     /* configure and clear interrupts */
     pmu_wr_multiple(D1759_REG_IRQMASKA, 3, "\x50\xFE\x2B");
     pmu_wr_multiple(D1759_REG_EVENTA, 3, "\xFF\xFF\xFF");
-
-    pmu_wr(D1759_REG_LEDOUT, 0x64); /* set backlight brightness to 40% */
-    pmu_wr(D1759_REG_LEDCTL,
-            pmu_rd(D1759_REG_LEDCTL) | D1759_LEDCTL_ENABLE); /* backlight on */
 
     pmu_wr(0xa, 0x70);
     pmu_wr(0x13, 0x02);

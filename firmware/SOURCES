@@ -589,6 +589,8 @@ drivers/audio/ak4376.c
 drivers/audio/uda1341.c
 #elif defined(HAVE_CS42L55)
 drivers/audio/cs42l55.c
+#elif defined(HAVE_CS42L58)
+drivers/audio/cs42l58.c
 #elif defined (HAVE_RK27XX_CODEC)
 drivers/audio/rk27xx_codec.c
 #elif defined(HAVE_AIC3X)
@@ -1673,6 +1675,7 @@ target/arm/s5l8702/ipodnano4g/adc-nano4g.c
 target/arm/s5l8702/ipodnano4g/powermgmt-nano4g.c
 target/arm/s5l8702/ipodnano4g/power-nano4g.c
 target/arm/s5l8702/ipodnano4g/nand-nano4g.c
+target/arm/s5l8702/ipodnano4g/ftl-nano4g.c
 #if (CONFIG_RTC == RTC_NANO4G)
 target/arm/s5l8702/ipodnano4g/rtc-nano4g.c
 #endif

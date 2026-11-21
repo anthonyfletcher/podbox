@@ -261,6 +261,7 @@ void iap_interface_state_change(const enum interface_state new);
 
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;
+extern bool iap_btnstop;
 
 /* How long a seek started by an accessory may last without being ended,
  * in iap_periodic() ticks */
@@ -274,6 +275,7 @@ void iap_set_shuffle(bool shuffle, bool restore);
 void iap_set_repeat(int mode, bool restore);
 void iap_seek_start(bool forward);
 void iap_seek_stop(void);
+int iap_seek_dir(void);
 
 uint32_t iap_get_trackpos(void);
 uint32_t iap_get_trackindex(void);

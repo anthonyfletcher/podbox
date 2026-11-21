@@ -28,11 +28,11 @@
    Reads the AAC bitstream as defined in 14496-3 (MPEG-4 Audio)
 */
 
-#include <stddef.h>
 #include "common.h"
 #include "structs.h"
 
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "decoder.h"
@@ -652,6 +652,12 @@ static uint8_t channel_pair_element(NeAACDecHandle hDecoder, bitfile *ld,
                         DEBUGVAR(1,42,"channel_pair_element(): faad_get1bit"));
                 }
             }
+        }
+        else if (ics1->ms_mask_present == 3)
+        {
+            /* reserved: ms_decode() reads ms_used, which was all zeros
+             * when the element was cleared for each frame */
+            memset(ics1->ms_used, 0, sizeof(ics1->ms_used));
         }
 
 #ifdef ERROR_RESILIENCE
@@ -1699,6 +1705,10 @@ static uint8_t section_data(NeAACDecHandle hDecoder, ic_stream *ics, bitfile *ld
 
             /* past num_swb, sect_sfb_offset holds what an earlier track left */
             if (k + sect_len >= 8*15 || k + sect_len > ics->num_swb)
+                return 15;
+            /* a section past max_sfb would read offsets this frame did
+             * not set */
+            if (k + sect_len > ics->max_sfb)
                 return 15;
             if (i >= 8*15)
                 return 15;

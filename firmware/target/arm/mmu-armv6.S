@@ -38,6 +38,11 @@
     .type       ttb_init, %function
 ttb_init:
     ldr     r0, =TTB_BASE_ADDR      @
+#if (CONFIG_CPU == S5L8720) && !defined(BOOTLOADER)
+    @ TTBCR N=0: TTB0 translates every address, TTB1 is not used
+    mov     r1, #0                  @
+    mcr     p15, 0, r1, c2, c0, 2   @
+#endif
     mvn     r1, #0                  @
     // TODO: only set the first 3 bits to 0
     // mcr     p15, 0, r1, c2, c0, 2   @ Set TTB backwards compatiblity
@@ -184,11 +189,9 @@ enable_mmu:
 .endm
 #endif /* CONFIG_CPU == IMX31L */
 
-#if 0 /* unused */
-
 /*
  * Write DCache back to RAM for the given range and remove cache lines
- * from DCache afterwards
+ * from DCache afterwards. NAND DMA on the Nano 4G uses this.
  * void commit_discard_dcache_range(const void *base, unsigned int size);
  */
     .section   .text.commit_discard_dcache_range, "ax", %progbits
@@ -206,8 +209,6 @@ commit_discard_dcache_range:
     mcrhi   p15, 0, r2, c7, c10, 4  @ Data synchronization barrier
     bx      lr                      @
     .size   commit_discard_dcache_range, .-commit_discard_dcache_range
-
-#endif /* unused function */
 
 /*
  * Write DCache back to RAM for the given range

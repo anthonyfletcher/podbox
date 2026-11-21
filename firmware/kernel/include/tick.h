@@ -26,6 +26,10 @@ extern void init_tick(void) INIT_ATTR;
 
 #define HZ      100 /* number of ticks per second */
 
+/* Convert milliseconds to ticks, rounding up, suitable for calculating delays */
+#define MS_TO_TICKS(x) \
+    (((x) + ((1000 / HZ) - 1)) / (1000 / HZ))
+
 /* A full table panics, and the fork's resident tasks with a USB DAC's stream
  * and a volume fade need nine */
 #define MAX_NUM_TICK_TASKS 16
