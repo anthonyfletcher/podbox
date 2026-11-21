@@ -53,7 +53,7 @@ from one frame to the next, until changed. Set them, draw, and set them
 back.
 
 **What it costs.** Each tick has a budget of work, counted in units --
-about 12,500 a tick on an iPod Video playing FLAC, the slowest case (see
+about 28,500 a tick on an iPod Video playing MP3, the slowest case (see
 **Making it fast**). The costs below are measured on the engine; a call
 in a loop also pays about 4 units a turn for the loop itself.
 
@@ -677,9 +677,9 @@ function draw() {
 
 ![A starry background with a moon, and a yellow ball drawn over it](img/d-target.png)
 
-- Drawn every frame, these 1,200 stars cost about 24,000 units -- more
-  than a whole tick on an iPod Video playing music. Copied from `bg`, the
-  frame costs about 6,000.
+- Drawn every frame, these 1,200 stars cost about 24,000 units -- about
+  five-sixths of a tick on an iPod Video playing MP3. Copied from `bg`,
+  the frame costs about 6,000.
 - Copying is not free: about 0.3 units a pixel, 6,000 for the whole
   screen -- or 1,000 for a picture with nothing clear and no colour
   swapped, copied whole. An image saves time only when what is in it costs more than

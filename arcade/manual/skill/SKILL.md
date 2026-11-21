@@ -125,20 +125,20 @@ To see a game played rather than idle, script the input from a trace:
 
 ## The budget
 
-A cart is done when it keeps its rate on **an iPod Video playing FLAC**,
+A cart is done when it keeps its rate on **an iPod Video playing MP3**,
 the slowest case. `--units` prints each tick's units. One unit there is
-about 1.9 µs, and sending the whole screen about 6.6 ms (only rows whose
+about 0.76 µs, and sending the whole screen about 8.7 ms (only rows whose
 pixels changed are sent; comparing a drawn row that did not change costs
-about a third of sending it), so a tick may take
+under half of sending it), so a tick may take
 
 ```
-units ≤ (1000 / rate − 6.6 × rows changed / 120
-         − 2.0 × rows drawn unchanged / 120) / 0.0019
+units ≤ (1000 / rate − 8.7 × rows changed / 120
+         − 2.7 × rows drawn unchanged / 120) / 0.00076
 ```
 
--- about 12,500 at 33 ticks a second with the whole screen changing,
-about 17,500 at 25. Keep a margin, and step down when `skipped()` says
-the cart is behind. With the music stopped the Video has about 46,000 at
+-- about 28,500 at 33 ticks a second with the whole screen changing,
+about 41,000 at 25. Keep a margin, and step down when `skipped()` says
+the cart is behind. With the music stopped the Video has about 52,500 at
 33; the iPod Classic about 175,000, music or not.
 
 Measured costs to plan with (more in `reference-fast.md`):

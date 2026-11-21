@@ -95,8 +95,8 @@ actors.move(p, 1, 0, hits, 16);      // 1 walls, 16 one-way floors
 ## Script or system
 
 A game of 100 moving things does the same few steps to each every tick.
-Done in script, that loop is a large part of the budget; done in the
-engine, a small one. Measured, for the same work:
+Done in script, that loop costs from twice to thirty times what it does
+in the engine. Measured, for the same work:
 
 | | Script | System |
 |---|---|---|
@@ -105,8 +105,8 @@ engine, a small one. Measured, for the same work:
 | 300 particles, moved and drawn | about 12,900 | `particles.step` and `draw`: about 4,000 |
 | 100 sprites drawn | about 7,400 (`spr` in a loop) | `sprites.draw` or `actors.draw`: about 3,400 |
 
-A tick on an iPod Video playing FLAC has about 12,500 units. The script
-`overlaps` alone would take four ticks. The system calls also do
+A tick on an iPod Video playing MP3 has about 28,500 units. The script
+`overlaps` alone would take more than a tick. The system calls also do
 more than the script versions here: `move` sweeps every actor in steps
 against the map, so a fast one never passes through a thin wall.
 

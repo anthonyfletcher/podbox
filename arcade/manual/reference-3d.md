@@ -39,8 +39,9 @@ engine's `sin` is upside down -- y grows down the screen, and down the map
 
 The floor is the cost: some 80 rows of 160 pixels, each pixel a step
 across the map, a sprite looked up, a colour copied. Done in script with
-one `tline` a row, it is about 42,600 units a frame -- over three ticks' worth
-on an iPod Video playing FLAC, before anything else is drawn. `plane.draw`
+one `tline` a row, it is about 42,600 units a frame -- more than a
+tick's worth on an iPod Video playing MP3, before anything else is
+drawn. `plane.draw`
 does the same floor for about 11,800, and `coarse` brings it to about
 8,900.
 
@@ -53,12 +54,12 @@ does the same floor for about 11,800, and `coarse` brings it to about
 | a maze with floor and ceiling too | about 27,800 (coarse: 23,800) |
 | `light.draw`, two lights | about 11,000 |
 
-A tick on an iPod Video playing FLAC has about 12,500 units at 33 ticks
-a second, 17,500 at 25 and 22,800 at 20; with the music stopped, about
-46,000 at 33. A road with trees, with a sky and fog, is about 25,300: it
-keeps 33 with the music stopped, and needs `coarse` and a lower rate
-under FLAC. A landscape or a full maze is the same. Step down when frames
-go undrawn, and back up when the music stops:
+A tick on an iPod Video playing MP3 has about 28,500 units at 33 ticks
+a second, 41,000 at 25 and 54,000 at 20; with the music stopped, about
+52,500 at 33. A road with trees, with a sky and fog, is about 25,300: it
+keeps 33 under MP3, with little left for the rest of the game. A full
+maze only just fits, and a landscape needs `coarse` or 25. Step down
+when frames go undrawn, and back up when the music stops:
 
 ```js
 var late = 0, coarse = 1;
@@ -434,9 +435,9 @@ function draw() {
 
 - It draws the ground only: clear to the sky first, and draw anything
   flying after.
-- At about 29,000 units it is more than a tick with music playing: use
-  `coarse` and a lower rate there: step down to `coarse` first, then to
-  25, then 20, as frames are skipped.
+- At about 29,000 units it is a little over a tick at 33 with MP3
+  playing: when frames go undrawn, step down to `coarse` first, then to
+  25, then 20.
 
 ## land.height(heights, x, y, [scale])
 

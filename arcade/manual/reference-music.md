@@ -181,8 +181,8 @@ function newRound() {
   iPod can take a while: make them while a round is set up, not every
   frame. `tracks.count`, `tracks.pick` and `tracks.near` look at every
   track in the library and cost 200 units and 4 a track -- about 40,000
-  for a library of 10,000, over three ticks' worth on an iPod Video
-  playing FLAC.
+  for a library of 10,000, more than a tick's worth on an iPod Video
+  playing MP3.
 - `tracks.near` by sound reads the whole Sound Index instead, at the same
   cost. Given a list of tracks, it reads it once for them all: ask about
   every track a game needs in one call, not one call a track.

@@ -156,10 +156,10 @@ function draw() {
 - **What it costs**: each call goes to the disk, so it costs 2,000 units
   before anything is read, and a write 8,000 more; on top of that about 2
   units a number written and 1 a number read, more for text. Writing one
-  number is about 10,000 units, half a tick on an iPod Video playing
-  music; a list of 1,000 numbers is about 12,300 to write and 3,000 to
-  read. Read once when the game starts, and write when something changes,
-  not every tick.
+  number is about 10,000 units, over a third of a tick on an iPod
+  Video playing MP3; a list of 1,000 numbers is about 12,300 to write
+  and 3,000 to read. Read once when the game starts, and write when
+  something changes, not every tick.
 
 ## store.remove(name)
 

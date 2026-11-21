@@ -175,11 +175,11 @@ itself can leave out an effect before the tick runs late, rather than
 learn from `skipped()` after.
 
 ```js
-if (unitsnow() < 9000) particles.draw(smoke);   // smoke only with room
+if (unitsnow() < 18000) particles.draw(smoke);   // smoke only with room
 ```
 
-- The budget differs by iPod and by what it plays: about 12,500 a tick
-  at 33 ticks a second on an iPod Video playing FLAC.
+- The budget differs by iPod and by what it plays: about 28,500 a tick
+  at 33 ticks a second on an iPod Video playing MP3.
 
 ## resumed()
 
@@ -256,7 +256,7 @@ with `t()`, or scale the count.
 
 ## Stepping the rate down
 
-The iPod Video playing heavy music -- high-resolution FLAC, say -- has
+The iPod Video playing heavy music -- MP3, the heaviest -- has
 much less time to give a cart than the same iPod playing nothing. A
 cart that is busy every frame can measure how it is doing and step down:
 

@@ -475,10 +475,10 @@ host/pbgvm mygame.pbg --ticks 100 --units
 ```
 
 `--units` reports the cost of `init()` and of each tick. A unit is about
-0.55 µs on an iPod Video with no music playing, and about 1.9 µs playing
-FLAC; the iPod Classic is three to four times faster. A cart that redraws
-the whole screen at 33 ticks a second has about 12,500 units a tick on an
-iPod Video playing FLAC: see the manual's *Making it fast*.
+0.48 µs on an iPod Video with no music playing, and about 0.76 µs playing
+MP3; the iPod Classic is three to four times faster. A cart that redraws
+the whole screen at 33 ticks a second has about 28,500 units a tick on an
+iPod Video playing MP3: see the manual's *Making it fast*.
 A runtime error names the file, the line and the function.
 
 These options show what a cart drew, after the last tick:

@@ -67,8 +67,8 @@ flags section) and code can use them by name: a flag named `solid` is
 A sprite wholly off the screen costs only the call, about 26 whatever its
 size, so there is no need to test for that before drawing. Most of a plain
 `spr`'s cost is the call itself. A hundred sprites a frame is
-about 6,700 units, half the budget on an iPod Video playing FLAC;
-for many more, use [sprites.draw](#many-sprites-at-once) or the actors
+about 6,700 units, under a quarter of the budget on an iPod Video
+playing MP3; for many more, use [sprites.draw](#many-sprites-at-once) or the actors
 system.
 
 ---

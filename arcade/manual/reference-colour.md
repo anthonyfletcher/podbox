@@ -67,8 +67,8 @@ call:
 **What it costs.** The calls themselves are almost free -- about 3 units
 for `pal` or `setpal`, 26 for `loadpal`. But on the iPod, **any change to
 what the colours look like makes the iPod send the whole screen** that
-frame, not just the rows that changed: up to 6.6 ms on an iPod Video
-playing FLAC. That is `setpal`, the screen form of `pal`, `loadpal`, and
+frame, not just the rows that changed: up to 8.7 ms on an iPod Video
+playing MP3. That is `setpal`, the screen form of `pal`, `loadpal`, and
 `pal()` with nothing in the brackets, which resets the screen palette too.
 A fade or a flash is worth it; resetting with `pal()` every frame out of
 habit is not. Reset the draw palette one colour at a time instead, with

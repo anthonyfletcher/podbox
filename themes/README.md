@@ -12,26 +12,13 @@ firmware instead.
 
 [Click for more information](themify_2/README.md)
 
-## obsede_2
-
-<img src="obsede_2/ss_1.png"/>
-
-[Click for more information](obsede_2/README.md)
-
-## bony
-
-<img src="bony/ss_2.png"/>
-
-[Click for more information](bony/README.md)
-
 ## iclassic_square
 
 <img src="iclassic_square/ss_1.png"/>
 
 [Click for more information](iclassic_square/README.md)
 
-## jive
+## More
 
-<img src="jive/ss_1.png"/>
-
-[Click for more information](jive/README.md)
+Obsede' 2, Bony and Jive are in
+[podbox-themes](https://github.com/anthonyfletcher/podbox-themes).

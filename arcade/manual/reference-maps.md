@@ -451,8 +451,8 @@ shrinks into the distance.
 
 - Empty cells draw nothing, so the sky behind shows through.
 - **It is expensive**: about 3 units a pixel, so 60 rows across the screen
-  cost about 30,000 units -- more than a whole tick on an iPod Video
-  playing music. For a floor, use `plane.draw` (see **3D views**), which
+  cost about 30,000 units -- more than a tick on an iPod Video
+  playing MP3. For a floor, use `plane.draw` (see **3D views**), which
   draws one in a single call, far faster. `tline` is for a few lines: a
   road's stripe, a scanline effect.
 

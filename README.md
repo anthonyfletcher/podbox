@@ -65,6 +65,9 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
 - Message, input, confirmation, search, colour, date and time and folder dialogs share one
   themed design
   - `Settings > Appearance > Dialogs`
+- Slide from screen to screen, as an iPod does: into menus, lists and Now Playing, and back
+  - `Settings > Appearance > Interface Elements > Screen Transitions`. Off by default; a theme
+    can turn it on, as iClassic Square does, and a change you make is kept with the theme
 - Hold `Select` on a track, folder or file and select `Select...`
   - Click `Select` to tick or untick a row; hold `Select` and turn the wheel to tick a run of
     rows, and turn back to untick them
@@ -93,6 +96,12 @@ or promoted onto the main menu.
   - `Settings > Library > Music > Sort > Artists By`
 - Sort artists and albums ignoring a leading "The", "A" or "An"
   - Off by default. `Settings > Library > Music > Sort > Ignore The/A/An`
+- List an album under each artist its Album Artist names, separated by ";": "Madonna; Charli
+  XCX" appears under both, in Music, Artist Portraits, the charts and Search
+  - Off by default. `Settings > Library > Music > Split Album Artists`
+  - An artist with no folder of their own, such as a guest named only on someone else's album,
+    takes their picture from `Artwork/People`: `Artwork/People/Charli XCX.jpg`. See the
+    [Artwork guide](docs/podbox/artwork-guide.md)
 - Play a random album
   - `Music > Random Album`
 - Shuffle albums rather than tracks: every album in a list, in a random order, each whole and in
@@ -304,8 +313,8 @@ Your year in listening, like the summaries streaming services send at the end of
 out on the player from what it has logged. Based on [Spun](https://github.com/majorsiebe/Stats_for_iPod).
 
 - `Playback Report` on the main menu
-  - It reads the log that `Settings > Playback > Logging` writes, on by default. With
-    `On + Last.fm`, the scrobble log is read only while it holds plays the iPod's own log lacks
+  - It reads the log that `Settings > Playback > Logging` writes, on by default, whichever
+    logging choice is set
   - It counts your whole history, from the first entry of the log.
 - The report is a row of cards in sections. The wheel scrolls along a section, and `Left`/`Right`
   move between sections
@@ -502,6 +511,8 @@ for the full list.
   - `System > Background Tasks` to see what it is doing
 - The iPod Video's screen is updated by a second DMA engine while music plays, leaving more of
   the CPU to the decoder
+- The iPod Video's second processor decodes the music and runs the equalizer, leaving the main
+  one for the screen, the menus and games
 - Album and artist lists come straight from the database held in memory, so Album Covers, the
   charts and Random Album open quickly
 
@@ -696,10 +707,10 @@ them in `all-themes.zip`, from the
 [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Themes):
 
 - [themify 2](themes/themify_2/README.md)
-- [obsede 2](themes/obsede_2/README.md)
-- [bony](themes/bony/README.md)
 - [iclassic square](themes/iclassic_square/README.md) - classic, dark and light
-- [jive](themes/jive/README.md)
+
+Obsede' 2, Bony and Jive are in [podbox-themes](https://github.com/anthonyfletcher/podbox-themes),
+which explains how to install them.
 
 Unzip onto the root of the iPod, the same way you installed PodBox, then pick
 it under `Settings > Appearance > Load Theme`. Each zip carries the fonts its theme needs, so
@@ -864,17 +875,8 @@ Built on the work of:
 - Themify 2
   - Created by: Evan Kenny aka [Dook](https://d00k.net/)
   - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
-- Obsede' 2
-  - Created by: Serge Fahnenstell
-  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
-- Bony
-  - Based on BONES created by: Chuck Lardo
-  - License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/deed.en)
 - iClassic Square (and its Dark and Light versions)
   - Created by: Humberto Santana
-  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
-- Jive
-  - Created by: James Stevenson
   - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
 ### Fonts
@@ -907,10 +909,6 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
   - Licensed under the SIL Open Font License, Version 1.1 —
     [full text](themes/themify_2/.rockbox/fonts/LICENSE-LeagueSpartan.txt)
-- ProFont Font
-  - Copyright 2014 Andrew Welch, Carl R. Osterwald, Stephen C. Gilardi
-  - Licensed under the MIT License —
-    [full text](themes/bony/.rockbox/fonts/LICENSE-ProFont.txt)
 - Fusion Pixel Font, the games' text font
   - Copyright 2022 TakWolf (https://github.com/TakWolf/fusion-pixel-font)
   - Drawn with Galmuri (Lee Minseo), Miseki Bitmap (Mark Li), BoutiqueBitmap7x7
@@ -1017,6 +1015,8 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
   (https://github.com/ssarkisy/RockWheel), GPL v2 or later
   - Faster seeks in long files, smooth volume fades, the directory cache's name space,
     an MP3 lead-in fix and lighter AAC decoding
+  - Decoding on the iPod Video's second processor: the design, and the code PodBox's is
+    ported from
 
 ### Album Artwork
 

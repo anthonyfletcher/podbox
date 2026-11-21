@@ -567,7 +567,7 @@ function draw() {
 - The same points draw the ground and stop the bag: `polyfill` and
   `segs.make` take outlines the same way.
 - About 3,000 units a tick for the 20-point bag resting on the ground, and
-  1,750 falling; most of a tick's budget on an iPod Video playing FLAC is
+  1,750 falling; most of a tick's budget on an iPod Video playing MP3 is
   left for the rest of the game.
 
 ## segs.make(xs, ys, n, [mats], [ends])
@@ -784,8 +784,8 @@ function draw() {
 
 - **Cloth is costly.** A 12x10 cloth has 120 points and about 400 links:
   `links.step` about 10,100 units a tick and `links.fill` about 19,300 --
-  together over two ticks' worth on an iPod Video playing FLAC. Use a
-  smaller cloth, fewer `passes`, or `links.draw` (about 10,500) where the
-  shading is not needed.
+  together more than a tick on an iPod Video playing MP3.
+  Use a smaller cloth, fewer `passes`, or `links.draw` (about 10,500)
+  where the shading is not needed.
 - With `tear` set, a hard pull rips it: tug a cloth's hem down hard and
   it tears.

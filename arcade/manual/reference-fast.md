@@ -30,33 +30,33 @@ iPod:
 | iPod | A unit | |
 |---|---|---|
 | iPod Classic | about 0.16 µs | music makes little difference |
-| iPod Video, music stopped | about 0.55 µs | |
-| iPod Video, playing FLAC | about 1.9 µs | the slowest, and the one to aim at |
+| iPod Video, music stopped | about 0.48 µs | |
+| iPod Video, playing MP3 | about 0.76 µs | the slowest, and the one to aim at |
 
 The music takes the processor's time first; a cart has what is left. How
-much that is depends on the music: high-resolution FLAC, the heaviest to
-decode, leaves the Video about a third of its speed. Lighter music, such
-as MP3, leaves more.
+much that is depends on the music: MP3, the heaviest, leaves the Video
+about two-thirds of its speed. The other formats are decoded on the
+Video's second processor and leave more.
 
 ### The budget
 
 A tick has its share of a second: 30.3 ms at 33 ticks a second, 40 ms at
 25. Into that go the cart's units and the time to send the screen to the
-display (below). On an iPod Video playing FLAC, redrawing the whole
+display (below). On an iPod Video playing MP3, redrawing the whole
 screen every tick:
 
 | Rate | Units a tick, at most |
 |---|---|
-| 50 | about 7,000 |
-| 33 | about 12,500 |
-| 25 | about 17,500 |
-| 20 | about 22,800 |
+| 50 | about 15,000 |
+| 33 | about 28,500 |
+| 25 | about 41,000 |
+| 20 | about 54,000 |
 
 In general:
 
 ```
-units a tick ≤ (1000 / rate − 6.6 × rows sent / 120
-                − 2.0 × rows drawn unchanged / 120) / 0.0019
+units a tick ≤ (1000 / rate − 8.7 × rows sent / 120
+                − 2.7 × rows drawn unchanged / 120) / 0.00076
 ```
 
 Aim well under it: busy moments -- an explosion, a crowded screen -- cost
@@ -66,11 +66,11 @@ down when it falls behind -- draw less, or `setrate(25)` -- by watching
 `skipped()`; see
 [stepping the rate down](reference-time.md#stepping-the-rate-down). The
 iPod Classic has room for about 175,000 a tick at 33, music or not: a
-cart that keeps up on the Video playing FLAC has room to spare there.
+cart that keeps up on the Video playing MP3 has room to spare there.
 
 Listening to the music's beat (`beat.listen(true)`) costs about 6,300
-units a tick at 33 while music plays -- half the budget -- so stop
-listening once the tempo is held.
+units a tick at 33 while music plays -- about a fifth of the budget --
+so stop listening once the tempo is held.
 
 One call that runs to 2,000,000 units stops the cart as "The game stopped
 responding": a loop that never ends. `init()` may run to 8,000,000, for
@@ -81,15 +81,15 @@ after ten seconds, however few units it has used.
 ### The screen
 
 After each drawn tick, the iPod sends the rows of the screen that
-changed to the display. On an iPod Video playing FLAC the whole screen
-takes about 6.6 ms -- a fifth of a tick at 33 -- and part of it takes its
-share: 10 rows, about 0.55 ms. Four rows a frame are also sent
-whatever they hold, which costs about 0.2 ms.
+changed to the display. On an iPod Video playing MP3 the whole screen
+takes about 8.7 ms -- over a quarter of a tick at 33 -- and part of it
+takes its share: 10 rows, about 0.73 ms. Four rows a frame are also
+sent whatever they hold, which costs about 0.3 ms.
 
 **What counts as changed**: the iPod compares each row the tick drew
 with the same row last frame, and sends only those whose pixels differ.
 Comparing costs too, though less: a whole screen drawn and found the
-same is about 2 ms on the Video. Rows not drawn at all cost nothing.
+same is about 2.7 ms on the Video. Rows not drawn at all cost nothing.
 
 | A tick that... | Rows compared | Rows sent |
 |---|---|---|
@@ -153,11 +153,11 @@ local first, and the arrays the loop reads are best kept global.
 **Run > Run as** chooses which iPod the IDE runs the cart as. Each
 tick takes as long as it would there -- its units, and the rows it sends
 -- so the cart falls behind in the IDE where it would on the iPod. The
-choices are the iPod Classic, the iPod Video, the iPod Video playing FLAC
+choices are the iPod Classic, the iPod Video, the iPod Video playing MP3
 (the default, and the one that matters), and no limit.
 
 The status bar under the editor shows the frames drawn each second: "33
-frames a second as an iPod Video, playing FLAC" when it keeps up, "29
+frames a second as an iPod Video, playing MP3" when it keeps up, "29
 of 33" when it does not. Click it to choose another iPod.
 
 ## The profiler
@@ -266,7 +266,7 @@ tick 2 2839
 
 That is the tutorial game: its start-up (`init()` and the globals set
 before it) cost 325 units, and each tick about 2,800 -- well inside the
-12,500 a tick has on an iPod Video playing FLAC, at 33.
+28,500 a tick has on an iPod Video playing MP3, at 33.
 
 `--dirty` prints the rows the last tick sent -- all of them after a
 palette change, which sends the whole screen. `--buttons` and `--wheel`
@@ -306,18 +306,18 @@ every turn; the systems -- `particles`, `actors`, `sprites.draw`,
 | 300 sparks falling under gravity, moved and drawn | about 16,500 units | `particles.step` and `particles.draw`: about 4,000 |
 | 100 sprites drawn from arrays of positions | a loop of `spr`: about 7,400 | `sprites.draw`: about 3,400 |
 
-The first is the difference between a cart that cannot keep up and one
-with most of its tick to spare.
+The first is the difference between sparks that take over half a tick
+and sparks that take a seventh of one.
 
 **2. Change fewer rows.** Only rows whose pixels changed are sent, so a
-screen that mostly stands still costs a fraction of the 6.6 ms a whole
+screen that mostly stands still costs a fraction of the 8.7 ms a whole
 one does; drawing only what moved saves the comparing too. Keep what
 moves together, rather than spread down the screen. See
 [the screen](#the-screen).
 
 **3. Don't build strings each tick.** A join is about 24 units; a
-thousand of them, more than a whole tick. Build text when it changes. `print` with
-a `+` inside costs nothing extra -- `print("SCORE " + points)` is as
+thousand of them, about five-sixths of a tick. Build text when it
+changes. `print` with a `+` inside costs nothing extra -- `print("SCORE " + points)` is as
 cheap as printing the characters -- so this is about strings made into
 variables, arrays and records each tick.
 

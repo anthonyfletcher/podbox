@@ -49,7 +49,7 @@ How much is left depends on the iPod:
 - The **iPod Classic** is fast: about three to four times the Video's
   speed.
 - The **iPod Video** is slower, and **playing music** takes some of
-  that: FLAC, the heaviest, about two-thirds.
+  that: MP3, the heaviest, over a third.
 
 So an iPod Video playing music is the slowest case, and the one every
 game must keep up on. The IDE runs your game as that by default: the
@@ -59,7 +59,7 @@ game must keep up on. The IDE runs your game as that by default: the
 
 As each iPod, each tick takes as long as it would on that iPod. The line
 at the bottom right of the IDE says how it is doing: "33 frames a second
-as an iPod Video, playing FLAC" means it keeps up. FLAC is the heaviest
+as an iPod Video, playing MP3" means it keeps up. MP3 is the heaviest
 music to play alongside a game, so a game that keeps up there keeps up
 everywhere. A lower number than 33 means frames are being dropped -- it
 would stutter on the iPod.
@@ -90,7 +90,7 @@ For this game:
 - **Sending the screen** takes 2.7 ms. The iPod compares each row drawn
   with the last frame and sends only those that changed: here, the rows
   with the ball, the bat and the twinkling stars. A whole new screen
-  would take 6.6 ms.
+  would take 7.6 ms.
 
 Click a row to go to that function in the code.
 
@@ -108,10 +108,10 @@ at its own speed: on an iPod Video playing FLAC a unit is about 1.9
 millionths of a second, so 2,800 units are about 5.4 ms, and with the
 2.7 ms of the screen, 8.1 ms.
 
-The rule of thumb: on an iPod Video playing FLAC, a game at 33 ticks a
-second that redraws the whole screen has room for about **12,500 units**
-a tick. This one uses under a quarter of that, so there is room for much more --
-more stars, more balls, a wall of bricks.
+The rule of thumb: on an iPod Video playing MP3, a game at 33 ticks a
+second that redraws the whole screen has room for about **28,500 units**
+a tick. This one uses under a tenth of that, so there is room for much
+more -- more stars, more balls, a wall of bricks.
 
 When a game does run out, the profiler says where to look. Common causes,
 in the order to look for them:
@@ -173,11 +173,11 @@ be exported: a web page has no music library to play from.
 - **Cart > Save as .pbg** saves the whole cart, its source included, as
   one file. Copy it to the iPod and open it from **Files**.
 - Each tick has about 30 ms at 33 a second, shared with sending the screen
-  and the music. An iPod Video playing FLAC is the slowest case, and the
+  and the music. An iPod Video playing MP3 is the slowest case, and the
   IDE runs as it by default.
 - **Run > Run and profile** shows what each frame costs and where it goes.
-- A game's work is counted in units: about 12,500 a tick on an iPod Video
-  playing FLAC for a game that redraws the whole screen.
+- A game's work is counted in units: about 28,500 a tick on an iPod Video
+  playing MP3 for a game that redraws the whole screen.
 - Every run is recorded; **Replay the last run** plays it again exactly.
 - **Cart > Export as web page** makes a page anyone can play the game in.
 

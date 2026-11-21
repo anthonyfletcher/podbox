@@ -44,8 +44,8 @@ are slow; here they run inside the engine. Measured on a 20x15 board:
 | `grid.fill`, the same | about 2,100 |
 | Life on 80x60 in script, for comparison (see **Simulations**) | about 310,000 |
 
-A tick on an iPod Video playing FLAC has about 12,500 units. A flood fill
-in script takes more than all of it; `grid.fill` takes about a sixth.
+A tick on an iPod Video playing MP3 has about 28,500 units. A flood fill
+in script takes about two-thirds of it; `grid.fill` about a fourteenth.
 
 **Cells and directions.** Positions here are cells, not pixels. The four
 directions are constants, the same numbers as the actors' contact sides:
