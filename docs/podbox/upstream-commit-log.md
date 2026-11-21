@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`127dff1016`**, merged 2026-11-11 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`c6fab89af5`**, merged 2026-11-21 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -336,8 +336,26 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-26 | the libfaad SBR and PS, wavpack, flac, metadata and utf8proc commits | codecs and metadata | **Adopted** | |
 | 2026-09-09 | `2476968a20` `3b226dd23e`, and the nano 4G, S5L8720, 3DS and x1600 commits | other targets | **N/A** | |
 | 2026-10-27 | `b9002ac186` `f3ffe789ef` `8e4a103eb0` | mikmod, plugin splash, radio | **N/A** | |
+| 2026-10-29 | `d4c0eeb956` `35fe08dfb9` `5bc75fa315` `782dff7c87` `654e69f22d` `08c892267a` `e56ef48f7c` | serial iap: stop and seek-stop notifications, track -1, Previous restarts, colour formats, file name as title, no stale track info, SetiPodStateInfo play and seek | **Adopted** | Adapted to our iap code. |
+| 2026-10-29 | `4d89096045` `943a5af196` `68e0953167` `eeedeca4bf` `d5df66a7ca` | serial iap: shared SelectDBRecord, length checks, no pause from the play status, simple remote buttons | **Adopted (independently)** | `d5df66a7ca` was ours. |
+| 2026-10-30 | `f96282992b` | iap: lockup when the accessory selects a playlist | **Adopted (independently)** | `iap-library.c` loads it on the iAP thread without the UI's prompts. No "pending" reply is sent. |
+| 2026-11-17 | `5283b204fa` | `MS_TO_TICKS` in `tick.h` | **Adopted** | `iap-core.c`'s copy removed. |
+| 2026-08-23 | `6b6642fcbe` `162241602a` `3be791bc1d` `473b827ea1` | jpeg_load: Huffman counts, truncated Ogg picture, short segment, zero sampling factor | **Adopted** | The first two were ours; `3be791bc1d` ported. |
+| 2026-10-31 | `619144481a` `cb36cae2bc` | id3 unsynchronised picture start; FLAC prefers a JPEG front cover | **Adopted (in part)** | Ours for id3. FLAC and Vorbis comments rank JPEG and PNG alike, both being decodable here, then a front cover. |
+| 2026-10-31 | `7b7a2dde98` `a9319e71c4` | libffmpegFLAC hardening; FLAC resyncs after a bad frame | **Adopted** | Beside our own hardening. |
+| 2026-11-14 | `43704e0670` `d65530a075` | alac: Rice bit cache; ARM predictor, orders 4 to 8 | **Adopted (in part)** | Upstream's predictor with our Rice decoder and 24-bit merge, each the faster on the 5G. |
+| 2026-10-21 | `d93afb29bf` | libfaad: stop clearing the element every frame | **Declined** | Stale `sfb_cb` reaches `pns_decode()` on a pair with separate windows. Our partial clear stays; its `ms_used` clear and `max_sfb` check are taken. |
+| 2026-11-08 | `a332000a74` | database: ignore hidden and trash folders | **Adopted** | Recycle bins at the top of a search root only. |
+| 2026-10-26 | `3dc105a54a` | list: restore the foreground after the separator | **Adopted (independently)** | |
+| 2026-11-19 | `6cc73ed194` | config: no dircache or RAM tagcache for CHECKWPS | **Declined** | Our CheckWPS compiles our settings list, which needs them. |
+| 2026-10-03 | `f17046eee1` `33a9e98e78` `dec7062f88` | S5L87xx early boot and bounded waits, PCM queued before start, timer divider | **Adopted** | The shared S5L8702 code the 6G builds. The bootloader's PLL2 check now needs the divisor-mode lock bit. |
+| 2026-11-17 | `5c5a53d90f` `62dc719762` `8f59462873` | 6G H.264 POC type 2, file open error, vuprintf `%n` | **Adopted** | |
+| 2026-11-01 | `0e450f00b0` | tagtree: `%hide_special` | **Postponed** | About 20 lines in `browser_db.c`, beside our settings for the special rows. |
+| 2026-11-01 | `51cd988e61` `c4fdfae7a5` `01bcba89b7` `683b5fa76b` `c1a706228c` `ec11d6ba77` `230b3624aa` | tagnavi_edit, EQ Optimizer | **N/A** | No plugin system. |
+| 2026-11-16 | `a958507036` `15207b1fa4` | pcmbuf and recording buffers for 4 MiB targets | **N/A** | |
+| 2026-11-08 | the nano 4G, S5L8720, erosqnative, x1000, ATJ2137, PSP, agptek, nand-ingenic, cabbiev2, rbutil, manual and `$Id` commits | other targets | **N/A** | |
 
-Complete through `127dff1016` (2026-11-10), merged as `d65129f47e`.
+Complete through `c6fab89af5` (2026-11-21), merged as `41f4a4e50a`.
 
 ---
 
