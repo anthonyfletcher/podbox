@@ -422,10 +422,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x03:
                 {
-                    /* TODO: Handle FF/REW
-                     */
                     play_status = audio_status();
-                    if (play_status & AUDIO_STATUS_PLAY) {
+                    if (remote_seek_direction() > 0) {
+                        IAP_TX_PUT(0x03);   /* FF */
+                    } else if (remote_seek_direction() < 0) {
+                        IAP_TX_PUT(0x04);   /* REW */
+                    } else if (play_status & AUDIO_STATUS_PLAY) {
                         if (play_status & AUDIO_STATUS_PAUSE) {
                             IAP_TX_PUT(0x02);
                         } else {
@@ -747,6 +749,10 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 case 0x03:
                 {
                     CHECKLEN(4);
+                    /* stopped, playing or paused ends a seek where it has
+                     * got to, as PlayControl's do */
+                    if (buf[0x03] <= 0x02)
+                        remote_seek_stop();
                     switch(buf[0x03])
                     {
                         case 0x00:

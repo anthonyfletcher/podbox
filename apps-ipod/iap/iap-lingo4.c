@@ -90,6 +90,22 @@ static void select_record(const unsigned int cmd, const unsigned char *buf,
     cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
 }
 
+/* PlayControl's previous, as the previous button: a track played for a few
+ * seconds restarts. Head units such as the Audi MMI rely on it, and select
+ * the current track again right after. */
+static void restart_or_prev(void)
+{
+    struct mp3entry *id3 = audio_current_track();
+
+    if (id3 && id3->elapsed >= DEFAULT_SKIP_THRESH)
+    {
+        audio_pre_ff_rewind();
+        audio_ff_rewind(0);
+    }
+    else
+        audio_prev();
+}
+
 void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
 {
     /* Lingo 0x04 commands are at least 3 bytes in length. Until the
@@ -1950,6 +1966,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t index = get_u32(&buf[3]);
             bool ok;
 
+            /* -1 plays the first track of the selection */
+            if (index == 0xFFFFFFFF)
+                index = 0;
             if (iap_library_building())
                 ok = true;
             else if (iap_library_tracks_are_queue())
@@ -2027,7 +2046,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     audio_next();
                     break;
                 case 0x04: /* skip-- */
-                    audio_prev();
+                    restart_or_prev();
                     break;
                 case 0x05: /* ffwd */
                 case 0x06: /* frwd */
@@ -2042,7 +2061,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     break;
                 case 0x09: /* previous: the chapter, else the track */
                     if (!iap_skip_chapter(-1))
-                        audio_prev();
+                        restart_or_prev();
                     break;
                 default:
                     cmd_ack(cmd, IAP_ACK_BAD_PARAM);
@@ -2952,11 +2971,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            /* Set the same as the ReturnMonoDisplayImageLimits */
+            /* RGB565 little endian (0x02) and big endian (0x03), as the
+             * original firmware lists them; SetDisplayImage accepts and
+             * discards either */
             unsigned char data[] = {0x04, 0x00, 0x3A,
                                     LCD_WIDTH >> 8, LCD_WIDTH & 0xff,
                                     LCD_HEIGHT >> 8, LCD_HEIGHT & 0xff,
-                                    0x01};
+                                    0x02,
+                                    LCD_WIDTH >> 8, LCD_WIDTH & 0xff,
+                                    LCD_HEIGHT >> 8, LCD_HEIGHT & 0xff,
+                                    0x03};
             iap_send_pkt(data, sizeof(data));
             break;
         }

@@ -75,16 +75,6 @@
 #include "ipod_remote_tuner.h"
 #endif
 
-
-/* MS_TO_TICKS converts a milisecond time period into the
- * corresponding amount of ticks. If the time period cannot
- * be accurately measured in ticks it will round up.
- */
-#if (HZ>1000)
-#error "HZ is >1000, please fix MS_TO_TICKS"
-#endif
-#define MS_PER_HZ (1000/HZ)
-#define MS_TO_TICKS(x) (((x)+MS_PER_HZ-1)/MS_PER_HZ)
 /* IAP specifies a timeout of 25ms for traffic from a device to the iPod.
  * Depending on HZ this cannot be accurately measured. Find out the next
  * best thing.
@@ -509,7 +499,9 @@ void iap_reset_device(struct device_t* device)
         iap_restore_pending = true;
     device->pb_notifications = 0;
     device->pb_track_changed = false;
-    device->pb_play_status = 0;
+    /* stopped at the start is not a stop to report */
+    device->pb_stopped_ticks = 2;
+    device->pb_seek_dir = 0;
     device->pb_ext_state = 0xff;
     device->pb_trackpos_ms = UINT32_MAX;
     device->pb_trackpos_s = UINT32_MAX;
@@ -1211,6 +1203,8 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
 {
     int tracknum;
     struct playlist_track_info info;
+    struct mp3entry *current = NULL;
+    bool at_current;
 
     tracknum = track;
 
@@ -1218,18 +1212,36 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     if(tracknum >= playlist_amount())
         tracknum -= playlist_amount();
 
-    /* If the tracknumber is not the current one, or nothing is playing and
-       the current one's tags are empty, take them from the database, or
-       failing that read them from the file */
-    if(playlist_get_current()->index != tracknum
-       || !(audio_status() & AUDIO_STATUS_PLAY))
+    if (audio_status() & AUDIO_STATUS_PLAY)
+        current = audio_current_track();
+    at_current = current && playlist_get_current()->index == tracknum;
+    if (playlist_get_track_info(NULL, tracknum, &info) < 0)
+        info.filename[0] = '\0';
+
+    /* The playing track's tags only if it is the file asked for: right
+     * after a skip the playlist is at the new track before playback has
+     * switched to it, and an accessory that asks then may not ask again.
+     * Otherwise the database's, failing that the file's (both clear id3
+     * before filling it); and failing both, the playing track's still, as
+     * playback drops leading directories of a playlist entry that do not
+     * exist. */
+    if (at_current && !strcmp(current->path, info.filename))
+        memcpy(id3, current, sizeof(*id3));
+    else if (!tagcache_fill_tags(id3, info.filename)
+             && !get_metadata(id3, -1, info.filename))
     {
-        playlist_get_track_info(NULL, tracknum, &info);
-        /* Both clear id3 before filling it */
-        if (!tagcache_fill_tags(id3, info.filename))
-            get_metadata(id3, -1, info.filename);
-    } else {
-        memcpy(id3, audio_current_track(), sizeof(*id3));
+        if (at_current)
+            memcpy(id3, current, sizeof(*id3));
+        else
+            strlcpy(id3->path, info.filename, sizeof(id3->path));
+    }
+
+    /* An untagged file, such as a voice recording, is listed by its file
+     * name, so it is sent as its title rather than an empty one */
+    if (!id3->title || !id3->title[0])
+    {
+        const char *name = strrchr(id3->path, '/');
+        id3->title = (char *)(name ? name + 1 : id3->path);
     }
 }
 
@@ -1608,6 +1620,24 @@ void iap_periodic(void)
         iap_send_pb(0x01, 4, iap_get_trackindex());
     device.pb_track_changed = false;
 
+    /* Bit 0, every tick: a stop once it has lasted two, as a new playlist
+     * stops playback for a moment as it starts; and the end of a seek,
+     * 0x02 forward or 0x03 back, however it ended */
+    if (interface_state == IST_EXTENDED && device.pb_notifications) {
+        bool basic = device.pb_notifications & BIT_N(0);
+        int dir = remote_seek_direction();
+
+        if (audio_status() & AUDIO_STATUS_PLAY)
+            device.pb_stopped_ticks = 0;
+        else if (device.pb_stopped_ticks < 2
+                 && ++device.pb_stopped_ticks == 2 && basic)
+            iap_send_pb(0x00, 0, 0);
+
+        if (device.pb_seek_dir && dir != device.pb_seek_dir && basic)
+            iap_send_pb(device.pb_seek_dir > 0 ? 0x02 : 0x03, 0, 0);
+        device.pb_seek_dir = dir;
+    }
+
     /* Volume: looked at every 100ms, sent only on a change */
     if (device.notifications & (BIT_N(4) | BIT_N(16))) {
         unsigned char level = device.mute ? 0
@@ -1655,12 +1685,6 @@ void iap_periodic(void)
                           : (status & AUDIO_STATUS_PLAY) ? 0x0A : 0x02;
         uint32_t ms = iap_get_trackpos();
         uint32_t n = playlist_amount();
-
-        /* Bit 0: stopped */
-        if ((mask & BIT_N(0)) && !(status & AUDIO_STATUS_PLAY)
-            && (device.pb_play_status & AUDIO_STATUS_PLAY))
-            iap_send_pb(0x00, 0, 0);
-        device.pb_play_status = status;
 
         /* Bit 1: playing, paused or stopped */
         if ((mask & BIT_N(1)) && ext != device.pb_ext_state)
@@ -1989,17 +2013,35 @@ void iap_periodic(void)
      */
 }
 
-/* Playing or paused, a skip to index; stopped, a skip has nothing to move
- * (audio_skip() drops it), so playback starts there. True if it started. */
+/* Playing or paused, a skip to index, or to the start of the track when it
+ * is the current one, as an iPod since the 2G nano does; stopped, a skip
+ * has nothing to move (audio_skip() drops it), so playback starts there.
+ * True if it started. */
 bool iap_skip_to(uint32_t index)
 {
+    bool paused = audio_status() & AUDIO_STATUS_PAUSE;
+    long offset;
+
     if (!(audio_status() & AUDIO_STATUS_PLAY))
     {
         playlist_start((playlist_get_first_index(NULL) + index)
                        % playlist_amount(), 0, 0);
         return true;
     }
-    audio_skip(index - iap_get_trackindex());
+    /* audio_pause() waits for the audio thread, so a skip already queued
+     * has moved the playlist index by the time it is read */
+    audio_pause();
+    offset = (long)index - (long)iap_get_trackindex();
+    if (offset != 0)
+        audio_skip(offset);
+    else
+    {
+        /* audio_skip(0) plays the "no more tracks" sound, not the track */
+        audio_pre_ff_rewind();
+        audio_ff_rewind(0);
+    }
+    if (!paused)
+        audio_resume();
     return false;
 }
 

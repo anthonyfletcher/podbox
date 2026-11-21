@@ -163,7 +163,8 @@ struct device_t {
      * last sent */
     uint32_t pb_notifications;
     bool pb_track_changed;          /* set from the audio thread */
-    unsigned char pb_play_status;
+    unsigned char pb_stopped_ticks; /* ticks stopped, up to 2 */
+    signed char pb_seek_dir;        /* remote_seek_direction() */
     unsigned char pb_ext_state;
     uint32_t pb_trackpos_ms;
     uint32_t pb_trackpos_s;
