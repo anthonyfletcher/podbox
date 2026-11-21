@@ -261,6 +261,55 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
 }
 #endif
 
+/* "handover: ack from tagcache, #3". The thread is named when the line is
+ * written, so one that has since exited shows as "?". */
+static void usb_log_format_handover(const struct usb_log_entry *e, char *p,
+                                    size_t size)
+{
+    const unsigned long c = e->c, d = e->d;
+
+    switch (e->a)
+    {
+        case USB_LOG_HANDOVER_ASKED:
+            snprintf(p, size, "handover: asked, #%lu, %d acks owed", c,
+                     e->b);
+            break;
+        case USB_LOG_HANDOVER_REFUSED:
+            snprintf(p, size, "handover: not asked again, %s",
+                     d ? "the host ejected" : "already asked");
+            break;
+        case USB_LOG_HANDOVER_ACK:
+        {
+            struct thread_debug_info info;
+
+            if (thread_get_debug_info(c, &info) <= 0)
+                strcpy(info.name, "?");
+            snprintf(p, size, "handover: ack from %s, #%lu", info.name, d);
+            break;
+        }
+        case USB_LOG_HANDOVER_IGNORED:
+            snprintf(p, size, "handover: ack #%lu IGNORED, %s, now #%lu", c,
+                     e->b ? "none owed" : "late", d);
+            break;
+        case USB_LOG_HANDOVER_DONE:
+            snprintf(p, size, "handover: all acked, %s", e->b ?
+                     "the host has the disk" : "NOT HANDED OVER, host gone");
+            break;
+        case USB_LOG_HANDOVER_UNHEARD:
+            snprintf(p, size, "handover: mass storage INACTIVE, its notice "
+                     "DROPPED");
+            break;
+        case USB_LOG_HANDOVER_RESUMED:
+            snprintf(p, size, "handover: mass storage told, state %d, %s, "
+                     "%s", e->b, c ? "receiving" : "NOT RECEIVING",
+                     d ? "host has the disk" : "DISK NOT HANDED OVER");
+            break;
+        default:
+            snprintf(p, size, "handover %d", e->a);
+            break;
+    }
+}
+
 /* us is the entry's stamp, widened by the caller where it can be. */
 static void format_entry(const struct usb_log_entry *e, uint64_t us,
                          char *buf, size_t size)
@@ -729,6 +778,9 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                 snprintf(p, size, "storage: BAD CBW, signature %08lx, "
                          "%lu bytes", (unsigned long)e->c,
                          (unsigned long)e->d);
+            break;
+        case USB_LOG_HANDOVER:
+            usb_log_format_handover(e, p, size);
             break;
         case USB_LOG_SYNC:
             snprintf(p, size, "log on disk after %lu ms%s",

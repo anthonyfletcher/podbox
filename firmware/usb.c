@@ -927,10 +927,14 @@ static void NORETURN_ATTR usb_thread(void)
         case SYS_USB_CONNECTED_ACK:
             if((uint32_t)ev.data != usb_broadcast_seqnum) {
                 DEBUGF("usb: late ack %lX < %lX", ev.data, usb_broadcast_seqnum);
+                usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_IGNORED, 0,
+                        ev.data, usb_broadcast_seqnum);
                 break;
             }
             if(usb_num_acks_to_expect == 0) {
                 DEBUGF("usb: unexpected ack");
+                usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_IGNORED, 1,
+                        ev.data, usb_broadcast_seqnum);
                 break;
             }
             if(--usb_num_acks_to_expect > 0) {
@@ -939,6 +943,8 @@ static void NORETURN_ATTR usb_thread(void)
             }
 
             DEBUGF("usb: all threads have acknowledged the connect.\n");
+            usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_DONE,
+                    usb_host_present && exclusive_storage_requested, 0, 0);
             if(usb_host_present && exclusive_storage_requested) {
                 usb_slave_mode(true);
                 exclusive_storage_enabled = true;
@@ -1195,6 +1201,9 @@ void usb_start_monitoring(void)
 
 void usb_acknowledge(long id, intptr_t seqnum)
 {
+    if(id == SYS_USB_CONNECTED_ACK)
+        usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_ACK, 0, thread_self(),
+                seqnum);
     queue_post(&usb_queue, id, seqnum);
 }
 #endif /* USB_FULL_INIT */
@@ -1382,13 +1391,18 @@ bool usb_exclusive_storage(void)
 
 void usb_request_exclusive_storage(void)
 {
-    if(exclusive_storage_requested || usb_disk_ejected)
+    if(exclusive_storage_requested || usb_disk_ejected) {
+        usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_REFUSED, 0,
+                exclusive_storage_requested, usb_disk_ejected);
         return;
+    }
 
     exclusive_storage_requested = true;
     usb_broadcast_seqnum += 1;
     usb_num_acks_to_expect = queue_broadcast(SYS_USB_CONNECTED, usb_broadcast_seqnum) - 1;
     DEBUGF("usb: waiting for %d acks...\n", usb_num_acks_to_expect);
+    usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_ASKED, usb_num_acks_to_expect,
+            usb_broadcast_seqnum, 0);
 #ifndef BOOTLOADER
     usb_record.acks_expected = usb_num_acks_to_expect;
     usb_record.broadcast_tick = current_tick;

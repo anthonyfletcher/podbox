@@ -1546,6 +1546,8 @@ static void handle_scsi(struct command_block_wrapper* cbw)
 static void usb_storage_notify_event(intptr_t data)
 {
     (void)data;
+    usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_RESUMED, state,
+            receiving_commands(), usb_exclusive_storage());
     if(!receiving_commands()) {
         if(usb_exclusive_storage())
             start_receiving_commands();

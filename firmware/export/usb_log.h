@@ -173,6 +173,8 @@ enum usb_log_type
                           * interface state */
     USB_LOG_STORAGE,     /* mass storage: a = USB_LOG_STORAGE_*, the rest
                           * as named there */
+    USB_LOG_HANDOVER,    /* the disk passing to the host: a =
+                          * USB_LOG_HANDOVER_*, the rest as named there */
 };
 
 #define USB_LOG_OUTPUT_GONE    0
@@ -226,6 +228,25 @@ static inline void usb_log_iap_error_args(int unused, ...)
                                    * b = state, c = status, d = length,
                                    * bit 31 set for IN */
 #define USB_LOG_STORAGE_BAD_CBW 5 /* c = signature, d = length */
+
+/* Every thread that takes broadcasts owes one ack before the host has the
+ * disk; a handover that stalls is read for the thread with no ACK line */
+#define USB_LOG_HANDOVER_ASKED   0 /* SYS_USB_CONNECTED went out: b = acks
+                                    * owed, c = sequence number */
+#define USB_LOG_HANDOVER_REFUSED 1 /* asked for and not sent: c = 1 already
+                                    * asked, d = 1 the host ejected */
+#define USB_LOG_HANDOVER_ACK     2 /* a thread acked: c = its ID, d = the
+                                    * sequence number */
+#define USB_LOG_HANDOVER_IGNORED 3 /* the USB thread set an ack aside: b = 1
+                                    * none was owed, 0 late; c = its sequence
+                                    * number, d = the current one */
+#define USB_LOG_HANDOVER_DONE    4 /* the last ack: b = 1 the disk went to the
+                                    * host, 0 the host no longer wanted it */
+#define USB_LOG_HANDOVER_UNHEARD 5 /* a notice to an inactive class driver,
+                                    * dropped: b = driver */
+#define USB_LOG_HANDOVER_RESUMED 6 /* mass storage told the disk is free: b =
+                                    * its state, c = 1 receiving commands,
+                                    * d = 1 the host has the disk */
 
 #define USB_LOG_HOST_PORT_READ 0x80
 

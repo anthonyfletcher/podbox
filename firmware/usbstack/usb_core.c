@@ -1588,6 +1588,11 @@ void usb_core_handle_notify(long id, intptr_t data)
             if(is_active(drivers[index]) && drivers[index]->notify_event != NULL) {
                 drivers[index]->notify_event(data & 0x00ffffff);
             }
+#ifdef USB_ENABLE_STORAGE
+            else if(index == USB_DRIVER_MASS_STORAGE)
+                usb_log(USB_LOG_HANDOVER, USB_LOG_HANDOVER_UNHEARD, index,
+                        0, 0);
+#endif
         } break;
         default:
             break;
