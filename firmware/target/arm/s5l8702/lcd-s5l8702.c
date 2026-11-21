@@ -662,8 +662,9 @@ void lcd_awake(void)
     lcd_run_seq(lcd_info->seq_awake);
     lcd_ispowered = true;       // XXX: we have to put the lcd_ispowered before the lcd_update()
 
-    /* A transition's hold would keep this update off the panel */
-    lcd_release_updates();
+    /* A transition's hold would keep this update off the panel; it sends the
+     * whole screen, so what the hold deferred is dropped */
+    lcd_end_hold();
     lcd_update();              // XXX: update the display and wait for the update to finish before returning,
 
     displaylcd_wait_dma();      //      we should really do sleep_out + lcd_update + display_on,

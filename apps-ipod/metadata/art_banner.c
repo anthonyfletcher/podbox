@@ -252,6 +252,7 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
         const char *dot = strrchr(e->d_name, '.');
         struct dirinfo info = dir_get_info(d, e);
         struct banner_rec rec;
+        char aat[BANNER_PATH];
         int o;
 
         if (e->d_name[0] == '.' || !dot || !art_image_ext(dot)
@@ -279,24 +280,15 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
         if (o >= 0)
             banner_seen[o] = true;
 
-        if (o >= 0 && banner_old[o].stamp == rec.stamp)
+        banner_aat_path(aat, sizeof(aat), rec.key, kind);
+        if (o >= 0 && banner_old[o].stamp == rec.stamp
+            && (!banner_old[o].made || file_exists(aat)))
         {
-            char aat[BANNER_PATH];
-
-            banner_aat_path(aat, sizeof(aat), rec.key, kind);
-            if (!banner_old[o].made || file_exists(aat))
-            {
-                banner_new[(*n_new)++] = banner_old[o];
-                continue;
-            }
+            banner_new[(*n_new)++] = banner_old[o];
+            continue;
         }
 
-        {
-            char aat[BANNER_PATH];
-
-            banner_aat_path(aat, sizeof(aat), rec.key, kind);
-            rec.made = banner_make(banner_path, aat, buf, size);
-        }
+        rec.made = banner_make(banner_path, aat, buf, size);
         banner_new[(*n_new)++] = rec;
         *changed = true;
         yield();

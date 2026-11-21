@@ -246,7 +246,7 @@ static bool part_once(int p)
 static bool add_artist_match(const char *name, long seek, const char *query)
 {
     int parts[DB_FEATURED_MAX_GUESTS];
-    int n = db_names_joint_parts(seek, parts, ARRAYLEN(parts));
+    int n = db_names_joint_parts(seek, parts, ARRAYLEN(parts)), p;
 
     for (int i = 0; i < n; i++)
     {
@@ -259,7 +259,7 @@ static bool add_artist_match(const char *name, long seek, const char *query)
     if (n > 0 || !text_matches(name, query))
         return true;
     seek = db_names_browse_seek(seek);
-    if (db_names_index(seek) >= 0 && !part_once(db_names_index(seek)))
+    if ((p = db_names_index(seek)) >= 0 && !part_once(p))
         return true;
     return add_match(tag_albumartist, name, seek, -1);
 }

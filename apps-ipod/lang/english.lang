@@ -24318,13 +24318,13 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT
-  desc: splash at boot: a debug log is on, and off in hours:minutes
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on, off in %d:%02d"
+    *: none
   </source>
   <dest>
-    *: "Debug logs on, off in %d:%02d"
+    *: none
   </dest>
   <voice>
     *: none
@@ -24332,16 +24332,16 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT_NEVER
-  desc: splash at boot: a debug log is on and stays on
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on"
+    *: none
   </source>
   <dest>
-    *: "Debug logs on"
+    *: none
   </dest>
   <voice>
-    *: "Debug logs on"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25326,16 +25326,16 @@
 </phrase>
 <phrase>
   id: LANG_ROW_HIDDEN
-  desc: splash after a row is hidden
+  desc: deprecated
   user: core
   <source>
-    *: "Hidden. Show it again in Appearance > Menus"
+    *: none
   </source>
   <dest>
-    *: "Hidden. Show it again in Appearance > Menus"
+    *: none
   </dest>
   <voice>
-    *: "Hidden. Show it again in Appearance > Menus"
+    *: none
   </voice>
 </phrase>
 <phrase>

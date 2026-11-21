@@ -614,15 +614,15 @@ static off_t tv_page(off_t start, bool render)
             bool pull = quote || (avail >= 3 && !memcmp(s, TL_QUOTE, 3));
 
             tv_heads_seen |= head;
-            int first, bullet = -1;
-            int indent = pull ? m
-                         : global_settings.text_viewer_indent && !head
-                           && s[0] != '\n' && tv_paragraph_start(off)
-                         ? m : 0;
+            int first, bullet = -1, rule = pull ? m : 0;
+            int indent = (pull || (global_settings.text_viewer_indent && !head
+                                   && s[0] != '\n'
+                                   && tv_paragraph_start(off))) ? m : 0;
+            bool ends;
 
             /* a list item's lines hang under its first word */
             if (item >= 0)
-                indent = (pull ? m : 0) + item;
+                indent = rule + item;
             else
             {
                 int skip = pull && !quote ? 3 : 0;
@@ -631,9 +631,9 @@ static off_t tv_page(off_t start, bool render)
                                       &bullet);
                 if (item)
                 {
-                    indent = (pull ? m : 0) + first;
+                    indent = rule + first;
                     if (bullet >= 0)
-                        bullet += pull ? m : 0;
+                        bullet += rule;
                 }
                 else
                     item = -1;
@@ -678,8 +678,9 @@ static off_t tv_page(off_t start, bool render)
                 screens[SCREEN_MAIN].set_foreground(now);
             }
             heading = tv_heading_after(s, ln.used, heading);
-            quote = pull && !(ln.used > 0 && s[ln.used - 1] == '\n');
-            if (ln.used > 0 && s[ln.used - 1] == '\n')
+            ends = s[ln.used - 1] == '\n';
+            quote = pull && !ends;
+            if (ends)
                 item = -1;
         }
 

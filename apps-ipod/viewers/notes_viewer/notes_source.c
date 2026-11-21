@@ -50,6 +50,7 @@
 #include "file.h"
 #include "lang.h"
 #include "string-extra.h"
+#include "system/strutil.h"         /* BOM_UTF_8 */
 #include "database/tagcache.h"
 #include "database/db_featured.h"   /* guest=true */
 #include "database/db_names.h"
@@ -77,7 +78,7 @@ static int ns_written(int kind, int album, uint32_t key)
     struct tagcache_album row;
     int i, found = -1, n = notes_page_count();
 
-    if (kind == NOTES_PAGE_ALBUM && !tagcache_album_get(album, &row))
+    if (kind == NOTES_PAGE_ALBUM ? !tagcache_album_get(album, &row) : !key)
         return -1;
     for (i = 0; i < n; i++)
     {
@@ -87,7 +88,7 @@ static int ns_written(int kind, int album, uint32_t key)
             continue;
         /* a page beside the music is its album's folder's */
         if (kind == NOTES_PAGE_ALBUM
-            ? (pg->dir ? pg->dir == row.dir_key
+            ? (pg->dir ? pg->dir == tagcache_album_dir_key(&row)
                        : notes_page_album(i) == album)
             : (pg->key == key || pg->alt == key || pg->part == key))
         {
@@ -342,8 +343,10 @@ static long ns_int(const struct ns_piece *pc, const char *key, long def)
         v++;
         len--;
     }
+    /* held below 10^9, so a long run of digits cannot overflow */
     for (; len && *v >= '0' && *v <= '9'; v++, len--, any = true)
-        n = n * 10 + (*v - '0');
+        if (n < 100000000)
+            n = n * 10 + (*v - '0');
     return any ? (neg ? -n : n) : def;
 }
 
@@ -389,16 +392,13 @@ static long ns_album_ms(int album)
     if (!tagcache_album_get(album, &row))
         return 0;
     for (idx = row.first; idx <= row.last; idx++)
+    {
+        notes_breathe();
         if (tagcache_album_of(idx) == album
             && tagcache_entry_numeric(idx, tag_length, &len))
             ms += len;
+    }
     return ms;
-}
-
-/* An album's running time in seconds */
-static long ns_album_secs(int album)
-{
-    return ns_album_ms(album) / 1000;
 }
 
 /* A running time of `s` seconds into `buf` */
@@ -494,6 +494,7 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
         {
             long dn = 0, tn = 0;
 
+            notes_breathe();
             if (tagcache_album_of(idx) != a)
                 continue;
             tagcache_entry_numeric(idx, tag_discnumber, &dn);
@@ -550,7 +551,7 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
     }
     if (ns_is(name, n, "length"))
     {
-        long s = ns_album_secs(d->album);
+        long s = ns_album_ms(d->album) / 1000;
 
         if (s <= 0)
             return false;
@@ -559,7 +560,7 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
             snprintf(buf, size, str(LANG_NOTES_MINUTES), (int)((s + 30) / 60));
             return true;
         }
-        return ns_secs_text(ns_album_secs(d->album), buf, size);
+        return ns_secs_text(s, buf, size);
     }
     for (i = 0; i < ARRAYLEN(strings); i++)
         if (ns_is(name, n, strings[i].name))
@@ -1228,6 +1229,7 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
             int32_t r[2] = { 0, 0 };
             int at;
 
+            notes_breathe();
             if (tagcache_album_of(idx) != a
                 || (composer && !ns_composed(idx, composer)))
                 continue;
@@ -1292,12 +1294,9 @@ static int ns_tracks(const struct ns_piece *pc, const struct notes_doc *d,
             continue;
         if (group && multi && disc_of[at] != last_disc)
         {
-            o = ns_item();
-            ns_puts(o, "### ");
             snprintf(ns_buf, sizeof(ns_buf), str(LANG_NOTES_DISC),
                      disc_of[at]);
-            ns_puts(o, ns_buf);
-            ns_item_done(true);
+            ns_item_heading(ns_buf);
         }
         last_disc = disc_of[at];
         o = ns_item();
@@ -1767,9 +1766,7 @@ static void ns_expand(struct ns_state *st, const char *text)
     }
 }
 
-/* A heading's text past the track number in front of it -- "5. Pink Up",
- * "2-03 Pink Up" -- or all of it */
-static const char *ns_numbered(const char *s)
+const char *notes_numbered(const char *s)
 {
     const char *p = s;
 
@@ -1798,9 +1795,12 @@ static bool ns_track_sections(const char *text, int album)
     if (!tagcache_album_get(album, &row))
         return false;
     for (idx = row.first; idx <= row.last && n < NS_LIST_MAX; idx++)
+    {
+        notes_breathe();
         if (tagcache_album_of(idx) == album
             && tagcache_entry_string(idx, tag_title, ns_buf, sizeof(ns_buf)))
             keys[n++] = art_name_hash(ns_buf);
+    }
     for (s = text; *s; s++)
     {
         size_t len = 0;
@@ -1817,7 +1817,7 @@ static bool ns_track_sections(const char *text, int album)
             len++;
         memcpy(ns_trim, s, len);
         ns_trim[len] = '\0';
-        key = art_name_hash(ns_numbered(ns_trim));
+        key = art_name_hash(notes_numbered(ns_trim));
         for (i = 0; key && i < n; i++)
             if (keys[i] == key)
                 return true;
@@ -1904,26 +1904,6 @@ static bool ns_rule_line(const char *s, char c)
     return n == 3;
 }
 
-/* Whether the front matter line at `s` is YAML: blank, indented, a list's
- * or a comment's, or a key of at most 32 bytes and its colon */
-static bool ns_yaml_line(const char *s)
-{
-    int n;
-
-    if (*s == '\n' || *s == '\r' || !*s || strchr(" \t-#.", *s))
-        return true;
-    for (n = 0; n < 32; n++, s++)
-    {
-        unsigned char c = *s;
-
-        if (!((c >= '0' && c <= '9')
-              || ((c | 0x20) >= 'a' && (c | 0x20) <= 'z')
-              || c >= 0x80 || (c && strchr("_- .\"'", c))))
-            break;
-    }
-    return *s == ':';
-}
-
 /* `buf` less its front matter and its comments, as the Markdown reader
  * (ts_text.c) leaves them out, so the pieces, the headings and the links in
  * them are not counted either. Front matter: a line of exactly --- opening
@@ -1935,13 +1915,13 @@ static void ns_strip(char *buf)
     char *w = buf, *r = buf;
     bool fence = false, code = false;
 
-    if (!strncmp(r, "\xef\xbb\xbf", 3))
-        r += 3;
+    if (!strncmp(r, BOM_UTF_8, BOM_UTF_8_SIZE))
+        r += BOM_UTF_8_SIZE;
     if (!strncmp(r, "---\n", 4) || !strncmp(r, "---\r\n", 5))
     {
         r = strchr(r, '\n') + 1;
         while (*r && !ns_rule_line(r, '-') && !ns_rule_line(r, '.')
-               && ns_yaml_line(r))
+               && notes_yaml_line(r))
             r = strchr(r, '\n') ? strchr(r, '\n') + 1 : r + strlen(r);
         if (*r && (ns_rule_line(r, '-') || ns_rule_line(r, '.')))
             r = strchr(r, '\n') ? strchr(r, '\n') + 1 : r + strlen(r);
@@ -2112,7 +2092,7 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
     if (d->part)
     {
         ns_expand(&st, scratch);
-        return st.o.len;
+        goto written;
     }
     if (d->kind == NOTES_PAGE_ALBUM && !ns_uses(scratch, "artist")
         && !(d->artist && ns_links_to(scratch, d->artist)))
@@ -2131,5 +2111,11 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
         snprintf(tail, sizeof(tail), "\n## %s\n{{albums|guest=true}}\n",
                  str(LANG_ALBUMS));
     ns_expand(&st, tail);
+
+  written:
+    /* A written page with nothing in it, or only front matter, is still a
+     * page: its banner and its name */
+    if (!st.o.len)
+        ns_puts(&st.o, "\n");
     return st.o.len;
 }

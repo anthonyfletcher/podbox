@@ -60,6 +60,9 @@ bool notes_where_load(void);
 void notes_where_begin(void);
 void notes_where_found(const char *path, uint32_t size, uint32_t mtime);
 void notes_where_end(bool completed);
+/* Changes whenever the index is loaded or replaced, renumbering the pages:
+ * a page number kept from before is found again by its keys */
+unsigned int notes_pages_generation(void);
 
 /* The written pages a track has, as a mask */
 #define NOTES_BIO   1
@@ -105,6 +108,12 @@ int notes_find_album(const struct notes_album *a, struct notes_pages *p);
 /* Whether there is a written page of the person called `name`, in /Notes
  * or beside the music */
 bool notes_has_bio(const char *name);
+
+/* Front matter is a line of exactly --- opening the page, to the next ---
+ * or ... line, for as long as its lines are YAML: blank, indented, a list's
+ * or a comment's, or a key of at most 32 bytes and its colon. Whether the
+ * line at `s` is. */
+bool notes_yaml_line(const char *s);
 
 /* The value of `key` in the front matter `text` starts with, a `key: value`
  * line, into `buf` without its quotes; its length, 0 for none. A page of an

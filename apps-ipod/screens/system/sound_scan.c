@@ -346,7 +346,7 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
     long t0;
     int rc;
 
-    if (sound_index_done(key, mtime, size))
+    if (sound_index_done(key, mtime, size, probe_file_format(path)))
     {
         ss_skipped++;
         return true;

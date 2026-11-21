@@ -2093,12 +2093,21 @@ static const struct menu_item_ex row_menu =
     { MT_RETURN_ID|MENU_DYNAMIC_DESC|MENU_ITEM_COUNT(ROW_COUNT),
       { .strings = NULL }, { .menu_get_name_and_icon = &row_menu_desc } };
 
+/* The order as Move found it: the turned-off rows' places count the rows
+ * before it, so the drop is made from it */
+static struct menu_item_ex *carry_order[MAX_MENU_ITEMS];
+static unsigned carry_count;
+
 /* A row Move carried, kept where it was dropped */
 static void row_dropped(const struct menu_item_ex *item)
 {
-    unsigned i = root_menu_find(item, MENU_GET_COUNT(root_menu_.flags));
+    unsigned count = MENU_GET_COUNT(root_menu_.flags);
+    unsigned i = root_menu_find(item, count);
+    const struct menu_item_ex *after = i > 0 ? root_menu__[i - 1] : NULL;
 
-    main_menu_place_item(item, i > 0 ? root_menu__[i - 1] : NULL);
+    if (count == carry_count)
+        memcpy(root_menu__, carry_order, count * sizeof(root_menu__[0]));
+    main_menu_place_item(item, after);
     /* Saving lists a Segregate row with nothing in it; out again, as the
      * root loop takes it out on its way into the menu */
     audiobooks_row(global_settings.segregate_audiobooks, false);
@@ -2123,6 +2132,9 @@ static int load_context_screen(int selection)
     switch (do_menu(&row_menu, NULL, NULL, false))
     {
         case ROW_MOVE:
+            carry_count = MENU_GET_COUNT(root_menu_.flags);
+            memcpy(carry_order, root_menu__,
+                   carry_count * sizeof(root_menu__[0]));
             menu_carry(ctx_row, row_dropped);
             break;
         case ROW_HIDE:

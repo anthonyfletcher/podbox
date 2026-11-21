@@ -41,9 +41,9 @@ enum eq_cop_state
 /* Create the worker; once, from a thread on the CPU */
 void eq_cop_init(void);
 /* Run bands(buf, count, channels) on the COP and wait for it. False when
-   the caller must run it itself: no worker, or an interrupt. True with the
-   block unfiltered while the COP still has an earlier one (an interrupt's
-   block, or one after a timeout). */
+   the caller must run it itself: no worker, or an interrupt. True with an
+   interrupt's block unfiltered while the COP has a thread's. A block the
+   COP is late with is still waited for, and the next go to the CPU. */
 bool eq_cop_run(eq_cop_bands_fn bands, int32_t * const buf[], int count,
                 unsigned int channels);
 /* Held around a run and around every change to the bands, so a block is

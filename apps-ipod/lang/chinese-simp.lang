@@ -24212,13 +24212,13 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT
-  desc: splash at boot: a debug log is on, and off in hours:minutes
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on, off in %d:%02d"
+    *: none
   </source>
   <dest>
-    *: "调试日志已开启，%d:%02d后关闭"
+    *: none
   </dest>
   <voice>
     *: none
@@ -24226,16 +24226,16 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT_NEVER
-  desc: splash at boot: a debug log is on and stays on
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on"
+    *: none
   </source>
   <dest>
-    *: "调试日志已开启"
+    *: none
   </dest>
   <voice>
-    *: "调试日志已开启"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25220,16 +25220,16 @@
 </phrase>
 <phrase>
   id: LANG_ROW_HIDDEN
-  desc: splash after a row is hidden
+  desc: deprecated
   user: core
   <source>
-    *: "Hidden. Show it again in Appearance > Menus"
+    *: none
   </source>
   <dest>
-    *: "已隐藏。可在 外观 > 菜单 中重新显示"
+    *: none
   </dest>
   <voice>
-    *: "已隐藏。可在 外观 > 菜单 中重新显示"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -27781,6 +27781,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPLIT_ALBUM_ARTISTS
+  desc: in Music settings: list an album under each artist its Album Artist tag names, separated by ;
+  user: core
+  <source>
+    *: "Split Album Artists"
+  </source>
+  <dest>
+    *: "拆分专辑艺术家"
+  </dest>
+  <voice>
+    *: "拆分专辑艺术家"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_WHICH_ARTIST
+  desc: title of the list Go to Artist shows for an album filed under several artists
+  user: core
+  <source>
+    *: "Which Artist?"
+  </source>
+  <dest>
+    *: "哪位艺术家？"
+  </dest>
+  <voice>
+    *: "哪位艺术家？"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_NOTES_LINK_COLOUR
   desc: liner notes custom colours: the colour of links
   user: core
@@ -27820,6 +27848,34 @@
   </dest>
   <voice>
     *: "黑色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCREEN_TRANSITIONS
+  desc: in Appearance > Interface Elements: how one screen gives way to the next
+  user: core
+  <source>
+    *: "Screen Transitions"
+  </source>
+  <dest>
+    *: "屏幕过渡"
+  </dest>
+  <voice>
+    *: "屏幕过渡"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRANSITION_SLIDE
+  desc: Screen Transitions option: the next screen slides in from the side
+  user: core
+  <source>
+    *: "Slide"
+  </source>
+  <dest>
+    *: "滑动"
+  </dest>
+  <voice>
+    *: "滑动"
   </voice>
 </phrase>
 <phrase>

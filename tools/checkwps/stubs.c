@@ -375,6 +375,12 @@ void lcd_scroll_speed(int speed) { (void)speed; }
 void lcd_scroll_step(int pixels) { (void)pixels; }
 void lcd_set_sleep_after_backlight_off(int seconds) { (void)seconds; }
 void lineout_set(bool on) { (void)on; }
+void notes_chose_dim(int value) { (void)value; }
+void notes_chose_heads(int value) { (void)value; }
+void notes_chose_links(int value) { (void)value; }
+void notes_chose_page(int value) { (void)value; }
+void notes_chose_quote(int value) { (void)value; }
+void notes_chose_text(int value) { (void)value; }
 void spoken_speed_set(int pct) { (void)pct; }
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
 void tv_out_size_set(int size) { (void)size; }

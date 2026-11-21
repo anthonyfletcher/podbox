@@ -1234,8 +1234,9 @@ void lcd_awake(void)
         lcd_state.state = LCD_INITIAL;
         lcd_state.display_on = true;
         /* Under a transition's hold this update would be deferred, and the
-         * wait below never end */
-        lcd_release_updates();
+         * wait below never end. It sends the whole screen, so what the hold
+         * deferred is dropped: the BCM takes one update while it starts. */
+        lcd_end_hold();
         lcd_update();
         lcd_state.update_timeout = current_tick + BCM_LCDINIT_TIMEOUT;
 

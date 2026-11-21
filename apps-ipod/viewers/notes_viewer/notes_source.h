@@ -57,4 +57,8 @@ int notes_album_parts(const struct notes_doc *d, const struct name_index *ix,
 struct notes_page;
 void notes_page_title(const struct notes_page *pg, char *buf, size_t size);
 
+/* A heading's text past the track number in front of it -- "5. Pink Up",
+ * "2-03 Pink Up" -- or all of it */
+const char *notes_numbered(const char *s);
+
 #endif /* _NOTES_SOURCE_H_ */

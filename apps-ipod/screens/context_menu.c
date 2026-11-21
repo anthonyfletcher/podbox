@@ -268,13 +268,19 @@ int context_menu_notes_result(int ret)
     return ONPLAY_OK;
 }
 
-static int notes_run(void)
+/* A notes screen's GO_TO_* code passed on to the menu's caller, and the
+ * menu row's 0 */
+static int notes_go(int ret)
 {
-    int ret = context_menu_notes_result(notes_viewer());
-
+    ret = context_menu_notes_result(ret);
     if (ret != ONPLAY_OK)
         context_menu_result = ret;
     return 0;
+}
+
+static int notes_run(void)
+{
+    return notes_go(notes_viewer());
 }
 
 /* Now Playing's button action */
@@ -331,17 +337,7 @@ static struct notes_album notes_row_album;
 
 static int album_notes_run(void)
 {
-    int ret = context_menu_notes_result(notes_album(&notes_row_album));
-
-    if (ret != ONPLAY_OK)
-        context_menu_result = ret;
-    return 0;
-}
-
-static char *album_notes_name(int selected_item, void *data, char *buffer,
-                              size_t buffer_len)
-{
-    return notes_name(selected_item, data, buffer, buffer_len);
+    return notes_go(notes_album(&notes_row_album));
 }
 
 static int album_notes_callback(int action,
@@ -373,7 +369,7 @@ static int album_notes_callback(int action,
 }
 
 MENUITEM_FUNCTION_DYNTEXT(album_notes_item, 0, album_notes_run,
-                          album_notes_name, NULL, NULL, album_notes_callback,
+                          notes_name, NULL, NULL, album_notes_callback,
                           Icon_NOICON);
 
 /* An artist row's Biography, for an artist with a bio, and Mentions: the
@@ -389,20 +385,12 @@ static const char *mentions_name(void)
 
 static int mentions_run(void)
 {
-    int ret = context_menu_notes_result(notes_person(mentions_name()));
-
-    if (ret != ONPLAY_OK)
-        context_menu_result = ret;
-    return 0;
+    return notes_go(notes_person(mentions_name()));
 }
 
 static int biography_run(void)
 {
-    int ret = context_menu_notes_result(notes_bio(mentions_name()));
-
-    if (ret != ONPLAY_OK)
-        context_menu_result = ret;
-    return 0;
+    return notes_go(notes_bio(mentions_name()));
 }
 
 /* Visible on an artist list's row only */

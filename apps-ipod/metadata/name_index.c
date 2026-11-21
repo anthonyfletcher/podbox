@@ -540,25 +540,35 @@ const char *name_index_name(const struct name_index *ix, uint32_t key)
     return NULL;
 }
 
+/* The records are sorted by key: read a block at a time, and only as far
+ * as the greater of the two keys */
 bool name_index_named(uint32_t key, uint32_t alt)
 {
+    static struct name_mention m[64];
     struct libfile_header h;
-    struct name_mention m;
-    uint32_t i;
-    bool found = false;
+    uint32_t i, j, n = 0, last = MAX(key, alt);
+    bool found = false, past = false;
     int fd;
 
-    if (!global_settings.liner_notes)
+    if (!global_settings.liner_notes || !last)
         return false;
-    fd = libfile_open(LIB_NAMES_FILE, LIB_NAMES_MAGIC, NI_VERSION, sizeof(m),
-                      &h, NULL);
+    fd = libfile_open(LIB_NAMES_FILE, LIB_NAMES_MAGIC, NI_VERSION,
+                      sizeof(m[0]), &h, NULL);
     if (fd < 0)
         return false;
-    for (i = 0; i < h.count && !found; i++)
+    for (i = 0; i < h.count && !found && !past; i += n)
     {
-        if (read(fd, &m, sizeof(m)) != (ssize_t)sizeof(m))
+        ssize_t got = read(fd, m, MIN(h.count - i, (uint32_t)ARRAYLEN(m))
+                                  * sizeof(m[0]));
+
+        n = got > 0 ? (uint32_t)got / sizeof(m[0]) : 0;
+        if (!n)
             break;
-        found = (key && m.key == key) || (alt && m.key == alt);
+        for (j = 0; j < n && !found && !past; j++)
+        {
+            found = (key && m[j].key == key) || (alt && m[j].key == alt);
+            past = m[j].key > last;
+        }
     }
     close(fd);
     return found;

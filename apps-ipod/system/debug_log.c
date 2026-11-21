@@ -31,6 +31,7 @@
 #include "database/tagcache.h"
 #include "system/usb_log_file.h"
 #include "system/battery_log.h"
+#include "system/hash.h"
 #include "debug_log.h"
 
 /* ---- the table ---------------------------------------------------------- */
@@ -230,6 +231,8 @@ static void old_path(enum debug_log_id id, int n, char *buf, size_t size)
     snprintf(buf, size, "%.*s.%d%s", (int)(dot - path), path, n, dot);
 }
 
+static void end_repeats(enum debug_log_id id, int fd);
+
 static int open_locked(enum debug_log_id id)
 {
     int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_APPEND, 0666);
@@ -240,6 +243,7 @@ static int open_locked(enum debug_log_id id)
          * its stack has no room for two paths beside the rename */
         static char rotate_path[MAX_PATH], rotate_to[MAX_PATH];
 
+        end_repeats(id, fd);
         close(fd);
         mutex_lock(&rotate_lock);
         old_path(id, DEBUG_LOG_KEEP, rotate_to, sizeof rotate_to);
@@ -356,10 +360,8 @@ static int format_line(char *line, size_t size, const char *fmt, va_list ap)
 
 static uint32_t text_hash(const char *s, size_t len)
 {
-    uint32_t h = 2166136261u;
+    uint32_t h = fnv1a_bytes(s, len);
 
-    while (len--)
-        h = (h ^ (unsigned char)*s++) * 16777619u;
     return h ? h : 1;
 }
 
@@ -371,23 +373,39 @@ static uint32_t text_hash(const char *s, size_t len)
  * left out if one is due, its length in *note_len or 0. */
 #define REPEAT_NOTE_TICKS (10*60*HZ)
 
+/* The note of the repeats counted, into `note`; its length */
+static int repeat_note(struct repeats *r, char *note, size_t size, bool still)
+{
+    int n = snprintf(note, size, "[%8ld] %lu more of the %s above, "
+                     "the last at [%ld]%s\n", (long)current_tick, r->count,
+                     r->period == 1 ? "line" : "two lines", r->tick,
+                     still ? ", and still coming" : "");
+
+    r->count = 0;
+    return MIN(n, (int)size - 1);
+}
+
 static bool repeat_check(enum debug_log_id id, const char *line, int len,
                          char *note, size_t size, int *note_len)
 {
     struct repeats *r = &logs[id].rep;
     const char *text = strchr(line, ']') + 2;
     uint32_t h = text_hash(text, len - (text - line));
-    bool skip, still = false;
+    bool skip = false, still = false;
 
     *note_len = 0;
     if (r->period)
         skip = h == r->last[r->period - 1];
     else if (h == r->last[0])
-        skip = true, r->period = 1;
+    {
+        skip = true;
+        r->period = 1;
+    }
     else if (h == r->last[1] && r->last[0] == r->last[2])
-        skip = true, r->period = 2;
-    else
-        skip = false;
+    {
+        skip = true;
+        r->period = 2;
+    }
 
     if (skip)
     {
@@ -398,14 +416,7 @@ static bool repeat_check(enum debug_log_id id, const char *line, int len,
         still = TIME_AFTER(current_tick, r->since + REPEAT_NOTE_TICKS);
     }
     if (r->count && (still || !skip))
-    {
-        *note_len = snprintf(note, size, "[%8ld] %lu more of the %s above, "
-                             "the last at [%ld]%s\n", (long)current_tick,
-                             r->count, r->period == 1 ? "line" : "two lines",
-                             r->tick, still ? ", and still coming" : "");
-        *note_len = MIN(*note_len, (int)size - 1);
-        r->count = 0;
-    }
+        *note_len = repeat_note(r, note, size, still);
     if (!skip)
         r->period = 0;
 
@@ -413,6 +424,24 @@ static bool repeat_check(enum debug_log_id id, const char *line, int len,
     r->last[1] = r->last[0];
     r->last[0] = h;
     return skip;
+}
+
+/* With the log's lock held, before a header, the switched-off line or a
+ * rotation: the held lines and the note of any repeats go in first, and
+ * nothing after it counts as a repeat of what came before */
+static void end_repeats(enum debug_log_id id, int fd)
+{
+    struct repeats *r = &logs[id].rep;
+
+    if (log_info[id].held)
+        flush_into(id, fd);
+    if (r->count)
+    {
+        char note[96];
+
+        write(fd, note, repeat_note(r, note, sizeof note, false));
+    }
+    memset(r, 0, sizeof(*r));
 }
 
 /* With the log's lock held; below the held lines, so the file stays in
@@ -514,9 +543,7 @@ void debug_log_header(enum debug_log_id id, const char *what)
 
     if (fd < 0)
         return;
-    /* Lines held from before go above it */
-    if (log_info[id].held)
-        flush_into(id, fd);
+    end_repeats(id, fd);
     write_header(fd, id, what);
     debug_log_close(id, fd);
 }
@@ -554,8 +581,7 @@ void debug_log_apply(void)
         fd = debug_log_open(id);
         if (fd < 0)
             continue;
-        if (log_info[id].held)
-            flush_into(id, fd);
+        end_repeats(id, fd);
         fdprintf(fd, "%s %s log switched off%s\n", log_info[id].mark,
                  log_info[id].name, off_reason);
         debug_log_close(id, fd);

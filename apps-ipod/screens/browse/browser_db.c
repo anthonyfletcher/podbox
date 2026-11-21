@@ -3204,6 +3204,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     /* Before the search, which the table's own build cannot run inside */
     bool split = tag == tag_albumartist && c->currtable == TABLE_NAVIBROWSE
                  && db_names_ensure();
+    bool split_counted = false;
 
     if (split)
         memset(split_state, 0, sizeof(split_state));
@@ -3651,8 +3652,10 @@ entry_skip_formatter:
         }
     }
 
-    /* The crawl read whole, so every part present is known */
-    if (split && !c->dirfull)
+    /* The crawl read whole, so every part present is known, and counted
+     * here */
+    split_counted = split && !c->dirfull;
+    if (split_counted)
     {
         dptr = add_split_rows(c, dptr, offset, &total_count, &namebufused,
                               order_prefix, artist_by_plays);
@@ -3744,7 +3747,7 @@ entry_skip_formatter:
 
     /* A list too long to hold whole: the split artists' rows are counted at
      * its end, and written when a page reaches them */
-    if (split && c->dirfull)
+    if (split && c->dirfull && !split_counted)
         add_split_rows(c, NULL, INT_MAX, &total_count, &namebufused,
                        order_prefix, artist_by_plays);
 

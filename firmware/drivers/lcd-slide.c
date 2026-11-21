@@ -69,6 +69,12 @@ void lcd_release_updates(void)
     send_deferred();
 }
 
+void lcd_end_hold(void)
+{
+    held = false;
+    drop_deferred();
+}
+
 bool lcd_hold_rect(int x, int y, int width, int height)
 {
     if (!held)

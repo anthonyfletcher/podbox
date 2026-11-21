@@ -286,9 +286,11 @@ int  tagcache_find_path(const char *path);
  * album's tracks in the master index. Play figures follow every counted play.
  * Rows are copied out, the tables living in a buffer that can move. */
 struct tagcache_album {
-    uint64_t dir_key;            /* path_key() of its first track's folder,
-                                    0 for one at the root; first, where it
-                                    needs no padding */
+    uint32_t dir_key_lo;         /* path_key() of its first track's folder,
+                                    0 for one at the root, in two halves:
+                                    the table moves in 4-byte steps;
+                                    tagcache_album_dir_key() joins them */
+    uint32_t dir_key_hi;
     int32_t  album_seek;
     int32_t  artist_seek;        /* tag_albumartist */
     int32_t  first, last;
@@ -309,6 +311,11 @@ struct tagcache_album {
                                     from 1 to 1024 of this row or an earlier
                                     row of the same album name */
 };
+
+static inline uint64_t tagcache_album_dir_key(const struct tagcache_album *r)
+{
+    return (uint64_t)r->dir_key_hi << 32 | r->dir_key_lo;
+}
 
 struct tagcache_artist {
     int32_t  seek;               /* tag_albumartist */

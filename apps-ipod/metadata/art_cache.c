@@ -48,6 +48,7 @@
 #include "art_banner.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "database/db_names.h"     /* split album artists */
+#include "database/db_featured.h"  /* DB_FEATURED_NAME_MAX */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"   /* which albums are books */
@@ -2725,12 +2726,23 @@ static void aa_split_artists(const struct aa_people_ctx *c)
 {
     for (int n = 0; aa_split && n < db_names_count() && !*c->aborted; n++)
     {
-        const char *name = db_names_name(n);
-        const struct aa_person *p = aa_person_get(art_name_hash(name), false);
+        /* Copied, as finding a person yields and the table can be rebuilt
+         * meanwhile; stopped once it no longer stands for this database */
+        char name[DB_FEATURED_NAME_MAX + 1];
+        bool own;
+        const struct aa_person *p;
 
+        if (aa_check_abort() || tagcache_is_busy() || !db_names_active())
+        {
+            *c->aborted = true;
+            break;
+        }
+        strmemccpy(name, db_names_name(n), sizeof(name));
+        own = db_names_own_seek(n) >= 0;
+        p = aa_person_get(art_name_hash(name), false);
         if (!p)
             p = aa_named_person(name, c);
-        if (db_names_own_seek(n) >= 0)
+        if (own)
             continue;
         aa_counts.artists++;
         if (p && (p->flags & AA_PERSON_ART))

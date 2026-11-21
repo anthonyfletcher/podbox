@@ -164,6 +164,7 @@ static struct codec_api *host;
 static bool host_running;
 static bool host_kicked;    /* a message comes, maybe not queued yet */
 static volatile unsigned int host_kicks; /* their count */
+static volatile long host_kick_tick;     /* when the last came */
 
 
 /** On the COP **/
@@ -430,12 +431,18 @@ static bool win_seek(size_t newpos)
     return true;
 }
 
+/* pos is in the window, or at its end */
+static bool win_holds(off_t pos)
+{
+    return pos >= sh.win_pos && pos <= sh.win_pos + (off_t)sh.win_len;
+}
+
 static void cop_advance_buffer(size_t amount)
 {
     /* the amount may be a step back, as bufadvance() takes it */
     const off_t newpos = ci_cop.curpos + (off_t)amount;
 
-    if (newpos >= sh.win_pos && newpos <= sh.win_pos + (off_t)sh.win_len)
+    if (win_holds(newpos))
         ci_cop.curpos = newpos;
     else if (newpos < 0 || newpos > ci_cop.filesize || !win_seek(newpos))
     {
@@ -469,8 +476,7 @@ static size_t cop_read_filebuf(void *ptr, size_t size)
 static bool cop_seek_buffer(size_t newpos)
 {
     /* in the window: nothing to ask */
-    if ((off_t)newpos >= sh.win_pos &&
-        (off_t)newpos <= sh.win_pos + (off_t)sh.win_len)
+    if (win_holds((off_t)newpos))
     {
         ci_cop.curpos = newpos;
         return true;
@@ -717,6 +723,7 @@ void codec_cop_kick(void)
     if (host_running)
     {
         host_kicks++;
+        host_kick_tick = current_tick;
         host_kicked = true;
         semaphore_release(&host_sem);
     }
@@ -964,10 +971,16 @@ int codec_cop_run(struct codec_api *api, int stereo_mode, int depth,
             continue;
         }
         else
+        {
             /* kicked by a sender this thread runs above (its priority
                raised as PCM ran low), the message is not in the queue yet:
-               the sender queues it when this waits, seen at the next tick */
-            semaphore_wait(&host_sem, host_kicked ? 1 : HZ/10);
+               the sender queues it when this waits, seen at the next tick.
+               A kick whose message a serve took stays set, so the ticks
+               are polled only for a while after it. */
+            const bool soon = host_kicked &&
+                TIME_BEFORE(current_tick, host_kick_tick + HZ/10);
+            semaphore_wait(&host_sem, soon ? 1 : HZ/10);
+        }
 
         if (woken && news != last_news)
         {
@@ -999,8 +1012,10 @@ int codec_cop_run(struct codec_api *api, int stereo_mode, int depth,
 
 /* MP3 keeps mpa.c's own synthesis thread on the COP, and SPC its own
    thread there too. KSS's and VGM's emulators take so much of the codec's
-   buffer that a run there is never left room. WMA Voice has no metadata
-   parser, so it never plays; VTX is built only with an FPU. */
+   buffer that a run there is never left room. NSF, AY and ASAP's formats
+   (SAP, CMC to TM2) seek by emulating up to the time, silent and asking
+   nothing, for longer than the watchdog allows a quiet run. WMA Voice has
+   no metadata parser, so it never plays; VTX is built only with an FPU. */
 bool codec_cop_wanted(int afmt)
 {
     switch (afmt)
@@ -1036,22 +1051,7 @@ bool codec_cop_wanted(int afmt)
     case AFMT_ADX:
     case AFMT_DSD:
     case AFMT_SID:
-    case AFMT_NSF:
     case AFMT_MOD:
-    case AFMT_SAP:
-    case AFMT_CMC:
-    case AFMT_CM3:
-    case AFMT_CMR:
-    case AFMT_CMS:
-    case AFMT_DMC:
-    case AFMT_DLT:
-    case AFMT_MPT:
-    case AFMT_MPD:
-    case AFMT_RMT:
-    case AFMT_TMC:
-    case AFMT_TM8:
-    case AFMT_TM2:
-    case AFMT_AY:
     case AFMT_GBS:
     case AFMT_HES:
     case AFMT_SGC:

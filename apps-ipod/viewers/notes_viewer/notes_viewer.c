@@ -155,8 +155,9 @@ struct nv_hist
 };
 
 /* How a page is asked for: by where a link goes, or from outside the screen
- * by a track, an album or a name */
-enum { NV_BY_TARGET, NV_BY_ALBUM, NV_BY_NAME };
+ * by a track, an album or a name; or by a link's name, as a page is found
+ * again once the library or the pages are renumbered */
+enum { NV_BY_TARGET, NV_BY_ALBUM, NV_BY_NAME, NV_BY_LINK };
 
 /* A request's focus: the track an album request's path names */
 #define NV_FOCUS_TRACK (-2)
@@ -215,6 +216,14 @@ static struct
     int text_top, name_y, scroll, max_scroll;
     int focus_line;             /* a track's line to open at, or -1 */
     struct name_index ix;
+
+    /* The page's album rows, tracks and page numbers, and the history's,
+     * hold under the database and the page index it was made in; after
+     * either changes, the page is found again by this link name */
+    int32_t built_commit;
+    uint32_t built_gen;
+    unsigned int built_pages;
+    char refind[NV_NAME_MAX];
 
     struct nv_hist hist[NV_HISTORY];
     int nhist;
@@ -426,8 +435,7 @@ static void nv_colours(void)
         text_viewer_colours(&fg, &bg);
         nv.fg = fg;
         nv.bg = bg;
-        nv.accent = nv_luma(fg) >= nv_luma(bg) ? color_tone_bound(ac, 70, 1)
-                                                : color_tone_bound(ac, 45, -1);
+        nv.accent = nv_readable(ac, nv_luma(fg) >= nv_luma(bg));
     }
     else
     {
@@ -443,14 +451,13 @@ static void nv_colours(void)
         {
             nv.bg = color_blend(color_tone_bound(bg, 14, -1), LCD_BLACK, 80);
             nv.fg = color_tone_bound(fg, 90, 1);
-            nv.accent = color_tone_bound(ac, 70, 1);
         }
         else
         {
             nv.bg = color_blend(color_tone_bound(bg, 94, 1), LCD_WHITE, 80);
             nv.fg = color_tone_bound(fg, 18, -1);
-            nv.accent = color_tone_bound(ac, 45, -1);
         }
+        nv.accent = nv_readable(ac, dark);
     }
     nv.dim = color_blend(nv.fg, nv.bg, 108);
     nv.head = nv.fg;
@@ -1060,7 +1067,7 @@ static void nv_heading_text(int i, char *buf, size_t size)
 
     while (*s && *s != '\n' && n + 1 < size)
     {
-        if (s[0] == 0xee && s[1] == 0x80)
+        if (s[0] == 0xee && s[1] == 0x80 && s[2])
         {
             if (s[2] == 0x83)
                 break;                          /* the heading's end */
@@ -1076,24 +1083,6 @@ static void nv_heading_text(int i, char *buf, size_t size)
         buf[n++] = *s++;
     }
     buf[n] = '\0';
-}
-
-/* A heading's text past the track number in front of it -- "5. Pink Up",
- * "2-03 Pink Up" -- or all of it */
-static const char *nv_numbered(const char *s)
-{
-    const char *p = s;
-
-    while (*p >= '0' && *p <= '9')
-        p++;
-    if (p == s)
-        return s;
-    if ((*p == '-' || *p == '.') && p[1] >= '0' && p[1] <= '9')
-        for (p++; *p >= '0' && *p <= '9'; p++)
-            ;
-    while (*p == '.' || *p == ')' || *p == '-' || *p == ':' || *p == ' ')
-        p++;
-    return *p ? p : s;
 }
 
 /* The disc a heading names -- "Disc 2", "Disk 2", "CD 2" -- or 0 */
@@ -1666,20 +1655,15 @@ static int nv_reset_callback(int action, const struct menu_item_ex *this_item,
     return action;
 }
 
-static const struct notes_target *nv_menu_target(void)
-{
-    return &nv_mt;
-}
-
 /* Play and the queue's rows: for an album or a track */
 static int nv_play_callback(int action, const struct menu_item_ex *this_item,
                             struct gui_synclist *this_list)
 {
-    const struct notes_target *t = nv_menu_target();
+    const struct notes_target *t = &nv_mt;
 
     (void)this_item;
     (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM && !(t && t->album >= 0))
+    if (action == ACTION_REQUEST_MENUITEM && !(t->album >= 0))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -1689,12 +1673,12 @@ static int nv_go_album_callback(int action,
                                 const struct menu_item_ex *this_item,
                                 struct gui_synclist *this_list)
 {
-    const struct notes_target *t = nv_menu_target();
+    const struct notes_target *t = &nv_mt;
 
     (void)this_item;
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM
-        && !(t && t->album >= 0 && t->to != NOTES_TO_TRACK))
+        && !(t->album >= 0 && t->to != NOTES_TO_TRACK))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -1703,12 +1687,12 @@ static int nv_go_artist_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)
 {
-    const struct notes_target *t = nv_menu_target();
+    const struct notes_target *t = &nv_mt;
 
     (void)this_item;
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM
-        && !(t && t->album < 0 && notes_is_artist(t->artist_seek)))
+        && !(t->album < 0 && notes_is_artist(t->artist_seek)))
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -1910,7 +1894,7 @@ static bool nv_run_menu(const struct menu_item_ex *menu)
 static bool nv_album_target(const struct notes_album *a, struct notes_target *t,
                             int *focus)
 {
-    struct notes_pages pages;
+    static struct notes_pages pages;    /* three paths: not on the stack */
     int idx = a->path[0] ? tagcache_find_path(a->path) : -1, i, n;
     int album = idx >= 0 ? tagcache_album_of(idx) : -1;
     const char *path;
@@ -1992,6 +1976,40 @@ static void nv_album_pages(const struct name_index *ix)
     }
 }
 
+/* What the page was made under, and the link name that finds it again:
+ * an album by its artist and title, a written page by its file's name, else
+ * the name it is shown by */
+static void nv_stamp(void)
+{
+    const struct notes_page *pg = notes_page_get(nv.doc.page);
+    char artist[128], title[128];
+    const char *qual = "";
+    int kind = pg ? pg->kind : nv.doc.kind;
+
+    nv.built_commit = tagcache_commit_id();
+    nv.built_gen = tagcache_generation();
+    nv.built_pages = notes_pages_generation();
+    if (nv.doc.kind == NOTES_PAGE_ALBUM && nv.doc.album >= 0 && !nv.doc.part
+        && notes_album_title(nv.doc.album, title, sizeof(title)))
+    {
+        if (notes_album_artist(nv.doc.album, artist, sizeof(artist)))
+            snprintf(nv.refind, sizeof(nv.refind), "%s - %s (album)", artist,
+                     title);
+        else
+            snprintf(nv.refind, sizeof(nv.refind), "%s (album)", title);
+        return;
+    }
+    if (pg)
+        notes_page_name(pg, title, sizeof(title));
+    else
+        strlcpy(title, nv.doc.title, sizeof(title));
+    if (kind == NOTES_PAGE_PERSON)
+        qual = " (person)";
+    else if (kind == NOTES_PAGE_ALBUM)
+        qual = " (album)";
+    snprintf(nv.refind, sizeof(nv.refind), "%s%s", title, qual);
+}
+
 static bool nv_build(const struct nv_req *r)
 {
     static struct notes_target t;
@@ -2032,7 +2050,10 @@ static bool nv_build(const struct nv_req *r)
     {
         char name[NV_NAME_MAX];
 
-        snprintf(name, sizeof(name), "%s (person)", r->name);
+        if (r->by == NV_BY_LINK)
+            strlcpy(name, r->name, sizeof(name));
+        else
+            snprintf(name, sizeof(name), "%s (person)", r->name);
         if (!notes_link_find(name, strlen(name), 0, -1, &t))
             goto none;
     }
@@ -2046,6 +2067,7 @@ static bool nv_build(const struct nv_req *r)
     nv.t = t;
     nv.doc = doc;
     nv_utf8_cut(nv.doc.title);
+    nv_stamp();
     nv_album_pages(have_ix ? &nv.ix : NULL);
     nv_markdown(src, len, arena);
     nv_layout();
@@ -2075,7 +2097,7 @@ static bool nv_build(const struct nv_req *r)
                 if (nv_disc_heading(text))
                     disc = nv_disc_heading(text);
                 else if ((!disc || disc == track_disc)
-                         && art_name_hash(nv_numbered(text)) == key)
+                         && art_name_hash(notes_numbered(text)) == key)
                     line = i;
             }
         for (i = 0; line < 0 && i < nv.nlinks; i++)
@@ -2127,6 +2149,53 @@ static bool nv_open_target(const struct notes_target *t)
     return nv_open(&r);
 }
 
+/* Whether the database or the page index has changed since the page was
+ * made, so that its album rows, tracks and page numbers no longer hold */
+static bool nv_stale(void)
+{
+    return tagcache_commit_id() != nv.built_commit
+           || tagcache_generation() != nv.built_gen
+           || notes_pages_generation() != nv.built_pages;
+}
+
+/* The page found again by its name, and the history let go, its numbers no
+ * longer holding; false when the page is gone */
+static bool nv_refind(void)
+{
+    static char name[NV_NAME_MAX];
+    struct nv_req r = { NV_BY_LINK, { 0 }, NULL, name, -1 };
+
+    nv.nhist = 0;
+    strlcpy(name, nv.refind, sizeof(name));
+    return name[0] && nv_open(&r);
+}
+
+/* Before a press acts on the page's numbers: 1 when they hold; 0 when the
+ * page was made again and drawn instead, for the press to be made on it;
+ * -1 when it is gone and the screen is to be left */
+static int nv_fresh(void)
+{
+    if (!nv_stale())
+        return 1;
+    if (!nv_refind())
+        return -1;
+    nv.cur = nv_natural(false);
+    nv_draw();
+    return 0;
+}
+
+/* `h` onto the history, its oldest let go when it is full */
+static void nv_push(const struct nv_hist *h)
+{
+    if (nv.nhist == NV_HISTORY)
+    {
+        memmove(&nv.hist[0], &nv.hist[1],
+                sizeof(nv.hist[0]) * (NV_HISTORY - 1));
+        nv.nhist--;
+    }
+    nv.hist[nv.nhist++] = *h;
+}
+
 /* Following a link: the page left goes on the history */
 static void nv_follow(const struct notes_target *t)
 {
@@ -2134,12 +2203,7 @@ static void nv_follow(const struct notes_target *t)
 
     if (!nv_open_target(t))
         return;
-    if (nv.nhist == NV_HISTORY)
-    {
-        memmove(&nv.hist[0], &nv.hist[1], sizeof(nv.hist[0]) * (NV_HISTORY - 1));
-        nv.nhist--;
-    }
-    nv.hist[nv.nhist++] = h;
+    nv_push(&h);
     nv_draw();
 }
 
@@ -2164,19 +2228,12 @@ static int nv_section_line(uint32_t key)
  * line */
 static void nv_to_section(uint32_t key)
 {
+    struct nv_hist h = { nv.t, nv.scroll, nv.cur };
     int i = nv_section_line(key);
 
     if (i < 0)
         return;
-    if (nv.nhist == NV_HISTORY)
-    {
-        memmove(&nv.hist[0], &nv.hist[1],
-                sizeof(nv.hist[0]) * (NV_HISTORY - 1));
-        nv.nhist--;
-    }
-    nv.hist[nv.nhist].t = nv.t;
-    nv.hist[nv.nhist].scroll = nv.scroll;
-    nv.hist[nv.nhist++].cur = nv.cur;
+    nv_push(&h);
     nv_scroll_to(i);
     nv.cur = nv_natural(false);
     nv_draw();
@@ -2271,6 +2328,10 @@ static void nv_insert(const struct notes_target *t, int position)
 
 /* ---- the screen, and its entry points ---------------------------------- */
 
+/* Whether the screen holds the app buffer: a claim that fails after the
+ * queue let it go leaves nothing for the screen's end to release */
+static bool nv_claimed;
+
 /* The app buffer, carved up. False with no room. */
 static bool nv_claim(void)
 {
@@ -2300,13 +2361,16 @@ static bool nv_claim(void)
     nv.nlines = nv.nlinks = 0;
     nv.cur = -1;
     nv_dirty = false;
+    nv_claimed = true;
     return true;
 }
 
 static void nv_release(void)
 {
     nv_unboost(true);
-    app_release_buffer("notes");
+    if (nv_claimed)
+        app_release_buffer("notes");
+    nv_claimed = false;
 }
 
 /* The page on screen made again, where it was: after the buffer was let go
@@ -2335,7 +2399,7 @@ static bool nv_reopen(void)
     int scroll = nv.scroll, cur = nv.cur;
 
     nv.slot.valid = false;
-    if (!nv_open_target(&nv.t))
+    if (nv_stale() ? !nv_refind() : !nv_open_target(&nv.t))
         return false;
     nv.scroll = scroll;
     nv_clamp_scroll();
@@ -2374,6 +2438,16 @@ static int nv_menu_run(bool page)
     nv_do = NV_DO_NONE;
     if (nv_run_menu(&nv_menu))
         return GO_TO_ROOT;
+    /* The library or the pages changed while the menu was up: what it chose
+     * may no longer be what it showed */
+    if (nv_do != NV_DO_NONE && nv_do != NV_DO_BANNER && nv_stale())
+    {
+        if (!nv_refind())
+            return GO_TO_PREVIOUS;
+        nv.cur = nv_natural(false);
+        nv_draw();
+        return -1;
+    }
     switch (nv_do)
     {
         case NV_DO_PLAY:
@@ -2508,10 +2582,25 @@ static int nv_run(const struct nv_req *r)
 
     while (1)
     {
-        int action, go;
+        int action, go, fresh = 1;
 
         keyclick_set_callback(nv_keyclick, NULL);
         action = get_action(CONTEXT_WPS, nv_dirty ? TIMEOUT_NOBLOCK : NV_POLL);
+
+        switch (action)
+        {
+            case ACTION_WPS_BROWSE:
+            case ACTION_WPS_SKIPNEXT:
+            case ACTION_WPS_CONTEXT:
+            case ACTION_WPS_SKIPPREV:
+            case ACTION_WPS_PLAY:
+            case ACTION_WPS_QUICKSCREEN:
+                if ((fresh = nv_fresh()) < 0)
+                    goto done;
+                break;
+        }
+        if (!fresh)
+            continue;
 
         switch (action)
         {

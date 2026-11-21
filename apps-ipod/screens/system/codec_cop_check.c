@@ -30,6 +30,7 @@
 #include "widgets/splash.h"
 #include "input/action.h"
 #include "api/misc.h"
+#include "system/hash.h"
 
 #define CHECK_MS        30000
 #define CHECK_FILES     40
@@ -61,9 +62,9 @@ static void hash_sink(const void *ch1, const void *ch2, int count,
         n = count * 2;
     for (int i = 0; i < n; i++)
     {
-        hash = (hash ^ (uint32_t)a[i]) * 16777619u;
+        hash = (hash ^ (uint32_t)a[i]) * FNV1A_PRIME;
         if (fmt->stereo_mode == STEREO_NONINTERLEAVED && b != NULL)
-            hash = (hash ^ (uint32_t)b[i]) * 16777619u;
+            hash = (hash ^ (uint32_t)b[i]) * FNV1A_PRIME;
     }
     (void)track_ms;
 }
@@ -123,7 +124,7 @@ static int decode_once(const char *path, void *window, bool cop,
 {
     int rc;
 
-    hash = 2166136261u;
+    hash = FNV1A_BASIS;
     track_decode_on_cop(cop);
     rc = track_decode_run(path, 0, CHECK_MS, window, CHECK_WINDOW,
                           hash_sink, NULL, check_abort, ms);

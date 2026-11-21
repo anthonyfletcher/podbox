@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include "config.h"
 #include "system.h"
+#include "kernel.h"                 /* yield */
 #include "string-extra.h"
 #include "database/tagcache.h"
 #include "metadata/art_name.h"
@@ -70,6 +71,22 @@ static char nl_buf[256], nl_trim[256];
  * album at a time, so it is tried next */
 static int nl_last_album = -1;
 
+/* A link to a track found nowhere nearer reads every title in the library:
+ * a page's first NL_ANYWHERE_MAX such links look, and the rest are plain */
+#define NL_ANYWHERE_MAX 8
+static int nl_anywhere;
+
+void notes_breathe(void)
+{
+    static long next;
+
+    if (TIME_AFTER(current_tick, next))
+    {
+        yield();
+        next = current_tick + HZ / 50;
+    }
+}
+
 size_t notes_links_need(void)
 {
     int n = tagcache_album_count();
@@ -98,6 +115,7 @@ bool notes_links_begin(void *buf, size_t size, const struct name_index *ix)
     nl.n = 0;
     nl.ix = ix;
     nl_last_album = -1;
+    nl_anywhere = 0;
     if (n <= 0 || n * sizeof(struct nl_album) > size)
         return false;
     nl.a = buf;
@@ -107,6 +125,7 @@ bool notes_links_begin(void *buf, size_t size, const struct name_index *ix)
         struct tagcache_album row;
         const char *t;
 
+        notes_breathe();
         memset(e, 0, sizeof(*e));
         if (!tagcache_album_get(i, &row)
             || !nl_string(tag_album, row.album_seek, nl_buf, sizeof(nl_buf)))
@@ -193,7 +212,7 @@ int notes_page_album(int page)
     if (pg->dir)
     {
         for (i = 0; i < nl.n; i++)
-            if (tagcache_album_get(i, &row) && row.dir_key == pg->dir)
+            if (tagcache_album_get(i, &row) && tagcache_album_dir_key(&row) == pg->dir)
                 return i;
         return -1;
     }
@@ -316,8 +335,7 @@ static int nl_reserved(const char *name, size_t len, size_t bare, int *entry)
     return NL_ANY;
 }
 
-/* The " - " that parts an artist from a title in `len` bytes of `name` */
-static const char *nl_dash(const char *name, size_t len)
+const char *notes_dash(const char *name, size_t len)
 {
     const char *s;
 
@@ -325,6 +343,16 @@ static const char *nl_dash(const char *name, size_t len)
         if (!strncmp(s, " - ", 3))
             return s;
     return NULL;
+}
+
+/* The key of "Artist - Title": `len` bytes of `name`, parted at `dash` */
+static uint32_t nl_work_key(const char *name, size_t len, const char *dash)
+{
+    static char a[256], b[256];
+
+    snprintf(a, sizeof(a), "%.*s", (int)(dash - name), name);
+    snprintf(b, sizeof(b), "%.*s", (int)(name + len - dash - 3), dash + 3);
+    return art_name_work_hash(a, b);
 }
 
 /* Whether entry `idx` is titled `key`, as tagged or through Trim Titles */
@@ -349,8 +377,11 @@ static int nl_track_in(int album, uint32_t key)
     if (album < 0 || !tagcache_album_get(album, &row))
         return -1;
     for (idx = row.first; idx <= row.last; idx++)
+    {
+        notes_breathe();
         if (tagcache_album_of(idx) == album && nl_titled(idx, key))
             return idx;
+    }
     return -1;
 }
 
@@ -376,6 +407,8 @@ static bool nl_track(uint32_t key, uint32_t artist, int album, bool anywhere,
         if (i != album && i != last && nl.a[i].artist == artist
             && nl_track_at(i, key, t))
             return true;
+    if (anywhere && nl_anywhere++ >= NL_ANYWHERE_MAX)
+        return false;
     for (i = 0; anywhere && i < nl.n; i++)
         if (i != album && i != last
             && !(artist && nl.a[i].artist == artist)
@@ -491,7 +524,7 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
     t->artist_seek = -1;
     if (kind != NL_ANY)
         len = bare;
-    dash = nl_dash(name, len);
+    dash = notes_dash(name, len);
     k.key = t->key = art_name_hash_n(name, len);
     k.alt = art_name_alt_hash_n(name, len);
     k.artist = artist;
@@ -526,14 +559,7 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
         return true;
     }
     if (dash)
-    {
-        static char a[256], b[256];
-
-        snprintf(a, sizeof(a), "%.*s", (int)(dash - name), name);
-        snprintf(b, sizeof(b), "%.*s", (int)(name + len - dash - 3),
-                 dash + 3);
-        k.work = art_name_work_hash(a, b);
-    }
+        k.work = nl_work_key(name, len, dash);
 
     /* 1 to 4: the pages */
     if (nl_found_page(nl_page(kind == NL_ALBUM ? NOTES_PAGE_ALBUM
@@ -579,17 +605,10 @@ bool notes_link_find(const char *name, size_t len, uint32_t artist,
 
 int notes_album_named(const char *name, size_t len, uint32_t artist)
 {
-    static char a[256], b[256];
-    const char *dash = nl_dash(name, len);
+    const char *dash = notes_dash(name, len);
     int i;
 
-    if (dash)
-    {
-        snprintf(a, sizeof(a), "%.*s", (int)(dash - name), name);
-        snprintf(b, sizeof(b), "%.*s", (int)(name + len - dash - 3),
-                 dash + 3);
-        if ((i = nl_album_work(art_name_work_hash(a, b))) >= 0)
-            return i;
-    }
+    if (dash && (i = nl_album_work(nl_work_key(name, len, dash))) >= 0)
+        return i;
     return nl_album_titled(art_name_hash_n(name, len), artist);
 }

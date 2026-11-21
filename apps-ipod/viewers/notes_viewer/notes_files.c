@@ -37,6 +37,7 @@
 #include "database/tagcache.h"
 #include "database/path_key.h"
 #include "system/library_files.h"
+#include "system/strutil.h"         /* BOM_UTF_8 */
 #include "settings/settings.h"
 #include "metadata/art_name.h"
 #include "metadata/name_index.h"   /* name_index_pages_changed */
@@ -55,6 +56,7 @@
 static struct
 {
     bool loaded;                /* the index answers; else there are none */
+    unsigned int generation;    /* counts each index loaded or replaced */
     int npages, pool_used;
     struct notes_page pages[NW_PAGES_MAX];
     char pool[NW_POOL];
@@ -107,6 +109,22 @@ static unsigned int nw_work_key(const char *artist, size_t alen,
     return art_name_work_hash(alen ? a : NULL, t);
 }
 
+/* Whether the index read from the file holds together: every path inside
+ * the pool, which ends in a NUL, and every kind one there is */
+static bool nw_valid(int npages, int pool_used)
+{
+    int i;
+
+    if (npages && (!pool_used || nw.pool[pool_used - 1]))
+        return false;
+    for (i = 0; i < npages; i++)
+        if (nw.pages[i].path >= (uint32_t)pool_used
+            || nw.pages[i].kind < NOTES_PAGE_PERSON
+            || nw.pages[i].kind > NOTES_PAGE_OTHER)
+            return false;
+    return true;
+}
+
 bool notes_where_load(void)
 {
     struct nw_header h;
@@ -114,6 +132,7 @@ bool notes_where_load(void)
     bool ok;
 
     nw.loaded = false;
+    nw.generation++;
     if (fd < 0)
         return false;
     ok = read(fd, &h, sizeof(h)) == (ssize_t)sizeof(h) && h.magic == NW_MAGIC
@@ -121,7 +140,8 @@ bool notes_where_load(void)
          && h.pool_used >= 0 && h.pool_used <= NW_POOL
          && read(fd, nw.pages, h.npages * sizeof(nw.pages[0]))
             == (ssize_t)(h.npages * sizeof(nw.pages[0]))
-         && read(fd, nw.pool, h.pool_used) == h.pool_used;
+         && read(fd, nw.pool, h.pool_used) == h.pool_used
+         && nw_valid(h.npages, h.pool_used);
     close(fd);
     if (ok)
     {
@@ -130,6 +150,11 @@ bool notes_where_load(void)
         nw.loaded = true;
     }
     return ok;
+}
+
+unsigned int notes_pages_generation(void)
+{
+    return nw.generation;
 }
 
 void notes_where_begin(void)
@@ -185,7 +210,8 @@ static bool nw_unstage(void)
         uint32_t size;
 
         ok = read(fd, pg, sizeof(*pg)) == (ssize_t)sizeof(*pg)
-             && (size = pg->path) > 0 && nw.pool_used + size <= NW_POOL
+             && (size = pg->path) > 0
+             && size <= (uint32_t)(NW_POOL - nw.pool_used)
              && read(fd, nw.pool + nw.pool_used, size) == (ssize_t)size;
         if (!ok)
             break;
@@ -214,14 +240,8 @@ static void nw_found_in_notes(const char *path, const char *rel,
                art_name_alt_hash_n(leaf, len), part, 0, 0, path, rank);
     else if (flen == 6 && !strncasecmp(rel, "Albums", 6))
     {
-        const char *dash = NULL, *s;
+        const char *dash = notes_dash(leaf, len);
 
-        for (s = leaf; s + 3 <= leaf + len; s++)
-            if (!strncmp(s, " - ", 3))
-            {
-                dash = s;
-                break;
-            }
         if (dash)
             nw_add(NOTES_PAGE_ALBUM,
                    nw_work_key(leaf, dash - leaf, dash + 3,
@@ -313,6 +333,7 @@ void notes_where_end(bool completed)
     }
 
     nw.loaded = false;
+    nw.generation++;
     if (!nw_unstage())
     {
         remove(NW_STAGE);
@@ -400,29 +421,24 @@ static const struct notes_page *nw_match(int kind, unsigned int key,
     return found;
 }
 
-/* The best page beside the music in the folder whose key is `dir` */
-static const struct notes_page *nw_beside(uint64_t dir, int kind)
-{
-    const struct notes_page *found = NULL;
-    int i, n = notes_page_count();
-
-    for (i = 0; i < n; i++)
-        if (nw.pages[i].dir == dir && nw.pages[i].kind == kind
-            && notes_page_better(&nw.pages[i], found))
-            found = &nw.pages[i];
-    return found;
-}
-
 /* ---- the lookups for a track and an album ------------------------------ */
 
-/* The page beside the music in the first `dirlen` bytes of `dir` */
+/* The best page beside the music in the first `dirlen` bytes of `dir` */
 static const struct notes_page *nw_in_dir(const char *dir, size_t dirlen,
                                           int kind)
 {
     static char folder[MAX_PATH];
+    const struct notes_page *found = NULL;
+    int i, n = notes_page_count();
+    uint64_t key;
 
     snprintf(folder, sizeof(folder), "%.*s", (int)dirlen, dir);
-    return nw_beside(path_key(folder), kind);
+    key = path_key(folder);
+    for (i = 0; i < n; i++)
+        if (nw.pages[i].dir == key && nw.pages[i].kind == kind
+            && notes_page_better(&nw.pages[i], found))
+            found = &nw.pages[i];
+    return found;
 }
 
 void notes_page_name(const struct notes_page *pg, char *name, size_t size)
@@ -581,6 +597,24 @@ bool notes_has_bio(const char *name)
 
 /* ---- a page's front matter --------------------------------------------- */
 
+bool notes_yaml_line(const char *s)
+{
+    int n;
+
+    if (*s == '\n' || *s == '\r' || !*s || strchr(" \t-#.", *s))
+        return true;
+    for (n = 0; n < 32; n++, s++)
+    {
+        unsigned char c = *s;
+
+        if (!((c >= '0' && c <= '9')
+              || ((c | 0x20) >= 'a' && (c | 0x20) <= 'z')
+              || c >= 0x80 || (c && strchr("_- .\"'", c))))
+            break;
+    }
+    return *s == ':';
+}
+
 size_t notes_front_value(const char *text, const char *key, char *buf,
                          size_t size)
 {
@@ -588,8 +622,8 @@ size_t notes_front_value(const char *text, const char *key, char *buf,
     const char *s = text;
 
     buf[0] = '\0';
-    if (!strncmp(s, "\xef\xbb\xbf", 3))
-        s += 3;
+    if (!strncmp(s, BOM_UTF_8, BOM_UTF_8_SIZE))
+        s += BOM_UTF_8_SIZE;
     if (strncmp(s, "---\n", 4) && strncmp(s, "---\r\n", 5))
         return 0;
     while ((s = strchr(s, '\n')) && *++s)
@@ -597,7 +631,8 @@ size_t notes_front_value(const char *text, const char *key, char *buf,
         const char *v = s + klen + 1, *end;
         size_t n;
 
-        if (!strncmp(s, "---", 3) || !strncmp(s, "...", 3))
+        if (!strncmp(s, "---", 3) || !strncmp(s, "...", 3)
+            || !notes_yaml_line(s))
             break;
         if (strncasecmp(s, key, klen) || s[klen] != ':')
             continue;

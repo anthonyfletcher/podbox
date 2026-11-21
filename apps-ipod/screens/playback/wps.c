@@ -612,10 +612,10 @@ static void leave_for_list(void)
     gwps_leave_wps(true);
 }
 
+/* The slide is begun after the stop, which can wait on the disk for longer
+ * than a transition's hold lasts */
 static long do_wps_exit(long action)
 {
-    transition_begin(TRANSITION_BACK);
-    transition_whole_screen();
     audio_pause();
     update_non_static();
     book_resume_save();
@@ -623,6 +623,8 @@ static long do_wps_exit(long action)
 
     ab_reset_markers();
 
+    transition_begin(TRANSITION_BACK);
+    transition_whole_screen();
     gwps_leave_wps(true);
     (void)action;
     if (global_settings.browse_current)

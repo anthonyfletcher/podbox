@@ -82,6 +82,17 @@ static bool artist_split(const struct tagcache_artist *r, bool split)
     return split && db_names_is_joint(r->seek);
 }
 
+/* Whether split artist k has an entry by their own string: they have one,
+ * and it is not hidden. One who has not is entered after the rest. */
+static bool part_listed_alone(int k)
+{
+    struct tagcache_artist own;
+    long seek = db_names_own_seek(k);
+
+    return seek >= 0 && tagcache_artist_get(tagcache_artist_find(seek), &own)
+           && !artist_hidden(&own);
+}
+
 static void artist_record(struct artist_data *d,
                           const struct tagcache_artist *r)
 {
@@ -110,7 +121,7 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
             && !artist_split(&r, split))
             n++;
     for (int k = 0; k < np; k++)
-        if (db_names_own_seek(k) < 0 && db_names_artist(k, artist_hidden, &r))
+        if (!part_listed_alone(k) && db_names_artist(k, artist_hidden, &r))
             n++;
     if (n == 0)
         return ERROR_NO_ARTISTS;
@@ -134,7 +145,7 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
         n++;
     }
     for (int k = 0; k < np; k++)
-        if (db_names_own_seek(k) < 0 && db_names_artist(k, artist_hidden, &r))
+        if (!part_listed_alone(k) && db_names_artist(k, artist_hidden, &r))
             artist_record(&t->artist_index[n++], &r);
     t->artist_ct = n;
     p += n * sizeof(struct artist_data);

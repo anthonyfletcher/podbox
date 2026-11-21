@@ -1098,6 +1098,7 @@ static void albums_note_path(int idx_id, const char *filename)
 {
     static char dir[TAGCACHE_BUFSZ];
     struct tagcache_album *r;
+    uint64_t key;
     char *sep;
     int n;
 
@@ -1115,7 +1116,9 @@ static void albums_note_path(int idx_id, const char *filename)
         return;
     *sep = '\0';                     /* track file -> album folder */
     r->art_hash = art_cache_dir_hash(dir);
-    r->dir_key = path_key(dir);
+    key = path_key(dir);
+    r->dir_key_lo = (uint32_t)key;
+    r->dir_key_hi = (uint32_t)(key >> 32);
 }
 
 /* The name at 'seek' in the RAM copy of tag file 'tag', or NULL for none or

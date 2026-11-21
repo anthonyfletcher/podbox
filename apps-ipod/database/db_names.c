@@ -119,8 +119,9 @@ static void timed_yield(void)
     }
 }
 
-/* One joint string into the table, whole or not at all: one that does not
- * fit stays one artist, rather than lose an artist it names. */
+/* One joint string into the table, whole or not at all: one the table has
+ * no room for stays one artist. The names are db_names_split()'s, which has
+ * already left out any it cannot keep (one byte, past 63 or past the 8th). */
 static void add_joint(long seek, const struct db_featured_names *names)
 {
     struct joint *j = &joints[joint_ct];

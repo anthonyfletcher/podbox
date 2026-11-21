@@ -247,19 +247,19 @@ static void fi_walk(int depth)
              * and /Notes the bios and liner notes, which are no books --
              * while Liner Notes and Biographies is on to read them, and
              * walked then for the notes table alone */
-            if (depth > 0 || !global_settings.liner_notes
-                || strcasecmp((char *)entry->d_name, "Notes"))
+            if (depth == 0 && !strcasecmp((char *)entry->d_name, "Artwork"))
             {
-                if (depth > 0
-                    || strcasecmp((char *)entry->d_name, "Artwork"))
-                    fi_walk(depth + 1);
+                /* not walked */
             }
-            else
+            else if (depth == 0 && global_settings.liner_notes
+                     && !strcasecmp((char *)entry->d_name, "Notes"))
             {
                 fi_notes_only = true;
                 fi_walk(depth + 1);
                 fi_notes_only = false;
             }
+            else
+                fi_walk(depth + 1);
         }
         else if (fi_notes_only)
             notes_where_found(fi_path, info.size, info.mtime);

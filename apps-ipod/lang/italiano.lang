@@ -24205,13 +24205,13 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT
-  desc: splash at boot: a debug log is on, and off in hours:minutes
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on, off in %d:%02d"
+    *: none
   </source>
   <dest>
-    *: "Log di debug attivi, fino a %d:%02d"
+    *: none
   </dest>
   <voice>
     *: none
@@ -24219,16 +24219,16 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG_BOOT_NEVER
-  desc: splash at boot: a debug log is on and stays on
+  desc: deprecated
   user: core
   <source>
-    *: "Debug logs on"
+    *: none
   </source>
   <dest>
-    *: "Log di debug attivi"
+    *: none
   </dest>
   <voice>
-    *: "Log di debug attivi"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -25213,16 +25213,16 @@
 </phrase>
 <phrase>
   id: LANG_ROW_HIDDEN
-  desc: splash after a row is hidden
+  desc: deprecated
   user: core
   <source>
-    *: "Hidden. Show it again in Appearance > Menus"
+    *: none
   </source>
   <dest>
-    *: "Nascosta. Mostrala di nuovo in Aspetto > Menu"
+    *: none
   </dest>
   <voice>
-    *: "Nascosta. Mostrala di nuovo in Aspetto > Menu"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -27774,6 +27774,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPLIT_ALBUM_ARTISTS
+  desc: in Music settings: list an album under each artist its Album Artist tag names, separated by ;
+  user: core
+  <source>
+    *: "Split Album Artists"
+  </source>
+  <dest>
+    *: "Dividi artisti album"
+  </dest>
+  <voice>
+    *: "Dividi artisti album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_WHICH_ARTIST
+  desc: title of the list Go to Artist shows for an album filed under several artists
+  user: core
+  <source>
+    *: "Which Artist?"
+  </source>
+  <dest>
+    *: "Quale artista?"
+  </dest>
+  <voice>
+    *: "Quale artista?"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_NOTES_LINK_COLOUR
   desc: liner notes custom colours: the colour of links
   user: core
@@ -27813,6 +27841,34 @@
   </dest>
   <voice>
     *: "Nero"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCREEN_TRANSITIONS
+  desc: in Appearance > Interface Elements: how one screen gives way to the next
+  user: core
+  <source>
+    *: "Screen Transitions"
+  </source>
+  <dest>
+    *: "Transizioni schermo"
+  </dest>
+  <voice>
+    *: "Transizioni schermo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRANSITION_SLIDE
+  desc: Screen Transitions option: the next screen slides in from the side
+  user: core
+  <source>
+    *: "Slide"
+  </source>
+  <dest>
+    *: "Scorrimento"
+  </dest>
+  <voice>
+    *: "Scorrimento"
   </voice>
 </phrase>
 <phrase>

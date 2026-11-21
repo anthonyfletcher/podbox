@@ -123,11 +123,16 @@ static bool tl_is_minor_mark(const unsigned char *s, size_t n)
 
 size_t tl_hidden(const unsigned char *s, size_t n)
 {
-    return tl_is_shy(s, n) ? 2
-           : tl_is_heading_mark(s, n) || tl_is_style_mark(s, n)
-             || tl_is_item_mark(s, n) || tl_is_minor_mark(s, n) ? 3
-           : tl_note_mark(s, n) ? tl_note_mark(s, n)
-           : tl_span(s, n, TL_HIDE_OPEN, TL_HIDE_CLOSE);
+    size_t note;
+
+    if (tl_is_shy(s, n))
+        return 2;
+    if (tl_is_heading_mark(s, n) || tl_is_style_mark(s, n)
+        || tl_is_item_mark(s, n) || tl_is_minor_mark(s, n))
+        return 3;
+    if ((note = tl_note_mark(s, n)))
+        return note;
+    return tl_span(s, n, TL_HIDE_OPEN, TL_HIDE_CLOSE);
 }
 
 int tl_item_indent(const struct text_layout *tl, unsigned char *s, size_t n,

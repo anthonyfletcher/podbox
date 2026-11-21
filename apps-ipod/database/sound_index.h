@@ -86,6 +86,9 @@ struct sound_record
                                   an update retries it. See sound_index.c */
 #define SOUND_F_NO_MODE  0x10  /* Pitch content did not settle on a mode --
                                   common, and not a fault. See chroma.h */
+#define SOUND_F_WIDE     0x20  /* Measured with a 16-bit codec's samples
+                                  widened. Such a codec's record without it
+                                  read them as 32-bit, and is stale */
 
 /* How far the tempo may wander and still be usable. Two bounds in two units,
  * because each is dominated by something different.
@@ -152,8 +155,10 @@ int sound_index_begin(int capacity, bool fresh);
 
 /* Whether this track is already measured and still current -- the staleness
  * rule described on the record above, in one place so the two front ends
- * cannot disagree about it. Pass 0 for an mtime that is not known. */
-bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size);
+ * cannot disagree about it. Pass 0 for an mtime that is not known. 'afmt'
+ * is the file's probe_file_format(): see SOUND_F_WIDE. */
+bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size,
+                      unsigned int afmt);
 
 /* Add one record, replacing any the file already holds for the same key.
  * Replacing rather than appending is what stops an update leaving two

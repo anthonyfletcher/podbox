@@ -29,6 +29,7 @@
 #include "system/library_files.h"
 #include "file.h"
 #include "core_alloc.h"
+#include "metadata.h"
 #include "audio/track_decode.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
@@ -76,6 +77,7 @@ struct key_entry
     uint32_t size;
     uint32_t ordinal;   /* Position in the working file */
     uint8_t  seen;      /* The run reached this track. See sound_index_seen() */
+    uint8_t  wide;      /* The record has SOUND_F_WIDE */
 };
 
 static int          part_fd = -1;
@@ -159,6 +161,7 @@ void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,
 
     memset(out, 0, sizeof (*out));
 
+    out->flags     = SOUND_F_WIDE;
     out->key       = key;
     out->mtime     = mtime;
     out->size      = size;
@@ -307,6 +310,7 @@ static void table_append(struct key_entry *t, const struct sound_record *r,
     t[table_used].size = r->size;
     t[table_used].ordinal = (uint32_t)table_used;
     t[table_used].seen = seen;
+    t[table_used].wide = (r->flags & SOUND_F_WIDE) != 0;
     table_used++;
 }
 
@@ -573,7 +577,30 @@ void sound_index_seen(uint64_t key)
         t[i].seen = 1;
 }
 
-bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size)
+/* The codecs that hand the decoder int16 samples */
+static bool narrow_format(unsigned int afmt)
+{
+    switch (afmt)
+    {
+        case AFMT_OPUS: case AFMT_SPEEX: case AFMT_ADX:
+        case AFMT_SID: case AFMT_NSF: case AFMT_AY:
+#ifdef HAVE_FPU
+        case AFMT_VTX:
+#endif
+        case AFMT_GBS: case AFMT_HES: case AFMT_SGC: case AFMT_VGM:
+        case AFMT_KSS:
+        case AFMT_SAP: case AFMT_CMC: case AFMT_CM3: case AFMT_CMR:
+        case AFMT_CMS: case AFMT_DMC: case AFMT_DLT: case AFMT_MPT:
+        case AFMT_MPD: case AFMT_RMT: case AFMT_TMC: case AFMT_TM8:
+        case AFMT_TM2:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size,
+                      unsigned int afmt)
 {
     struct key_entry *t = table();
     int i = find_entry(key);
@@ -581,6 +608,9 @@ bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size)
     if (t != NULL && i >= 0)
     {
         if (t[i].size != size)
+            return false;
+
+        if (!t[i].wide && narrow_format(afmt))
             return false;
 
         /* Zero on either side is "not known", which is what a desktop tool
@@ -626,6 +656,7 @@ bool sound_index_add(const struct sound_record *r)
         t[at].mtime = r->mtime;
         t[at].size = r->size;
         t[at].seen = 1;
+        t[at].wide = (r->flags & SOUND_F_WIDE) != 0;
 
         /* The key set is unchanged, so a sorted table stays sorted and the
          * count in the header still describes the file. */

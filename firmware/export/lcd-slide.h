@@ -34,6 +34,9 @@ void lcd_hold_updates(long ticks);
 bool lcd_updates_held(void);
 /* Ends a hold and sends what it deferred, from the framebuffer. */
 void lcd_release_updates(void);
+/* Ends a hold and drops what it deferred, for a caller about to send the
+ * whole screen. */
+void lcd_end_hold(void);
 
 /* The driver's hook, first thing in each of its update calls: true when
  * the rectangle was deferred and the caller is to send nothing. A hold

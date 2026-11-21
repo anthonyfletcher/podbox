@@ -36,6 +36,7 @@
 
 /* A healthy block takes well under a millisecond */
 #define JOB_TIMEOUT HZ
+#define JOB_STUCK   (5*HZ)
 
 static struct
 {
@@ -49,8 +50,11 @@ static struct
 static struct semaphore job_sem SHAREDBSS_ATTR;
 static struct semaphore done_sem SHAREDBSS_ATTR;
 
-/* The COP's alone once created (create_thread writes the CPU's cache back) */
-static long worker_stack[DEFAULT_STACK_SIZE / sizeof(long)];
+/* The COP's alone once created (create_thread writes the CPU's cache back).
+   It must own whole cache lines: both cores write their whole caches back
+   every cached block, and a line shared with the CPU's variables below is
+   then overwritten by whichever core writes it last. */
+static long worker_stack[DEFAULT_STACK_SIZE / sizeof(long)] CACHEALIGN_ATTR;
 
 /* The CPU's alone */
 static struct mutex eq_mutex;
@@ -96,16 +100,10 @@ static bool coherent(const void *p)
 bool eq_cop_run(eq_cop_bands_fn bands, int32_t * const buf[], int count,
                 unsigned int channels)
 {
-    /* While the COP still has a block, the filters are its: anything else
-       passes unfiltered, as from the USB sound card's interrupt, or after a
-       timeout until the late block comes back */
+    /* While the COP has a block, the filters are its: the USB sound card's
+       interrupt then passes its block unfiltered */
     if (job_out)
-    {
-        if (!is_thread_context() ||
-            semaphore_wait(&done_sem, 0) != OBJ_WAIT_SUCCEEDED)
-            return true;
-        job_out = false;
-    }
+        return true;
 
     if (state != EQ_COP_RUNNING || !is_thread_context())
         return false;
@@ -123,10 +121,16 @@ bool eq_cop_run(eq_cop_bands_fn bands, int32_t * const buf[], int count,
 
     job_out = true;
     semaphore_release(&job_sem);
-    if (semaphore_wait(&done_sem, JOB_TIMEOUT) == OBJ_WAIT_SUCCEEDED)
-        job_out = false;
-    else
-        state = EQ_COP_TIMED_OUT;   /* the next blocks are the CPU's */
+    if (semaphore_wait(&done_sem, JOB_TIMEOUT) != OBJ_WAIT_SUCCEEDED)
+    {
+        /* The next blocks are the CPU's. This one, its filters and, cached,
+           its lines are the COP's until it hands them back: moving on first
+           lets its late write-back land on the buffer's next contents. A
+           COP silent for JOB_STUCK more is hung, and writes nothing late. */
+        state = EQ_COP_TIMED_OUT;
+        semaphore_wait(&done_sem, JOB_STUCK);
+    }
+    job_out = false;
 
     return true;
 }

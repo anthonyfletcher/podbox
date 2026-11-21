@@ -49,11 +49,10 @@ static size_t           window_fill;  /* Valid bytes in it */
 static struct mp3entry  id3;
 static struct codec_api dci;
 static struct track_pcm fmt;
-/* The codec announced 16 bits or fewer, so it hands over int16 samples, as
- * dsp_sample_input.c takes them. Opus does. The sink is given int32 from
- * every codec, so these are widened on the way through. */
-static bool             narrow;
-static int              codec_depth;  /* As the codec announced it */
+/* As the codec announced it. At 16 bits or fewer it hands over int16
+ * samples, as dsp_sample_input.c takes them; Opus does. The sink is given
+ * int32 from every codec, so these are widened on the way through. */
+static int              codec_depth;
 #define WIDEN_FRAMES    256
 static int32_t          widened[2][WIDEN_FRAMES];
 
@@ -255,8 +254,8 @@ static void cb_configure(int setting, intptr_t value)
 
     case DSP_SET_SAMPLE_DEPTH:
         codec_depth = value;
-        narrow = value <= NATIVE_DEPTH;
-        fmt.shift = narrow ? 0 : (int)value + 1 - NATIVE_DEPTH;
+        fmt.shift = value <= NATIVE_DEPTH ? 0
+                                          : (int)value + 1 - NATIVE_DEPTH;
         break;
 
     case DSP_SET_STEREO_MODE:
@@ -346,7 +345,7 @@ static void cb_pcmbuf_insert(const void *ch1, const void *ch2, int count)
      * hold the core until the hang catcher stops it at 10 seconds */
     yield();
 
-    if (!narrow)
+    if (codec_depth > NATIVE_DEPTH)
     {
         sink(ch1, ch2, count, &fmt, stamp());
         frames_since_stamp += count;
@@ -544,7 +543,6 @@ int track_decode_run(const char *path,
     fmt.stereo_mode = STEREO_NONINTERLEAVED;
     /* As the DSP's reset leaves it, until the codec says otherwise */
     fmt.shift       = 0;
-    narrow          = true;
     codec_depth     = NATIVE_DEPTH;
 
     /* Everything the codec needs from the kernel and from string.h is

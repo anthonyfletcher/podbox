@@ -568,7 +568,7 @@ static int run_codec_on_cop(void)
     }
 
     if (status == CODEC_ERROR && !at_end &&
-        (res.made_pcm || res.commanded ? resumes : true) &&
+        (resumes || !(res.made_pcm || res.commanded)) &&
         (!codec_msg_waiting() ||
          /* a seek waiting that restarted it (seek_codec()), taken by the run
             here at its first get_command */

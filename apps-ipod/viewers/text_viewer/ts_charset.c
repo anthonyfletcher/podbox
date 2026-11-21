@@ -266,6 +266,14 @@ static void cs_skip_bom(cs_st *s)
         s->ipos += 2;
 }
 
+/* A decoded character into the pending ring. The marks the back ends write
+ * (txt_source.h) lie in U+E000-U+E0FF, so one typed in the file shows as
+ * U+FFFD rather than act as a mark. */
+static void cs_emit(cs_st *s, uint32_t cp)
+{
+    ts_emit_cp(&s->out, cp >= 0xE000 && cp <= 0xE0FF ? 0xFFFD : cp);
+}
+
 /* Decodes one character into the pending ring. Returns 1 if it produced
  * output, 0 at end of input. */
 static int cs_step(cs_st *s, int *err)
@@ -296,7 +304,7 @@ static int cs_step(cs_st *s, int *err)
                 u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
             }
         }
-        ts_emit_cp(&s->out, u);
+        cs_emit(s, u);
         return 1;
     }
 
@@ -318,7 +326,7 @@ static int cs_step(cs_st *s, int *err)
             cp = (cp << 6) | (c & 0x3F);
         }
         s->ipos += need;
-        ts_emit_cp(&s->out, cp);
+        cs_emit(s, cp);
         return 1;
     }
 

@@ -2073,7 +2073,7 @@ static int poly_plain(struct poly *g, const struct pen *p,
             /* a run begins: the lines from point i - 1 to point b */
             uint32_t b = i - 1 + POLY_RUN_LINES < e ? i - 1 + POLY_RUN_LINES
                                                     : e;
-            int64_t lx, hx;
+            int64_t lx = 0, hx = 0;
             int side = run_side(g, p, g->boxes + 3 + 4 * g->run++, top, bot,
                                 &lx, &hx);
             g->tally[1]++;

@@ -277,7 +277,7 @@ static bool measure(const char *path, uint32_t size)
     /* mtime stays zero: it is the player's FAT directory time read as local
      * time, which cannot be reproduced from here across timezones. The size
      * is what stands in -- see sound_index.h. */
-    if (sound_index_done(key, 0, size))
+    if (sound_index_done(key, 0, size, probe_file_format(path)))
     {
         n_current++;
         return true;
