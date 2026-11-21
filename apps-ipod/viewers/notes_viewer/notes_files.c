@@ -22,6 +22,7 @@
  * Parts, in order:
  *   - the index: built by the walk, saved, read at boot, asked
  *   - the lookups for a track and an album
+ *   - a page's front matter
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -29,6 +30,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "config.h"
+#include "system.h"                 /* MIN */
 #include "string-extra.h"
 #include "file.h"
 #include "dir.h"
@@ -575,5 +577,46 @@ bool notes_has_bio(const char *name)
             && nw_person_is(&nw.pages[i], key, alt))
             return true;
     return false;
+}
+
+/* ---- a page's front matter --------------------------------------------- */
+
+size_t notes_front_value(const char *text, const char *key, char *buf,
+                         size_t size)
+{
+    size_t klen = strlen(key);
+    const char *s = text;
+
+    buf[0] = '\0';
+    if (!strncmp(s, "\xef\xbb\xbf", 3))
+        s += 3;
+    if (strncmp(s, "---\n", 4) && strncmp(s, "---\r\n", 5))
+        return 0;
+    while ((s = strchr(s, '\n')) && *++s)
+    {
+        const char *v = s + klen + 1, *end;
+        size_t n;
+
+        if (!strncmp(s, "---", 3) || !strncmp(s, "...", 3))
+            break;
+        if (strncasecmp(s, key, klen) || s[klen] != ':')
+            continue;
+        while (*v == ' ' || *v == '\t')
+            v++;
+        for (end = v; *end && *end != '\n' && *end != '\r'; end++)
+            ;
+        while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
+            end--;
+        if (end - v >= 2 && (*v == '"' || *v == '\'') && end[-1] == *v)
+        {
+            v++;
+            end--;
+        }
+        n = MIN((size_t)(end - v), size - 1);
+        memcpy(buf, v, n);
+        buf[n] = '\0';
+        return n;
+    }
+    return 0;
 }
 

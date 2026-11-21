@@ -28,7 +28,9 @@
  *
  * A written album page gets the line of its artist and year above it, and
  * its tracks below when it does not list them; a written artist's page its
- * albums when it links none of them. Everything here comes from the database's RAM copy and the names
+ * albums when it links none of them. A page whose front matter names an
+ * album, `album: Artist - Album`, is one of that album's pages: about the
+ * album, and given neither. Everything here comes from the database's RAM copy and the names
  * index: nothing but the page and its template is read from the disk.
  *
  * Parts, in order:
@@ -96,9 +98,7 @@ static int ns_written(int kind, int album, uint32_t key)
     return found;
 }
 
-/* The page's name, its artist part left out of an album's and its
- * qualifier out of a person's */
-static void ns_page_title(const struct notes_page *pg, char *buf, size_t size)
+void notes_page_title(const struct notes_page *pg, char *buf, size_t size)
 {
     char *dash;
 
@@ -122,6 +122,7 @@ static void ns_doc(const struct notes_target *t, struct notes_doc *d,
     d->artist = 0;
     d->key = t->key;
     d->title[0] = '\0';
+    d->part = false;
     switch (t->to)
     {
         case NOTES_TO_PAGE:
@@ -172,7 +173,7 @@ static void ns_doc(const struct notes_target *t, struct notes_doc *d,
     if (d->kind == NOTES_PAGE_ALBUM && d->album >= 0)
         notes_album_title(d->album, d->title, sizeof(d->title));
     else if (pg)
-        ns_page_title(pg, d->title, sizeof(d->title));
+        notes_page_title(pg, d->title, sizeof(d->title));
     else if (d->kind == NOTES_PAGE_PERSON && notes_is_artist(d->artist_seek))
         tagcache_seek_string(tag_albumartist, d->artist_seek, d->title,
                              sizeof(d->title));
@@ -478,8 +479,9 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
         return true;
     }
     if (ns_is(name, n, "album"))
-        return d->kind == NOTES_PAGE_ALBUM
-               && strlcpy(buf, d->title, size) > 0;
+        return d->album >= 0 ? notes_album_title(d->album, buf, size)
+               : d->kind == NOTES_PAGE_ALBUM
+                 && strlcpy(buf, d->title, size) > 0;
     if (ns_is(name, n, "track"))
     {
         /* {{track|number=5}}: a link to that track */
@@ -1985,8 +1987,9 @@ static void ns_strip(char *buf)
 }
 
 /* The file `path` into `buf`, NUL ended and ns_strip()ped; its length, or
- * -1 */
-static long ns_read(const char *path, char *buf, size_t size)
+ * -1. The album its front matter names into `album`, if given. */
+static long ns_read(const char *path, char *buf, size_t size, char *album,
+                    size_t album_size)
 {
     int fd = open(path, O_RDONLY);
     long got;
@@ -1998,6 +2001,8 @@ static long ns_read(const char *path, char *buf, size_t size)
     if (got < 0)
         return -1;
     buf[got] = '\0';
+    if (album)
+        notes_front_value(buf, NOTES_FRONT_ALBUM, album, album_size);
     ns_strip(buf);
     return strlen(buf);
 }
@@ -2008,7 +2013,7 @@ static void ns_template(const char *name, char *buf, size_t size)
     char path[MAX_PATH];
 
     snprintf(path, sizeof(path), NS_TEMPLATES "/%s.md", name);
-    if (ns_read(path, buf, size) >= 0)
+    if (ns_read(path, buf, size, NULL, 0) >= 0)
         return;
     if (!strcmp(name, "Album"))
         snprintf(buf, size,
@@ -2024,6 +2029,47 @@ static void ns_template(const char *name, char *buf, size_t size)
                  str(LANG_NOTES_MENTIONED_IN));
 }
 
+/* The written page `d` is about made a page of the album its front matter
+ * names, `name`: the album's artist, cover and rows, its own name kept. Not
+ * of the album whose own page it is. */
+static void ns_part_of(struct notes_doc *d, const char *name)
+{
+    struct tagcache_album row;
+    int album = notes_album_named(name, strlen(name), d->artist);
+
+    if (album < 0 || !tagcache_album_get(album, &row)
+        || (d->kind == NOTES_PAGE_ALBUM && d->album == album))
+        return;
+    d->kind = NOTES_PAGE_ALBUM;
+    d->album = album;
+    d->artist = row.artist_art_hash;
+    d->artist_seek = row.artist_seek;
+    d->part = true;
+}
+
+int notes_album_parts(const struct notes_doc *d, const struct name_index *ix,
+                      int *pages, int max)
+{
+    int i, n = 0;
+
+    if (!ix || d->kind != NOTES_PAGE_ALBUM || d->album < 0)
+        return 0;
+    for (i = 0; i < ix->nfiles && n < max; i++)
+    {
+        const struct name_file *f = &ix->files[i];
+        const struct notes_page *pg = notes_page_get(f->page);
+        const char *s;
+
+        if (f->album == NAME_NONE || f->page == d->page || !pg
+            || name_index_path_hash(notes_page_path(pg)) != f->hash)
+            continue;
+        s = ix->strings + ix->str_off[f->album];
+        if (notes_album_named(s, strlen(s), d->artist) == d->album)
+            pages[n++] = f->page;
+    }
+    return n;
+}
+
 bool notes_library_waiting(void)
 {
     return !tagcache_is_in_ram()
@@ -2036,7 +2082,7 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
 {
     struct ns_state st = { d, ix, { out, size, 0 }, -1, scratch };
     const struct notes_page *pg;
-    char tail[64];
+    char tail[64], album[NS_VALUE_MAX];
 
     out[0] = '\0';
     if (t->to == NOTES_TO_NONE)
@@ -2058,8 +2104,16 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
         ns_expand(&st, scratch);
         return st.o.len;
     }
-    if (ns_read(notes_page_path(pg), scratch, scratch_size) < 0)
+    if (ns_read(notes_page_path(pg), scratch, scratch_size, album,
+                sizeof(album)) < 0)
         return 0;
+    if (album[0])
+        ns_part_of(d, album);
+    if (d->part)
+    {
+        ns_expand(&st, scratch);
+        return st.o.len;
+    }
     if (d->kind == NOTES_PAGE_ALBUM && !ns_uses(scratch, "artist")
         && !(d->artist && ns_links_to(scratch, d->artist)))
         ns_expand(&st, "[{{artist}}]" NS_DOT "{{year}}\n\n");

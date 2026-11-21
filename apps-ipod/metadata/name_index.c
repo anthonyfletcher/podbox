@@ -3,7 +3,8 @@
  *
  * The names index: every name bracketed in the notes' pages -- `[Name]`,
  * which the Markdown back end marks TS_NAME_OPEN and TS_NAME_CLOSE -- with
- * where each is named. The notes screen's {{mentions}} come from it.
+ * where each is named. The notes screen's {{mentions}} come from it, and
+ * an album's other pages from the album each page's front matter names.
  *
  * A step on the shared background thread (system/bg_task.c), as the file
  * index is: it runs after boot and after a USB session, the times files in
@@ -56,7 +57,7 @@
 #include "albumart.h"           /* art_image_ext */
 #include "name_index.h"
 
-#define NI_VERSION      3
+#define NI_VERSION      4
 #define NI_FILES_MAX    2048        /* the page index's NW_PAGES_MAX */
 #define NI_MENTIONS_MAX 4096
 #define NI_STRINGS_MAX  4096
@@ -205,6 +206,17 @@ static void ni_read_file(struct ni_work *w, int file, const char *path)
     uint32_t pos = 0, name_at = 0;
     long got;
 
+    int fd = open(path, O_RDONLY);
+
+    if (fd >= 0)
+    {
+        got = read(fd, w->chunk, sizeof(w->chunk) - 1);
+        close(fd);
+        w->chunk[MAX(got, 0)] = '\0';
+        if ((got = notes_front_value(w->chunk, NOTES_FRONT_ALBUM, name,
+                                     sizeof(name))) > 0)
+            w->files[file].album = ni_string(w, name, got);
+    }
     cfg.force_format = TS_FMT_MARKDOWN;
     if (ts_io_core(&io, &f, path) != BS_OK)
         return;
@@ -324,6 +336,7 @@ static bool ni_build(struct ni_work *w, uint32_t text_fp, uint32_t img_fp)
             return false;               /* the index is being replaced */
         memset(fr, 0, sizeof(*fr));
         fr->page = i;
+        fr->album = NAME_NONE;
         fr->hash = name_index_path_hash(notes_page_path(pg));
         w->nfiles++;
     }
@@ -497,6 +510,10 @@ bool name_index_load(void *buf, size_t size, struct name_index *ix)
             return false;
     for (i = 0; i < (int)t.nnames; i++)
         if (ix->name_str[i] >= t.nstrings)
+            return false;
+    for (i = 0; i < (int)t.nfiles; i++)
+        if (ix->files[i].album != NAME_NONE
+            && ix->files[i].album >= t.nstrings)
             return false;
     ix->nfiles = t.nfiles;
     ix->nstrings = t.nstrings;

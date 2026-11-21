@@ -38,7 +38,8 @@
  * NV_HISTORY pages, each where it was left. Play plays an album page's album
  * when it is not the one playing, and is pause and play anywhere else. Menu
  * leaves; Menu held offers the same for the page itself, Move Banner, and
- * the colour and banner settings.
+ * the colour and banner settings, below the other pages of an album's: its
+ * own and those whose front matter names it (notes_album_parts()).
  *
  * Parts, in order:
  *   - the buffer, colours and the screen
@@ -113,6 +114,7 @@
 #define NV_FILE_MAX     (32 * 1024) /* the written file, or the template */
 #define NV_NAME_MAX     224         /* a link's name, qualifier and all */
 #define NV_HISTORY      8
+#define NV_PAGES_MAX    8           /* an album's pages, on the page's menu */
 #define NV_READ         (LCD_HEIGHT / 3)    /* the reading line */
 #define NV_NEAR         3           /* lines from it a link is current */
 #define NV_POLL         (HZ / 2)
@@ -216,6 +218,11 @@ static struct
 
     struct nv_hist hist[NV_HISTORY];
     int nhist;
+
+    /* the page's album's other pages, its own first, and their names */
+    struct notes_target pages[NV_PAGES_MAX];
+    char page_names[NV_PAGES_MAX][64];
+    int npages;
 
     /* an album to play once the screen has let go of the buffer */
     int play_album;
@@ -1598,8 +1605,9 @@ static struct notes_target nv_mt;
 static bool nv_mt_page;
 
 enum { NV_DO_NONE, NV_DO_PLAY, NV_DO_NEXT, NV_DO_LAST, NV_DO_GO,
-       NV_DO_BANNER };
+       NV_DO_BANNER, NV_DO_PAGE };
 static int nv_do;
+static int nv_do_page;          /* NV_DO_PAGE's, into nv.pages */
 
 /* USB plugged in during Move Banner, for nv_run_menu() to leave on */
 static bool nv_usb;
@@ -1705,6 +1713,50 @@ static int nv_go_artist_callback(int action,
     return action;
 }
 
+/* The album's pages, at the top of the page's menu */
+static int nv_page_run(void *param)
+{
+    nv_do = NV_DO_PAGE;
+    nv_do_page = (intptr_t)param;
+    return 1;
+}
+
+static char *nv_page_name(int selected_item, void *data, char *buffer,
+                          size_t buffer_len)
+{
+    (void)selected_item;
+    (void)buffer;
+    (void)buffer_len;
+    return nv.page_names[(intptr_t)data];
+}
+
+static int nv_page_callback(int action, const struct menu_item_ex *this_item,
+                            struct gui_synclist *this_list)
+{
+    intptr_t i = (intptr_t)this_item->menu_get_name_and_icon
+                     ->list_get_name_data;
+
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !(nv_mt_page && i < nv.npages))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+#define NV_PAGE_ITEM(name, i)                                               \
+    MENUITEM_FUNCTION_DYNTEXT_W_PARAM(name, MENU_FUNC_CHECK_RETVAL,         \
+                                      nv_page_run, (void *)(i),             \
+                                      nv_page_name, NULL, (void *)(i),      \
+                                      nv_page_callback, Icon_NOICON)
+NV_PAGE_ITEM(nv_page_0, 0)
+NV_PAGE_ITEM(nv_page_1, 1)
+NV_PAGE_ITEM(nv_page_2, 2)
+NV_PAGE_ITEM(nv_page_3, 3)
+NV_PAGE_ITEM(nv_page_4, 4)
+NV_PAGE_ITEM(nv_page_5, 5)
+NV_PAGE_ITEM(nv_page_6, 6)
+NV_PAGE_ITEM(nv_page_7, 7)
+_Static_assert(NV_PAGES_MAX == 8, "a menu row for each of an album's pages");
+
 MENUITEM_FUNCTION(nv_play_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_PLAY),
                   nv_do_play, nv_play_callback, Icon_NOICON);
 MENUITEM_FUNCTION(nv_next_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_PLAY_NEXT),
@@ -1766,7 +1818,8 @@ MENUITEM_SETTING(nv_banners_item, &global_settings.liner_notes_banners,
 MENUITEM_SETTING(nv_progress_item, &global_settings.liner_notes_progress,
                  nv_setting_callback);
 MAKE_MENU(nv_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL, Icon_NOICON,
-          &nv_play_item, &nv_next_item, &nv_last_item, &nv_go_album_item,
+          &nv_page_0, &nv_page_1, &nv_page_2, &nv_page_3, &nv_page_4,
+          &nv_page_5, &nv_page_6, &nv_page_7, &nv_play_item, &nv_next_item, &nv_last_item, &nv_go_album_item,
           &nv_go_artist_item, &nv_move_item, &nv_reset_item, &nv_colours_item,
           &nv_text_item, &nv_links_item, &nv_page_item, &nv_dim_item,
           &nv_heads_item, &nv_quote_item, &nv_banners_item,
@@ -1899,6 +1952,46 @@ static bool nv_album_target(const struct notes_album *a, struct notes_target *t,
  * with no page of their own unlinked and {{mentions}} empty; past about
  * 10,000 albums the albums do not fit either, and nothing in the library
  * links. */
+/* The page's album's pages for its menu: the album's own, unless this is
+ * it, then those whose front matter names the album */
+static void nv_album_pages(const struct name_index *ix)
+{
+    int parts[NV_PAGES_MAX], i, n;
+
+    nv.npages = 0;
+    n = notes_album_parts(&nv.doc, ix, parts, NV_PAGES_MAX - 1);
+    if (nv.doc.part)
+    {
+        struct notes_target *t = &nv.pages[nv.npages];
+
+        memset(t, 0, sizeof(*t));
+        t->to = NOTES_TO_ALBUM;
+        t->album = nv.doc.album;
+        t->page = t->track = -1;
+        t->artist_seek = -1;
+        notes_album_title(t->album, nv.page_names[nv.npages],
+                          sizeof(nv.page_names[0]));
+        nv_utf8_cut(nv.page_names[nv.npages++]);
+    }
+    for (i = 0; i < n; i++)
+    {
+        const struct notes_page *pg = notes_page_get(parts[i]);
+        struct notes_target *t = &nv.pages[nv.npages];
+
+        if (!pg)
+            continue;
+        memset(t, 0, sizeof(*t));
+        t->to = NOTES_TO_PAGE;
+        t->page = parts[i];
+        t->album = t->track = -1;
+        t->artist_seek = -1;
+        t->key = pg->key;
+        notes_page_title(pg, nv.page_names[nv.npages],
+                         sizeof(nv.page_names[0]));
+        nv_utf8_cut(nv.page_names[nv.npages++]);
+    }
+}
+
 static bool nv_build(const struct nv_req *r)
 {
     static struct notes_target t;
@@ -1953,6 +2046,7 @@ static bool nv_build(const struct nv_req *r)
     nv.t = t;
     nv.doc = doc;
     nv_utf8_cut(nv.doc.title);
+    nv_album_pages(have_ix ? &nv.ix : NULL);
     nv_markdown(src, len, arena);
     nv_layout();
     if (nv_find_links())
@@ -2322,6 +2416,13 @@ static int nv_menu_run(bool page)
                 return GO_TO_DBBROWSER;
             }
             break;
+        case NV_DO_PAGE:
+        {
+            struct notes_target to = nv.pages[nv_do_page];
+
+            nv_follow(&to);
+            break;
+        }
         case NV_DO_BANNER:
             /* At the top, where the banner is, made from where it now is */
             if (!nv_reopen())

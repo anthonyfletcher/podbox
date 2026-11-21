@@ -25,13 +25,14 @@ struct name_mention
 };
 #define NAME_NONE 0xffff
 
-/* A page the index read: its number in the page index (notes_files.h) and
+/* A page the index read: its number in the page index (notes_files.h),
  * name_index_path_hash() of its path, which says whether that number is
- * still the same page */
+ * still the same page, and its front matter's album as a string, or
+ * NAME_NONE */
 struct name_file
 {
     uint32_t hash;
-    uint16_t page, pad;
+    uint16_t page, album;
 };
 
 /* The buffer name_index_load() needs for the largest index the task

@@ -247,7 +247,9 @@ menu, and holding `Select` on it does nothing.
 
 The page's menu has the same rows for the album or artist the page is
 about, `Move Banner` (below), and the `Colours` and `Banners` settings,
-which change the page as soon as you leave the menu.
+which change the page as soon as you leave the menu. On an album's page,
+the album's other pages (below) come first, each opening that page; `|<<`
+comes back.
 
 The page doesn't change with the music: it stays where you are until you
 leave, and the next time you open it from Now Playing it is the album then
@@ -375,6 +377,37 @@ disc's.
 
 The disc comes from the track's disc number tag; a track without one is on
 disc 1. Notes with no disc headings are read as one disc.
+
+## An album's other pages
+
+A page is read only up to its first 32 KB, and shows no more than 40 KB
+once its pieces are filled in. Notes longer than that, or notes you would
+rather read in parts, can go in pages of their own that belong to the
+album. Start each with front matter naming the album:
+
+```markdown
+---
+album: Steely Dan - Aja
+---
+*Recorded at Village Recorder, Los Angeles, 1977*
+
+{{tracks}}
+```
+
+Name the file for the album and the part:
+`/Notes/Albums/Steely Dan - Aja - Credits.md` is the page "Aja - Credits",
+and `[Steely Dan - Aja - Credits]` links to it. Such a page
+has the album's banner and colours, its menu plays the album and has `Go to
+Album`, pieces such as `{{tracks}}` and `{{year}}` are the album's, and
+`[Peg (track)]` finds the album's track first. It gets no line linking the
+artist and no track list of its own; write `{{artist}}` and `{{tracks}}`
+where you want them.
+
+The album's page and its other pages list one another at the top of the
+page's menu (hold `Menu`), up to eight of them. A new page is listed after
+you next connect to a computer, or after `Rebuild File Index`. `album:`
+also takes the title alone, `album: Aja`, which is the oldest album of that
+name in your library.
 
 ## Markdown files in the text viewer
 

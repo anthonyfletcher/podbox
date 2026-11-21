@@ -9,6 +9,7 @@
 #define _NOTES_FILES_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "file.h"           /* MAX_PATH */
 
@@ -104,5 +105,12 @@ int notes_find_album(const struct notes_album *a, struct notes_pages *p);
 /* Whether there is a written page of the person called `name`, in /Notes
  * or beside the music */
 bool notes_has_bio(const char *name);
+
+/* The value of `key` in the front matter `text` starts with, a `key: value`
+ * line, into `buf` without its quotes; its length, 0 for none. A page of an
+ * album's has `album: Artist - Album`. */
+#define NOTES_FRONT_ALBUM "album"
+size_t notes_front_value(const char *text, const char *key, char *buf,
+                         size_t size);
 
 #endif /* _NOTES_FILES_H_ */
