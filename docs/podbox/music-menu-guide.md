@@ -138,6 +138,20 @@ the albums that have no genre:
 
 ---
 
+## Leaving out [All Tracks] and [Random]
+
+Add `%hide_special` anywhere on a row, after any of its levels, and none of
+its lists show `[All Tracks]`, `[Random]` or `[Shuffle Albums]`:
+
+```
+"Genres" -> genre -> album -> title = "fmt_title" %hide_special
+```
+
+The **Extra Rows** settings hide those rows from every list; this hides them
+for one row's lists only.
+
+---
+
 ## Common edits
 
 **One genre, by composer.** Change the genre after `==` to use another:
