@@ -27400,6 +27400,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_WPS_LONG_PRESS_PLAY_ACTION
+  desc: in settings_menu: what a long press of PLAY does on the now-playing screen
+  user: core
+  <source>
+    *: "Long Press Play Action"
+  </source>
+  <dest>
+    *: "Aktion für langes Drücken von Play"
+  </dest>
+  <voice>
+    *: "Aktion für langes Drücken von Play"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ALBUM_VIA
+  desc: in settings_menu: which Music list the now-playing screen's Go to Album opens the album under
+  user: core
+  <source>
+    *: "Go to Album Via"
+  </source>
+  <dest>
+    *: "Zum Album über"
+  </dest>
+  <voice>
+    *: "Zum Album über"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_PREVIOUS_BROWSER
   desc: a now-playing button's action: back to the browser last used
   user: core
@@ -27425,6 +27453,188 @@
   </dest>
   <voice>
     *: "Vorheriger Bildschirm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE
+  desc: the main menu row and title of the Arcade, the game carts on the player
+  user: core
+  <source>
+    *: "Arcade"
+  </source>
+  <dest>
+    *: "Arcade"
+  </dest>
+  <voice>
+    *: "Arcade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_NONE
+  desc: the Arcade with no game carts on the player
+  user: core
+  <source>
+    *: "No games. Copy .pbg game files onto the player"
+  </source>
+  <dest>
+    *: "Keine Spiele. Kopiere .pbg-Spieldateien auf den Player"
+  </dest>
+  <voice>
+    *: "Keine Spiele. Kopiere .pbg-Spieldateien auf den Player"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_PAUSED
+  desc: a game on the Arcade that was left with Quit and starts where it was left: its name, then this
+  user: core
+  <source>
+    *: "%s (Paused)"
+  </source>
+  <dest>
+    *: "%s (Pausiert)"
+  </dest>
+  <voice>
+    *: "Pausiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME
+  desc: a game's context menu on the Arcade: forget its paused game and the progress it has saved
+  user: core
+  <source>
+    *: "Delete Saved Game"
+  </source>
+  <dest>
+    *: "Spielstand löschen"
+  </dest>
+  <voice>
+    *: "Spielstand löschen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME_ASK
+  desc: asked before Delete Saved Game
+  user: core
+  <source>
+    *: "Delete the paused game and the progress this game has saved?"
+  </source>
+  <dest>
+    *: "Pausiertes Spiel und den gespeicherten Fortschritt dieses Spiels löschen?"
+  </dest>
+  <voice>
+    *: "Pausiertes Spiel und den gespeicherten Fortschritt dieses Spiels löschen?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_QUIT_ASK
+  desc: asked over a game when Menu is pressed and let go: leave the game, as the pause menu's Quit does
+  user: core
+  <source>
+    *: "Quit this game?"
+  </source>
+  <dest>
+    *: "Dieses Spiel beenden?"
+  </dest>
+  <voice>
+    *: "Dieses Spiel beenden?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_PLAYED
+  desc: a game's high-score tables: the page of how often and how long it was played
+  user: core
+  <source>
+    *: "Played"
+  </source>
+  <dest>
+    *: "Gespielt"
+  </dest>
+  <voice>
+    *: "Gespielt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_GAME_SOUND
+  desc: a game's pause menu: the game's own sound effects on or off, not the music
+  user: core
+  <source>
+    *: "Game Sound"
+  </source>
+  <dest>
+    *: "Spielsound"
+  </dest>
+  <voice>
+    *: "Spielsound"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_COVER
+  desc: in Settings, an artist row with no photo shows their latest album cover
+  user: core
+  <source>
+    *: "Album Cover If No Photo"
+  </source>
+  <dest>
+    *: "Albumcover, wenn kein Foto"
+  </dest>
+  <voice>
+    *: "Albumcover, wenn kein Foto"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_COVER
+  desc: in Settings, an audiobook author row with no photo shows their latest book cover
+  user: core
+  <source>
+    *: "Audiobook Cover If No Photo"
+  </source>
+  <dest>
+    *: "Hörbuchcover, wenn kein Foto"
+  </dest>
+  <voice>
+    *: "Hörbuchcover, wenn kein Foto"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_NOW
+  desc: choosing a track while the queue plays: play it next, now, and keep the queue
+  user: core
+  <source>
+    *: "Play Now"
+  </source>
+  <dest>
+    *: "Jetzt abspielen"
+  </dest>
+  <voice>
+    *: "Jetzt abspielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEW_QUEUE
+  desc: choosing a track while the queue plays: replace the queue with its list
+  user: core
+  <source>
+    *: "New Queue"
+  </source>
+  <dest>
+    *: "Neue Warteschlange"
+  </dest>
+  <voice>
+    *: "Neue Warteschlange"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_NOW_PROMPT
+  desc: asked when a track is chosen while the queue plays; buttons Play Now and New Queue
+  user: core
+  <source>
+    *: "Play it now, or start a new queue?"
+  </source>
+  <dest>
+    *: "Jetzt abspielen oder neue Warteschlange starten?"
+  </dest>
+  <voice>
+    *: "Jetzt abspielen oder neue Warteschlange starten?"
   </voice>
 </phrase>
 <phrase>

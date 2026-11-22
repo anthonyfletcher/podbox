@@ -27389,6 +27389,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_WPS_LONG_PRESS_PLAY_ACTION
+  desc: in settings_menu: what a long press of PLAY does on the now-playing screen
+  user: core
+  <source>
+    *: "Long Press Play Action"
+  </source>
+  <dest>
+    *: "长按播放键动作"
+  </dest>
+  <voice>
+    *: "长按播放键动作"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ALBUM_VIA
+  desc: in settings_menu: which Music list the now-playing screen's Go to Album opens the album under
+  user: core
+  <source>
+    *: "Go to Album Via"
+  </source>
+  <dest>
+    *: "转到专辑的途径"
+  </dest>
+  <voice>
+    *: "转到专辑的途径"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_PREVIOUS_BROWSER
   desc: a now-playing button's action: back to the browser last used
   user: core
@@ -27414,6 +27442,188 @@
   </dest>
   <voice>
     *: "上一画面"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE
+  desc: the main menu row and title of the Arcade, the game carts on the player
+  user: core
+  <source>
+    *: "Arcade"
+  </source>
+  <dest>
+    *: "街机"
+  </dest>
+  <voice>
+    *: "街机"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_NONE
+  desc: the Arcade with no game carts on the player
+  user: core
+  <source>
+    *: "No games. Copy .pbg game files onto the player"
+  </source>
+  <dest>
+    *: "没有游戏。请将 .pbg 游戏文件复制到播放器"
+  </dest>
+  <voice>
+    *: "没有游戏。请将 .pbg 游戏文件复制到播放器"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GAME_PAUSED
+  desc: a game on the Arcade that was left with Quit and starts where it was left: its name, then this
+  user: core
+  <source>
+    *: "%s (Paused)"
+  </source>
+  <dest>
+    *: "%s (已暂停)"
+  </dest>
+  <voice>
+    *: "已暂停"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME
+  desc: a game's context menu on the Arcade: forget its paused game and the progress it has saved
+  user: core
+  <source>
+    *: "Delete Saved Game"
+  </source>
+  <dest>
+    *: "删除存档"
+  </dest>
+  <voice>
+    *: "删除存档"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DELETE_SAVED_GAME_ASK
+  desc: asked before Delete Saved Game
+  user: core
+  <source>
+    *: "Delete the paused game and the progress this game has saved?"
+  </source>
+  <dest>
+    *: "删除暂停的游戏和此游戏保存的进度？"
+  </dest>
+  <voice>
+    *: "删除暂停的游戏和此游戏保存的进度？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_QUIT_ASK
+  desc: asked over a game when Menu is pressed and let go: leave the game, as the pause menu's Quit does
+  user: core
+  <source>
+    *: "Quit this game?"
+  </source>
+  <dest>
+    *: "退出此游戏？"
+  </dest>
+  <voice>
+    *: "退出此游戏？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_PLAYED
+  desc: a game's high-score tables: the page of how often and how long it was played
+  user: core
+  <source>
+    *: "Played"
+  </source>
+  <dest>
+    *: "游戏记录"
+  </dest>
+  <voice>
+    *: "游戏记录"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARCADE_GAME_SOUND
+  desc: a game's pause menu: the game's own sound effects on or off, not the music
+  user: core
+  <source>
+    *: "Game Sound"
+  </source>
+  <dest>
+    *: "游戏音效"
+  </dest>
+  <voice>
+    *: "游戏音效"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_COVER
+  desc: in Settings, an artist row with no photo shows their latest album cover
+  user: core
+  <source>
+    *: "Album Cover If No Photo"
+  </source>
+  <dest>
+    *: "无照片时显示专辑封面"
+  </dest>
+  <voice>
+    *: "无照片时显示专辑封面"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_COVER
+  desc: in Settings, an audiobook author row with no photo shows their latest book cover
+  user: core
+  <source>
+    *: "Audiobook Cover If No Photo"
+  </source>
+  <dest>
+    *: "无照片时显示有声书封面"
+  </dest>
+  <voice>
+    *: "无照片时显示有声书封面"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_NOW
+  desc: choosing a track while the queue plays: play it next, now, and keep the queue
+  user: core
+  <source>
+    *: "Play Now"
+  </source>
+  <dest>
+    *: "立即播放"
+  </dest>
+  <voice>
+    *: "立即播放"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEW_QUEUE
+  desc: choosing a track while the queue plays: replace the queue with its list
+  user: core
+  <source>
+    *: "New Queue"
+  </source>
+  <dest>
+    *: "新建队列"
+  </dest>
+  <voice>
+    *: "新建队列"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_NOW_PROMPT
+  desc: asked when a track is chosen while the queue plays; buttons Play Now and New Queue
+  user: core
+  <source>
+    *: "Play it now, or start a new queue?"
+  </source>
+  <dest>
+    *: "立即播放，还是新建播放队列？"
+  </dest>
+  <voice>
+    *: "立即播放，还是新建播放队列？"
   </voice>
 </phrase>
 <phrase>
