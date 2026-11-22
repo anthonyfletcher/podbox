@@ -165,6 +165,14 @@ bool bg_task_preempted(const struct bg_task *task);
  * BG_INTERRUPTED -- it will be retried later. */
 bool bg_task_should_stop(const struct bg_task *task);
 
+/* Stop every background pass and wait, up to `timeout` ticks, for the one
+ * under way to close its files; true if it did. Call before anything that
+ * ends this run without the threads' say -- a firmware reload, a power-off --
+ * since a write cut off there leaves a file the filesystem cannot account
+ * for. Nothing starts again until bg_task_resume(). */
+bool bg_task_halt(long timeout);
+void bg_task_resume(void);
+
 /* One word for what the task is doing, for the status screen. Reads the state
  * above and nothing else, so it costs nothing to ask. */
 const char *bg_task_state(const struct bg_task *task);

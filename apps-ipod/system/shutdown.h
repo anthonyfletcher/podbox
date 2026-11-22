@@ -23,5 +23,9 @@ void car_adapter_mode_init(void) INIT_ATTR;
 void check_bootfile(bool do_rolo);
 #endif
 
+/* From a host's eject until the end-of-session checks (a replaced firmware or
+ * database) have run, which can reload the firmware: background work waits */
+bool usb_session_checks_pending(void);
+
 
 #endif /* _SHUTDOWN_H_ */

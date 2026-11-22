@@ -44,6 +44,7 @@
 #include "widgets/list.h"
 #include "playlist/playlist.h"
 #include "database/tagcache.h"
+#include "system/bg_task.h"    /* bg_task_halt */
 #include "screens/system/usb_screen.h"
 #include "games/arcade/shell.h"   /* shell_power_off */
 #include "metadata/book_resume.h"
@@ -56,13 +57,34 @@
 #include "shutdown.h"
 #include "output_pause.h"
 
+/* Long enough for a background pass to finish the file it is writing: the
+ * slowest step between its checks is one cover decode. */
+#define BG_HALT_TIMEOUT (HZ * 10)
+
 #ifdef BOOTFILE
 /* True once this cable session's "before" BOOTFILE mtime has been recorded. */
 static bool bootfile_baseline_taken = false;
 /* A cable session ended before the cable was seen to be out: its comparison
  * waits for the first event that sees it out or the disk ejected. */
 static bool bootfile_check_pending = false;
+/* Cleared as a cable session starts, set once its end-of-session checks have
+ * run */
+static bool session_checks_done = true;
+/* A reload the owner or a host asked for that could not start yet: tried
+ * again from later events, no sooner than restart_next_try */
+static bool restart_owed = false;
+static long restart_next_try;
+#define RESTART_RETRY (HZ * 5)
 #endif
+
+bool usb_session_checks_pending(void)
+{
+#ifdef BOOTFILE
+    return usb_storage_is_ejected() && !session_checks_done;
+#else
+    return false;
+#endif
+}
 
 static void system_flush(void)
 {
@@ -126,6 +148,8 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             splashf(0, "%s %s", str(LANG_WARNING_BATTERY_EMPTY),
                                 str(LANG_SHUTTINGDOWN));
         }
+
+        bg_task_halt(BG_HALT_TIMEOUT);
 
         /* A USB dock is told now, while the saves below give the USB
          * thread time to send it */
@@ -278,31 +302,66 @@ void car_adapter_mode_init(void)
 }
 
 #ifdef BOOTFILE
-/* Starts the firmware on disk again. The bus is left first: with the USB
- * Sound Card on, the host is still talking to us after an eject, and a
- * controller that stops answering mid-session is what Windows reports as a
- * device that has malfunctioned. A load that fails returns, and the bus is
- * taken back if the cable is still in. */
-static void restart_firmware(void)
+/* Starts the firmware on disk again, once every background pass and the
+ * database's scan or commit have stopped, since a write cut off by the reload
+ * leaves clusters the filesystem cannot account for. The passes go first: an
+ * art pass holds a database search open, and the database waits for every
+ * search to close. The disk stays mounted, as the load reads through it; the
+ * bus is let go before it, because a sound card host still talking after an
+ * eject reports a controller that stops answering as a malfunction. False,
+ * with nothing done, when they would not stop in time; true once the load was
+ * tried, and a load that fails returns with the passes and the bus back. */
+static bool restart_firmware(void)
 {
+    long until = current_tick + BG_HALT_TIMEOUT;
+
+    if (!bg_task_halt(BG_HALT_TIMEOUT))
+    {
+        bg_task_resume();
+        return false;
+    }
+    while (!tagcache_prepare_shutdown() || tagcache_is_busy())
+    {
+        if (TIME_AFTER(current_tick, until))
+        {
+            bg_task_resume();
+            return false;
+        }
+        sleep(HZ / 10);
+    }
     audio_hard_stop();
     usb_enable(false);
     rolo_load(BOOTDIR "/" BOOTFILE);
+    bg_task_resume();
     if (usb_inserted())
         usb_enable(true);
+    return true;
+}
+
+/* An owed reload, while the database is idle: asking with a scan or commit
+ * running would hold the UI for the whole of BG_HALT_TIMEOUT */
+static void restart_when_ready(void)
+{
+    if (!restart_owed || tagcache_is_busy()
+        || TIME_BEFORE(current_tick, restart_next_try))
+        return;
+    restart_next_try = current_tick + RESTART_RETRY;
+    if (restart_firmware())
+        restart_owed = false;
 }
 
 /* A computer rewrote the database (tools/database_pb). This run holds the old
  * one's track numbers, in the playlist and the buffered tracks, so start
- * again. Tried once: a failed load leaves the database closed to this run. */
+ * again. Owed once: a load that fails leaves the database closed to this
+ * run. */
 static void restart_if_database_replaced(void)
 {
-    static bool tried = false;
+    static bool seen = false;
 
-    if (!tried && tagcache_changed_over_usb())
+    if (!seen && tagcache_changed_over_usb())
     {
-        tried = true;
-        restart_firmware();
+        seen = true;
+        restart_owed = true;
     }
 }
 
@@ -314,6 +373,7 @@ static void bootfile_session_end(void)
     bootfile_baseline_taken = false;
     if (usb_core_host_wrote_storage())
         check_bootfile(true);
+    session_checks_done = true;
 }
 #endif
 
@@ -327,6 +387,7 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
         if (bootfile_check_pending && event != SYS_USB_CONNECTED)
             bootfile_session_end();
         restart_if_database_replaced();
+        restart_when_ready();
     }
 #endif
 
@@ -361,6 +422,7 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             }
             /* This session's end compares against the same baseline */
             bootfile_check_pending = false;
+            session_checks_done = false;
 #endif
             gui_usb_screen_run(false, seqnum);
 #ifdef BOOTFILE
@@ -373,6 +435,7 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             {
                 bootfile_session_end();
                 restart_if_database_replaced();
+                restart_when_ready();
             }
             else
                 bootfile_check_pending = true;
@@ -502,6 +565,7 @@ void check_bootfile(bool do_rolo)
     static time_t mtime = 0;
     DIR* dir = NULL;
     struct dirent* entry = NULL;
+    bool restart = false;
 
     /* 1. open BOOTDIR and find the BOOTFILE dir entry */
     dir = opendir(BOOTDIR);
@@ -524,7 +588,7 @@ void check_bootfile(bool do_rolo)
                     static const struct text_message message={ lines, 2 };
                     button_clear_queue(); /* Empty the keyboard buffer */
                     if(gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
-                        restart_firmware();
+                        restart = true;
                 }
             }
             mtime = info.mtime;
@@ -532,6 +596,15 @@ void check_bootfile(bool do_rolo)
         }
     }
     closedir(dir);
+
+    if (restart)
+    {
+        restart_owed = true;
+        restart_next_try = current_tick;
+        restart_when_ready();
+        if (restart_owed)               /* it reloads once the database is */
+            splash(HZ * 2, ID2P(LANG_TAGCACHE_BUSY));
+    }
 }
 #endif
 
