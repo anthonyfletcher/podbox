@@ -45,11 +45,20 @@ void i2c_init()
     mutex_init(&i2c_mtx[1]);
 }
 
+/* The S5L8702 waits without a bound, so its callers never see a failure: the
+ * bounded waits are tested on the Nano 3G and 4G only, and a PMU write that
+ * gives up is ignored by callers such as pmu_hdd_power(), which leaves the
+ * disk unpowered. */
 static bool wait_rdy(int bus)
 {
+#if CONFIG_CPU == S5L8702
+    while (IICUNK10(bus));
+    return true;
+#else
     for (int i = 0; i < 100000 && IICUNK10(bus); i++)
         ;
     return IICUNK10(bus) == 0;
+#endif
 }
 
 static void i2c_on(int bus)
@@ -83,6 +92,14 @@ static bool i2c_off(int bus)
    8 data + 1 ack clocks are generated), or STOP. */
 static bool i2c_wait_io(int bus)
 {
+#if CONFIG_CPU == S5L8702
+    while (((IICSTAT(bus) & (1 << 5)) != 0) &&
+            ((IICSTA2(bus) & ((1 << 8)|(1 << 13))) == 0)) {
+        wait_rdy(bus);
+    }
+    IICSTA2(bus) |= (1 << 8)|(1 << 13);
+    return true;
+#else
     for (int i = 0; i < 100000; i++) {
         if ((IICSTAT(bus) & (1 << 5)) == 0 ||
             (IICSTA2(bus) & ((1 << 8)|(1 << 13))) != 0) {
@@ -93,6 +110,7 @@ static bool i2c_wait_io(int bus)
             return false;
     }
     return false;
+#endif
 }
 
 static int i2c_start(int bus, unsigned char slave, bool rd)

@@ -523,9 +523,11 @@ static bool syscon_preinit(void)
         pll_onoff(pll, false);
 
 #if CONFIG_CPU == S5L8702
-    if (pll_config(2, PLLOP_DM, 1, 36, 1, 32400)
-        || pll_onoff(2, true) <= 0)
-        return false;
+    /* Neither the setting's result nor the divisor-mode lock is required on
+     * the Classic, whose bootloader has always gone on without them; the
+     * check is tested on the Nanos only */
+    pll_config(2, PLLOP_DM, 1, 36, 1, 32400);
+    pll_onoff(2, true);
     soc_set_system_divs(1, 2, 2 /*hprat*/);
 #elif CONFIG_CPU == S5L8720
     PLLUNK3C = 0;

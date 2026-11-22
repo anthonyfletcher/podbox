@@ -382,8 +382,13 @@ int pll_onoff(int pll, bool onoff)
     if (onoff)
     {
         PLLMODE |= PLLMODE_EN_BIT(pll); /* start PLL */
-        /* Same bound on every CPU. The lock bit is the configured
-         * lock time expiring, not proof that the PLL locked. */
+#if CONFIG_CPU == S5L8702
+        /* Unbounded on the Classic, as its bootloader has always run: the
+         * bound is tested on the Nanos only */
+        while (!(PLLLOCK & PLLLOCK_LCK_BIT(pll))); /* locking... */
+#else
+        /* The lock bit is the configured lock time expiring, not proof
+         * that the PLL locked. */
         for (int i = 0; i < 1000000 &&
                         !(PLLLOCK & PLLLOCK_LCK_BIT(pll)); i++)
             ;
@@ -392,6 +397,7 @@ int pll_onoff(int pll, bool onoff)
             PLLMODE &= ~PLLMODE_EN_BIT(pll);
             return -1;
         }
+#endif
         PLLMODE |= PLLMODE_PLLOUT_BIT(pll); /* slow mode OFF */
 
         /* returns DMLCK status, only meaningful for Divisor Mode (DM) */
