@@ -709,9 +709,6 @@ them in `all-themes.zip`, from the
 - [themify 2](themes/themify_2/README.md)
 - [iclassic square](themes/iclassic_square/README.md) - classic, dark and light
 
-Obsede' 2, Bony and Jive are in [podbox-themes](https://github.com/anthonyfletcher/podbox-themes),
-which explains how to install them.
-
 Unzip onto the root of the iPod, the same way you installed PodBox, then pick
 it under `Settings > Appearance > Load Theme`. Each zip carries the fonts its theme needs, so
 they can be installed in any order and on their own.
