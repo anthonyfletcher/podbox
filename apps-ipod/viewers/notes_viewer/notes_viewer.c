@@ -1672,7 +1672,7 @@ static int nv_play_callback(int action, const struct menu_item_ex *this_item,
 
     (void)this_item;
     (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM && !(t->album >= 0))
+    if (action == ACTION_REQUEST_MENUITEM && t->album < 0)
         return ACTION_EXIT_MENUITEM;
     return action;
 }
@@ -1985,9 +1985,8 @@ static void nv_album_pages(const struct name_index *ix)
     }
 }
 
-/* What the page was made under, and the link name that finds it again:
- * an album by its artist and title, a written page by its file's name, else
- * the name it is shown by */
+/* The link name that finds the page again: an album by its artist and title,
+ * a written page by its file's name, else the name it is shown by */
 static void nv_stamp(void)
 {
     const struct notes_page *pg = notes_page_get(nv.doc.page);
@@ -1995,9 +1994,6 @@ static void nv_stamp(void)
     const char *qual = "";
     int kind = pg ? pg->kind : nv.doc.kind;
 
-    nv.built_commit = tagcache_commit_id();
-    nv.built_gen = tagcache_generation();
-    nv.built_pages = notes_pages_generation();
     if (nv.doc.kind == NOTES_PAGE_ALBUM && nv.doc.album >= 0 && !nv.doc.part
         && notes_album_title(nv.doc.album, title, sizeof(title)))
     {
@@ -2028,6 +2024,12 @@ static bool nv_build(const struct nv_req *r)
     void *albums = NULL;
     bool have_ix;
     int focus = -1, i;
+    /* What the page is made under, read before anything here yields: an
+     * Update committing mid-build then leaves the page stale, not stamped
+     * with numbers it was never built on */
+    int32_t commit = tagcache_commit_id();
+    uint32_t gen = tagcache_generation();
+    unsigned int pages = notes_pages_generation();
 
     nv_boost();
     src = w;
@@ -2076,6 +2078,9 @@ static bool nv_build(const struct nv_req *r)
     nv.t = t;
     nv.doc = doc;
     nv_utf8_cut(nv.doc.title);
+    nv.built_commit = commit;
+    nv.built_gen = gen;
+    nv.built_pages = pages;
     nv_stamp();
     nv_album_pages(have_ix ? &nv.ix : NULL);
     nv_markdown(src, len, arena);
@@ -2449,13 +2454,14 @@ static int nv_menu_run(bool page)
         return GO_TO_ROOT;
     /* The library or the pages changed while the menu was up: what it chose
      * may no longer be what it showed */
-    if (nv_do != NV_DO_NONE && nv_do != NV_DO_BANNER && nv_stale())
+    if (nv_do != NV_DO_NONE && nv_do != NV_DO_BANNER)
     {
-        if (!nv_refind())
+        int fresh = nv_fresh();
+
+        if (fresh < 0)
             return GO_TO_PREVIOUS;
-        nv.cur = nv_natural(false);
-        nv_draw();
-        return -1;
+        if (fresh == 0)
+            return -1;
     }
     switch (nv_do)
     {

@@ -212,7 +212,8 @@ int notes_page_album(int page)
     if (pg->dir)
     {
         for (i = 0; i < nl.n; i++)
-            if (tagcache_album_get(i, &row) && tagcache_album_dir_key(&row) == pg->dir)
+            if (tagcache_album_get(i, &row)
+                && tagcache_album_dir_key(&row) == pg->dir)
                 return i;
         return -1;
     }
