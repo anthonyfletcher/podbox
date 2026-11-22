@@ -157,6 +157,10 @@ int usb_audio_get_cur_volume(void);
 
 bool usb_audio_get_active(void);
 
+/* From usb_core_exit(): the cable is out or USB is being turned off, so the
+ * host's mute is lifted */
+void usb_audio_host_gone(void);
+
 /*
  * usb_audio_get_dsp_claims():
  *

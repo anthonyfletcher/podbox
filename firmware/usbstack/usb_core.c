@@ -549,6 +549,9 @@ bool usb_core_storage_pending(void)
 void usb_core_exit(void)
 {
     usb_core_do_set_config(0);
+#ifdef USB_ENABLE_AUDIO
+    usb_audio_host_gone();
+#endif
     if(initialized) {
         usb_drv_exit();
         initialized = false;

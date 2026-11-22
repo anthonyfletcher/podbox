@@ -968,32 +968,30 @@ static bool feature_unit_set_mute(int value, uint8_t cmd)
         return false;
     }
 
-    if(value == 1)
-    {
-        logf("usbaudio: mute !");
-        tmp_saved_vol = sound_current(SOUND_VOLUME);
-        host_muted = true;
-
-        // setvol does range checking for us!
-        global_status.volume = sound_min(SOUND_VOLUME);
-        setvol();
-        return true;
-    }
-    else if(value == 0)
-    {
-        logf("usbaudio: not muted !");
-        host_muted = false;
-
-        // setvol does range checking for us!
-        global_status.volume = tmp_saved_vol;
-        setvol();
-        return true;
-    }
-    else
+    if(value != 0 && value != 1)
     {
         logf("usbaudio: invalid value for CUR setting of feature unit (%d)", value);
         return false;
     }
+    /* A repeated mute would save the muted volume as the one to restore */
+    if(host_muted == (value == 1))
+        return true;
+
+    host_muted = (value == 1);
+    if(host_muted)
+    {
+        logf("usbaudio: mute !");
+        tmp_saved_vol = sound_current(SOUND_VOLUME);
+        global_status.volume = sound_min(SOUND_VOLUME);
+    }
+    else
+    {
+        logf("usbaudio: not muted !");
+        global_status.volume = tmp_saved_vol;
+    }
+    // setvol does range checking for us!
+    setvol();
+    return true;
 }
 
 static bool feature_unit_get_mute(int *value, uint8_t cmd)
@@ -1004,7 +1002,7 @@ static bool feature_unit_get_mute(int *value, uint8_t cmd)
         return false;
     }
 
-    *value = (sound_current(SOUND_VOLUME) == sound_min(SOUND_VOLUME));
+    *value = host_muted;
     return true;
 }
 
@@ -1057,7 +1055,14 @@ static bool feature_unit_set_volume(int value, uint8_t cmd)
 
     // setvol does range checking for us!
     // we cannot guarantee the host will send us a volume within our range
-    global_status.volume = usb_audio_volume_to_db(value, sound_numdecimals(SOUND_VOLUME));
+    int volume = usb_audio_volume_to_db(value, sound_numdecimals(SOUND_VOLUME));
+    /* Muted, the volume is the one unmuting brings back */
+    if(host_muted)
+    {
+        tmp_saved_vol = volume;
+        return true;
+    }
+    global_status.volume = volume;
     setvol();
     return true;
 }
@@ -1066,7 +1071,10 @@ static bool feature_unit_get_volume(int *value, uint8_t cmd)
 {
     switch(cmd)
     {
-        case USB_AC_CUR_REQ: *value = db_to_usb_audio_volume(sound_current(SOUND_VOLUME), sound_numdecimals(SOUND_VOLUME)); break;
+        case USB_AC_CUR_REQ:
+            *value = db_to_usb_audio_volume(host_muted ? tmp_saved_vol :
+                     sound_current(SOUND_VOLUME), sound_numdecimals(SOUND_VOLUME));
+            break;
         case USB_AC_MIN_REQ: *value = db_to_usb_audio_volume(sound_min(SOUND_VOLUME), sound_numdecimals(SOUND_VOLUME)); break;
         case USB_AC_MAX_REQ: *value = db_to_usb_audio_volume(sound_max(SOUND_VOLUME), sound_numdecimals(SOUND_VOLUME)); break;
         case USB_AC_RES_REQ: *value = db_to_usb_audio_volume(sound_steps(SOUND_VOLUME), sound_numdecimals(SOUND_VOLUME)); break;
@@ -1258,8 +1266,10 @@ static int usb_audio_init_connection(void)
      * set has to outlive the reset. */
     set_playback_sampling_frequency(
         usb_audio_get_playback_sampling_frequency());
-    tmp_saved_vol = sound_current(SOUND_VOLUME);
-    host_muted = false;
+    /* A bus reset reconfigures without the host's mute changing, so a mute
+     * lasts until the host lifts it or usb_audio_host_gone() */
+    if(!host_muted)
+        tmp_saved_vol = sound_current(SOUND_VOLUME);
     usb_audio_playing = false;
     return 0;
 }
@@ -1279,6 +1289,14 @@ static void usb_audio_disconnect(void)
 
     usb_audio_stop_playback();
     usbaudio_active = false;
+}
+
+/* The host is gone, not merely reconfiguring: a mute it left would hold the
+ * player at minimum volume */
+void usb_audio_host_gone(void)
+{
+    if(host_muted)
+        feature_unit_set_mute(0, USB_AC_CUR_REQ);
 }
 
 unsigned int usb_audio_get_dsp_claims(void)
