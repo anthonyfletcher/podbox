@@ -1741,8 +1741,10 @@ database. The fix for a new album not showing up in the Music browser.
 Much quicker than a rebuild, because it only reads what it has to.
 
 [action: Rebuild Database]
-Throws the database away and reads every file on the player again. Play
-counts, ratings and last-played times are saved first and put back afterwards.
+Builds the database again by reading every file on the player. Play counts,
+ratings and last-played times are saved first and put back afterwards. The old
+database stays until the new one is finished, and comes back if the rebuild is
+cut short or finds no music, so it needs its room twice while it runs.
 
 Slow -- minutes on a full disk -- and rarely what you want: Update Database
 finds new music on its own. Worth it only if the database looks wrong rather

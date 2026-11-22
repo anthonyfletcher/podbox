@@ -183,6 +183,12 @@ static bool usr_cancel(void);
 /* Present while a commit's .new files are being renamed into place */
 #define TAGCACHE_FILE_SWAP       "database_swap.tcd"
 
+/* Present while a rebuild runs: the database it replaces waits beside it,
+ * each file under its own name plus TAGCACHE_OLD, until the new one is
+ * whole. See rebuild_settle(). */
+#define TAGCACHE_FILE_REBUILD    "database_rebuild.tcd"
+#define TAGCACHE_OLD             ".old"
+
 
 /* Flags */
 #define FLAG_DELETED     0x0001  /* Entry has been removed from db */
@@ -728,14 +734,66 @@ static int open_master_fd(struct master_header *hdr, bool write)
 }
 
 static void merge_discard(void);
+static bool db_file_exists(const char *filename);
+
+/* Set when rebuild_settle() puts the old database back, cleared as a rebuild
+ * starts */
+static bool rebuild_restored;
+
+/* Each file a rebuild replaces, by name: the master, then the string tags'
+ * files. fn(name) for each. */
+static void for_each_db_file(void (*fn)(const char *name))
+{
+    char name[32];
+
+    fn(TAGCACHE_FILE_MASTER);
+    for (int i = 0; i < TAG_COUNT; i++)
+    {
+        if (TAGCACHE_IS_NUMERIC(i))
+            continue;
+        snprintf(name, sizeof(name), TAGCACHE_FILE_INDEX, i);
+        fn(name);
+    }
+}
+
+static void set_aside(const char *name)
+{
+    char old[32];
+
+    snprintf(old, sizeof(old), "%s" TAGCACHE_OLD, name);
+    remove_db_file(old);
+    if (!rename_db_file(name, old))
+        remove_db_file(name);
+}
+
+static void put_back(const char *name)
+{
+    char old[32];
+
+    snprintf(old, sizeof(old), "%s" TAGCACHE_OLD, name);
+    remove_db_file(name);
+    rename_db_file(old, name);
+}
+
+static void drop_old(const char *name)
+{
+    char old[32];
+
+    snprintf(old, sizeof(old), "%s" TAGCACHE_OLD, name);
+    remove_db_file(old);
+}
+
+static void drop_new(const char *name)
+{
+    remove_db_file(name);
+}
 
 static void remove_files(void)
 {
-    int i;
-    char buf[MAX_PATH];
-    const int bufsz = sizeof(buf);
+    int fd;
     logf("%s", __func__);
 
+    rebuild_restored = false;
     tc_stat.ready = false;
     tc_stat.ramcache = false;
     tc_stat.econ = false;
@@ -745,18 +803,68 @@ static void remove_files(void)
      * leaves only .new files, which no swap is waiting on. */
     remove_db_file(TAGCACHE_FILE_SWAP);
     merge_discard();
-    remove_db_file(TAGCACHE_FILE_MASTER);
     /* A rebuild tries every file again */
     unreadable_forget();
-    for (i = 0; i < TAG_COUNT; i++)
+    /* The marker before the first rename, so a cut anywhere after it is
+     * settled by putting the old files back. A marker already present is an
+     * earlier rebuild's, whose old files are still the last whole database. */
+    if (db_file_exists(TAGCACHE_FILE_REBUILD))
     {
-        if (TAGCACHE_IS_NUMERIC(i))
-            continue;
-
-        snprintf(buf, bufsz, "%s/" TAGCACHE_FILE_INDEX,
-                 tc_stat.db_path, i);
-        remove(buf);
+        for_each_db_file(drop_new);
+        return;
     }
+    fd = open_db_fd(TAGCACHE_FILE_REBUILD, O_WRONLY | O_CREAT | O_TRUNC);
+    if (fd >= 0)
+    {
+        close(fd);
+        for_each_db_file(set_aside);
+    }
+    else
+        for_each_db_file(drop_new);
+}
+
+/* The entries in the master, or -1 when there is none to read */
+static long master_entries(void)
+{
+    struct master_header hdr;
+    int fd = open_master_fd(&hdr, false);
+
+    if (fd < 0)
+        return -1;
+    close(fd);
+    return hdr.tch.entry_count;
+}
+
+/* Ends a rebuild, at boot or as one stops. A temp file still waiting means
+ * its commit has yet to run, and that decides nothing. Otherwise a master
+ * with entries in it is the new database, and the old one goes; anything
+ * less and the old one comes back whole. Old files with no marker are a
+ * finished rebuild's that the cleanup did not reach. */
+static void rebuild_settle(void)
+{
+    if (!db_file_exists(TAGCACHE_FILE_REBUILD))
+    {
+        for_each_db_file(drop_old);
+        return;
+    }
+    if (db_file_exists(TAGCACHE_FILE_TEMP))
+        return;
+
+    if (master_entries() > 0 ||
+        !db_file_exists(TAGCACHE_FILE_MASTER TAGCACHE_OLD))
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "rebuild: done, old database dropped");
+        remove_db_file(TAGCACHE_FILE_REBUILD);
+        for_each_db_file(drop_old);
+        return;
+    }
+
+    debug_log(DEBUG_LOG_TAGCACHE, "rebuild: cut short, old database back");
+    remove_db_file(TAGCACHE_FILE_SWAP);
+    merge_discard();
+    for_each_db_file(put_back);
+    remove_db_file(TAGCACHE_FILE_REBUILD);
+    rebuild_restored = true;
 }
 
 static bool check_all_headers(void)
@@ -6986,6 +7094,9 @@ void tagcache_build(void)
     tc_stat.scanning = true;
     do_tagcache_build((const char**)vect);
     tc_stat.scanning = false;
+    /* After any build, not only a rebuild's: an update can commit the temp
+     * file a cut-short rebuild left */
+    rebuild_settle();
 }
 
 static void free_ramcache(void)
@@ -7278,6 +7389,8 @@ static void tagcache_thread(void)
             queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
         free_tempbuf();
     }
+    /* After that commit, which may be the one finishing a rebuild */
+    rebuild_settle();
 
     /* Allocate space for the tagcache if found on disk. */
     if (!tc_stat.ramcache)
@@ -7347,6 +7460,9 @@ static void tagcache_thread(void)
                 mutex_unlock(&command_queue_mutex);
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
+                /* A rebuild cut short has the old database back on the disk,
+                 * and the headers read this run may be the new empty one's */
+                tagcache_commit_finalize();
                 /* Load it back, as Q_UPDATE below does: commit() unloads the
                  * RAM copy before it starts, and unreloaded the database
                  * stays on the disk until the next USB session or reboot --
@@ -7644,6 +7760,7 @@ bool tagcache_tool_run(bool rebuild)
     finish_interrupted_swap();
     if (db_file_exists(TAGCACHE_FILE_TEMP))
         commit();
+    rebuild_settle();
     tagcache_commit_finalize();
     tc_stat.initialized = true;
 
@@ -7667,6 +7784,9 @@ bool tagcache_tool_run(bool rebuild)
 
     tagcache_build();
     tagcache_commit_finalize();
+    /* A rebuild that put the old database back has failed */
+    if (rebuild && rebuild_restored)
+        return false;
 
     /* A database built new takes back the saved figures, as the thread does
      * on the Q_IMPORT_CHANGELOG do_tagcache_build() posts */

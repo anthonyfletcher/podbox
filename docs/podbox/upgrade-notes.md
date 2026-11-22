@@ -14,3 +14,7 @@
   update: rename the folder first to keep it. Names such as
   `...And Justice for All` and `.38 Special` are read as before, and Images,
   Books and Sound Scan now find what is in them.
+- **Rebuild Database** keeps your old database until the new one is
+  finished, so a rebuild cut short by USB, a restart or a flat battery leaves
+  the library as it was. While it runs, the old database takes its space a
+  second time. A rebuild that finds no music at all now keeps the old one.
