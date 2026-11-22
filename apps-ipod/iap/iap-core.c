@@ -1226,12 +1226,12 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
      * playback drops leading directories of a playlist entry that do not
      * exist. */
     if (at_current && !strcmp(current->path, info.filename))
-        memcpy(id3, current, sizeof(*id3));
+        copy_mp3entry(id3, current);
     else if (!tagcache_fill_tags(id3, info.filename)
              && !get_metadata(id3, -1, info.filename))
     {
         if (at_current)
-            memcpy(id3, current, sizeof(*id3));
+            copy_mp3entry(id3, current);
         else
             strlcpy(id3->path, info.filename, sizeof(id3->path));
     }
