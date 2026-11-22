@@ -154,6 +154,9 @@ struct dynamic_colors_cache {
 
 static struct dynamic_colors_cache cache;
 static volatile bool needs_extraction;
+/* The palette is still the one seeded from the resume point at boot: no track
+ * has changed and no theme loaded since */
+static bool palette_seeded;
 static uint16_t histogram[HISTOGRAM_BUCKETS];
 
 /* Colours the theme named that are neither its foreground nor its background,
@@ -1416,7 +1419,10 @@ static void track_change_cb(unsigned short id, void *param)
      * skin_albumart_art_opened() is, and it is the load that calls it. */
     palette_miss = 0;
     if (id == PLAYBACK_EVENT_TRACK_CHANGE)
+    {
         cache.track_change_tick = current_tick;
+        palette_seeded = false;
+    }
 }
 
 /* A track about to play: work out its palette now if the disk is running,
@@ -1573,11 +1579,13 @@ void dynamic_colors_seed_resume(void)
     cache.needs_full_update = false;
     cache.needs_screen_clear = false;
     cache.change_tick = current_tick - AA_SETTLE_TICKS;
+    palette_seeded = true;
 }
 
 void dynamic_colors_save_theme(void)
 {
     save_all_theme_colors();
+    palette_seeded = false;
     /* Invalidate cached colors — they were for the old theme */
     cache.valid = false;
     cache.needs_screen_clear = false;
@@ -1662,6 +1670,13 @@ void dynamic_colors_check_extraction(int aa_slot)
          * nothing asks again. */
         if (current_tick - cache.track_change_tick > NO_ART_TIMEOUT)
             needs_extraction = false;
+    }
+    else if (palette_seeded && !(audio_status() & AUDIO_STATUS_PLAY))
+    {
+        /* The boot palette, with nothing playing to take art from: reverting
+         * would clear resume_art_hash and leave the next boot nothing to seed
+         * from. */
+        needs_extraction = false;
     }
     else
     {
