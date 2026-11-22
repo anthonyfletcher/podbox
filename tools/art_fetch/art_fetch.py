@@ -33,7 +33,7 @@ except ModuleNotFoundError:
     MutagenFile = None
     FLAC = Picture = APIC = ID3 = MP4 = MP4Cover = None
 
-SCRIPT_VERSION = "3.8"
+SCRIPT_VERSION = "3.9"
 
 AUDIO_EXTS = {".mp3", ".mp2", ".mp1", ".m4a", ".mp4", ".aac", ".flac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif"}
 CONFIG_FILENAME = "artist_art_credentials.json"
@@ -48,6 +48,21 @@ MUSICBRAINZ_RELEASE_API = "https://musicbrainz.org/ws/2/release"
 CAA_RELEASE_FRONT = "https://coverartarchive.org/release/{mbid}/front"
 THEAUDIODB_API = "https://www.theaudiodb.com/api/v1/json"
 THEAUDIODB_PUBLIC_KEY = "123"
+DEEZER_API = "https://api.deezer.com"
+# Last.fm's public pages refuse or throttle requests that don't look like a
+# browser, so page and image requests identify as one.
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/129.0 Safari/537.36")
+# Header sets tried in turn for Last.fm pages. Last.fm sometimes answers a
+# request it dislikes with 406/403; the next set is tried after a pause.
+LASTFM_PAGE_HEADERS = (
+    {"User-Agent": BROWSER_UA,
+     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+     "Accept-Language": "en-GB,en;q=0.9",
+     "Upgrade-Insecure-Requests": "1"},
+    {"User-Agent": "RockboxMusicArt/3.7"},
+    {"User-Agent": BROWSER_UA, "Accept": "*/*"},
+)
 
 PLACEHOLDER_MARKERS = {
     "2a96cbd8b46e442fc41c2b86b821562f", "c6f59c1e5e7240a4c0d427abd71f3dbb",
@@ -63,6 +78,7 @@ SOURCE_REPUTATION_WEIGHTS = {
     "last.fm-api": 30.0,
     "last.fm-web": 30.0,
     "last.fm": 30.0,
+    "deezer": 25.0,
     "TheAudioDB": 20.0,
     "fanart.tv": 10.0,
     "cache": 0.0,
@@ -111,6 +127,7 @@ class RateLimiter:
             "coverartarchive": args.coverartarchive_rate_limit,
             "theaudiodb": args.theaudiodb_rate_limit,
             "image": args.image_rate_limit,
+            "deezer": args.deezer_rate_limit,
         }
         self.last: dict[str, float] = {}
     def wait(self, service: str) -> None:
@@ -119,6 +136,24 @@ class RateLimiter:
         if elapsed < delay:
             time.sleep(delay - elapsed)
         self.last[service] = time.time()
+
+def http_get(session: requests.Session, url: str, retries: int = 3, **kwargs) -> requests.Response:
+    """GET that waits and tries again when a site says "too many requests"
+    (429) or is briefly unavailable (5xx), instead of failing straight away."""
+    kwargs.setdefault("timeout", 30)
+    r = session.get(url, **kwargs)
+    for attempt in range(retries):
+        if r.status_code != 429 and r.status_code < 500:
+            break
+        wait = 5.0 * (attempt + 1)
+        try:
+            wait = max(wait, min(60.0, float(r.headers.get("Retry-After", 0))))
+        except ValueError:
+            pass
+        print(f"    (server said HTTP {r.status_code}; waiting {wait:.0f}s and trying again)")
+        time.sleep(wait)
+        r = session.get(url, **kwargs)
+    return r
 
 # ---------------------------------------------------------------------
 # Credentials and cache
@@ -249,7 +284,14 @@ def image_from_candidate(c: ImageCandidate, args: argparse.Namespace, session: r
         if not c.image_url: raise RejectedImage("empty image URL")
         if contains_placeholder_marker(c.image_url): raise RejectedImage(f"known placeholder URL: {c.image_url}")
         limiter.wait("image")
-        r = session.get(c.image_url, timeout=60, headers={"User-Agent": "RockboxMusicArt/3.2"})
+        r = http_get(session, c.image_url, timeout=60, headers={"User-Agent": BROWSER_UA})
+        m = re.match(r"(https://lastfm\.freetls\.fastly\.net/i/u/)500x500/([0-9a-f]{32}\.jpg)$", c.image_url)
+        if r.status_code == 404 and m:
+            for size in ("770x0/", "300x300/", ""):
+                limiter.wait("image")
+                r = http_get(session, m.group(1) + size + m.group(2), timeout=60, headers={"User-Agent": BROWSER_UA})
+                if r.status_code != 404:
+                    break
         r.raise_for_status()
         img = Image.open(BytesIO(r.content)).convert("RGB")
     reason = image_seems_bad(img, args.min_source_size, c.source)
@@ -377,15 +419,6 @@ def normalise_lastfm_html(text: str) -> str:
     text = text.replace("%2B", "+").replace("%2b", "+")
     return text
 
-def extract_lastfm_image_urls(text: str) -> list[str]:
-    text = normalise_lastfm_html(text)
-    urls: list[str] = []
-    for pattern in (r'https?://lastfm\.freetls\.fastly\.net/i/u/[^"\'<>\s]+', r'https?://[^"\'<>\s]*lastfm[^"\'<>\s]+/i/u/[^"\'<>\s]+'):
-        for m in re.findall(pattern, text, flags=re.IGNORECASE):
-            u = m.split("?")[0]
-            if u not in urls and not contains_placeholder_marker(u): urls.append(u)
-    return urls
-
 def extract_lastfm_photo_hashes(text: str) -> list[str]:
     text = normalise_lastfm_html(text)
     hashes: list[str] = []
@@ -394,23 +427,31 @@ def extract_lastfm_photo_hashes(text: str) -> list[str]:
         if h not in hashes and not contains_placeholder_marker(h): hashes.append(h)
     return hashes
 
-def lastfm_cdn_urls_from_hash(h: str) -> list[str]:
+def lastfm_cdn_url_from_hash(h: str) -> str:
+    """The 500x500 CDN image for a photo hash; image_from_candidate() tries
+    the other sizes when that one is missing."""
     h = h.lower().strip()
-    if not re.fullmatch(r"[0-9a-f]{32}", h): return []
-    return [
-        f"https://lastfm.freetls.fastly.net/i/u/500x500/{h}.jpg",
-        f"https://lastfm.freetls.fastly.net/i/u/300x300/{h}.jpg",
-        f"https://lastfm.freetls.fastly.net/i/u/770x0/{h}.jpg",
-        f"https://lastfm.freetls.fastly.net/i/u/{h}.jpg",
-    ]
+    if not re.fullmatch(r"[0-9a-f]{32}", h): return ""
+    return f"https://lastfm.freetls.fastly.net/i/u/500x500/{h}.jpg"
+
+def extract_lastfm_og_image(text: str) -> list[str]:
+    """The artist's headline image from the page's og:image tag."""
+    text = normalise_lastfm_html(text)
+    out = []
+    for pattern in (r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+                    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']'):
+        for m in re.findall(pattern, text, flags=re.IGNORECASE):
+            if "/i/u/" in m and not contains_placeholder_marker(m) and m not in out:
+                out.append(m.split("?")[0])
+    return out
 
 def lookup_lastfm_artist_web_candidates(name: str, session: requests.Session, limiter: RateLimiter, mbid: str = "") -> list[ImageCandidate]:
     """Return Last.fm artist image candidates discovered from public web pages.
 
     Last.fm's API image list can be sparse or placeholder-heavy for some artists.
-    The gallery pages often contain direct CDN image URLs or image hashes, so this
-    scraper collects those URLs and lets the normal download/score pipeline decide
-    whether they are actually usable.
+    This takes the photos in the artist's gallery and the headline og:image of
+    the main page, and lets the normal download/score pipeline decide whether
+    they are usable. The main page's other images are similar artists' photos.
 
     This function must be deliberately non-fatal: a layout change, 404, or scrape
     failure should not discard valid Last.fm API candidates.
@@ -420,44 +461,45 @@ def lookup_lastfm_artist_web_candidates(name: str, session: requests.Session, li
         return []
 
     encoded_name = quote(artist_name, safe="")
-    pages = [
-        f"{LASTFM_SITE}/{encoded_name}",
-        f"{LASTFM_SITE}/{encoded_name}/+images",
-    ]
+    main_page = f"{LASTFM_SITE}/{encoded_name}"
+    gallery_page = f"{LASTFM_SITE}/{encoded_name}/+images"
 
     urls: list[str] = []
     seen: set[str] = set()
 
-    for page_url in pages:
-        try:
+    def add(url: str) -> None:
+        if url and url not in seen and not contains_placeholder_marker(url):
+            seen.add(url)
+            urls.append(url)
+
+    def fetch(page_url: str) -> str:
+        for n, headers in enumerate(LASTFM_PAGE_HEADERS):
+            if n:
+                time.sleep(3.0)
             limiter.wait("lastfm")
-            r = session.get(
-                page_url,
-                timeout=30,
-                headers={"User-Agent": "RockboxMusicArt/3.7"},
-            )
-            if r.status_code == 404:
-                continue
-            r.raise_for_status()
+            r = http_get(session, page_url, headers=headers)
+            if r.status_code not in (403, 406):
+                break
+        if r.status_code == 404:
+            return ""
+        r.raise_for_status()
+        return r.text or ""
 
-            text = r.text or ""
-
-            for url in extract_lastfm_image_urls(text):
-                if url and url not in seen and not contains_placeholder_marker(url):
-                    seen.add(url)
-                    urls.append(url)
-
-            for image_hash in extract_lastfm_photo_hashes(text):
-                for url in lastfm_cdn_urls_from_hash(image_hash):
-                    if url and url not in seen and not contains_placeholder_marker(url):
-                        seen.add(url)
-                        urls.append(url)
-
-        except Exception:
-            # Keep this silent so the caller can decide how much to log. The
-            # lookup_lastfm_artist_candidates() wrapper catches/logs web scrape
-            # failures without losing Last.fm API results.
+    # Only images that belong to this artist: the gallery's photos and the
+    # main page's headline image. The main page also shows photos of
+    # *similar* artists, so its other image links are not used.
+    for page_url, kind in ((gallery_page, "gallery"), (main_page, "main")):
+        try:
+            text = fetch(page_url)
+        except Exception as exc:
+            print(f"  candidate: last.fm {kind} page failed: {exc}")
             continue
+        if kind == "gallery":
+            for image_hash in extract_lastfm_photo_hashes(text):
+                add(lastfm_cdn_url_from_hash(image_hash))
+        else:
+            for url in extract_lastfm_og_image(text):
+                add(url)
 
     return [
         ImageCandidate(
@@ -476,7 +518,7 @@ def lookup_lastfm_artist_candidates(name: str, creds: Credentials, session: requ
         return []
     params = {"method": "artist.getinfo", "artist": name, "api_key": creds.lastfm_api_key, "format": "json", "autocorrect": "1"}
     limiter.wait("lastfm")
-    r = session.get(LASTFM_API, params=params, timeout=30); r.raise_for_status()
+    r = http_get(session, LASTFM_API, params=params); r.raise_for_status()
     artist = r.json().get("artist") or {}
     artist_name = artist.get("name") or name
     mbid = artist.get("mbid") or ""
@@ -498,7 +540,7 @@ def lookup_musicbrainz_artist_mbid(name: str, args: argparse.Namespace, session:
     headers = {"User-Agent": args.musicbrainz_user_agent, "Accept": "application/json"}
     params = {"query": f'artist:"{name}"', "fmt": "json", "limit": "5"}
     limiter.wait("musicbrainz")
-    r = session.get(MUSICBRAINZ_ARTIST_API, params=params, headers=headers, timeout=30); r.raise_for_status()
+    r = http_get(session, MUSICBRAINZ_ARTIST_API, params=params, headers=headers); r.raise_for_status()
     artists = r.json().get("artists") or []
     if not artists: return ""
     best = max(artists, key=lambda a: similarity(name, a.get("name", "")) * 100 + float(a.get("score") or 0))
@@ -539,7 +581,7 @@ def lookup_fanart_artist_candidates(name: str, mbid: str, creds: Credentials, ar
     if not mbid:
         return []
     limiter.wait("fanart")
-    r = session.get(f"{FANART_API}/{mbid}", params={"api_key": creds.fanart_api_key}, timeout=30)
+    r = http_get(session, f"{FANART_API}/{mbid}", params={"api_key": creds.fanart_api_key})
     if r.status_code == 404:
         return []
     r.raise_for_status()
@@ -555,7 +597,7 @@ def lookup_theaudiodb_artist_candidates(name: str, session: requests.Session, li
     if normalise_name(name) in {"", "unknown artist", "various artists"}:
         return []
     limiter.wait("theaudiodb")
-    r = session.get(f"{THEAUDIODB_API}/{THEAUDIODB_PUBLIC_KEY}/search.php?s={quote_plus(name)}", timeout=30); r.raise_for_status()
+    r = http_get(session, f"{THEAUDIODB_API}/{THEAUDIODB_PUBLIC_KEY}/search.php?s={quote_plus(name)}"); r.raise_for_status()
     artists = r.json().get("artists") or []
     if not artists:
         return []
@@ -576,6 +618,53 @@ def lookup_theaudiodb_artist_candidates(name: str, session: requests.Session, li
             out.append(ImageCandidate("TheAudioDB", best.get("strArtist") or name, image_url=url, mbid=best.get("strMusicBrainzID") or "", source_score=score))
     return unique_candidates(out)
 
+
+def plain_album_title(title: str) -> str:
+    """'Heady Metal - EP', 'Heady Metal (Deluxe)' -> 'Heady Metal'."""
+    t = re.sub(r"\([^)]*\)|\[[^]]*\]", " ", title or "")
+    t = re.sub(r"\s[-–]\s*(ep|single|lp|deluxe.*|remaster.*|expanded.*)\s*$", " ", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s(ep|lp)\s*$", " ", t, flags=re.IGNORECASE)
+    return t.strip() or (title or "")
+
+def deezer_album_overlap(artist_id: int, local_albums: list[str], session: requests.Session, limiter: RateLimiter) -> int:
+    """How many of the local album folder names match this Deezer artist's albums."""
+    limiter.wait("deezer")
+    r = http_get(session, f"{DEEZER_API}/artist/{artist_id}/albums", params={"limit": 200}); r.raise_for_status()
+    titles = [plain_album_title(a.get("title", "")) for a in (r.json().get("data") or [])]
+    return sum(1 for local in local_albums if any(similarity(plain_album_title(local), t) >= 0.85 for t in titles))
+
+def lookup_deezer_artist_candidates(name: str, local_albums: list[str], session: requests.Session, limiter: RateLimiter) -> list[ImageCandidate]:
+    """Deezer's artist picture, only when Deezer's artist is clearly yours.
+
+    Many bands share a name, so an artist whose name matches is used only if
+    at least one of its albums matches one of your album folders. With no
+    album folders to compare, a single exact name match is accepted.
+    """
+    if normalise_name(name) in {"", "unknown artist", "various artists"}:
+        return []
+    limiter.wait("deezer")
+    r = http_get(session, f"{DEEZER_API}/search/artist", params={"q": name, "limit": 15}); r.raise_for_status()
+    exact = [a for a in (r.json().get("data") or []) if normalise_name(a.get("name", "")) == normalise_name(name)]
+    if not exact:
+        return []
+    chosen = None
+    if local_albums:
+        best = 0
+        for a in exact[:5]:
+            n = deezer_album_overlap(a["id"], local_albums, session, limiter)
+            if n > best:
+                best, chosen = n, a
+        if not chosen:
+            print(f"  candidate: deezer has {len(exact)} artist(s) called '{name}' but none share your albums; not used")
+            return []
+    elif len(exact) == 1:
+        chosen = exact[0]
+    else:
+        return []
+    url = chosen.get("picture_xl") or chosen.get("picture_big") or ""
+    if not url or "/artist//" in url:   # Deezer's blank silhouette
+        return []
+    return [ImageCandidate("deezer", chosen.get("name") or name, image_url=url, source_score=10.0)]
 
 def lookup_theaudiodb_artist(name: str, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
     # Backward-compatible single-candidate wrapper.
@@ -624,7 +713,7 @@ def lookup_lastfm_album(artist: str, album: str, creds: Credentials, session: re
     if not creds.has_lastfm: return None
     params = {"method":"album.getinfo", "artist":artist, "album":album, "api_key":creds.lastfm_api_key, "format":"json", "autocorrect":"1"}
     limiter.wait("lastfm")
-    r = session.get(LASTFM_API, params=params, timeout=30); r.raise_for_status()
+    r = http_get(session, LASTFM_API, params=params); r.raise_for_status()
     data = r.json(); obj = data.get("album") or {}
     if not obj or data.get("error"): return None
     url = choose_best_lastfm_image(obj.get("image") or [])
@@ -634,7 +723,7 @@ def lookup_musicbrainz_release_mbid(artist: str, album: str, args: argparse.Name
     headers = {"User-Agent": args.musicbrainz_user_agent, "Accept": "application/json"}
     params = {"query": f'artist:"{artist}" AND release:"{album}"', "fmt":"json", "limit":"10"}
     limiter.wait("musicbrainz")
-    r = session.get(MUSICBRAINZ_RELEASE_API, params=params, headers=headers, timeout=30); r.raise_for_status()
+    r = http_get(session, MUSICBRAINZ_RELEASE_API, params=params, headers=headers); r.raise_for_status()
     releases = r.json().get("releases") or []
     if not releases: return ""
     def score(rel: dict[str, Any]) -> float:
@@ -654,7 +743,7 @@ def lookup_cover_art_archive(artist: str, album: str, mbid: str, args: argparse.
 
 def lookup_theaudiodb_album(artist: str, album: str, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
     limiter.wait("theaudiodb")
-    r = session.get(f"{THEAUDIODB_API}/{THEAUDIODB_PUBLIC_KEY}/searchalbum.php?s={quote_plus(artist)}&a={quote_plus(album)}", timeout=30); r.raise_for_status()
+    r = http_get(session, f"{THEAUDIODB_API}/{THEAUDIODB_PUBLIC_KEY}/searchalbum.php?s={quote_plus(artist)}&a={quote_plus(album)}"); r.raise_for_status()
     albums = r.json().get("album") or []
     if not albums: return None
     best = max(albums, key=lambda a: similarity(album, a.get("strAlbum", "")) + similarity(artist, a.get("strArtist", "")))
@@ -772,12 +861,13 @@ def cap_provider_candidates(label: str, candidates: list[ImageCandidate], args: 
     return candidates
 
 
-def artist_candidates(name: str, creds: Credentials, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter, mbid: str="") -> list[ImageCandidate]:
+def artist_candidates(name: str, creds: Credentials, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter, mbid: str="", local_albums: Optional[list[str]]=None) -> list[ImageCandidate]:
     out=[]
     calls=[
         ("last.fm", lambda: lookup_lastfm_artist_candidates(name,creds,session,limiter)),
         ("fanart.tv", lambda: lookup_fanart_artist_candidates(name,mbid,creds,args,session,limiter)),
         ("TheAudioDB", lambda: [] if args.no_theaudiodb else lookup_theaudiodb_artist_candidates(name,session,limiter)),
+        ("deezer", lambda: [] if args.no_deezer else lookup_deezer_artist_candidates(name,local_albums or [],session,limiter)),
     ]
     for label,fn in calls:
         try:
@@ -818,12 +908,13 @@ def process_artist_folder(folder: Path, args: argparse.Namespace, creds: Credent
     else: print(f"  folder check: OK, {reason}")
     if args.dry_run: print(f"  dry-run: would search artist artwork for '{name}'"); return False,"dry-run"
     key=cache_key(name); entry=cache.get("artists",{}).get(key,{})
+    albums=[d.name for d in folder.iterdir() if d.is_dir() and not d.name.startswith(".")]
     if entry.get("status")=="found" and entry.get("image_url") and not args.ignore_cache:
         candidates=[ImageCandidate(entry.get("source") or "cache", entry.get("artist_name") or name, image_url=entry.get("image_url") or "", mbid=entry.get("mbid") or "")]
     elif entry.get("status")=="not_found" and not args.retry_not_found and not args.ignore_cache:
         print(f"  cache: {entry.get('reason') or 'cached as not found'}"); return False,"not-found-cache"
     else:
-        candidates=artist_candidates(name, creds, args, session, limiter, entry.get("mbid") or "")
+        candidates=artist_candidates(name, creds, args, session, limiter, entry.get("mbid") or "", albums)
     ok,source,notes=try_candidates(candidates, output, args, session, limiter)
     if ok:
         c=next((x for x in candidates if x.source==source), candidates[0])
@@ -832,7 +923,7 @@ def process_artist_folder(folder: Path, args: argparse.Namespace, creds: Credent
     if args.interactive:
         override=prompt_artist(name, notes or "No source returned artwork")
         if override:
-            candidates=artist_candidates(override, creds, args, session, limiter)
+            candidates=artist_candidates(override, creds, args, session, limiter, "", albums)
             ok,source,notes=try_candidates(candidates, output, args, session, limiter)
             if ok:
                 c=next((x for x in candidates if x.source==source), candidates[0])
@@ -1021,6 +1112,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--retry-not-found", action="store_true", help="Retry cached not-found items")
     p.add_argument("--ignore-cache", action="store_true", help="Ignore cached decisions")
     p.add_argument("--no-theaudiodb", action="store_true", help="Disable TheAudioDB fallback")
+    p.add_argument("--no-deezer", action="store_true", help="Disable Deezer artist pictures")
+    p.add_argument("--deezer-rate-limit", type=float, default=0.3, help="Sets the rate limit for api calls")
     p.add_argument("--max-candidates-per-provider", type=int, default=3, help="Maximum artist candidate images retained from each provider before download/scoring; 0 = unlimited")
     p.add_argument("--lastfm-rate-limit", type=float, default=1.0, help="Sets the rate limit for api calls")
     p.add_argument("--fanart-rate-limit", type=float, default=1.0, help="Sets the rate limit for api calls")
@@ -1040,7 +1133,7 @@ def main(argv: Optional[list[str]]=None) -> int:
     if args.show_credentials_status:
         print(f"Script version  : {SCRIPT_VERSION}"); print(f"Credential file : {get_config_path()}")
         print(f"Last.fm enabled : {creds.has_lastfm}"); print(f"fanart.tv enabled: {creds.has_fanart}")
-        print("MusicBrainz API : no key used"); print(f"TheAudioDB enabled: {not args.no_theaudiodb}")
+        print("MusicBrainz API : no key used"); print(f"TheAudioDB enabled: {not args.no_theaudiodb}"); print(f"Deezer enabled  : {not args.no_deezer}")
         return 0
     if not ensure_dependencies(): return 2
     if not args.music_root:

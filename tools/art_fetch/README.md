@@ -142,7 +142,7 @@ Check configured provider status:
 python art_fetch.py --show-credentials-status
 ```
 
-Last.fm and fanart.tv require configured API keys. MusicBrainz and TheAudioDB use public endpoints in this script.
+Last.fm and fanart.tv require configured API keys. MusicBrainz, TheAudioDB and Deezer use public endpoints in this script.
 
 ---
 
@@ -154,6 +154,7 @@ Artist artwork uses these providers:
 2. Last.fm public artist/gallery pages
 3. fanart.tv
 4. TheAudioDB
+5. Deezer, used only when one of its albums matches one of the artist's album folders, or, for an artist folder with no album folders, when exactly one Deezer artist has that name
 
 The process is:
 
@@ -281,6 +282,7 @@ Cover Art Archive   35.0
 last.fm-api         30.0
 last.fm-web         30.0
 last.fm             30.0
+deezer              25.0
 TheAudioDB          20.0
 fanart.tv           10.0
 cache                0.0
@@ -496,6 +498,7 @@ both
 --ignore-cache
 --retry-not-found
 --no-theaudiodb
+--no-deezer
 ```
 
 ### Rate limits
@@ -506,6 +509,7 @@ both
 --musicbrainz-rate-limit 1.1
 --coverartarchive-rate-limit 1.0
 --theaudiodb-rate-limit 2.5
+--deezer-rate-limit 0.3
 --image-rate-limit 0.2
 ```
 
