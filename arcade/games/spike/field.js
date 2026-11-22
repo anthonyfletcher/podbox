@@ -70,6 +70,11 @@ const GREY_SHADE = 12, CLEARER = 0.25;
 const ACCENT_CHROMA = 48, INK_CHROMA = 24, ACCENT_APART = 0.1;
 var ACCENTS = [0xe8304a, 0xf5962a, 0xf8e43c, 0x3cd250, 0x2f9cf0, 0xf27ab4];
 
+// The accent is made VIVID more of its own colour than the album gives it, a
+// sleeve's colours being paler than a game's. A yellow one darkens toward
+// orange by WARM_TURN, as a darker yellow at its own hue is olive.
+const VIVID = 0.6, WARM_TURN = -0.06;
+
 var heard = new Int32Array(3);
 var oppA = 0, oppB = 0;     // opponent()'s answer
 
@@ -117,17 +122,23 @@ function pickAccent(vivid, paper, ink) {
     return best;
 }
 
-// Colour c, of tone k, CLEARER farther from the grey of its tone
-function clearer(c, k) {
+// Colour c, of tone k, `more` farther from the grey of its tone
+function clearer(c, k, more) {
     var g = color.toned(0x808080, k), out = 0;
     for (var sh = 16; sh >= 0; sh -= 8) {
         var v = (c >> sh) & 255, w = (g >> sh) & 255;
-        out = out * 256 + mid(0, flr(v + (v - w) * CLEARER), 255);
+        out = out * 256 + mid(0, flr(v + (v - w) * more), 255);
     }
     return color.toned(out, k);
 }
 
-// Set from what is playing; about 8,000 units, once a track
+// Whether colour c is a yellow: within an eighth of a turn of it
+function yellow(c) {
+    opponent(c);
+    return oppB > 0 && abs(oppA) < oppB;
+}
+
+// Set from what is playing; about 11,000 units, once a track
 function colours() {
     playback.colors(heard);
     var paper = heard[0], ink = heard[1];
@@ -137,7 +148,7 @@ function colours() {
     if (oppA * oppA + oppB * oppB < INK_CHROMA * INK_CHROMA) {
         paper = color.toned(0x808080, t);
         step = t < k ? GREY_SHADE : -GREY_SHADE;
-        ink = clearer(ink, k);
+        ink = clearer(ink, k, CLEARER);
     }
     setpal(PAPER, paper);
     setpal(PAPER2, color.toned(paper, t + step));
@@ -151,8 +162,12 @@ function colours() {
     if (color.contrast(accent, paper) < 2.0)
         accent = color.toned(accent, t < 50 ? 75 : 30);
     var a = color.tone(accent);
+    accent = clearer(accent, a, VIVID);
     setpal(ACCENT, accent);
-    setpal(ACCENT2, color.toned(accent, a - away));
+    var shade = color.toned(accent, a - away);
+    if (away > 0 && yellow(accent))
+        shade = color.turn(shade, WARM_TURN);
+    setpal(ACCENT2, shade);
     setpal(ACCENT3, color.toned(accent, a + away));
 }
 

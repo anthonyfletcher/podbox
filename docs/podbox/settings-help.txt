@@ -1017,6 +1017,10 @@ fits fewer rows on screen.
 An optional bold companion to the interface font, used where a screen wants
 emphasis. Unset means the regular font is used for both.
 
+[font heading]
+The font for a Liner Notes page's name, set over its banner. Unset, the page
+takes the tallest text font the theme has loaded.
+
 [backdrop]
 An image drawn behind everything. Loading a theme replaces it, and a theme that
 names none clears it rather than keeping the last one.

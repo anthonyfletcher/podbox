@@ -82,7 +82,7 @@ comm -23 "$tmp/named" "$tmp/stanzas" | grep -Ev "$KNOWN_UNDOCUMENTED" \
 # you meet in the menus, so there is no row for one to reach. Nothing shows
 # these on the player either -- with no row there is no context menu to open
 # Explain from -- so a stanza here is read in the file or not at all.
-NO_GUIDE_ROW='\[(backdrop|filetype colours|font bold|hold_lr_for_scroll_in_list|iconset|progress bar radius|ui viewport|viewers iconset)\]$'
+NO_GUIDE_ROW='\[(backdrop|filetype colours|font bold|font heading|hold_lr_for_scroll_in_list|iconset|progress bar radius|ui viewport|viewers iconset)\]$'
 
 awk '
     NR == FNR { guide = guide "\n" $0; next }

@@ -50,11 +50,11 @@ default, never whatever the previous theme chose.
 looks right only because the previous one set something, it will not look right
 on a clean player.
 
-The reset covers 73 settings:
+The reset covers 74 settings:
 
 | Group | Settings |
 |---|---|
-| The skins and fonts | `wps`, `sbs`, `font`, `font bold` |
+| The skins and fonts | `wps`, `sbs`, `font`, `font bold`, `font heading` |
 | Colours | `foreground color`, `background color`, the three `line selector …` colours, `list separator color` |
 | Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
 | Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
@@ -146,6 +146,11 @@ all shows the built-in font on an unthemed screen — there is no fallback theme
 behind yours. `font bold` also defaults to none, and when unset the bold UI font
 falls back to your regular `font`; name it only if you ship a genuinely separate
 bold face.
+
+`font heading` is the font for a Liner Notes page's name, no taller than 40
+pixels. Unset, the page takes the tallest font your skins load that sets text,
+which can be the wrong one; name it if your skins load a large display or
+numeral font.
 
 ---
 

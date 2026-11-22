@@ -411,6 +411,9 @@ void tv_standard_set(int standard);
  * use it unconditionally. Do NOT font_unload() the returned id -- settings_apply
  * owns its lifecycle. */
 int font_get_ui_bold(void);
+/* The theme's heading font ('font heading'), loaded and owned as the bold
+ * one is; -1 when the theme names none or it failed to load */
+int font_get_ui_heading(void);
 void settings_display(void);
 
 enum optiontype { RB_INT, RB_BOOL };
@@ -956,6 +959,8 @@ struct user_settings
      * screens/covers/album_covers.c, for the album name; not a general theme
      * concept like font_file, just a per-feature opt-in. */
     unsigned char bold_font_file[MAX_FILENAME+1];
+    /* The theme's font for page titles; "-" means none */
+    unsigned char heading_font_file[MAX_FILENAME+1];
     int glyphs_to_cache; /* default font allocation size in glyphs */
     /* Core text viewer (viewers/text_viewer). */
     int text_viewer_colour_mode;  /* TV_COLOUR_* */

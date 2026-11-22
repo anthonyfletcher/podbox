@@ -1808,6 +1808,8 @@ const struct settings_list settings[] = {
      * previous value and the fallback in font_get_ui_bold() never runs. */
     TEXT_SETTING(F_THEMESETTING|F_THEMERESET, bold_font_file, "font bold",
                      "-", FONT_DIR "/", ".fnt"),
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET, heading_font_file,
+                     "font heading", "-", FONT_DIR "/", ".fnt"),
     INT_SETTING(0, glyphs_to_cache, LANG_GLYPHS, DEFAULT_GLYPHS,
                 "glyphs", UNIT_INT, MIN_GLYPHS, MAX_GLYPHS, 10,
                 NULL, NULL, NULL),

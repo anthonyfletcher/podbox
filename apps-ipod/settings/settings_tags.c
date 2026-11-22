@@ -283,6 +283,7 @@ static const struct tag_row tag_rows[] = {
 { "sbs",                 TAG_APPEARANCE,                         "theme base skin statusbar" },
 { "font",                TAG_APPEARANCE,                         "theme typeface" },
 { "font bold",           TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "theme typeface" },
+{ "font heading",        TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "theme typeface title liner notes" },
 { "backdrop",            TAG_APPEARANCE|TAG_THEMEAUTHOR,         "theme background image wallpaper" },
 { "iconset",             TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "icons theme" },
 { "viewers iconset",     TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "icons theme" },

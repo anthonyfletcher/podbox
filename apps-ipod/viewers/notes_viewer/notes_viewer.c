@@ -14,7 +14,8 @@
  *     engine, laid out by text_layout.c, and every link in it found once.
  *     Its banner is the owner's banner art, else a band of the person's
  *     picture or the album's cover, and scrolls with the text; the page's
- *     name is set over it in the biggest font loaded that sets a name.
+ *     name is set over it in the theme's heading font, else the biggest font
+ *     loaded that sets a name.
  *   - The page takes its own picture's colours, held to a deep or a pale
  *     tint, never the colour itself: it is read against for minutes at a
  *     time. Or the theme's, the text viewer's, or Custom's text, link,
@@ -478,20 +479,28 @@ static void nv_colours(void)
     nv.vp.bg_pattern = nv.tvp.bg_pattern = nv.bg;
 }
 
-/* The largest font loaded that sets a name -- in practice one of the theme's
- * skin fonts, its Now Playing title's in nearly every theme: one with the
- * alphabet in it, as a clock's digits-only font has not, and no taller than
- * NV_NAME_MAX_H. The UI font when there is none larger. */
+/* The theme's `font heading`, else the largest font loaded that sets a name
+ * -- in practice one of the theme's skin fonts, its Now Playing title's in
+ * nearly every theme -- no taller than NV_NAME_MAX_H. A font sets a name when
+ * it has the alphabet, as a clock's digits-only font has not, letters that
+ * hang below the line, and an i narrower than its W; an icon font, which
+ * often spans the alphabet too, has neither. The UI font when there is none
+ * larger. */
 static int nv_name_font(void)
 {
-    int best = nv.font, best_h = nv.lh, id;
+    int best = nv.font, best_h = nv.lh, id = font_get_ui_heading();
+    struct font *pf = id >= 0 ? font_get(id) : NULL;
 
+    if (pf && pf->height <= NV_NAME_MAX_H)
+        return id;
     for (id = FONT_FIRSTUSERFONT; id < MAXFONTS; id++)
     {
-        struct font *pf = font_get(id);
+        pf = font_get(id);
 
         if (pf && (int)pf->height > best_h && pf->height <= NV_NAME_MAX_H
-            && pf->firstchar <= 'A' && pf->firstchar + pf->size > 'z')
+            && pf->firstchar <= 'A' && pf->firstchar + pf->size > 'z'
+            && pf->ascent > 0 && pf->ascent < (int)pf->height
+            && font_get_width(pf, 'i') < font_get_width(pf, 'W'))
         {
             best = id;
             best_h = pf->height;

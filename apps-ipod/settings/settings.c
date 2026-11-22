@@ -1245,6 +1245,14 @@ int font_get_ui_bold(void)
     return screens[SCREEN_MAIN].getuifont();
 }
 
+/* The theme's heading font ('font heading'); -1 when it names none */
+static int ui_heading_font_id = -1;
+
+int font_get_ui_heading(void)
+{
+    return ui_heading_font_id;
+}
+
 static int clamp_int(int v, int lo, int hi)
 {
     if (v < lo)
@@ -1440,6 +1448,24 @@ void settings_apply(bool read_disk)
         {
             font_unload(ui_bold_font_id);
             ui_bold_font_id = -1;
+        }
+        if (global_settings.heading_font_file[0]
+            && global_settings.heading_font_file[0] != '-')
+        {
+            snprintf(buf, sizeof buf, FONT_DIR "/%s.fnt",
+                     global_settings.heading_font_file);
+            if (ui_heading_font_id < 0
+                || !font_filename_matches_loaded_id(ui_heading_font_id, buf))
+            {
+                if (ui_heading_font_id >= 0)
+                    font_unload(ui_heading_font_id);
+                ui_heading_font_id = font_load(buf);
+            }
+        }
+        else if (ui_heading_font_id >= 0)
+        {
+            font_unload(ui_heading_font_id);
+            ui_heading_font_id = -1;
         }
         /* Loadable keyboard layouts are gone (click-wheel editor); the
          * kbd_file setting is inert. */
