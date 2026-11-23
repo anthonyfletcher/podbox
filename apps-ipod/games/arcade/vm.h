@@ -353,8 +353,10 @@ struct vm
     uint32_t nic;
     struct value *globals;
     uint32_t nglobals;
+    /* LINE, read only to name an error's place: in the arena at lines, or
+     * left in the cart file at lines_at when the host can read it there */
     const uint8_t *lines;
-    uint32_t lines_len;
+    uint32_t lines_at, lines_len;
 
     /* String keys: id -> string offset, and a hash of contents -> id + 1 */
     uint32_t *keyoff;

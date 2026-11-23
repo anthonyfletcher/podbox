@@ -5,7 +5,8 @@
  *
  * Parts: the perm allocator; string keys (ids, the content hash); reading
  * the chunks, each CRC-checked, SRC_ and unknown chunks skipped unread;
- * building the tables from them; the error's source position from LINE;
+ * building the tables from them; the error's source position from LINE,
+ * which stays in the cart file when the host can read it there;
  * arcade_load() itself.
  *
  * The byte layouts are the ones arcade/sdk/src/compiler.js writes; its
@@ -715,6 +716,17 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
                 return bad(vm, "truncated");
             continue;
         }
+        /* the line table left in the file, read only for an error */
+        if (want == 4 && vm->host && vm->host->cart_read) {
+            uint8_t sum[4];
+            if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
+                return bad(vm, "truncated");
+            vm->lines_at = pos + 8;
+            vm->lines_len = len;
+            vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
+                            rd_le32(sum);
+            continue;
+        }
         uint32_t off = perm_alloc(vm, len + 4);
         if (!off)
             return vm_fail(vm, "not enough memory for this game", "", "");
@@ -736,8 +748,10 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
     for (int i = 0; i < 4; i++)
         if (!chunk[i])
             return bad(vm, "a chunk is missing");
-    vm->lines = chunk[4];
-    vm->lines_len = clen[4];
+    if (chunk[4]) {
+        vm->lines = chunk[4];
+        vm->lines_len = clen[4];
+    }
     vm->pals = chunk[5];
     vm->pals_len = clen[5];
     vm->shet = chunk[6];
@@ -807,53 +821,120 @@ struct where
     int line;
 };
 
-static void copy_name(char *dst, uint32_t cap, const uint8_t *b, uint32_t n)
+/* A cursor over LINE, in the arena or in the cart file. From the file it
+ * reads a window at a time into a static buffer: the arena may be full,
+ * as it is for "out of memory". */
+struct lcur
 {
-    if (n >= cap)
-        n = cap - 1;
-    memcpy(dst, b, n);
-    dst[n] = 0;
+    const struct vm *vm;
+    uint32_t pos;               /* in the chunk */
+    uint32_t win_at, win_n;     /* the window's place in the chunk, its size */
+    int bad;
+};
+
+static uint8_t lwin[1024];
+
+/* n bytes at the cursor into dst, or passed over without dst */
+static void lget(struct lcur *c, uint8_t *dst, uint32_t n)
+{
+    const struct vm *vm = c->vm;
+    if (c->bad || vm->lines_len - c->pos < n) {
+        c->bad = 1;
+        return;
+    }
+    if (!dst || vm->lines) {
+        if (dst)
+            memcpy(dst, vm->lines + c->pos, n);
+        c->pos += n;
+        return;
+    }
+    while (n) {
+        if (c->pos < c->win_at || c->pos >= c->win_at + c->win_n) {
+            uint32_t want = vm->lines_len - c->pos;
+            if (want > sizeof(lwin))
+                want = sizeof(lwin);
+            c->win_at = c->pos;
+            c->win_n = vm->host->cart_read(vm->host->ctx,
+                                           vm->lines_at + c->pos, lwin, want);
+            if (c->win_n != want) {
+                c->win_n = 0;
+                c->bad = 1;
+                return;
+            }
+        }
+        uint32_t k = c->win_at + c->win_n - c->pos;
+        if (k > n)
+            k = n;
+        memcpy(dst, lwin + (c->pos - c->win_at), k);
+        dst += k;
+        c->pos += k;
+        n -= k;
+    }
+}
+
+static uint32_t l8(struct lcur *c)
+{
+    uint8_t b[1] = { 0 };
+    lget(c, b, 1);
+    return b[0];
+}
+
+static uint32_t l16(struct lcur *c)
+{
+    uint8_t b[2] = { 0, 0 };
+    lget(c, b, 2);
+    return rd16(b);
+}
+
+/* A name of n bytes at the cursor into dst, cut to fit */
+static void lname(struct lcur *c, char *dst, uint32_t cap, uint32_t n)
+{
+    uint32_t k = n < cap ? n : cap - 1;
+    lget(c, (uint8_t *)dst, k);
+    lget(c, NULL, n - k);
+    dst[c->bad ? 0 : k] = 0;
 }
 
 /* Fills w from LINE for err_fn and err_pc; returns 0 when unknown. */
 static int find_where(const struct vm *vm, struct where *w)
 {
-    if (!vm->lines || !vm->err_where)
+    if ((!vm->lines && !vm->lines_at) || !vm->err_where)
         return 0;
-    struct cur c = { vm->lines, vm->lines + vm->lines_len, 0 };
-    const uint8_t *files[64];
-    uint32_t flen[64];
-    uint32_t nfiles = c16(&c), i, n;
+    struct lcur c = { vm, 0, 0, 0, 0 };
+    uint32_t files[64], flen[64];
+    uint32_t nfiles = l16(&c), i, n;
     for (i = 0; i < nfiles; i++) {
-        n = c16(&c);
-        const uint8_t *b = take(&c, n);
+        n = l16(&c);
         if (i < 64) {
-            files[i] = b;
+            files[i] = c.pos;
             flen[i] = n;
         }
+        lget(&c, NULL, n);
     }
-    for (i = c16(&c); i > 0; i--)
-        take(&c, c16(&c));
+    for (i = l16(&c); i > 0 && !c.bad; i--)
+        lget(&c, NULL, l16(&c));
     for (uint32_t f = 0; f < vm->nfns && !c.bad; f++) {
-        n = c16(&c);
-        const uint8_t *name = take(&c, n);
-        uint32_t file = c8(&c);
-        uint32_t pairs = c16(&c);
+        n = l16(&c);
         if (f != vm->err_fn) {
-            take(&c, pairs * 4);
+            lget(&c, NULL, n + 1);
+            lget(&c, NULL, l16(&c) * 4);
             continue;
+        }
+        lname(&c, w->fn, sizeof(w->fn), n);
+        uint32_t file = l8(&c);
+        uint32_t pairs = l16(&c);
+        w->line = 0;
+        for (i = 0; i < pairs && !c.bad; i++) {
+            uint32_t pc = l16(&c), line = l16(&c);
+            if (pc <= vm->err_pc)
+                w->line = (int)line;
         }
         if (c.bad)
             return 0;
-        copy_name(w->fn, sizeof(w->fn), name, n);
         w->file[0] = 0;
-        if (file < nfiles && file < 64)
-            copy_name(w->file, sizeof(w->file), files[file], flen[file]);
-        w->line = 0;
-        for (i = 0; i < pairs; i++) {
-            uint32_t pc = c16(&c), line = c16(&c);
-            if (pc <= vm->err_pc)
-                w->line = (int)line;
+        if (file < nfiles && file < 64) {
+            c.pos = files[file];
+            lname(&c, w->file, sizeof(w->file), flen[file]);
         }
         return !c.bad;
     }
@@ -866,6 +947,8 @@ const char *arcade_error(const struct vm *vm, const char **file, int *line,
     static struct where w;
     if (!vm->err)
         return NULL;
+    if (!file && !line && !fn)
+        return vm->msg;
     if (find_where(vm, &w)) {
         if (file) *file = w.file;
         if (line) *line = w.line;

@@ -65,6 +65,27 @@ test('runtime errors name the file, line and function', () => {
     assert.match(s.error, /^main\.js:4: can't set \.x of null \(in update\)$/);
 });
 
+/* pbgvm reads the line table from the cart file, as the player does, a
+ * window at a time: this one is several windows long, and the error's
+ * file is named back at its start */
+test('an error far into a long line table names its place', () => {
+    /* each calls the next, so none is dropped as unused */
+    let b = '';
+    for (let i = 0; i < 200; i++)
+        b += 'function f' + i + '(z) {\n  var q = ' + i + ';\n  return ' +
+             (i == 150 ? 'q / z' : i < 199 ? 'f' + (i + 1) + '(z)' : 'q') +
+             ';\n}\n';
+    const res = compileFiles({ 'cart.json': CART, 'b.js': b,
+        'main.js': 'function init() {}\nfunction update() {\n  b.f0(0);\n}' });
+    assert.deepEqual(res.errors, []);
+    const file = path.join(tmp, 'lines.pbg');
+    fs.writeFileSync(file, res.cart);
+    assert.ok(readCart(res.cart).chunks.LINE.length > 2 * 1024,
+              'the table spans windows');
+    const r = spawnSync(exe, [file, '--ticks', '1'], { encoding: 'utf8' });
+    assert.equal(r.stderr.trim(), 'b.js:603: division by zero (in b.f150)');
+});
+
 test('a property of a number stops the cart, in the reference as in the VM', () => {
     /* through a parameter, so the compiler cannot see it is a number */
     const got = same('function rx(o) { return o.x; }\nfunction init() {\n  printh("before");\n' +
