@@ -29,23 +29,42 @@ struct notes_page
                            its qualifier, 0 when it has none */
     uint32_t by;        /* an album's artist; another page's folder */
     uint64_t dir;       /* beside the music, path_key() of its folder */
-    uint32_t path;
-    uint32_t size, mtime;
+    uint32_t path;      /* where it is among the saved paths */
+    uint32_t hash;      /* name_index_path_hash() of the path */
+    uint32_t stamp;     /* the file's size and time, as one number */
     uint8_t  kind;
     uint8_t  rank;      /* 2 for .md, 1 for .txt */
     uint16_t pad;
 };
 
-/* The pages, 0 to notes_page_count() - 1: none while the setting is off or
- * no walk has written the index. notes_page_get() is NULL for an index out
- * of range, and for every page while a completed walk's index replaces the
- * last one: a caller holding an index across a yield checks it. */
+/* The pages, 0 to notes_page_count() - 1, in the order the walk found
+ * them: none while the setting is off or no walk has written the index.
+ * notes_page_get() is NULL for an index out of range, and for every page
+ * while a completed walk's index replaces the last one. A page number or
+ * pointer held across a yield is good only while notes_pages_generation()
+ * is unchanged. */
 int notes_page_count(void);
 const struct notes_page *notes_page_get(int i);
-const char *notes_page_path(const struct notes_page *pg);
+/* The page's path into `buf`, read from the saved index; false, and `buf`
+ * empty, when it cannot be read */
+bool notes_page_path(const struct notes_page *pg, char *buf, size_t size);
 /* Whether `a` is to be read over `b`, a page of the same name (or NULL):
  * one in /Notes over one beside the music, then .md over .txt */
 bool notes_page_better(const struct notes_page *a, const struct notes_page *b);
+/* Whether page `page` replaces `best` (-1 for none) as the page to read:
+ * better, or as good and first */
+bool notes_page_wins(int page, int best);
+
+/* The pages whose key, alt or part is `value`, one a call: `*at` is -1 at
+ * first, and -1 is returned when there are no more. They come in page
+ * order, so taking each that notes_page_wins() chooses the page a look at
+ * every page would. 0 finds nothing. */
+#define NOTES_BY_KEY  0
+#define NOTES_BY_ALT  1
+#define NOTES_BY_PART 2
+int notes_pages_by(int field, uint32_t value, int *at);
+/* The same for the pages beside the music in the folder path_key() `dir` */
+int notes_pages_in(uint64_t dir, int *at);
 /* The name a page's file gives it: its file name without the extension, or
  * beside the music its folder's name */
 void notes_page_name(const struct notes_page *pg, char *name, size_t size);
@@ -71,15 +90,14 @@ unsigned int notes_pages_generation(void);
 struct notes_pages
 {
     int have;                   /* NOTES_BIO and NOTES_ALBUM */
-    char bio[MAX_PATH];         /* the bio's file */
-    char person[MAX_PATH];      /* who it is about, as its file is named */
-    char album[MAX_PATH];       /* the notes' file */
+    int bio, album;             /* their pages, -1 for none */
 };
 
 /* The bio of the album artist (or artist) and the notes of the album, into
  * `p`; their mask. In /Notes by name, else beside the music: notes.md in
  * the folder of `track`, a path of one of the album's tracks or NULL, and
- * bio.md in the folder above it when that is named for the artist. */
+ * bio.md in the folder above it when that is named for the artist. Reads
+ * no file. */
 int notes_find_names(const char *albumartist, const char *artist,
                      const char *album, const char *track,
                      struct notes_pages *p);

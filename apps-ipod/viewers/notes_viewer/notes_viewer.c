@@ -1903,10 +1903,9 @@ static bool nv_run_menu(const struct menu_item_ex *menu)
 static bool nv_album_target(const struct notes_album *a, struct notes_target *t,
                             int *focus)
 {
-    static struct notes_pages pages;    /* three paths: not on the stack */
-    int idx = a->path[0] ? tagcache_find_path(a->path) : -1, i, n;
+    struct notes_pages pages;
+    int idx = a->path[0] ? tagcache_find_path(a->path) : -1;
     int album = idx >= 0 ? tagcache_album_of(idx) : -1;
-    const char *path;
 
     memset(t, 0, sizeof(*t));
     t->page = t->album = t->track = -1;
@@ -1923,16 +1922,9 @@ static bool nv_album_target(const struct notes_album *a, struct notes_target *t,
     if (!notes_find_names(a->albumartist, a->artist, a->album, a->path,
                           &pages))
         return false;
-    path = pages.have & NOTES_ALBUM ? pages.album : pages.bio;
-    for (i = 0, n = notes_page_count(); i < n; i++)
-        if (notes_page_get(i)
-            && !strcmp(notes_page_path(notes_page_get(i)), path))
-        {
-            t->to = NOTES_TO_PAGE;
-            t->page = i;
-            return true;
-        }
-    return false;
+    t->to = NOTES_TO_PAGE;
+    t->page = pages.have & NOTES_ALBUM ? pages.album : pages.bio;
+    return true;
 }
 
 /* The page `r` asks for, made whole into the buffer, its target into
@@ -1940,14 +1932,12 @@ static bool nv_album_target(const struct notes_album *a, struct notes_target *t,
  * work area holds a picture after.
  *
  * The library's albums go first in the work area after the page's own
- * buffers, 24 bytes each, then the names index in what is left: on the 5G
- * the two share about 250 KB. A names index that does not fit leaves names
- * with no page of their own unlinked and {{mentions}} empty; past about
- * 10,000 albums the albums do not fit either, and nothing in the library
- * links. */
+ * buffers, 24 bytes each, then the names index's cache in what is left: on
+ * the 5G the two share about 250 KB. Past about 10,000 albums the albums do
+ * not fit, and nothing in the library links. */
 /* The page's album's pages for its menu: the album's own, unless this is
  * it, then those whose front matter names the album */
-static void nv_album_pages(const struct name_index *ix)
+static void nv_album_pages(struct name_index *ix)
 {
     int parts[NV_PAGES_MAX], i, n;
 
@@ -2046,7 +2036,7 @@ static bool nv_build(const struct nv_req *r)
     else if (need)
         debug_log(DEBUG_LOG_TASKS, "notes: %lu bytes of albums, %lu free",
                   (unsigned long)need, (unsigned long)left);
-    have_ix = name_index_load(w, left, &nv.ix);
+    have_ix = name_index_open(w, left, &nv.ix);
     notes_links_begin(albums, albums ? need : 0, have_ix ? &nv.ix : NULL);
 
     if (r->by == NV_BY_TARGET)
@@ -2125,10 +2115,12 @@ static bool nv_build(const struct nv_req *r)
             nv.focus_line = line;
     }
     notes_links_end();
+    name_index_close(&nv.ix);
     return true;
 
   none:
     notes_links_end();
+    name_index_close(&nv.ix);
     return false;
 }
 

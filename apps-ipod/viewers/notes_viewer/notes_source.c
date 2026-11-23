@@ -74,28 +74,42 @@ static char ns_buf[NS_VALUE_MAX], ns_trim[NS_VALUE_MAX];
  * album artist whose key is `key` */
 static int ns_written(int kind, int album, uint32_t key)
 {
-    const struct notes_page *best = NULL;
     struct tagcache_album row;
-    int i, found = -1, n = notes_page_count();
+    uint32_t keys[4];
+    int i, p, at, found = -1;
 
-    if (kind == NOTES_PAGE_ALBUM ? !tagcache_album_get(album, &row) : !key)
-        return -1;
-    for (i = 0; i < n; i++)
+    if (kind == NOTES_PAGE_PERSON)
     {
-        const struct notes_page *pg = notes_page_get(i);
+        static const int fields[] = { NOTES_BY_KEY, NOTES_BY_ALT,
+                                      NOTES_BY_PART };
 
-        if (!pg || pg->kind != kind || !notes_page_better(pg, best))
-            continue;
-        /* a page beside the music is its album's folder's */
-        if (kind == NOTES_PAGE_ALBUM
-            ? (pg->dir ? pg->dir == tagcache_album_dir_key(&row)
-                       : notes_page_album(i) == album)
-            : (pg->key == key || pg->alt == key || pg->part == key))
-        {
-            best = pg;
-            found = i;
-        }
+        for (p = 0; p < (int)ARRAYLEN(fields); p++)
+            for (at = -1; (i = notes_pages_by(fields[p], key, &at)) >= 0; )
+                if (notes_page_get(i)->kind == kind
+                    && notes_page_wins(i, found))
+                    found = i;
+        return found;
     }
+    if (!tagcache_album_get(album, &row))
+        return -1;
+    /* a page beside the music is its album's folder's */
+    for (at = -1; (i = notes_pages_in(tagcache_album_dir_key(&row),
+                                      &at)) >= 0; )
+        if (notes_page_get(i)->kind == kind && notes_page_wins(i, found))
+            found = i;
+    if (!notes_album_keys(album, keys))
+        return found;
+    for (p = 0; p < 4; p++)
+        for (at = -1; (i = notes_pages_by(p < 2 ? NOTES_BY_KEY
+                                                : NOTES_BY_PART,
+                                          keys[p], &at)) >= 0; )
+        {
+            const struct notes_page *pg = notes_page_get(i);
+
+            if (pg->kind == kind && !pg->dir && notes_page_wins(i, found)
+                && notes_page_album(i) == album)
+                found = i;
+        }
     return found;
 }
 
@@ -112,7 +126,7 @@ void notes_page_title(const struct notes_page *pg, char *buf, size_t size)
 }
 
 static void ns_doc(const struct notes_target *t, struct notes_doc *d,
-                   const struct name_index *ix)
+                   struct name_index *ix)
 {
     const struct notes_page *pg;
     struct tagcache_album row;
@@ -179,8 +193,7 @@ static void ns_doc(const struct notes_target *t, struct notes_doc *d,
         tagcache_seek_string(tag_albumartist, d->artist_seek, d->title,
                              sizeof(d->title));
     else if (ix)
-        strlcpy(d->title, name_index_name(ix, d->key) ?: "",
-                sizeof(d->title));
+        name_index_name(ix, d->key, d->title, sizeof(d->title));
 }
 
 /* ---- values and lists -------------------------------------------------- */
@@ -1337,17 +1350,18 @@ static bool ns_library_artist(const struct notes_page *pg)
 }
 
 /* A page as a link back to it: by its whole name, a person's and an
- * album's kind said */
-static void ns_page_link(struct ns_out *o, int page)
+ * album's kind said; false, and nothing written, when it cannot be read */
+static bool ns_page_link(struct ns_out *o, int page)
 {
     const struct notes_page *pg = notes_page_get(page);
-    const char *path;
+    unsigned int generation = notes_pages_generation();
+    char path[MAX_PATH];
     size_t len;
 
     if (!pg)
-        return;
-    path = notes_page_path(pg);
-    if (pg->kind == NOTES_PAGE_ALBUM && pg->dir)
+        return false;
+    if (pg->kind == NOTES_PAGE_ALBUM && pg->dir
+        && notes_page_path(pg, path, sizeof(path)))
     {
         /* Beside the music: "Artist - Album", as its folders give it */
         const char *leaf = strrchr(path, '/'), *album = leaf, *artist;
@@ -1366,10 +1380,14 @@ static void ns_page_link(struct ns_out *o, int page)
     }
     else
         notes_page_name(pg, ns_buf, sizeof(ns_buf));
+    /* The read yields, and an index replaced meanwhile has moved `pg` */
+    if (!ns_buf[0] || notes_pages_generation() != generation)
+        return false;
     len = strlen(ns_buf);
     ns_label(o, ns_buf, pg->kind == NOTES_PAGE_PERSON
                         && notes_bare_len(ns_buf, len) == len
                         ? " (person)" : NULL);
+    return true;
 }
 
 /* Whether page `pg` passes the mentions' `filter` */
@@ -1386,71 +1404,83 @@ static bool ns_kind_ok(const struct ns_piece *pc, const struct notes_page *pg)
            || (ns_has(pc, "filter", "other") && pg->kind == NOTES_PAGE_OTHER);
 }
 
-/* The page the names index's file `file` is, or -1: by its number in the
+/* The page the names index's file `f` is, or -1: by its number in the
  * page index while that is still the same file, else by its path's hash */
-static int ns_index_page(const struct name_index *ix, int file)
+static int ns_index_page(const struct name_file *f)
 {
-    const struct name_file *f = &ix->files[file];
     const struct notes_page *pg = notes_page_get(f->page);
     int p, pages = notes_page_count();
 
-    if (pg && name_index_path_hash(notes_page_path(pg)) == f->hash)
+    if (pg && pg->hash == f->hash)
         return f->page;
     for (p = 0; p < pages; p++)
-        if ((pg = notes_page_get(p))
-            && name_index_path_hash(notes_page_path(pg)) == f->hash)
+        if ((pg = notes_page_get(p)) && pg->hash == f->hash)
             return p;
     return -1;
 }
 
 /* {{mentions}}: the pages that name any of the keys, the page itself left
  * out, each once */
-static int ns_mentions(const struct ns_piece *pc, const struct name_index *ix,
+static int ns_mentions(const struct ns_piece *pc, struct name_index *ix,
                        const uint32_t *keys, int nkeys, int self, int kind)
 {
     bool headings = ns_has(pc, "headings", "true");
-    int i, j, k, p, last = -1;
+    uint32_t sorted[8];
+    int j, k, n = 0;
 
     if (!ix)
         return 0;
-    for (i = 0; i < ix->count && ns_room(pc); i++)
+    /* In key order, as the index holds them, each key once */
+    for (k = 0; k < nkeys && n < (int)ARRAYLEN(sorted); k++)
     {
-        const struct name_mention *m = &ix->m[i];
-        const struct notes_page *pg;
-        struct ns_out *o;
-
-        for (k = 0; k < nkeys && (!keys[k] || keys[k] != m->key); k++)
+        for (j = n; j > 0 && sorted[j - 1] > keys[k]; j--)
             ;
-        if (k == nkeys || m->file == last || m->file >= ix->nfiles)
+        if (!keys[k] || (j > 0 && sorted[j - 1] == keys[k]))
             continue;
-        last = m->file;
-        p = ns_index_page(ix, m->file);
-        if (p < 0 || p == self)
-            continue;
-        /* once each, though named under two keys */
-        for (j = 0; j < i; j++)
-            if (ix->m[j].file == m->file)
-            {
-                for (k = 0; k < nkeys && keys[k] != ix->m[j].key; k++)
-                    ;
-                if (k < nkeys)
-                    break;
-            }
-        if (j < i)
-            continue;
-        if (!(pg = notes_page_get(p)) || !ns_kind_ok(pc, pg)
-            || (kind && pg->kind != kind))
-            continue;
-        o = ns_item();
-        ns_page_link(o, p);
-        if (headings && m->section != NAME_NONE
-            && m->section < ix->nstrings)
-        {
-            const char *parts[1] = { ix->strings + ix->str_off[m->section] };
+        memmove(sorted + j + 1, sorted + j, (n - j) * sizeof(sorted[0]));
+        sorted[j] = keys[k];
+        n++;
+    }
+    for (k = 0; k < n && ns_room(pc); k++)
+    {
+        struct name_mention m;
+        uint32_t i;
+        int last = -1;
 
-            ns_suffix(o, parts, 1);
+        for (i = name_index_first(ix, sorted[k]);
+             ns_room(pc) && name_index_mention(ix, i, &m)
+             && m.key == sorted[k]; i++)
+        {
+            char head[128];
+            struct name_file f;
+            const struct notes_page *pg;
+            struct ns_out *o;
+            int p;
+
+            if (m.file == last || !name_index_file(ix, m.file, &f))
+                continue;
+            last = m.file;
+            /* once each, though named under two keys */
+            for (j = 0; j < k && !name_index_names_in(ix, sorted[j], m.file);
+                 j++)
+                ;
+            if (j < k)
+                continue;
+            p = ns_index_page(&f);
+            if (p < 0 || p == self || !(pg = notes_page_get(p))
+                || !ns_kind_ok(pc, pg) || (kind && pg->kind != kind))
+                continue;
+            o = ns_item();
+            if (!ns_page_link(o, p))
+                continue;
+            if (headings && name_index_section(ix, &f, &m, head, sizeof(head)))
+            {
+                const char *parts[1] = { head };
+
+                ns_suffix(o, parts, 1);
+            }
+            ns_item_done(false);
         }
-        ns_item_done(false);
     }
     return ni.count;
 }
@@ -1491,8 +1521,8 @@ static int ns_pages(const struct ns_piece *pc)
     ns_order(rows, n, true, false);
     for (i = 0; i < n && ns_room(pc); i++)
     {
-        ns_page_link(ns_item(), rows[i][0]);
-        ns_item_done(false);
+        if (ns_page_link(ns_item(), rows[i][0]))
+            ns_item_done(false);
     }
     return ni.count;
 }
@@ -1502,7 +1532,7 @@ static int ns_pages(const struct ns_piece *pc)
 struct ns_state
 {
     const struct notes_doc *d;
-    const struct name_index *ix;
+    struct name_index *ix;
     struct ns_out o;
     long head;                  /* where the heading just written starts */
     const char *text;           /* the page as written, for {{contents}} */
@@ -1545,7 +1575,7 @@ static int ns_contents(const struct ns_piece *pc, const char *text)
 
 /* The mentions of `keys`, under a heading a kind of page for group=kind */
 static void ns_mentions_grouped(const struct ns_piece *pc,
-                                const struct name_index *ix,
+                                struct name_index *ix,
                                 const uint32_t *keys, int self)
 {
     static const int kinds[][2] = {
@@ -2027,25 +2057,27 @@ static void ns_part_of(struct notes_doc *d, const char *name)
     d->part = true;
 }
 
-int notes_album_parts(const struct notes_doc *d, const struct name_index *ix,
+int notes_album_parts(const struct notes_doc *d, struct name_index *ix,
                       int *pages, int max)
 {
-    int i, n = 0;
+    uint32_t i;
+    int n = 0;
 
     if (!ix || d->kind != NOTES_PAGE_ALBUM || d->album < 0)
         return 0;
-    for (i = 0; i < ix->nfiles && n < max; i++)
+    for (i = 0; i < ix->nalbums && n < max; i++)
     {
-        const struct name_file *f = &ix->files[i];
-        const struct notes_page *pg = notes_page_get(f->page);
-        const char *s;
+        int file = name_index_album_file(ix, i);
+        struct name_file f;
+        const struct notes_page *pg;
 
-        if (f->album == NAME_NONE || f->page == d->page || !pg
-            || name_index_path_hash(notes_page_path(pg)) != f->hash)
+        if (file < 0 || !name_index_file(ix, file, &f)
+            || f.page == d->page || !(pg = notes_page_get(f.page))
+            || pg->hash != f.hash
+            || !name_index_string(ix, f.album, ns_buf, sizeof(ns_buf)))
             continue;
-        s = ix->strings + ix->str_off[f->album];
-        if (notes_album_named(s, strlen(s), d->artist) == d->album)
-            pages[n++] = f->page;
+        if (notes_album_named(ns_buf, strlen(ns_buf), d->artist) == d->album)
+            pages[n++] = f.page;
     }
     return n;
 }
@@ -2057,10 +2089,11 @@ bool notes_library_waiting(void)
 }
 
 size_t notes_source(const struct notes_target *t, struct notes_doc *d,
-                    const struct name_index *ix, char *out, size_t size,
+                    struct name_index *ix, char *out, size_t size,
                     char *scratch, size_t scratch_size)
 {
     struct ns_state st = { d, ix, { out, size, 0 }, -1, scratch };
+    static char path[MAX_PATH];
     const struct notes_page *pg;
     char tail[64], album[NS_VALUE_MAX];
 
@@ -2084,8 +2117,8 @@ size_t notes_source(const struct notes_target *t, struct notes_doc *d,
         ns_expand(&st, scratch);
         return st.o.len;
     }
-    if (ns_read(notes_page_path(pg), scratch, scratch_size, album,
-                sizeof(album)) < 0)
+    if (!notes_page_path(pg, path, sizeof(path))
+        || ns_read(path, scratch, scratch_size, album, sizeof(album)) < 0)
         return 0;
     if (album[0])
         ns_part_of(d, album);

@@ -35,6 +35,10 @@ page, and a link you add or take out, is picked up after you next connect
 the player to a computer, or straight away with `Settings > Library >
 Maintenance > Rebuild File Index`.
 
+The player reads up to 65,535 pages, and each takes about 50 bytes of
+memory from the music buffer, so 25,000 pages take about 1.2 MB. Past the
+limit the rest are left out, and the background task log says so.
+
 ### Beside the music
 
 You can keep pages with the music instead, as you might a `cover.jpg`:

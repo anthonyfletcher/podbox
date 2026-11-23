@@ -41,7 +41,7 @@ struct name_index;
 size_t notes_links_need(void);
 /* `ix` is the names index, which a name two or more pages give is found in,
  * or NULL */
-bool notes_links_begin(void *buf, size_t size, const struct name_index *ix);
+bool notes_links_begin(void *buf, size_t size, struct name_index *ix);
 void notes_links_end(void);
 
 /* Called through a walk of the library's rows while a page is made, on the
@@ -63,6 +63,10 @@ int notes_album_named(const char *name, size_t len, uint32_t artist);
 /* The library album a written album page is about: by its folder beside
  * the music, else by its artist and title. -1 for none. */
 int notes_page_album(int page);
+/* The keys of the library album `album` that notes_page_album() matches a
+ * page in /Notes by: its artist and title, and its title, each as written
+ * and through Trim Titles. False when the albums are not worked out. */
+bool notes_album_keys(int album, uint32_t keys[4]);
 
 /* The library album artist whose name key is `key`, `alt` or `part` (0 for
  * none): their seek, or under Split Album Artists the handle that brings

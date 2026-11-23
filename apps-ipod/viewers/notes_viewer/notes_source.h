@@ -43,13 +43,13 @@ bool notes_library_waiting(void);
  * page is about into `d`. `ix` is the names index for {{mentions}}, or NULL.
  * The bytes written; 0 when there is no such page. */
 size_t notes_source(const struct notes_target *t, struct notes_doc *d,
-                    const struct name_index *ix, char *out, size_t size,
+                    struct name_index *ix, char *out, size_t size,
                     char *scratch, size_t scratch_size);
 
 /* The pages of the album `d` is about, its own page aside, whose front
  * matter names it, into `pages` (at most `max`, by page index); how many.
  * Asked while the links are begun, as notes_source() is. */
-int notes_album_parts(const struct notes_doc *d, const struct name_index *ix,
+int notes_album_parts(const struct notes_doc *d, struct name_index *ix,
                       int *pages, int max);
 
 /* The name a page is shown by: an album's without its artist, a person's

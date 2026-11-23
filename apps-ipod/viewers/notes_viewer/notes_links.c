@@ -62,7 +62,7 @@ static struct
 {
     struct nl_album *a;
     int n;
-    const struct name_index *ix;
+    struct name_index *ix;
 } nl;
 
 static char nl_buf[256], nl_trim[256];
@@ -106,7 +106,7 @@ static bool nl_string(int tag, long seek, char *buf, size_t size)
     return true;
 }
 
-bool notes_links_begin(void *buf, size_t size, const struct name_index *ix)
+bool notes_links_begin(void *buf, size_t size, struct name_index *ix)
 {
     static char artist[256];
     int i, n = tagcache_album_count();
@@ -153,17 +153,7 @@ void notes_links_end(void)
 /* Whether two or more pages name `key` */
 static bool nl_named_twice(uint32_t key)
 {
-    int i, first = -1;
-
-    for (i = 0; nl.ix && i < nl.ix->count; i++)
-        if (nl.ix->m[i].key == key)
-        {
-            if (first < 0)
-                first = nl.ix->m[i].file;
-            else if (nl.ix->m[i].file != first)
-                return true;
-        }
-    return false;
+    return nl.ix && name_index_files_naming(nl.ix, key) >= 2;
 }
 
 /* Whether `b` is the older of two albums, an undated one never */
@@ -199,6 +189,17 @@ static int nl_album_work(uint32_t key)
         if (nl.a[i].work == key || nl.a[i].twork == key)
             return i;
     return -1;
+}
+
+bool notes_album_keys(int album, uint32_t keys[4])
+{
+    if (album < 0 || album >= nl.n)
+        return false;
+    keys[0] = nl.a[album].work;
+    keys[1] = nl.a[album].twork;
+    keys[2] = nl.a[album].title;
+    keys[3] = nl.a[album].trimmed;
+    return true;
 }
 
 int notes_page_album(int page)
@@ -418,27 +419,36 @@ static bool nl_track(uint32_t key, uint32_t artist, int album, bool anywhere,
     return false;
 }
 
-/* The best page of `kind` (0 for any) that `match` takes */
-static int nl_page(int kind, bool (*match)(const struct notes_page *,
-                                           const void *), const void *arg)
-{
-    int i, best = -1, n = notes_page_count();
-
-    for (i = 0; i < n; i++)
-    {
-        const struct notes_page *pg = notes_page_get(i);
-
-        if ((!kind || pg->kind == kind) && match(pg, arg)
-            && notes_page_better(pg, best < 0 ? NULL : notes_page_get(best)))
-            best = i;
-    }
-    return best;
-}
-
 struct nl_keys
 {
     uint32_t key, alt, work, artist;
 };
+
+/* The best page of `kind` (0 for any) that `match` takes, of those any of
+ * the keys finds: every page the three matches below can take */
+static int nl_page(int kind, bool (*match)(const struct notes_page *,
+                                           const void *),
+                   const struct nl_keys *k)
+{
+    const struct { int field; uint32_t value; } probes[] = {
+        { NOTES_BY_KEY, k->key }, { NOTES_BY_KEY, k->work },
+        { NOTES_BY_ALT, k->key }, { NOTES_BY_PART, k->key },
+        { NOTES_BY_KEY, k->alt }, { NOTES_BY_ALT, k->alt },
+    };
+    int i, p, at, best = -1;
+
+    for (p = 0; p < (int)ARRAYLEN(probes); p++)
+        for (at = -1; (i = notes_pages_by(probes[p].field, probes[p].value,
+                                          &at)) >= 0; )
+        {
+            const struct notes_page *pg = notes_page_get(i);
+
+            if ((!kind || pg->kind == kind) && match(pg, k)
+                && notes_page_wins(i, best))
+                best = i;
+        }
+    return best;
+}
 
 /* An album page named for its title alone is found by its title, where the
  * page's artist decides between two */
@@ -470,14 +480,15 @@ static bool nl_other(const struct notes_page *pg, const void *arg)
  * of two pages of one album, the better (notes_page_better()) */
 static int nl_album_page(const struct nl_keys *k)
 {
-    int i, best = -1, best_row = -1, by = -1, n = notes_page_count();
+    int i, best = -1, best_row = -1, by = -1, at = -1;
 
-    for (i = 0; i < n; i++)
+    /* in page order, which the choice below depends on */
+    while ((i = notes_pages_by(NOTES_BY_PART, k->key, &at)) >= 0)
     {
         const struct notes_page *pg = notes_page_get(i);
         int row;
 
-        if (pg->kind != NOTES_PAGE_ALBUM || pg->part != k->key)
+        if (pg->kind != NOTES_PAGE_ALBUM)
             continue;
         if (k->artist && pg->by == k->artist)
         {

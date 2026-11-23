@@ -18,3 +18,6 @@
   finished, so a rebuild cut short by USB, a restart or a flat battery leaves
   the library as it was. While it runs, the old database takes its space a
   second time. A rebuild that finds no music at all now keeps the old one.
+- **Liner Notes** reads `/Notes` again, in the background, the first time the
+  iPod starts; until it finishes, notes pages and **Biography** rows are
+  missing. A library of more than 2,048 pages now keeps all of them.
