@@ -59,4 +59,10 @@ void usb_set_hid(bool enable);
 void filesystem_init(void);
 bool ns_volume_is_visible(IF_MV_NONVOID(int volume));
 
+#ifdef __EMSCRIPTEN__
+/* The Theme IDE's requests, run on the UI thread; see theme_ide.c. */
+#define SYS_THEME_IDE MAKE_SYS_EVENT(SYS_EVENT_CLS_MISC, 40)
+void theme_ide_event(intptr_t what);
+#endif
+
 #endif /* PODBOX_SIM_SYSTEM_SIM_H */

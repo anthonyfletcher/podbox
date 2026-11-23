@@ -1,0 +1,16 @@
+{
+  "name": "podbox-theme-ide",
+  "private": true,
+  "type": "module",
+  "description": "The Theme IDE: edit a PodBox theme beside the firmware running it",
+  "license": "GPL-2.0-only",
+  "dependencies": {
+    "@codemirror/theme-one-dark": "6.1.3",
+    "codemirror": "6.0.2",
+    "dockview-core": "8.8.3",
+    "lucide": "1.70.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

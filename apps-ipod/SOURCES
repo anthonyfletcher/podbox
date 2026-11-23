@@ -438,4 +438,6 @@ sim/shim-buffer.c
 sim/shim-dircache.c
 sim/shim-fs.c
 sim/shim-usb.c
+sim/theme_ide.c
+sim/load_code-emscripten.c
 #endif

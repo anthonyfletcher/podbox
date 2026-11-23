@@ -28,7 +28,7 @@
 
 extern int sdl_app_has_input_focus;
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__EMSCRIPTEN__)
 int sdl_event_filter(void *userdata, SDL_Event * event);
 #endif
 

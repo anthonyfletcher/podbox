@@ -23,7 +23,7 @@
 #include <sys/time.h>
 #if !defined(WIN32)
 #include <sys/ioctl.h>
-#if !defined(__APPLE__) && !defined(N3DS)
+#if !defined(__APPLE__) && !defined(N3DS) && !defined(__EMSCRIPTEN__)
 #include <linux/rtc.h>
 #endif
 #include <fcntl.h>
@@ -59,7 +59,8 @@ int rtc_read_datetime(struct tm *tm)
 
 int rtc_write_datetime(const struct tm *tm)
 {
-#if !defined(WIN32) && !defined(__APPLE__) && !defined(N3DS)
+#if !defined(WIN32) && !defined(__APPLE__) && !defined(N3DS) \
+    && !defined(__EMSCRIPTEN__)
     struct timeval tv;
     struct tm *tm_time;
 

@@ -75,7 +75,9 @@ bool debug_audio = false;
 bool debug_wps = false;
 int wps_verbose_level = 3;
 
-#ifndef __APPLE__ /* MacOS requires events to be handled on main thread */
+/* MacOS requires events to be handled on main thread; a WebAssembly build
+ * takes them at kernel-emscripten.c's poll */
+#if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
 /*
  * This thread will read the buttons in an interrupt like fashion, and
  * also initializes SDL_INIT_VIDEO and the surfaces
@@ -261,7 +263,9 @@ void system_init(void)
 #endif
 #endif
 
-#ifndef __APPLE__ /* MacOS requires events to be handled on main thread */
+#if defined(__EMSCRIPTEN__)
+    /* events are taken at kernel-emscripten.c's poll */
+#elif !defined(__APPLE__) /* MacOS requires events on the main thread */
     s = SDL_CreateSemaphore(0); /* 0-count so it blocks */
 
     #if SDL_MAJOR_VERSION > 1

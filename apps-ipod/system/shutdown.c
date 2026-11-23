@@ -494,6 +494,12 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             splash(HZ*2, ID2P(LANG_USB_DAC_OFF));
             return SYS_USB_DAC_OFF;
 #endif
+#ifdef __EMSCRIPTEN__
+        /* A theme, settings or folder from the Theme IDE; sim/theme_ide.c */
+        case SYS_THEME_IDE:
+            theme_ide_event(button_get_data());
+            return SYS_THEME_IDE;
+#endif
         /* An iAP accessory -- a dock, a car kit -- has identified itself */
         case SYS_ACCESSORY_CONNECTED:
             splash(HZ, ID2P(LANG_ACCESSORY_CONNECTED));

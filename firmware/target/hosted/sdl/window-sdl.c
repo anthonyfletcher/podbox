@@ -218,6 +218,12 @@ void sdl_window_setup(void)
     if (display_zoom == 1)
         flags |= SDL_WINDOW_RESIZABLE;
 #endif
+#ifdef __EMSCRIPTEN__
+    /* The page scales the screen itself. A resizable window would take the
+     * canvas's CSS size, and a high-DPI one the display's pixel ratio, and
+     * either would filter the LCD's pixels. */
+    flags = 0;
+#endif
 
     if (!(picture_surface = SDL_LoadBMP("UI256.bmp")))
         background = false;

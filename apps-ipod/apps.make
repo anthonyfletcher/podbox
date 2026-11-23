@@ -38,6 +38,9 @@ INCLUDES += -I$(APPSDIR)/api -I$(APPSDIR)
 # Gated on APP_TYPE so a hardware build sees no new flag at all.
 ifeq ($(APP_TYPE),sdl-sim)
 INCLUDES := -I$(APPSDIR)/sim/include $(INCLUDES)
+ifneq (,$(findstring emcc,$(CC)))
+include $(APPSDIR)/sim/codecs-wasm.make
+endif
 endif
 
 SRC += $(call preprocess, $(APPSDIR)/SOURCES)

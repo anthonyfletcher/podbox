@@ -335,6 +335,11 @@ static void sdl_audio_callback(void *handle, Uint8 *stream, int len)
             {
                 int delay = pcm_data_size*250 / pcm_sampr - 1;
 
+#ifdef __EMSCRIPTEN__
+                /* This runs from a page's audio event, where the module
+                 * cannot sleep */
+                delay = 0;
+#endif
                 if (delay > 0)
                 {
                     SDL_Delay(delay);

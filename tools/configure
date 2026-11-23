@@ -249,6 +249,12 @@ EOF
 }
 
 simcc () {
+ if [ "$ARG_EMSCRIPTEN" = "1" ]; then
+   . "$rootdir/tools/configure-emscripten.sh"
+   emscripten_simcc "$1"
+   return
+ fi
+
  # default tool setup for native building
  prefixtools "$CROSS_COMPILE"
  ARG_ARM_THUMB=0 # can't use thumb in native builds
@@ -1565,6 +1571,8 @@ help() {
     --no-sdl-threads  Disallow use of SDL threads. This prevents the default
                       behavior of falling back to them if no native thread
                       support was found.
+    --emscripten      Build the simulator as WebAssembly with Emscripten
+                      (emcc on PATH), for the Theme IDE.
     --with-address-sanitizer
                       Enables the AddressSanitizer feature. Forces SDL threads.
     --with-ubsan      Enables the UB Sanitizer feature.  Forces SDL threads.
@@ -1597,6 +1605,7 @@ ARG_VOICE=
 ARG_ARM_THUMB=
 ARG_PREFIX="$PREFIX"
 ARG_THREAD_SUPPORT=
+ARG_EMSCRIPTEN=
 ARG_32BIT=
 ARG_ADDR_SAN=
 ARG_UBSAN=
@@ -1626,6 +1635,7 @@ for arg in "$@"; do
         --sdl-threads)ARG_THREAD_SUPPORT=1;;
         --no-sdl-threads)
                       ARG_THREAD_SUPPORT=0;;
+        --emscripten) ARG_EMSCRIPTEN=1;;
         --with-address-sanitizer) ARG_ADDR_SAN=1;;
         --with-ubsan) ARG_UBSAN=1;;
         --with-stack-protector=*) ARG_STACK_PROTECTOR=`echo "$arg" | cut -d = -f 2`;;

@@ -3,6 +3,8 @@
   #include "thread-win32.c"
 #elif defined(HAVE_SIGALTSTACK_THREADS)
   #include "thread-unix.c"
+#elif defined(HAVE_EMSCRIPTEN_FIBER_THREADS)
+  #include "thread-emscripten.c"
 
   /* Now the CPU-specific implementations */
 #elif defined(CPU_ARM_CLASSIC) || defined(CPU_ARM_APPLICATION)

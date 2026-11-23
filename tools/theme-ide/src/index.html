@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theme IDE</title>
+<style>
+:root {
+    --bg: #f4f3f0; --panel: #ffffff; --ink: #1c1c22; --dim: #6b6a73;
+    --line: #dddbd5; --accent: #2f6fd6; --bad: #c8283c; --warn: #b7791f; --good: #2d8a4e;
+    --screen-bg: #101014; --sel: rgba(47, 111, 214, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+    :root { --bg: #18181c; --panel: #222227; --ink: #e8e6e1; --dim: #9a98a2;
+            --line: #34343b; --accent: #6ea0ff; --bad: #ff6b7d; --warn: #f0b75a; --good: #5fcf86;
+            --sel: rgba(110, 160, 255, 0.16); }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink);
+       font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+       display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+button { font: inherit; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+         border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+[hidden] { display: none !important; }
+
+/* ---- the menu bar ---- */
+header { display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+         border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
+#theme-name { font-weight: 600; margin-left: auto; }
+#live { font-size: 12px; color: var(--dim); }
+#menubar { display: flex; gap: 2px; }
+.menu { position: relative; }
+.menu .title { border: none; background: none; padding: 5px 10px; }
+.menu .title:hover, .menu.open .title { background: var(--bg); }
+.menu .items { display: none; position: absolute; top: 100%; left: 0; z-index: 10;
+               min-width: 250px; padding: 4px; background: var(--panel);
+               border: 1px solid var(--line); border-radius: 8px;
+               box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
+.menu.open .items { display: block; }
+.menu .items button { display: flex; width: 100%; border: none; background: none;
+                      text-align: left; padding: 6px 10px; border-radius: 5px; }
+.menu .items button:hover { background: var(--accent); color: #fff; }
+.menu .items button:disabled { opacity: 0.45; cursor: default; }
+.menu .items button:disabled:hover { background: none; color: inherit; }
+.menu .items kbd { margin-left: auto; padding-left: 24px; font: 12px system-ui, sans-serif; color: var(--dim); }
+.menu .items button:hover kbd { color: #fff; }
+.menu .items hr { border: none; border-top: 1px solid var(--line); margin: 4px 6px; }
+.menu .items .label { font-size: 12px; color: var(--dim); padding: 4px 10px 2px; }
+.menu .items button::before { content: ""; display: inline-block; width: 18px; flex: none; }
+.menu .items .check.on::before { content: "\2713"; }
+.menu .items .choice.on::before { content: "\25CF"; }
+
+/* ---- the dock ---- */
+#dock { min-height: 0; min-width: 0; }
+#dock .dockview-theme-dark, #dock.dockview-theme-dark {
+    --dv-group-view-background-color: var(--panel);
+    --dv-tabs-and-actions-container-background-color: var(--panel);
+    --dv-tabs-and-actions-container-height: 30px;
+    --dv-tabs-and-actions-container-font-size: 11px;
+    --dv-activegroup-visiblepanel-tab-background-color: var(--panel);
+    --dv-activegroup-hiddenpanel-tab-background-color: var(--panel);
+    --dv-inactivegroup-visiblepanel-tab-background-color: var(--panel);
+    --dv-inactivegroup-hiddenpanel-tab-background-color: var(--panel);
+    --dv-activegroup-visiblepanel-tab-color: var(--ink);
+    --dv-activegroup-hiddenpanel-tab-color: var(--dim);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--dim);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--dim);
+    --dv-tab-divider-color: transparent;
+    --dv-separator-border: var(--line);
+    --dv-paneview-header-border-color: var(--line);
+    --dv-sash-color: transparent;
+    --dv-active-sash-color: var(--accent);
+    --dv-drag-over-background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+    --dv-drag-over-border-color: var(--accent);
+    --dv-icon-hover-background-color: var(--bg);
+    --dv-scrollbar-background-color: var(--line);
+    background: var(--bg); color: var(--ink);
+}
+#dock .dv-groupview { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#dock .dv-tabs-and-actions-container { border-bottom: 1px solid var(--line); }
+#dock .dv-tab { padding: 0; }
+#dock .ide-tab { display: flex; align-items: center; gap: 4px; height: 100%; padding: 0 4px 0 10px;
+           font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+#dock .ide-tab.file { text-transform: none; letter-spacing: 0; font: 12px ui-monospace, Consolas, monospace; }
+#dock .ide-tab .ib { width: 20px; height: 20px; opacity: 0; }
+#dock .ide-tab .ib svg { width: 14px; height: 14px; }
+#dock .dv-tab:hover .ide-tab .ib, #dock .dv-active-tab .ide-tab .ib { opacity: 1; }
+#dock .dv-tab.dv-active-tab { box-shadow: inset 0 -2px 0 var(--accent); }
+#dock .dv-inactive-group .dv-tab.dv-active-tab { box-shadow: inset 0 -2px 0 var(--line); }
+.dock-actions { display: flex; align-items: center; gap: 2px; height: 100%; padding: 0 4px; }
+.dock-actions .ib { width: 24px; height: 24px; }
+.pane { height: 100%; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+        background: var(--panel); overflow: hidden; }
+#panes { display: none; }
+
+/* ---- toolbars ---- */
+.tb { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 3px 6px; min-height: 34px;
+      border-bottom: 1px solid var(--line); background: var(--panel); flex: none; }
+.tb .sep { width: 1px; height: 18px; margin: 0 5px; background: var(--line); }
+.tb .grow { flex: 1; }
+.tb .note { font-size: 12px; color: var(--dim); margin: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb select { font: 12px system-ui, sans-serif; height: 26px; padding: 0 4px; border-radius: 5px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.ib { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid transparent; background: none; color: var(--dim); border-radius: 5px; flex: none; }
+.ib:hover { background: var(--bg); color: var(--ink); border-color: transparent; }
+.ib.on { background: var(--accent); color: #fff; }
+.ib:disabled { opacity: 0.35; cursor: default; background: none; }
+.ib svg { display: block; }
+.empty { padding: 18px 20px; color: var(--dim); font-size: 13px; line-height: 1.5; }
+.empty button { margin-top: 10px; }
+.scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* ---- files ---- */
+.tree { padding: 4px 0 10px; font-size: 13px; }
+.tree .group { padding: 10px 12px 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+               text-transform: uppercase; color: var(--dim); }
+.tree .item { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 16px; cursor: pointer; }
+.tree .item svg { width: 16px; height: 16px; color: var(--dim); flex: none; }
+.tree .item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree .item .what { color: var(--dim); font-size: 12px; white-space: nowrap; }
+.tree .item:hover { background: var(--bg); }
+.tree .item.open { background: var(--sel); }
+.tree .item.dirty .name::after { content: " \25CF"; color: var(--accent); }
+.tree .item.bad .what { color: var(--bad); }
+
+/* ---- the editor ---- */
+#editor-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#editor-host .cm-editor { flex: 1; min-height: 0; font-size: 13.5px; }
+#editor-host .cm-scroller { font-family: ui-monospace, Consolas, monospace; }
+.t-cmt { color: #7a8a6e; font-style: italic; }
+.t-tag { color: #2f6fd6; }
+.t-custom { color: #8a43c7; }
+.t-vpdecl { color: #c25b12; font-weight: 600; }
+.t-cond { color: #b2186b; font-weight: 600; }
+.t-num { color: #1d8a6e; }
+.t-str { color: #96650e; }
+.t-punct { color: var(--dim); }
+.t-bad { color: var(--bad); text-decoration: underline wavy var(--bad); }
+@media (prefers-color-scheme: dark) {
+    .t-cmt { color: #8a9a7e; } .t-tag { color: #7fb0ff; } .t-custom { color: #c792ea; }
+    .t-vpdecl { color: #ffab70; } .t-cond { color: #ff79c6; } .t-num { color: #7ee0c3; }
+    .t-str { color: #e6c07b; }
+}
+.cm-sel-vp { background: var(--sel); }
+.swatch-chip { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 3px 0 1px;
+               border: 1px solid rgba(128, 128, 128, 0.6); vertical-align: -1px; }
+.cm-tooltip.skin-help { max-width: 460px; padding: 8px 10px; font: 13px/1.45 system-ui, sans-serif; }
+.skin-help h4 { margin: 0 0 4px; font-size: 13px; }
+.skin-help code { font: 12px ui-monospace, Consolas, monospace; }
+.skin-help .arg { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin-top: 6px; font-size: 12px; }
+.skin-help .arg .k { color: var(--dim); }
+.skin-help .fork { color: var(--dim); font-size: 12px; margin-top: 4px; }
+
+/* ---- the player ---- */
+#player-body { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center;
+               gap: 10px; padding: 12px; }
+.screen-stack { position: relative; flex: none; line-height: 0; }
+#screen { image-rendering: pixelated; background: var(--screen-bg); border-radius: 4px; outline: none;
+          box-shadow: 0 0 0 1px var(--line); }
+#screen:focus { box-shadow: 0 0 0 2px var(--accent); }
+#overlay { position: absolute; left: 0; top: 0; pointer-events: none; }
+.screen-stack.picking #overlay { pointer-events: auto; cursor: pointer; }
+#player-note { font-size: 12px; color: var(--dim); text-align: center; max-width: 340px; min-height: 1.4em; }
+#player-note.warn { color: var(--warn); }
+#wheel { width: 150px; height: 150px; touch-action: none; user-select: none; cursor: grab; flex: none; }
+#wheel .ring { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+#wheel .hub { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; cursor: pointer; }
+#wheel text { fill: var(--dim); font: 600 11px system-ui, sans-serif; text-anchor: middle;
+              dominant-baseline: middle; pointer-events: none; }
+
+/* ---- outline ---- */
+.outline .row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.outline .row:hover { background: var(--bg); }
+.outline .row.on { background: var(--sel); }
+.outline .row svg { width: 15px; height: 15px; color: var(--dim); flex: none; }
+.outline .row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline .row .geo { font: 11px ui-monospace, Consolas, monospace; color: var(--dim); white-space: nowrap; }
+.outline .row.hidden .name { color: var(--dim); }
+.outline .row .state { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.outline .row.shown .state { color: var(--good); }
+.outline .head { padding: 8px 10px 4px; font-size: 12px; color: var(--dim); line-height: 1.4; }
+
+/* ---- inspector, state ---- */
+.form { padding: 8px 12px 16px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.form h3 { margin: 4px 0 0; font-size: 14px; }
+.form .sub { color: var(--dim); font-size: 12px; margin-top: -6px; }
+.form .sec { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+             color: var(--dim); margin-top: 6px; }
+.form .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.form label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--dim); }
+.form input, .form select { font: 13px system-ui, sans-serif; padding: 3px 6px; border-radius: 4px; min-width: 0;
+      border: 1px solid var(--line); background: var(--bg); color: var(--ink); height: 28px; }
+.form input[type=color] { padding: 1px 2px; width: 40px; flex: none; }
+.form .colour { display: flex; gap: 6px; align-items: center; }
+.form .colour input[type=text] { flex: 1; font-family: ui-monospace, Consolas, monospace; }
+.form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.form .contents { display: flex; flex-direction: column; gap: 3px; }
+.form .contents div { display: flex; gap: 8px; }
+.form .contents code { font: 12px ui-monospace, Consolas, monospace; color: var(--accent); min-width: 44px; }
+.form .note { color: var(--dim); font-size: 12px; line-height: 1.45; }
+.form .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.form input[type=range] { height: auto; padding: 0; accent-color: var(--accent); }
+
+/* ---- problems, reference, output ---- */
+.list .row { display: flex; gap: 8px; padding: 4px 10px; cursor: pointer; font-size: 13px; align-items: baseline; }
+.list .row:hover { background: var(--bg); }
+.list .row .where { color: var(--dim); font: 12px ui-monospace, Consolas, monospace; white-space: nowrap; }
+.list .row .sev { width: 8px; height: 8px; border-radius: 4px; flex: none; transform: translateY(-1px); }
+.list .row .sev.err { background: var(--bad); }
+.list .row .sev.warn { background: var(--warn); }
+.ref .row { flex-direction: column; gap: 1px; cursor: default; }
+.ref .row code { font: 13px ui-monospace, Consolas, monospace; color: var(--accent); }
+.ref .row .args { color: var(--dim); font-size: 12px; }
+.tb input[type=search] { flex: 1; min-width: 120px; font: 13px system-ui, sans-serif; height: 26px;
+      padding: 2px 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+#console { flex: 1; overflow: auto; padding: 4px 12px; font: 12px/1.45 ui-monospace, Consolas, monospace; }
+#console div { white-space: pre-wrap; word-break: break-word; }
+#console .error { color: var(--bad); }
+
+/* ---- the status bar ---- */
+#statusbar { display: flex; align-items: center; gap: 4px; padding: 0 8px; min-height: 24px;
+             background: var(--accent); color: #fff; font-size: 12px; }
+#statusbar button { border: none; background: none; color: inherit; padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+#statusbar button:hover { background: rgba(255, 255, 255, 0.18); }
+#statusbar .grow { flex: 1; }
+#statusbar.bad { background: var(--bad); }
+#tray { display: flex; gap: 2px; }
+#tray button { text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px;
+               box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+
+/* ---- dialogs ---- */
+dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+         border-radius: 10px; max-width: 540px; }
+dialog h2 { margin-top: 0; font-size: 16px; }
+dialog a { color: var(--accent); }
+dialog p { line-height: 1.5; }
+.credits { padding-left: 20px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Theme IDE</h1>
+  <nav id="menubar">
+    <div class="menu"><button class="title">File</button><div class="items">
+      <button data-do="open-folder">Open theme folder&hellip;<kbd>Ctrl+O</kbd></button>
+      <hr>
+      <button data-do="save">Save<kbd>Ctrl+S</kbd></button>
+      <button data-do="save-all">Save all</button>
+      <button data-do="revert">Take the copy on disk</button>
+    </div></div>
+    <div class="menu"><button class="title">Edit</button><div class="items">
+      <button data-do="undo">Undo<kbd>Ctrl+Z</kbd></button>
+      <button data-do="redo">Redo<kbd>Ctrl+Y</kbd></button>
+      <hr>
+      <button data-do="find">Find and replace<kbd>Ctrl+F</kbd></button>
+      <button data-do="goto-line">Go to line<kbd>Ctrl+G</kbd></button>
+      <button data-do="comment">Comment out or back in<kbd>Ctrl+/</kbd></button>
+    </div></div>
+    <div class="menu"><button class="title">View</button><div class="items">
+      <button data-do="view-files" class="check" data-panel="files">Files<kbd>Ctrl+B</kbd></button>
+      <button data-do="view-editor" class="check" data-panel="editor">Editor</button>
+      <button data-do="view-player" class="check" data-panel="player">Player</button>
+      <button data-do="view-outline" class="check" data-panel="outline">Outline</button>
+      <button data-do="view-inspector" class="check" data-panel="inspector">Inspector</button>
+      <button data-do="view-state" class="check" data-panel="state">State</button>
+      <button data-do="view-problems" class="check" data-panel="problems">Problems</button>
+      <button data-do="view-reference" class="check" data-panel="reference">Tag reference</button>
+      <button data-do="view-output" class="check" data-panel="output">Output<kbd>Ctrl+J</kbd></button>
+      <hr>
+      <button data-do="view-reset">Reset the layout</button>
+    </div></div>
+    <div class="menu"><button class="title">Player</button><div class="items">
+      <button data-do="run">Show unsaved changes<kbd>Ctrl+Enter</kbd></button>
+      <button data-do="live" class="check" id="m-live">Update as you type</button>
+      <button data-do="outlines" class="check" id="m-outlines">Outlines</button>
+      <hr>
+      <div class="label">Go to</div>
+      <button data-goto="menu">Main menu</button>
+      <button data-goto="music">Music</button>
+      <button data-goto="albums">Albums</button>
+      <button data-goto="wps">Now Playing</button>
+      <button data-goto="quick">Quick Settings</button>
+      <hr>
+      <button data-do="shot">Save a screenshot&hellip;</button>
+      <button data-do="restart">Restart the player</button>
+    </div></div>
+    <div class="menu"><button class="title">Help</button><div class="items">
+      <button data-do="help-start">Getting started</button>
+      <button data-do="view-reference">Tag reference</button>
+      <button data-do="help-keys">Keys and the wheel</button>
+      <hr>
+      <button data-do="about">About Theme IDE</button>
+    </div></div>
+  </nav>
+  <span id="theme-name"></span>
+  <span id="live"></span>
+</header>
+<main id="dock"></main>
+<div id="panes">
+  <div id="pane-files" class="pane"><div class="scroll"><div class="tree" id="tree"></div></div></div>
+  <div id="pane-editor" class="pane"><div id="editor-host"></div></div>
+  <div id="pane-player" class="pane">
+    <div id="player-body">
+      <div class="screen-stack" id="stack">
+        <canvas id="screen" width="320" height="240" tabindex="0"></canvas>
+        <canvas id="overlay" width="320" height="240"></canvas>
+      </div>
+      <div id="player-note"></div>
+      <svg id="wheel" viewBox="-100 -100 200 200">
+        <circle class="ring" r="98"/>
+        <circle class="hub" r="36"/>
+        <text y="-72">MENU</text>
+        <text x="72">&#x25B6;&#x25B6;|</text>
+        <text x="-72">|&#x25C0;&#x25C0;</text>
+        <text y="74">&#x25B6; ||</text>
+      </svg>
+    </div>
+  </div>
+  <div id="pane-outline" class="pane"><div class="scroll outline" id="outline"></div></div>
+  <div id="pane-inspector" class="pane"><div class="scroll" id="inspector"></div></div>
+  <div id="pane-state" class="pane"><div class="scroll" id="state"></div></div>
+  <div id="pane-problems" class="pane"><div class="scroll list" id="problems"></div></div>
+  <div id="pane-reference" class="pane">
+    <div class="tb"><input type="search" id="ref-find" placeholder="Find a tag by name or by what it does"></div>
+    <div class="scroll list ref" id="reference"></div>
+  </div>
+  <div id="pane-output" class="pane"><div id="console"></div></div>
+</div>
+<footer id="statusbar">
+  <button id="status"></button>
+  <span id="tray"></span>
+  <span class="grow"></span>
+  <span id="cursor"></span>
+</footer>
+<input type="file" id="folder-input" webkitdirectory multiple hidden>
+
+<dialog id="help-start"><h2>Getting started</h2>
+<p>Open the folder that holds your theme's <code>.rockbox</code>. Its skins are
+listed in Files by the screen each draws: <b>Now Playing</b> is the
+<code>.wps</code>, <b>Menus and status bar</b> the <code>.sbs</code>.</p>
+<p>The Player is PodBox itself with your theme on it, and a library of
+invented music to play. Open the Now Playing skin and the player goes to Now
+Playing; open the menus skin and it goes to the main menu.</p>
+<p>Save (Ctrl+S) and the player loads the theme again. With
+<b>Update as you type</b> on, it does so as you edit, without saving.</p>
+<p>The Outline names each viewport by what it shows. Pick one there or on
+the player, and the Inspector edits where it sits, its font and its
+colours; drag it on the player to move it.</p>
+<form method="dialog"><button>Close</button></form></dialog>
+<dialog id="help-keys"><h2>Keys and the wheel</h2>
+<p>Click the player's screen to give it the keys. Up and Down turn the
+wheel; Left and Right are &#x25C0;&#x25C0; and &#x25B6;&#x25B6;; Enter is
+Select, Space is Play and Esc is Menu. Hold Esc for Quick Settings.</p>
+<p>On the drawn wheel, drag round the ring to turn it. Click the ring for
+Menu, &#x25C0;&#x25C0;, &#x25B6;&#x25B6; or Play by where you click, and hold
+it for as long as you want the button held. The middle is Select.</p>
+<form method="dialog"><button>Close</button></form></dialog>
+<dialog id="about"><h2>Theme IDE</h2>
+<p>Makes themes for <a href="https://github.com/anthonyfletcher/podbox" target="_blank" rel="noopener">PodBox</a>,
+and is part of it: free software under the
+<a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noopener">GNU
+General Public License, version 2</a>. The player is PodBox's iPod Video
+firmware, built for the browser with Emscripten.</p>
+<p>It is built with these open-source projects:</p>
+<ul class="credits">
+<li><a href="https://codemirror.net" target="_blank" rel="noopener">CodeMirror</a>, the editor (MIT)</li>
+<li><a href="https://dockview.dev" target="_blank" rel="noopener">dockview</a>, the panels (MIT)</li>
+<li><a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, the icons (ISC)</li>
+<li><a href="https://www.libsdl.org" target="_blank" rel="noopener">SDL</a>, under the player (zlib)</li>
+</ul>
+<form method="dialog"><button>Close</button></form></dialog>
+<script src="tags.js"></script>
+<script src="skin-core.js"></script>
+<script src="ide.js"></script>
+</body>
+</html>

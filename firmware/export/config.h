@@ -1051,6 +1051,7 @@ Lyre prototype 1 */
 #if defined(ASSEMBLER_THREADS) \
     || defined(HAVE_WIN32_FIBER_THREADS) \
     || defined(HAVE_SIGALTSTACK_THREADS) \
+    || defined(HAVE_EMSCRIPTEN_FIBER_THREADS) \
     || defined(N3DS) \
     || defined(SONY_PSP)
 #define HAVE_PRIORITY_SCHEDULING

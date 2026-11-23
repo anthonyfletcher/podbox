@@ -24,7 +24,8 @@
 
 /* generic thread.h */
 
-#if defined(HAVE_WIN32_FIBER_THREADS) || defined(HAVE_SIGALTSTACK_THREADS)
+#if defined(HAVE_WIN32_FIBER_THREADS) || defined(HAVE_SIGALTSTACK_THREADS) \
+    || defined(HAVE_EMSCRIPTEN_FIBER_THREADS)
 
 struct regs
 {
@@ -57,6 +58,9 @@ struct regs
 #endif
   #elif defined(HAVE_WIN32_FIBER_THREADS)
     #define DEFAULT_STACK_SIZE 0x1000 /* Bytes */
+  #elif defined(HAVE_EMSCRIPTEN_FIBER_THREADS)
+    /* Also the stack the page's event handlers run on mid-sleep */
+    #define DEFAULT_STACK_SIZE 0x8000 /* Bytes */
   #endif
 #elif defined(CPU_ARM_CLASSIC) || defined(CPU_ARM_APPLICATION)
   #include "arm/thread-classic.h"

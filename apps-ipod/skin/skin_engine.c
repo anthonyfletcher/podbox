@@ -273,6 +273,16 @@ struct gui_wps *skin_get_gwps(enum skinnable_screens skin, enum screen_type scre
     return &skins[skin][screen].gui_wps;
 }
 
+/* The skin only if it is loaded: never loads one, so safe from outside the
+ * UI thread (the Theme IDE's viewport poll) */
+struct gui_wps *skin_get_gwps_loaded(enum skinnable_screens skin,
+                                     enum screen_type screen)
+{
+    if (!skins_initialised || !skins[skin][screen].data.wps_loaded)
+        return NULL;
+    return &skins[skin][screen].gui_wps;
+}
+
 /* This is called to find out if we the screen needs a full update.
  * if true you MUST do a full update as the next call will return false */
 bool skin_do_full_update(enum skinnable_screens skin,

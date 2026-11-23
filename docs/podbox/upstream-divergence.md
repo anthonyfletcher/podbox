@@ -19,8 +19,8 @@ nothing for those.
 `apps/`, `manual/`, `android/`, `backdrops/` and `screenshots/` are
 upstream-identical and unbuilt, kept so merges apply without delete/modify
 conflicts. `themes/` is the fork's own; see *Repo root*. `uisimulator/` is
-built, and upstream-identical apart from the `--screenshot` argument (see *The
-simulator*). The `firmware/` changes are mostly RockPod's hardware work and this
+built, and upstream-identical apart from the `--screenshot` argument and one
+signature fix (see *The simulator*). The `firmware/` changes are mostly RockPod's hardware work and this
 fork's USB work; the `tools/` changes are this fork's.
 
 ---
@@ -370,6 +370,7 @@ and produces the wrong firmware.
 | `spun_testlog.pl` | Synthesises playback logs, and the expected parse, for Spun. |
 | `speech/` | The speech synthesiser's host side. `gen_lexicon.py` writes `cmudict.bin` from the CMU Pronouncing Dictionary; `gen_phonemes.py` writes `apps-ipod/speech/synth_phonemes.c` from NV Speech Player's `data.py`; `synth_render.c` renders IPA to a WAV through the player's synthesiser, to compare with NV Speech Player; `text_render.c` renders text to words, IPA or a WAV, with `host/rbunicode.h` standing in for the firmware's. |
 | `bitperfect/` | Whether the DSP passes a 16-bit source through bit for bit with every stage at its default, and dithers 24-bit, resampled and Replaygain-scaled audio under automatic dither. `sh tools/bitperfect/run.sh` on Linux: it builds the DSP library as warble does and links in warble's place, so needs no SDL. `files.sh` does the same with real WAV and FLAC files through warble, for which `lib/rbcodec/test/warble.c`'s `dither=` takes the mode (2 is automatic). The C output path only. |
+| `theme-ide/` | The Theme IDE: a browser editor for themes beside the iPod Video simulator built as WebAssembly (see *The simulator* below), with `serve.py` to edit a folder in place and `ctl.py` to drive it. `build.sh` builds the page and the player on the build server. |
 | `gen_about_art.py` | Writes `apps-ipod/screens/system/about_art.h`, the About page's logo mask and QR code, from `docs/podbox/images/logo/`. Run by hand; needs Pillow and `qrcode`. |
 
 ### CheckWPS
@@ -402,6 +403,25 @@ screenshots, three a fix for a crash at boot, and two Screen Transitions:
 | `firmware/target/hosted/rtc.c` | Under `SIMULATOR`, `sim_screenshot` makes `rtc_read_datetime()` return Monday 2024-01-01 09:00:00 | Every clock and date in the UI reads it. |
 | `uisimulator/common/powermgmt-sim.c` | `sim_screenshot` stops `battery_status_update()`, so the battery stays at 4300 mV, 100 %, not charging | Otherwise the simulated battery drains 1 % a second and cycles through charging. |
 | `firmware/target/hosted/sdl/lcd-bitmap.c`; `lcd-slide-sdl.c` (new), `firmware/SOURCES` | `lcd_update_rect()` first asks `lcd_hold_rect()`; `lcd_slide_rect()` blits its two parts into the LCD surface and shows the rectangle | Screen Transitions in the simulator, as on the players (`drivers/lcd-slide.c` above). |
+| `uisimulator/common/stubs.c` | `usb_charging_enable()` is `void (int)`, as `firmware/export/usb.h` declares it | Upstream's `bool (bool)` links natively; WebAssembly traps on the mismatched call. |
+
+#### In a browser: the Theme IDE's player
+
+`tools/configure --emscripten` builds the simulator as WebAssembly for
+`tools/theme-ide/`. Rockbox threads run as Emscripten fibers, and the tick and
+SDL's events are delivered at each thread switch. Every change is under
+`__EMSCRIPTEN__` or the new thread define, so other builds compile as before.
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `tools/configure`; `configure-emscripten.sh` (new) | `--emscripten`: `simcc()` hands over to `emscripten_simcc()`, which sets `emcc`, the link options and `HAVE_EMSCRIPTEN_FIBER_THREADS` | The whole of the WebAssembly setup, in its own file. |
+| `firmware/asm/thread-emscripten.c` (new), `thread.c`, `thread.h`, `export/config.h` | Context switch on `emscripten_fiber_swap()`; the thread file's include, `struct regs` and a 32 KB default stack; priority scheduling | The browser has no threads to give Rockbox, and the page's own events run on whichever thread stack is asleep. |
+| `firmware/target/hosted/sdl/kernel-emscripten.c` (new), `firmware/SOURCES` | Replaces `kernel-sdl.c`: interrupt level, tick and SDL events at `sim_emscripten_poll()`, the page given a turn once a frame | Nothing runs beside the Rockbox threads to deliver them. |
+| `firmware/SOURCES` | `load_code-sdl.c` left out | `apps-ipod/sim/load_code-emscripten.c` hands out the WAV codec, linked into the binary. |
+| `firmware/target/hosted/sdl/system-sdl.c`, `button-sdl.c`, `button-sdl.h` | No event thread; `sdl_event_filter()` built, as on macOS | The poll calls the filter itself. |
+| `firmware/target/hosted/sdl/window-sdl.c` | Window flags 0 | A resizable or high-DPI window takes its size from the page and filters the LCD's pixels. |
+| `firmware/target/hosted/sdl/pcm-sdl.c` | No `SDL_Delay()` in the audio callback | The callback runs from a browser audio event, where the module cannot sleep. |
+| `firmware/target/hosted/rtc.c` | No `linux/rtc.h`, no `settimeofday()` | Emscripten has neither. |
 
 Two upstream files reach the app layer by bare include name, through `api/` stubs:
 

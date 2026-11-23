@@ -584,19 +584,17 @@ in this order:
   Player's `data.py`) and `text_render.c`, which renders text to a WAV on
   the build server. The synthesiser itself is `apps-ipod/speech/`, and
   `.specifications/COMPLETED/on-device-speech.md` is its specification
-**Theme Lens lives outside the tree**, in the git-ignored `.build/theme-lens/`
-— the skin reader, linter and previewer. `python serve.py <theme folder>` (or
-double-click `ThemeLens.cmd`) edits that folder live; `ctl.py` drives a running
-one from a script. **It carries its own copy of the tag table**, so a change to
-`apps-ipod/skin/custom_tags.c` has to be mirrored into `index.html` or the lens
-explains tags that no longer exist. It also carries a copy of the `.options`
-parser, `apps-ipod/skin/theme_options.c`, as `parseOptions()` in
-`skin-core.js`; change one and change the other. Its list fixtures are not
-mirrored — `extract-lists.py` reads them out of this checkout, so re-run it with `--embed
-index.html` after a menu change.
-
-It is not ready to ship, so it is not versioned here. A fresh clone will not
-have it.
+- `tools/theme-ide/` — the Theme IDE: a theme's files in an editor beside the
+  iPod Video simulator built as WebAssembly (`tools/configure --emscripten`).
+  `build.sh` builds the page and the player on the build server;
+  `python serve.py <theme folder>` (or `ThemeIDE.cmd`) edits that folder in
+  place, and `ctl.py` drives a running one from a script. Its tag arguments
+  and screen count are read from `lib/skin_parser/tag_table.c`,
+  `apps-ipod/skin/custom_tags.c` and `activity.h` at each page build; the tag
+  *descriptions* and the `.options` parser (`parseOptions()`, a copy of
+  `apps-ipod/skin/theme_options.c`) are `skin-core.js`'s own, so change those
+  with the firmware. `apps-ipod/sim/README.md` describes the player's side.
+  Theme Lens, its predecessor, is still in the git-ignored `.build/theme-lens/`.
 
 ## Debugging a Skin
 
@@ -620,7 +618,7 @@ inherited from the `.sbs` `%Vi`, or neither. **Name the `.sbs` first**: the
 `.wps` then resolves against it the way it does on the player, which is the
 only way that inheritance is visible at all. It ends with a count, and a `.wps`
 reporting most of its viewports as `sbs` is a theme living off the browser
-list's colours. Theme Lens (above) is the third tool, for looking at the result
+list's colours. The Theme IDE (above) is the third tool, for looking at the result
 rather than the decisions.
 
 **Build CheckWPS on the build server**, in a scratch directory rather than the

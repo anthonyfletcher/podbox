@@ -195,10 +195,9 @@ bool usb_powered_only(void)
     return false;
 }
 
-bool usb_charging_enable(bool on)
+void usb_charging_enable(int state)
 {
-    (void)on;
-    return false;
+    (void)state;
 }
 #endif
 

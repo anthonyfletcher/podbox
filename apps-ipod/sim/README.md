@@ -188,3 +188,21 @@ DLL beside it.
 Either way, follow the build with `make zip` and the three `bundle-*.sh` scripts
 and unzip the result into `simdisk/`, or the sim boots themeless with the 6x8
 fallback iconset — which looks exactly like a rendering bug and is not one.
+
+## In a browser: the Theme IDE's player
+
+`tools/theme-ide/build.sh player` configures with `--emscripten` and builds the
+iPod Video simulator as WebAssembly. Four files here are its, all empty in any
+other build:
+
+| File | What it does |
+| --- | --- |
+| `theme_ide.c` | What the page calls: load a theme or a few settings, play a folder, and read the loaded skin's viewports as JSON. The first three post `SYS_THEME_IDE`, which `system/shutdown.c` hands to `theme_ide_event()` on the UI thread |
+| `load_code-emscripten.c` | `wav.codec` opened from the binary itself: a browser cannot load a shared object |
+| `codecs-wasm.make` | Builds the WAV codec into the binary, its exported names prefixed `wavcodec_` so none meets the core's; `apps.make` includes it when `CC` is `emcc` |
+| `wasmcodec_lib.c` | The two codec helpers WAV needs. `codeclib.c` cannot be linked into the core: it defines `memcpy` and its kin |
+
+The player starts with no database, and its first build must finish before
+anything plays: playback holds the memory the commit needs, and the commit is
+put off until a restart that never comes. The page waits for the `library`
+field of `theme_ide_viewports()` before it plays.
