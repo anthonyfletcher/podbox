@@ -1,0 +1,5 @@
+mutagen==1.48.1
+pillow==13.0.0
+PyYAML==6.0.4
+requests==2.34.2
+truststore==0.10.5

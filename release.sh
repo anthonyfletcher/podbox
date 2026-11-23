@@ -48,6 +48,8 @@
 #   --no-voices   skip the voice files; leave the Voices release as it is
 #   --no-arcade   leave the Arcade's build action, game template and IDE
 #                 page as they are (release-arcade.sh publishes them)
+#   --no-tools    leave the Tools release (the library fetch tools for
+#                 Windows and macOS) as it is
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
 # installed and authenticated THERE -- see the --repo note further down, and
@@ -146,6 +148,7 @@ DRY_RUN=
 WITH_SIM=1
 WITH_VOICES=1
 WITH_ARCADE=1
+WITH_TOOLS=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -155,6 +158,7 @@ while [ $# -gt 0 ]; do
         --no-sim)   WITH_SIM= ;;
         --no-voices) WITH_VOICES= ;;
         --no-arcade) WITH_ARCADE= ;;
+        --no-tools) WITH_TOOLS= ;;
         --server)   [ $# -ge 2 ] || die "--server needs user@host"
                     SERVER=$2; shift ;;
         --root)     [ $# -ge 2 ] || die "--root needs a path"
@@ -395,7 +399,7 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES" "$VOICES_NOTES"'
 
 cat <<PLAN
 
-  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}
+  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}${WITH_TOOLS:+, then Tools on GitHub Actions}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS${WITH_SIM:+  (firmware and Windows simulator)}
@@ -844,6 +848,20 @@ say "Published $COMMIT as $RELEASE"
 echo "  https://github.com/$SLUG/releases/tag/$RELEASE"
 
 echo "  local copies in dist/"
+
+# The fetch tools are Python built by PyInstaller, which makes executables
+# only for the system it runs on, so a workflow builds them on Windows and
+# macOS runners and replaces the Tools release itself. Started on the tag
+# just published, so the tools are built from the same commit. Not waited
+# for: it takes several minutes, and a failure there leaves the firmware
+# release as it is. A draft creates no tag, so there is nothing to build.
+if [ -n "$WITH_TOOLS" ] && [ -z "$DRAFT" ]; then
+    if ssh "$SERVER" "gh workflow run fetch-tools.yml --repo '$SLUG' --ref '$RELEASE' -f publish=true"; then
+        echo "  Tools: building on GitHub Actions -- https://github.com/$SLUG/actions/workflows/fetch-tools.yml"
+    else
+        echo "  Tools: could not start the workflow; run it from the Actions tab" >&2
+    fi
+fi
 
 # The Arcade's side, from the same commit: published after the firmware,
 # so @latest never builds for a firmware not yet out

@@ -1,14 +1,13 @@
-# Rockbox Music Artwork Fetcher
+# podbox_fetch art
 
-Single-file, single-parser artwork generation for Rockbox-style music libraries.
-
-This tool creates square JPEG artwork for a music library organised as artist folders containing album folders. It can create:
+Creates JPEG artwork for a music library organised as artist folders containing album
+folders, and for the audiobooks, podcasts and ebooks on an iPod. It can create:
 
 - artist artwork at `Artist/folder.jpg`
 - album artwork at `Artist/Album/folder.jpg`
-- baseline / non-progressive JPEG files suitable for older devices and Rockbox use cases
-
-It is designed for local music libraries where artwork quality, square cropping, repeatability and performance matter more than simply accepting the first image returned by an API.
+- covers of audiobooks, podcasts and ebooks, and pictures of their authors, in the iPod's
+  `Artwork` folder
+- baseline / non-progressive JPEG files, which the player decodes fastest
 
 ---
 
@@ -32,23 +31,28 @@ The important point is that provider metadata is not trusted blindly. The image 
 
 ---
 
-## Supported modes
+## What to fetch
 
-The script supports three modes:
+Name the kinds you want before the folder, or none for all five:
+
+| Kind | Writes |
+|---|---|
+| `artists` | a picture of each artist, in the artist's folder |
+| `albums` | each album's cover, in the album's folder |
+| `audiobooks` | covers of audiobooks, and pictures of their authors |
+| `podcasts` | covers of podcasts |
+| `ebooks` | covers of ebooks, and pictures of their authors |
 
 ```bash
-python art_fetch.py both "D:\Music"
+.\podbox_fetch art E:\Music                    # everything
+.\podbox_fetch art albums E:\Music             # album covers only
+.\podbox_fetch art podcasts audiobooks E:\     # podcasts and audiobooks
 ```
 
-```bash
-python art_fetch.py artist "D:\Music"
-```
-
-```bash
-python art_fetch.py album "D:\Music"
-```
-
-If no mode is provided, the default mode is `both`.
+Give the music folder: artists and albums are found in the folders below it. Audiobooks,
+podcasts and ebooks are found anywhere on the iPod, and their covers go in its `Artwork`
+folder (see [below](#audiobooks-podcasts-and-ebooks)). When the folder is not on an iPod,
+those three are skipped unless you name them and give `--artwork-root`.
 
 ---
 
@@ -96,33 +100,90 @@ PodBox also reads art from an `Artwork` folder at the root of the player: artist
 These take precedence over the images beside the music. To keep the images out of your music
 folders, move the files this tool writes there and rename them to match.
 
+Folders of audiobooks or podcasts (going by genre, as the player decides) are skipped by
+`artists` and `albums`; the `audiobooks` and `podcasts` kinds cover them.
+
+---
+
+## Your own artwork is left alone
+
+art_fetch keeps a list of the images it wrote, and never replaces anything else. An image you
+put there yourself, or one an older art_fetch wrote, is reported as `your artwork` and
+skipped.
+
+- `--overwrite` fetches again the images art_fetch wrote.
+- `--overwrite-all` replaces any artist picture or album cover, yours included. Covers and
+  pictures of authors you put in `Artwork` are never replaced.
+
+The list is `fetch-manifest.json`: in `.rockbox/fetch/` on an iPod, or at the top of a music
+folder on your computer.
+
+---
+
+## Audiobooks, podcasts and ebooks
+
+```bash
+python art_fetch.py audiobooks podcasts ebooks E:\
+```
+
+Point it at the mounted iPod, or a folder on it. It finds the audiobooks and podcasts by genre, and the EPUB,
+FB2 and MOBI books, and writes into the iPod's `Artwork` folder:
+
+- a book's cover as `Artwork/Covers/<Author> - <Title>.jpg`, and a show's as
+  `Artwork/Covers/<Show>.jpg`
+- a picture of each author as `Artwork/People/<Author>.jpg` (`--no-authors` skips them)
+
+Nothing is fetched for a book the iPod can already show a cover for: one in `Artwork/Covers`,
+a cover inside the book or its files, an image named after it, or an image in a folder it
+has to itself.
+
+Covers come from Audible (through Audnexus, when the folder or tags carry the book's ASIN,
+such as `Dune [B002V1OF70]`), Apple Books, Open Library and, with `--google-books-key`,
+Google Books. A podcast's comes from Apple and the show's own feed. An ISBN in the tags,
+the file name or an ebook's details finds the book exactly. Without one, it is matched by
+title and author.
+
+A printed book's cover is taller than it is wide. It is saved whole, and PodBox crops it
+where it needs a square.
+
+On a music folder on your computer, give `--artwork-root` the folder to write into.
+
+---
+
+## Close matches only
+
+An album found online is used only when its title and artist agree with yours to 85%
+(`--auto-accept`), or 90% for an artist's name (`--auto-accept-artist`). Edition words such as
+"Deluxe" or "Remastered" and "feat." guests are ignored. When nothing is close enough but
+something was near, the album is listed at the end as **Unsure**, with the nearest match and
+its image's address, for you to check.
+
 ---
 
 ## Installation
 
-Install the required Python dependencies:
+Download it for Windows or macOS from the
+[Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools); the
+[README](README.md) says how to run it. To run the script itself instead, with Python 3.11 or
+later:
 
 ```bash
-pip install mutagen pillow requests
+pip install -r requirements.txt
 ```
-
-The script uses:
-
-- `mutagen` for reading audio metadata and embedded artwork
-- `Pillow` for image validation, cropping, resizing and JPEG writing
-- `requests` for online provider lookups and image downloads
 
 ---
 
 ## Credentials
 
-Credentials are stored in a shared config file.
-
-On Windows:
+Credentials are stored in the settings file the PodBox tools share:
 
 ```text
-%APPDATA%\RockboxArtistArt\artist_art_credentials.json
+%APPDATA%\PodBox\fetch\fetch.json                              (Windows)
+~/Library/Application Support/PodBox/fetch/fetch.json          (macOS)
 ```
+
+Keys saved by an older art_fetch, in `%APPDATA%\RockboxArtistArt\`, are copied across the
+first time it runs.
 
 Install or update credentials interactively:
 
@@ -195,9 +256,16 @@ Album artwork uses these sources:
 1. embedded artwork from local audio files
 2. Last.fm album lookup
 3. Cover Art Archive
-4. TheAudioDB album lookup
+4. Deezer
+5. Apple Music
+6. TheAudioDB album lookup
+7. Discogs, with a personal access token (`--install-credentials --discogs-token TOKEN`)
 
 Embedded artwork is checked first. If embedded artwork is found, it is added as a candidate and usually wins because it receives a strong source reputation bonus.
+
+`--ignore-embedded` leaves embedded artwork out, for an album whose files carry a small or
+poor cover: a better one is fetched online instead. It also fetches covers for books and shows
+whose files, or ebooks, already carry one.
 
 The album workflow is:
 
@@ -279,12 +347,16 @@ Current source reputation values:
 ```text
 embedded            40.0
 Cover Art Archive   35.0
-last.fm-api         30.0
-last.fm-web         30.0
+audnexus            35.0
+podcast feed        35.0
 last.fm             30.0
+apple               30.0
 deezer              25.0
 TheAudioDB          20.0
+openlibrary         20.0
+discogs             15.0
 fanart.tv           10.0
+google books        10.0
 cache                0.0
 ```
 
@@ -372,7 +444,7 @@ Retry previously cached not-found entries:
 A full retest normally uses both:
 
 ```bash
-python art_fetch.py both "D:\Music" --overwrite --ignore-cache --retry-not-found
+python art_fetch.py "D:\Music" --overwrite --ignore-cache --retry-not-found
 ```
 
 ---
@@ -413,18 +485,15 @@ Higher threshold example:
 
 ---
 
-## Single-pass `both` mode
+## Artists and albums in one pass
 
-In `both` mode, the script performs a single top-level library traversal.
+Fetching both artists and albums, the script walks the library once.
 
 For each artist branch it:
 
 1. processes artist artwork
 2. processes album folders inside that artist branch
 3. moves to the next artist branch
-
-This avoids the older behaviour of running one album pass and then one artist pass over the whole library.
-
 Example output:
 
 ```text
@@ -443,12 +512,10 @@ Traversal      : single pass over artist folders
 
 ## Important command-line options
 
-### Processing mode
+### What to fetch
 
 ```bash
-artist
-album
-both
+artists albums audiobooks podcasts ebooks   # any of them, before the folder; none for all
 ```
 
 ### Output filename
@@ -493,12 +560,33 @@ both
 
 ```bash
 --interactive
---overwrite
+--overwrite                  # fetch again what art_fetch wrote
+--overwrite-all              # replace your own artwork too
 --dry-run
 --ignore-cache
 --retry-not-found
 --no-theaudiodb
 --no-deezer
+--no-apple
+--ignore-embedded            # don't use art inside the files: fetch a cover anyway
+--update-player-cache        # on a mounted iPod (Windows), run its artcache_pb.exe afterwards
+```
+
+### Matching
+
+```bash
+--auto-accept 0.85
+--auto-accept-artist 0.90
+--min-match 0.45             # nearer than this, but not close enough, is listed as unsure
+```
+
+### Audiobooks, podcasts and ebooks
+
+```bash
+--artwork-root D:\Artwork    # where to write, when not on a mounted iPod
+--no-authors
+--no-audnexus
+--google-books-key KEY       # remembered
 ```
 
 ### Rate limits
@@ -510,83 +598,89 @@ both
 --coverartarchive-rate-limit 1.0
 --theaudiodb-rate-limit 2.5
 --deezer-rate-limit 0.3
+--apple-rate-limit 3.0
+--discogs-rate-limit 1.1
+--openlibrary-rate-limit 1.0
 --image-rate-limit 0.2
 ```
 
-### MusicBrainz user agent
+### Identifying yourself
 
 ```bash
---musicbrainz-user-agent "RockboxMusicArt/3.8 (local library artwork tool)"
+--contact you@example.com
 ```
+
+Puts your address in the tool's requests, so a service can reach you about them instead of
+blocking them. It is remembered, and shared with `lyrics` and `notes`.
 
 ---
 
 ## Common command examples
 
-Basic combined run:
+Everything:
 
 ```bash
-python art_fetch.py both "D:\Music"
+python art_fetch.py "D:\Music"
 ```
 
-Interactive combined run:
+Interactive run:
 
 ```bash
-python art_fetch.py both "D:\Music" --interactive
+python art_fetch.py "D:\Music" --interactive
 ```
 
 Artist artwork only:
 
 ```bash
-python art_fetch.py artist "D:\Music"
+python art_fetch.py artists "D:\Music"
 ```
 
 Album artwork only:
 
 ```bash
-python art_fetch.py album "D:\Music"
+python art_fetch.py albums "D:\Music"
 ```
 
 Overwrite existing generated files:
 
 ```bash
-python art_fetch.py both "D:\Music" --overwrite
+python art_fetch.py "D:\Music" --overwrite
 ```
 
 Dry run:
 
 ```bash
-python art_fetch.py both "D:\Music" --dry-run
+python art_fetch.py "D:\Music" --dry-run
 ```
 
 Full retest:
 
 ```bash
-python art_fetch.py both "D:\Music" --overwrite --ignore-cache --retry-not-found
+python art_fetch.py "D:\Music" --overwrite --ignore-cache --retry-not-found
 ```
 
 Higher quality source requirement:
 
 ```bash
-python art_fetch.py both "D:\Music" --min-source-size 500
+python art_fetch.py "D:\Music" --min-source-size 500
 ```
 
 Try more candidates per provider:
 
 ```bash
-python art_fetch.py both "D:\Music" --max-candidates-per-provider 5
+python art_fetch.py "D:\Music" --max-candidates-per-provider 5
 ```
 
 Unlimited artist provider candidates:
 
 ```bash
-python art_fetch.py both "D:\Music" --max-candidates-per-provider 0
+python art_fetch.py "D:\Music" --max-candidates-per-provider 0
 ```
 
 Disable TheAudioDB:
 
 ```bash
-python art_fetch.py both "D:\Music" --no-theaudiodb
+python art_fetch.py "D:\Music" --no-theaudiodb
 ```
 
 ---
@@ -599,13 +693,14 @@ Check whether existing artwork is being skipped:
 
 ```text
 skip: artwork already exists: folder.jpg
+skip: your artwork: folder.jpg
 ```
 
-Use:
+The first is an image art_fetch wrote, which `--overwrite` fetches again. The second is one
+it did not write, which only `--overwrite-all` replaces.
 
-```bash
---overwrite
-```
+An album listed as **Unsure** at the end had no match close enough to use; see
+[Close matches only](#close-matches-only).
 
 ### Cached not-found results are being reused
 
@@ -643,7 +738,7 @@ Keep the default cap or lower it:
 --max-candidates-per-provider 2
 ```
 
-### You want the old unlimited behaviour
+### You want every candidate tried
 
 Use:
 
@@ -661,34 +756,12 @@ Increase the minimum source size:
 
 ---
 
-## Building a standalone Windows executable
+## Running the downloaded program
 
-Install PyInstaller:
-
-```bash
-pip install pyinstaller
-```
-
-Build a single executable:
+To run the commands in this manual with the downloaded program, replace
+`python art_fetch.py` with `.\podbox_fetch art` on Windows or `./podbox_fetch art` on a Mac,
+in the folder you unzipped it to:
 
 ```bash
-pyinstaller --onefile art_fetch.py
-```
-
-The executable will be created under:
-
-```text
-dist\art_fetch.exe
-```
-
-To run the commands explained in this manual with the executable, replace:
-
-```text
-python art_fetch.py
-```
-
-with:
-
-```text
-.\art_fetch.exe
+.\podbox_fetch art E:\Music
 ```

@@ -357,7 +357,7 @@ and produces the wrong firmware.
 | File | What it is |
 | --- | --- |
 | `convfnt.c` | Exports a glyph from a 4 bpp `.fnt` to a greyscale `.bmp` and back. `convbdf` cannot round-trip 4 bpp. |
-| `art_fetch/` | Fetches album and artist artwork. Run by hand. |
+| `fetch/` | Desktop tools that fill a library from the web: `art_fetch.py` (album and artist artwork, and with `art_books.py` covers for books and podcasts), `lyric_fetch.py` (synchronised lyrics) and `notes_fetch.py` (notes pages), on the shared `fetchlib.py`, and `podbox_fetch.py`, which runs them as `art`, `lyrics` and `notes` and is what ships. Run by hand; `.github/workflows/fetch-tools.yml` builds them for Windows and macOS as the `Tools` release. |
 | `eq_refit/` | Re-fits an EQ preset onto fewer bands; each band costs a pass over every sample. |
 | `pfgeom/` | Mirrors the carousel's projection and cull on the host. Change it with `screens/covers/carousel.c`, or it proves nothing. |
 | `dbfeat/` | Runs `apps-ipod/database/db_featured_parse.c`, unmodified, over a table of tags and the guests each must yield. |
@@ -447,7 +447,7 @@ Two upstream files reach the app layer by bare include name, through `api/` stub
 | `build-voices.sh` | Runs `make voice` in a build directory with Piper, for English and the eleven translations, into `voices.zip`. A voice is numbered by that build's language strings, so it is made per build. |
 | `bundle-tools.sh` | Adds `soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`, rebuilt by make on each run, and the host-built codecs soundscan loads, as `.rockbox/tools/`. A missing Windows simulator is reported, not fatal; a failed tool build is fatal; `release.sh` requires it. |
 | `build-bootloader.sh`, `tools/bootloader-installer/` | Builds both bootloaders and Windows `ipodpatcher.exe` and `mks5lboot.exe` from `utils/`, unchanged, and zips them with the install scripts and README as `podbox-bootloader.zip`. The 5G bootloader is passed to ipodpatcher by `install-5g.cmd`: embedding it needs every iPod model's bootloader beside it. |
-| `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator`, `Voices`, `Bootloader` and `latest` releases, in that order. `--no-voices` leaves `Voices` as it is. |
+| `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator`, `Voices`, `Bootloader` and `latest` releases, in that order, then starts the workflow that replaces `Tools`. `--no-voices` leaves `Voices` as it is, `--no-tools` leaves `Tools`. |
 | `docs/CREDITS` | PodBox, RockPod, Spun, accessory protocol, car protocol, themes-and-fonts, speech, iPod Video display and RockWheel blocks above `For Rockbox:`, a heading this fork adds. Upstream's list below it is untouched, trailing newline included, so merges apply. |
 | `docs/LICENSES` | The CMU Pronouncing Dictionary's licence appended, for `cmudict.bin`. Upstream's text above it is untouched. |
 | `docs/podbox/` (new) | The fork's documents: user guides, `settings-help.txt`, the iAP source ledgers, this file and `upstream-commit-log.md`. |

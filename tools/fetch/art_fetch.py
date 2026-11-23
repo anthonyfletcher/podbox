@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
 """
-Rockbox Music Artwork Fetcher
-Single-file, single-parser artist + album art tool.
+art_fetch: album covers and artist pictures for a PodBox music library,
+written beside the music; audiobook, podcast and ebook covers in the
+player's /Artwork (art_books.py). Each is a kind the command line names,
+and naming none fetches all five.
+
+Candidates from every source are downloaded and scored on their real
+pixels. An online match is used only when its names agree closely enough
+(--auto-accept); a weaker one is listed as unsure instead. A file the tool
+did not write is never replaced (fetchlib's manifest).
 """
 from __future__ import annotations
 
 import argparse
 import base64
-import difflib
 import getpass
 import html
-import json
 import os
 import re
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 from urllib.parse import quote, quote_plus, urljoin
 
 import requests
@@ -33,10 +39,14 @@ except ModuleNotFoundError:
     MutagenFile = None
     FLAC = Picture = APIC = ID3 = MP4 = MP4Cover = None
 
-SCRIPT_VERSION = "3.9"
+import art_books
+from fetchlib import (MUSIC, Manifest, RateLimiter, config_path,
+                      contact_from, http_get, iter_audio_files, load_config,
+                      load_json, normalise_name, player_root_of, read_tags,
+                      save_config, save_json, similarity, user_agent)
 
-AUDIO_EXTS = {".mp3", ".mp2", ".mp1", ".m4a", ".mp4", ".aac", ".flac", ".ogg", ".opus", ".wav", ".wma", ".aiff", ".aif"}
-CONFIG_FILENAME = "artist_art_credentials.json"
+SCRIPT_VERSION = "4.0"
+
 ARTIST_CACHE_FILENAME = "artist-art-cache.json"
 ALBUM_CACHE_FILENAME = "album-art-cache.json"
 
@@ -49,6 +59,8 @@ CAA_RELEASE_FRONT = "https://coverartarchive.org/release/{mbid}/front"
 THEAUDIODB_API = "https://www.theaudiodb.com/api/v1/json"
 THEAUDIODB_PUBLIC_KEY = "123"
 DEEZER_API = "https://api.deezer.com"
+APPLE_SEARCH_API = "https://itunes.apple.com/search"
+DISCOGS_API = "https://api.discogs.com"
 # Last.fm's public pages refuse or throttle requests that don't look like a
 # browser, so page and image requests identify as one.
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -60,14 +72,22 @@ LASTFM_PAGE_HEADERS = (
      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
      "Accept-Language": "en-GB,en;q=0.9",
      "Upgrade-Insecure-Requests": "1"},
-    {"User-Agent": "RockboxMusicArt/3.7"},
+    {"User-Agent": user_agent("art_fetch", SCRIPT_VERSION)},
     {"User-Agent": BROWSER_UA, "Accept": "*/*"},
 )
 
 PLACEHOLDER_MARKERS = {
     "2a96cbd8b46e442fc41c2b86b821562f", "c6f59c1e5e7240a4c0d427abd71f3dbb",
     "default_artist", "default_album", "default_cover", "placeholder", "noimage", "no_image",
+    "/artist//", "/cover//",
 }
+
+# Difference hashes (dhash, below) of the stand-in images providers serve
+# when they have no picture: Last.fm's two stars, Deezer's blank artist and
+# blank cover. Caught by the picture, so a new URL for one is caught too.
+PLACEHOLDER_DHASHES = (0x10080C0F0E961208, 0x300C162B2B160C30,
+                       0x0810323269492004, 0x0832695555693208)
+PLACEHOLDER_DISTANCE = 6
 
 # Reputational weighting used after an image has been downloaded and measured.
 # These are deliberately modest bonuses: they influence close calls, but a much
@@ -78,8 +98,16 @@ SOURCE_REPUTATION_WEIGHTS = {
     "last.fm-api": 30.0,
     "last.fm-web": 30.0,
     "last.fm": 30.0,
+    "apple": 30.0,
     "deezer": 25.0,
     "TheAudioDB": 20.0,
+    "discogs": 15.0,
+    # Books and shows: Audible's own art and a show's feed art are the
+    # originals; Apple's and Open Library's are copies or scans
+    "audnexus": 35.0,
+    "feed": 35.0,
+    "openlibrary": 20.0,
+    "google books": 10.0,
     "fanart.tv": 10.0,
     "cache": 0.0,
 }
@@ -89,18 +117,13 @@ class Credentials:
     lastfm_api_key: str = ""
     lastfm_api_secret: str = ""
     fanart_api_key: str = ""
+    discogs_token: str = ""
     @property
     def has_lastfm(self) -> bool: return bool(self.lastfm_api_key.strip())
     @property
     def has_fanart(self) -> bool: return bool(self.fanart_api_key.strip())
-
-@dataclass
-class TrackTags:
-    path: Path
-    artist: str = ""
-    album_artist: str = ""
-    album: str = ""
-    error: str = ""
+    @property
+    def has_discogs(self) -> bool: return bool(self.discogs_token.strip())
 
 @dataclass
 class ImageCandidate:
@@ -115,75 +138,53 @@ class ImageCandidate:
     source_width: int = 0
     source_height: int = 0
     source_score: float = 0.0
+    # How well the source's names agree with the library's, 0 to 1
+    # (album_match); 1 for embedded art and for what the cache remembers.
+    match: float = 1.0
 
 class RejectedImage(Exception): pass
 
-class RateLimiter:
-    def __init__(self, args: argparse.Namespace) -> None:
-        self.delays = {
-            "lastfm": args.lastfm_rate_limit,
-            "fanart": args.fanart_rate_limit,
-            "musicbrainz": args.musicbrainz_rate_limit,
-            "coverartarchive": args.coverartarchive_rate_limit,
-            "theaudiodb": args.theaudiodb_rate_limit,
-            "image": args.image_rate_limit,
-            "deezer": args.deezer_rate_limit,
-        }
-        self.last: dict[str, float] = {}
-    def wait(self, service: str) -> None:
-        delay = max(0.0, float(self.delays.get(service, 0.0)))
-        elapsed = time.time() - self.last.get(service, 0.0)
-        if elapsed < delay:
-            time.sleep(delay - elapsed)
-        self.last[service] = time.time()
+# Album lookups whose match fell short of --auto-accept, for the summary
+UNSURE: list[str] = []
 
-def http_get(session: requests.Session, url: str, retries: int = 3, **kwargs) -> requests.Response:
-    """GET that waits and tries again when a site says "too many requests"
-    (429) or is briefly unavailable (5xx), instead of failing straight away."""
-    kwargs.setdefault("timeout", 30)
-    r = session.get(url, **kwargs)
-    for attempt in range(retries):
-        if r.status_code != 429 and r.status_code < 500:
-            break
-        wait = 5.0 * (attempt + 1)
-        try:
-            wait = max(wait, min(60.0, float(r.headers.get("Retry-After", 0))))
-        except ValueError:
-            pass
-        print(f"    (server said HTTP {r.status_code}; waiting {wait:.0f}s and trying again)")
-        time.sleep(wait)
-        r = session.get(url, **kwargs)
-    return r
+def make_limiter(args: argparse.Namespace) -> RateLimiter:
+    return RateLimiter({
+        "lastfm": args.lastfm_rate_limit,
+        "fanart": args.fanart_rate_limit,
+        "musicbrainz": args.musicbrainz_rate_limit,
+        "coverartarchive": args.coverartarchive_rate_limit,
+        "theaudiodb": args.theaudiodb_rate_limit,
+        "image": args.image_rate_limit,
+        "deezer": args.deezer_rate_limit,
+        "apple": args.apple_rate_limit,
+        "discogs": args.discogs_rate_limit,
+        "audnexus": 1.0,
+        "openlibrary": args.openlibrary_rate_limit,
+        "google": 1.0,
+        "feed": 1.0,
+    })
 
 # ---------------------------------------------------------------------
 # Credentials and cache
 # ---------------------------------------------------------------------
 def get_config_path() -> Path:
-    if os.name == "nt":
-        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
-        return Path(base) / "RockboxArtistArt" / CONFIG_FILENAME
-    base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    return base / "rockbox-artist-art" / CONFIG_FILENAME
+    return config_path()
 
 def load_credentials() -> Credentials:
-    path = get_config_path()
-    if not path.exists(): return Credentials()
-    try: data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception: return Credentials()
-    return Credentials(str(data.get("lastfm_api_key") or ""), str(data.get("lastfm_api_secret") or ""), str(data.get("fanart_api_key") or ""))
+    data = load_config()
+    return Credentials(str(data.get("lastfm_api_key") or ""), str(data.get("lastfm_api_secret") or ""), str(data.get("fanart_api_key") or ""), str(data.get("discogs_token") or ""))
 
 def save_credentials(creds: Credentials) -> Path:
-    path = get_config_path(); path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"lastfm_api_key": creds.lastfm_api_key.strip(), "lastfm_api_secret": creds.lastfm_api_secret.strip(), "fanart_api_key": creds.fanart_api_key.strip()}, indent=2), encoding="utf-8")
-    try: os.chmod(path, 0o600)
-    except Exception: pass
-    return path
+    data = load_config()
+    data.update({"lastfm_api_key": creds.lastfm_api_key.strip(), "lastfm_api_secret": creds.lastfm_api_secret.strip(), "fanart_api_key": creds.fanart_api_key.strip(), "discogs_token": creds.discogs_token.strip()})
+    return save_config(data)
 
 def install_credentials(args: argparse.Namespace) -> int:
     existing = load_credentials()
     lastfm_key = args.lastfm_api_key if args.lastfm_api_key is not None else existing.lastfm_api_key
     lastfm_secret = args.lastfm_api_secret if args.lastfm_api_secret is not None else existing.lastfm_api_secret
     fanart_key = args.fanart_api_key if args.fanart_api_key is not None else existing.fanart_api_key
+    discogs_token = args.discogs_token if args.discogs_token is not None else existing.discogs_token
     if args.prompt_credentials:
         print("Install API credentials. Leave blank to keep existing value or skip.")
         v = input("Last.fm API key: ").strip()
@@ -192,24 +193,24 @@ def install_credentials(args: argparse.Namespace) -> int:
         if v: lastfm_secret = v
         v = input("fanart.tv API key: ").strip()
         if v: fanart_key = v
-    creds = Credentials(lastfm_key or "", lastfm_secret or "", fanart_key or "")
+        v = getpass.getpass("Discogs personal access token: ").strip()
+        if v: discogs_token = v
+    creds = Credentials(lastfm_key or "", lastfm_secret or "", fanart_key or "", discogs_token or "")
     path = save_credentials(creds)
     print(f"Saved credentials to: {path}")
     print(f"Last.fm enabled  : {creds.has_lastfm}")
     print(f"fanart.tv enabled: {creds.has_fanart}")
+    print(f"Discogs enabled  : {creds.has_discogs}")
     return 0
 
 def load_cache(path: Path, key: str) -> dict[str, Any]:
-    if not path.exists(): return {key: {}}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data.get(key), dict): data[key] = {}
-        return data
-    except Exception:
-        return {key: {}}
+    data = load_json(path, {key: {}})
+    if not isinstance(data, dict): data = {}
+    if not isinstance(data.get(key), dict): data[key] = {}
+    return data
 
 def save_cache(path: Path, cache: dict[str, Any]) -> None:
-    path.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+    save_json(path, cache)
 
 # ---------------------------------------------------------------------
 # General helpers
@@ -219,40 +220,6 @@ def ensure_dependencies() -> bool:
         print("ERROR: missing dependency 'mutagen'. Install with: pip install mutagen pillow requests", file=sys.stderr)
         return False
     return True
-
-def normalise_name(value: str) -> str:
-    value = (value or "").casefold().strip().replace("&", " and ")
-    value = re.sub(r"\bthe\b", " ", value)
-    value = re.sub(r"\b(feat|ft|featuring)\.?\b.*$", " ", value)
-    value = re.sub(r"\([^)]*\)|\[[^]]*\]", " ", value)
-    value = re.sub(r"\b(cd|disc|disk)\s*\d+\b", " ", value)
-    value = re.sub(r"[^\w\s]+", " ", value, flags=re.UNICODE)
-    return re.sub(r"\s+", " ", value).strip()
-
-def similarity(a: str, b: str) -> float:
-    na, nb = normalise_name(a), normalise_name(b)
-    if not na or not nb: return 0.0
-    if na == nb: return 1.0
-    if set(na.split()) == set(nb.split()): return 0.98
-    return difflib.SequenceMatcher(None, na, nb).ratio()
-
-def first_value(v: Any) -> str:
-    if v is None: return ""
-    if isinstance(v, list): return str(v[0]) if v else ""
-    return str(v)
-
-def read_tags(path: Path) -> TrackTags:
-    try:
-        audio = MutagenFile(str(path), easy=True)
-        if audio is None: return TrackTags(path=path, error="Unsupported metadata")
-        return TrackTags(path, first_value(audio.get("artist")), first_value(audio.get("albumartist") or audio.get("album artist") or audio.get("performer")), first_value(audio.get("album")))
-    except Exception as exc:
-        return TrackTags(path=path, error=str(exc))
-
-def iter_audio_files(path: Path) -> Iterable[Path]:
-    for p in sorted(path.rglob("*"), key=lambda x: str(x).casefold()):
-        if p.is_file() and p.suffix.casefold() in AUDIO_EXTS and not any(part.startswith(".") for part in p.parts):
-            yield p
 
 def contains_placeholder_marker(url: str) -> bool:
     low = (url or "").casefold()
@@ -266,9 +233,25 @@ def centre_crop_square(img: Image.Image) -> Image.Image:
     side = min(img.width, img.height)
     return img.crop(((img.width-side)//2, (img.height-side)//2, (img.width-side)//2 + side, (img.height-side)//2 + side))
 
+def dhash(img: Image.Image) -> int:
+    """64-bit difference hash: each bit says whether a pixel of a 9x8
+    greyscale copy is brighter than its right-hand neighbour."""
+    px = img.convert("L").resize((9, 8), Image.Resampling.LANCZOS).tobytes()
+    bits = 0
+    for y in range(8):
+        for x in range(8):
+            bits = bits << 1 | (px[y * 9 + x] > px[y * 9 + x + 1])
+    return bits
+
+def is_placeholder_picture(img: Image.Image) -> bool:
+    h = dhash(img)
+    return any(bin(h ^ p).count("1") <= PLACEHOLDER_DISTANCE for p in PLACEHOLDER_DHASHES)
+
 def image_seems_bad(img: Image.Image, min_source_size: int, source: str = "") -> Optional[str]:
     if img.width < min_source_size or img.height < min_source_size:
         return f"image too small ({img.width}x{img.height}, minimum {min_source_size}x{min_source_size})"
+    if source != "embedded" and is_placeholder_picture(img):
+        return "a provider's stand-in picture, not a real one"
     if source.casefold().startswith("last.fm"):
         sample = img.convert("RGB").resize((64, 64))
         colours = sample.getcolors(maxcolors=4096) or []
@@ -368,24 +351,26 @@ def score_downloaded_candidate(
     )
     return score, reason
 
-def save_square_jpeg(
-    img: Image.Image,
-    output_path: Path,
-    size: int,
-) -> None:
-    img = centre_crop_square(img)
-    if img.width != size or img.height != size:
-        img = img.resize((size, size), Image.Resampling.LANCZOS)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    # Written beside the target and renamed over it, so an interrupted run
-    # leaves the old image or none, never a truncated one that later runs skip.
-    tmp_path = output_path.with_name(output_path.name + ".tmp")
-    try:
-        img.save(tmp_path, "JPEG", quality=92, optimize=True, progressive=False)
-        os.replace(tmp_path, output_path)
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
+def jpeg_bytes(img: Image.Image, size: int, square: bool = True) -> bytes:
+    """Baseline JPEG, which every player decodes fastest. Square: cropped
+    from the middle to 'size'. Otherwise kept whole with its short edge
+    'size', so the player's own square crop of it is still 'size'."""
+    if square:
+        img = centre_crop_square(img)
+        target = (size, size)
+    else:
+        scale = size / min(img.width, img.height)
+        target = (max(1, round(img.width * scale)), max(1, round(img.height * scale)))
+    if img.size != target:
+        img = img.resize(target, Image.Resampling.LANCZOS)
+    out = BytesIO()
+    img.save(out, "JPEG", quality=92, optimize=True, progressive=False)
+    return out.getvalue()
+
+def save_square_jpeg(img: Image.Image, output_path: Path, size: int, manifest: Manifest) -> None:
+    # Atomic, and recorded as the tool's: a later run may refresh it, but
+    # never a file the owner put there.
+    manifest.write(output_path, jpeg_bytes(img, size), "art_fetch")
 
 # ---------------------------------------------------------------------
 # Last.fm helpers, including robust Rêve-style photo gallery parsing
@@ -513,7 +498,7 @@ def lookup_lastfm_artist_web_candidates(name: str, session: requests.Session, li
     ]
 
 
-def lookup_lastfm_artist_candidates(name: str, creds: Credentials, session: requests.Session, limiter: RateLimiter) -> list[ImageCandidate]:
+def lookup_lastfm_artist_candidates(name: str, creds: Credentials, session: requests.Session, limiter: RateLimiter, min_match: float = 0.0) -> list[ImageCandidate]:
     if not creds.has_lastfm:
         return []
     params = {"method": "artist.getinfo", "artist": name, "api_key": creds.lastfm_api_key, "format": "json", "autocorrect": "1"}
@@ -521,6 +506,9 @@ def lookup_lastfm_artist_candidates(name: str, creds: Credentials, session: requ
     r = http_get(session, LASTFM_API, params=params); r.raise_for_status()
     artist = r.json().get("artist") or {}
     artist_name = artist.get("name") or name
+    if similarity(name, artist_name) < min_match:
+        print(f"  candidate: last.fm corrected '{name}' to '{artist_name}'; not the same artist, not used")
+        return []
     mbid = artist.get("mbid") or ""
     out = lastfm_image_candidates(artist.get("image") or [], "last.fm-api", artist_name, mbid)
     try:
@@ -593,7 +581,7 @@ def lookup_fanart_artist(name: str, mbid: str, creds: Credentials, args: argpars
     candidates = lookup_fanart_artist_candidates(name, mbid, creds, args, session, limiter)
     return candidates[0] if candidates else None
 
-def lookup_theaudiodb_artist_candidates(name: str, session: requests.Session, limiter: RateLimiter) -> list[ImageCandidate]:
+def lookup_theaudiodb_artist_candidates(name: str, session: requests.Session, limiter: RateLimiter, min_match: float = 0.0) -> list[ImageCandidate]:
     if normalise_name(name) in {"", "unknown artist", "various artists"}:
         return []
     limiter.wait("theaudiodb")
@@ -602,6 +590,9 @@ def lookup_theaudiodb_artist_candidates(name: str, session: requests.Session, li
     if not artists:
         return []
     best = max(artists, key=lambda a: similarity(name, a.get("strArtist", "")))
+    if similarity(name, best.get("strArtist", "")) < min_match:
+        print(f"  candidate: TheAudioDB's nearest artist is '{best.get('strArtist')}'; not the same, not used")
+        return []
     out: list[ImageCandidate] = []
     fields = (
         ("strArtistThumb", 35.0),
@@ -709,6 +700,17 @@ def find_embedded_album_art(folder: Path, max_files: int) -> Optional[ImageCandi
         if i >= max_files: break
     return ImageCandidate("embedded", folder.parent.name, folder.name, image_bytes=best[1]) if best else None
 
+def search_artist(artist: str) -> str:
+    """The artist as a search wants it: no "feat." guests."""
+    return re.sub(r"\s+(feat|ft|featuring)\.?\s.*$", "", artist or "", flags=re.IGNORECASE).strip() or artist
+
+def album_match(artist: str, album: str, r_artist: str, r_album: str) -> float:
+    """How well a source's album agrees with the library's: 0.6 the title,
+    0.4 the artist, edition words ("Deluxe", "Remastered") and guests
+    left out of both."""
+    return (0.6 * similarity(plain_album_title(album), plain_album_title(r_album))
+            + 0.4 * similarity(search_artist(artist), search_artist(r_artist)))
+
 def lookup_lastfm_album(artist: str, album: str, creds: Credentials, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
     if not creds.has_lastfm: return None
     params = {"method":"album.getinfo", "artist":artist, "album":album, "api_key":creds.lastfm_api_key, "format":"json", "autocorrect":"1"}
@@ -717,38 +719,88 @@ def lookup_lastfm_album(artist: str, album: str, creds: Credentials, session: re
     data = r.json(); obj = data.get("album") or {}
     if not obj or data.get("error"): return None
     url = choose_best_lastfm_image(obj.get("image") or [])
-    return ImageCandidate("last.fm", obj.get("artist") or artist, obj.get("name") or album, image_url=url, mbid=obj.get("mbid") or "") if url else None
+    ra, rl = obj.get("artist") or artist, obj.get("name") or album
+    return ImageCandidate("last.fm", ra, rl, image_url=url, mbid=obj.get("mbid") or "", match=album_match(artist, album, ra, rl)) if url else None
 
-def lookup_musicbrainz_release_mbid(artist: str, album: str, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter) -> str:
+def lookup_deezer_album(artist: str, album: str, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
+    limiter.wait("deezer")
+    q = f'artist:"{search_artist(artist)}" album:"{plain_album_title(album)}"'
+    r = http_get(session, f"{DEEZER_API}/search/album", params={"q": q, "limit": 10}); r.raise_for_status()
+    found = r.json().get("data") or []
+    if not found: return None
+    def names(a: dict[str, Any]) -> tuple[str, str]:
+        return (a.get("artist") or {}).get("name") or "", a.get("title") or ""
+    best = max(found, key=lambda a: album_match(artist, album, *names(a)))
+    url = best.get("cover_xl") or best.get("cover_big") or ""
+    if not url: return None
+    ra, rl = names(best)
+    return ImageCandidate("deezer", ra, rl, image_url=url, match=album_match(artist, album, ra, rl))
+
+def lookup_apple_album(artist: str, album: str, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
+    limiter.wait("apple")
+    params = {"term": f"{search_artist(artist)} {plain_album_title(album)}", "media": "music", "entity": "album", "limit": 10}
+    r = http_get(session, APPLE_SEARCH_API, params=params); r.raise_for_status()
+    found = r.json().get("results") or []
+    if not found: return None
+    best = max(found, key=lambda a: album_match(artist, album, a.get("artistName") or "", a.get("collectionName") or ""))
+    small = best.get("artworkUrl100") or ""
+    if not small: return None
+    # The size is part of the file name; Apple serves the same art larger
+    url = re.sub(r"/\d+x\d+bb\.(jpg|png)$", r"/1200x1200bb.\1", small)
+    ra, rl = best.get("artistName") or "", best.get("collectionName") or ""
+    return ImageCandidate("apple", ra, rl, image_url=url, match=album_match(artist, album, ra, rl))
+
+def lookup_discogs_album(artist: str, album: str, creds: Credentials, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
+    if not creds.has_discogs: return None
+    limiter.wait("discogs")
+    headers = {"User-Agent": args.user_agent, "Authorization": f"Discogs token={creds.discogs_token}"}
+    params = {"type": "master", "artist": search_artist(artist), "release_title": plain_album_title(album), "per_page": 10}
+    r = http_get(session, f"{DISCOGS_API}/database/search", params=params, headers=headers); r.raise_for_status()
+    found = [x for x in (r.json().get("results") or []) if x.get("cover_image") and "spacer.gif" not in x.get("cover_image", "")]
+    if not found: return None
+    def names(x: dict[str, Any]) -> tuple[str, str]:
+        # Discogs titles a result "Artist - Album"
+        ra, _, rl = (x.get("title") or "").partition(" - ")
+        return ra, rl
+    best = max(found, key=lambda x: album_match(artist, album, *names(x)))
+    ra, rl = names(best)
+    return ImageCandidate("discogs", ra, rl, image_url=best["cover_image"], match=album_match(artist, album, ra, rl))
+
+def release_artist(rel: dict[str, Any]) -> str:
+    return "".join((a.get("name") or "") + (a.get("joinphrase") or "") for a in rel.get("artist-credit", []) if isinstance(a, dict))
+
+def lookup_musicbrainz_release_mbid(artist: str, album: str, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter) -> tuple[str, float]:
+    """The best release's id, and how well it matches (album_match)."""
     headers = {"User-Agent": args.musicbrainz_user_agent, "Accept": "application/json"}
-    params = {"query": f'artist:"{artist}" AND release:"{album}"', "fmt":"json", "limit":"10"}
+    params = {"query": f'artist:"{search_artist(artist)}" AND release:"{plain_album_title(album)}"', "fmt":"json", "limit":"10"}
     limiter.wait("musicbrainz")
     r = http_get(session, MUSICBRAINZ_RELEASE_API, params=params, headers=headers); r.raise_for_status()
     releases = r.json().get("releases") or []
-    if not releases: return ""
+    if not releases: return "", 0.0
     def score(rel: dict[str, Any]) -> float:
-        title = rel.get("title") or ""; ac = " ".join((a.get("name") or "") for a in rel.get("artist-credit", []) if isinstance(a, dict))
         cover = 25 if (rel.get("cover-art-archive") or {}).get("front") else 0
-        return similarity(album,title)*100 + similarity(artist,ac)*100 + float(rel.get("score") or 0) + cover
+        return album_match(artist, album, release_artist(rel), rel.get("title") or "")*200 + float(rel.get("score") or 0) + cover
     best = max(releases, key=score)
-    return best.get("id") or "" if similarity(album, best.get("title", "")) >= 0.65 else ""
+    return best.get("id") or "", album_match(artist, album, release_artist(best), best.get("title") or "")
 
 def lookup_cover_art_archive(artist: str, album: str, mbid: str, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
-    if not mbid: mbid = lookup_musicbrainz_release_mbid(artist, album, args, session, limiter)
+    match = 1.0
+    if not mbid: mbid, match = lookup_musicbrainz_release_mbid(artist, album, args, session, limiter)
     if not mbid: return None
     url = CAA_RELEASE_FRONT.format(mbid=mbid)
     limiter.wait("coverartarchive")
-    head = session.head(url, timeout=20, allow_redirects=False, headers={"User-Agent":"RockboxMusicArt/3.2"})
-    return ImageCandidate("Cover Art Archive", artist, album, image_url=url, mbid=mbid) if head.status_code in (200,301,302,307) else None
+    head = session.head(url, timeout=20, allow_redirects=False, headers={"User-Agent": args.user_agent})
+    return ImageCandidate("Cover Art Archive", artist, album, image_url=url, mbid=mbid, match=match) if head.status_code in (200,301,302,307) else None
 
 def lookup_theaudiodb_album(artist: str, album: str, session: requests.Session, limiter: RateLimiter) -> Optional[ImageCandidate]:
     limiter.wait("theaudiodb")
     r = http_get(session, f"{THEAUDIODB_API}/{THEAUDIODB_PUBLIC_KEY}/searchalbum.php?s={quote_plus(artist)}&a={quote_plus(album)}"); r.raise_for_status()
     albums = r.json().get("album") or []
     if not albums: return None
-    best = max(albums, key=lambda a: similarity(album, a.get("strAlbum", "")) + similarity(artist, a.get("strArtist", "")))
+    best = max(albums, key=lambda a: album_match(artist, album, a.get("strArtist", ""), a.get("strAlbum", "")))
     url = best.get("strAlbumThumb") or ""
-    return ImageCandidate("TheAudioDB", best.get("strArtist") or artist, best.get("strAlbum") or album, image_url=url, mbid=best.get("strMusicBrainzID") or "") if url else None
+    ra, rl = best.get("strArtist") or artist, best.get("strAlbum") or album
+    return ImageCandidate("TheAudioDB", ra, rl, image_url=url, mbid=best.get("strMusicBrainzID") or "", match=album_match(artist, album, ra, rl)) if url else None
 
 # ---------------------------------------------------------------------
 # Scanning and processing
@@ -828,7 +880,7 @@ def try_candidates(candidates: list[ImageCandidate], output_path: Path, args: ar
     validated.sort(key=lambda x: x[0], reverse=True)
     score, c, img, reason = validated[0]
     try:
-        save_square_jpeg(img, output_path, args.max_size)
+        save_square_jpeg(img, output_path, args.max_size, args.manifest)
         print(f"  selected: {c.source} ({reason})")
         print(f"  saved: {output_path} ({c.source})")
         return True,c.source,""
@@ -864,9 +916,9 @@ def cap_provider_candidates(label: str, candidates: list[ImageCandidate], args: 
 def artist_candidates(name: str, creds: Credentials, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter, mbid: str="", local_albums: Optional[list[str]]=None) -> list[ImageCandidate]:
     out=[]
     calls=[
-        ("last.fm", lambda: lookup_lastfm_artist_candidates(name,creds,session,limiter)),
+        ("last.fm", lambda: lookup_lastfm_artist_candidates(name,creds,session,limiter,args.auto_accept_artist)),
         ("fanart.tv", lambda: lookup_fanart_artist_candidates(name,mbid,creds,args,session,limiter)),
-        ("TheAudioDB", lambda: [] if args.no_theaudiodb else lookup_theaudiodb_artist_candidates(name,session,limiter)),
+        ("TheAudioDB", lambda: [] if args.no_theaudiodb else lookup_theaudiodb_artist_candidates(name,session,limiter,args.auto_accept_artist)),
         ("deezer", lambda: [] if args.no_deezer else lookup_deezer_artist_candidates(name,local_albums or [],session,limiter)),
     ]
     for label,fn in calls:
@@ -883,21 +935,58 @@ def artist_candidates(name: str, creds: Credentials, args: argparse.Namespace, s
     return out
 
 def album_candidates(artist: str, album: str, creds: Credentials, args: argparse.Namespace, session: requests.Session, limiter: RateLimiter, mbid: str="") -> list[ImageCandidate]:
-    out=[]
-    calls=[("last.fm", lambda: lookup_lastfm_album(artist,album,creds,session,limiter)), ("Cover Art Archive", lambda: lookup_cover_art_archive(artist,album,mbid,args,session,limiter)), ("TheAudioDB", lambda: None if args.no_theaudiodb else lookup_theaudiodb_album(artist,album,session,limiter))]
+    """Every source's album, kept only when its names agree with the
+    library's to --auto-accept. The best one that falls short is listed as
+    unsure, for the owner to check, when nothing passes."""
+    out=[]; near: Optional[ImageCandidate] = None
+    calls=[("last.fm", lambda: lookup_lastfm_album(artist,album,creds,session,limiter)),
+           ("Cover Art Archive", lambda: lookup_cover_art_archive(artist,album,mbid,args,session,limiter)),
+           ("deezer", lambda: None if args.no_deezer else lookup_deezer_album(artist,album,session,limiter)),
+           ("apple", lambda: None if args.no_apple else lookup_apple_album(artist,album,session,limiter)),
+           ("TheAudioDB", lambda: None if args.no_theaudiodb else lookup_theaudiodb_album(artist,album,session,limiter)),
+           ("discogs", lambda: lookup_discogs_album(artist,album,creds,args,session,limiter))]
     for label,fn in calls:
         try:
             c=fn()
-            if c: out.append(c); print(f"  candidate: {c.source} -> {c.artist} / {c.album}")
-            else: print(f"  candidate: {label} returned no usable album image")
+            if not c: print(f"  candidate: {label} returned no usable album image"); continue
+            if c.match < args.auto_accept:
+                print(f"  candidate: {c.source} -> {c.artist} / {c.album}, match {c.match:.0%}: too far off, not used")
+                if near is None or c.match > near.match: near = c
+                continue
+            out.append(c); print(f"  candidate: {c.source} -> {c.artist} / {c.album} (match {c.match:.0%})")
+            # A matched album's MusicBrainz id lets Cover Art Archive skip its search
+            if c.mbid: mbid=c.mbid
         except Exception as exc: print(f"  candidate: {label} error: {exc}")
-        if out and out[-1].mbid: mbid=out[-1].mbid
+    if not out and near is not None and near.match >= args.min_match:
+        UNSURE.append(f"{artist} / {album}: nearest is {near.source}'s '{near.artist} / {near.album}' ({near.match:.0%}) {near.image_url}")
     return out
+
+def is_spoken_folder(folder: Path, max_files: int) -> bool:
+    """Whether the tracks sampled from 'folder' are all books or podcasts,
+    by genre as the player decides. Those are the spoken kinds'."""
+    kinds = set()
+    for i, f in enumerate(iter_audio_files(folder), 1):
+        kinds.add(read_tags(f).kind)
+        if i >= max_files: break
+    return bool(kinds) and MUSIC not in kinds
+
+def art_in_the_way(output: Path, args: argparse.Namespace) -> Optional[str]:
+    """Why an existing image stops this one being written, or None. The
+    tool's own images are refreshed with --overwrite; anything else is the
+    owner's, and replaced only with --overwrite-all."""
+    if not output.exists():
+        return None
+    if args.manifest.owns(output):
+        return None if args.overwrite or args.overwrite_all else f"artwork already exists: {output.name} (--overwrite fetches it again)"
+    return None if args.overwrite_all else f"your artwork: {output.name} (art_fetch did not write it, so it is left alone)"
 
 def process_artist_folder(folder: Path, args: argparse.Namespace, creds: Credentials, session: requests.Session, limiter: RateLimiter, cache: dict[str,Any]) -> tuple[bool,str]:
     print(f"\n[{folder.name}]")
     output=folder/args.output_name
-    if output.exists() and not args.overwrite: print(f"  skip: artwork already exists: {output.name}"); return False,"exists"
+    why=art_in_the_way(output,args)
+    if why: print(f"  skip: {why}"); return False,"exists"
+    if is_spoken_folder(folder,args.max_files_per_artist):
+        print("  skip: audiobooks or podcasts, which the audiobooks and podcasts kinds cover"); return False,"spoken"
     ok,name,reason=verify_artist_folder(folder,args)
     if not ok:
         print(f"  folder check: no confident tag match ({reason})")
@@ -936,7 +1025,10 @@ def process_artist_folder(folder: Path, args: argparse.Namespace, creds: Credent
 def process_album_folder(folder: Path, args: argparse.Namespace, creds: Credentials, session: requests.Session, limiter: RateLimiter, cache: dict[str,Any]) -> tuple[bool,str]:
     print(f"\n[{folder.parent.name} / {folder.name}]")
     output=folder/args.output_name
-    if output.exists() and not args.overwrite: print(f"  skip: artwork already exists: {output.name}"); return False,"exists"
+    why=art_in_the_way(output,args)
+    if why: print(f"  skip: {why}"); return False,"exists"
+    if is_spoken_folder(folder,args.max_files_per_album):
+        print("  skip: an audiobook or podcast, which the audiobooks and podcasts kinds cover"); return False,"spoken"
     ok,artist,album,reason=verify_album_folder(folder,args)
     if not ok:
         print(f"  folder check: no confident tag match ({reason})")
@@ -946,8 +1038,9 @@ def process_album_folder(folder: Path, args: argparse.Namespace, creds: Credenti
         artist,album=override
     else: print(f"  folder check: OK, {reason}")
     if args.dry_run: print(f"  dry-run: would try embedded artwork first, then online lookup for '{artist} / {album}'"); return False,"dry-run"
-    candidates=[]; embedded=find_embedded_album_art(folder,args.max_files_per_album)
+    candidates=[]; embedded=None if args.ignore_embedded else find_embedded_album_art(folder,args.max_files_per_album)
     if embedded: embedded.artist=artist; embedded.album=album; candidates.append(embedded); print("  candidate: embedded artwork found in audio file")
+    elif args.ignore_embedded: print("  candidate: embedded artwork ignored (--ignore-embedded)")
     else: print("  candidate: no embedded artwork found in checked audio files")
     key=cache_key(artist,album); entry=cache.get("albums",{}).get(key,{})
     if not candidates:
@@ -1005,13 +1098,9 @@ def run_album(root: Path, args: argparse.Namespace, creds: Credentials, session:
     return 0
 
 def run_both_single_pass(root: Path, args: argparse.Namespace, creds: Credentials, session: requests.Session, limiter: RateLimiter) -> int:
-    """Process artist and album artwork in a single top-level library traversal.
-
-    The earlier clean single-parser build called run_album() and then run_artist(), which
-    caused two independent passes over the library. This function walks each artist folder
-    once, processes the artist and then its album folders while that branch is already in
-    hand, and writes both caches at the end.
-    """
+    """Artist and album artwork in one walk of the library: each artist
+    folder, then its album folders while that branch is in hand. Both caches
+    are written at the end."""
     artist_cache_path = root / ARTIST_CACHE_FILENAME
     album_cache_path = root / ALBUM_CACHE_FILENAME
     artist_cache = load_cache(artist_cache_path, "artists")
@@ -1091,14 +1180,19 @@ def run_both_single_pass(root: Path, args: argparse.Namespace, creds: Credential
 # Single parser
 # ---------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
-    p=argparse.ArgumentParser(description="Single-file Rockbox artwork fetcher with one parser for artist and album artwork.")
-    p.add_argument("mode", nargs="?", choices=("artist","album","both"), default="both", help="What to process. Default: both")
-    p.add_argument("music_root", nargs="?", help="Root folder containing <artist>/<album>/<music files>")
+    p=argparse.ArgumentParser(usage="%(prog)s [KIND ...] ROOT [options]", description="Covers and pictures for artists, albums, audiobooks, podcasts and ebooks.")
+    p.add_argument("what", nargs="*", metavar="[KIND ...] ROOT", help="Any of artists, albums, audiobooks, podcasts, ebooks (default all), then the folder holding <artist>/<album>/<music files>. Audiobooks, podcasts and ebooks are found anywhere on the iPod")
+    p.add_argument("--artwork-root", default=None, help="Audiobooks, podcasts, ebooks: the Artwork folder to write into, when not a mounted iPod's")
+    p.add_argument("--no-authors", action="store_true", help="Audiobooks, ebooks: no pictures of authors")
+    p.add_argument("--no-audnexus", action="store_true", help="Audiobooks: do not ask Audnexus for Audible covers")
+    p.add_argument("--google-books-key", default=None, help="Ebooks, audiobooks: a Google Books API key, to use it as a last source; remembered")
+    p.add_argument("--openlibrary-rate-limit", type=float, default=1.0, help="Sets the rate limit for api calls")
     p.add_argument("--install-credentials", action="store_true", help="Install/update Last.fm and fanart.tv credentials, then exit")
     p.add_argument("--prompt-credentials", action="store_true", help="Prompt interactively for credentials")
     p.add_argument("--lastfm-api-key", default=None, help="Last.fm API key to install")
     p.add_argument("--lastfm-api-secret", default=None, help="Last.fm shared secret to install")
     p.add_argument("--fanart-api-key", default=None, help="fanart.tv API key to install")
+    p.add_argument("--discogs-token", default=None, help="Discogs personal access token to install")
     p.add_argument("--show-credentials-status", action="store_true", help="Show source/credential status, then exit")
     p.add_argument("--output-name", default="folder.jpg", choices=("folder.jpg","cover.jpg"), help="Image filename to create")
     p.add_argument("--max-size", type=int, default=300, help="Final square output size in pixels")
@@ -1107,12 +1201,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-files-per-artist", type=int, default=25, help="Files to inspect per artist folder")
     p.add_argument("--max-files-per-album", type=int, default=20, help="Files to inspect per album folder")
     p.add_argument("--interactive", action="store_true", help="Prompt for alternative search names")
-    p.add_argument("--overwrite", action="store_true", help="Replace existing artwork")
+    p.add_argument("--overwrite", action="store_true", help="Fetch again the artwork art_fetch wrote before")
+    p.add_argument("--overwrite-all", action="store_true", help="Replace any existing artist or album artwork, yours included; your own covers in Artwork are kept")
+    p.add_argument("--auto-accept", type=float, default=0.85, help="How closely an online album's names must match yours to be used (0-1)")
+    p.add_argument("--auto-accept-artist", type=float, default=0.90, help="How closely an online artist's name must match yours to be used (0-1)")
+    p.add_argument("--min-match", type=float, default=0.45, help="Albums matching at least this, but under --auto-accept, are listed as unsure")
+    p.add_argument("--ignore-embedded", action="store_true", help="Do not use art embedded in the files; fetch a cover online instead, for books and shows whose files carry one too")
+    p.add_argument("--no-apple", action="store_true", help="Disable Apple album covers")
+    p.add_argument("--apple-rate-limit", type=float, default=3.0, help="Sets the rate limit for api calls")
+    p.add_argument("--discogs-rate-limit", type=float, default=1.1, help="Sets the rate limit for api calls")
+    p.add_argument("--contact", default=None, help="Your email, put in requests so the services can reach you; remembered")
+    p.add_argument("--update-player-cache", action="store_true", help="On a mounted iPod, run its artcache_pb.exe afterwards so the new art shows at once (Windows)")
     p.add_argument("--dry-run", action="store_true", help="Show what would happen without writing images")
     p.add_argument("--retry-not-found", action="store_true", help="Retry cached not-found items")
     p.add_argument("--ignore-cache", action="store_true", help="Ignore cached decisions")
     p.add_argument("--no-theaudiodb", action="store_true", help="Disable TheAudioDB fallback")
-    p.add_argument("--no-deezer", action="store_true", help="Disable Deezer artist pictures")
+    p.add_argument("--no-deezer", action="store_true", help="Disable Deezer artist pictures and album covers")
     p.add_argument("--deezer-rate-limit", type=float, default=0.3, help="Sets the rate limit for api calls")
     p.add_argument("--max-candidates-per-provider", type=int, default=3, help="Maximum artist candidate images retained from each provider before download/scoring; 0 = unlimited")
     p.add_argument("--lastfm-rate-limit", type=float, default=1.0, help="Sets the rate limit for api calls")
@@ -1121,19 +1225,61 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--coverartarchive-rate-limit", type=float, default=1.0, help="Sets the rate limit for api calls")
     p.add_argument("--theaudiodb-rate-limit", type=float, default=2.5, help="Sets the rate limit for api calls")
     p.add_argument("--image-rate-limit", type=float, default=0.2, help="Sets the rate limit for api calls")
-    p.add_argument("--musicbrainz-user-agent", default="RockboxMusicArt/3.2 (local library artwork tool)", help="Specifies the user agent for requests")
+    p.add_argument("--musicbrainz-user-agent", default=None, help="Specifies the user agent for MusicBrainz requests")
     return p
 
+def update_player_cache(root: Path, dry_run: bool) -> None:
+    """Runs the player's own art cache pass from the computer, so the new
+    images are in the cache before the iPod is ejected."""
+    player = player_root_of(root)
+    tool = player / ".rockbox" / "tools" / "artcache_pb.exe" if player else None
+    if tool is None or not tool.is_file():
+        print("\nUpdate player cache: no .rockbox/tools/artcache_pb.exe here; run Update Art Cache on the iPod instead")
+        return
+    if os.name != "nt":
+        print("\nUpdate player cache: artcache_pb.exe runs on Windows only; run Update Art Cache on the iPod instead")
+        return
+    if dry_run:
+        print(f"\nUpdate player cache: would run {tool}"); return
+    print(f"\nUpdating the player's art cache: {tool} {player}")
+    subprocess.run([str(tool), str(player)], check=False)
+
+KINDS = ("artists", "albums", "audiobooks", "podcasts", "ebooks")
+
+def split_what(what: list[str]) -> tuple[list[str], Optional[str], list[str]]:
+    """The kinds named, the root, and any word that is neither."""
+    kinds=[]; roots=[]
+    for word in what:
+        k=word.casefold()
+        k=k if k in KINDS else k+"s" if k+"s" in KINDS else ""
+        if k: kinds.append(k)
+        else: roots.append(word)
+    return [k for k in KINDS if k in kinds], roots[-1] if roots else None, roots[:-1]
+
 def main(argv: Optional[list[str]]=None) -> int:
-    args=build_parser().parse_args(argv)
+    parser=build_parser(); args=parser.parse_args(argv)
+    kinds,args.music_root,extra=split_what(args.what)
+    if extra: parser.error(f"not a kind: {', '.join(extra)} (kinds are {', '.join(KINDS)})")
+    named=bool(kinds); kinds=kinds or list(KINDS)
+    args.mode=" ".join(kinds)
     if args.install_credentials:
-        if not any([args.lastfm_api_key,args.lastfm_api_secret,args.fanart_api_key,args.prompt_credentials]): args.prompt_credentials=True
+        if not any([args.lastfm_api_key,args.lastfm_api_secret,args.fanart_api_key,args.discogs_token,args.prompt_credentials]): args.prompt_credentials=True
         return install_credentials(args)
     creds=load_credentials()
+    config=load_config()
+    contact=contact_from(args.contact, config)
+    if args.google_books_key:
+        if config.get("google_books_key") != args.google_books_key:
+            config["google_books_key"]=args.google_books_key; save_config(config)
+    else:
+        args.google_books_key=str(config.get("google_books_key") or "")
+    args.user_agent=user_agent("art_fetch", SCRIPT_VERSION, contact)
+    if not args.musicbrainz_user_agent: args.musicbrainz_user_agent=args.user_agent
     if args.show_credentials_status:
         print(f"Script version  : {SCRIPT_VERSION}"); print(f"Credential file : {get_config_path()}")
-        print(f"Last.fm enabled : {creds.has_lastfm}"); print(f"fanart.tv enabled: {creds.has_fanart}")
-        print("MusicBrainz API : no key used"); print(f"TheAudioDB enabled: {not args.no_theaudiodb}"); print(f"Deezer enabled  : {not args.no_deezer}")
+        print(f"Last.fm enabled : {creds.has_lastfm}"); print(f"fanart.tv enabled: {creds.has_fanart}"); print(f"Discogs enabled : {creds.has_discogs}")
+        print("MusicBrainz API : no key used"); print(f"TheAudioDB enabled: {not args.no_theaudiodb}"); print(f"Deezer enabled  : {not args.no_deezer}"); print(f"Apple enabled   : {not args.no_apple}")
+        print(f"Contact         : {contact or 'none (--contact you@example.com)'}")
         return 0
     if not ensure_dependencies(): return 2
     if not args.music_root:
@@ -1143,13 +1289,28 @@ def main(argv: Optional[list[str]]=None) -> int:
     print(f"Script version  : {SCRIPT_VERSION}"); print("JPEG output     : baseline/non-progressive"); print(f"Mode            : {args.mode}")
     print(f"Music root      : {root}"); print(f"Output name     : {args.output_name}"); print(f"Output size     : {args.max_size}x{args.max_size}")
     print(f"Min source size : {args.min_source_size}x{args.min_source_size}"); print(f"Dry run         : {args.dry_run}")
-    session=requests.Session(); limiter=RateLimiter(args); rc=0
-    if args.mode == "both":
-        rc = run_both_single_pass(root,args,creds,session,limiter)
-    elif args.mode == "album":
-        rc = run_album(root,args,creds,session,limiter)
-    elif args.mode == "artist":
-        rc = run_artist(root,args,creds,session,limiter)
+    session=requests.Session(); limiter=make_limiter(args); rc=0
+    args.manifest=Manifest(root)
+    args.spoken_kinds={k[:-1] for k in kinds if k in ("audiobooks","podcasts","ebooks")}
+    try:
+        if "artists" in kinds and "albums" in kinds:
+            rc = run_both_single_pass(root,args,creds,session,limiter)
+        elif "albums" in kinds:
+            rc = run_album(root,args,creds,session,limiter)
+        elif "artists" in kinds:
+            rc = run_artist(root,args,creds,session,limiter)
+        if args.spoken_kinds:
+            if not named and art_books.artwork_root(root,args) is None:
+                print("\nAudiobooks, podcasts and ebooks: skipped, as this is not a mounted iPod (--artwork-root names the Artwork folder)")
+            else:
+                rc = art_books.run_books(root,args,session,limiter,sys.modules[__name__]) or rc
+    finally:
+        if not args.dry_run: args.manifest.save()
+    if UNSURE:
+        print(f"\nUnsure: {len(UNSURE)} album(s) where the nearest online match was not close enough to use.")
+        print("Check them, then lower --auto-accept or rename the folder or tags:")
+        for line in UNSURE: print(f"  {line}")
+    if args.update_player_cache: update_player_cache(root, args.dry_run)
     return rc
 
 if __name__ == "__main__":

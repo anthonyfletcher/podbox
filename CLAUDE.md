@@ -566,7 +566,16 @@ in this order:
   instead
 - `tools/convfnt` — this fork's 4bpp icon-font tool. Theme icon fonts are 4bpp
   and `convbdf`/BDF cannot round-trip them, so use this instead
-- `tools/art_fetch/art_fetch.py` — fetches album and artist artwork
+- `tools/fetch/` — desktop tools that fill a library from the web:
+  `art_fetch.py` (artwork for artists and albums, and through
+  `art_books.py` for audiobooks, podcasts and ebooks), `lyric_fetch.py`
+  (LRCLIB lyrics), `notes_fetch.py` (notes pages from MusicBrainz and
+  Wikipedia), on `fetchlib.py`, whose name keys, spoken-word genres and
+  ebook extensions copy `art_name.c`, `db_spoken.c` and `book_index.c`:
+  change those and change it. `podbox_fetch.py` runs the three as
+  subcommands and is the one executable that ships. Built for
+  Windows and macOS by `.github/workflows/fetch-tools.yml` as the `Tools`
+  release, which `release.sh` starts
 - `tools/check-settings-docs.sh` — whether `settings-help.txt` and
   `settings-guide.md` still describe the settings that exist. See **Adding,
   Removing or Renaming a Setting** above
@@ -657,7 +666,10 @@ releases -- so a failed build leaves the previous ones standing. Four releases
 go out: `Themes`, `Simulator`, `Bootloader` and then `latest`. `Bootloader` is
 `build-bootloader.sh`'s zip: both bootloaders, `ipodpatcher.exe` and
 `mks5lboot.exe` built from `utils/`, and the scripts and README in
-`tools/bootloader-installer/`. **`latest` is the only release
+`tools/bootloader-installer/`. Then it starts
+`.github/workflows/fetch-tools.yml` on the new `latest` tag, which builds the
+fetch tools on Windows and macOS runners and replaces `Tools` itself
+(`--no-tools` skips it). **`latest` is the only release
 marked Latest** -- the other three pass `--latest=false` -- and GitHub features
 that one on the repository's front page.
 Release notes list every commit since the last release, using the `latest` tag

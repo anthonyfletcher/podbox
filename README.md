@@ -257,6 +257,7 @@ GIF, WebP and BMP pictures.
   biographies you write, and links between them to follow and play from
   - Turn on `Settings > Library > Music > Liner Notes and Biographies > Enabled`
   - Write pages as Markdown files in `/Notes`, then hold `Select` on the Now Playing screen
+  - Or fetch them from Wikipedia and MusicBrainz with [`podbox_fetch notes`](tools/fetch/notes_fetch.md)
   - See [`notes-guide.md`](docs/podbox/notes-guide.md) for more
 - Choose how documents look: font, text size, margin, line spacing, justification, paragraph
   indent and colours
@@ -667,7 +668,8 @@ differently still finds its art: see the [Artwork guide](docs/podbox/artwork-gui
 
 To fill your library with album and artist art, try
 [rockbox-library-manager](https://github.com/cyberdeliaAI/rockbox-library-manager), or the
-command-line [art_fetch](tools/art_fetch/README.md).
+command-line [`podbox_fetch art`](tools/fetch/art_fetch.md), from the
+[Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools) for Windows and macOS.
 
 ## Lyrics
 
@@ -676,6 +678,10 @@ Lyrics are found when they are:
 - embedded in your audio files, or stored beside the track with the same name and a different
   extension, e.g. `Artist/Album/01 Track.lrc`
 - in a `.lrc`, `.lrc8` or `.snc` file
+
+To fetch them for your library, run [`podbox_fetch lyrics`](tools/fetch/lyric_fetch.md) from the
+[Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools) against your mounted
+iPod. It saves timed lyrics from LRCLIB beside each track it finds them for.
 
 # First run
 
