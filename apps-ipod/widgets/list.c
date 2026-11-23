@@ -1103,7 +1103,13 @@ bool list_do_action(int context, int timeout,
     skin_inhibit_flush(true);
     *action = get_action(context, timeout);
     skin_inhibit_flush(false);
-    return gui_synclist_do_button(lists, action);
+    bool ret = gui_synclist_do_button(lists, action);
+    /* The skin redrawn at the top of get_action() waits for the list's own
+     * flush, and an idle timeout draws no list: flush it here, or a header
+     * change with no key behind it (Hold, battery) never reaches the LCD. */
+    if (*action == ACTION_NONE)
+        skin_flush_dirty();
+    return ret;
 }
 
 /* Simple use list implementation */
