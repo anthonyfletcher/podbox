@@ -5974,6 +5974,7 @@ static bool insert_all_playlist(struct browser_context *c,
     bool *rand_bool_array = NULL;
     char buf[MAX_PATH];
     struct playlist_insert_context context;
+    bool count_down = browser_db_counts_down(c);
 
     cpu_boost(true);
 
@@ -6092,7 +6093,9 @@ static bool insert_all_playlist(struct browser_context *c,
             }
         }
 
-        struct tagentry *entry = browser_db_get_entry(c, i);
+        /* A show listed newest first still plays oldest first */
+        struct tagentry *entry = browser_db_get_entry(c,
+                                     count_down ? n - 1 - i : i);
 
         /* NULL when the entry had to be read and the search was refused,
          * as it is once a database commit has started */
@@ -6967,6 +6970,9 @@ static int browser_db_play_folder(struct browser_context* c)
     int start_index = c->selected_item - c->special_entry_count;
     if (start_index < 0)
         start_index = 0;
+    /* insert_all_playlist() turns a newest-first show round */
+    else if (browser_db_counts_down(c))
+        start_index = c->filesindir - c->special_entry_count - 1 - start_index;
     long album_seek, artist_seek;
     /* A book plays in order whatever Shuffle says */
     bool book = browser_db_is_spoken_list(c)
