@@ -22,3 +22,8 @@ album_header: on
 # all the list's rows.
 # Possible Values: on, off
 episode_notes: on
+#
+#-- Battery number --#
+# The charge left as a number beside the battery, in the title bar.
+# Possible Values: off, on
+battery_number: off

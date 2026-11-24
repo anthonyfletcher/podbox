@@ -95,3 +95,12 @@ type    = choice
 choice  = on  | On
 choice  = off | Off
 default = on
+
+[battery_number]
+name    = Battery Number
+help    = The charge left as a number beside the battery, in the title bar.
+help    = On, the title between them is narrower to make room.
+type    = choice
+choice  = off | Off
+choice  = on  | On
+default = off

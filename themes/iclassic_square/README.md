@@ -62,6 +62,7 @@ All three versions have these:
 | `menu_cover` | `full`, `framed` | `full` | The cover beside the menus. `full` fills the right half of the screen, as the iPod does; `framed` shows it smaller, with the song playing under it. |
 | `album_header` | `on`, `off` | `on` | The cover, name and counts above an album's tracks, a book's chapters and a podcast's episodes. `off` gives the list all its rows. |
 | `episode_notes` | `on`, `off` | `on` | The selected podcast episode's notes in a box below its list. `off` gives the list all its rows. |
+| `battery_number` | `off`, `on` | `off` | The charge left as a number beside the battery, in the title bar. `on` narrows the title between them to make room. |
 
 Dark and Light also choose which parts take the album's colour. `yes` gives a
 part the album's colour and `no` keeps it white in Dark, black in Light.

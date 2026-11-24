@@ -26,6 +26,7 @@
 %Fl(4,16-noto-sans-bold.fnt)
 %Fl(5,16-noto-sans.fnt)
 %Fl(6,19-iclassic-icons.fnt)
+%Fl(7,14-noto-sans.fnt)
 #
 #Battery: a frame per charge level, and the same while charging
 %xl(battery,battery.bmp,0,4,8)
@@ -60,7 +61,7 @@
 #
 #- Screen switches. 1x1 because a flip clears its line
 %V(319,239,1,1,-)
-%?if(%cs,=,22)<|%Vd(Chrome)>
+%?if(%cs,=,22)<|%Vd(Chrome)%?if(%ft(themes/iclassic_square_light.preferences,battery_number:),=,on)<%Vd(ChromeN)|%Vd(ChromeW)>>
 %?if(%cs,=,10)<%Vd(QuickBg)%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
 %?if(%cs,=,22)<|%?Ld<|%?and(%LH,%if(%ft(themes/iclassic_square_light.preferences,album_header:),!=,off))<%Vd(AlbumHead)|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%?if(%ft(themes/iclassic_square_light.preferences,menu_cover:),=,framed)<%Vd(Pane)|%Vd(Bleed)>|>>>>
 %?and(%LD,%if(%ft(themes/iclassic_square_light.preferences,episode_notes:),!=,off))<%Vd(Notes)>
@@ -98,13 +99,22 @@
 %Vl(Chrome,4,0,48,19,6)%Vf(!000000)
 %?if(%ft(themes/iclassic_square_light.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid<50:186dbd)|>%?mh<À|%?mp<|A|B|G|F>>
 #
-#- Title, centred between the two
-%Vl(Chrome,56,1,208,17,4)%Vf(!000000)
+#- Title, centred between the two. ChromeW without the battery's number,
+#  ChromeN with it, narrower by its width on each side
+%Vl(ChromeW,56,1,208,17,4)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_text:),=,yes)<%Vf(vivid<50:186dbd)|>%ac%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%?and(%LH,%if(%ft(themes/iclassic_square_light.preferences,album_header:),!=,off))<%sel(%LH,book,%Sx(Audiobooks),show,%Sx(Podcasts),%Sx(Album))|%s%Lt>>>
+%Vl(ChromeN,84,1,152,17,4)%Vf(!000000)
 %?if(%ft(themes/iclassic_square_light.preferences,vivid_title_text:),=,yes)<%Vf(vivid<50:186dbd)|>%ac%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%?and(%LH,%if(%ft(themes/iclassic_square_light.preferences,album_header:),!=,off))<%sel(%LH,book,%Sx(Audiobooks),show,%Sx(Podcasts),%Sx(Album))|%s%Lt>>>
 #
-#- Busy spinner, beside the battery
-%Vl(Chrome,264,0,26,19,6)%Vf(!000000)
+#- Busy spinner, beside the battery or its number
+%Vl(ChromeW,264,0,26,19,6)%Vf(!000000)
 %ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(ChromeN,238,0,18,19,6)%Vf(!000000)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+#
+#- The battery's number, "100%" wide, against the battery
+%Vl(ChromeN,256,3,34,15,7)%Vf(!000000)
+%ar%bl%%
 #
 #- Battery
 %Vl(Chrome,292,0,26,19,-)
