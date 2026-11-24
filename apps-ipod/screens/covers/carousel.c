@@ -518,7 +518,8 @@ static const int pf_random_spin[] = { 6, 12, 24 };
 static int pf_random_recent[PF_RANDOM_HISTORY];
 static int pf_random_count;
 static const struct carousel_model *pf_random_model;
-/* A random spin under way: each cover it passes clicks, as the wheel would.
+/* A spin under way, a random pick's or a jump's: each cover it passes
+ * clicks, as the wheel would.
  * Any other move of the carousel ends it. */
 static bool pf_random_spinning;
 
@@ -3146,6 +3147,8 @@ static void show_next_slide(void)
     }
 }
 
+static void spin_to(int pick);
+
 static bool random_was_recent(int index, int depth)
 {
     for (int i = 0; i < depth; i++)
@@ -3159,7 +3162,7 @@ static bool random_was_recent(int index, int depth)
 static void show_random_slide(void)
 {
     int n = number_of_slides;
-    int depth, pick, from, spin, i;
+    int depth, pick, i;
 
     if (n < 2)
         return;
@@ -3183,10 +3186,18 @@ static void show_random_slide(void)
     if (pf_random_count < PF_RANDOM_HISTORY)
         pf_random_count++;
 
-    spin = pf_random_spin[global_settings.album_covers_random_spin
-                          % ARRAYLEN(pf_random_spin)];
-    from = (pick > center_index) ? MAX(center_index, pick - spin)
-                                 : MIN(center_index, pick + spin);
+    spin_to(pick);
+}
+
+/* Spin to slide 'pick', as a random pick or a jump does: a cut to a few
+ * covers short of it, by Random Spin Length, and a fast scroll the rest. */
+static void spin_to(int pick)
+{
+    int spin = pf_random_spin[global_settings.album_covers_random_spin
+                              % ARRAYLEN(pf_random_spin)];
+    int from = (pick > center_index) ? MAX(center_index, pick - spin)
+                                     : MIN(center_index, pick + spin);
+
     if (from != center_index)
         set_current_slide(from);
     target = pick;
@@ -4698,23 +4709,16 @@ static int album_covers_loop(void)
             show_random_slide();
             break;
         case PF_JMP:
-        {
-            int new_idx = model->jump_next();
-            if (new_idx != center_index)
-            {
-                pf_state = pf_idle;
-                set_current_slide(new_idx);
-            }
-            break;
-        }
         case PF_JMP_PREV:
         {
-            int new_idx = model->jump_prev();
+            int new_idx;
+
+            /* A held jump counts on from where the last one lands */
+            return_to_idle_state();
+            new_idx = button == PF_JMP ? model->jump_next()
+                                       : model->jump_prev();
             if (new_idx != center_index)
-            {
-                pf_state = pf_idle;
-                set_current_slide(new_idx);
-            }
+                spin_to(new_idx);
             break;
         }
         case ACTION_STD_CONTEXT:

@@ -989,8 +989,9 @@ size, in two piles either side of the current one.
 How far a flick of the wheel carries. Affects both view modes.
 
 [album covers random spin]
-How many covers go past when holding Play picks an album at random. Long makes
-more of a show of it and takes a little longer to land.
+How many covers go past when holding Play picks an album at random, or Left
+and Right jump to the next letter or year. Long makes more of a show of it and
+takes a little longer to land.
 
 [album covers transition speed]
 How quickly the 3D view settles after scrolling. No effect in Flat, which times

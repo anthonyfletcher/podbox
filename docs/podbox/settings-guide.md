@@ -304,7 +304,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | No |  |
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | Show tracks |  |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175% |  |
-| Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | Medium |  |
+| Random Spin Length | How many covers go past when holding Play picks an album at random, or Left and Right jump to the next letter or year. Long makes more of a show of it and takes a little longer to land. | Medium |  |
 
 **Appearance** opens `Settings > Appearance > Carousel`, below.
 
