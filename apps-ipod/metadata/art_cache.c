@@ -48,7 +48,7 @@
 #include "art_banner.h"
 #include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "database/db_names.h"     /* split album artists */
-#include "database/db_featured.h"  /* DB_FEATURED_NAME_MAX */
+#include "database/db_featured.h"  /* the guests, and DB_FEATURED_NAME_MAX */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"   /* which albums are books */
@@ -1858,7 +1858,8 @@ static size_t aa_work_bytes(void)
  * whole library, one settles pictures, and one, only when needed, gives the
  * people whose named folder had no image their fallback -- which cannot be
  * tried before every named folder has been. Then one crawl of the track
- * artists' names settles those who are no album artist.
+ * artists' names settles those who are no album artist, and one of
+ * Featured Artists' guests those whom only a title or a shared tag credits.
  *
  * The first walk also notes which folders hold more than one book of a kind,
  * whose images are then no book's cover, so a book's own cover is settled on
@@ -2752,6 +2753,53 @@ static void aa_split_artists(const struct aa_people_ctx *c)
     }
 }
 
+/* Featured Artists' guests, whom a title or another artist's tag may be all
+ * that credits: their picture from /Artwork/People. Not counted, nor listed
+ * as missing, as a guest is not one of the library's artists. A table not
+ * there to read leaves the pass short, or the orphan sweep would take the
+ * pictures of guests it did not reach. */
+static void aa_guests(const struct aa_people_ctx *c)
+{
+    int since_yield = 0;
+
+    if (!aa_central_people() || !global_settings.featured_artists)
+        return;                         /* no picture to make */
+    if (!db_featured_active())
+    {
+        aa_unreached = true;
+        return;
+    }
+    for (int n = 0; !*c->aborted; n++)
+    {
+        /* Copied, as finding a person yields and the table can be rebuilt
+         * meanwhile; stopped once it no longer stands for this database */
+        char name[DB_FEATURED_NAME_MAX + 1];
+        unsigned int key;
+
+        if (++since_yield >= 16)
+        {
+            since_yield = 0;
+            yield();
+        }
+        if (aa_check_abort() || tagcache_is_busy())
+        {
+            *c->aborted = true;
+            break;
+        }
+        if (!db_featured_active())
+        {
+            aa_unreached = true;
+            break;
+        }
+        if (n >= db_featured_count())
+            break;
+        strmemccpy(name, db_featured_name(n), sizeof(name));
+        key = art_name_hash(name);
+        if (key && !aa_person_get(key, false))
+            aa_named_person(name, c);
+    }
+}
+
 /* Every person's picture, once the album walk and the books are done */
 static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
 {
@@ -2783,6 +2831,7 @@ static bool aa_people_pass(void *workbuf, size_t worksz, bool *aborted)
     aa_people_report();
     aa_track_artists(&c);
     aa_split_artists(&c);
+    aa_guests(&c);
     return !*aborted;
 }
 
@@ -2981,6 +3030,7 @@ static enum bg_result aa_run_pass(void)
     aa_reread_tags = art_cache_task.done_marks.entries < 0
                      && aa_scheme_began >= AA_SCHEME;
     aa_split = db_names_ensure();
+    db_featured_ensure();               /* the guests, for aa_guests() */
     wh = core_alloc(worksz);
     if (wh <= 0)
         return BG_INTERRUPTED; /* not enough free memory right now */

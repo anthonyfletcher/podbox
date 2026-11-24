@@ -80,18 +80,25 @@ int db_names_split(const char *s, struct db_featured_names *out);
  * short and still returns true; db_featured_ensure() rebuilds it after.
  *
  * This crawls three tag files, yielding as it goes. Call it where a screen
- * is entered, not from a redraw. */
+ * is entered, not from a redraw, or from the art cache's pass. While one of
+ * those builds, the other's call does nothing and returns false, and the
+ * readers below find the table empty. */
 bool db_featured_build(void);
 
 /* Build it if it has not been built, or if the database has changed since it
  * was. Everything that reads the table calls this first; after the first one
- * per boot it costs a pair of comparisons.
+ * per boot it costs a pair of comparisons. The same two callers.
  *
  * A play does not count as a change. tagcache's serial moves for every track
  * finished and its commitid only when the library itself does, and a credit
  * lives in a tag -- so watching the serial would rebuild the whole table
  * after every song. */
 void db_featured_ensure(void);
+
+/* Whether the table stands for the database as it is now: the setting on,
+ * built, and not being built. Any thread; one that yields while reading the
+ * table asks again after. Nothing here builds it. */
+bool db_featured_active(void);
 
 /* Guests in the table, and one guest's name and track count.
  * 0 <= n < db_featured_count(). */

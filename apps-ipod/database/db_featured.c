@@ -70,9 +70,13 @@ static int pair_ct;
 
 static int titles_scanned;
 static bool truncated;
+/* While a build fills the table, which yields: the UI thread and the art
+ * cache's pass both build it, and the other one is told it is empty */
+static bool building;
 
-/* The build runs on the UI thread and, from RAM, never blocks; this hands
- * the processor round every HZ/25 so playback and the screen keep up. */
+/* The build runs on the UI thread or in the art cache's pass and, from RAM,
+ * never blocks; this hands the processor round every HZ/25 so playback and
+ * the screen keep up. */
 static void timed_yield(void)
 {
     static long next;
@@ -459,11 +463,14 @@ static void discard(void)
 
 bool db_featured_build(void)
 {
+    if (building)
+        return false;           /* the other thread's, under way */
     discard();
 
     if (!global_settings.featured_artists || !tagcache_is_in_ram())
         return false;
 
+    building = true;
     cpu_boost(true);
 
     /* The user's names first: the set is capped, and the album artists
@@ -477,6 +484,7 @@ bool db_featured_build(void)
     resolve_artist_seeks();
 
     cpu_boost(false);
+    building = false;
 
     return true;
 }
@@ -490,6 +498,8 @@ void db_featured_ensure(void)
 {
     struct tagcache_marks now;
 
+    if (building)
+        return;                 /* the other thread's build, under way */
     if (!global_settings.featured_artists)
     {
         /* The setting can go off while the table is standing, and the rows
@@ -528,9 +538,21 @@ void db_featured_ensure(void)
     }
 }
 
+bool db_featured_active(void)
+{
+    struct tagcache_marks now;
+
+    if (!global_settings.featured_artists || !built || building
+        || !tagcache_is_in_ram())
+        return false;
+    tagcache_get_marks(&now);
+    return now.commitid == built_marks.commitid
+           && now.generation == built_marks.generation;
+}
+
 int db_featured_count(void)
 {
-    return guest_ct;
+    return building ? 0 : guest_ct;
 }
 
 const char *db_featured_name(int n)
@@ -568,14 +590,14 @@ static int collect(int g, uint32_t not_owner, int32_t *out, int max)
 
 int db_featured_track_ids(int n, int32_t *out, int max)
 {
-    return collect(n, 0, out, max);
+    return building ? 0 : collect(n, 0, out, max);
 }
 
 int db_featured_guest_tracks(const char *artist, int32_t *out, int max)
 {
     int len = (int)strlen(artist);
     uint32_t key = name_hash(artist, len);
-    int g = guest_find(artist, len, key);
+    int g = building ? -1 : guest_find(artist, len, key);
 
     return g < 0 ? 0 : collect(g, key, out, max);
 }
