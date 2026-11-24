@@ -13,7 +13,7 @@ folders, and for the audiobooks, podcasts and ebooks on an iPod. It can create:
 
 ## What the tool does
 
-For each artist or album folder, the script:
+For each artist or album folder, it:
 
 1. checks folder names against audio metadata
 2. collects artwork candidates from local and online sources
@@ -48,6 +48,9 @@ Name the kinds you want before the folder, or none for all five:
 .\fetch_pb art albums E:\Music             # album covers only
 .\fetch_pb art podcasts audiobooks E:\     # podcasts and audiobooks
 ```
+
+On a Mac, `./fetch_pb art /Volumes/IPOD/Music`. From source, `python art_fetch.py` takes
+the same options.
 
 Give the music folder: artists and albums are found in the folders below it. Audiobooks,
 podcasts and ebooks are found anywhere on the iPod, and their covers go in its `Artwork`
@@ -123,7 +126,7 @@ folder on your computer.
 ## Audiobooks, podcasts and ebooks
 
 ```bash
-python art_fetch.py audiobooks podcasts ebooks E:\
+.\fetch_pb art audiobooks podcasts ebooks E:\
 ```
 
 Point it at the mounted iPod, or a folder on it. It finds the audiobooks and podcasts by genre, and the EPUB,
@@ -164,12 +167,7 @@ its image's address, for you to check.
 
 Download it for Windows or macOS from the
 [Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools); the
-[README](README.md) says how to run it. To run the script itself instead, with Python 3.11 or
-later:
-
-```bash
-pip install -r requirements.txt
-```
+[README](README.md) says how to run it.
 
 ---
 
@@ -188,22 +186,22 @@ first time it runs.
 Install or update credentials interactively:
 
 ```bash
-python art_fetch.py --install-credentials --prompt-credentials
+.\fetch_pb art --install-credentials --prompt-credentials
 ```
 
 Install credentials non-interactively:
 
 ```bash
-python art_fetch.py --install-credentials --lastfm-api-key YOUR_KEY --fanart-api-key YOUR_KEY
+.\fetch_pb art --install-credentials --lastfm-api-key YOUR_KEY --fanart-api-key YOUR_KEY
 ```
 
 Check configured provider status:
 
 ```bash
-python art_fetch.py --show-credentials-status
+.\fetch_pb art --show-credentials-status
 ```
 
-Last.fm and fanart.tv require configured API keys. MusicBrainz, TheAudioDB and Deezer use public endpoints in this script.
+Last.fm and fanart.tv require configured API keys. MusicBrainz, TheAudioDB and Deezer need no key.
 
 ---
 
@@ -444,14 +442,14 @@ Retry previously cached not-found entries:
 A full retest normally uses both:
 
 ```bash
-python art_fetch.py "D:\Music" --overwrite --ignore-cache --retry-not-found
+.\fetch_pb art "D:\Music" --overwrite --ignore-cache --retry-not-found
 ```
 
 ---
 
 ## Folder verification
 
-The script does not blindly trust folder names. It reads a sample of audio files and compares folder names against metadata.
+It does not blindly trust folder names. It reads a sample of audio files and compares folder names against metadata.
 
 Artist folders are checked against:
 
@@ -469,7 +467,7 @@ Default threshold:
 --match-threshold 0.78
 ```
 
-If matching fails and `--interactive` is enabled, the script can prompt for an alternative search term.
+If matching fails and `--interactive` is enabled, it can prompt for an alternative search term.
 
 Lower threshold example:
 
@@ -487,7 +485,7 @@ Higher threshold example:
 
 ## Artists and albums in one pass
 
-Fetching both artists and albums, the script walks the library once.
+Fetching both artists and albums, it walks the library once.
 
 For each artist branch it:
 
@@ -620,67 +618,67 @@ blocking them. It is remembered, and shared with `lyrics` and `notes`.
 Everything:
 
 ```bash
-python art_fetch.py "D:\Music"
+.\fetch_pb art "D:\Music"
 ```
 
 Interactive run:
 
 ```bash
-python art_fetch.py "D:\Music" --interactive
+.\fetch_pb art "D:\Music" --interactive
 ```
 
 Artist artwork only:
 
 ```bash
-python art_fetch.py artists "D:\Music"
+.\fetch_pb art artists "D:\Music"
 ```
 
 Album artwork only:
 
 ```bash
-python art_fetch.py albums "D:\Music"
+.\fetch_pb art albums "D:\Music"
 ```
 
 Overwrite existing generated files:
 
 ```bash
-python art_fetch.py "D:\Music" --overwrite
+.\fetch_pb art "D:\Music" --overwrite
 ```
 
 Dry run:
 
 ```bash
-python art_fetch.py "D:\Music" --dry-run
+.\fetch_pb art "D:\Music" --dry-run
 ```
 
 Full retest:
 
 ```bash
-python art_fetch.py "D:\Music" --overwrite --ignore-cache --retry-not-found
+.\fetch_pb art "D:\Music" --overwrite --ignore-cache --retry-not-found
 ```
 
 Higher quality source requirement:
 
 ```bash
-python art_fetch.py "D:\Music" --min-source-size 500
+.\fetch_pb art "D:\Music" --min-source-size 500
 ```
 
 Try more candidates per provider:
 
 ```bash
-python art_fetch.py "D:\Music" --max-candidates-per-provider 5
+.\fetch_pb art "D:\Music" --max-candidates-per-provider 5
 ```
 
 Unlimited artist provider candidates:
 
 ```bash
-python art_fetch.py "D:\Music" --max-candidates-per-provider 0
+.\fetch_pb art "D:\Music" --max-candidates-per-provider 0
 ```
 
 Disable TheAudioDB:
 
 ```bash
-python art_fetch.py "D:\Music" --no-theaudiodb
+.\fetch_pb art "D:\Music" --no-theaudiodb
 ```
 
 ---
@@ -752,16 +750,4 @@ Increase the minimum source size:
 
 ```bash
 --min-source-size 500
-```
-
----
-
-## Running the downloaded program
-
-To run the commands in this manual with the downloaded program, replace
-`python art_fetch.py` with `.\fetch_pb art` on Windows or `./fetch_pb art` on a Mac,
-in the folder you unzipped it to:
-
-```bash
-.\fetch_pb art E:\Music
 ```
