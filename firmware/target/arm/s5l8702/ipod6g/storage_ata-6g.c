@@ -941,7 +941,7 @@ static int ata_rw_chunk(uint64_t sector, uint32_t cnt, void* buffer, bool write)
 static int ata_transfer_sectors(uint64_t sector, int count, void* buffer, int write)
 {
     if (!ata_powered)
-        ata_power_up();
+        PASS_RC(ata_power_up(), 1, 0);
     if (sector + count > total_sectors)
         RET_ERR(0);
     ata_set_active();
@@ -998,7 +998,7 @@ int ata_soft_reset(void)
     int rc;
     mutex_lock(&ata_mutex);
     if (!ata_powered)
-        PASS_RC(ata_power_up(), 1, 0);
+        PASS_RC_MTX(ata_power_up(), 1, 0, &ata_mutex);
     ata_set_active();
     if (ceata)
     {
@@ -1021,7 +1021,7 @@ int ata_hard_reset(void)
 {
     mutex_lock(&ata_mutex);
     ata_needs_full_init = true; /* a reset never takes the fast path */
-    PASS_RC(ata_power_up(), 0, 0);
+    PASS_RC_MTX(ata_power_up(), 0, 0, &ata_mutex);
     ata_set_active();
     mutex_unlock(&ata_mutex);
     return 0;
@@ -1032,7 +1032,7 @@ static int ata_reset(void)
     int rc;
     mutex_lock(&ata_mutex);
     if (!ata_powered)
-        PASS_RC(ata_power_up(), 2, 0);
+        PASS_RC_MTX(ata_power_up(), 2, 0, &ata_mutex);
     ata_set_active();
     rc = ata_soft_reset();
     if (IS_ERR(rc))

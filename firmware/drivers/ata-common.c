@@ -20,6 +20,8 @@
 
 /* This is intended to be #included into the ATA driver */
 
+#include <limits.h>
+
 static sector_t total_sectors;
 static uint32_t log_sector_size;
 static uint16_t identify_info[ATA_IDENTIFY_WORDS] STORAGE_ALIGN_ATTR;
@@ -102,6 +104,16 @@ static int ata_transfer_sectors(uint64_t start,
                                 void* inbuf,
                                 int write);
 
+/* A driver's error code with the failing stage folded in. A code that keeps
+ * its error in the sign bit (the 6G's ERR_RC) would overflow rc * 10 into a
+ * positive number, which callers read as success, so it passes unchanged. */
+static int ata_stage_rc(int rc, int stage)
+{
+    if (rc < (INT_MIN + stage) / 10)
+        return rc;
+    return rc * 10 - stage;
+}
+
 static int cache_sector(sector_t sector)
 {
     int rc;
@@ -152,7 +164,7 @@ int ata_read_sectors(IF_MD(int drive,)
         rc = cache_sector(start);
         if (rc)
         {
-            rc = rc * 10 - 1;
+            rc = ata_stage_rc(rc, 1);
             goto error;
         }
         memcpy(inbuf, sector_cache.data + offset * log_sector_size,
@@ -170,7 +182,7 @@ int ata_read_sectors(IF_MD(int drive,)
         rc = ata_transfer_sectors(start, incount, inbuf, false);
         if (rc)
         {
-            rc = rc * 10 - 2;
+            rc = ata_stage_rc(rc, 2);
             goto error;
         }
         start += incount;
@@ -182,7 +194,7 @@ int ata_read_sectors(IF_MD(int drive,)
         rc = cache_sector(start);
         if (rc)
         {
-            rc = rc * 10 - 3;
+            rc = ata_stage_rc(rc, 3);
             goto error;
         }
         memcpy(inbuf, sector_cache.data, offset * log_sector_size);
@@ -216,7 +228,7 @@ int ata_write_sectors(IF_MD(int drive,)
         rc = cache_sector(start);
         if (rc)
         {
-            rc = rc * 10 - 1;
+            rc = ata_stage_rc(rc, 1);
             goto error;
         }
         memcpy(sector_cache.data + offset * log_sector_size, buf,
@@ -224,7 +236,7 @@ int ata_write_sectors(IF_MD(int drive,)
         rc = flush_current_sector();
         if (rc)
         {
-            rc = rc * 10 - 2;
+            rc = ata_stage_rc(rc, 2);
             goto error;
         }
         start += partcount;
@@ -237,10 +249,13 @@ int ata_write_sectors(IF_MD(int drive,)
 
     if (count) /* all complete physical sectors */
     {
+        /* This write bypasses the cache, so a cached sector it covers would
+         * go stale; dropped first, as a failed write may still have landed. */
+        sector_cache.inuse = false;
         rc = ata_transfer_sectors(start, count, (void*)buf, true);
         if (rc)
         {
-            rc = rc * 10 - 3;
+            rc = ata_stage_rc(rc, 3);
             goto error;
         }
         start += count;
@@ -252,19 +267,22 @@ int ata_write_sectors(IF_MD(int drive,)
         rc = cache_sector(start);
         if (rc)
         {
-            rc = rc * 10 - 4;
+            rc = ata_stage_rc(rc, 4);
             goto error;
         }
         memcpy(sector_cache.data, buf, offset * log_sector_size);
         rc = flush_current_sector();
         if (rc)
         {
-            rc = rc * 10 - 5;
+            rc = ata_stage_rc(rc, 5);
             goto error;
         }
     }
 
   error:
+    /* After a failed write the cached bytes may not match the disk. */
+    if (rc)
+        sector_cache.inuse = false;
     mutex_unlock(&ata_mutex);
 
     return rc;
