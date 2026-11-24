@@ -774,7 +774,9 @@ def fill(template: str, values: dict[str, str]) -> str:
 def source_line(lang: str, title: str, extra: str) -> str:
     if not title:
         return f"*{extra}*" if extra else ""
-    url = f"https://{lang}.wikipedia.org/wiki/{quote(title.replace(' ', '_'))}"
+    # Written to be read: only what would end or break the address is encoded
+    path = re.sub(r'[%?#"<>\s]', lambda m: quote(m.group(0)), title.replace(" ", "_"))
+    url = f"https://{lang}.wikipedia.org/wiki/{path}"
     return (f'*Adapted from Wikipedia, "{title}", {url}, CC BY-SA 4.0.'
             + (f" {extra}" if extra else "") + "*")
 
