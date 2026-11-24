@@ -174,26 +174,31 @@ static void cal_ladder(int ax)
         cal_val[ax][p] = -1;
 }
 
-/* Read the index and fill cal_val[]. The number of records counted, or 0
- * where there were too few to say anything. */
-static uint32_t cal_pass(void)
+/* Read the whole index and fill cal_val[], with the number of records counted
+ * in *total, 0 where there were too few to say anything. False when the index
+ * could not be read to its end: a ladder of the part read would be saved
+ * under the whole index's fingerprint. */
+static bool cal_pass(uint32_t *total)
 {
     struct sound_index_reader rd;
     struct sound_record r;
     struct sound_axes a;
-    uint32_t total = 0;
     int i, ax;
 
+    *total = 0;
     memset(cal_hist, 0, sizeof (cal_hist));
     memset(cal_n, 0, sizeof (cal_n));
 
     if (sound_index_reader_open(&rd) != SOUND_OK)
-        return 0;
+        return false;
 
     for (i = 0; i < rd.count; i++)
     {
         if (!sound_index_read(&rd, i, &r))
-            break;
+        {
+            sound_index_reader_close(&rd);
+            return false;
+        }
 
         /* A failed decode is written zeroed and zero is not neutral here --
          * a loudness of zero is full scale -- so such a record would drag
@@ -227,7 +232,7 @@ static uint32_t cal_pass(void)
             cal_n[ax]++;
         }
 
-        total++;
+        (*total)++;
     }
 
     sound_index_reader_close(&rd);
@@ -237,7 +242,7 @@ static uint32_t cal_pass(void)
     for (ax = 0; ax < CAL_AXES; ax++)
         cal_ladder(ax);
 
-    return total;
+    return true;
 }
 
 
@@ -387,7 +392,8 @@ bool sound_cal_update(void)
     if (!cal_fingerprint(&count, &first, &last))
         return false;
 
-    total = cal_pass();
+    if (!cal_pass(&total))
+        return false;
     if (total == 0)
     {
         /* Nothing to say about this library. The file goes, so that a stale

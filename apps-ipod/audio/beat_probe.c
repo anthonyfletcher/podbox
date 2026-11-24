@@ -243,6 +243,10 @@ static void bp_take_tempo(unsigned long track_ms)
         hold_period = bt.period_ms;
         hold_since_ms = track_ms;
         period_lo = period_hi = bt.period_ms;
+        /* Settled describes the period reported, which is this run's: an
+         * early run is often a half or a third of the tempo a later one
+         * corrects */
+        settled = false;
     }
     else
     {
@@ -379,15 +383,25 @@ static int bp_db10_amplitude(uint32_t amp)
     return (int)((fp_decibels(amp * 2, 16) * 10) / 65536);
 }
 
-/* The same for a mean square, which is the amplitude's decibels doubled. */
+/* The same for a mean square, which is the amplitude's decibels doubled.
+ * Scaled up before it is taken to Q16, and the doublings taken off after at
+ * 3.0103 dB each: dividing first rounds anything under -48 dBFS to zero,
+ * which would read as silence. */
 static int bp_db10_power(uint32_t mean_sq)
 {
-    uint32_t ratio_q16 = mean_sq / 16384;   /* mean_sq / 32768^2, in Q16 */
+    unsigned int shifts = 0;
 
-    if (ratio_q16 == 0)
+    if (mean_sq == 0)
         return -960;
 
-    return (int)((fp_decibels(ratio_q16, 16) * 10) / 65536 / 2);
+    while (mean_sq < (1UL << 29))
+    {
+        mean_sq <<= 1;
+        shifts++;
+    }
+
+    return (int)((fp_decibels(mean_sq / 16384, 16) * 10) / 65536 / 2)
+           - (int)((shifts * 30103u + 500u) / 1000u);
 }
 
 void beat_probe_result(struct track_sound *out)
@@ -420,7 +434,8 @@ void beat_probe_result(struct track_sound *out)
                       (bp_db10_amplitude(peak_mid) - out->loudness_db10);
 
     /* Width against the mid rather than against full scale: what matters is
-     * how much of this track is in the sides, not how loud it is. */
+     * how much of this track is in the sides, not how loud it is. No mid at
+     * all, with sides, is as wide as it gets. */
     if (mean_sq > 0)
     {
         uint64_t side = sum_side_sq / frames_in;
@@ -428,6 +443,8 @@ void beat_probe_result(struct track_sound *out)
 
         out->width = (unsigned int)(w > 255 ? 255 : w);
     }
+    else if (sum_side_sq > 0)
+        out->width = 255;
 
     if (level_n > 0)
     {
