@@ -8,7 +8,8 @@
  * "Beatles, The" -- so neither is compared as written: each is reduced to its
  * letters and digits, Latin ones lowercased and unaccented, and the reduction
  * hashed. Letters of other scripts are kept as they are, or a name in kana
- * would reduce to nothing.
+ * would reduce to nothing. A name of nothing but symbols ("¥$", "!!!") is
+ * hashed as written instead, less its spaces and Latin case.
  *
  * A name with one comma has a second key, read as "Pratchett, Terry" ->
  * "Terry Pratchett", which matching tries as well; the cache key is always
@@ -91,10 +92,23 @@ static void add_char(struct name_hash *nh, unsigned int c)
     add(nh, c);
 }
 
-/* The characters of [s, end) into the hash. A leading "The " is skipped when
- * 'first', the part the name starts with. */
-static void add_part(struct name_hash *nh, const char *s, const char *end,
-                     bool first)
+/* One character of a name of symbols: all kept but spaces */
+static void add_symbol(struct name_hash *nh, unsigned int c)
+{
+    if (c >= 0xFF01 && c <= 0xFF5E)
+        c -= 0xFEE0;
+    if (c <= ' ' || c == 0xA0 || c == 0x3000)
+        return;
+    if (c >= 'A' && c <= 'Z')
+        c += 'a' - 'A';
+    add(nh, c);
+}
+
+/* The characters of [s, end) into the hash, through 'fn'. A leading "The "
+ * is skipped when 'first', the part the name starts with. */
+static void add_part_by(struct name_hash *nh, const char *s, const char *end,
+                        bool first,
+                        void (*fn)(struct name_hash *, unsigned int))
 {
     const unsigned char *p = (const unsigned char *)s;
 
@@ -105,8 +119,14 @@ static void add_part(struct name_hash *nh, const char *s, const char *end,
         ucschar_t c;
 
         p = utf8decode(p, &c);
-        add_char(nh, c);
+        fn(nh, c);
     }
+}
+
+static void add_part(struct name_hash *nh, const char *s, const char *end,
+                     bool first)
+{
+    add_part_by(nh, s, end, first, add_char);
 }
 
 static unsigned int finish(const struct name_hash *nh)
@@ -129,6 +149,8 @@ unsigned int art_name_hash_n(const char *name, size_t len)
     if (len > 5 && !strncasecmp(end - 5, ", the", 5))
         end -= 5;
     add_part(&nh, name, end, true);
+    if (!nh.kept)
+        add_part_by(&nh, name, end, true, add_symbol);
     return finish(&nh);
 }
 

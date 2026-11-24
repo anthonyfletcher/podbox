@@ -257,13 +257,28 @@ def _fold_part(s: str, first: bool) -> str:
     return "".join(_fold_char(ord(ch)) for ch in s)
 
 
+def _symbol_char(c: int) -> str:
+    if 0xFF01 <= c <= 0xFF5E:
+        c -= 0xFEE0
+    if c <= 0x20 or c in (0xA0, 0x3000):
+        return ""
+    ch = chr(c)
+    return ch.lower() if "A" <= ch <= "Z" else ch
+
+
 def name_key(name: str) -> str:
-    """The player's key for a person: "" for a name with nothing left."""
+    """The player's key for a person: "" for a name with nothing left. A name
+    of nothing but symbols ("¥$") is kept as written, less spaces and case."""
     if not name:
         return ""
     if len(name.encode("utf-8")) > 5 and name[-5:].casefold() == ", the":
         name = name[:-5]
-    return _fold_part(name, True)
+    key = _fold_part(name, True)
+    if not key:
+        if len(name.encode("utf-8")) > 4 and name[:4].casefold() == "the ":
+            name = name[4:]
+        key = "".join(_symbol_char(ord(ch)) for ch in name)
+    return key
 
 
 def name_alt_key(name: str) -> str:

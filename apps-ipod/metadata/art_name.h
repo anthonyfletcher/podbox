@@ -13,8 +13,9 @@
 
 /* The cache key of the person called 'name': its letters and digits, Latin
  * ones lowercased and unaccented, "&" read as "and", a leading "The " or
- * trailing ", The" dropped, hashed. 0 for NULL or a name with nothing left,
- * which matches nothing. A folder name and a tag for the same person, written
+ * trailing ", The" dropped, hashed. A name of nothing but symbols ("¥$") is
+ * hashed as written, less its spaces and Latin case. 0 for NULL or a name
+ * of spaces, which matches nothing. A folder name and a tag for the same person, written
  * either way, give the same key. */
 unsigned int art_name_hash(const char *name);
 
