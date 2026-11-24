@@ -308,9 +308,12 @@ static void button_tick(void)
                         repeat_count++;
                         /* Send a SYS_POWEROFF event if we have a device
                            which doesn't shut down easily with the OFF
-                           key */
+                           key. A multimedia code reuses the main buttons'
+                           bits (the 6G's VOLUME_UP carries PLAY's), so it
+                           never counts as the power-off button. */
 
                         if (enable_sw_poweroff &&
+                            !(btn & BUTTON_MULTIMEDIA) &&
                             (btn & POWEROFF_BUTTON
 #ifdef RC_POWEROFF_BUTTON
                                     || btn == RC_POWEROFF_BUTTON
