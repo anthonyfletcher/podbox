@@ -1252,6 +1252,9 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
             logf("scsi read_capacity16 %d",lun);
 
             if(lun_present) {
+                /* The buffer holds the last transfer's data, and not every
+                 * byte of the reply is written below */
+                memset(tb.capacity_data_16, 0, sizeof(struct capacity_16));
                 /* "block count" actually means "number of last block" */
 #ifdef STORAGE_64BIT_SECTOR
                     tb.capacity_data_16->block_count[2] =
@@ -1270,15 +1273,6 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                         ((bcount-1) & 0x0000ff00)>>8;
                     tb.capacity_data_16->block_count[7] =
                         ((bcount-1) & 0x000000ff);
-
-                    tb.ms_data_10->block_descriptor.block_size[0] =
-                        (bsize & 0xff000000)>>24;
-                    tb.ms_data_10->block_descriptor.block_size[1] =
-                        (bsize & 0x00ff0000)>>16;
-                    tb.ms_data_10->block_descriptor.block_size[2] =
-                        (bsize & 0x0000ff00)>>8;
-                    tb.ms_data_10->block_descriptor.block_size[3] =
-                        (bsize & 0x000000ff);
 
                 tb.capacity_data_16->block_size[0] = (bsize & 0xff000000)>>24;
                 tb.capacity_data_16->block_size[1] = (bsize & 0x00ff0000)>>16;
