@@ -186,7 +186,10 @@ bool libfile_finish(struct libfile_writer *w, bool ok)
         ok = lseek(w->fd, 0, SEEK_SET) == 0
              && write(w->fd, &w->hdr, sizeof(w->hdr))
                 == (ssize_t)sizeof(w->hdr);
-    close(w->fd);
+    /* The last of the data reaches the disk at the close, so a failed one
+     * leaves the good file in place */
+    if (close(w->fd) < 0)
+        ok = false;
     w->fd = -1;
 
     if (ok)
@@ -255,7 +258,8 @@ bool libfile_append(const char *path, uint32_t magic, uint16_t version,
         if (!ok)
             ftruncate(fd, end);
     }
-    close(fd);
+    if (close(fd) < 0)
+        ok = false;
     return ok;
 }
 
@@ -275,6 +279,7 @@ bool libfile_set_marks(const char *path, uint32_t magic, uint16_t version,
         ok = lseek(fd, 0, SEEK_SET) == 0
              && write(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr);
     }
-    close(fd);
+    if (close(fd) < 0)
+        ok = false;
     return ok;
 }

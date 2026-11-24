@@ -321,13 +321,30 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
         return !file_exists(BOOK_RESUME_FILE);
     }
 
-    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
+    /* The header counts bytes, not books. A read that fails before they are
+     * all read fails the scan: a rewrite from what came before it would
+     * drop every book after it. */
+    uint32_t left = h.count;
+    bool ok = true;
+
+    while (left > 0)
     {
         struct entry e;
 
-        if (r.path_len >= sizeof(path) || r.left >= ARRAYLEN(left_words)
-            || read(fd, path, r.path_len) != r.path_len)
+        if (left < sizeof(r) || read(fd, &r, sizeof(r)) != (ssize_t)sizeof(r))
+        {
+            ok = false;
             break;
+        }
+        left -= sizeof(r);
+        if (r.path_len >= sizeof(path) || r.path_len > left
+            || r.left >= ARRAYLEN(left_words)
+            || read(fd, path, r.path_len) != r.path_len)
+        {
+            ok = false;
+            break;
+        }
+        left -= r.path_len;
         path[r.path_len] = '\0';
         e.book = r.book;
         e.path = r.path_len ? path : NULL;
@@ -342,7 +359,7 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
     }
 
     close(fd);
-    return true;
+    return ok;
 }
 
 /* ------------------------------------------------------------------ *

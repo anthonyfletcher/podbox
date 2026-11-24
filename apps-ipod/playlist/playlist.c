@@ -1423,6 +1423,12 @@ static int add_track_to_playlist_unlocked(struct playlist_info* playlist,
             break;
     }
 
+    /* An explicit position, as the control file gives on resume, is used as
+     * it stands, and a corrupt one must not write past the end; the end
+     * itself appends. */
+    if (orig_position >= 0 && insert_position > playlist->amount)
+        return -1;
+
     /* A playlist being built to play holds the music itself, not additions to
      * it, so it leaves no insert chain behind: the first Add to Queue once it
      * plays goes straight after the playing track. Resume restores the chain
