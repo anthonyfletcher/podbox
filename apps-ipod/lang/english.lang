@@ -28250,3 +28250,45 @@
     *: "Progress Line"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION
+  desc: in the Carousel settings menu -- the mirrored strip drawn under each cover
+  user: core
+  <source>
+    *: "Reflection"
+  </source>
+  <dest>
+    *: "Reflection"
+  </dest>
+  <voice>
+    *: "Reflection"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_SHORT
+  desc: Carousel Reflection choice -- a shallow reflection
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "Short"
+  </dest>
+  <voice>
+    *: "Short"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_TALL
+  desc: Carousel Reflection choice -- a deeper reflection
+  user: core
+  <source>
+    *: "Tall"
+  </source>
+  <dest>
+    *: "Tall"
+  </dest>
+  <voice>
+    *: "Tall"
+  </voice>
+</phrase>

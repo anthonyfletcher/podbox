@@ -953,6 +953,11 @@ later. The captions turn black or white to read on it.
 [album covers statusbar]
 Draws the status bar over the carousel. Off gives the covers the whole screen.
 
+[album covers reflection]
+Mirrors the foot of each cover beneath it, fading into the background, and
+moves the covers up to make room. Tall is deeper; each step costs the carousel
+a little speed while scrolling.
+
 [album covers sort same as music]
 Sorts the carousels the way the Music lists are sorted: albums as All Albums,
 artists and The/A/An as their Music settings. The carousel's own sort settings

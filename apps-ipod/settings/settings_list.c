@@ -2025,6 +2025,11 @@ const struct settings_list settings[] = {
                 NULL, NULL, NULL),
     OFFON_SETTING(F_THEMESETTING, album_covers_parallel_slides, LANG_SPACING, true,
                   "album covers parallel slides", NULL),
+    CHOICE_SETTING(F_THEMESETTING, album_covers_reflection,
+                   LANG_CAROUSEL_REFLECTION, 1,
+                   "album covers reflection", "off,short,tall", NULL, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_CAROUSEL_REFLECTION_SHORT),
+                   ID2P(LANG_CAROUSEL_REFLECTION_TALL)),
     /* Diagnostics: append what the two background workers are doing to
      * .rockbox/logs/tagcache.log and art.log. Both drive the same
      * "Building" indicator, so when it will not go away these say which. */

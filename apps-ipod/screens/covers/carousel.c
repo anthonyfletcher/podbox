@@ -220,6 +220,19 @@ static void pf_update_dynamic_colors(void)
 #define PF_TEXT_MARGIN 20
 #define PF_TEXT_WIDTH  (LCD_WIDTH - 2 * PF_TEXT_MARGIN)
 
+/* The reflection: the bottom rows of each cover (PF_REFLECT_SHORT or _TALL, by
+ * the Reflection setting), mirrored below it and faded toward the background in
+ * PF_REFLECT_BANDS steps, starting at PF_REFLECT_ALPHA out of 256. Each band is
+ * one alpha, so its pixels go through the same faded run as a side slide's and
+ * the loop gains no per-pixel work. The covers move up by half of it, so it
+ * takes none of the caption's rows, and the caption sits PF_REFLECT_GAP rows
+ * under it rather than centred in what is left. */
+#define PF_REFLECT_SHORT 12
+#define PF_REFLECT_TALL  24
+#define PF_REFLECT_BANDS 6
+#define PF_REFLECT_ALPHA 96
+#define PF_REFLECT_GAP   2
+
 #define MAX_SLIDES_COUNT 10
 /* Number of side slides rendered per side (3 visible + 1 animation buffer).
  * Was a user-configurable field in the original plugin's config struct, but
@@ -392,6 +405,7 @@ static int pf_half_height;      /* rows of drawable (post text-margin) height ab
 static int pf_lower_half;       /* rows of drawable (post text-margin) height below center */
 static int pf_draw_y_shift;     /* rows skipped below pf_vp_y for a TOP text caption's margin */
 static int pf_caption_band;     /* rows the covers give up to the caption */
+static int pf_reflect;          /* cover rows mirrored under each cover; 0 for none */
 /* The caption's own rows, measured from the top of the viewport. Not the same
  * as the band: the band is a reservation, and carousel_caption_layout() centres
  * the text in the space that opens up, which starts a few rows above where the
@@ -2322,7 +2336,8 @@ static int caption_block(bool two_lines)
 void carousel_caption_layout(bool two_lines, struct pf_caption *out)
 {
     int block = caption_block(two_lines);
-    int art_top = (pf_height - pf_caption_band - PF_NOMINAL_ART_H) / 2;
+    int art_top = (pf_height - pf_caption_band - PF_NOMINAL_ART_H
+                   - pf_reflect) / 2;
     int space, top;
 
     if (art_top < 0)        /* cover taller than the drawable area: it is
@@ -2337,11 +2352,18 @@ void carousel_caption_layout(bool two_lines, struct pf_caption *out)
     }
     else
     {
-        top = art_top + PF_NOMINAL_ART_H;
+        top = art_top + PF_NOMINAL_ART_H + pf_reflect;
         space = pf_height - top;
     }
 
-    out->y1 = (space > block) ? top + (space - block) / 2 : top;
+    /* Under a reflection the caption hangs just below it, since its faded tail
+     * already reads as a gap. Not less than PF_ROW_MARGIN, which is how far
+     * past it the covers' rows are counted: closer, and every caption step
+     * would redraw the covers too. */
+    if (pf_reflect && !pf_draw_y_shift && space >= block + PF_REFLECT_GAP)
+        out->y1 = top + PF_REFLECT_GAP;
+    else
+        out->y1 = (space > block) ? top + (space - block) / 2 : top;
     out->y2 = out->y1 + caption_line2();
 }
 
@@ -2446,7 +2468,7 @@ static void pf_clear_band(int y, int h)
  * first test. */
 static int slide_voff(int sh, PFreal cy)
 {
-    int voff = ((pf_half_height + pf_lower_half) - sh) / 2;
+    int voff = ((pf_half_height + pf_lower_half) - pf_reflect - sh) / 2;
 
     if (cy > 0)             /* the flat view's pile offset; zero in 3D */
         voff += cy >> PFREAL_SHIFT;
@@ -2487,7 +2509,8 @@ static void slide_rows(struct slide_data *slide, int *y0, int *y1)
     sh = bmp->height;
     voff = slide_voff(sh, slide->cy);
     *y0 = MAX(0, voff - PF_ROW_MARGIN) + pf_draw_y_shift;
-    *y1 = MIN(pf_half_height + pf_lower_half, voff + sh + PF_ROW_MARGIN)
+    *y1 = MIN(pf_half_height + pf_lower_half,
+              voff + sh + MIN(pf_reflect, sh) + PF_ROW_MARGIN)
         + pf_draw_y_shift;
 }
 
@@ -2639,11 +2662,44 @@ static int draw_tile_half(struct pf_col *cols, int ncols, int step,
     return total;
 }
 
-static void draw_tile(struct pf_col *up, struct pf_col *lo, int ncols,
-                      const struct pf_fade *f)
+/* A column's reflection carries on downward from where its lower half stopped,
+ * reading the cover upward again; n[b] is how many of its rows fall in band b. */
+struct pf_refl
+{
+    struct pf_col k;    /* k.n is unused */
+    unsigned char n[PF_REFLECT_BANDS];
+};
+
+/* Band by band across the tile, so each band's rows are written while the
+ * cache lines the band before it fetched are still in. */
+static int draw_tile_reflect(struct pf_refl *rf, int ncols,
+                             const struct pf_fade *fb)
+{
+    int total = 0;
+
+    for (int b = 0; b < PF_REFLECT_BANDS; b++)
+        for (int c = 0; c < ncols; c++)
+        {
+            int n = rf[c].n[b];
+
+            if (n > 0)
+            {
+                total += n;
+                draw_run_faded(&rf[c].k, n, BUFFER_WIDTH, &fb[b]);
+            }
+        }
+    return total;
+}
+
+static void draw_tile(struct pf_col *up, struct pf_col *lo,
+                      struct pf_refl *rf, int ncols,
+                      const struct pf_fade *f, const struct pf_fade *fb)
 {
     int px = draw_tile_half(up, ncols, -BUFFER_WIDTH, f)
            + draw_tile_half(lo, ncols, BUFFER_WIDTH, f);
+
+    if (fb)
+        px += draw_tile_reflect(rf, ncols, fb);
 #if PF_SHOW_STATS
     pf_px += px;
 #else
@@ -2736,6 +2792,28 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
     fade_prepare(&fd, alpha);
     const struct pf_fade *f = (alpha == 256) ? NULL : &fd;
 
+    /* The reflection's bands, as source rows: band b runs from rlim[b - 1]
+     * (the cover's bottom edge, for band 0) up to rlim[b]. Each band's alpha is
+     * the one at its middle, scaled by the slide's own. */
+    const int refl = MIN(pf_reflect, sh);
+    struct pf_fade rfd[PF_REFLECT_BANDS];
+    int rlim[PF_REFLECT_BANDS];
+    const struct pf_fade *fb = NULL;
+
+    if (refl > 0)
+    {
+        for (int b = 0; b < PF_REFLECT_BANDS; b++)
+        {
+            int a = PF_REFLECT_ALPHA * (2 * (PF_REFLECT_BANDS - b) - 1)
+                  / (2 * PF_REFLECT_BANDS);
+
+            fade_prepare(&rfd[b], (unsigned)(a * alpha) >> 8);
+            rlim[b] = sh * PFREAL_ONE
+                    - (b + 1) * refl * PFREAL_ONE / PF_REFLECT_BANDS;
+        }
+        fb = rfd;
+    }
+
     /* Walked a column at a time, which is the order the source is stored in
      * (art_sizes.h keeps the coverflow thumbnails column-major for exactly
      * this), and drawn a tile at a time -- see PF_TILE_W. Each column is
@@ -2746,6 +2824,7 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
      * column walk: the column-major source is then read across its stride,
      * and the misses move from the stores onto the loads. */
     struct pf_col tile_up[PF_TILE_W], tile_lo[PF_TILE_W];
+    struct pf_refl tile_rf[PF_TILE_W];
     int ncols = 0;
 
 #define LCDADDR(x, y) (&buffer[(y)*BUFFER_WIDTH + (x)])
@@ -2802,11 +2881,36 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
         l->n = (plo > p_start_lower)
              ? div_by_recip(plo - p_start_lower + dy - 1, dy, recip) : 0;
 
+        /* The reflection takes the rows the lower half left, if the cover's
+         * bottom edge came before the screen's. Its source row is the lower
+         * half's, mirrored about that edge: p past the edge reads 2 sh - p. */
+        if (fb)
+        {
+            struct pf_refl *r = &tile_rf[ncols];
+            int rem = (plo == sh * PFREAL_ONE) ? lower_half - l->n : 0;
+            int q = 2 * sh * PFREAL_ONE - 1 - (p_start_lower + l->n * dy);
+            int done = 0;
+
+            r->k.src = ptr;
+            r->k.px = LCDADDR(x, half_height + l->n);
+            r->k.p = q;
+            r->k.dp = -dy;
+            for (int b = 0; b < PF_REFLECT_BANDS; b++)
+            {
+                int upto = (rem > 0 && q >= rlim[b])
+                         ? div_by_recip(q - rlim[b], dy, recip) + 1 : 0;
+
+                upto = MIN(upto, rem);
+                r->n[b] = MAX(upto - done, 0);
+                done = MAX(done, upto);
+            }
+        }
+
         /* A tile ends where a cache line does, not after PF_TILE_W columns
          * counted from wherever the slide happens to start. */
         if (++ncols == PF_TILE_W || (x & (PF_TILE_W - 1)) == PF_TILE_W - 1)
         {
-            draw_tile(tile_up, tile_lo, ncols, f);
+            draw_tile(tile_up, tile_lo, tile_rf, ncols, f, fb);
             ncols = 0;
         }
 
@@ -2820,7 +2924,7 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
 
     }
     if (ncols > 0)
-        draw_tile(tile_up, tile_lo, ncols, f);
+        draw_tile(tile_up, tile_lo, tile_rf, ncols, f, fb);
 }
 
 static void render_slide(struct slide_data *slide, const int alpha)
@@ -3818,7 +3922,12 @@ static bool init(void)
             case ALBUM_NAME_BOTTOM:
             case ALBUM_AND_ARTIST_BOTTOM:
             default:
-                pf_caption_band = caption_block(true) + 2 * PF_CAPTION_PAD;
+                /* Under a reflection the caption hangs PF_REFLECT_GAP below it
+                 * and reserves nothing else, so covers, reflection and caption
+                 * are centred as one block. */
+                pf_caption_band = caption_block(true)
+                    + (global_settings.album_covers_reflection
+                       ? PF_REFLECT_GAP : 2 * PF_CAPTION_PAD);
                 text_at_top = false;
                 break;
         }
@@ -3827,7 +3936,16 @@ static bool init(void)
         if (draw_height < 0)
             draw_height = 0;
 
-        pf_half_height = draw_height / 2;
+        /* The middle row is the covers' horizon, so it moves up with them:
+         * a tilted cover then tapers evenly above and below it. */
+        switch (global_settings.album_covers_reflection)
+        {
+            case CAROUSEL_REFLECT_SHORT: pf_reflect = PF_REFLECT_SHORT; break;
+            case CAROUSEL_REFLECT_TALL:  pf_reflect = PF_REFLECT_TALL;  break;
+            default:                     pf_reflect = 0;                break;
+        }
+        pf_reflect = MIN(pf_reflect, draw_height / 4);
+        pf_half_height = (draw_height - pf_reflect) / 2;
         pf_lower_half = draw_height - pf_half_height;
         pf_draw_y_shift = text_at_top ? pf_caption_band : 0;
 

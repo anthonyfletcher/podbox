@@ -458,6 +458,7 @@ Also reached as **Appearance** under `Settings > Playback > Now Playing Screen`.
 | Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | Background Colour |  |
 | Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
 | Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | No |  |
+| Reflection | Mirrors the foot of each cover beneath it, fading into the background, and moves the covers up to make room. Tall is deeper; each step costs the carousel a little speed while scrolling. | Short |  |
 | View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3D |  |
 | 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
 | 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |

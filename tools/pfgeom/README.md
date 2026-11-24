@@ -40,6 +40,7 @@ gcc -O2 -W -Wall -Wextra -std=gnu11 -o pfgeom tools/pfgeom/pfgeom.c
 ./pfgeom          # the sweep; exit status is 0 only if nothing went stale
 ./pfgeom -x       # compare dy at every column instead of sampling three
 ./pfgeom -v       # print every frame, not just the failures
+./pfgeom -r 12    # reflection rows to check (24 by default, 0 for none)
 ```
 
 `-x` is the one worth knowing about. `slide_covers()` decides whether one slide

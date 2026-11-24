@@ -266,6 +266,7 @@ static const struct tag_row tag_rows[] = {
 { "album covers sort ignoring articles", TAG_LIBRARY,            "carousel sorting ignore the a an" },
 { "album covers sort same as music", TAG_LIBRARY,                "carousel sorting music" },
 { "album covers view mode",       TAG_APPEARANCE,                "carousel 3d flat" },
+{ "album covers reflection",      TAG_APPEARANCE,                "carousel cover flow mirror" },
 { "album covers scroll speed",    TAG_APPEARANCE,                "carousel speed" },
 { "album covers random spin",     TAG_LIBRARY,                   "carousel shuffle play hold" },
 { "album covers center margin",   TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },

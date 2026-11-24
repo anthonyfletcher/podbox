@@ -25,6 +25,14 @@ enum carousel_view_mode_values {
     CAROUSEL_VIEW_FLAT
 };
 
+/* Values for global_settings.album_covers_reflection: how many rows of each
+ * cover are mirrored beneath it. */
+enum carousel_reflection_values {
+    CAROUSEL_REFLECT_OFF = 0,
+    CAROUSEL_REFLECT_SHORT,
+    CAROUSEL_REFLECT_TALL
+};
+
 /* Values for global_settings.album_covers_on_select */
 enum on_album_select_values {
     ON_SELECT_SHOW_TRACKS = 0,

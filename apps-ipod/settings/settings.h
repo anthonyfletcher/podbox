@@ -786,6 +786,7 @@ struct user_settings
     int  album_covers_center_margin;
     int  album_covers_slide_tuck;
     bool album_covers_parallel_slides;
+    int  album_covers_reflection;   /* CAROUSEL_REFLECT_*: under the covers */
     int  album_covers_scroll_speed;
     int  album_covers_random_spin;  /* 0..2: covers a held PLAY passes */
     int  album_covers_transition_speed;

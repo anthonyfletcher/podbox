@@ -59,6 +59,10 @@ static int set_parallel      = 1;       /* album covers parallel slides       */
 /* the viewport split, from init() */
 static int pf_half_height, pf_lower_half;
 
+#define PF_REFLECT_BANDS 6
+static int pf_reflect;                  /* rows of reflection, 0 for none */
+static int reflect_rows = 24;           /* PF_REFLECT_TALL, or -r N */
+
 /* A slide carries its own bitmap size here; on the device that comes from
  * surface(), and covers keep their aspect, so it genuinely varies. */
 struct slide_data { int angle; PFreal cx, cy; PFreal distance; int sw, sh; };
@@ -394,7 +398,7 @@ static void cull_side(struct slide_data *side, const int *alpha,
 
 static int slide_voff(int sh, PFreal cy)
 {
-    int voff = ((pf_half_height + pf_lower_half) - sh) / 2;
+    int voff = ((pf_half_height + pf_lower_half) - pf_reflect - sh) / 2;
 
     if (cy > 0)
         voff += cy >> PFREAL_SHIFT;
@@ -417,7 +421,8 @@ static void slide_rows(struct slide_data *slide, int *y0, int *y1)
     sh = bmp->height;
     voff = slide_voff(sh, slide->cy);
     *y0 = MAX(0, voff - PF_ROW_MARGIN);
-    *y1 = MIN(pf_half_height + pf_lower_half, voff + sh + PF_ROW_MARGIN);
+    *y1 = MIN(pf_half_height + pf_lower_half,
+              voff + sh + MIN(pf_reflect, sh) + PF_ROW_MARGIN);
 }
 
 /* carousel.c's cover_rows() without the union against the previous frame --
@@ -450,6 +455,10 @@ static int fb_mark_id;
  * blending. Everything that decides *which* pixels are written is copied; the
  * blend itself is not, because the cull cannot change a colour, only whether a
  * pixel is reached. */
+static long refl_px;            /* of the pixels returned, how many reflection */
+static long long refl_culled;   /* refl_px summed over the culled renders */
+static long long refl_bad_reads;    /* reflection rows read outside its source */
+
 static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
 {
     struct dim *bmp = surface(slide);
@@ -492,11 +501,14 @@ static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
     int x, dy = PFREAL_ONE;
     const int half_height = pf_half_height, lower_half = pf_lower_half;
     const int perspective = (zo != 0 || slide->angle != 0);
-    int voff = ((half_height + lower_half) - sh) / 2;
-    if (slide->cy > 0) voff += slide->cy >> PFREAL_SHIFT;
-    if (voff > half_height) voff = half_height;
+    int voff = slide_voff(sh, slide->cy);
     const int p_start_upper = (half_height - 1 - voff) * PFREAL_ONE;
     const int p_start_lower = (half_height - voff) * PFREAL_ONE;
+    const int refl = MIN(pf_reflect, sh);
+    int rlim[PF_REFLECT_BANDS];
+    for (int b = 0; b < PF_REFLECT_BANDS; b++)
+        rlim[b] = sh * PFREAL_ONE
+                - (b + 1) * refl * PFREAL_ONE / PF_REFLECT_BANDS;
 
     for (x = xi; x < x_to; x++) {
         if (xs < slide_left) xs = slide_left;
@@ -526,10 +538,37 @@ static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
             p = p_start_lower;
             plim = MIN(sh * PFREAL_ONE, p + lower_half * dy);
             y = half_height;
+            int n_lo = 0;
             while (p < plim) {
                 px++;
+                n_lo++;
                 if (y >= 0 && y < FBH) fb_top[y*LCD_WIDTH + x] = fb_mark_id;
                 p += dy; y++;
+            }
+
+            /* the reflection, counted the way carousel.c counts it */
+            if (refl > 0) {
+                unsigned int recip = 0xffffffffu / dy;
+                int rem = (plim == sh * PFREAL_ONE) ? lower_half - n_lo : 0;
+                int q = 2 * sh * PFREAL_ONE - 1 - (p_start_lower + n_lo * dy);
+                int done = 0;
+
+                for (int b = 0; b < PF_REFLECT_BANDS; b++) {
+                    int upto = (rem > 0 && q >= rlim[b])
+                             ? div_by_recip(q - rlim[b], dy, recip) + 1 : 0;
+                    upto = MIN(upto, rem);
+                    for (int r = done; r < upto; r++) {
+                        int src = (q - r * dy) >> PFREAL_SHIFT;
+                        if (src < sh - refl || src >= sh)
+                            refl_bad_reads++;
+                        px++;
+                        refl_px++;
+                        if (y >= 0 && y < FBH)
+                            fb_top[y*LCD_WIDTH + x] = fb_mark_id;
+                        y++;
+                    }
+                    done = MAX(done, upto);
+                }
             }
         }
         if (perspective) { xsnum += xsnumi; xsden += xsdeni; xs = fdiv(xsnum, xsden); }
@@ -679,7 +718,9 @@ static long check_frame(int dir, int tick, long *plain, long long *bad)
 
     pose(dir, tick);
     memset(fb_top, 0, sizeof fb_top);
+    refl_px = 0;
     culled = render_frame(1);
+    refl_culled += refl_px;
     check_rows();
 
     for (i = 0; i < LCD_WIDTH * FBH; i++)
@@ -726,13 +767,20 @@ int main(int argc, char **argv)
     long long saved = 0, plain_total = 0, bad = 0;
     long long frames = 0, configs = 0;
     unsigned seed = 12345;
-    int verbose = (argc > 1 && !strcmp(argv[1], "-v"));
+    int verbose = 0;
+
+    for (int a = 1; a < argc; a++) {
+        if (!strcmp(argv[a], "-v")) verbose = 1;
+        else if (!strcmp(argv[a], "-x")) exhaustive = 1;
+        else if (!strcmp(argv[a], "-r") && a + 1 < argc)
+            reflect_rows = atoi(argv[++a]);
+    }
+    printf("reflection: %d rows\n", reflect_rows);
 
     long long div_bad = check_divisions();
     printf("division by multiplying: %lld wrong quotients%s\n", div_bad,
            div_bad ? "  *** FAILED ***" : "  (pass)");
 
-    exhaustive = (argc > 1 && !strcmp(argv[1], "-x"));
     if (exhaustive)
         printf("comparing every column rather than sampling three\n");
 
@@ -750,7 +798,8 @@ int main(int argc, char **argv)
         set_parallel = par;
         set_slide_tuck = TUCK[t];
         set_center_margin = MARGIN[g];
-        pf_half_height = draw_h / 2;
+        pf_reflect = MIN(reflect_rows, draw_h / 4);
+        pf_half_height = (draw_h - pf_reflect) / 2;
         pf_lower_half = draw_h - pf_half_height;
         recalc_offsets();
 
@@ -794,6 +843,9 @@ int main(int argc, char **argv)
     printf("culled    %lld pixels/frame  (%lld%% less)\n",
            (plain_total - saved) / frames, saved * 100 / plain_total);
     printf("stale pixels: %lld%s\n", bad, bad ? "  *** FAILED ***" : "  (pass)");
+    printf("reflection %lld pixels/frame of those culled; "
+           "%lld read outside its rows%s\n", refl_culled / frames,
+           refl_bad_reads, refl_bad_reads ? "  *** FAILED ***" : "  (pass)");
 
     /* The clear and the flush are sized from cover_rows() rather than the whole
      * viewport, so that band has to contain everything the render wrote. */
@@ -804,5 +856,5 @@ int main(int argc, char **argv)
            rows_short, rows_over_max,
            rows_short ? "  *** FAILED ***" : "  (pass)");
 
-    return (bad || rows_short || div_bad) ? 1 : 0;
+    return (bad || rows_short || div_bad || refl_bad_reads) ? 1 : 0;
 }

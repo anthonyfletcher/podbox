@@ -803,6 +803,7 @@ static int album_on_menu(void)
     int old_show_name  = global_settings.album_covers_show_album_name;
     int old_cache_ver  = pf_cfg.cache_version;
     bool old_statusbar = global_settings.album_covers_statusbar;
+    int old_reflection = global_settings.album_covers_reflection;
     int old_filter[CAROUSEL_FILTER_SLOTS];
     char old_chain[CAROUSEL_FILTER_MAX];
 
@@ -814,12 +815,13 @@ static int album_on_menu(void)
         return GO_TO_ROOT;
 
     /* A cache rebuild/update (those items bump cache_version), a caption-layout
-     * change or a status-bar change needs a full rebuild -- init() recomputes
-     * the text margin and the viewport and, when the cache was invalidated,
-     * regenerates the index. */
+     * change, a status-bar change or a reflection change needs a full rebuild
+     * -- init() recomputes the text margin and the viewport and, when the cache
+     * was invalidated, regenerates the index. */
     if (pf_cfg.cache_version != old_cache_ver
         || global_settings.album_covers_show_album_name != old_show_name
-        || global_settings.album_covers_statusbar != old_statusbar)
+        || global_settings.album_covers_statusbar != old_statusbar
+        || global_settings.album_covers_reflection != old_reflection)
     {
         if (!reinit())
             return GO_TO_PREVIOUS;

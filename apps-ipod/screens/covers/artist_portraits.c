@@ -260,6 +260,7 @@ static int artist_on_menu(void)
 {
     int old_show_name = global_settings.album_covers_show_album_name;
     bool old_statusbar = global_settings.album_covers_statusbar;
+    int old_reflection = global_settings.album_covers_reflection;
     int old_sort = carousel_artist_order();
     bool old_articles = carousel_skips_articles();
     int old_filter[CAROUSEL_FILTER_SLOTS];
@@ -275,12 +276,13 @@ static int artist_on_menu(void)
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
 
-    /* The caption layout decides the text margin and the status bar decides
-     * the viewport, both computed during init(), and init() sorts the index
-     * -- so a change to any of them needs a full rebuild, not just a redraw.
-     * The artist on screen stays on screen. */
+    /* The caption layout and the reflection decide the text margin and the
+     * status bar decides the viewport, all computed during init(), and init()
+     * sorts the index -- so a change to any of them needs a full rebuild, not
+     * just a redraw. The artist on screen stays on screen. */
     if (global_settings.album_covers_show_album_name != old_show_name
         || global_settings.album_covers_statusbar != old_statusbar
+        || global_settings.album_covers_reflection != old_reflection
         || carousel_artist_order() != old_sort
         || carousel_skips_articles() != old_articles)
     {
