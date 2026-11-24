@@ -19,8 +19,10 @@
  *   - the table
  *   - building it: the joint strings, then the parts' own strings
  *   - db_names_ensure(), and reading the table
+ *   - showing a joint string
  ****************************************************************************/
 
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -423,4 +425,36 @@ bool db_names_artist(int n, bool (*skip)(const struct tagcache_artist *),
         }
     }
     return any;
+}
+
+/* ------------------------------------------------------------------ *
+ * showing a joint string                                             *
+ * ------------------------------------------------------------------ */
+
+const char *db_names_display(const char *raw, char *buf, size_t size)
+{
+    struct db_featured_names names;
+    const char *s;
+    size_t used = 0;
+    int semis = 0;
+
+    if (!raw || buf == raw || size == 0
+        || !global_settings.split_album_artists
+        || db_names_split(raw, &names) < 2)
+        return raw;
+    for (s = raw; (s = strchr(s, ';')); s++)
+        semis++;
+    if (names.count != semis + 1)
+        return raw;             /* a name dropped: shown as tagged */
+    for (int i = 0; i < names.count; i++)
+    {
+        const char *sep = i == 0 ? "" : i == names.count - 1 ? " & " : ", ";
+        int n = snprintf(buf + used, size - used, "%s%.*s", sep,
+                         names.len[i], names.name[i]);
+
+        if (n < 0 || (size_t)n >= size - used)
+            return raw;
+        used += n;
+    }
+    return buf;
 }

@@ -160,6 +160,7 @@ static int read_track_rows(char *arena, size_t arena_sz)
     struct tagcache_search tcs;
     char title[TAGCACHE_BUFSZ];
     char artist[TAGCACHE_BUFSZ];
+    static char joint[TAGCACHE_BUFSZ];  /* off the stack */
     size_t used = 0;
     int ct = 0;
 
@@ -179,7 +180,8 @@ static int read_track_rows(char *arena, size_t arena_sz)
             artist[0] = '\0';
 
         if (artist[0])
-            len = snprintf(arena + used, avail, "%s - %s", title, artist);
+            len = snprintf(arena + used, avail, "%s - %s", title,
+                           db_names_display(artist, joint, sizeof(joint)));
         else
             len = snprintf(arena + used, avail, "%s", title);
 

@@ -6747,6 +6747,14 @@ bool browser_db_album_header(struct browser_context *c,
                                      h->artist, sizeof(h->artist)))
             h->artist[0] = '\0';
 
+    {
+        char joint[sizeof(h->artist)];
+        const char *s = db_names_display(h->artist, joint, sizeof(joint));
+
+        if (s != h->artist)
+            strlcpy(h->artist, s, sizeof(h->artist));
+    }
+
     /* The list's own rows, not the table's count: a view's clauses can leave
      * some of the album out */
     for (i = c->special_entry_count; i < c->filesindir; i++)

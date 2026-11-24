@@ -802,8 +802,10 @@ Artists off and on.
 Files an album under each artist its Album Artist tag names, separated by a
 semicolon: "Madonna; Charli XCX" lists the album, whole, under both, in the
 Album Artist list, Artist Portraits, the artist charts and Search. Only ";"
-splits, never "&". The first name is the album's artist for sorting and
-folder pictures. Needs the database loaded to RAM.
+splits, never "&". Where the album's artist is shown, the names read
+"Madonna & Charli XCX", or "A, B & C" for three. The first name is the
+album's artist for sorting and folder pictures. Needs the database loaded to
+RAM.
 
 [liner notes]
 A page for every artist and album, with the liner notes and biographies you

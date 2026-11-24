@@ -48,6 +48,7 @@
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* the album/artist index, and playing one */
 #include "database/db_spoken.h"    /* whether the track playing is a book */
+#include "database/db_names.h"     /* a joint album artist: shown, sorted */
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
@@ -681,9 +682,12 @@ static void draw_album_text(void)
          * not the FONT_UI constant -- see init()'s comment on pf_bold_font. */
         lcd_setfont(screens[SCREEN_MAIN].getuifont());
 
+        static char joint[TAGCACHE_BUFSZ];  /* off the stack */
+
         get_album_artist(center_index, artisttxt, sizeof(artisttxt));
-        artist_line = carousel_caption_fit(artisttxt, artist_fit,
-                                           sizeof(artist_fit));
+        artist_line = carousel_caption_fit(db_names_display(artisttxt, joint,
+                                                            sizeof(joint)),
+                                           artist_fit, sizeof(artist_fit));
         if (album_changed)
             set_scroll_line(artist_line, PF_SCROLL_ARTIST);
         artisttxt_x = get_scroll_line_offset(PF_SCROLL_ARTIST);

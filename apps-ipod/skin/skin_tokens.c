@@ -71,6 +71,7 @@
 #include "tdspeed.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
+#include "database/db_names.h"
 
 #include "wps_internals.h"
 #include "custom_tokens.h"
@@ -464,7 +465,7 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
             case SKIN_TOKEN_METADATA_ALBUM:
                 return tag_trim(id3->album, buf, buf_size);
             case SKIN_TOKEN_METADATA_ALBUM_ARTIST:
-                return id3->albumartist;
+                return db_names_display(id3->albumartist, buf, buf_size);
             case SKIN_TOKEN_METADATA_GROUPING:
                 return id3->grouping;
             case SKIN_TOKEN_METADATA_GENRE:

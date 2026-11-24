@@ -8,6 +8,7 @@
 #define _DB_NAMES_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* Fixed-size and resident, as the guest table is: what does not fit is
@@ -81,5 +82,12 @@ int db_names_strings(int n, long *out, int max);
 struct tagcache_artist;
 bool db_names_artist(int n, bool (*skip)(const struct tagcache_artist *),
                      struct tagcache_artist *out);
+
+/* An album-artist string as the screen shows it: under the setting, a joint
+ * string's names joined "A & B" or "A, B & C" into 'buf'. Otherwise, or when
+ * it does not fit, 'raw' itself. Needs no table, so any thread, any time;
+ * 'buf' must not be 'raw'. For display only: sorting, matching and anything
+ * stored keep the string as tagged. */
+const char *db_names_display(const char *raw, char *buf, size_t size);
 
 #endif /* _DB_NAMES_H */

@@ -122,10 +122,14 @@ static const char *entry_name(int i, char *buf, size_t size)
 /* Albums show who they are by; an artist row is already the artist. */
 static const char *entry_subtitle(int i, char *buf, size_t size)
 {
+    static char joint[TAGCACHE_BUFSZ];  /* off the stack */
+
     if (CHART_IS_ARTIST(chart_kind))
         return NULL;
-    return db_summary_name(&idx, tag_albumartist,
-                           idx.album_index[i].artist_seek, buf, size);
+    return db_names_display(db_summary_name(&idx, tag_albumartist,
+                                            idx.album_index[i].artist_seek,
+                                            buf, size),
+                            joint, sizeof(joint));
 }
 
 /* ---- ranking ----------------------------------------------------------- */
