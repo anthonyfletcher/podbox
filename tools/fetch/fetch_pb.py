@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-podbox_fetch: the three library tools as one program, so the download is
+fetch_pb: the three library tools as one program, so the download is
 one executable rather than three that each carry Python. Each tool is also
 its own script and runs alone (python lyric_fetch.py ...).
 
-    podbox_fetch art [artists] [albums] [audiobooks] [podcasts] [ebooks] ROOT [options]
-    podbox_fetch lyrics ROOT [options]
-    podbox_fetch notes ROOT [options]
+    fetch_pb art [artists] [albums] [audiobooks] [podcasts] [ebooks] ROOT [options]
+    fetch_pb lyrics ROOT [options]
+    fetch_pb notes ROOT [options]
 """
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ COMMANDS = {
 
 
 def usage() -> str:
-    lines = [f"podbox_fetch {VERSION}: fill a PodBox library from the web.", "",
-             "Usage: podbox_fetch COMMAND ROOT [options]", "", "Commands:"]
+    lines = [f"fetch_pb {VERSION}: fill a PodBox library from the web.", "",
+             "Usage: fetch_pb COMMAND ROOT [options]", "", "Commands:"]
     lines += [f"  {name:<8}{what}" for name, (_m, what) in COMMANDS.items()]
     lines += ["", "ROOT is a mounted iPod, such as E:\\ or /Volumes/IPOD, or a music folder.",
-              "podbox_fetch COMMAND --help lists that command's options."]
+              "fetch_pb COMMAND --help lists that command's options."]
     return "\n".join(lines)
 
 
@@ -40,11 +40,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(usage())
         return 0 if argv else 2
     if argv[0] == "--version":
-        print(f"podbox_fetch {VERSION}")
+        print(f"fetch_pb {VERSION}")
         return 0
     command = COMMANDS.get(argv[0])
     if command is None:
-        print(f"podbox_fetch: no command '{argv[0]}'.\n\n{usage()}", file=sys.stderr)
+        print(f"fetch_pb: no command '{argv[0]}'.\n\n{usage()}", file=sys.stderr)
         return 2
     # Imported by name, here: PyInstaller bundles only the imports it can
     # see, and a tool's start-up then costs only that tool
@@ -54,7 +54,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         import lyric_fetch as module
     else:
         import notes_fetch as module
-    sys.argv[0] = f"podbox_fetch {argv[0]}"          # what its --help calls it
+    sys.argv[0] = f"fetch_pb {argv[0]}"          # what its --help calls it
     return module.main(argv[1:])
 
 

@@ -1,4 +1,4 @@
-# podbox_fetch art
+# fetch_pb art
 
 Creates JPEG artwork for a music library organised as artist folders containing album
 folders, and for the audiobooks, podcasts and ebooks on an iPod. It can create:
@@ -44,9 +44,9 @@ Name the kinds you want before the folder, or none for all five:
 | `ebooks` | covers of ebooks, and pictures of their authors |
 
 ```bash
-.\podbox_fetch art E:\Music                    # everything
-.\podbox_fetch art albums E:\Music             # album covers only
-.\podbox_fetch art podcasts audiobooks E:\     # podcasts and audiobooks
+.\fetch_pb art E:\Music                    # everything
+.\fetch_pb art albums E:\Music             # album covers only
+.\fetch_pb art podcasts audiobooks E:\     # podcasts and audiobooks
 ```
 
 Give the music folder: artists and albums are found in the folders below it. Audiobooks,
@@ -759,9 +759,9 @@ Increase the minimum source size:
 ## Running the downloaded program
 
 To run the commands in this manual with the downloaded program, replace
-`python art_fetch.py` with `.\podbox_fetch art` on Windows or `./podbox_fetch art` on a Mac,
+`python art_fetch.py` with `.\fetch_pb art` on Windows or `./fetch_pb art` on a Mac,
 in the folder you unzipped it to:
 
 ```bash
-.\podbox_fetch art E:\Music
+.\fetch_pb art E:\Music
 ```

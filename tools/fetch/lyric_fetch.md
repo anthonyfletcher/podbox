@@ -1,12 +1,12 @@
-# podbox_fetch lyrics
+# fetch_pb lyrics
 
 Saves synchronised lyrics for your music, from [LRCLIB](https://lrclib.net), as `.lrc`
 files beside the tracks, where PodBox's Lyrics screen finds them.
 
 ```bash
-.\podbox_fetch lyrics E:\                # a mounted iPod (Windows)
-./podbox_fetch lyrics /Volumes/IPOD     # a mounted iPod (macOS)
-.\podbox_fetch lyrics D:\Music           # or a music folder on your computer
+.\fetch_pb lyrics E:\                # a mounted iPod (Windows)
+./fetch_pb lyrics /Volumes/IPOD     # a mounted iPod (macOS)
+.\fetch_pb lyrics D:\Music           # or a music folder on your computer
 ```
 
 From source, `python lyric_fetch.py` takes the same options.

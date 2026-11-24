@@ -555,13 +555,22 @@ def lead_and_section(blocks: list[tuple[str, str, list[Any]]], wanted: tuple[str
 # ---------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------
+# The player's own {{pieces}} pass through: the lists it puts on the pages it
+# makes up, which a written page in their place would otherwise lose. An
+# empty list goes on the player, with the heading above it.
 ALBUM_TEMPLATE = """<<lead>>
 
 <<section:Background|Recording|Production>>
 
 <<personnel>>
 
+## Tracks
+{{tracks|group=disc}}
+
 <<tracks_page>>
+
+## Mentioned In
+{{mentions}}
 
 <<source>>
 """
@@ -570,6 +579,12 @@ PERSON_TEMPLATE = """<<facts>>
 <<lead>>
 
 <<members>>
+
+## Albums
+{{albums|guest=true}}
+
+## Mentioned In
+{{mentions}}
 
 <<source>>
 """

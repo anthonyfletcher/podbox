@@ -1,4 +1,4 @@
-# podbox_fetch notes
+# fetch_pb notes
 
 Writes liner notes and biographies for your music into the iPod's `/Notes` folder, as pages
 for PodBox's Liner Notes and Biographies: each album's story and credits, and each artist's
@@ -6,13 +6,13 @@ biography, from [Wikipedia](https://www.wikipedia.org) and
 [MusicBrainz](https://musicbrainz.org).
 
 ```bash
-.\podbox_fetch notes E:\ --contact you@example.com    # the first time
-.\podbox_fetch notes E:\                              # after that
-.\podbox_fetch notes E:\ --depth 1                    # producers, songwriters and band members too
-.\podbox_fetch notes E:\ --tracks                     # and a page about each album's tracks
+.\fetch_pb notes E:\ --contact you@example.com    # the first time
+.\fetch_pb notes E:\                              # after that
+.\fetch_pb notes E:\ --depth 1                    # producers, songwriters and band members too
+.\fetch_pb notes E:\ --tracks                     # and a page about each album's tracks
 ```
 
-On a Mac, `./podbox_fetch notes /Volumes/IPOD`. From source, `python notes_fetch.py` takes
+On a Mac, `./fetch_pb notes /Volumes/IPOD`. From source, `python notes_fetch.py` takes
 the same options.
 
 It looks everything up first and writes the pages at the end, so that each page can link to
@@ -30,10 +30,11 @@ the iPod is connected to a computer.
 
 - **An album** gets `/Notes/Albums/<Artist> - <Album>.md`: the opening of its Wikipedia
   article and its Background, Recording or Production section, then its personnel, one line
-  a person, with the tracks they are on where that is not the whole album. The player adds
-  the track list.
+  a person, with the tracks they are on where that is not the whole album. The player fills
+  in the track list and the pages that mention the album.
 - **An artist** gets `/Notes/People/<Artist>.md`: when and where they were born or formed,
-  the opening of their article, and a band's members. The player adds the albums.
+  the opening of their article, and a band's members. The player fills in their albums and
+  the pages that mention them.
 - With `--depth 1`, **the key people** the albums credit get pages too: producers,
   songwriters, band members, featured artists, conductors and orchestras credited on a whole
   album or at least two of its tracks. Engineers, arrangers and session players get a page when
@@ -83,7 +84,7 @@ The pages are made from three templates: `Album.md`, `Person.md` and `Tracks.md`
 them:
 
 ```bash
-.\podbox_fetch notes E:\ --save-templates
+.\fetch_pb notes E:\ --save-templates
 ```
 
 puts the built-in ones in `.rockbox\fetch\templates` on the iPod. Edit them there, and every
@@ -100,7 +101,13 @@ The built-in album layout:
 
 <<personnel>>
 
+## Tracks
+{{tracks|group=disc}}
+
 <<tracks_page>>
+
+## Mentioned In
+{{mentions}}
 
 <<source>>
 ```
@@ -113,6 +120,12 @@ The person layout:
 <<lead>>
 
 <<members>>
+
+## Albums
+{{albums|guest=true}}
+
+## Mentioned In
+{{mentions}}
 
 <<source>>
 ```
@@ -140,7 +153,9 @@ album: <<album>>
 
 A line whose placeholder has nothing to say is left out. A run warns about a placeholder it
 does not know. `<<section:...>>` works only on a line of its own. The player's own pieces, such as
-`{{tracks}}` and `{{mentions}}`, can go in a template too: they pass through to the page.
+`{{tracks}}` and `{{mentions}}`, pass through to the page, and the player fills them in; one
+with nothing to list is left out with the heading above it. The
+[Liner Notes guide](https://github.com/anthonyfletcher/podbox/blob/master/docs/podbox/notes-guide.md) lists them all.
 
 ## Time
 

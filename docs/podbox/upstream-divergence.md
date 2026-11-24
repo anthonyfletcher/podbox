@@ -357,7 +357,7 @@ and produces the wrong firmware.
 | File | What it is |
 | --- | --- |
 | `convfnt.c` | Exports a glyph from a 4 bpp `.fnt` to a greyscale `.bmp` and back. `convbdf` cannot round-trip 4 bpp. |
-| `fetch/` | Desktop tools that fill a library from the web: `art_fetch.py` (album and artist artwork, and with `art_books.py` covers for books and podcasts), `lyric_fetch.py` (synchronised lyrics) and `notes_fetch.py` (notes pages), on the shared `fetchlib.py`, and `podbox_fetch.py`, which runs them as `art`, `lyrics` and `notes` and is what ships. Run by hand; `.github/workflows/fetch-tools.yml` builds them for Windows and macOS as the `Tools` release. |
+| `fetch/` | Desktop tools that fill a library from the web: `art_fetch.py` (album and artist artwork, and with `art_books.py` covers for books and podcasts), `lyric_fetch.py` (synchronised lyrics) and `notes_fetch.py` (notes pages), on the shared `fetchlib.py`, and `fetch_pb.py`, which runs them as `art`, `lyrics` and `notes` and is what ships. Run by hand; `.github/workflows/fetch-tools.yml` builds them for Windows and macOS as the `Tools` release. |
 | `eq_refit/` | Re-fits an EQ preset onto fewer bands; each band costs a pass over every sample. |
 | `pfgeom/` | Mirrors the carousel's projection and cull on the host. Change it with `screens/covers/carousel.c`, or it proves nothing. |
 | `dbfeat/` | Runs `apps-ipod/database/db_featured_parse.c`, unmodified, over a table of tags and the guests each must yield. |

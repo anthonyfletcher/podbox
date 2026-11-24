@@ -572,7 +572,7 @@ in this order:
   (LRCLIB lyrics), `notes_fetch.py` (notes pages from MusicBrainz and
   Wikipedia), on `fetchlib.py`, whose name keys, spoken-word genres and
   ebook extensions copy `art_name.c`, `db_spoken.c` and `book_index.c`:
-  change those and change it. `podbox_fetch.py` runs the three as
+  change those and change it. `fetch_pb.py` runs the three as
   subcommands and is the one executable that ships. Built for
   Windows and macOS by `.github/workflows/fetch-tools.yml` as the `Tools`
   release, which `release.sh` starts

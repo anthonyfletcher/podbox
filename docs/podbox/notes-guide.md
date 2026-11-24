@@ -23,7 +23,7 @@ at all and no menu offers them.
 A page's name is its file's name. `.txt` works too, read as Markdown; where
 both exist, `.md` is used.
 
-[`podbox_fetch notes`](../../tools/fetch/notes_fetch.md), a tool you run on a computer
+[`fetch_pb notes`](../../tools/fetch/notes_fetch.md), a tool you run on a computer
 with the iPod connected, writes pages for your albums and artists from Wikipedia and
 MusicBrainz, and with `--tracks` a page about each album's tracks. It leaves the pages you
 wrote alone.

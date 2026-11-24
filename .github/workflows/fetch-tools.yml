@@ -45,13 +45,13 @@ jobs:
         shell: bash
         run: |
           cd tools/fetch
-          python -m PyInstaller --onefile --console --clean --name podbox_fetch podbox_fetch.py
+          python -m PyInstaller --onefile --console --clean --name fetch_pb fetch_pb.py
       - name: Check
         shell: bash
         run: |
           cd tools/fetch/dist
           for command in art lyrics notes; do
-            ./podbox_fetch "$command" --help > /dev/null
+            ./fetch_pb "$command" --help > /dev/null
           done
       - name: Pack
         shell: bash
@@ -59,6 +59,7 @@ jobs:
           mkdir -p out/podbox-tools
           cp tools/fetch/dist/* out/podbox-tools/
           cp tools/fetch/README.md tools/fetch/art_fetch.md tools/fetch/lyric_fetch.md tools/fetch/notes_fetch.md out/podbox-tools/
+          python tools/fetch/licenses.py out/podbox-tools/LICENSES.txt
           cd out
           if [ "${{ matrix.name }}" = windows ]; then
             7z a -tzip "podbox-tools-${{ matrix.name }}.zip" podbox-tools > /dev/null
@@ -87,13 +88,13 @@ jobs:
           cat > notes.md <<EOF
           Desktop tools that fill a library with what the player shows but cannot fetch, built from ${GITHUB_SHA::10}.
 
-          One program, \`podbox_fetch\`, with three commands:
+          One program, \`fetch_pb\`, with three commands:
 
           - **art** -- pictures of artists and authors, and covers for albums, audiobooks, podcasts and ebooks.
           - **lyrics** -- synchronised lyrics from LRCLIB, as \`.lrc\` files beside the tracks.
           - **notes** -- liner notes and biographies from Wikipedia and MusicBrainz, as pages for the player's Liner Notes.
 
-          Unzip the one for your computer and run it from a terminal in that folder: \`.\\podbox_fetch lyrics E:\\\` on Windows, \`./podbox_fetch lyrics /Volumes/IPOD\` on a Mac. \`podbox_fetch COMMAND --help\` lists a command's options, and the READMEs inside say more.
+          Unzip the one for your computer and run it from a terminal in that folder: \`.\\fetch_pb lyrics E:\\\` on Windows, \`./fetch_pb lyrics /Volumes/IPOD\` on a Mac. \`fetch_pb COMMAND --help\` lists a command's options, and the READMEs inside say more.
 
           On a Mac the program is not signed, so macOS refuses it the first time. In Terminal, in the unzipped folder, run \`xattr -dr com.apple.quarantine .\` once.
           EOF
