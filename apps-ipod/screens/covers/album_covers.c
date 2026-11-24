@@ -422,10 +422,27 @@ static int name_order(int tag, long a, long b)
     return res != 0 ? res : (int)(a - b);
 }
 
+/* Whether Split Album Artists' table was in use when this sort began */
+static bool sort_split;
+
+/* The artist an album sorts under: under Split Album Artists, a joint
+ * string's first artist, so "A; B" falls among A's own albums. A first
+ * artist with no album of their own keeps the joint string. */
+static long artist_group(long seek)
+{
+    int first;
+    long own;
+
+    if (!sort_split || db_names_joint_parts(seek, &first, 1) == 0)
+        return seek;
+    own = db_names_own_seek(first);
+    return own >= 0 ? own : seek;
+}
+
 static int compare_albums(const void *a_v, const void *b_v)
 {
-    long artist_a = ((struct album_data *)a_v)->artist_seek;
-    long artist_b = ((struct album_data *)b_v)->artist_seek;
+    long artist_a = artist_group(((struct album_data *)a_v)->artist_seek);
+    long artist_b = artist_group(((struct album_data *)b_v)->artist_seek);
 
     long album_a = ((struct album_data *)a_v)->seek;
     long album_b = ((struct album_data *)b_v)->seek;
@@ -481,8 +498,11 @@ static int album_build_index(void)
                                     carousel_idx.buf_sz);
 
     if (res >= SUCCESS)
+    {
+        sort_split = db_names_ensure();
         qsort(carousel_idx.album_index, carousel_idx.album_ct,
               sizeof(struct album_data), compare_albums);
+    }
 
     return res;
 }
