@@ -774,6 +774,7 @@ static bool slides(int screen)
         case GO_TO_PLAYLISTS_SCREEN:
         case GO_TO_PLAYLIST_VIEWER:
         case GO_TO_ALBUM_COVERS_TRACKS:
+        case GO_TO_ARCADE:
             return true;
         default:
             return false;
@@ -2271,7 +2272,7 @@ void root_menu(void)
                 ignore_back_button_stub(true);
 
                 next_screen = do_menu(&root_menu_, &selected, NULL, false);
-                if (next_screen >= 0)
+                if (next_screen >= 0 || next_screen == GO_TO_PREVIOUS_MUSIC)
                     transition_begin(TRANSITION_FORWARD);
 
                 ignore_back_button_stub(false);

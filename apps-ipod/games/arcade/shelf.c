@@ -43,6 +43,7 @@
 #include "widgets/splash.h"
 #include "widgets/dialog_prose.h"
 #include "draw/img_filter.h"
+#include "draw/transition.h"
 #include "screens/browse/browser.h"      /* browser_set_showing_art */
 #include "files/file_index.h"
 #include "files/path_list.h"
@@ -546,6 +547,8 @@ int arcade_shelf_run(void)
         }
     }
     browser_set_showing_art(false);
+    /* Ahead of the activity's pop, which clears the list */
+    transition_begin(ret >= 0 ? TRANSITION_FORWARD : TRANSITION_BACK);
     pop_current_activity();
     return ret;
 }
