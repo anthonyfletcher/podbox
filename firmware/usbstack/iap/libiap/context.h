@@ -121,6 +121,7 @@ struct IAPContext {
     IAPBool  flushing_notifications : 1;
     IAPBool  waiting_for_audio_attrs_ack : 1;
     IAPBool  power_off_pending : 1; /* NotifyIPodStateChange to send */
+    int32_t  audio_attrs_trans_id; /* the TrackNewAudioAttributes owed an ack */
 
     uint8_t phase; /* IAPPhase */
 };

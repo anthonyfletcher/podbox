@@ -493,6 +493,8 @@ static int usb_iap_init_connection(void) {
         ERROR("failed to claim albumart slot");
     }
     platform.control_pending = false;
+    platform.track_key       = 0;
+    platform.track_caps      = 0;
 
     /* register timer */
     timeout_register(&tick_tmo, tick_callback, HZ / 10, 0);
@@ -794,6 +796,7 @@ static void usb_iap_notify_event(intptr_t data) {
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
         iap_platform_chapter_tick(ctx);
+        iap_platform_track_tick(ctx);
         if(iap_platform_control_waits(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();

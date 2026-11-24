@@ -33,6 +33,7 @@ int _iap_hanlde_set_fid_token_values(struct IAPSpan* request, struct IAPSpan* re
 void iap_notify_track_time_position(struct IAPContext* ctx, uint32_t pos_ms);
 void iap_notify_track_playback_index(struct IAPContext* ctx, uint32_t index);
 void iap_notify_track_caps(struct IAPContext* ctx, uint32_t caps);
+void iap_notify_track_unique_id(struct IAPContext* ctx, uint64_t id);
 void iap_notify_tracks_count(struct IAPContext* ctx, uint32_t count);
 void iap_notify_chapter_index(struct IAPContext* ctx, uint32_t index, uint16_t count);
 void iap_notify_play_status(struct IAPContext* ctx, uint8_t status /* IAPIPodStatePlayStatus */);

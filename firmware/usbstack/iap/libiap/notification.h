@@ -7,6 +7,7 @@ struct _IAPNotifyState {
     uint32_t           track_time_position_ms;
     uint32_t           track_playback_index;
     uint32_t           track_caps; /* IAPIPodStateTrackCapBits */
+    uint8_t            track_unique_id[8]; /* big-endian */
     uint32_t           tracks_count;
     uint32_t           chapter_index; /* 0xFFFFFFFF for none */
     uint16_t           chapter_count; /* 0 for none */

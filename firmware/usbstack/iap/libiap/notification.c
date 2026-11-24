@@ -1,3 +1,4 @@
+#include <string.h>
 #include "context.h"
 #include "endian.h"
 #include "iap.h"
@@ -25,6 +26,14 @@ void iap_notify_track_playback_index(struct IAPContext* ctx, uint32_t index) {
 void iap_notify_track_caps(struct IAPContext* ctx, uint32_t caps) {
     ctx->notification_data.track_caps = caps;
     ctx->notifications_3 |= 1 << IAPIPodStateType_TrackCaps;
+    ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_TrackCapsChanged;
+}
+
+void iap_notify_track_unique_id(struct IAPContext* ctx, uint64_t id) {
+    for(int i = 0; i < 8; i++) {
+        ctx->notification_data.track_unique_id[i] = (uint8_t)(id >> (56 - 8 * i));
+    }
+    ctx->notifications_4 |= 1 << IAPStatusChangeNotificationType_TrackUniqueID;
 }
 
 void iap_notify_tracks_count(struct IAPContext* ctx, uint32_t count) {
@@ -218,9 +227,16 @@ IAPBool _iap_flush_notification(struct IAPContext* ctx) {
                   payload->state = ctx->notification_data.hold_switch_state);
     send_notify_4(IAPPlayStatusChangeNotificationPlaybackStoppedPayload,
                   IAPStatusChangeNotificationType_PlaybackStopped, );
+    /* The ID first: a car that follows tracks by it refreshes on it */
+    send_notify_4(IAPPlayStatusChangeNotificationTrackUniqueIDPayload,
+                  IAPStatusChangeNotificationType_TrackUniqueID,
+                  memcpy(payload->id, ctx->notification_data.track_unique_id, sizeof(payload->id)));
     send_notify_4(IAPPlayStatusChangeNotificationTrackIndexPayload,
                   IAPStatusChangeNotificationType_TrackIndex,
                   payload->index = swap_32(ctx->notification_data.track_playback_index));
+    send_notify_4(IAPPlayStatusChangeNotificationTrackCapsChangedPayload,
+                  IAPStatusChangeNotificationType_TrackCapsChanged,
+                  payload->caps = swap_32(ctx->notification_data.track_caps));
     send_notify_4(IAPPlayStatusChangeNotificationChapterIndexPayload,
                   IAPStatusChangeNotificationType_ChapterIndex,
                   payload->index = swap_32(ctx->notification_data.chapter_index));

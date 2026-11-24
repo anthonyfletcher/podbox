@@ -17,8 +17,6 @@
  * KIND, either express or implied.
  *
  ****************************************************************************/
-#include "playback.h"
-
 #include "iap-usb.h"
 #include "libiap/iap.h"
 #include "platform.h"
@@ -44,26 +42,13 @@ void iap_on_track_playback_index(uint32_t index, bool track_ready) {
 
     /* before the accessory hears of the track and asks about it */
     iap_platform_track_changed(index);
-    if(track_ready) {
-        /* called from from audio_finish_load_track() */
-        goto notify;
-    }
+    iap_platform_track_id(ctx);
 
-    /* called from audio_playlist_track_change() */
-    struct Platform* plt = ctx->platform;
-    if(plt->aa_slot < 0) {
-        goto notify;
-    }
-    if(playback_current_aa_hid(plt->aa_slot) >= 0) {
-        /* artwork ready, maybe preloaded track */
-        goto notify;
-    } else {
-        /* artwork not ready, maybe after a playlist jump.
-         * in this case, we will be called again from audio_finish_load_track(),
-         * with track_ready == true. */
-        return;
-    }
-notify:
+    /* Sent on the change itself, whatever the art: a track that was already
+     * buffered gets no second call. A track that was not gets one from
+     * audio_finish_load_track() (track_ready), which says it again once the
+     * playback engine's art, the fallback to the art cache, is loaded. */
+    (void)track_ready;
     iap_notify_track_playback_index(ctx, index);
 }
 

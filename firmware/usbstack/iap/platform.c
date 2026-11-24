@@ -313,6 +313,12 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
     }
     long button = BUTTON_NONE;
     if(control == IAPPlatformControl_Play || (control == IAPPlatformControl_TogglePlayPause && !(audio_status() & AUDIO_STATUS_PLAY))) {
+        /* One held answer at a time: holding a second would leave the
+         * first's transaction unanswered */
+        if(plt->control_pending) {
+            ret = iap_false;
+            goto exit;
+        }
         if(iap_library_building()) {
             /* The library starts playback once the Queue is built, and an
              * accessory told before then asks about a Queue half made */
@@ -517,7 +523,7 @@ IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* tot
 }
 
 /* taken from iap-core.c */
-static void get_trackinfo(const unsigned int track, struct mp3entry* id3) {
+static bool get_trackinfo(const unsigned int track, struct mp3entry* id3) {
     int tracknum = track;
     tracknum += playlist_get_first_index(NULL);
     if(tracknum >= playlist_amount()) {
@@ -527,15 +533,20 @@ static void get_trackinfo(const unsigned int track, struct mp3entry* id3) {
     /* Stopped, the current track's tags are empty */
     if(playlist_next(0) != tracknum || !(audio_status() & AUDIO_STATUS_PLAY)) {
         struct playlist_track_info info;
-        playlist_get_track_info(NULL, tracknum, &info);
+        if(playlist_get_track_info(NULL, tracknum, &info) < 0) {
+            return false;
+        }
         /* The database first: a dock listing a playlist asks for every
-         * track, and the file is a parse each. */
+         * track, and the file is a parse each. A file neither can read
+         * leaves id3 cleared, and goes with empty tags. */
         if(!tagcache_fill_tags(id3, info.filename)) {
             get_metadata(id3, -1, info.filename);
         }
     } else {
-        memcpy(id3, audio_current_track(), sizeof(*id3));
+        /* a copy whose strings are its own: playback rewrites the live one */
+        copy_mp3entry(id3, audio_current_track());
     }
+    return true;
 }
 
 IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformTrackInfo* info) {
@@ -546,7 +557,7 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
      * parse below already strains */
     static struct mp3entry     id3;
     check_act(playlist_get_track_info(NULL, index, &track) == 0, return iap_false);
-    get_trackinfo(index, &id3);
+    check_act(get_trackinfo(index, &id3), return iap_false);
 
     if(info->total_ms != NULL) {
         *info->total_ms = id3.length;
@@ -685,6 +696,39 @@ void iap_platform_chapter_tick(struct IAPContext* ctx) {
     struct iap_chapter_info info;
     const bool              has = iap_current_chapter(&info);
     iap_notify_chapter_index(ctx, has ? info.index : 0xFFFFFFFF, has ? info.count : 0);
+}
+
+/* Here rather than in the playback callbacks, so that every route to a new
+ * track is seen, and the art check is never asked from the audio thread. An
+ * art check still pending reads as no art, and its answer as a change. */
+void iap_platform_track_tick(struct IAPContext* ctx) {
+    struct Platform* plt = ctx->platform;
+    struct mp3entry* id3 = audio_current_track();
+    if(id3 == NULL || !(audio_status() & AUDIO_STATUS_PLAY)) {
+        return;
+    }
+
+    iap_platform_track_id(ctx);
+
+    const uint32_t caps = track_caps(plt, playlist_get_display_index() - 1, id3);
+    if(caps != plt->track_caps) {
+        plt->track_caps = caps;
+        iap_notify_track_caps(ctx, caps);
+    }
+}
+
+void iap_platform_track_id(struct IAPContext* ctx) {
+    struct Platform* plt = ctx->platform;
+    struct mp3entry* id3 = audio_current_track();
+    if(id3 == NULL) {
+        return;
+    }
+
+    const uint64_t key = iap_library_key(id3->path);
+    if(key != plt->track_key) {
+        plt->track_key = key;
+        iap_notify_track_unique_id(ctx, key);
+    }
 }
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {

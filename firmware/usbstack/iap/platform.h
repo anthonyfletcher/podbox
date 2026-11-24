@@ -37,6 +37,10 @@ struct Platform {
     bool                             control_pending;
 
     int aa_slot;
+
+    /* the playing track as last told to the accessory */
+    uint64_t track_key;
+    uint32_t track_caps;
 };
 
 void iap_platform_seek_tick(struct IAPContext* ctx);
@@ -61,3 +65,8 @@ void    _iap_convert_datetime(struct tm* rb_time, struct IAPDateTime* time);
 bool    iap_platform_control_waits(struct IAPContext* ctx);
 /* Each tick: the playing chapter, for the accessory to hear of a change */
 void    iap_platform_chapter_tick(struct IAPContext* ctx);
+/* Each tick: the playing track's unique ID and caps, likewise */
+void    iap_platform_track_tick(struct IAPContext* ctx);
+/* The playing track's unique ID, if it has changed: also called on a track
+ * change, ahead of the new index */
+void    iap_platform_track_id(struct IAPContext* ctx);

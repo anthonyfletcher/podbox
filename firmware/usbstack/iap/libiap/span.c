@@ -34,7 +34,7 @@ IAPBool iap_span_append(struct IAPSpan* span, const void* ptr, size_t size) {
         return iap_true;                                                          \
     }                                                                             \
     IAPBool iap_span_write_##width(struct IAPSpan* span, uint##width##_t value) { \
-        uint##width##_t* ptr = iap_span_alloc(span, width / 8);                   \
+        uu##width* ptr = iap_span_alloc(span, width / 8);                         \
         check_ret(ptr != NULL, iap_false);                                        \
         *ptr = swap_##width(value);                                               \
         return iap_true;                                                          \

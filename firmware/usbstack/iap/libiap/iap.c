@@ -196,6 +196,12 @@ static uint32_t play_stage_change_notification_set_mask_to_type_mask(uint32_t ma
     if(mask & IAPStatusChangeNotificationBits_ChapterIndex) {
         ret |= 1 << IAPStatusChangeNotificationType_ChapterIndex;
     }
+    if(mask & IAPStatusChangeNotificationBits_TrackUniqueID) {
+        ret |= 1 << IAPStatusChangeNotificationType_TrackUniqueID;
+    }
+    if(mask & IAPStatusChangeNotificationBits_TrackCapsChanged) {
+        ret |= 1 << IAPStatusChangeNotificationType_TrackCapsChanged;
+    }
     if(mask & IAPStatusChangeNotificationBits_PlaybackEngineContentsChanged) {
         ret |= 1 << IAPStatusChangeNotificationType_PlaybackEngineContentsChanged;
     }
@@ -1295,6 +1301,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             response_span->ptr = NULL;
             if(request->id == IAPDigitalAudioCommandID_TrackNewAudioAttributes) {
                 check_ret(ctx->waiting_for_audio_attrs_ack, 0, "unexpected ack");
+                check_ret(ctx->handling_trans_id == ctx->audio_attrs_trans_id, 0, "stale ack");
                 ctx->waiting_for_audio_attrs_ack = iap_false;
                 iap_platform_on_audio_attrs_ack(ctx, request->status == IAPAckStatus_Success);
             }
@@ -1813,18 +1820,24 @@ static IAPBool push_active_event(struct IAPContext* ctx, struct IAPActiveEvent e
     return iap_false;
 }
 
+/* An ack is owed only for an announcement that went out, and only the latest
+ * one's transaction is taken: a late ack for an earlier rate must not pass
+ * for this one's */
 static IAPBool process_select_sampr(struct IAPContext* ctx, struct IAPActiveEvent* event) {
     if(ctx->waiting_for_audio_attrs_ack) {
         IAP_ERRORF("another sampr request pending");
     }
-    ctx->waiting_for_audio_attrs_ack = iap_true;
 
     struct IAPSpan                            request_span = _iap_get_buffer_for_send_payload(ctx);
     struct IAPTrackNewAudioAttributesPayload* request      = iap_span_alloc(&request_span, sizeof(*request));
-    request->sample_rate                                   = swap_32(event->sampr);
-    request->sound_check                                   = 0;
-    request->volume_adjustment                             = 0;
-    check_ret(_iap_send_packet(ctx, IAPLingoID_DigitalAudio, IAPDigitalAudioCommandID_TrackNewAudioAttributes, _iap_next_trans_id(ctx), request_span.ptr), iap_false);
+    check_ret(request != NULL, iap_false);
+    request->sample_rate       = swap_32(event->sampr);
+    request->sound_check       = 0;
+    request->volume_adjustment = 0;
+    const int32_t trans_id     = _iap_next_trans_id(ctx);
+    check_ret(_iap_send_packet(ctx, IAPLingoID_DigitalAudio, IAPDigitalAudioCommandID_TrackNewAudioAttributes, trans_id, request_span.ptr), iap_false);
+    ctx->audio_attrs_trans_id        = trans_id;
+    ctx->waiting_for_audio_attrs_ack = iap_true;
     return iap_true;
 }
 
