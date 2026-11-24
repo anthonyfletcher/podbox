@@ -158,7 +158,7 @@ static int band_eval(const struct band_pre *p, int32_t sphi)
     if (ratio > 0x7fffffff)
         ratio = 0x7fffffff;
     /* 10 log10(x) = 4.3429 ln(x); 27795 / 2^22 is 4.3429 / 65536 * 100 */
-    int cdb = (int)(((int64_t)fp16_log((int)ratio) * 27795) >> 22);
+    int cdb = (int)(((int64_t)fp16_log((int)ratio) * 27795 + (1 << 21)) >> 22);
     return p->peak ? cdb : p->half_cdb + cdb;
 }
 

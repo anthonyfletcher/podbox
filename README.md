@@ -1021,6 +1021,8 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
   - Decoding on the iPod Video's second processor: the design, and the code PodBox's is
     ported from
   - Screen Transitions: the idea, when a slide starts and how it eases
+  - The equaliser: a band checked at both of the iPod Video's sample rates, the curve
+    rounded to the nearest, and a change made while paused heard as soon as it plays
 
 ### Album Artwork
 

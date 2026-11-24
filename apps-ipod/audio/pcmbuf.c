@@ -495,6 +495,13 @@ void * pcmbuf_request_buffer(int *count)
     }
     else    /* !playing */
     {
+        /* Low latency keeps its quarter second while paused too -- after a
+           pause's fade, which stops the channel, or while playback may not
+           start -- so a change made then is heard as soon as it plays. */
+        if (low_latency_mode && remaining > DATA_LEVEL(1)
+            && (fade_out_complete || !audio_pcmbuf_may_play()))
+            return NULL;
+
         /* Boost CPU for pre-buffer */
         trigger_cpu_boost();
 

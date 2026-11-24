@@ -940,6 +940,12 @@ static void speak_band(void)
     talk_value_decimal(s->gain, UNIT_DB, 1, true);
 }
 
+/* At either output rate: the curve's rate is only the one playing now. */
+static bool band_fits(const struct eq_band_setting *s)
+{
+    return eq_band_fits(s, PLAY_SAMPR_MIN) && eq_band_fits(s, PLAY_SAMPR_MAX);
+}
+
 /* One wheel step, or several when the wheel turns fast. */
 static void wheel(int dir)
 {
@@ -984,8 +990,8 @@ static void wheel(int dir)
      * brought toward 0 dB: a smaller gain never fits less, and 0 fits. */
     if (!memcmp(&next, s, sizeof next))
         return;
-    if (!eq_band_fits(&next, curve.fs)
-        && (eq_band_fits(s, curve.fs) || abs(next.gain) >= abs(s->gain)))
+    if (!band_fits(&next)
+        && (band_fits(s) || abs(next.gain) >= abs(s->gain)))
         return;
     *s = next;
     band_applied(ed.band);
