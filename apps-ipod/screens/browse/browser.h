@@ -159,6 +159,9 @@ const struct bitmap *browser_art_row(int selected_item, void *data,
                                      struct dim *size,
                                      const struct img_filter *filter,
                                      uint32_t filter_hash);
+/* An artist row's art key, as the browser's artist lists choose it: their
+ * own picture's 'own', or with Artist Cover on and no picture, 'cover' */
+unsigned int browser_artist_art_hash(unsigned int own, unsigned int cover);
 /* %LH(art): the header's cover at the size given, from the same cache */
 const struct bitmap *browser_header_art(struct dim *size);
 

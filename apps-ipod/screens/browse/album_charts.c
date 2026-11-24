@@ -50,6 +50,7 @@
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* the index, and SUCCESS/ERROR_* */
 #include "database/db_names.h"
+#include "screens/browse/browser.h"      /* art rows, as the browser's */
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
 #include "root_menu.h"
@@ -253,6 +254,45 @@ static const char *chart_get_name(int selected_item, void *data,
     return buffer;
 }
 
+/* Art rows behind the settings that give the browser's album and artist
+ * lists theirs, with the keys those lists use */
+static bool chart_has_art(void)
+{
+    return CHART_IS_ARTIST(chart_kind) ? global_settings.db_artistart
+                                       : global_settings.db_albumart;
+}
+
+static unsigned int chart_art_hash(int selected_item, void *data)
+{
+    int i;
+    (void)data;
+
+    if (selected_item < 0 || selected_item >= chart_len)
+        return 0;
+    i = chart[selected_item];
+    if (!CHART_IS_ARTIST(chart_kind))
+        return idx.album_index[i].art_hash;
+    return browser_artist_art_hash(idx.artist_index[i].art_hash,
+                                   idx.artist_index[i].cover_hash);
+}
+
+static const struct bitmap *chart_get_albumart(int selected_item, void *data,
+                                               struct dim *size,
+                                               const struct img_filter *filter,
+                                               uint32_t filter_hash)
+{
+    return browser_art_row(selected_item, data, chart_art_hash, size, filter,
+                           filter_hash);
+}
+
+/* An album or an artist, as in the browser's lists of them */
+static enum list_row_kind chart_get_kind(int selected_item, void *data)
+{
+    (void)selected_item;
+    (void)data;
+    return LIST_ROW_CONTAINER;
+}
+
 static int chart_title(enum album_chart kind)
 {
     switch (kind)
@@ -351,9 +391,23 @@ int album_charts_show(enum album_chart kind)
     {
         simplelist_info_init(&info, str(chart_title(kind)), chart_len, NULL);
         info.get_name = chart_get_name;
+        info.get_kind = chart_get_kind;
         info.wps_on_play = true;
+        /* The thumbnails are cached by row, and these rows are not the
+         * browser's */
+        browser_albumart_invalidate();
+        browser_set_showing_art(chart_has_art());
+        if (chart_has_art())
+        {
+            info.get_albumart = chart_get_albumart;
+            info.row_height = global_settings.db_art_row_height;
+        }
 
-        if (simplelist_show_list(&info))
+        bool to_root = simplelist_show_list(&info);
+
+        browser_set_showing_art(false);
+        browser_albumart_invalidate();
+        if (to_root)
             ret = GO_TO_ROOT;
         else if (info.selection == -2)
             ret = GO_TO_WPS;

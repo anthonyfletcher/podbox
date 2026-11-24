@@ -409,9 +409,10 @@ Separator set above zero.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
-| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser, from /Artwork/People or the artist's folder. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser and the album charts. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
+| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser and the artist charts, from /Artwork/People or the artist's folder. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
 | Art Rows ▸ Album Cover If No Photo | Shows the cover of an artist's latest album when there is no photograph of them, instead of the placeholder: beside their row, in Artist Portraits, and on the now-playing screen when it shows the artist photograph. | No |  |
+| Art Rows ▸ Featured Artist Art Rows | Draws a photograph beside each guest in Featured Artists, from an image named after them in /Artwork/People. Without one the row shows a placeholder. | No |  |
 | Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | Yes |  |
 | Art Rows ▸ Audiobook Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from an image named after them in /Artwork/People or a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
 | Art Rows ▸ Audiobook Cover If No Photo | Shows the cover of an audiobook author's latest book beside their row when there is no photograph of them, instead of the placeholder. Only shown where Audiobook Author Art Rows is on. | No |  |

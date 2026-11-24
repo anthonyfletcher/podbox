@@ -599,6 +599,19 @@ static unsigned int browser_row_art_hash(int selected_item, void *data)
     return hash;
 }
 
+unsigned int browser_artist_art_hash(unsigned int own, unsigned int cover)
+{
+    char aat[MAX_PATH];
+    bool is_fallback;
+
+    if (own && cover && global_settings.db_artist_cover
+        && art_cache_lookup_hash(own, browser_aa_size_idx, aat, sizeof(aat),
+                                 &is_fallback)
+        && is_fallback)
+        return cover;
+    return own;
+}
+
 static const struct bitmap *browser_get_albumart(int selected_item, void * data,
                                               struct dim *size,
                                               const struct img_filter *filter,

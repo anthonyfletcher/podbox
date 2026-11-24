@@ -244,6 +244,7 @@ static const struct tag_row tag_rows[] = {
 { "database album art",  TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows cover thumbnail" },
 { "database artist art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows photo thumbnail" },
 { "database artist cover", TAG_ARTWORK|TAG_LIBRARY,            "art rows portraits now playing photo album cover missing placeholder" },
+{ "database featured artist art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows featured guest photo thumbnail" },
 { "database audiobook art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows book cover thumbnail" },
 { "database author art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows audiobook author photo thumbnail" },
 { "database author cover", TAG_ARTWORK|TAG_LIBRARY,            "art rows audiobook author photo book cover missing placeholder" },

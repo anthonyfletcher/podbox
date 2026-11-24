@@ -2327,6 +2327,9 @@ const struct settings_list settings[] = {
      * library, not the theme's, so a theme neither sets nor resets them */
     OFFON_SETTING(0, db_artist_cover, LANG_DB_ARTIST_COVER,
                   false, "database artist cover", NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_featuredart,
+                  LANG_DB_FEATURED_ART, false, "database featured artist art",
+                  NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_bookart, LANG_DB_BOOK_ART,
                   true, "database audiobook art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_authorart, LANG_DB_AUTHOR_ART,

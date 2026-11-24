@@ -28292,3 +28292,17 @@
     *: "Tall"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_FEATURED_ART
+  desc: in Settings, art rows on the Featured Artists list
+  user: core
+  <source>
+    *: "Featured Artist Art Rows"
+  </source>
+  <dest>
+    *: "Featured Artist Art Rows"
+  </dest>
+  <voice>
+    *: "Featured Artist Art Rows"
+  </voice>
+</phrase>

@@ -35,11 +35,15 @@
 #include "widgets/list.h"
 #include "widgets/splash.h"
 #include "input/action.h"
+#include "settings/settings.h"
 #include "system/activity.h"
 #include "system/app_buffer.h"       /* where the track rows are read into */
 #include "system/app_util.h"         /* warn_on_pl_erase */
 #include "database/tagcache.h"
 #include "database/db_featured.h"
+#include "database/db_names.h"
+#include "metadata/art_name.h"         /* a guest's picture, by name */
+#include "screens/browse/browser.h"    /* art rows, as the browser's */
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
 #include "screens/context_menu.h"
@@ -90,6 +94,23 @@ static const char *guest_get_name(int n, void *data, char *buffer,
     snprintf(buffer, buffer_len, "%s (%d)", db_featured_name(g),
              db_featured_track_count(g));
     return buffer;
+}
+
+/* A guest's picture is keyed by their name, as any artist's is */
+static unsigned int guest_art_hash(int n, void *data)
+{
+    (void)data;
+    return n >= 0 && n < order_ct ? art_name_hash(db_featured_name(order[n]))
+                                  : 0;
+}
+
+static const struct bitmap *guest_get_albumart(int n, void *data,
+                                               struct dim *size,
+                                               const struct img_filter *filter,
+                                               uint32_t filter_hash)
+{
+    return browser_art_row(n, data, guest_art_hash, size, filter,
+                           filter_hash);
 }
 
 static enum list_row_kind guest_get_kind(int n, void *data)
@@ -508,7 +529,20 @@ int featured_artists_show(void)
         info.action_callback = context_action_cb;
         info.selection = selection;
         info.wps_on_play = true;
-        if (simplelist_show_list(&info))
+        /* The thumbnails are cached by row, and these rows are not the
+         * browser's */
+        browser_albumart_invalidate();
+        browser_set_showing_art(global_settings.db_featuredart);
+        if (global_settings.db_featuredart)
+        {
+            info.get_albumart = guest_get_albumart;
+            info.row_height = global_settings.db_art_row_height;
+        }
+        bool to_root = simplelist_show_list(&info);
+
+        browser_set_showing_art(false);
+        browser_albumart_invalidate();
+        if (to_root)
         {
             ret = GO_TO_ROOT;
             break;

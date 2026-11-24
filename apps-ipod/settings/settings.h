@@ -860,6 +860,10 @@ struct user_settings
      * instead of the placeholder: on their row, in Artist Portraits and as
      * Now Playing's artist art. Off by default. */
     bool db_artist_cover;
+    /* The same photographs on the Featured Artists list, apart from the
+     * album artists', since few people keep pictures of their guests. Off
+     * by default. */
+    bool db_featuredart;
     /* Art on the book rows of an audiobook browse, overriding the two above
      * for those lists only -- tall rows are a different bargain over a few
      * dozen books than over a few thousand albums. Off by default. */
