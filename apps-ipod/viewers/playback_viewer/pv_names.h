@@ -32,7 +32,8 @@ size_t pv_names_init(void *buf, size_t bufsz);
 void pv_names_discard(void);
 
 /* A value that changes whenever the names every path resolves to could: the
- * moved-folder table, and whether the database is in RAM. 0 when there is no
+ * moved-folder table, whether the database is in RAM, and which plays
+ * pv_names_kept_apart() leaves out. 0 when there is no
  * usable database. Cheap, so a cache of resolved names can be checked against
  * it before deciding to build one. What the database says about one path is
  * pv_names_fingerprint()'s. */
@@ -55,6 +56,12 @@ bool pv_names_complete(void);
  * the new folder, in a static buffer valid until the next call. Resolve names
  * and artwork from what this returns, not from the logged path. */
 const char *pv_names_locate(const char *path);
+
+/* Whether the file at 'path' is a book or a podcast that Segregate Audiobooks
+ * or Segregate Podcasts keeps out of the music, which the report leaves out
+ * too. Read from its genre, as the lists do; a file the database does not
+ * hold has none, and counts as music. */
+bool pv_names_kept_apart(const char *path);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a
  * device with a database in RAM ever comes back PV_NAME_DB, the logged paths

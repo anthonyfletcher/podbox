@@ -21,3 +21,7 @@
 - **Liner Notes** reads `/Notes` again, in the background, the first time the
   iPod starts; until it finishes, notes pages and **Biography** rows are
   missing. A library of more than 2,048 pages now keeps all of them.
+- The **Playback Report** leaves out audiobooks and podcasts while
+  **Segregate Audiobooks** and **Segregate Podcasts** keep them out of the
+  music, so its figures, badges included, can go down. It reads the whole
+  log again the first time it opens.

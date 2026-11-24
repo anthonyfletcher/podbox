@@ -766,6 +766,7 @@ static void wk_entry(const struct pv_entry *e, void *ctx)
 {
     struct wk_ctx *c = ctx;
     char artist[PV_NAME_MAX], title[PV_NAME_MAX], album[PV_NAME_MAX];
+    const char *path;
     long d;
 
     if (!e->valid_ts || !e->listened)
@@ -778,7 +779,10 @@ static void wk_entry(const struct pv_entry *e, void *ctx)
     /* Names are resolved only for entries inside the week, which is what
      * keeps this affordable: the read is one week, the naming is what is in
      * it. */
-    pv_names_resolve(pv_names_locate(e->path), artist, title, album, NULL);
+    path = pv_names_locate(e->path);
+    if (pv_names_kept_apart(path))
+        return;
+    pv_names_resolve(path, artist, title, album, NULL);
     wk_add(wk_art, &wk_art_n, artist);
     wk_add(wk_trk, &wk_trk_n, title);
 }

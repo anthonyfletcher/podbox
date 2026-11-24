@@ -25,6 +25,9 @@
  * renumbered in place, and pv_names_locate()
  * gives the path it has now, which the database may well know.
  *
+ * It also says which plays the report leaves out: books and podcasts, while
+ * Segregate Audiobooks and Segregate Podcasts keep them out of the music.
+ *
  * The database is asked by path_key(), which ignores case and a volume
  * prefix. The artwork cache hashes the folder string as given (see
  * aa_dirname() in metadata/art_cache.c), so artwork resolves for every path
@@ -42,13 +45,14 @@
 #include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"
 #include "settings/settings.h"
 #include "pv_moves.h"
 #include "pv_names.h"
 
 /* Moves whenever the way a path is named changes, so pv_names_identity()
  * does too and every saved report is rebuilt from the log once. */
-#define PV_NAMES_VERSION 3
+#define PV_NAMES_VERSION 4
 
 /* Longest file name taken apart by the filename guesswork. */
 #define META_MAX 160
@@ -79,7 +83,7 @@ static bool db_state(struct pv_moves_db *db)
 unsigned long pv_names_identity(void)
 {
     struct pv_moves_db db;
-    unsigned long key[3];
+    unsigned long key[4];
 
     if (!db_state(&db))
         return 0;
@@ -88,6 +92,8 @@ unsigned long pv_names_identity(void)
     /* Names come from the database only while it is in RAM, so a report
      * built without it is named differently from one built with it. */
     key[2] = tagcache_is_in_ram();
+    /* And which plays it leaves out: see pv_names_kept_apart() */
+    key[3] = (unsigned long)db_spoken_apart();
     return fnv1a_bytes(key, sizeof(key));
 }
 
@@ -351,6 +357,21 @@ const char *pv_names_locate(const char *path)
         return path;
     moved = pv_moves_apply(path);
     return moved ? moved : path;
+}
+
+bool pv_names_kept_apart(const char *path)
+{
+    char genre[64];
+    int idx_id;
+
+    if (!db_spoken_apart())
+        return false;
+    idx_id = tagcache_find_path(path);
+    if (idx_id < 0
+        || !tagcache_entry_string(idx_id, tag_genre, genre, sizeof(genre))
+        || !db_spoken_is_spoken_genre(genre))
+        return false;
+    return db_spoken_kind_apart(db_spoken_is_podcast_genre(genre) ? 2 : 1);
 }
 
 enum pv_name_src pv_names_resolve(const char *path, char *artist,

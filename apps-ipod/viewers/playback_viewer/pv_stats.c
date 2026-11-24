@@ -681,6 +681,9 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     replay_progress(e->offset);
 
     path = pv_names_locate(e->path);
+    /* Left out of every figure, the badges and the lifetime included */
+    if (pv_names_kept_apart(path))
+        return;
     if (tagcache_find_key(key) < 0)
         logged_add(key, path == e->path ? key : path_key(path));
     src = pv_names_resolve(path, artist, title, album, album_artist);
