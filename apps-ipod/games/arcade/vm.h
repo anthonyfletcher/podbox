@@ -409,6 +409,8 @@ struct vm
      * of them */
     const uint8_t *pals, *shet, *maps, *imgs;
     uint32_t pals_len, shet_len, maps_len, imgs_len;
+    struct lazy maps_left;      /* MAPS in the cart file, when maps is NULL */
+    uint8_t *objbuf;            /* the active map's objects, read from there */
     struct mapinfo *mapdir;
     uint32_t nmaps;
     int32_t active_map;         /* -1 while the map is the empty default */
@@ -461,7 +463,9 @@ struct vm
 };
 
 /* A cart map: its cells, LZ4 -- in the arena, or left in the cart file as
- * lazy chunk mapc[lazy] -- and where each object's record starts */
+ * lazy chunk mapc[lazy] -- and where each object's record starts. With
+ * MAPS left in the file, every map's obj is the one table of the active
+ * map's records in objbuf, and objs is where its records are in the file */
 struct mapinfo
 {
     uint16_t w, h, nobj;
@@ -469,6 +473,7 @@ struct mapinfo
     const uint8_t *z;
     const uint8_t **obj;
     int32_t lazy;               /* -1 when z holds the cells */
+    struct lazy objs;           /* len 0 when obj is its own */
 };
 
 
@@ -692,6 +697,8 @@ uint32_t perm_alloc(struct vm *vm, uint32_t bytes);
 int lz4_decode(const uint8_t *src, uint32_t n, uint8_t *dst, uint32_t size);
 int lazy_unpack(struct vm *vm, const struct lazy *c, uint8_t *dst,
                 uint32_t size);
+int lazy_read(struct vm *vm, const struct lazy *c, uint8_t *dst);
+uint32_t cart_crc(const uint8_t *b, uint32_t n);
 uint32_t key_id(struct vm *vm, struct value s, int add);
 uint32_t key_find(struct vm *vm, const char *b, uint32_t len);
 /* A record's field by its name, from C; null when o is not a record or has

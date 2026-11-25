@@ -308,6 +308,49 @@ function update() {}`;
     assert.equal(readCart(r.cart).list.filter((c) => c.tag === 'MAPC').length, 4);
 });
 
+test('each loadmap brings its own map\'s objects, before and after a resume', () => {
+    const coin = (x, v) => ({ kind: 'coin', x: x, y: 0, props: { v: v } });
+    const files = {
+        'cart.json': JSON.stringify({ id: '00000000000a55eb', name: 'Objects' }),
+        'maps/a.json': JSON.stringify({ width: 1, height: 1,
+            objects: [{ kind: 'spawn', x: 8, y: 0, props: { v: 5 } }] }),
+        'maps/b.json': JSON.stringify({ width: 1, height: 1 }),
+        'maps/c.json': JSON.stringify({ width: 1, height: 1,
+            objects: [coin(16, 1), coin(24, -2), coin(32, 'hi')] }),
+        'main.js': `var obj = new Int32Array(20), step = 0;
+function show(m) {
+    loadmap(m);
+    var n = mapobj(obj, 4), s = n + ":";
+    for (var i = 0; i < n; i++)
+        s += " " + obj[i * 5] + "," + obj[i * 5 + 1] + "," + mapprop(i, "v");
+    printh(s);
+}
+function init() {}
+function update() {
+    var order = [MAP.a, MAP.c, MAP.b, MAP.a, MAP.c, MAP.a];
+    if (step < 5) show(order[step]);
+    else if (step == 5) { loadmap(MAP.a); mapprop(1, "v"); }
+    step++;
+}`
+    };
+    const dir = folder('mapobjs', files);
+    const res = compileFiles(readFolder(dir), readAssets(dir));
+    assert.deepEqual(res.errors, []);
+    const file = path.join(dir, 'objs.pbg');
+    fs.writeFileSync(file, res.cart);
+    const want = ['1: 1,8,5', '3: 0,16,1 0,24,-2 0,32,hi', '0:',
+                  '1: 1,8,5', '3: 0,16,1 0,24,-2 0,32,hi'];
+    for (const extra of [[], ['--suspend-at', '3']]) {
+        const r = spawnSync(exe, [file, '--ticks', '7'].concat(extra),
+                            { encoding: 'utf8', timeout: 20000 });
+        const out = r.stdout.replace(/\r/g, '').split('\n')
+            .filter((l) => l && l !== 'resumed');
+        assert.deepEqual(out, want, extra.join(' '));
+        /* map a's one object, though c's three were read before it */
+        assert.match(r.stderr, /mapprop\(\) needs an object of the active map/);
+    }
+});
+
 test('a kept game reads its maps and lazy images from the file after it resumes', () => {
     const files = {
         'cart.json': JSON.stringify({ id: '00000000000a55ea', name: 'Keep', lazy_images: ['sky'] }),

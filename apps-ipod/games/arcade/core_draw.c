@@ -186,13 +186,33 @@ static void use_palette(struct vm *vm, const uint8_t *rgb, uint32_t k)
     reshow(&vm->d);
 }
 
+/* MAPS left in the cart file, read whole into the arena's top while the
+ * directory is made from it */
+static const uint8_t *maps_from_file(struct vm *vm)
+{
+    const struct lazy *c = &vm->maps_left;
+    uint32_t top = (vm->size - c->len) & ~7u;
+    if (c->len > vm->size || top < vm->perm) {
+        vm_fail(vm, "not enough memory for this game", "", "");
+        return NULL;
+    }
+    return lazy_read(vm, c, MEM(vm, top)) ? MEM(vm, top) : NULL;
+}
+
 /* The map directory; *cap is the most cells any map needs */
 static int read_maps(struct vm *vm, uint32_t *cap)
 {
     *cap = MAP_W * MAP_H;
-    if (!vm->maps)
+    /* objects read as their map becomes active, when MAPS is not kept */
+    int left = vm->maps_left.len != 0;
+    const uint8_t *p = left ? maps_from_file(vm) : vm->maps;
+    if (left && !p)
+        return 0;
+    if (!p)
         return 1;
-    const uint8_t *p = vm->maps, *end = p + vm->maps_len;
+    const uint8_t *start = p, *end = p + (left ? vm->maps_left.len
+                                                : vm->maps_len);
+    uint32_t most = 0, most_obj = 0;
     if (end - p < 2)
         return damaged(vm, "maps");
     uint32_t n = le16(p);
@@ -201,6 +221,8 @@ static int read_maps(struct vm *vm, uint32_t *cap)
     if (!at)
         return 0;
     vm->mapdir = MEM(vm, at);
+    if (left && vm->mem + vm->perm > start)
+        return vm_fail(vm, "not enough memory for this game", "", "");
     for (uint32_t i = 0; i < n; i++) {
         struct mapinfo *m = &vm->mapdir[i];
         if (end - p < 8)
@@ -228,12 +250,16 @@ static int read_maps(struct vm *vm, uint32_t *cap)
             return damaged(vm, "maps");
         m->nobj = (uint16_t)le16(p);
         p += 2;
-        at = perm_alloc(vm, m->nobj * sizeof(uint8_t *) + 8);
-        if (!at)
-            return 0;
-        m->obj = MEM(vm, at);
+        const uint8_t *first = p;
+        if (!left) {
+            at = perm_alloc(vm, m->nobj * sizeof(uint8_t *) + 8);
+            if (!at)
+                return 0;
+            m->obj = MEM(vm, at);
+        }
         for (uint32_t o = 0; o < m->nobj; o++) {
-            m->obj[o] = p;
+            if (!left)
+                m->obj[o] = p;
             if (end - p < 10)
                 return damaged(vm, "map objects");
             uint32_t props = p[9];
@@ -249,10 +275,48 @@ static int read_maps(struct vm *vm, uint32_t *cap)
                 p += type ? 2 : 4;
             }
         }
+        if (left) {
+            m->objs.at = vm->maps_left.at + (uint32_t)(first - start);
+            m->objs.len = (uint32_t)(p - first);
+            m->objs.crc = cart_crc(first, m->objs.len);
+            if (m->objs.len > most)
+                most = m->objs.len;
+            if (m->nobj > most_obj)
+                most_obj = m->nobj;
+        }
         if ((uint32_t)m->w * m->h > *cap)
             *cap = (uint32_t)m->w * m->h;
     }
     vm->nmaps = n;
+    if (left) {
+        /* the arena's top is free again: the one table every map shares */
+        const uint8_t **obj;
+        if (!(at = perm_alloc(vm, most + 8)))
+            return 0;
+        vm->objbuf = MEM(vm, at);
+        if (!(at = perm_alloc(vm, most_obj * sizeof(uint8_t *) + 8)))
+            return 0;
+        obj = MEM(vm, at);
+        for (uint32_t i = 0; i < n; i++)
+            vm->mapdir[i].obj = obj;
+    }
+    return 1;
+}
+
+/* A map's object records read from the cart file into objbuf, and its
+ * table pointed at them: they were checked as the directory was made */
+static int map_objects(struct vm *vm, const struct mapinfo *m)
+{
+    if (!lazy_read(vm, &m->objs, vm->objbuf))
+        return 0;
+    const uint8_t *p = vm->objbuf;
+    for (uint32_t o = 0; o < m->nobj; o++) {
+        m->obj[o] = p;
+        uint32_t props = p[9];
+        p += 10;
+        for (uint32_t k = 0; k < props; k++)
+            p += 3 + (p[2] ? 2 : 4);
+    }
     return 1;
 }
 
@@ -273,7 +337,8 @@ static int use_map(struct vm *vm, uint32_t n)
 {
     const struct mapinfo *m = &vm->mapdir[n];
     uint32_t cells = (uint32_t)m->w * m->h;
-    if (!map_cells(vm, m, MEM(vm, vm->map), cells))
+    if (!map_cells(vm, m, MEM(vm, vm->map), cells) ||
+        (m->objs.len && !map_objects(vm, m)))
         return 0;
     vm->map_w = m->w;
     vm->map_h = m->h;
@@ -408,10 +473,15 @@ int core_draw_init(struct vm *vm)
         const uint8_t *first = palette_at(vm, 0, &k);
         use_palette(vm, first, k);
     }
-    /* Every map is checked by unpacking it; the first is then active */
-    for (uint32_t i = vm->nmaps; i-- > 0;)
-        if (!use_map(vm, i))
+    /* Every map's cells are checked by unpacking them; the first is then
+     * active. Objects were checked as the directory was made. */
+    for (uint32_t i = vm->nmaps; i-- > 1;) {
+        const struct mapinfo *m = &vm->mapdir[i];
+        if (!map_cells(vm, m, MEM(vm, vm->map), (uint32_t)m->w * m->h))
             return 0;
+    }
+    if (vm->nmaps && !use_map(vm, 0))
+        return 0;
     if (!read_sheet(vm) || !read_images(vm))
         return 0;
     full_clip(vm);

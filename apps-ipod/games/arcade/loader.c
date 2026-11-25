@@ -4,9 +4,10 @@
  * Arcade: loading a cart into the arena.
  *
  * Parts: the perm allocator; string keys (ids, the content hash); reading
- * the chunks, each CRC-checked, SRC_ and unknown chunks skipped unread;
- * building the tables from them; the error's source position from LINE,
- * which stays in the cart file when the host can read it there;
+ * the chunks, each CRC-checked, SRC_ and unknown chunks skipped unread,
+ * LINE and a format 3 cart's MAPS left in the cart file when the host can
+ * read it there;
+ * building the tables from them; the error's source position from LINE;
  * arcade_load() itself.
  *
  * The byte layouts are the ones arcade/sdk/src/compiler.js writes; its
@@ -178,10 +179,6 @@ static uint32_t crc32(const uint8_t *b, uint32_t n)
 int lazy_unpack(struct vm *vm, const struct lazy *c, uint8_t *dst,
                 uint32_t size)
 {
-    const struct arcade_host *h = vm->host;
-    if (!h || !h->cart_read)
-        return vm_fail(vm, "this player cannot read the game's maps and "
-                       "images as it plays", "", "");
     uint32_t held = 0;
     uint8_t *buf;
     if (vm->heap_hi) {
@@ -196,17 +193,36 @@ int lazy_unpack(struct vm *vm, const struct lazy *c, uint8_t *dst,
             return vm_fail(vm, "not enough memory for this game", "", "");
         buf = MEM(vm, top);
     }
-    crc_init();
-    int ok = h->cart_read(h->ctx, c->at, buf, c->len) == c->len &&
-             crc32(buf, c->len) == c->crc &&
-             (!dst || lz4_decode(buf, c->len, dst, size));
+    int ok = lazy_read(vm, c, buf);
+    if (ok && dst && !lz4_decode(buf, c->len, dst, size))
+        ok = vm_fail(vm, "the game file has changed or is damaged", "", "");
     if (held)
         gc_scratch_end(vm, held);
+    return ok;
+}
+
+/* Lazy chunk c, or a piece of one, read from the cart file into dst as it
+ * is and checked: 1, or 0 with the error set */
+int lazy_read(struct vm *vm, const struct lazy *c, uint8_t *dst)
+{
+    const struct arcade_host *h = vm->host;
+    if (!h || !h->cart_read)
+        return vm_fail(vm, "this player cannot read the game's maps and "
+                       "images as it plays", "", "");
+    crc_init();
+    int ok = h->cart_read(h->ctx, c->at, dst, c->len) == c->len &&
+             crc32(dst, c->len) == c->crc;
     /* measured on the ARM rig (lzcost): about 41 cycles a packed byte,
      * read, checked and unpacked; the unpacked bytes are the caller's */
     vm_charge(vm, c->len);
     return ok ? 1 : vm_fail(vm, "the game file has changed or is damaged",
                             "", "");
+}
+
+uint32_t cart_crc(const uint8_t *b, uint32_t n)
+{
+    crc_init();
+    return crc32(b, n);
 }
 
 static uint32_t rd16(const uint8_t *p) { return p[0] | (p[1] << 8); }
@@ -723,6 +739,20 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
                 return bad(vm, "truncated");
             vm->lines_at = pos + 8;
             vm->lines_len = len;
+            vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
+                            rd_le32(sum);
+            continue;
+        }
+        /* a format 3 cart's maps left there too: core_draw.c reads them,
+         * and holds only the active map's objects */
+        if (want == 7 && clen[0] >= 2 && rd16(chunk[0]) >= 3 &&
+            vm->host && vm->host->cart_read) {
+            uint8_t sum[4];
+            if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
+                return bad(vm, "truncated");
+            vm->maps_left.at = pos + 8;
+            vm->maps_left.len = len;
+            vm->maps_left.crc = rd_le32(sum);
             vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
                             rd_le32(sum);
             continue;
