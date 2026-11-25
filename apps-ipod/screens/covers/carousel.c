@@ -3735,6 +3735,7 @@ static void update_scroll_animation(void)
         /* Decided per cover, at the crossing, where every card is on its
          * resting place and the choice costs nothing to make. */
         pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
+        queue_remove_from_head(&thread_q, EV_WAKEUP);
         queue_post(&thread_q, EV_WAKEUP, 0);
         if (pf_random_spinning)
             keyclick_click(true, BUTTON_SCROLL_FWD);
