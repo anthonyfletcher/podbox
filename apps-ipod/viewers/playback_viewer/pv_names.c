@@ -361,12 +361,15 @@ const char *pv_names_locate(const char *path)
 
 bool pv_names_kept_apart(const char *path)
 {
+    return db_spoken_apart() && pv_names_kept_apart_idx(tagcache_find_path(path));
+}
+
+bool pv_names_kept_apart_idx(int idx_id)
+{
     char genre[64];
-    int idx_id;
 
     if (!db_spoken_apart())
         return false;
-    idx_id = tagcache_find_path(path);
     if (idx_id < 0
         || !tagcache_entry_string(idx_id, tag_genre, genre, sizeof(genre))
         || !db_spoken_is_spoken_genre(genre))

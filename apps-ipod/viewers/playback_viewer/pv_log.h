@@ -6,10 +6,10 @@
  *
  * Interface to pv_log.c.
  *
- * One reader at a time. The stream position and its 16 KB buffer are file
- * statics, so a second read started while one is running takes the first
- * one's place in the file. In particular an entry callback must not call back
- * in here -- pv_log_size() and pv_log_peek() included.
+ * One reader at a time: the stream position and its 16 KB buffer are file
+ * statics, and a read started on another thread waits for the one running.
+ * An entry callback must not call back in here -- pv_log_size() and
+ * pv_log_peek() included.
  ****************************************************************************/
 #ifndef _PV_LOG_H
 #define _PV_LOG_H
@@ -78,6 +78,16 @@ long pv_log_read(enum pv_source src, pv_entry_fn cb, void *ctx);
  * as a line of its own. */
 long pv_log_read_range(enum pv_source src, unsigned long from,
                        unsigned long to, pv_entry_fn cb, void *ctx);
+
+/* The same, ending early once *stop turns true; stop may be NULL */
+long pv_log_read_range_stop(enum pv_source src, unsigned long from,
+                            unsigned long to, pv_entry_fn cb, void *ctx,
+                            const volatile bool *stop);
+
+/* An offset to read from with pv_log_read_range() that misses no entry dated
+ * 'ts' or later: the start of the last file of the family whose first dated
+ * entry is earlier. Costs an open and one buffer's read per file. */
+unsigned long pv_log_offset_since(enum pv_source src, unsigned long ts);
 
 /* What 'src' holds, without reading any of it. Sizes only, so this is an open
  * and a seek per file. */

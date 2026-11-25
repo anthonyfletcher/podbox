@@ -168,6 +168,8 @@ static const struct tag_row tag_rows[] = {
 /* --- playlists ----------------------------------------------------------- */
 { "sort playlists",      TAG_PLAYLIST|TAG_LIBRARY,               NULL },
 { "recursive directory insert", TAG_PLAYLIST,                    "subfolder insert" },
+{ "on repeat",           TAG_PLAYLIST|TAG_LIBRARY,               "most played week month rolling" },
+{ "on repeat length",    TAG_PLAYLIST,                           "tracks how many most played" },
 { "warn when erasing dynamic playlist", TAG_PLAYLIST,            "warn erase" },
 { "keep current track when replacing playlist", TAG_ADVANCED|TAG_PLAYLIST, NULL },
 { "show shuffled adding options", TAG_ADVANCED|TAG_PLAYLIST,     "shuffle add" },

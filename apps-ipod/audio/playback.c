@@ -386,8 +386,8 @@ static unsigned int position_key = 0;
 #define PLAYBACK_LOG_MIN_ELAPSED_MS   (500) /* 500 milliseconds */
 #define PLAYBACK_LOG_BUFSZ (MAX_PATH * 10)
 static int playback_log_handle = 0; /* core_alloc handle for playback log buffer */
-/* The buffer is filled by the audio thread and flushed by it or by the UI
- * thread (playback_log_flush()); every use of it holds this. */
+/* The buffer is filled by the audio thread and flushed by it, the UI thread
+ * or an accessory's (playback_log_flush()); every use of it holds this. */
 static struct mutex playback_log_mutex SHAREDBSS_ATTR;
 
 /* global_settings.playback_log values */

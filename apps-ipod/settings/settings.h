@@ -81,6 +81,13 @@ enum {
     MIX_VARY_VARIABLE,          /* a new list every time */
 };
 
+/* global_settings.on_repeat -- which plays On Repeat counts */
+enum {
+    ON_REPEAT_WEEKLY = 0,       /* last week's, kept all week */
+    ON_REPEAT_MONTHLY,          /* last calendar month's, kept all month */
+    ON_REPEAT_ROLLING,          /* the seven days up to now */
+};
+
 /* global_settings.album_show_year -- where an album list puts the year */
 enum {
     ALBUM_YEAR_OFF = 0,
@@ -719,6 +726,9 @@ struct user_settings
     int mix_length;           /* tracks in a generated playlist */
     bool continue_playing;    /* extend a playlist that runs out */
     bool mix_starts_with_selected; /* Play Similar/Wind Down lead with it */
+
+    int on_repeat;            /* ON_REPEAT_* */
+    int on_repeat_length;     /* tracks in the On Repeat playlist */
 
     unsigned char backdrop_file[MAX_PATHNAME+1];  /* backdrop bitmap file */
     unsigned char usb_image_file[MAX_PATHNAME+1]; /* the USB screen's image */

@@ -6,11 +6,11 @@
  *
  * Playlists are [All Tracks] at index 0, which accessories hide and open as
  * their Songs list, then the Queue, then the folders Moods and Journeys while
- * the Playlist Engine is on, and Audiobooks, then the playlist catalogue's
- * files in directory order. A folder's Track category lists what it holds,
- * and choosing one plays it. Choosing the Queue leaves playback alone and a
- * file plays at once; either way the Track category is then the Queue, which
- * the caller names and plays.
+ * the Playlist Engine is on, and Audiobooks, then On Repeat, then the
+ * playlist catalogue's files in directory order. A folder's Track category
+ * lists what it holds, and choosing one plays it. Choosing the Queue leaves
+ * playback alone, and On Repeat or a file plays at once; either way the Track
+ * category is then the Queue, which the caller names and plays.
  *
  * Genres, Artists (album artists), Composers, Albums and Audiobooks come from
  * the database, and only while it is in RAM. Choosing one narrows everything
@@ -60,6 +60,7 @@
 #include "string-extra.h"
 #include "playlist/playlist.h"
 #include "playlist/mood_screen.h"
+#include "playlist/on_repeat.h"
 #include "database/tagcache.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
@@ -210,8 +211,8 @@ static uint32_t list_count;
 /* The database commit the lists and the selection were read under */
 static int32_t lists_commit = -1;
 
-enum { EV_PLAY = 1, EV_MIX, EV_START, EV_ARTWORK, EV_PREFETCH, EV_LIST,
-       EV_SHUFFLE, EV_REPEAT, EV_EXIT };
+enum { EV_PLAY = 1, EV_MIX, EV_ON_REPEAT, EV_ON_REPEAT_ASK, EV_START,
+       EV_ARTWORK, EV_PREFETCH, EV_LIST, EV_SHUFFLE, EV_REPEAT, EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
@@ -221,12 +222,16 @@ static volatile bool leaving;
 /* IAP_LIST_*, the playlists' and the Queue's: see the playlists for iAP2 */
 static volatile int lists_state, queue_state;
 
+/* An EV_ON_REPEAT_ASK is waiting, so another is not posted */
+static volatile bool repeat_asked;
+
 /* What EV_PLAY plays, taken before the selection is cleared */
 static bool play_book;
 static long play_book_seek;
 
 static void play_tracks(uint32_t start);
 static void play_mix(int mix);
+static void play_on_repeat(void);
 static void read_artwork(intptr_t request);
 static void prefetch_artwork(void);
 static void read_lists(intptr_t what);
@@ -255,6 +260,13 @@ static void worker(void)
             read_lists(ev.data);    /* nor are iAP2's */
             continue;
         }
+        if (ev.id == EV_ON_REPEAT_ASK)
+        {
+            if (!leaving)
+                on_repeat_refresh(&leaving);
+            repeat_asked = false;
+            continue;
+        }
         if (ev.id == EV_SHUFFLE || ev.id == EV_REPEAT)
         {
             if (leaving)
@@ -269,6 +281,8 @@ static void worker(void)
             play_tracks(ev.data);
         else if (ev.id == EV_MIX)
             play_mix(ev.data);
+        else if (ev.id == EV_ON_REPEAT)
+            play_on_repeat();
         else if (ev.id == EV_START && !leaving)
             playlist_start(ev.data, 0, 0);
         building = false;
@@ -852,6 +866,53 @@ static void play_mix(int mix)
                                &leaving);
 }
 
+/* On the worker: On Repeat's tracks become the song list, and play */
+static void play_on_repeat(void)
+{
+    static uint64_t keys[ON_REPEAT_MAX];
+    int i, n;
+
+    if (leaving || iap_library_queue_lent())
+        return;
+    n = on_repeat_keys(keys, MIN(global_settings.on_repeat_length,
+                                 (int)capacity), &leaving);
+    list_count = 0;
+    for (i = 0; i < n; i++)
+    {
+        int idx = tagcache_find_key(keys[i]);
+
+        if (idx < 0)
+            continue;
+        block->entries[list_count].key = 0;
+        block->entries[list_count].idx = idx;
+        list_count++;
+    }
+    play_book = false;
+    if (list_count > 0)
+        play_tracks(0);
+}
+
+/* The On Repeat row, after the folders: 1 when it is offered. Asked without
+ * reading the log, which an accessory would not wait for: an answer On Repeat
+ * does not remember is taken as yes, and the worker is sent to work it out
+ * for the next count. */
+static int repeat_count_seen = -1;
+
+static int repeat_offered(void)
+{
+    if (repeat_count_seen < 0)
+    {
+        repeat_count_seen = global_settings.iap_browse_size != 0
+                            && on_repeat_offered(false);
+        if (repeat_count_seen && block && !repeat_asked)
+        {
+            repeat_asked = true;
+            queue_post(&worker_q, EV_ON_REPEAT_ASK, 0);
+        }
+    }
+    return repeat_count_seen;
+}
+
 static bool is_playlist_file(const char *name)
 {
     const char *ext = strrchr(name, '.');
@@ -955,6 +1016,7 @@ static bool playlist_record_name(uint32_t index, char *buf, size_t size)
 {
     const int *rows;
     uint32_t folders = folders_offered(&rows);
+    uint32_t repeat = repeat_offered();
 
     if (index == PLAYLIST_ALL)
         strmemccpy(buf, str(LANG_TAGNAVI_ALL_TRACKS), size);
@@ -963,10 +1025,12 @@ static bool playlist_record_name(uint32_t index, char *buf, size_t size)
     else if (index <= PLAYLIST_QUEUE + folders)
         strmemccpy(buf, str(folder_lang[rows[index - PLAYLIST_QUEUE - 1]]),
                    size);
+    else if (index <= PLAYLIST_QUEUE + folders + repeat)
+        strmemccpy(buf, str(LANG_ON_REPEAT), size);
     else
     {
         *buf = '\0';
-        catalog_name(index - PLAYLIST_QUEUE - folders, buf, size);
+        catalog_name(index - PLAYLIST_QUEUE - folders - repeat, buf, size);
         char *dot = strrchr(buf, '.');
         if (dot)
             *dot = '\0';
@@ -978,6 +1042,7 @@ static bool playlist_record_select(uint32_t index)
 {
     const int *rows;
     uint32_t folders = folders_offered(&rows);
+    uint32_t repeat = repeat_offered();
 
     if (index == INDEX_UP)
         return true;
@@ -1003,7 +1068,14 @@ static bool playlist_record_select(uint32_t index)
     }
     if (queue_refused())
         return false;
-    return play_catalog_playlist(index - PLAYLIST_QUEUE - folders);
+    if (index <= PLAYLIST_QUEUE + folders + repeat)
+    {
+        if (!open_block(true))
+            return false;
+        start_work(EV_ON_REPEAT, 0);
+        return true;
+    }
+    return play_catalog_playlist(index - PLAYLIST_QUEUE - folders - repeat);
 }
 
 /* The Track category of a folder */
@@ -1089,7 +1161,8 @@ bool iap_library_count(int type, uint32_t *count)
     if (type == TYPE_PLAYLIST)
     {
         folder_count_seen = find_folders(folder_rows);
-        *count = PLAYLIST_QUEUE + 1 + folder_count_seen
+        repeat_count_seen = -1;
+        *count = PLAYLIST_QUEUE + 1 + folder_count_seen + repeat_offered()
                  + count_catalog();
         return true;
     }
@@ -1229,6 +1302,8 @@ void iap_library_close(int transport)
     block = NULL;
     capacity = 0;
     folder_count_seen = -1;
+    repeat_count_seen = -1;
+    repeat_asked = false;
     catalog_cached = false;
     lists_state = queue_state = IAP_LIST_IDLE;
     iap_library_reset();
@@ -1389,7 +1464,9 @@ void iap_library_repeat_next(void)
 
 /* iAP2's playlists are the Playlist category's rows, without [All Tracks]
  * and without the engine's Moods and Journeys: the Queue, Audiobooks and
- * each book, then the catalogue. A car names a playlist's tracks to play it,
+ * each book, On Repeat when it holds anything, then the catalogue. On Repeat
+ * costs a read of the playback log's files that cover its span, at every
+ * connection. A car names a playlist's tracks to play it,
  * never the playlist, so a mix would have to be made for every connection,
  * not when chosen; seconds each on the 5G, with its audio heard to stutter.
  * All are read on the worker in one go, every list of track keys into one
@@ -1406,6 +1483,7 @@ static struct iap_library_list queue_list;
 static struct {
     int folders[3], n_folders;
     int books;
+    bool on_repeat;
     uint32_t catalog;
 } rows;
 
@@ -1443,6 +1521,7 @@ static void find_rows(void)
             rows.folders[rows.n_folders++] = all[i];
             rows.books = find_books();
         }
+    rows.on_repeat = global_settings.iap_browse_size != 0;
     rows.catalog = count_catalog();
 }
 
@@ -1579,6 +1658,19 @@ static bool read_row(int row, struct iap_library_list *l, uint64_t *keys,
             return true;
         }
         r -= 1 + held;
+    }
+    if (rows.on_repeat)
+    {
+        if (r == 0)
+        {
+            int n = on_repeat_keys(keys, MIN(room,
+                (uint32_t)global_settings.on_repeat_length), &leaving);
+            list_name(l, str(LANG_ON_REPEAT));
+            l->id = name_id(8, l->name, NULL);
+            l->count = n > 0 ? n : 0;
+            return true;
+        }
+        r--;
     }
     if (r < 0 || (uint32_t)r >= rows.catalog)
         return false;

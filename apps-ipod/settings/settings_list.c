@@ -1361,6 +1361,12 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, recursive_dir_insert, LANG_RECURSE_DIRECTORY , RECURSE_ON,
                    "recursive directory insert", off_on_ask, NULL , 3 ,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_ASK)),
+    CHOICE_SETTING(0, on_repeat, LANG_ON_REPEAT, ON_REPEAT_WEEKLY,
+                   "on repeat", "weekly,monthly,rolling", NULL, 3,
+                   ID2P(LANG_MIX_WEEKLY), ID2P(LANG_ON_REPEAT_MONTHLY),
+                   ID2P(LANG_ON_REPEAT_ROLLING)),
+    INT_SETTING(0, on_repeat_length, LANG_ON_REPEAT_LENGTH, 30,
+                "on repeat length", UNIT_INT, 5, 100, 5, NULL, NULL, NULL),
     /* peak meter */
     TABLE_SETTING_LIST(F_TIME_SETTING | F_ALLOW_ARBITRARY_VALS, peak_meter_clip_hold,
                   LANG_PM_CLIP_HOLD, 60, "peak meter clip hold", "eternal",

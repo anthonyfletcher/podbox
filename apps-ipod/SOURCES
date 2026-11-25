@@ -41,6 +41,7 @@ database/sound_mix.c
 database/sound_mood.c
 database/sound_cal.c
 playlist/mood_screen.c
+playlist/on_repeat.c
 database/db_featured.c
 database/db_featured_parse.c
 database/db_names.c

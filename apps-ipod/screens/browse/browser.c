@@ -226,11 +226,13 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
             return (*local_tc->dirfilter == SHOW_M3U) ? Icon_Playlist
                                                       : Icon_Folder;
 
-        /* The Moods and Journeys rows are not file types either. They open a
-         * list, so they take the icon the catalogue's other list-opening row
-         * takes -- which is also what the themes that draw a chevron key it
-         * on. Scrim and Scrim_p override the glyph by name. */
-        if (masked == FILE_ATTR_MOODS || masked == FILE_ATTR_JOURNEYS)
+        /* The Moods, Journeys and On Repeat rows are not file types either.
+         * Moods and Journeys open a list and On Repeat plays at once, as a
+         * saved playlist does; all three take the playlist icon, which the
+         * themes that draw a chevron key it on. Scrim and Scrim_p override
+         * the glyph by name. */
+        if (masked == FILE_ATTR_MOODS || masked == FILE_ATTR_JOURNEYS
+            || masked == FILE_ATTR_ON_REPEAT)
             return Icon_Playlist;
 
         return filetype_get_icon(entry->attr);

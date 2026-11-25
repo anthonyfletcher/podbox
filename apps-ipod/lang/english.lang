@@ -28306,3 +28306,101 @@
     *: "Featured Artist Art Rows"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ON_REPEAT
+  desc: playlist catalogue row and setting -- the most played tracks of a recent span
+  user: core
+  <source>
+    *: "On Repeat"
+  </source>
+  <dest>
+    *: "On Repeat"
+  </dest>
+  <voice>
+    *: "On Repeat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_LENGTH
+  desc: in Playback - Playlists, how many tracks On Repeat holds
+  user: core
+  <source>
+    *: "On Repeat Length"
+  </source>
+  <dest>
+    *: "On Repeat Length"
+  </dest>
+  <voice>
+    *: "On Repeat Length"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_MONTHLY
+  desc: On Repeat choice -- last calendar month's plays, kept all month
+  user: core
+  <source>
+    *: "Monthly"
+  </source>
+  <dest>
+    *: "Monthly"
+  </dest>
+  <voice>
+    *: "Monthly"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_ROLLING
+  desc: On Repeat choice -- the seven days up to now, new every time
+  user: core
+  <source>
+    *: "Rolling"
+  </source>
+  <dest>
+    *: "Rolling"
+  </dest>
+  <voice>
+    *: "Rolling"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NONE
+  desc: On Repeat, when nothing was played in the span it counts
+  user: core
+  <source>
+    *: "Nothing played in that time"
+  </source>
+  <dest>
+    *: "Nothing played in that time"
+  </dest>
+  <voice>
+    *: "Nothing played in that time"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NO_LOG
+  desc: On Repeat, when Playback - Logging is off and so nothing is recorded
+  user: core
+  <source>
+    *: "Needs Playback > Logging on"
+  </source>
+  <dest>
+    *: "Needs Playback > Logging on"
+  </dest>
+  <voice>
+    *: "Needs playback logging on"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NO_CLOCK
+  desc: On Repeat, when the clock is not set and so no span can be found
+  user: core
+  <source>
+    *: "Set the clock first"
+  </source>
+  <dest>
+    *: "Set the clock first"
+  </dest>
+  <voice>
+    *: "Set the clock first"
+  </voice>
+</phrase>

@@ -28191,3 +28191,101 @@
     *: "Ligne de progression"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ON_REPEAT
+  desc: playlist catalogue row and setting -- the most played tracks of a recent span
+  user: core
+  <source>
+    *: "On Repeat"
+  </source>
+  <dest>
+    *: "En boucle"
+  </dest>
+  <voice>
+    *: "En boucle"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_LENGTH
+  desc: in Playback - Playlists, how many tracks On Repeat holds
+  user: core
+  <source>
+    *: "On Repeat Length"
+  </source>
+  <dest>
+    *: "Longueur En boucle"
+  </dest>
+  <voice>
+    *: "Longueur En boucle"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_MONTHLY
+  desc: On Repeat choice -- last calendar month's plays, kept all month
+  user: core
+  <source>
+    *: "Monthly"
+  </source>
+  <dest>
+    *: "Mensuel"
+  </dest>
+  <voice>
+    *: "Mensuel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_ROLLING
+  desc: On Repeat choice -- the seven days up to now, new every time
+  user: core
+  <source>
+    *: "Rolling"
+  </source>
+  <dest>
+    *: "Glissant"
+  </dest>
+  <voice>
+    *: "Glissant"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NONE
+  desc: On Repeat, when nothing was played in the span it counts
+  user: core
+  <source>
+    *: "Nothing played in that time"
+  </source>
+  <dest>
+    *: "Rien écouté pendant cette période"
+  </dest>
+  <voice>
+    *: "Rien écouté pendant cette période"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NO_LOG
+  desc: On Repeat, when Playback - Logging is off and so nothing is recorded
+  user: core
+  <source>
+    *: "Needs Playback > Logging on"
+  </source>
+  <dest>
+    *: "Activez Réglages lecture > Enregistrement"
+  </dest>
+  <voice>
+    *: "Activez Réglages lecture, Enregistrement"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_REPEAT_NO_CLOCK
+  desc: On Repeat, when the clock is not set and so no span can be found
+  user: core
+  <source>
+    *: "Set the clock first"
+  </source>
+  <dest>
+    *: "Réglez d'abord l'horloge"
+  </dest>
+  <voice>
+    *: "Réglez d'abord l'horloge"
+  </voice>
+</phrase>

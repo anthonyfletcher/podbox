@@ -62,6 +62,8 @@ const char *pv_names_locate(const char *path);
  * too. Read from its genre, as the lists do; a file the database does not
  * hold has none, and counts as music. */
 bool pv_names_kept_apart(const char *path);
+/* The same for the database entry idx_id */
+bool pv_names_kept_apart_idx(int idx_id);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a
  * device with a database in RAM ever comes back PV_NAME_DB, the logged paths

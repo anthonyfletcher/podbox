@@ -55,6 +55,8 @@
 #define FILE_ATTR_LYRICS   0x1c00
 /* An Arcade cart, played by games/arcade/shell.c */
 #define FILE_ATTR_GAME     0x1d00
+/* The catalogue's On Repeat row, synthetic like the Moods row */
+#define FILE_ATTR_ON_REPEAT 0x1e00
 #define FILE_ATTR_MASK  0xFF00 /* which bits tree.c uses for file types */
 
 /* The rows the browser invents rather than reads off the disk. They name an
@@ -67,7 +69,7 @@
 static inline bool file_attr_is_row(int masked)
 {
     return masked == FILE_ATTR_SEARCH || masked == FILE_ATTR_MOODS ||
-           masked == FILE_ATTR_JOURNEYS;
+           masked == FILE_ATTR_JOURNEYS || masked == FILE_ATTR_ON_REPEAT;
 }
 
 long filetype_get_voiceclip(int attr);

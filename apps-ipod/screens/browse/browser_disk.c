@@ -38,6 +38,7 @@
 #include "files/filetypes.h"
 #include "database/sound_index.h"
 #include "playlist/mood_screen.h"
+#include "playlist/on_repeat.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
 #include "lang.h"
@@ -315,6 +316,18 @@ int browser_disk_load(struct browser_context* c, const char* tempdir)
     if (!c->is_browsing)
         c->browse = NULL;
 
+    /* Asked before the directory is opened and the cache locked: answering
+     * may mean reading the playback log */
+    bool search_rows = !tempdir && c->dirlevel == 0 && c->browse
+                       && (c->browse->flags & BROWSE_SEARCH_ROW);
+    bool on_repeat = false;
+    if (search_rows && *c->dirfilter == SHOW_M3U)
+    {
+        if (!on_repeat_known())
+            splash(0, ID2P(LANG_WAIT));
+        on_repeat = on_repeat_offered(true);
+    }
+
     if (tempdir)
         dir = opendir(tempdir);
     else
@@ -339,17 +352,24 @@ int browser_disk_load(struct browser_context* c, const char* tempdir)
      * it has no directory entry behind it, and every filter in that loop is
      * about what a real one contains. */
     c->special_entry_count = 0;
-    if (!tempdir && c->dirlevel == 0 && c->browse
-        && (c->browse->flags & BROWSE_SEARCH_ROW))
+    if (search_rows)
     {
-        struct { int attr; int lang; } rows[3];
+        struct { int attr; int lang; } rows[4];
         int nrows = 0, n;
 
         rows[nrows].attr = FILE_ATTR_SEARCH;
         rows[nrows++].lang = LANG_DB_SEARCH;
 
-        /* The playlist catalogue gets two more, because what they build is a
-         * playlist and this is where the playlists are. Only with an engine
+        /* On Repeat reads the playback log, not the sound index, so it is
+         * offered without the engine -- but only with something in it */
+        if (on_repeat)
+        {
+            rows[nrows].attr = FILE_ATTR_ON_REPEAT;
+            rows[nrows++].lang = LANG_ON_REPEAT;
+        }
+
+        /* Moods and Journeys too, because what they build is a playlist and
+         * this is where the playlists are. Only with an engine
          * switched on and an index to read: without both they would open on
          * an apology. */
         if (*c->dirfilter == SHOW_M3U && global_settings.playlist_engine
@@ -666,6 +686,9 @@ int browser_disk_enter(struct browser_context* c)
             case FILE_ATTR_JOURNEYS:
                 return mood_screen_pick((file_attr & FILE_ATTR_MASK)
                                         == FILE_ATTR_JOURNEYS);
+
+            case FILE_ATTR_ON_REPEAT:
+                return on_repeat_play();
 
             case FILE_ATTR_M3U:
                 play = browser_disk_play_playlist(c->currdir, file->name);

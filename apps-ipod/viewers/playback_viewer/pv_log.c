@@ -23,6 +23,7 @@
 #include <string.h>
 #include <file.h>
 #include "config.h"
+#include "kernel.h"
 #include "system/library_files.h"
 #include "rbpaths.h"
 #include "pv_log.h"
@@ -59,6 +60,28 @@ static struct
 } rd = { .fd = -1, .next = -1 };
 
 static char rd_buf[PV_BUF_SZ];
+
+/* The one reader is shared by the UI and an accessory's thread (On Repeat,
+ * read for a car), so whoever comes second waits */
+static struct mutex rd_mutex;
+static bool rd_mutex_ready;
+
+static void rd_lock(void)
+{
+    /* Threads here are cooperative, so nothing runs between the test and
+     * the set */
+    if (!rd_mutex_ready)
+    {
+        mutex_init(&rd_mutex);
+        rd_mutex_ready = true;
+    }
+    mutex_lock(&rd_mutex);
+}
+
+static void rd_unlock(void)
+{
+    mutex_unlock(&rd_mutex);
+}
 
 /* Open the next file of the family, stepping off the numbered run onto the
  * live log when the numbers run out. */
@@ -282,8 +305,12 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
 
     if (src == PV_SRC_NONE || len <= 0 || offset < (unsigned long)len)
         return 0;
+    rd_lock();
     if (!rd_open_at(offset - (unsigned long)len))
+    {
+        rd_unlock();
         return 0;
+    }
 
     /* Straight out of the stream rather than through the line reader: this
      * is bytes, not entries, and may well start mid-line. */
@@ -307,6 +334,7 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
     }
 
     rd_close();
+    rd_unlock();
     return got;
 }
 
@@ -318,13 +346,81 @@ enum pv_source pv_log_pick_source(void)
     struct pv_entry e;
     bool found = false;
 
-    if (!rd_open())
-        return PV_SRC_NONE;
-    while (!found && rd_line(line, sizeof(line)))
-        found = line[0] != '#' && line[0] != '\0'
-                && parse_playback_line(line, &e);
-    rd_close();
+    rd_lock();
+    if (rd_open())
+    {
+        while (!found && rd_line(line, sizeof(line)))
+            found = line[0] != '#' && line[0] != '\0'
+                    && parse_playback_line(line, &e);
+        rd_close();
+    }
+    rd_unlock();
     return found ? PV_SRC_PLAYBACK : PV_SRC_NONE;
+}
+
+/* The first dated entry among the opening bytes of 'fd', or 0 when none of
+ * them carries one. Reads into rd_buf, which is free while no reader runs. */
+static unsigned long file_first_ts(int fd)
+{
+    int len = read(fd, rd_buf, sizeof(rd_buf) - 1);
+    char *p = rd_buf;
+
+    if (len <= 0)
+        return 0;
+    rd_buf[len] = '\0';
+
+    while (*p)
+    {
+        unsigned long ts = (*p >= '0' && *p <= '9') ? parse_ul(p) : 0;
+
+        if (ts >= PV_MIN_VALID_TS)
+            return ts;
+        while (*p && *p != '\n')
+            p++;
+        if (*p)
+            p++;
+    }
+    return 0;
+}
+
+unsigned long pv_log_offset_since(enum pv_source src, unsigned long ts)
+{
+    unsigned long at = 0, total = 0;
+    char path[MAX_PATH];
+    int n, fd;
+
+    if (src == PV_SRC_NONE)
+        return 0;
+
+    rd_lock();     /* file_first_ts() reads into rd_buf */
+    for (n = 1; n <= PV_LOG_MAX_NUMBERED + 1; n++)
+    {
+        unsigned long first, sz;
+
+        if (n <= PV_LOG_MAX_NUMBERED)
+            snprintf(path, sizeof(path), "%s_%04d.log", PV_LOG_STEM, n);
+        fd = open(n <= PV_LOG_MAX_NUMBERED ? path : PV_LOG_PATH, O_RDONLY);
+        if (fd < 0)
+        {
+            if (n > PV_LOG_MAX_NUMBERED)
+                break;
+            n = PV_LOG_MAX_NUMBERED;    /* numbered run ended: the live log */
+            continue;
+        }
+
+        sz = (unsigned long)ffilesize(fd);
+        first = file_first_ts(fd);
+        close(fd);
+
+        /* A file that starts at or after 'ts' holds nothing earlier, and
+         * neither does anything after it */
+        if (first >= ts)
+            break;
+        at = total;
+        total += sz;
+    }
+    rd_unlock();
+    return at;
 }
 
 long pv_log_read(enum pv_source src, pv_entry_fn cb, void *ctx)
@@ -335,20 +431,31 @@ long pv_log_read(enum pv_source src, pv_entry_fn cb, void *ctx)
 long pv_log_read_range(enum pv_source src, unsigned long from,
                        unsigned long to, pv_entry_fn cb, void *ctx)
 {
+    return pv_log_read_range_stop(src, from, to, cb, ctx, NULL);
+}
+
+long pv_log_read_range_stop(enum pv_source src, unsigned long from,
+                            unsigned long to, pv_entry_fn cb, void *ctx,
+                            const volatile bool *stop)
+{
     char line[PV_LINE_MAX];
     long lines = 0;
 
     if (src == PV_SRC_NONE)
         return -1;
+    rd_lock();
     if (!(from ? rd_open_at(from) : rd_open()))
+    {
+        rd_unlock();
         return -1;
+    }
 
     for (;;)
     {
         unsigned long line_at = rd.consumed;
         struct pv_entry e;
 
-        if (to && line_at >= to)
+        if ((to && line_at >= to) || (stop && *stop))
             break;
         if (!rd_line(line, sizeof(line)))
             break;
@@ -368,5 +475,6 @@ long pv_log_read_range(enum pv_source src, unsigned long from,
     }
 
     rd_close();
+    rd_unlock();
     return lines;
 }
