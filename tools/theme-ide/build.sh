@@ -50,6 +50,21 @@ if [ "$what" != page ]; then
         2>&1 | grep -v FORCE_FILESYSTEM || true
     cp rockboxui.js rockboxui.wasm "$out/"
     rm -rf disk
+
+    # The licences of what Emscripten links into the player: its own runtime,
+    # its musl libc and its SDL2 port. The fonts' are in player/fonts/.
+    em=$EMSDK/upstream/emscripten
+    sdl=$(ls "$(em-config CACHE)"/ports/sdl2/SDL-*/LICENSE.txt | tail -1)
+    rule=$(printf '=%.0s' $(seq 78))
+    licence() { printf '\n%s\n%s\n%s\n\n' "$rule" "$1" "$rule"; tr -d '\r' < "$2"; }
+    {
+        echo "The open-source code inside the Theme IDE's player, and its licences."
+        echo "The player is PodBox, under the GNU General Public License v2."
+        licence Emscripten "$em/LICENSE"
+        licence "musl libc, as Emscripten bundles it" "$em/system/lib/libc/musl/COPYRIGHT"
+        licence "SDL $(basename "$(dirname "$sdl")" | sed 's/SDL-release-//')" "$sdl"
+    } > "$out/LICENSES.txt"
+
     python3 "$here/demo/covers.py" "$out/demo" > /dev/null
     du -sh "$out"/rockboxui.wasm "$out"/rockboxui.data "$out"/fonts "$out"/demo
 fi
