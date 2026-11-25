@@ -378,6 +378,10 @@ static struct
    there looking stupid and comatose until the user does something */
 static bool codec_skip_pending = false;
 static int  codec_skip_status;
+/* Tracks in a row the codec gave up on: a queue none of whose tracks can
+   play would otherwise go round for ever under Repeat */
+static int  codec_failures_in_a_row = 0;
+#define CODEC_FAILURES_MAX 50
 static bool codec_seeking = false;          /* Codec seeking ack expected? */
 static unsigned int position_key = 0;
 
@@ -3428,6 +3432,24 @@ static void audio_on_codec_complete(int status)
 
     codec_skip_pending = false;
 
+    /* Stop once every track in the queue, or fifty, failed in a row */
+    if (status < 0)
+    {
+        int limit = MIN(MAX(playlist_amount(), 1), CODEC_FAILURES_MAX);
+        if (++codec_failures_in_a_row >= limit)
+        {
+            if (audio_scratch_memory)
+                debug_log(DEBUG_LOG_PLAYBACK,
+                          "stopped: %d tracks in a row could not play",
+                          codec_failures_in_a_row);
+            filling = STATE_ENDED;
+            audio_stop_playback(true);
+            return;
+        }
+    }
+    else
+        codec_failures_in_a_row = 0;
+
     int trackstat = LOAD_TRACK_OK;
 
     track_event_flags = TEF_AUTO_SKIP;
@@ -3648,6 +3670,8 @@ static void audio_stop_playback(bool allow_fade)
 
     if (play_status == PLAY_STOPPED)
         return;
+
+    codec_failures_in_a_row = 0;
 
     /* allow_fade is false when a USB host is waiting on us. The fade takes a
      * third of a second and audio_wait_fade_complete() below sits in it, which
