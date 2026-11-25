@@ -63,6 +63,7 @@ MENUITEM_SETTING(album_covers_parallel_slides, &global_settings.album_covers_par
 MENUITEM_SETTING(album_covers_reflection, &global_settings.album_covers_reflection, NULL);
 MENUITEM_SETTING(album_covers_scroll_speed, &global_settings.album_covers_scroll_speed, NULL);
 MENUITEM_SETTING(album_covers_random_spin, &global_settings.album_covers_random_spin, NULL);
+MENUITEM_SETTING(album_covers_wheel_glide, &global_settings.album_covers_wheel_glide, NULL);
 MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, tilt_only_callback);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
 MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
@@ -242,5 +243,6 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_sort_menu,
             &album_covers_on_select,
             &album_covers_scroll_speed,
+            &album_covers_wheel_glide,
             &album_covers_random_spin,
             &carousel_appearance_link);

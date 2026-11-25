@@ -799,6 +799,7 @@ struct user_settings
     int  album_covers_reflection;   /* CAROUSEL_REFLECT_*: under the covers */
     int  album_covers_scroll_speed;
     int  album_covers_random_spin;  /* 0..2: covers a held PLAY passes */
+    bool album_covers_wheel_glide;  /* a flick of the wheel coasts on */
     int  album_covers_transition_speed;
     int  album_covers_show_album_name;
     int  album_covers_on_select;  /* ON_SELECT_*: browse the album, or play it */

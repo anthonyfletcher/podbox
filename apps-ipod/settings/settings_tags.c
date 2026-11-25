@@ -275,6 +275,7 @@ static const struct tag_row tag_rows[] = {
 { "album covers reflection",      TAG_APPEARANCE,                "carousel cover flow mirror" },
 { "album covers scroll speed",    TAG_APPEARANCE,                "carousel speed" },
 { "album covers random spin",     TAG_LIBRARY,                   "carousel shuffle play hold" },
+{ "album covers wheel glide",     TAG_LIBRARY,                   "carousel flick momentum coast" },
 { "album covers center margin",   TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },
 { "album covers slide tuck",      TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },
 { "album covers parallel slides", TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },

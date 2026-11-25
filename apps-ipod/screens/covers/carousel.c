@@ -523,6 +523,32 @@ static const struct carousel_model *pf_random_model;
  * Any other move of the carousel ends it. */
 static bool pf_random_spinning;
 
+/* Wheel Glide: a flick of the click wheel coasts on, slowing as if against
+ * friction, and a finger held still on the wheel stops it at the next cover.
+ * The wheel's place is read every tick, as a quick flick can be over between
+ * two frames; the carousel acts on what the reader saw once a frame
+ * (glide_watch()). */
+static bool pf_gliding;
+#ifdef HAVE_WHEEL_POSITION
+#define GLIDE_WHEEL_CLICKS  96  /* in a turn */
+#define GLIDE_RECENT        12  /* readings its speed is taken over */
+#define GLIDE_RECENT_MIN    4   /* as if at least this many: one can be off */
+#define GLIDE_JUMP          8   /* clicks in one reading that are the place
+                                   jumping as a finger lifts, not a turn */
+#define GLIDE_LOST          3   /* readings untouched before the finger is off */
+#define GLIDE_HELD          8   /* readings still that stop a glide */
+static struct {
+    int position;               /* -1 untouched */
+    int lost, still;
+    signed char recent[GLIDE_RECENT];
+    int oldest, sum, moving, travel;
+    volatile int flick;         /* clicks a second at the lift, signed */
+    volatile bool lifted;       /* a lift glide_watch() has not seen */
+    volatile bool held;         /* touched and still for GLIDE_HELD readings */
+} glide_wheel = { .position = -1 };
+static bool glide_ticking;
+#endif
+
 static struct pf_slide_cache pf_sldcache;
 
 /* use long for aligning */
@@ -3010,6 +3036,7 @@ void set_current_slide(const int slide_index)
     int old_center_index = center_index;
     step = 0;
     pf_random_spinning = false;
+    pf_gliding = false;
     center_index = fbound(0, slide_index, number_of_slides - 1);
     if (old_center_index != center_index)
     {
@@ -3119,12 +3146,15 @@ static void show_previous_slide(void)
             start_animation();
         }
     } else if ( step > 0 ) {
+        pf_gliding = false;
         target = center_index;
         step = (target <= center_slide.slide_index) ? -1 : 1;
         if (step < 0)
             update_scroll_animation();
     } else {
-        target = fmax(0, center_index - 2);
+        /* Turned on the way a glide goes, it keeps what it has left */
+        int near = fmax(0, center_index - 2);
+        target = pf_gliding ? MIN(target, near) : near;
     }
 }
 
@@ -3138,12 +3168,14 @@ static void show_next_slide(void)
             start_animation();
         }
     } else if ( step < 0 ) {
+        pf_gliding = false;
         target = center_index;
         step = (target < center_slide.slide_index) ? -1 : 1;
         if (step > 0)
             update_scroll_animation();
     } else {
-        target = fmin(center_index + 2, number_of_slides - 1);
+        int near = fmin(center_index + 2, number_of_slides - 1);
+        target = pf_gliding ? MAX(target, near) : near;
     }
 }
 
@@ -3208,6 +3240,187 @@ static void spin_to(int pick)
     pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
     start_animation();
     pf_random_spinning = true;
+}
+
+/* Wheel Glide's feel. A flick's speed in covers a second, carried on for
+ * GLIDE_TAU_MS, is how far it goes: the covers leave the wheel at the speed it
+ * was turning and slow as the way left shrinks (scroll_speed()). */
+#define GLIDE_CLICKS_SLIDE  6       /* wheel clicks a cover is worth in a flick */
+#define GLIDE_MIN_RATE      42      /* clicks a second: slower, a lift just stops */
+#define GLIDE_TRAVEL_FULL   48      /* clicks: a shorter flick counts for its share */
+#define GLIDE_TAU_MS        450     /* how long the speed takes to fall by e */
+#define GLIDE_MAX_SLIDES    80      /* the most a flick, or several, carries */
+#define GLIDE_SPEED_MIN     2048    /* a nominal frame's step onto the last cover */
+/* Under a cover a frame: a crossing snaps to the cover reached (see
+ * update_scroll_animation()), so a frame covering more shows only resting
+ * places and the covers seem to jump */
+#define GLIDE_SPEED_MAX     49152
+
+#ifdef HAVE_WHEEL_POSITION
+/* Every tick, in the tick interrupt: where the finger is, how fast it has been
+ * turning, and whether it has lifted or been held still. */
+static void glide_tick(void)
+{
+#ifdef HAS_BUTTON_HOLD
+    int pos = button_hold() ? -1 : wheel_status();
+#else
+    int pos = wheel_status();
+#endif
+    int d = 0;
+
+    if (pos < 0)
+    {
+        if (glide_wheel.position >= 0 && ++glide_wheel.lost >= GLIDE_LOST)
+        {
+            int rate = glide_wheel.sum * HZ
+                     / MAX(glide_wheel.moving, GLIDE_RECENT_MIN);
+            int travel = abs(glide_wheel.travel);
+            if (travel < GLIDE_TRAVEL_FULL)
+                rate = rate * travel / GLIDE_TRAVEL_FULL;
+            glide_wheel.flick = rate;
+            glide_wheel.lifted = true;
+            glide_wheel.held = false;
+            glide_wheel.position = -1;
+        }
+        return;
+    }
+    glide_wheel.lost = 0;
+
+    if (glide_wheel.position >= 0)
+    {
+        d = pos - glide_wheel.position;
+        if (d < -GLIDE_WHEEL_CLICKS / 2)
+            d += GLIDE_WHEEL_CLICKS;
+        else if (d > GLIDE_WHEEL_CLICKS / 2)
+            d -= GLIDE_WHEEL_CLICKS;
+        if (d > GLIDE_JUMP || d < -GLIDE_JUMP)
+            d = 0;
+    }
+    /* A new touch, or a turn back past a held finger's wobble of a click or
+     * two, measures afresh */
+    if (glide_wheel.position < 0
+        || ((d ^ glide_wheel.travel) < 0 && abs(d) > 2))
+    {
+        memset(glide_wheel.recent, 0, sizeof(glide_wheel.recent));
+        glide_wheel.sum = glide_wheel.moving = glide_wheel.travel = 0;
+        glide_wheel.still = 0;
+        glide_wheel.held = false;
+    }
+    glide_wheel.position = pos;
+
+    glide_wheel.sum += d - glide_wheel.recent[glide_wheel.oldest];
+    glide_wheel.recent[glide_wheel.oldest] = d;
+    glide_wheel.oldest = (glide_wheel.oldest + 1) % GLIDE_RECENT;
+    if (d || glide_wheel.moving)
+        glide_wheel.moving = MIN(glide_wheel.moving + 1, GLIDE_RECENT);
+    glide_wheel.travel += d;
+
+    if (d)
+    {
+        glide_wheel.still = 0;
+        glide_wheel.held = false;
+    }
+    else if (++glide_wheel.still >= GLIDE_HELD)
+        glide_wheel.held = true;
+}
+#endif /* HAVE_WHEEL_POSITION */
+
+/* The reader runs while the carousel is open with Wheel Glide on. Called on
+ * opening and closing, and after the in-screen menu, which can change the
+ * setting and whose own turns of the wheel are not a flick. */
+static void glide_sync(bool open)
+{
+    bool want = open && global_settings.album_covers_wheel_glide;
+#ifdef HAVE_WHEEL_POSITION
+    if (want && !glide_ticking)
+    {
+        glide_wheel.position = -1;
+        glide_wheel.held = false;
+        tick_add_task(glide_tick);
+    }
+    else if (!want && glide_ticking)
+        tick_remove_task(glide_tick);
+    glide_ticking = want;
+    glide_wheel.lifted = false;
+#endif
+    if (!want)
+        pf_gliding = false;
+}
+
+/* Whether the screen has to keep looking: a finger is on the wheel, or has
+ * just lifted. The idle wait is otherwise half a second. */
+static bool glide_pending(void)
+{
+#ifdef HAVE_WHEEL_POSITION
+    return glide_ticking && (glide_wheel.position >= 0 || glide_wheel.lifted);
+#else
+    return false;
+#endif
+}
+
+/* A finger on the wheel: its own steps click, so a glide's do not */
+static bool glide_finger_on(void)
+{
+#ifdef HAVE_WHEEL_POSITION
+    return glide_wheel.position >= 0;
+#else
+    return false;
+#endif
+}
+
+#ifdef HAVE_WHEEL_POSITION
+/* Coast on from a flick of `rate` clicks a second, or add to a glide going the
+ * same way. A flick against a move under way is the wheel's own steps turning
+ * it back, and starts nothing. */
+static void glide_start(int rate)
+{
+    int dir = (rate > 0) ? 1 : -1;
+    int slides = abs(rate) * GLIDE_TAU_MS / (1000 * GLIDE_CLICKS_SLIDE);
+    int base, to;
+
+    if (slides < 1 || step == -dir)
+        return;
+    base = (step == dir) ? target : center_index;
+    to = fbound(MAX(0, center_index - GLIDE_MAX_SLIDES),
+                base + dir * slides,
+                MIN(number_of_slides - 1, center_index + GLIDE_MAX_SLIDES));
+    if (to == center_index)
+        return;
+
+    target = to;
+    pf_flat_last_input = current_tick;
+    pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
+    if (step == 0)
+        start_animation();
+    pf_random_spinning = false;
+    pf_gliding = true;
+}
+#endif /* HAVE_WHEEL_POSITION */
+
+/* Once round the screen's loop: a lift starts or adds to a glide, and a
+ * finger held still ends one at the next cover. */
+static void glide_watch(void)
+{
+#ifdef HAVE_WHEEL_POSITION
+    if (!glide_ticking)
+        return;
+    if (glide_wheel.lifted)
+    {
+        int rate = glide_wheel.flick;
+
+        glide_wheel.lifted = false;
+        /* The touch that wakes a dark screen only wakes it */
+        if (lcd_active() && abs(rate) >= GLIDE_MIN_RATE
+            && (pf_state == pf_idle || pf_state == pf_scrolling))
+            glide_start(rate);
+        return;
+    }
+    if (pf_gliding && glide_wheel.held && step != 0)
+    {
+        pf_gliding = false;
+        target = fbound(0, center_index + step, number_of_slides - 1);
+    }
+#endif
 }
 
 /* A flat pile hides everything but its top card, so only four covers are ever
@@ -3633,6 +3846,14 @@ static int scroll_speed(int frame)
     int fi = frame - (target << 16);
     if (fi < 0)
         fi = -fi;
+
+    /* A glide goes as fast as the way it has left, over GLIDE_TAU_MS, so its
+     * speed falls away smoothly as if against friction */
+    if (pf_gliding)
+        return fbound(GLIDE_SPEED_MIN,
+                      fi / (GLIDE_TAU_MS * CAROUSEL_NOMINAL_FPS / 1000),
+                      GLIDE_SPEED_MAX);
+
     fi = fmin(fi, max);
 
     int ia = IANGLE_MAX * (fi - max / 2) / (max * 2);
@@ -3737,7 +3958,7 @@ static void update_scroll_animation(void)
         pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
         queue_remove_from_head(&thread_q, EV_WAKEUP);
         queue_post(&thread_q, EV_WAKEUP, 0);
-        if (pf_random_spinning)
+        if (pf_random_spinning || (pf_gliding && !glide_finger_on()))
             keyclick_click(true, BUTTON_SCROLL_FWD);
         slide_frame = index << 16;
         center_slide.slide_index = center_index;
@@ -3762,6 +3983,7 @@ static void update_scroll_animation(void)
         reset_slides();
         pf_state = pf_idle;
         pf_random_spinning = false;
+        pf_gliding = false;
         slide_frame = center_index << 16;
         step = 0;
         fade = 256;
@@ -4357,6 +4579,10 @@ static int album_covers_loop(void)
         else
             timeout = (quiescent || dark) ? HZ/2 : HZ/16;
 
+        /* A lift is seen by looking, not by an event */
+        if (glide_pending() && timeout > PF_FRAME_TICKS)
+            timeout = PF_FRAME_TICKS;
+
         if (speak_due)
         {
             long left = speak_due - current_tick;
@@ -4370,6 +4596,7 @@ static int album_covers_loop(void)
         /* A hold of Play from now on is the random spin */
         if (!(button_status() & BUTTON_PLAY))
             button_set_sw_poweroff_state(false);
+        glide_watch();
 
         /* The index's seeks, and the captions read through them, hold only
          * for the commit they were read in. Checked here, between the wait and
@@ -4678,6 +4905,7 @@ static int album_covers_loop(void)
             ret = model->on_menu();
             if (ret >= 0)
                 return ret;   /* a GO_TO_* screen code */
+            glide_sync(true);
             /* Handled in place -- restore the carousel's own status bar/viewport
              * after the menu overlay, and (on a rebuild) its colours. */
             sb_set_persistent_title(model_title(), Icon_NOICON, SCREEN_MAIN);
@@ -4811,7 +5039,9 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
      * off. Held Play on the playing screen opens this, and that hold still
      * powers off, until Play is let go: see album_covers_loop(). */
     button_set_sw_poweroff_state(button_status() & BUTTON_PLAY);
+    glide_sync(true);
     ret = album_covers_loop();
+    glide_sync(false);
     button_set_sw_poweroff_state(true);
 
     cleanup();

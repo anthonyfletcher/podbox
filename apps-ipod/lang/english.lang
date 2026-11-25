@@ -28463,3 +28463,17 @@
     codec_supply: "Full codec voltage"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CAROUSEL_WHEEL_GLIDE
+  desc: in carousel settings: a flick of the wheel coasts on
+  user: core
+  <source>
+    *: "Wheel Glide"
+  </source>
+  <dest>
+    *: "Wheel Glide"
+  </dest>
+  <voice>
+    *: "Wheel glide"
+  </voice>
+</phrase>

@@ -2081,6 +2081,8 @@ const struct settings_list settings[] = {
                    1, "album covers random spin", "short,medium,long", NULL, 3,
                    ID2P(LANG_RANDOM_SPIN_SHORT), ID2P(LANG_RANDOM_SPIN_MEDIUM),
                    ID2P(LANG_RANDOM_SPIN_LONG)),
+    OFFON_SETTING(0, album_covers_wheel_glide, LANG_CAROUSEL_WHEEL_GLIDE, false,
+                  "album covers wheel glide", NULL),
     INT_SETTING(0, album_covers_transition_speed,
                 LANG_CAROUSEL_TRANSITION_SPEED, 325,
                 "album covers transition speed", UNIT_PERCENT, 100, 400, 25,
