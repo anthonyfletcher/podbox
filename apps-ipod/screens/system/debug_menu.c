@@ -66,6 +66,7 @@
 #include "database/tagcache.h"
 #include "system/app_buffer.h"
 #include "database/db_featured.h"
+#include "database/db_names.h"
 #include "crc32.h"
 #include "logf.h"
 #include "disk.h"
@@ -1703,6 +1704,51 @@ static bool dbg_featured(void)
     return simplelist_show_list(&info);
 }
 
+/* Split Album Artists' table (database/db_names.c), for the guest table's
+ * reason: its sizes are fixed, and a joint string that does not fit stays
+ * one artist without a word anywhere else. */
+static bool dbg_split_artists(void)
+{
+    struct simplelist_info info;
+    struct db_names_stats st;
+    int n, shown;
+
+    if (!global_settings.split_album_artists)
+    {
+        splash(HZ * 3, "Off: Settings > Library > Music");
+        return false;
+    }
+    if (!tagcache_is_in_ram())
+    {
+        splash(HZ * 3, "Needs the database loaded to RAM");
+        return false;
+    }
+
+    db_names_ensure();
+    db_names_get_stats(&st);
+    n = db_names_count();
+
+    simplelist_info_init(&info, "Split album artists", 0, NULL);
+    info.scroll_all = true;
+    simplelist_reset_lines();
+
+    simplelist_addline("Build %ld ms%s", st.build_ticks * 1000 / HZ,
+                       st.truncated ? " TRUNCATED" : "");
+    simplelist_addline("Joint strings %d/%d", st.joints, DB_NAMES_JOINTS_MAX);
+    simplelist_addline("Artists %d/%d, links %d/%d", st.parts,
+                       DB_NAMES_PARTS_MAX, st.links, DB_NAMES_LINKS_MAX);
+    simplelist_addline("Names %d/%d B", st.arena_used, DB_NAMES_ARENA);
+
+    shown = MIN(n, 24);
+    for (int i = 0; i < shown; i++)
+        simplelist_addline("%s%s", db_names_name(i),
+                           db_names_own_seek(i) < 0 ? " (joint only)" : "");
+    if (shown < n)
+        simplelist_addline("... and %d more", n - shown);
+
+    return simplelist_show_list(&info);
+}
+
 static bool dbg_tagcache_info(void)
 {
     struct simplelist_info info;
@@ -2099,6 +2145,7 @@ static const struct {
         { "Database", dbg_tagcache_info, false, NULL },
         { "Directory cache", dbg_dircache_info, false, NULL },
         { "Featured artists", dbg_featured, false, NULL },
+        { "Split album artists", dbg_split_artists, false, NULL },
         { "Metadata log", dbg_metadatalog, false, &write_metadata_log },
 
         { "Skin memory", dbg_skin_engine, false, NULL },

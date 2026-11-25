@@ -288,6 +288,11 @@ unsigned int create_thread(void (*function)(void), void *stack,
     return 0;
 }
 
+unsigned int thread_self(void)
+{
+    return 0;
+}
+
 /* ---- the rest of the player -------------------------------------------- */
 
 static void say(const char *kind, const char *what)

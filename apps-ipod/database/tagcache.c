@@ -2821,6 +2821,9 @@ bool tagcache_search_add_filter(struct tagcache_search *tcs,
     if (TAGCACHE_IS_NUMERIC_OR_NONUNIQUE(tag))
         return false;
 
+    if (tag == tag_albumartist && db_names_is_handle(seek))
+        db_names_wait();
+
     tcs->filter_tag[tcs->filter_count] = tag;
     tcs->filter_seek[tcs->filter_count] = seek;
     tcs->filter_count++;

@@ -278,6 +278,11 @@ unsigned int create_thread(void (*function)(void), void *stack,
     return 0;
 }
 
+unsigned int thread_self(void)
+{
+    return 0;
+}
+
 /* Only a track change arms one, and nothing plays here */
 void timeout_register(struct timeout *tmo, timeout_cb_type callback,
                       int ticks, intptr_t data)

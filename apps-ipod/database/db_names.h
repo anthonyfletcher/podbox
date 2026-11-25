@@ -33,10 +33,23 @@ static inline bool db_names_is_handle(long seek)
 /* Build the table if the setting is on and the database has changed since
  * it was built, or empty it if the setting is off. Crawls the album-artist
  * tag, so not from a redraw and never inside a search: the UI thread, or the
- * art cache's pass. While one builds, the other is told the table is not in
- * use, and a handle matches nothing. Whether the table is in use
- * afterwards. */
+ * art cache's pass. A call while the other builds waits for that build.
+ * Whether the table is in use afterwards. */
 bool db_names_ensure(void);
+
+/* Until a build running in another thread has finished. A handle matches
+ * nothing while one runs, so tagcache_search_add_filter() waits here before
+ * filtering by one. */
+void db_names_wait(void);
+
+/* What the last build filled, for the debug screen: whether the fixed sizes
+ * above still fit the library */
+struct db_names_stats {
+    int parts, joints, links, arena_used;
+    long build_ticks;
+    bool truncated;     /* a joint string did not fit and stayed whole */
+};
+void db_names_get_stats(struct db_names_stats *out);
 
 /* Whether the table is in use: the setting on, and the table built against
  * the database as it is now. Any thread; false while it is being built. */

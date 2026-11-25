@@ -51,6 +51,7 @@
 #include "events.h"
 #include "system/appevents.h"
 #include "database/db_spoken.h"
+#include "database/db_names.h"
 #include "database/path_key.h"
 #include "database/tagcache.h"
 #include "metadata/book_resume.h"
@@ -154,14 +155,19 @@ bool book_resume_id_of(long album_seek, long artist_seek, char *buf,
     char album[BOOK_KEY_MAX];
     char author[BOOK_KEY_MAX];
     struct tagcache_album al;
+    long part = db_names_is_handle(artist_seek) ? artist_seek : -1;
     int n;
 
-    /* The book of that name if there is one, else whoever's album it is */
+    /* The book of that name if there is one, else whoever's album it is. A
+     * split artist's handle is no author: it picks the album naming them. */
+    if (part != -1)
+        artist_seek = -1;
     for (n = tagcache_album_find_name(album_seek);
          artist_seek < 0 && n >= 0 && tagcache_album_get(n, &al)
          && al.album_seek == album_seek; n++)
     {
-        if (db_spoken_album_kind(&al) == 1)
+        if (part != -1 ? db_names_match(part, al.artist_seek)
+                       : db_spoken_album_kind(&al) == 1)
             artist_seek = al.artist_seek;
     }
     if (artist_seek < 0 && n > 0 && tagcache_album_get(n - 1, &al)

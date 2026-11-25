@@ -120,6 +120,7 @@ static bool loaded_count_down;
 static bool loaded_unnumbered;
 static bool loaded_podcast_shows;
 static bool loaded_show_unplayed;
+static bool loaded_split_paged;
 
 
 /* this needs to be same size as struct entry (tree.h) and name needs to be
@@ -3030,11 +3031,13 @@ static int add_episode_clauses(struct tagcache_search *tcs, long state)
  * ("A; B") and shows its artists instead (db_names.h): a part whose name is a
  * string of its own takes that string's row, browsing by the part's handle so
  * their joint albums come too, and one with no such row gets one after the
- * list, which is then sorted. A part is listed only where one of its strings
- * passes this list's filters. */
+ * list, which is then sorted. A list too long to hold whole is read a page at
+ * a time and sorted on no page, so those rows stay at its end. A part is
+ * listed only where one of its strings passes this list's filters. */
 #define SPLIT_PRESENT 1     /* a string naming the part is in this list */
 #define SPLIT_ROWED   2     /* the part has a row already */
 static uint8_t split_state[DB_NAMES_PARTS_MAX];
+static bool split_paged;    /* the current list is too long to hold whole */
 
 /* One album-artist row of the crawl: false to leave it out, a joint string,
  * whose parts are present if they pass the list's clauses on the tag (a
@@ -3667,12 +3670,12 @@ entry_skip_formatter:
      * here */
     split_counted = split && !c->dirfull;
     if (split_counted)
-    {
         dptr = add_split_rows(c, dptr, offset, &total_count, &namebufused,
                               order_prefix, artist_by_plays);
-        if (c->dirfull)
-            sort = false;
-    }
+    if (init)
+        split_paged = split && c->dirfull;
+    if (split && (c->dirfull || split_paged))
+        sort = false;
 
     /* [Shuffle Albums] has nothing to shuffle on a list of one album. Its row
      * went in before the list was read, so it comes out now; a list too long
@@ -5153,6 +5156,7 @@ int browser_db_load(struct browser_context* c)
                     tracks_unnumbered = loaded_unnumbered;
                     podcast_shows = loaded_podcast_shows;
                     show_unplayed = loaded_show_unplayed;
+                    split_paged = loaded_split_paged;
                     logf("Reusing %d entries", count);
                     break;
                 }
@@ -6432,6 +6436,7 @@ static void remember_loaded(struct browser_context* c)
     loaded_unnumbered = tracks_unnumbered;
     loaded_podcast_shows = podcast_shows;
     loaded_show_unplayed = show_unplayed;
+    loaded_split_paged = split_paged;
 }
 
 bool browser_db_counts_down(struct browser_context *c)

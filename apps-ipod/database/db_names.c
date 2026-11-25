@@ -67,7 +67,10 @@ static uint16_t own_order[DB_NAMES_PARTS_MAX];
 static int own_ct;
 
 static bool built, building;
+static unsigned int builder;        /* the thread building, while 'building' */
 static struct tagcache_marks built_marks;
+static bool truncated;              /* a joint string stayed whole */
+static long build_ticks;
 
 static int part_find(const char *name, int len, uint32_t key)
 {
@@ -93,6 +96,7 @@ static int part_index(const char *name, int len)
     if (part_ct == DB_NAMES_PARTS_MAX || arena_used + len + 1 > DB_NAMES_ARENA)
     {
         logf("split album artists: table full");
+        truncated = true;
         return -1;
     }
     memcpy(arena + arena_used, name, len);
@@ -133,6 +137,7 @@ static void add_joint(long seek, const struct db_featured_names *names)
         || link_ct + names->count > DB_NAMES_LINKS_MAX)
     {
         logf("split album artists: table full");
+        truncated = true;
         return;
     }
     j->seek = seek;
@@ -185,6 +190,7 @@ static void build(void)
     static struct db_featured_names names;
 
     part_ct = joint_ct = link_ct = arena_used = own_ct = 0;
+    truncated = false;
 
     if (!tagcache_search(&tcs, tag_albumartist))
         return;
@@ -238,22 +244,43 @@ bool db_names_ensure(void)
     }
     /* The RAM copy is out for a moment around a commit or USB; the table
      * waits for it, and db_names_active() says no meanwhile */
-    if (!tagcache_is_in_ram() || building)
+    if (!tagcache_is_in_ram())
         return db_names_active();
+    db_names_wait();
 
     tagcache_get_marks(&now);
     if (!built || now.commitid != built_marks.commitid
         || now.generation != built_marks.generation)
     {
+        long tick = current_tick;
+
         building = true;
+        builder = thread_self();
         cpu_boost(true);
         build();
         cpu_boost(false);
         building = false;
         built = true;
         built_marks = now;
+        build_ticks = current_tick - tick;
     }
     return db_names_active();
+}
+
+void db_names_wait(void)
+{
+    while (building && builder != thread_self())
+        sleep(1);
+}
+
+void db_names_get_stats(struct db_names_stats *out)
+{
+    out->parts = part_ct;
+    out->joints = joint_ct;
+    out->links = link_ct;
+    out->arena_used = arena_used;
+    out->build_ticks = build_ticks;
+    out->truncated = truncated;
 }
 
 bool db_names_active(void)
