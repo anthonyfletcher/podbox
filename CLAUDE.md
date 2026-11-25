@@ -568,11 +568,12 @@ in this order:
   and `convbdf`/BDF cannot round-trip them, so use this instead
 - `tools/fetch/` — desktop tools that fill a library from the web:
   `art_fetch.py` (artwork for artists and albums, and through
-  `art_books.py` for audiobooks, podcasts and ebooks), `lyric_fetch.py`
+  `art_books.py` for audiobooks, podcasts and ebooks, and `art_people.py`
+  for split, track and featured artists), `lyric_fetch.py`
   (LRCLIB lyrics), `notes_fetch.py` (notes pages from MusicBrainz and
-  Wikipedia), on `fetchlib.py`, whose name keys, spoken-word genres and
-  ebook extensions copy `art_name.c`, `db_spoken.c` and `book_index.c`:
-  change those and change it. `fetch_pb.py` runs the three as
+  Wikipedia), on `fetchlib.py`, whose name keys, spoken-word genres,
+  ebook extensions and credit parsing copy `art_name.c`, `db_spoken.c`,
+  `book_index.c` and `db_featured_parse.c`: change those and change it. `fetch_pb.py` runs the three as
   subcommands and is the one executable that ships. Built for
   Windows and macOS by `.github/workflows/fetch-tools.yml` as the `Tools`
   release, which `release.sh` starts

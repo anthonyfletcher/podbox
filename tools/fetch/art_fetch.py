@@ -3,7 +3,8 @@
 art_fetch: album covers and artist pictures for a PodBox music library,
 written beside the music; audiobook, podcast and ebook covers in the
 player's /Artwork (art_books.py). Each is a kind the command line names,
-and naming none fetches all five.
+and naming none fetches all five. Three options add pictures of people
+with no folder of their own to the artists kind (art_people.py).
 
 Candidates from every source are downloaded and scored on their real
 pixels. An online match is used only when its names agree closely enough
@@ -40,6 +41,7 @@ except ModuleNotFoundError:
     FLAC = Picture = APIC = ID3 = MP4 = MP4Cover = None
 
 import art_books
+import art_people
 from fetchlib import (MUSIC, Manifest, RateLimiter, config_path,
                       contact_from, http_get, iter_audio_files, load_config,
                       load_json, normalise_name, player_root_of, read_tags,
@@ -1182,7 +1184,10 @@ def run_both_single_pass(root: Path, args: argparse.Namespace, creds: Credential
 def build_parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(usage="%(prog)s [KIND ...] ROOT [options]", description="Covers and pictures for artists, albums, audiobooks, podcasts and ebooks.")
     p.add_argument("what", nargs="*", metavar="[KIND ...] ROOT", help="Any of artists, albums, audiobooks, podcasts, ebooks (default all), then the folder holding <artist>/<album>/<music files>. Audiobooks, podcasts and ebooks are found anywhere on the iPod")
-    p.add_argument("--artwork-root", default=None, help="Audiobooks, podcasts, ebooks: the Artwork folder to write into, when not a mounted iPod's")
+    p.add_argument("--artwork-root", default=None, help="Audiobooks, podcasts, ebooks, and the three people options: the Artwork folder to write into, when not a mounted iPod's")
+    p.add_argument("--split-artists", action="store_true", help="Artists: also a picture of each artist in an Album Artist joined with ';', for Split Album Artists, in the iPod's Artwork/People")
+    p.add_argument("--track-artists", action="store_true", help="Artists: also a picture of each Artist-tag name that is never an album artist, for Music > Artist, in the iPod's Artwork/People")
+    p.add_argument("--featured-artists", action="store_true", help="Artists: also a picture of each guest a title or Artist tag credits, for Featured Artists, in the iPod's Artwork/People")
     p.add_argument("--no-authors", action="store_true", help="Audiobooks, ebooks: no pictures of authors")
     p.add_argument("--no-audnexus", action="store_true", help="Audiobooks: do not ask Audnexus for Audible covers")
     p.add_argument("--google-books-key", default=None, help="Ebooks, audiobooks: a Google Books API key, to use it as a last source; remembered")
@@ -1299,6 +1304,8 @@ def main(argv: Optional[list[str]]=None) -> int:
             rc = run_album(root,args,creds,session,limiter)
         elif "artists" in kinds:
             rc = run_artist(root,args,creds,session,limiter)
+        if "artists" in kinds and art_people.wanted_groups(args):
+            rc = art_people.run_people(root,args,creds,session,limiter,sys.modules[__name__]) or rc
         if args.spoken_kinds:
             if not named and art_books.artwork_root(root,args) is None:
                 print("\nAudiobooks, podcasts and ebooks: skipped, as this is not a mounted iPod (--artwork-root names the Artwork folder)")

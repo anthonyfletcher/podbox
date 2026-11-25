@@ -8,7 +8,8 @@ Parts, in order:
   - settings and credentials
   - requests: user agent, pacing, retries
   - files: atomic writes, JSON
-  - names: remote similarity, and the player's own name keys
+  - names: remote similarity, the player's own name keys, and the names
+    it reads out of a joint Album Artist and a credit
   - the library: tags, kinds, walking a root
   - the manifest
 """
@@ -308,6 +309,179 @@ def name_keys(name: str) -> set[str]:
 
 def same_person(a: str, b: str) -> bool:
     return bool(name_keys(a) & name_keys(b))
+
+
+# The names the player takes out of a joint Album Artist (Split Album
+# Artists) and out of a credit (Featured Artists), reproduced from
+# apps-ipod/database/db_featured_parse.c. Any letter past ASCII continues a
+# word, as every byte of one does there; limits are in UTF-8 bytes.
+_CREDIT_NAME_MAX = 63           # DB_FEATURED_NAME_MAX
+_CREDIT_NAMES_MAX = 8           # DB_FEATURED_MAX_GUESTS
+_JOINT_CUT_LEN = 499            # DB_NAMES_CUT_LEN
+_MARKERS = (("duet with", True), ("featuring", True), ("feat", True),
+            ("ft", True), ("w/", False), ("f/", False))
+
+
+def _word_char(c: str) -> bool:
+    return ("0" <= c <= "9" or "a" <= c <= "z" or "A" <= c <= "Z"
+            or ord(c) >= 0x80)
+
+
+def _space_at(s: str, i: int) -> bool:
+    return i < len(s) and s[i] in " \t"
+
+
+def _lower(text: str) -> str:
+    return "".join(chr(ord(c) + 32) if "A" <= c <= "Z" else c for c in text)
+
+
+def _trim(s: str, a: int, b: int) -> tuple[int, int]:
+    while a < b and s[a] in " \t":
+        a += 1
+    while b > a and s[b - 1] in " \t":
+        b -= 1
+    return a, b
+
+
+def credit_key(name: str) -> str:
+    """The player's identity for a credited name: trimmed, ASCII case
+    folded (db_featured_name_eq)."""
+    return _lower(name.strip(" \t"))
+
+
+def _find_marker(s: str) -> int:
+    """Where the guest list after the first marker begins, or -1."""
+    for p in range(len(s)):
+        if p > 0 and _word_char(s[p - 1]):
+            continue
+        for text, needs_sep in _MARKERS:
+            after = p + len(text)
+            if _lower(s[p:after]) != text:
+                continue
+            nxt = s[after] if after < len(s) else ""
+            if not needs_sep:
+                # "w/o" is "without", and credits nobody
+                if _lower(nxt) == "o" and not (after + 1 < len(s) and _word_char(s[after + 1])):
+                    continue
+                return after
+            if nxt in (".", ":"):
+                return after + 1
+            if nxt in (" ", "\t"):
+                return after
+    return -1
+
+
+def _list_end(s: str, guests: int) -> int:
+    """Where the list ends: the close of the bracket the marker sits in, or
+    the next bracket to open, or the end."""
+    opened = [""] * 4
+    depth = 0
+    for c in s[:guests]:
+        if c in "([":
+            if depth < 4:
+                opened[depth] = c
+            depth += 1
+        elif c in ")]" and depth > 0:
+            depth -= 1
+    end = len(s)
+    if 0 < depth <= 4:
+        close = s.find("]" if opened[depth - 1] == "[" else ")", guests)
+        if close >= 0:
+            end = close
+    for p in range(guests, end):
+        if s[p] in "([":
+            return p
+    return end
+
+
+def _next_sep(s: str, p: int, end: int) -> tuple[int, int]:
+    for i in range(p, end):
+        if s[i] in "&,;+/":
+            return i, 1
+        if s[i] not in " \t":
+            continue
+        if end - (i + 1) >= 3 and _lower(s[i + 1:i + 4]) == "and" and _space_at(s, i + 4):
+            return i + 1, 3
+        if end - (i + 1) >= 1 and _lower(s[i + 1]) == "x" and _space_at(s, i + 2):
+            return i + 1, 1
+    return -1, 0
+
+
+def _find_cut(s: str, start: int, end: int, known: set[str]) -> tuple[int, int]:
+    """Where [start, end) is cut in two: after the longest opening run the
+    library knows as an artist, else at the first separator; -1 to keep it
+    whole, as a run that is itself an artist is."""
+    ws, we = _trim(s, start, end)
+    if we > ws and credit_key(s[ws:we]) in known:
+        return -1, 0
+    first = longest = (-1, 0)
+    p = start
+    while p < end:
+        sep, n = _next_sep(s, p, end)
+        if sep < 0:
+            break
+        ls, le = _trim(s, start, sep)
+        rs, re_ = _trim(s, sep + n, end)
+        if le > ls and re_ > rs:
+            if first[0] < 0:
+                first = (sep, n)
+            if credit_key(s[ls:le]) in known:
+                longest = (sep, n)
+        p = sep + n
+    return longest if longest[0] >= 0 else first
+
+
+def _add_name(out: list[str], s: str, a: int, b: int) -> None:
+    a, b = _trim(s, a, b)
+    if 2 <= len(s[a:b].encode("utf-8")) <= _CREDIT_NAME_MAX:
+        out.append(s[a:b])
+
+
+def featured_names(s: str, known: set[str]) -> list[str]:
+    """The guests a title or Artist tag credits. 'known' holds the
+    credit_key() of every album artist and of each known_artists.txt line,
+    which decide where "A & B" comes apart."""
+    out: list[str] = []
+    guests = _find_marker(s)
+    if guests < 0:
+        return out
+    end = _list_end(s, guests)
+    rejected = 0
+    while len(out) < _CREDIT_NAMES_MAX and rejected < _CREDIT_NAMES_MAX:
+        cut, n = _find_cut(s, guests, end, known)
+        if cut < 0:
+            break
+        before = len(out)
+        _add_name(out, s, guests, cut)
+        if len(out) == before:
+            rejected += 1
+        guests = cut + n
+    if len(out) < _CREDIT_NAMES_MAX and rejected < _CREDIT_NAMES_MAX:
+        _add_name(out, s, guests, end)
+    return out
+
+
+def credits_anyone(s: str) -> bool:
+    return _find_marker(s) >= 0
+
+
+def split_album_artist(s: str) -> list[str]:
+    """The artists of an Album Artist joined with ';', or [] for one."""
+    out: list[str] = []
+    if ";" not in s:
+        return out
+    start = 0
+    while len(out) < _CREDIT_NAMES_MAX:
+        semi = s.find(";", start)
+        if semi < 0:
+            # The player reads a tag cut short, and drops a last name that
+            # may be half of one
+            if len(s.encode("utf-8")) < _JOINT_CUT_LEN:
+                _add_name(out, s, start, len(s))
+            break
+        _add_name(out, s, start, semi)
+        start = semi + 1
+    return out
 
 # ---------------------------------------------------------------------
 # The library

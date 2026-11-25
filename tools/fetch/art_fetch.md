@@ -7,6 +7,7 @@ folders, and for the audiobooks, podcasts and ebooks on an iPod. It can create:
 - album artwork at `Artist/Album/folder.jpg`
 - covers of audiobooks, podcasts and ebooks, and pictures of their authors, in the iPod's
   `Artwork` folder
+- if you ask, pictures of artists with no folder of their own, in the same place
 - baseline / non-progressive JPEG files, which the player decodes fastest
 
 ---
@@ -150,6 +151,34 @@ A printed book's cover is taller than it is wide. It is saved whole, and PodBox 
 where it needs a square.
 
 On a music folder on your computer, give `--artwork-root` the folder to write into.
+
+---
+
+## Artists without a folder
+
+`artists` pictures the artists that have folders. Three options add people who have none,
+each for a PodBox setting you may not use:
+
+| Option | Adds a picture of | For |
+|---|---|---|
+| `--split-artists` | each artist in an Album Artist such as `Madonna; Charli XCX` | **Split Album Artists** |
+| `--track-artists` | each name in the Artist tag that is never an album artist | Music > Artist |
+| `--featured-artists` | each guest a title or Artist tag credits, such as `Song (feat. Drake)` | **Featured Artists** |
+
+```bash
+.\fetch_pb art artists E:\Music --split-artists --featured-artists
+```
+
+Give the music folder on a mounted iPod: the pictures go in its `Artwork/People` folder, as
+`Artwork/People/<Artist>.jpg`. On a music folder on your computer, give `--artwork-root`.
+
+Every track's tags are read to find the names, which takes a few minutes on a large library.
+Names are split and guests found as the iPod does it, including the names in its
+`known_artists.txt`. Nobody is looked up who the iPod can already show a picture of: an
+album artist, or anyone with a picture in `Artwork/People` or in a folder of their name.
+
+On a library full of compilations, `--track-artists` can find thousands of names, and the run
+takes as long.
 
 ---
 
@@ -514,6 +543,14 @@ Traversal      : single pass over artist folders
 
 ```bash
 artists albums audiobooks podcasts ebooks   # any of them, before the folder; none for all
+```
+
+### Artists without a folder
+
+```bash
+--split-artists              # each artist of a ';' Album Artist
+--track-artists              # each Artist-tag name that is never an album artist
+--featured-artists           # each guest a credit names
 ```
 
 ### Output filename
