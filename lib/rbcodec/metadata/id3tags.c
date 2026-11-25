@@ -86,8 +86,21 @@ static const char* const genres[] = {
     "BritPop", "Negerpunk", "Polsk Punk", "Beat", "Christian Gangsta Rap",
     "Heavy Metal", "Black Metal", "Crossover", "Contemporary Christian",
     "Christian Rock", "Merengue", "Salsa", "Thrash Metal", "Anime", "Jpop",
-    "Synthpop"
+    "Synthpop",
+    /* Winamp 5.6 extensions, 148-191, named as FFmpeg's ff_id3v1_genre_str */
+    "Abstract", "Art Rock", "Baroque", "Bhangra", "Big Beat", "Breakbeat",
+    "Chillout", "Downtempo", "Dub", "EBM", "Eclectic", "Electro",
+    "Electroclash", "Emo", "Experimental", "Garage", "Global", "IDM",
+    "Illbient", "Industro-Goth", "Jam Band", "Krautrock", "Leftfield",
+    "Lounge", "Math Rock", "New Romantic", "Nu-Breakz", "Post-Punk",
+    "Post-Rock", "Psytrance", "Shoegaze", "Space Rock", "Trop Rock",
+    "World Music", "Neoclassical", "Audiobook", "Audio Theatre",
+    "Neue Deutsche Welle", "Podcast", "Indie Rock", "G-Funk", "Dubstep",
+    "Garage Rock", "Psybient"
 };
+
+/* The table must end at genre 191 */
+typedef char id3_genres_end_at_191[ARRAYLEN(genres) == 192 ? 1 : -1];
 
 char* id3_get_num_genre(unsigned int genre_num)
 {
