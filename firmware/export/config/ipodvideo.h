@@ -86,6 +86,9 @@
 /* Define this if you can switch on/off the accessory power supply */
 #define HAVE_ACCESSORY_SUPPLY
 
+/* Define this if the codec's supply can be set to more than one level */
+#define HAVE_CODEC_SUPPLY_LEVEL
+
 /* Define this, if you can switch on/off the lineout */
 #define HAVE_LINEOUT_POWEROFF
 

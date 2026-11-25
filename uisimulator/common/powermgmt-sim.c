@@ -173,6 +173,13 @@ void accessory_supply_set(bool enable)
 }
 #endif
 
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+void codec_supply_set(bool full)
+{
+    (void)full;
+}
+#endif
+
 #ifdef HAVE_LINEOUT_POWEROFF
 void lineout_set(bool enable)
 {

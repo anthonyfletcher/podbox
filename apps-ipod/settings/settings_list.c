@@ -722,6 +722,16 @@ static void iap_enabled_set(bool enable)
 #endif
 }
 
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+/* The supply's step reaches the headphones, so a change made while a track
+ * is playing or paused waits for main.c to apply it at the next start. */
+static void codec_supply_callback(bool full)
+{
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
+        codec_supply_set(full);
+}
+#endif
+
 static void albumart_callback(int mode)
 {
     set_albumart_mode(mode);
@@ -1589,6 +1599,10 @@ const struct settings_list settings[] = {
                    DITHER_OFF, "dithering enabled", "off,on,auto",
                    dsp_dither_enable, 3, ID2P(LANG_OFF), ID2P(LANG_ALWAYS),
                    ID2P(LANG_AUTO)),
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+    OFFON_SETTING(0, codec_supply_full, LANG_CODEC_SUPPLY_FULL, false,
+                  "codec supply full", codec_supply_callback),
+#endif
     /* surround */
      TABLE_SETTING(F_TIME_SETTING | F_SOUNDSETTING, surround_enabled,
                   LANG_SURROUND, 0, "surround enabled", off,

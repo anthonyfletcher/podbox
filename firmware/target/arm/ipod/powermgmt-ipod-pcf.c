@@ -120,6 +120,17 @@ void accessory_supply_set(bool enable)
 }
 #endif
 
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+/* The codec's supply (D1REGC1): 3.0V, Apple's level, or 2.5V, the analogue
+ * floor pcf50605_init() boots at. The datasheet gives 3.0V 4 dB more line-out
+ * SNR and 1.6 dB more headroom. The step reaches the outputs, so call this
+ * only with no audio playing. */
+void codec_supply_set(bool full)
+{
+    pcf50605_write(PCF5060X_D1REGC1, full ? 0xf5 : 0xf0);
+}
+#endif
+
 #ifdef HAVE_LINEOUT_POWEROFF
 void lineout_set(bool enable)
 {

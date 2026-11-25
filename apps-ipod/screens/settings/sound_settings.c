@@ -127,6 +127,10 @@ MENUITEM_SETTING(stereo_width, &global_settings.stereo_width,
 
     MENUITEM_SETTING(dithering_enabled,
                      &global_settings.dithering_enabled, lowlatency_callback);
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+    MENUITEM_SETTING(codec_supply_full,
+                     &global_settings.codec_supply_full, NULL);
+#endif
     MENUITEM_SETTING(afr_enabled,
                      &global_settings.afr_enabled, lowlatency_callback);
     MENUITEM_SETTING(pbe,
@@ -184,6 +188,9 @@ MAKE_MENU(sound_settings, ID2P(LANG_SOUND_SETTINGS), NULL, Icon_Audio,
           ,&treble_cutoff
           ,&balance,&channel_config,&stereo_width
           ,&crossfeed_menu, &equalizer_menu, &dithering_enabled
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+          ,&codec_supply_full
+#endif
           ,&surround_menu, &pbe_menu, &afr_enabled
           ,&compressor_menu
          );

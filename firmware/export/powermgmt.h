@@ -179,6 +179,9 @@ bool query_force_shutdown(void);
 #ifdef HAVE_ACCESSORY_SUPPLY
 void accessory_supply_set(bool);
 #endif
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+void codec_supply_set(bool full);
+#endif
 #ifdef HAVE_LINEOUT_POWEROFF
 void lineout_set(bool);
 #endif

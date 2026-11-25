@@ -8,6 +8,10 @@
 accessory_supply
 #endif
 
+#if defined(HAVE_CODEC_SUPPLY_LEVEL)
+codec_supply
+#endif
+
 #if defined(HAVE_AGC)
 agc
 #endif

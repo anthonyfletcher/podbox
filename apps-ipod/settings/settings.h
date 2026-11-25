@@ -1038,6 +1038,9 @@ struct user_settings
     int iap_identity;    /* USB_IDENTITY_*: the model accessories are told */
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+    bool codec_supply_full; /* codec at 3.0V rather than 2.5V */
+#endif
     bool lineout_active;
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
     int tv_out_size;      /* 0 the LCD pixel for pixel, 1 doubled */

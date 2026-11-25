@@ -28446,3 +28446,20 @@
     *: "Set the clock first"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CODEC_SUPPLY_FULL
+  desc: in sound settings, iPod Video: power the audio chip at 3.0 V
+  user: core
+  <source>
+    *: none
+    codec_supply: "Full Codec Voltage"
+  </source>
+  <dest>
+    *: none
+    codec_supply: "Full Codec Voltage"
+  </dest>
+  <voice>
+    *: none
+    codec_supply: "Full codec voltage"
+  </voice>
+</phrase>

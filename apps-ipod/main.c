@@ -804,6 +804,9 @@ static void init(void)
 #endif
     battery_log_init();
     accessory_supply_set(global_settings.accessory_supply);
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+    codec_supply_set(global_settings.codec_supply_full);
+#endif
     lineout_set(global_settings.lineout_active);
     /* The last stage, and a slow one -- parsing the WPS and SBS, then loading
      * their backdrops, bitmaps and fonts. It gets its own caption because the

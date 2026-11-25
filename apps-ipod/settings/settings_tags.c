@@ -83,6 +83,9 @@ static const struct tag_row tag_rows[] = {
 { "stereo_width",        TAG_SOUND,                              "stereo width" },
 { "volume fade",         TAG_SOUND|TAG_PLAYBACK,                 "fade stop pause" },
 { "dithering enabled",   TAG_ADVANCED|TAG_SOUND,                 "dither noise" },
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+{ "codec supply full",   TAG_ADVANCED|TAG_SOUND,                 "voltage noise headroom" },
+#endif
 { "afr enabled",         TAG_SOUND,                              "fatigue harsh listening" },
 { "volume adjustment mode",     TAG_ADVANCED|TAG_SOUND|TAG_SYSTEM, "perceptual steps" },
 { "perceptual volume step count", TAG_ADVANCED|TAG_SOUND|TAG_SYSTEM, "steps" },
