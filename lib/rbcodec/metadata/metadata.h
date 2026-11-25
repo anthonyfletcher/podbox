@@ -341,6 +341,9 @@ struct mp3entry {
 
     /* MP4 container has a video track */
     bool has_video;
+
+    /* The book's place in its series, as series_part.h says; 0 for none */
+    int series_part;
 };
 
 unsigned int probe_file_format(const char *filename); /* returns audio_fmt */

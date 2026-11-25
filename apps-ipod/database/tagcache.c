@@ -195,6 +195,9 @@ static bool usr_cancel(void);
 #define FLAG_DIRTYNUM    0x0004  /* Numeric data has been modified */
 #define FLAG_TRKNUMGEN   0x0008  /* Track number has been generated  */
 #define FLAG_RESURRECTED 0x0010  /* Statistics data has been resurrected */
+/* The top half holds the track's series_part (series_part.h), 0 for none */
+#define FLAG_SERIES_SHIFT 16
+#define FLAG_SERIES(flag) ((uint32_t)(flag) >> FLAG_SERIES_SHIFT)
 
 
 #define DB_LOG(kind, msg) debug_log(DEBUG_LOG_TAGCACHE, kind ": %s", msg)
@@ -1162,6 +1165,10 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
         }
         if (e->tag_seek[tag_year] > rows[r].year)
             rows[r].year = e->tag_seek[tag_year];
+        if (FLAG_SERIES(e->flag) && (!rows[r].series_part
+                                     || FLAG_SERIES(e->flag)
+                                        < rows[r].series_part))
+            rows[r].series_part = FLAG_SERIES(e->flag);
         if (plays > 0)
         {
             rows[r].playcount += plays;
@@ -3625,6 +3632,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     entry.tag_offset[tag_length] = id3.length;
     entry.tag_offset[tag_bitrate] = id3.bitrate;
     entry.tag_offset[tag_mtime] = mtime;
+    entry.flag = (uint32_t)id3.series_part << FLAG_SERIES_SHIFT;
 
     /* String tags. */
     has_artist = id3.artist != NULL

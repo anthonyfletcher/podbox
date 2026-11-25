@@ -112,6 +112,7 @@ struct db_summary_order {
     /* The album artist's place in name order, counting from 0; equal for two
      * albums by the same artist. DB_SUMMARY_NO_ARTIST for an album with none. */
     int  artist;
+    int  series_part;   /* the lowest of its tracks', 0 for none */
 };
 #define DB_SUMMARY_NO_ARTIST 99999
 

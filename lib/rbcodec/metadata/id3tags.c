@@ -44,6 +44,7 @@
 #include "mp3data.h"
 #include "metadata_common.h"
 #include "metadata_parsers.h"
+#include "series_part.h"
 #include "misc.h"
 
 static unsigned long unsync(unsigned long b0,
@@ -523,6 +524,14 @@ static int parsembtid( struct mp3entry* entry, char* tag, int bufferpos )
     return bufferpos;
 }
 
+/* MVIN, iTunes' movement number: "2" or "2/7". Nothing of it is kept. */
+static int parsemvin( struct mp3entry* entry, char* tag, int bufferpos )
+{
+    (void)bufferpos;
+    series_part_text(tag, entry);
+    return tag - entry->id3v2buf;
+}
+
 static const struct tag_resolver taglist[] = {
     { "TPE1", 4, offsetof(struct mp3entry, artist), NULL, false },
     { "TP1",  3, offsetof(struct mp3entry, artist), NULL, false },
@@ -552,6 +561,7 @@ static const struct tag_resolver taglist[] = {
     { "PIC",  3, 0, &parsealbumart, true },
 #endif
     { "TXXX", 4, 0, &parseuser, false },
+    { "MVIN", 4, 0, &parsemvin, false },
     { "RVA2", 4, 0, &parserva2, true },
     { "UFID", 4, 0, &parsembtid, false },
 };

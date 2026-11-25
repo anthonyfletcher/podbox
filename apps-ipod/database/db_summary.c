@@ -333,7 +333,8 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
         return ERROR_NO_ALBUMS;
 
     /* One entry an album name, the albums under it sharing their name's: the
-     * latest year among them, and the first artist's place */
+     * latest year among them, the lowest series part and the first artist's
+     * place */
     for (int i = 0; i < na; i++)
     {
         if (!tagcache_album_get(i, &a) || (!spoken && album_hidden(&a)))
@@ -342,6 +343,9 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
         {
             if (a.year > out[n - 1].year)
                 out[n - 1].year = a.year;
+            if (a.series_part && (!out[n - 1].series_part
+                                  || a.series_part < out[n - 1].series_part))
+                out[n - 1].series_part = a.series_part;
             continue;
         }
         if (n == max)
@@ -349,6 +353,7 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
         out[n].seek = a.album_seek;
         out[n].year = a.year;
         out[n].artist = tagcache_artist_find(a.artist_seek);
+        out[n].series_part = a.series_part;
         n++;
     }
 

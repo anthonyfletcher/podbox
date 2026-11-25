@@ -310,6 +310,8 @@ struct tagcache_album {
     bool     track_repeats;      /* one of its tracks repeats a track number
                                     from 1 to 1024 of this row or an earlier
                                     row of the same album name */
+    uint16_t series_part;        /* the lowest of its tracks' series_part
+                                    (series_part.h), 0 for none */
 };
 
 static inline uint64_t tagcache_album_dir_key(const struct tagcache_album *r)

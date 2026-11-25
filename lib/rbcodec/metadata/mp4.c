@@ -32,6 +32,7 @@
 #include "debug.h"
 #include "replaygain.h"
 #include "rbunicode.h"
+#include "series_part.h"
 
 #ifdef DEBUGF
 #undef DEBUGF
@@ -52,6 +53,7 @@
 #define MP4_cwrt FOURCC(0xa9, 'w', 'r', 't')
 #define MP4_ccmt FOURCC(0xa9, 'c', 'm', 't')
 #define MP4_cday FOURCC(0xa9, 'd', 'a', 'y')
+#define MP4_cmvi FOURCC(0xa9, 'm', 'v', 'i')
 #define MP4_covr FOURCC('c', 'o', 'v', 'r')
 #define MP4_disk FOURCC('d', 'i', 's', 'k')
 #define MP4_esds FOURCC('e', 's', 'd', 's')
@@ -506,6 +508,20 @@ static bool read_mp4_tags(int fd, struct mp3entry* id3,
         case MP4_cgen:
             read_mp4_tag_string(fd, size, &buffer, &buffer_left,
                 &id3->genre_string);
+            break;
+
+        case MP4_cmvi:
+            {
+                /* The movement number: a big-endian integer of 1 to 4 bytes */
+                unsigned char num[4];
+                unsigned long n = 0, len;
+
+                len = read_mp4_tag(fd, size, (char *)num, sizeof(num));
+                for (unsigned long i = 0; i < len; i++)
+                    n = n << 8 | num[i];
+                if (len > 0)
+                    series_part_number(n, id3);
+            }
             break;
 
         case MP4_disk:

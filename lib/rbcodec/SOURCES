@@ -39,6 +39,7 @@ dsp/dsp_arm_v6.S
 #  endif
 # endif
 metadata/replaygain.c
+metadata/series_part.c
 metadata/metadata_common.c
 metadata/a52.c
 metadata/adx.c

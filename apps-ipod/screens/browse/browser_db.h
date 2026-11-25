@@ -27,6 +27,8 @@ enum database_sort_albums {
     DB_SORT_ALBUMS_ARTIST_NAME,
     DB_SORT_ALBUMS_ARTIST_YEAR,
     DB_SORT_ALBUMS_ARTIST_YEAR_DESC,
+    /* A series' books by their part, then year; never a saved choice */
+    DB_SORT_ALBUMS_SERIES,
 };
 
 /* global_settings.database_sort_artists_by: how an artist list is ordered. */

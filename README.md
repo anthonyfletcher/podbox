@@ -159,9 +159,12 @@ their own.
   - Hold `Select` on a book or a podcast show and select `Listening Stats`; every book's
     together is at the foot of `Audiobooks`, every show's at the foot of `Podcasts`, and a
     book's chapters not yet heard are listed below its figures
-- Books in a series together, in the order they came out
+- Books in a series together, in series order
   - `Audiobooks > By Series`. The series is the grouping tag; give each book of a series the
     same one, with no number in it
+  - Give each book its number in `SERIES-PART`, or in the movement number some audiobook
+    tools write (`MVIN` in MP3, `©mvi` in M4B), with decimals for a novella such as `2.5`. A
+    series with no numbers is listed by year, and unnumbered books follow the numbered ones
   - `Book Info` shows the grouping as `Series`, and the composer as `Narrator`
 - Bookmark places in a book to come back to
   - While a book plays, hold `Select` and select `More... > Create Bookmark`

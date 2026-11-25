@@ -32,6 +32,7 @@
 #include "replaygain.h"
 #include "fixedpoint.h"
 #include "metadata_common.h"
+#include "series_part.h"
 
 #define FP_BITS         (12)
 #define FP_ONE          (1 << FP_BITS)
@@ -194,6 +195,10 @@ void parse_replaygain(const char* key, const char* value,
                                        "replaygain_album_peak",
                                        "r128_track_gain", "r128_album_gain",
                                        NULL};
+
+    /* Every format's reader hands its unrecognised user tags here */
+    if (series_part_user_tag(key, value, entry))
+        return;
 
     int rg_op = string_option(key, rg_options, true);
     long gain;

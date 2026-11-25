@@ -2170,6 +2170,8 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
  * within a key exactly as they do in the plain album list. */
 #define YEAR_FIELD_LEN   5      /* "2004 " */
 #define ARTIST_FIELD_LEN 6      /* the artist's rank, "00042 " */
+#define SERIES_FIELD_LEN 6      /* series_part.h's number, "00251 " */
+#define SERIES_UNKNOWN   99999  /* after every numbered book */
 #define PLAYS_FIELD_LEN  8      /* PLAYS_MAX less an artist's plays */
 #define PLAYS_MAX        9999999
 
@@ -2193,6 +2195,8 @@ static int order_prefix_len(int order)
         case DB_SORT_ALBUMS_ARTIST_YEAR:
         case DB_SORT_ALBUMS_ARTIST_YEAR_DESC:
             return ARTIST_FIELD_LEN + YEAR_FIELD_LEN;
+        case DB_SORT_ALBUMS_SERIES:
+            return SERIES_FIELD_LEN + YEAR_FIELD_LEN;
         default:
             return 0;
     }
@@ -2241,6 +2245,16 @@ static void write_order_prefix(char *dst, const struct db_summary_order *tab,
 
     if (year <= 0 || year > 9999)
         year = YEAR_UNKNOWN;
+
+    if (order == DB_SORT_ALBUMS_SERIES)
+    {
+        int part = row != NULL && row->series_part ? row->series_part
+                                                   : SERIES_UNKNOWN;
+
+        dst = write_field(dst, part, SERIES_FIELD_LEN);
+        write_field(dst, year, YEAR_FIELD_LEN);
+        return;
+    }
 
     if (order >= DB_SORT_ALBUMS_ARTIST_NAME)
         dst = write_field(dst, artist, ARTIST_FIELD_LEN);
@@ -2371,13 +2385,15 @@ static int album_sort_order(int level)
     int order = browser_db_album_sort_get(ctx);
 
     /* Audiobooks' books have a setting of their own, and a series' come in
-     * the order they were published, which is the series' as a rule */
+     * its own order where tagged, and otherwise as they were published */
     if (csi_spoken_kind() == 1)
-        order = level > 0 && csi->tagorder[level - 1] == tag_grouping
-                ? DB_SORT_ALBUMS_YEAR
-                : global_settings.audiobook_sort_books_by
-                  == BOOKS_SORT_AUTHOR_NAME ? DB_SORT_ALBUMS_ARTIST_NAME
-                                            : DB_SORT_ALBUMS_NAME;
+    {
+        if (level > 0 && csi->tagorder[level - 1] == tag_grouping)
+            return DB_SORT_ALBUMS_SERIES;
+        order = global_settings.audiobook_sort_books_by
+                == BOOKS_SORT_AUTHOR_NAME ? DB_SORT_ALBUMS_ARTIST_NAME
+                                          : DB_SORT_ALBUMS_NAME;
+    }
     else if (order < 0)
         order = global_settings.database_sort_albums_by;
     if (browser_db_album_sort_artist_first_moot(ctx)

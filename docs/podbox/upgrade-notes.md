@@ -25,3 +25,8 @@
   **Segregate Audiobooks** and **Segregate Podcasts** keep them out of the
   music, so its figures, badges included, can go down. It reads the whole
   log again the first time it opens.
+- An audiobook series lists its books in series order when they are tagged
+  with a series number (`SERIES-PART`, or the movement number some audiobook
+  tools write), and by year as before when they are not. Numbers already in
+  your tags are read at the next **Rebuild Database**; a book you tag from
+  now on is picked up by an ordinary update.
