@@ -3841,10 +3841,12 @@ static int tempbuf_sort(int fd)
     int length;
     off_t pos = lseek(fd, 0, SEEK_CUR);
 
-    /* Generate reverse lookup entries. */
+    /* Generate reverse lookup entries. Each id goes in just after the list's
+       head: the only reader below visits every node whatever their order, so
+       walking to the tail would make a value shared by many tracks quadratic. */
     for (i = 0; i < lookup_buffer_depth; i++)
     {
-        struct tempbuf_id_list *idlist;
+        struct tempbuf_id_list *head, *idlist;
 
         if (!lookup[i])
             continue;
@@ -3852,21 +3854,19 @@ static int tempbuf_sort(int fd)
         if (lookup[i]->idlist.id == i)
             continue;
 
-        idlist = &lookup[i]->idlist;
-        while (idlist->next != NULL)
-            idlist = idlist->next;
+        head = &lookup[i]->idlist;
 
         ALIGN_BUFFER(tempbuf_pos, tempbuf_left, alignof(struct tempbuf_id_list));
         tempbuf_left -= sizeof(struct tempbuf_id_list);
         if (tempbuf_left < 0)
             return -1;
 
-        idlist->next = (struct tempbuf_id_list *)&tempbuf[tempbuf_pos];
+        idlist = (struct tempbuf_id_list *)&tempbuf[tempbuf_pos];
         tempbuf_pos += sizeof(struct tempbuf_id_list);
 
-        idlist = idlist->next;
         idlist->id = i;
-        idlist->next = NULL;
+        idlist->next = head->next;
+        head->next = idlist;
 
         do_timed_yield();
     }
