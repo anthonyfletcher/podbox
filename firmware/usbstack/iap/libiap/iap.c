@@ -669,7 +669,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             } break;
             case IAPIPodStateType_AudiobookSpeeed: {
                 alloc_response(IAPIPodStateAudiobookSpeeedPayload);
-                response->speed = IAPIPodStateAudiobookSpeeed_Normal;
+                response->speed = iap_platform_get_audiobook_speed(ctx);
                 return IAPDisplayRemoteCommandID_RetIPodStateInfo;
             } break;
             case IAPIPodStateType_TrackTimePositionSec: {
@@ -999,7 +999,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_GetAudiobookSpeed: {
             alloc_response(IAPRetAudiobookSpeedPayload);
-            response->speed = IAPIPodStateAudiobookSpeeed_Normal;
+            response->speed = iap_platform_get_audiobook_speed(ctx);
             return IAPExtendedInterfaceCommandID_RetAudiobookSpeed;
         } break;
         case IAPExtendedInterfaceCommandID_GetIndexedPlayingTrackInfo: {

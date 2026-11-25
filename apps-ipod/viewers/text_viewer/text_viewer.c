@@ -42,7 +42,9 @@
 #include "lang.h"
 #include "widgets/splash.h"
 #include "widgets/dialog_prose.h"     /* dialog_prose_show */
+#include "widgets/dialog.h"           /* a splash in the page's colours */
 #include "reading_stats.h"
+#include "system/format_time.h"  /* a footer's time left */
 #include "draw/viewport.h"
 #include "draw/color.h"           /* color_blend, dim text */
 #include "font.h"
@@ -71,6 +73,7 @@
 #include "rbunicode.h"          /* utf8decode, a mark's label */
 #include "metadata/book_resume.h"       /* book_resume_key */
 #include "widgets/yesno.h"
+#include "widgets/keyboard.h"       /* kbd_input, a search's text */
 
 /* Extracted text kept resident, and how much of it sits behind the current
  * page. The margin is the backward reach: at a typical few KiB per page it
@@ -785,6 +788,7 @@ static void tv_fullscreen_vp(struct viewport *vp)
     vp->buffer = NULL;
     vp->flags = VP_DEFAULT_FLAGS;
     viewport_set_fullscreen(vp, SCREEN_MAIN);
+    vp->fg_pattern = tv.vp.fg_pattern;
     vp->bg_pattern = tv.vp.bg_pattern;
     if (tv_side)
     {
@@ -794,10 +798,13 @@ static void tv_fullscreen_vp(struct viewport *vp)
     }
 }
 
-/* A box over the page until the page is drawn again: splashf()'s upright,
- * or drawn into the sideways page and turned with it */
+/* A box over the page until the page is drawn again, in the page's colours
+ * rather than the theme's: its text, a fill lifted a little toward the text
+ * as a dark theme's surface is, and an outline further along. Drawn into the
+ * sideways page and turned with it. */
 static void tv_splashf(const char *fmt, ...)
 {
+    struct dialog_style theme = *dialog_get_default_style(), page = theme;
     struct viewport full;
     char text[160];
     va_list ap;
@@ -805,14 +812,17 @@ static void tv_splashf(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(text, sizeof(text), fmt, ap);
     va_end(ap);
-    if (!tv_side)
-    {
-        splashf(0, "%s", text);
-        return;
-    }
     tv_fullscreen_vp(&full);
+    page.box_fg = tv.vp.fg_pattern;
+    page.box_bg = color_blend(tv.vp.bg_pattern, tv.vp.fg_pattern, 20);
+    page.box_border_color = color_blend(page.box_bg, tv.vp.fg_pattern, 90);
+    dialog_set_default_style(&page);
     splashf_in(&full, "%s", text);
-    tv_side_push();
+    dialog_set_default_style(&theme);
+    if (tv_side)
+        tv_side_push();
+    else
+        screens[SCREEN_MAIN].update();
 }
 
 /* The text of the chapter, or of a document without chapters: exact once it
@@ -880,12 +890,26 @@ static void tv_draw_footer(void)
         snprintf(buf, sizeof buf, "%d", tv.sp + 1);
         break;
     case TV_FOOTER_CHAPTER:
+    {
+        int left = tv_pages_left(), secs = reading_stats_page_seconds();
+
         if (tv.nparts > 1)
             n = snprintf(buf, sizeof buf, "%d/%d \xc2\xb7 ",
                          tv.part + 1, tv.nparts);
-        snprintf(buf + n, sizeof buf - n, str(LANG_TEXT_VIEWER_PAGES_LEFT),
-                 tv_pages_left());
+        n += snprintf(buf + n, sizeof buf - n,
+                      str(LANG_TEXT_VIEWER_PAGES_LEFT), left);
+        /* And the time they take this reader, to the minute */
+        if (left > 0 && secs > 0 && n < (int)sizeof buf)
+        {
+            char t[24];
+
+            snprintf(buf + n, sizeof buf - n, " \xc2\xb7 %s",
+                     format_time_auto(t, sizeof t,
+                                      MAX(1, (left * secs + 30) / 60),
+                                      UNIT_MIN | UNIT_TRIM_ZERO, false));
+        }
         break;
+    }
     case TV_FOOTER_BOOK:
         snprintf(buf, sizeof buf, "%d%%", tv_book_percent());
         break;
@@ -3197,6 +3221,135 @@ static void tv_open_at(int part, off_t off)
         tv_resume_to(off);
 }
 
+/* ---- search ----------------------------------------------------------- */
+
+/* The last search, and where it last found: Find Next goes on past it while
+ * its page is the one on screen */
+static char tv_find_text[64];
+static int tv_found_part = -1;
+static off_t tv_found_off;
+
+static unsigned char tv_fold(unsigned char c)
+{
+    return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+}
+
+/* The button that stopped a search, or BUTTON_NONE */
+static long tv_find_stopped;
+
+/* The first match from `skip` on in the text the engine reads from here,
+ * as an offset from where it starts reading; -1 for none, -2 when a press
+ * stopped it. ASCII letters match either case, anything else as it is. */
+static off_t tv_find_stream(off_t skip)
+{
+    static char buf[1024 + sizeof(tv_find_text)];
+    size_t qlen = strlen(tv_find_text), keep = 0, n, i, j;
+    off_t at = 0;                   /* buf[0]'s offset */
+    long got;
+
+    while ((got = ts_read(tv.src, buf + keep, 1024)) > 0)
+    {
+        long b = button_get(false);
+
+        if (b != BUTTON_NONE && !(b & BUTTON_REL))
+        {
+            tv_find_stopped = b;
+            return -2;
+        }
+        n = keep + (size_t)got;
+        for (i = 0; i + qlen <= n; i++)
+        {
+            if (at + (off_t)i < skip)
+                continue;
+            for (j = 0; j < qlen && tv_fold(buf[i + j])
+                                    == tv_fold(tv_find_text[j]); j++)
+                ;
+            if (j == qlen)
+                return at + (off_t)i;
+        }
+        /* The tail, which a match may start in */
+        keep = MIN(qlen - 1, n);
+        memmove(buf, buf + n - keep, keep);
+        at += (off_t)(n - keep);
+    }
+    return -1;
+}
+
+/* The search on from `from` in chapter `part` to the book's end, chapter by
+ * chapter, each read alone from its start. A find's page is the page on
+ * screen after; otherwise it is the page it was. 1 found, 0 not, -2 stopped,
+ * MENU_ATTACHED_USB. */
+static int tv_find_from(int part, off_t from)
+{
+    int was_part = tv.part, last = tv.nparts ? tv.nparts : 1, p;
+    off_t was = tv.pos, hit = -1;
+
+    tv_find_stopped = BUTTON_NONE;
+    cpu_boost(true);
+    for (p = part; p < last && hit == -1; p++)
+    {
+        if (tv.nparts > 1)
+            splashf(0, "%s\n%d/%d", str(LANG_WAIT), p + 1, tv.nparts);
+        else
+            splashf(0, "%s", str(LANG_WAIT));
+        if (tv.nparts ? ts_seek_part(tv.src, p) != BS_OK
+                      : ts_rewind(tv.src) != BS_OK)
+            continue;
+        hit = tv_find_stream(p == part ? from : 0);
+    }
+    cpu_boost(false);
+    if (hit >= 0)
+    {
+        p--;
+        tv_reopen(p, hit);
+        tv_found_part = p;
+        tv_found_off = hit;
+        return 1;
+    }
+    tv_reopen(was_part, was);
+    if (hit == -2 && (tv_find_stopped & SYS_EVENT)
+        && default_event_handler_ex(tv_find_stopped, tv_event_save, NULL)
+           == SYS_USB_CONNECTED)
+        return MENU_ATTACHED_USB;
+    return hit == -2 ? -2 : 0;
+}
+
+/* The menu's two rows: 1 closes the menu on a find */
+static int tv_find_result(int rc)
+{
+    if (rc == 0)
+        splash(HZ, ID2P(LANG_TEXT_VIEWER_NOT_FOUND));
+    return rc == 1 || rc == MENU_ATTACHED_USB ? rc : 0;
+}
+
+int text_viewer_find(void)
+{
+    char text[sizeof(tv_find_text)];
+
+    strlcpy(text, tv_find_text, sizeof(text));
+    if (kbd_input(text, sizeof(text), NULL) < 0 || !text[0])
+        return 0;
+    strlcpy(tv_find_text, text, sizeof(tv_find_text));
+    tv_found_part = -1;
+    return tv_find_result(tv_find_from(tv.part, tv.pos));
+}
+
+bool text_viewer_has_find(void)
+{
+    return text_viewer_reading() && tv_find_text[0];
+}
+
+int text_viewer_find_next(void)
+{
+    /* Past the last find while its page is on screen, else from the page */
+    off_t from = tv.pos;
+
+    if (tv_found_part == tv.part && tv_found_off >= tv.pos
+        && tv_found_off < tv.next)
+        from = tv_found_off + 1;
+    return tv_find_result(tv_find_from(tv.part, from));
+}
+
 /* ---- bookmarks -------------------------------------------------------- */
 
 /* The first words of the page on screen, which a mark is listed by:
@@ -3251,6 +3404,59 @@ static void tv_mark_label(char *buf, size_t size)
     buf[n] = '\0';
 }
 
+/* The heading the page on screen is under, as far back as the window holds,
+ * one line into buf; "" for none, or for a page that opens with headings,
+ * whose first words name its chapter already */
+static void tv_mark_chapter(char *buf, size_t size)
+{
+    off_t wend = tv.win_start + (off_t)tv.win_len, first = tv.pos, h = -1, i;
+    const unsigned char *p, *stop;
+    size_t n = 0;
+    bool hidden = false, gap = false;
+
+    buf[0] = '\0';
+    if (tv.pos < tv.win_start || tv.pos > wend)
+        return;
+    while (first < wend && (TV_AT(first) == ' ' || TV_AT(first) == '\n'
+                            || TV_AT(first) == '\r' || TV_AT(first) == '\t'))
+        first++;
+    if (wend - first >= 3 && !memcmp(&TV_AT(first), TL_HEAD_OPEN, 3))
+        return;
+    for (i = tv.pos - 3; i >= tv.win_start && h < 0; i--)
+        if (!memcmp(&TV_AT(i), TL_HEAD_OPEN, 3))
+            h = i;
+    if (h < 0)
+        return;
+    p = &TV_AT(h + 3);
+    stop = (const unsigned char *)tv.win + tv.win_len;
+    while (p < stop)
+    {
+        const unsigned char *at = p;
+        ucschar_t c;
+
+        p = utf8decode(p, &c);
+        if (c == TS_HEADING_CLOSE || n + (p - at) + 2 >= size)
+            break;
+        if (c == TS_HIDE_OPEN || c == TS_HIDE_CLOSE)
+            hidden = c == TS_HIDE_OPEN;
+        if (hidden || (c >= 0xE000 && c <= 0xF8FF))
+            continue;
+        if (c <= ' ')
+        {
+            gap = n > 0;
+            continue;
+        }
+        if (gap)
+        {
+            buf[n++] = ' ';
+            gap = false;
+        }
+        memcpy(buf + n, at, p - at);
+        n += p - at;
+    }
+    buf[n] = '\0';
+}
+
 bool text_viewer_reading(void)
 {
     return tv.src != NULL && !tv_listing;
@@ -3263,9 +3469,15 @@ bool text_viewer_has_marks(void)
 
 int text_viewer_add_bookmark(void)
 {
-    char label[BOOK_MARK_LABEL_MAX];
+    char label[BOOK_MARK_LABEL_MAX], chapter[40];
+    size_t n;
 
-    tv_mark_label(label, sizeof(label));
+    /* Listed by its chapter and the page's first words */
+    tv_mark_chapter(chapter, sizeof(chapter));
+    n = chapter[0] ? (size_t)snprintf(label, sizeof(label), "%s \xc2\xb7 ",
+                                      chapter)
+                   : 0;
+    tv_mark_label(label + n, sizeof(label) - n);
     splash(HZ, book_marks_add_labelled(book_resume_key(tv.path), tv.path,
                                        tv.part, tv.pos, label, true)
                ? ID2P(LANG_BOOKMARK_CREATE_SUCCESS)
@@ -3399,6 +3611,7 @@ int text_viewer(const char *file)
     tv.user_font = -1;           /* no font override loaded yet */
     tv.footer_font = -1;
     tv_scrub_pct = -1;
+    tv_found_part = -1;
 
     /* Take the screen (theme off) and put up a clean loading frame before the
      * slow open -- the name splash for the container formats, a cleared

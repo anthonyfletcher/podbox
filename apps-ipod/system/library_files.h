@@ -97,7 +97,8 @@
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */
 #define LIB_BOOKS_VERSION   2       /* 1: books keyed by album alone */
 #define LIB_BOOK_INDEX_MAGIC 0x58444e49u    /* "INDX" */
-#define LIB_BOOK_INDEX_VERSION 3   /* 2: no series; 1: no subjects */
+#define LIB_BOOK_INDEX_VERSION 4   /* 3: no first-page cover; 2: no series;
+                                      1: no subjects */
 #define LIB_MARKS_MAGIC     0x4b52414du     /* "MARK" */
 #define LIB_MARKS_VERSION   1
 #define LIB_READING_MAGIC   0x44414552u     /* "READ" */

@@ -123,6 +123,8 @@ IAPBool iap_platform_get_date_time(struct IAPContext* iap_ctx, struct IAPDateTim
 IAPBool iap_platform_get_backlight_level(struct IAPContext* iap_ctx, uint8_t* level);
 IAPBool iap_platform_get_hold_switch_state(struct IAPContext* iap_ctx, IAPBool* state);
 IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used);
+/* the audiobook speed, an IAPIPodStateAudiobookSpeeed */
+uint8_t iap_platform_get_audiobook_speed(struct IAPContext* iap_ctx);
 /* the track position, while playing */
 IAPBool iap_platform_set_position(struct IAPContext* iap_ctx, uint32_t pos_ms);
 /* volume as IAPPlatformVolumeStatus's; muted, the volume is ignored */

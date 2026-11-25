@@ -30,3 +30,6 @@
   tools write), and by year as before when they are not. Numbers already in
   your tags are read at the next **Rebuild Database**; a book you tag from
   now on is picked up by an ordinary update.
+- **Books** reads every ebook again, in the background, the first time the
+  iPod starts, so an EPUB whose cover is only the picture on its first page
+  now shows that cover.

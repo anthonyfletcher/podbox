@@ -40,6 +40,14 @@ int text_viewer_add_bookmark(void);
 int text_viewer_bookmarks(void);
 int text_viewer_at_mark(const char *file);
 
+/* Find in the open book, from the page on to its end: a find shows its page
+ * (1, which closes the menu), MENU_ATTACHED_USB on USB, 0 otherwise. Find
+ * Next searches again from just past the last find, offered once there has
+ * been a search. */
+int text_viewer_find(void);
+int text_viewer_find_next(void);
+bool text_viewer_has_find(void);
+
 /* Path of the most recently read document, for a caller that wants to reopen
  * it. False if nothing has been read, or the record is unusable. The document
  * may since have been deleted; the caller checks. */

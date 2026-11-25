@@ -220,6 +220,28 @@ MENUITEM_FUNCTION(text_viewer_contents_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_BROWSE_CHAPTERS), text_viewer_contents,
                   contents_callback, Icon_NOICON);
 
+/* Only inside the reader too; Find Next once there has been a search */
+static int find_callback(int action, const struct menu_item_ex *this_item,
+                         struct gui_synclist *this_list);
+MENUITEM_FUNCTION(text_viewer_find_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_TEXT_VIEWER_FIND), text_viewer_find,
+                  find_callback, Icon_NOICON);
+MENUITEM_FUNCTION(text_viewer_find_next_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_TEXT_VIEWER_FIND_NEXT), text_viewer_find_next,
+                  find_callback, Icon_NOICON);
+
+static int find_callback(int action, const struct menu_item_ex *this_item,
+                         struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && (!text_viewer_reading()
+            || (this_item == &text_viewer_find_next_item
+                && !text_viewer_has_find())))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 /* Only inside the reader too; the list only when the book has marks */
 static int marks_callback(int action, const struct menu_item_ex *this_item,
                           struct gui_synclist *this_list);
@@ -245,6 +267,8 @@ static int marks_callback(int action, const struct menu_item_ex *this_item,
  * and listening: the rows most often wanted first in each */
 MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_contents_item,
+          &text_viewer_find_item,
+          &text_viewer_find_next_item,
           &text_viewer_mark_item,
           &text_viewer_marks_item,
           &text_viewer_larger_item,

@@ -20,6 +20,10 @@ void reading_stats_page(int words, int64_t at);
 void reading_stats_touch(void);
 /* pct how far through the book the reader is; finished, at its end */
 void reading_stats_end(int pct, bool finished);
+/* The seconds a page takes this reader, for the time left: this sitting's
+ * pages under two minutes once there are a few, else the book's record. 0
+ * while neither knows, or no book is open. */
+int reading_stats_page_seconds(void);
 
 /* The Books screen's side: one book's figures, or every book's together.
  * False when the list was left for the root menu. */

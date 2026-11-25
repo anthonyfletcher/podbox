@@ -211,7 +211,7 @@ int ts_series_pos(const char *s);
  * cover image lies in the file -- cover_at is -1 when it has none. An EPUB's
  * cover is the manifest item marked cover-image, else the one
  * <meta name="cover"> names, else an image item whose id or href holds
- * "cover" (the cover page's first image is not looked for); an FB2's is its
+ * "cover", else the first picture on the spine's first page; an FB2's is its
  * coverpage's; a MOBI's is the image EXTH 201 names. Its subjects, up to
  * TS_BOOK_SUBJECT_MAX of them, are one to a line: an EPUB's dc:subject, an
  * FB2's genre, a MOBI's EXTH 105. Its series, empty for none, is an EPUB's

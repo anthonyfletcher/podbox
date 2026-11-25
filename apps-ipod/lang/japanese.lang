@@ -18409,6 +18409,48 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_FIND
+  desc: core text viewer menu, search the open book from the page on
+  user: core
+  <source>
+    *: "Find"
+  </source>
+  <dest>
+    *: "検索"
+  </dest>
+  <voice>
+    *: "検索"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_FIND_NEXT
+  desc: core text viewer menu, the last search again from past its find
+  user: core
+  <source>
+    *: "Find Next"
+  </source>
+  <dest>
+    *: "次を検索"
+  </dest>
+  <voice>
+    *: "次を検索"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NOT_FOUND
+  desc: core text viewer, a search that found nothing from the page on
+  user: core
+  <source>
+    *: "Not found"
+  </source>
+  <dest>
+    *: "見つかりません"
+  </dest>
+  <voice>
+    *: "見つかりません"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_LICENSE
   desc: in system menu, opens docs/COPYING (the GNU GPL)
   user: core

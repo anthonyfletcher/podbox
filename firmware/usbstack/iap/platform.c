@@ -512,6 +512,15 @@ IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used
     return iap_true;
 }
 
+/* Spoken Word Speed as the nearest of the three */
+uint8_t iap_platform_get_audiobook_speed(struct IAPContext* iap_ctx) {
+    (void)iap_ctx;
+    const int pct = global_settings.spoken_speed;
+    return pct < 100   ? IAPIPodStateAudiobookSpeeed_Slower
+           : pct > 100 ? IAPIPodStateAudiobookSpeeed_Faster
+                       : IAPIPodStateAudiobookSpeeed_Normal;
+}
+
 IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* total, uint64_t* avail) {
     sector_t size_kib, free_kib;
 

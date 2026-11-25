@@ -474,10 +474,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              * ReturnAudioBookSpeed
              * 0x00 = Normal, 0xFF = Slow, 0x01 = Fast
-             * We always respond with Normal speed
+             * Spoken Word Speed as the nearest of the three
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x0A, 0x00};
+            int pct = global_settings.spoken_speed;
+            unsigned char data[] = {0x04, 0x00, 0x0A,
+                                    pct < 100 ? 0xFF : pct > 100 ? 0x01 : 0x00};
             iap_send_pkt(data, sizeof(data));
             break;
         }

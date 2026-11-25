@@ -18443,6 +18443,48 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TEXT_VIEWER_FIND
+  desc: core text viewer menu, search the open book from the page on
+  user: core
+  <source>
+    *: "Find"
+  </source>
+  <dest>
+    *: "Rechercher"
+  </dest>
+  <voice>
+    *: "Rechercher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_FIND_NEXT
+  desc: core text viewer menu, the last search again from past its find
+  user: core
+  <source>
+    *: "Find Next"
+  </source>
+  <dest>
+    *: "Rechercher le suivant"
+  </dest>
+  <voice>
+    *: "Rechercher le suivant"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_NOT_FOUND
+  desc: core text viewer, a search that found nothing from the page on
+  user: core
+  <source>
+    *: "Not found"
+  </source>
+  <dest>
+    *: "Introuvable"
+  </dest>
+  <voice>
+    *: "Introuvable"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_LICENSE
   desc: in system menu, opens docs/COPYING (the GNU GPL)
   user: core

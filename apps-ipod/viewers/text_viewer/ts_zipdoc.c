@@ -710,6 +710,7 @@ typedef struct {
     char      cover_named[256];   /* an image item called cover */
     int       coll;               /* in an EPUB 3 collection's meta (1), or
                                      its group-position's (2) */
+    char      first_ref[64];      /* the spine's first idref */
     book_img *img;
     int       nimg;
 } book_ctx;
@@ -818,9 +819,65 @@ static int book_tag(void *ud, const char *tag, const char *text)
         }
     }
 
-    if (tag_is(tag, "itemref") && tag[0] != '/')
+    if (tag_is(tag, "itemref") && tag[0] != '/') {
+        if (!b->out->parts)
+            attr(tag, "idref", b->first_ref, sizeof b->first_ref);
         b->out->parts++;
+    }
     return 0;
+}
+
+/* The manifest item `id`'s href, for the spine's first page */
+typedef struct {
+    const char *id;
+    char href[256];
+} item_find;
+
+static int item_href_tag(void *ud, const char *tag)
+{
+    item_find *f = ud;
+    char id[64];
+
+    return tag_is(tag, "item") && attr(tag, "id", id, sizeof id) &&
+           !strcmp(id, f->id) && attr(tag, "href", f->href, sizeof f->href);
+}
+
+/* A page's first picture: <img src>, or SVG's <image xlink:href> */
+static int first_picture_tag(void *ud, const char *tag)
+{
+    char *out = ud;
+
+    if (tag[0] == '/') return 0;
+    if (tag_is(tag, "img")) return attr(tag, "src", out, 256);
+    if (tag_is(tag, "image"))
+        return attr(tag, "xlink:href", out, 256) || attr(tag, "href", out, 256);
+    return 0;
+}
+
+/* The first picture on the spine's first page, the way the reader shows a
+ * cover page, its path in the zip into `full`; 0 for none */
+static int book_first_picture(ts_zip *z, int opf_idx, const char *opf,
+                              const char *first_ref, char *full, size_t cap)
+{
+    bs_stream *member;
+    item_find f;
+    char page[320], pic[256];
+    int idx;
+
+    f.id = first_ref;
+    f.href[0] = 0;
+    if (ts_zip_member(z, opf_idx, &member) != BS_OK ||
+        scan_tags(member, item_href_tag, &f) != BS_OK || !f.href[0])
+        return 0;
+    path_join(opf, f.href, page, sizeof page);
+    pic[0] = 0;
+    if ((idx = ts_zip_find(z, page)) < 0 ||
+        ts_zip_member(z, idx, &member) != BS_OK ||
+        scan_tags(member, first_picture_tag, pic) != BS_OK || !pic[0] ||
+        !ts_ascii_ncasecmp(pic, "data:", 5))
+        return 0;
+    path_join(page, pic, full, cap);
+    return 1;
 }
 
 int ts_series_pos(const char *s)
@@ -848,7 +905,7 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
     char opf[256], full[320];
     const char *href = NULL;
     bs_off_t at;
-    int rc, idx, i;
+    int rc, idx, opf_idx, i;
 
     memset(out, 0, sizeof *out);
     out->cover_at = -1;
@@ -864,6 +921,7 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
     rc = scan_tags(member, container_tag, opf);
     if (rc != BS_OK) return rc;
     if (!opf[0] || (idx = ts_zip_find(z, opf)) < 0) return BS_ERR_FORMAT;
+    opf_idx = idx;
 
     memset(&b, 0, sizeof b);
     b.out = out;
@@ -874,7 +932,8 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
     rc = scan_markup(member, book_tag, &b);
     if (rc != BS_OK) return rc;
 
-    /* EPUB 3's cover-image, then EPUB 2's meta, then an image called cover */
+    /* EPUB 3's cover-image, then EPUB 2's meta, then an image called cover,
+     * then the first picture of the first page */
     if (b.cover_prop[0])
         href = b.cover_prop;
     else if (b.cover_meta[0]) {
@@ -883,15 +942,16 @@ int ts_book_read(const bs_io *io, void *arena, size_t arena_size,
     }
     if (!href && b.cover_named[0])
         href = b.cover_named;
-    if (!href)
-        return BS_OK;
-
-    {
+    if (href) {
         char unescaped[256];
         book_copy(unescaped, href, sizeof unescaped);
         url_unescape(unescaped);
         path_join(opf, unescaped, full, sizeof full);
     }
+    else if (!b.first_ref[0] ||
+             !book_first_picture(z, opf_idx, opf, b.first_ref, full,
+                                 sizeof full))
+        return BS_OK;
     idx = ts_zip_find(z, full);
     if (idx < 0 ||
         ts_zip_extent(z, idx, &at, &out->cover_csize, &out->cover_usize,

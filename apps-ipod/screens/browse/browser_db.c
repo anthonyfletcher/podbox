@@ -1407,11 +1407,12 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
 
     bool auto_skip = te->flags & TEF_AUTO_SKIP;
     bool counted = true;
-    /* A podcast keeps its place whatever Segregate Podcasts says: without
-     * one, a play counted partway reads as Finished, and Delete Played
-     * Episodes takes it */
+    /* Spoken word keeps its place whatever Segregate says: without one, a
+     * podcast played partway reads as Finished, and Delete Played Episodes
+     * takes it; a book's is where book_resume_find() looks when its own file
+     * has none */
     bool autoresume = global_settings.autoresume_enable
-                      || db_spoken_is_podcast_genre(id3->genre_string);
+                      || db_spoken_is_spoken_genre(id3->genre_string);
 
     /* Don't process unplayed tracks, or tracks interrupted within the
        first 15 seconds but always process autoresume point */

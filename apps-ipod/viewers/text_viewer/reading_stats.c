@@ -45,6 +45,11 @@
  * set it; and never under RS_PAGE_MIN */
 #define RS_WPM_MAX  1000
 #define RS_PAGE_MIN HZ
+/* The most a page counts toward the reader's pace: a page left open longer
+ * was put down, not read */
+#define RS_PACE_CAP (2 * 60 * HZ)
+/* Turns this sitting before its pace stands in for the book's record */
+#define RS_PACE_MIN 3
 
 struct rs_record
 {
@@ -67,6 +72,8 @@ static bool rs_open, rs_day_done;
 static long rs_mark;                /* the clock's last event */
 static long rs_ticks;               /* this sitting's time */
 static int64_t rs_furthest;         /* pages before this one have counted */
+static long rs_pace_ticks;          /* this sitting's pages under the cap */
+static int rs_pace_pages;
 
 #define RS_EPOCH pv_days_from_civil(1999, 12, 31)
 
@@ -159,6 +166,8 @@ void reading_stats_begin(const char *path, int64_t at)
     rs_open = true;
     rs_day_done = false;
     rs_ticks = 0;
+    rs_pace_ticks = 0;
+    rs_pace_pages = 0;
     rs_furthest = at;
     rs_mark = current_tick;
 }
@@ -183,6 +192,11 @@ void reading_stats_page(int words, int64_t at)
         return;
     rs_furthest = at + 1;
     rs_ticks += t > RS_PAGE_CAP ? RS_PAGE_CAP : t;
+    if (t < RS_PACE_CAP)
+    {
+        rs_pace_ticks += t;
+        rs_pace_pages++;
+    }
     rs_cur.pages++;
     rs_cur.words += words;
     if (!rs_day_done)
@@ -205,6 +219,17 @@ void reading_stats_page(int words, int64_t at)
             }
         }
     }
+}
+
+int reading_stats_page_seconds(void)
+{
+    if (!rs_open)
+        return 0;
+    if (rs_pace_pages >= RS_PACE_MIN)
+        return (rs_pace_ticks / rs_pace_pages + HZ / 2) / HZ;
+    if (rs_cur.pages >= RS_PACE_MIN)
+        return (rs_cur.seconds + rs_cur.pages / 2) / rs_cur.pages;
+    return 0;
 }
 
 void reading_stats_end(int pct, bool finished)

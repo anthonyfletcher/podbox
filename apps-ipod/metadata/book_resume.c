@@ -429,6 +429,49 @@ bool book_resume_get(const char *book, struct book_resume *pos)
         && pos->left == BOOK_LEFT_PARTWAY && pos->track != 0;
 }
 
+/* A book the file has no place for, from where the database last left each
+ * of its tracks, which the finish event keeps for spoken word: the track
+ * played most recently, partway or ended. So a book dropped from the file,
+ * or the file lost, still resumes. Needs the RAM copy. */
+static bool find_in_database(uint64_t key, struct book_resume *pos)
+{
+    long best = -1;
+    int n, idx;
+
+    for (n = 0; n < tagcache_album_count(); n++)
+    {
+        struct tagcache_album al;
+        char id[BOOK_ID_MAX];
+
+        if (!tagcache_album_get(n, &al) || db_spoken_album_kind(&al) != 1
+            || !book_resume_id_of(al.album_seek, al.artist_seek, id,
+                                  sizeof(id))
+            || book_resume_key(id) != key)
+            continue;
+        for (idx = al.first; idx <= al.last; idx++)
+        {
+            long played, elapsed, offset;
+            uint64_t track;
+
+            if (tagcache_album_of(idx) != n
+                || !tagcache_entry_numeric(idx, tag_lastplayed, &played)
+                || played <= best
+                || !tagcache_entry_numeric(idx, tag_lastelapsed, &elapsed)
+                || !tagcache_entry_numeric(idx, tag_lastoffset, &offset)
+                || (track = tagcache_entry_key(idx)) == 0)
+                continue;
+            best = played;
+            pos->track = track;
+            pos->index = -1;
+            pos->elapsed = elapsed;
+            pos->offset = offset;
+            pos->left = elapsed > 0 ? BOOK_LEFT_PARTWAY : BOOK_LEFT_ENDED;
+        }
+        break;
+    }
+    return best > 0;
+}
+
 static void rekey(void);
 
 bool book_resume_find(const char *book, struct book_resume *pos)
@@ -442,6 +485,8 @@ bool book_resume_find(const char *book, struct book_resume *pos)
     rekey();
     ctx.book = book_resume_key(book);
     scan(find_one, &ctx);
+    if (!ctx.found)
+        ctx.found = find_in_database(ctx.book, pos);
     mutex_unlock(&book_mutex);
     return ctx.found;
 }

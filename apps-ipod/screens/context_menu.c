@@ -88,6 +88,7 @@
 #include "metadata/book_resume.h"
 #include "metadata/book_marks.h"
 #include "audio/spoken_speed.h"    /* spoken_speed_playing */
+#include "widgets/option_select.h" /* option_screen, a hotkey's speed */
 #include "audio/playback.h"        /* audio_pause_at_chapter_end */
 #include "screens/browse/listen_progress.h"
 #include "database/tagcache.h"
@@ -2902,6 +2903,16 @@ static int hotkey_theme_options(void)
     return ONPLAY_OK;
 }
 
+/* Spoken Word Speed's choice, for a button: offered whatever plays, as a
+ * change made during music applies from the next spoken track */
+static int hotkey_spoken_speed(void)
+{
+    if (option_screen(find_setting(&global_settings.spoken_speed), NULL,
+                      false, ID2P(LANG_SPOKEN_WORD_SPEED)))
+        return ONPLAY_MAINMENU;
+    return ONPLAY_OK;
+}
+
 #define HOTKEY_FUNC(func, param) {{(void *)func}, param}
 
 /* HOTKEY_CONTEXT_MENU: rather than run one action, offer all of the ones
@@ -3061,6 +3072,12 @@ static const struct hotkey_assignment hotkey_items[] = {
       .func = HOTKEY_FUNC(hotkey_notes, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_SPOKEN_SPEED,
+      .lang_id = LANG_SPOKEN_WORD_SPEED,
+      .func = HOTKEY_FUNC(hotkey_spoken_speed, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
