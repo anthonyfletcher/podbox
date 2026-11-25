@@ -185,6 +185,14 @@ static bool flac_init(FLACContext* fc, int first_frame_offset)
                     return false;
             }
 
+            /* Streams deeper than 24 bits decode wrongly (full-scale noise
+               on 25-29, a negative shift to FLAC_OUTPUT_DEPTH past 29) */
+            if (fc->bps > 24) {
+                    LOGF("FLAC: Too many bits per sample (%d > 24)\n",
+                         fc->bps);
+                    return false;
+            }
+
             /* totalsamples is a 36-bit field, but we assume <= 32 bits are
                used */
             fc->totalsamples = (buf[14] << 24) | (buf[15] << 16)
