@@ -70,3 +70,39 @@ episode_notes: on
 # The charge left as a number beside the battery, in the title bar.
 # Possible Values: off, on
 battery_number: off
+#
+#-- Now Playing row 1 --#
+# What row 1 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_1: artist
+#
+#-- Now Playing row 2 --#
+# What row 2 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_2: album
+#
+#-- Now Playing row 3 --#
+# What row 3 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_3: rating
+#
+#-- Now Playing row 4 --#
+# What row 4 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_4: position
+#
+#-- Now Playing row 5 --#
+# What row 5 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_5: none
+#
+#-- Now Playing row 6 --#
+# What row 6 under the song's title shows on the playing screen.
+# Possible Values: none, artist, album_artist, album, composer, genre,
+# year, track, position, format, bitrate, rating, plays, next, comment
+info_6: none

@@ -36,7 +36,11 @@
 #- Cover or grey tile. Not in %VB, which nothing here copies to screen
 %Vl(Pane,166,26,150,150,2)%Vy%Vg(d8d8d8,a0a0a0,ffffff)
 %?C<|%ac%Vs(gradient)b>
-%Cl(0,0,150,150,c,c)%Cd
+%Cl(0,0,150,150,c,c,-,-,framed)%Cd
+#
+#- Its reflection, fading into the pane
+%Vl(Pane,166,176,150,18,-)
+%Cd(framed,-,-,-,-,reflect,35)
 #
 #- Or the cover filling the pane, its middle 160 of 220 columns, as the
 #  iPod shows it. Its %Cl claims a second art size whether shown or not
@@ -185,9 +189,9 @@
 %dr(0,0,320,1,d8d8d8)
 #
 #Now-playing pane
-%Vl(Pane,166,180,150,22,3)%Vf(000000)
+%Vl(Pane,166,196,150,22,3)%Vf(000000)
 %s%?it<%it|%fn>
-%Vl(Pane,166,202,150,20,4)%Vf(888888)
+%Vl(Pane,166,218,150,20,4)%Vf(888888)
 %s%?ia<%ia|%?d(2)<%d(2)|>>
 #
 #Quick screen

@@ -8,11 +8,12 @@
 
 Modified to support dynamic colours and album/artist art, and redrawn after
 the iPod classic: a 20px title bar with the play state on the left and a
-glass battery on the right, gradient selection, the cover's reflection and a
-glass progress bar on the playing screen, menus beside the cover and every
-other list across the whole screen, a header over an album's tracks, a book's
-chapters and a podcast's episodes, the iPod's blue dot for what is left to
-hear of an episode or chapter, and Cover Flow full screen.
+glass battery on the right, gradient selection, the cover's reflection, six
+rows of your choosing and a glass progress bar on the playing screen, menus
+beside the cover and every other list across the whole screen, a header over
+an album's tracks, a book's chapters and a podcast's episodes, the iPod's blue
+dot for what is left to hear of an episode or chapter, and Cover Flow full
+screen with a tall reflection.
 
 Three versions come in the one zip:
 
@@ -59,10 +60,28 @@ All three versions have these:
 
 | Preference | Values | Default | What it does |
 |---|---|---|---|
-| `menu_cover` | `full`, `framed` | `full` | The cover beside the menus. `full` fills the right half of the screen, as the iPod does; `framed` shows it smaller, with the song playing under it. |
+| `menu_cover` | `full`, `framed` | `full` | The cover beside the menus. `full` fills the right half of the screen, as the iPod does; `framed` shows it smaller, with its reflection and the song playing under it. |
 | `album_header` | `on`, `off` | `on` | The cover, name and counts above an album's tracks, a book's chapters and a podcast's episodes. `off` gives the list all its rows. |
 | `episode_notes` | `on`, `off` | `on` | The selected podcast episode's notes in a box below its list. `off` gives the list all its rows. |
 | `battery_number` | `off`, `on` | `off` | The charge left as a number beside the battery, in the title bar. `on` narrows the title between them to make room. |
+| `info_1` to `info_6` | see below | `artist`, `album`, `rating`, `position`, `none`, `none` | The six rows under the song's title on the playing screen, top to bottom. The first is bold. |
+
+Each of the six rows can show:
+
+| Value | Shows |
+|---|---|
+| `none` | Nothing: the row stays empty. |
+| `artist` | The artist, or the folder above the album's if the song has none. |
+| `album_artist` | The album artist, or the artist if the song has none. |
+| `album` | The album, or the song's folder if it has none. |
+| `composer`, `genre`, `year`, `comment` | That tag. |
+| `track` | The disc and track number, as `Disc 1 · Track 3`. |
+| `position` | The song's place in the playlist, as `3 of 12`. |
+| `format` | The format and sample rate, as `FLAC · 44.1 kHz`. |
+| `bitrate` | The bitrate, as `320 kbps`, with `VBR` when it varies. |
+| `rating` | The rating, in stars. |
+| `plays` | How many times the song has been played. |
+| `next` | The next song's title. |
 
 Dark and Light also choose which parts take the album's colour. `yes` gives a
 part the album's colour and `no` keeps it white in Dark, black in Light.

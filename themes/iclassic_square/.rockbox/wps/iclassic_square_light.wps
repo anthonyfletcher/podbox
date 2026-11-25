@@ -46,9 +46,10 @@
 #
 #Foreground layer
 #
-#- Volume or progress. 1x1 because a flip clears its line
+#- Volume or progress, the title bar, and each row's text or stars. 1x1
+#  because a flip clears its line
 %V(319,239,1,1,-)
-%?mv(2)<%Vd(Volume)|%Vd(Progress)>%?if(%ft(themes/iclassic_square_light.preferences,battery_number:),=,on)<%Vd(BarN)|%Vd(BarW)>
+%?mv(2)<%Vd(Volume)|%Vd(Progress)>%?if(%ft(themes/iclassic_square_light.preferences,battery_number:),=,on)<%Vd(BarN)|%Vd(BarW)>%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,rating)<%Vd(Stars1)|%Vd(Info1)>%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,rating)<%Vd(Stars2)|%Vd(Info2)>%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,rating)<%Vd(Stars3)|%Vd(Info3)>%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,rating)<%Vd(Stars4)|%Vd(Info4)>%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,rating)<%Vd(Stars5)|%Vd(Info5)>%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,rating)<%Vd(Stars6)|%Vd(Info6)>
 #
 #- Play state, on the left as on the iPod
 %V(4,0,48,19,6)%Vf(!000000)
@@ -74,33 +75,49 @@
 %V(292,0,26,19,-)
 %?bc<%xd(charging,%bl)|%xd(battery,%bl)>
 #
-#- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
-#  nothing here copies to screen once the art arrives
-%V(8,32,150,150,2)%Vy%Vg(!c5c5c5,!dfdfdf,!6f6f6f)
+#- Cover or grey tile. Same size and height as the .sbs framed cover, so it
+#  holds still between the screens. Not in %VB, which nothing here copies
+#  to screen once the art arrives
+%V(8,26,150,150,2)%Vy%Vg(!c5c5c5,!dfdfdf,!6f6f6f)
 %?C<|%ac%Vs(gradient)b>
 %Cl(0,0,150,150,c,c)%Cd
 #
 #- Its reflection, fading into the page
-%V(8,182,150,24,-)
+%V(8,176,150,24,-)
 %Cd(-,-,-,-,-,reflect,35)
 #
 #Track
 #
-#- Title, artist, album
-%V(170,36,146,22,3)%Vf(!000000)
+#- Title
+%V(170,30,146,22,3)%Vf(!000000)
 %?if(%ft(themes/iclassic_square_light.preferences,vivid_song_text:),=,yes)<%Vf(vivid<50:186dbd)|>%s%?it<%it|%fn>
-%V(170,60,146,20,4)%Vf(!6f6f6f)
-%s%?ia<%ia|%?d(2)<%d(2)|>>
-%V(170,80,146,20,5)%Vf(!6f6f6f)
-%s%?id<%id|%?d(1)<%d(1)|>>
-#
-#- Rating
-%V(170,102,146,24,2)%Vf(!6f6f6f)
+#- Six rows under it, each showing what its theme option names. A
+#  row shows text or the rating, two viewports in one place, so the
+#  switch above shows one of them
+%Vl(Info1,170,54,146,20,4)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_1:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars1,170,54,146,20,6)%Vf(!6f6f6f)
 %sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
-#
-#- Playlist position
-%V(170,128,146,20,5)%Vf(!6f6f6f)
-%pp %Sx(of) %pe
+%Vl(Info2,170,74,146,20,5)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_2:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars2,170,74,146,20,6)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+%Vl(Info3,170,94,146,20,5)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_3:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars3,170,94,146,20,6)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+%Vl(Info4,170,114,146,20,5)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_4:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars4,170,114,146,20,6)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+%Vl(Info5,170,134,146,20,5)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_5:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars5,170,134,146,20,6)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+%Vl(Info6,170,154,146,20,5)%Vf(!6f6f6f)
+%s%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,artist)<%?ia<%ia|%?d(2)<%d(2)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,album_artist)<%?iA<%iA|%ia>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,album)<%?id<%id|%?d(1)<%d(1)|>>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,composer)<%ic|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,genre)<%ig|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,year)<%iy|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,track)<%?in<%?ik<%Sx(Disc) %ik · |>%Sx(Track) %in|>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,position)<%pp %Sx(of) %pe|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,format)<%fc · %fk kHz|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,bitrate)<%fb kbps%?fv< VBR|>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,plays)<%rp %Sx(Plays)|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,next)<%?Fn<%Sx(Next:) %?It<%It|%Fn>|>|%?if(%ft(themes/iclassic_square_light.preferences,info_6:),=,comment)<%iC|>>>>>>>>>>>>>
+%Vl(Stars6,170,154,146,20,6)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
 #
 #Progress, glass
 %Vl(Progress,2,212,52,20,4)%Vf(!000000)
