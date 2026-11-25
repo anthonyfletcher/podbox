@@ -51,6 +51,7 @@
 #include "lang.h"
 #include "string-extra.h"
 #include "system/strutil.h"         /* BOM_UTF_8 */
+#include "settings/settings.h"
 #include "database/tagcache.h"
 #include "database/db_featured.h"   /* guest=true */
 #include "database/db_names.h"
@@ -457,6 +458,36 @@ static int ns_album_of(const struct ns_piece *pc, const struct notes_doc *d)
 
 static void ns_track_label(char *buf, size_t size, int idx);
 
+/* Whether the value being made sits in a link's brackets, `[{{artist}}]` */
+static bool ns_bracketed;
+
+/* An album artist, written as tagged in `buf`, one name each when it is a
+ * joint one under Split Album Artists: "A & B" as the screens show it, or in
+ * a link's brackets "A] & [B", so the line links each of them. From the
+ * string alone, which the names table need not have been built for. */
+static void ns_joint_artist(char *buf, size_t size)
+{
+    static char raw[NS_VALUE_MAX * 2];
+    static struct db_featured_names names;
+    size_t len = 0;
+    int i;
+
+    strlcpy(raw, buf, sizeof(raw));
+    if (!global_settings.split_album_artists
+        || db_names_split(raw, &names) < 2)
+        return;
+    if (!ns_bracketed)
+    {
+        if (db_names_display(raw, buf, size) != buf)
+            strlcpy(buf, raw, size);
+        return;
+    }
+    for (i = 0; i < names.count && len < size; i++)
+        len += snprintf(buf + len, size - len, "%s%.*s",
+                        !i ? "" : i == names.count - 1 ? "] & [" : "], [",
+                        names.len[i], names.name[i]);
+}
+
 /* The value piece `pc` of the page into `buf` */
 static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
                      char *buf, size_t size)
@@ -481,7 +512,10 @@ static bool ns_value(const struct notes_doc *d, const struct ns_piece *pc,
             && tagcache_seek_string(tag_albumartist, d->artist_seek, buf,
                                     size)
             && strcmp(buf, UNTAGGED))
+        {
+            ns_joint_artist(buf, size);
             return true;
+        }
         buf[0] = '\0';
         if (!pg || pg->kind != NOTES_PAGE_ALBUM || pg->dir)
             return false;
@@ -1680,7 +1714,7 @@ static void ns_values(struct ns_state *st, const char *s, size_t n)
 {
     static char line[4096], value[NS_VALUE_MAX * 2];
     struct ns_out lo = { line, sizeof(line), 0 };
-    const char *end, *seg;
+    const char *start = s, *end, *seg;
     bool first = true;
 
     /* a file written on Windows ends its lines "\r\n" */
@@ -1712,8 +1746,14 @@ static void ns_values(struct ns_state *st, const char *s, size_t n)
                         ns_puts(&lo, ni.buf + ni.off[i]);
                     }
             }
-            else if (ns_value(st->d, &pc, value, sizeof(value)))
-                ns_puts(&lo, value);
+            else
+            {
+                ns_bracketed = s > start && s[-1] == '['
+                               && s + used < end && s[used] == ']';
+                if (ns_value(st->d, &pc, value, sizeof(value)))
+                    ns_puts(&lo, value);
+                ns_bracketed = false;
+            }
             ns_in_line = false;
             s += used;
         }

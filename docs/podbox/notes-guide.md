@@ -161,7 +161,8 @@ is on, among the words of a credit: `Bass on
 {{tracks|album=Aja|artist=Steely Dan|number=1,2,5|style=commas}}`.
 
 These become the album's details wherever you put them, so `[{{artist}}]`
-is a link to the artist:
+is a link to the artist -- with **Split Album Artists** on, a link to each
+of an album's artists, `Madonna & Charli XCX`:
 
 `{{artist}}`, `{{album}}`, `{{year}}`, `{{genre}}`, `{{composer}}`,
 `{{grouping}}`, `{{comment}}`, `{{tracks.count}}`, `{{discs}}`, `{{length}}`,
@@ -289,11 +290,12 @@ shows how far the playing track has got.
 `Settings > Library > Music > Liner Notes and Biographies > Banners` off
 leaves the picture out: every page starts with its name.
 
-A page in `/Notes/People` or `/Notes/Albums` shows its own picture -- `Steely
-Dan.jpg` beside `Steely Dan.md` -- if you give it one, scaled and cropped to
-the banner, which is 320 by 132. A wide picture suits it best. Without one,
-an artist's page uses the artist's picture from the player's artwork, and an
-album's its cover. Other pages have no picture: their name is set at the top.
+A page in `/Notes` shows its own picture -- `Steely Dan.jpg` beside `Steely
+Dan.md`, `Electric Lady.jpg` beside `Studios/Electric Lady.md` -- if you give
+it one, scaled and cropped to the banner, which is 320 by 132. A wide picture
+suits it best. Without one, an artist's page uses the artist's picture from
+the player's artwork, and an album's its cover. Other pages without one have
+no picture: their name is set at the top.
 
 A new picture is made ready in the background, so it shows the second time
 you open the page, or after you next connect to a computer.

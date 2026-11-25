@@ -116,6 +116,9 @@ bool notes_links_begin(void *buf, size_t size, struct name_index *ix)
     nl.ix = ix;
     nl_last_album = -1;
     nl_anywhere = 0;
+    /* A split artist is found through the names table, which nothing else
+     * need have built since the database changed */
+    db_names_ensure();
     if (n <= 0 || n * sizeof(struct nl_album) > size)
         return false;
     nl.a = buf;

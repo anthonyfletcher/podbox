@@ -11,7 +11,7 @@
  * /Notes come and go, and whenever the file index's walk has listed the
  * pages again (notes_files.h). It fingerprints the pages -- each one's path,
  * size and time, as the walk found them -- and reads them again only when
- * that changed. A change to an image of /Notes/People or /Notes/Albums asks
+ * that changed. A change to an image in /Notes or one of its folders asks
  * the art cache for a banner sweep (art_banner.h), which no library change
  * would otherwise bring.
  *
@@ -171,8 +171,6 @@ _Static_assert(sizeof(((struct ni_work *)0)->u) / NI_RUNS_MAX
                >= sizeof(struct ni_reader) + 2 * NI_RECORD_MAX,
                "the runs do not merge in the memory they are read in");
 
-static const char *const ni_dirs[] = { NOTES_PEOPLE_DIR, NOTES_ALBUMS_DIR };
-
 extern struct bg_task name_index_task;
 
 /* ---- the fingerprints -------------------------------------------------- */
@@ -182,7 +180,36 @@ static uint32_t ni_mix(uint32_t h, uint32_t v)
     return (h ^ v) * 16777619u;
 }
 
-/* The pages, and the images of the two folders, each as one number */
+/* One banner folder's images into the fingerprint at `ctx` */
+static bool ni_fingerprint_dir(const char *dir, int kind, uint32_t folder,
+                               void *ctx)
+{
+    uint32_t *h = ctx;
+    DIR *d = opendir(dir);
+    struct dirent *e;
+
+    if (!d)
+        return true;
+    while ((e = readdir(d)))
+    {
+        const char *dot = strrchr(e->d_name, '.'), *c;
+        struct dirinfo info = dir_get_info(d, e);
+
+        if (e->d_name[0] == '.' || (info.attribute & ATTR_DIRECTORY)
+            || !dot || !art_image_ext(dot))
+            continue;
+        *h = ni_mix(*h, kind);
+        *h = ni_mix(*h, folder);
+        for (c = e->d_name; *c; c++)
+            *h = ni_mix(*h, (unsigned char)*c);
+        *h = ni_mix(*h, info.size);
+        *h = ni_mix(*h, info.mtime);
+    }
+    closedir(d);
+    return true;
+}
+
+/* The pages, and the images of the banner folders, each as one number */
 static void ni_fingerprint(uint32_t *text, uint32_t *images)
 {
     int i, n = notes_page_count();
@@ -197,31 +224,7 @@ static void ni_fingerprint(uint32_t *text, uint32_t *images)
         *text = ni_mix(*text, pg->hash);
         *text = ni_mix(*text, pg->stamp);
     }
-    for (i = 0; i < (int)ARRAYLEN(ni_dirs); i++)
-    {
-        DIR *d = opendir(ni_dirs[i]);
-        struct dirent *e;
-
-        if (!d)
-            continue;
-        while ((e = readdir(d)))
-        {
-            const char *dot = strrchr(e->d_name, '.'), *c;
-            struct dirinfo info = dir_get_info(d, e);
-            uint32_t *h;
-
-            if (e->d_name[0] == '.' || (info.attribute & ATTR_DIRECTORY)
-                || !dot || !art_image_ext(dot))
-                continue;
-            h = images;
-            *h = ni_mix(*h, i);
-            for (c = e->d_name; *c; c++)
-                *h = ni_mix(*h, (unsigned char)*c);
-            *h = ni_mix(*h, info.size);
-            *h = ni_mix(*h, info.mtime);
-        }
-        closedir(d);
-    }
+    art_banner_each_dir(ni_fingerprint_dir, images);
 }
 
 /* ---- building ---------------------------------------------------------- */

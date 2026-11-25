@@ -11,14 +11,26 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* A banner's size on screen, and so in the cache */
 #define ART_BANNER_W 320
 #define ART_BANNER_H 132
 
 /* Where the owner puts bios, notes and their banner art */
+#define NOTES_DIR        "/Notes"
 #define NOTES_PEOPLE_DIR "/Notes/People"
 #define NOTES_ALBUMS_DIR "/Notes/Albums"
+
+/* Whose banner a folder's pictures are */
+enum { BANNER_PERSON = 0, BANNER_ALBUM, BANNER_OTHER };
+
+/* Calls `fn` for each folder whose pictures are banners: People's, Albums',
+ * then /Notes itself and each other folder of it, as BANNER_OTHER under
+ * `folder`, the page index's key of that folder (0 for /Notes itself).
+ * False when `fn` returned false, which stops it. */
+bool art_banner_each_dir(bool (*fn)(const char *dir, int kind,
+                                    uint32_t folder, void *ctx), void *ctx);
 
 /* Caches the banner art in /Notes that is new or changed since the last
  * sweep, and drops what has gone. Runs on the art cache's thread, with its
@@ -35,6 +47,11 @@ void art_banner_forget(void);
 bool art_banner_person(const char *name, char *out, size_t size);
 bool art_banner_album(const char *artist, const char *title, char *out,
                       size_t size);
+
+/* The same for a page in another folder of /Notes: its name key and its
+ * folder's, as the page index keeps them */
+bool art_banner_page(uint32_t name_key, uint32_t folder_key, char *out,
+                     size_t size);
 
 /* Where the owner moved the banner kept under `key` -- a person's name key,
  * or an album's work key (art_name.h) -- to: its top, in 1/1024ths of the

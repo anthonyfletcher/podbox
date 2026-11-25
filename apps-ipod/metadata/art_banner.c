@@ -17,8 +17,8 @@
  *   - the stamps
  *   - making one banner: cropped to fill 320 x 132, centred across and a
  *     third of the way down
- *   - the sweep
- *   - lookups by person and by album
+ *   - the sweep: People, Albums, and /Notes's other folders
+ *   - lookups by person, by album and by page
  *   - the moved banners, user/banners.dat
  ****************************************************************************/
 
@@ -50,27 +50,36 @@
 
 /* ---- the stamps -------------------------------------------------------- */
 
-enum { BANNER_PERSON = 0, BANNER_ALBUM };
-
 struct banner_rec
 {
-    uint32_t key;       /* the file's name key, and its .aat's name */
+    uint32_t key;       /* the file's name key, and its .aat's name; another
+                           folder's is banner_other_key() */
     uint32_t alt;       /* a person's "Surname, First" key, or 0 */
     uint32_t stamp;     /* of the image it was made from */
-    uint8_t kind;       /* BANNER_PERSON or BANNER_ALBUM */
+    uint8_t kind;       /* BANNER_PERSON, BANNER_ALBUM or BANNER_OTHER */
     uint8_t made;       /* 0 when the image would not decode */
     uint8_t pad[2];
 };
 
 static struct banner_rec banner_old[BANNER_MAX], banner_new[BANNER_MAX];
 static bool banner_seen[BANNER_MAX];
-static char banner_path[MAX_PATH], banner_tmp[MAX_PATH];
+static char banner_path[MAX_PATH], banner_tmp[MAX_PATH], banner_dir[MAX_PATH];
+
+/* A page in another folder is its name in its folder, so two folders can
+ * each have one of a name */
+static uint32_t banner_other_key(uint32_t name, uint32_t folder)
+{
+    uint32_t key = name ^ (folder * 0x9E3779B1u);
+
+    return key ? key : 1;
+}
 
 /* A person's and an album of the same name are two files */
 static void banner_aat_path(char *out, size_t size, uint32_t key, int kind)
 {
     snprintf(out, size, BANNER_DIR "/%c%08x.aat",
-             kind == BANNER_PERSON ? 'p' : 'a', (unsigned int)key);
+             kind == BANNER_PERSON ? 'p' : kind == BANNER_ALBUM ? 'a' : 'o',
+             (unsigned int)key);
 }
 
 /* The stamps, into `recs`; their number, 0 for none or a file of another
@@ -235,12 +244,51 @@ static int banner_find(const struct banner_rec *recs, int n, uint32_t key,
     return -1;
 }
 
+bool art_banner_each_dir(bool (*fn)(const char *dir, int kind,
+                                    uint32_t folder, void *ctx), void *ctx)
+{
+    DIR *d;
+    struct dirent *e;
+    bool go_on;
+
+    if (!fn(NOTES_PEOPLE_DIR, BANNER_PERSON, 0, ctx)
+        || !fn(NOTES_ALBUMS_DIR, BANNER_ALBUM, 0, ctx)
+        || !fn(NOTES_DIR, BANNER_OTHER, 0, ctx))
+        return false;
+    d = opendir(NOTES_DIR);
+    if (!d)
+        return true;
+    go_on = true;
+    while (go_on && (e = readdir(d)))
+    {
+        struct dirinfo info = dir_get_info(d, e);
+
+        if (e->d_name[0] == '.' || !(info.attribute & ATTR_DIRECTORY)
+            || !strcasecmp(e->d_name, "People")
+            || !strcasecmp(e->d_name, "Albums"))
+            continue;
+        snprintf(banner_dir, sizeof(banner_dir), NOTES_DIR "/%s", e->d_name);
+        go_on = fn(banner_dir, BANNER_OTHER, art_name_hash(e->d_name), ctx);
+    }
+    closedir(d);
+    return go_on;
+}
+
+struct banner_sweep
+{
+    int n_old, n_new;
+    bool changed;
+    void *buf;
+    size_t size;
+    bool (*stop)(void);
+};
+
 /* One folder of /Notes: each image's banner kept, made or made again, into
  * banner_new. False when `stop` stopped it. */
-static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
-                             bool *changed, void *buf, size_t size,
-                             bool (*stop)(void))
+static bool banner_sweep_dir(const char *dir, int kind, uint32_t folder,
+                             void *ctx)
 {
+    struct banner_sweep *s = ctx;
     DIR *d = opendir(dir);
     struct dirent *e;
     bool go_on = true;
@@ -258,7 +306,7 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
         if (e->d_name[0] == '.' || !dot || !art_image_ext(dot)
             || (info.attribute & ATTR_DIRECTORY))
             continue;
-        if (stop())
+        if (s->stop())
         {
             go_on = false;
             break;
@@ -269,14 +317,16 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
         rec.key = art_name_hash_n(e->d_name, dot - e->d_name);
         rec.alt = kind == BANNER_PERSON
                   ? art_name_alt_hash_n(e->d_name, dot - e->d_name) : 0;
-        if (!rec.key || banner_find(banner_new, *n_new, rec.key, kind) >= 0)
+        if (rec.key && kind == BANNER_OTHER)
+            rec.key = banner_other_key(rec.key, folder);
+        if (!rec.key || banner_find(banner_new, s->n_new, rec.key, kind) >= 0)
             continue;                       /* no name, or a second image */
-        if (*n_new == BANNER_MAX)
+        if (s->n_new == BANNER_MAX)
             break;                  /* full: the rest have no banner */
 
         snprintf(banner_path, sizeof(banner_path), "%s/%s", dir, e->d_name);
         rec.stamp = banner_stamp(banner_path, &info);
-        o = banner_find(banner_old, n_old, rec.key, kind);
+        o = banner_find(banner_old, s->n_old, rec.key, kind);
         if (o >= 0)
             banner_seen[o] = true;
 
@@ -284,13 +334,13 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
         if (o >= 0 && banner_old[o].stamp == rec.stamp
             && (!banner_old[o].made || file_exists(aat)))
         {
-            banner_new[(*n_new)++] = banner_old[o];
+            banner_new[s->n_new++] = banner_old[o];
             continue;
         }
 
-        rec.made = banner_make(banner_path, aat, buf, size);
-        banner_new[(*n_new)++] = rec;
-        *changed = true;
+        rec.made = banner_make(banner_path, aat, s->buf, s->size);
+        banner_new[s->n_new++] = rec;
+        s->changed = true;
         yield();
     }
     closedir(d);
@@ -299,21 +349,19 @@ static bool banner_sweep_dir(const char *dir, int kind, int n_old, int *n_new,
 
 bool art_banner_sweep(void *workbuf, size_t worksz, bool (*stop)(void))
 {
-    int n_old, n_new = 0, i;
-    bool changed = false, done;
+    struct banner_sweep s = { 0, 0, false, workbuf, worksz, stop };
+    int i;
+    bool done;
 
     if (!global_settings.liner_notes)
         return true;                /* nothing to do: not stopped */
-    n_old = banner_load(banner_old);
+    s.n_old = banner_load(banner_old);
 
     mkdir(BANNER_DIR);
     memset(banner_seen, 0, sizeof(banner_seen));
-    done = banner_sweep_dir(NOTES_PEOPLE_DIR, BANNER_PERSON, n_old, &n_new,
-                            &changed, workbuf, worksz, stop)
-           && banner_sweep_dir(NOTES_ALBUMS_DIR, BANNER_ALBUM, n_old, &n_new,
-                               &changed, workbuf, worksz, stop);
+    done = art_banner_each_dir(banner_sweep_dir, &s);
 
-    for (i = 0; i < n_old; i++)
+    for (i = 0; i < s.n_old; i++)
     {
         if (banner_seen[i])
             continue;
@@ -324,13 +372,13 @@ bool art_banner_sweep(void *workbuf, size_t worksz, bool (*stop)(void))
             banner_aat_path(aat, sizeof(aat), banner_old[i].key,
                             banner_old[i].kind);
             remove(aat);                    /* its image has gone */
-            changed = true;
+            s.changed = true;
         }
-        else if (n_new < BANNER_MAX)        /* not reached: kept as it was */
-            banner_new[n_new++] = banner_old[i];
+        else if (s.n_new < BANNER_MAX)      /* not reached: kept as it was */
+            banner_new[s.n_new++] = banner_old[i];
     }
-    if (changed)
-        banner_save(banner_new, n_new);
+    if (s.changed)
+        banner_save(banner_new, s.n_new);
     return done;
 }
 
@@ -397,6 +445,15 @@ bool art_banner_album(const char *artist, const char *title, char *out,
     return banner_lookup(BANNER_ALBUM, art_name_work_hash(artist, title), 0,
                          out, size)
            || banner_lookup(BANNER_ALBUM, art_name_hash(title), 0, out, size);
+}
+
+bool art_banner_page(uint32_t name_key, uint32_t folder_key, char *out,
+                     size_t size)
+{
+    return name_key
+           && banner_lookup(BANNER_OTHER,
+                            banner_other_key(name_key, folder_key), 0, out,
+                            size);
 }
 
 /* ---- the moved banners ------------------------------------------------- */

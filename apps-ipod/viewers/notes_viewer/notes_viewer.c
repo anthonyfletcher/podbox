@@ -742,6 +742,15 @@ static void nv_banner(void)
     }
     else if (d->kind == NOTES_PAGE_PERSON && d->title[0])
         nv.has_banner = nv_banner_person(d->title);
+    else if (d->kind == NOTES_PAGE_OTHER)
+    {
+        const struct notes_page *pg = notes_page_get(d->page);
+        char path[MAX_PATH];
+
+        nv.has_banner = pg && art_banner_page(pg->key, pg->by, path,
+                                              sizeof(path))
+                        && nv_banner_art(path);
+    }
 
     nv.slot.valid = true;
     nv.slot.id = id;
