@@ -25,26 +25,15 @@
 
 CODEC_HEADER
 
+/* MP3 decodes on a thread of its own on the COP rather than through the
+   other codecs' run there (codec_cop.c), which it is not given */
 #if NUM_CORES > 1 && !defined(MPEGPLAYER)
-#define MPA_SYNTH_ON_COP
+#define DECODE_THREAD
 #endif
 
 static struct mad_stream stream IBSS_ATTR;
 static struct mad_frame frame IBSS_ATTR;
 static struct mad_synth synth IBSS_ATTR;
-
-#ifdef MPA_SYNTH_ON_COP
-static volatile short die IBSS_ATTR = 0;          /*thread should die*/
-
-#if (CONFIG_CPU == PP5024) || (CONFIG_CPU == PP5022)
-static mad_fixed_t sbsample_prev[2][36][32] IBSS_ATTR;
-#else
-static mad_fixed_t sbsample_prev[2][36][32] SHAREDBSS_ATTR; 
-#endif
-
-static struct semaphore synth_done_sem IBSS_ATTR;
-static struct semaphore synth_pending_sem IBSS_ATTR;
-#endif
 
 #define INPUT_CHUNK_SIZE   8192
 
@@ -65,6 +54,82 @@ static int packetlength;
 static int packetdatasize;
 static int packetrest;
 static unsigned char *lastpacketpos;
+
+/* The decoding thread is RockWheel's (github.com/ssarkisy/RockWheel,
+ * lib/rbcodec/codecs/mpa.c), GPL v2 or later.
+ *
+ * With two cores all of the decoding is on the COP, which goes through a window
+ * of the input on its own, into a queue that the CPU empties: the CPU, which has
+ * the UI to draw too, is left with the DSP. A frame of the UI takes tens of ms
+ * during which the CPU can't take anything, threads only switching on a yield,
+ * so the COP has to be able to go on without it.
+ *
+ * The input and the PCM of the queue are only reached by their uncached
+ * addresses: no core has to sync its cache per frame, which also leaves the
+ * cache of the CPU as the UI and the DSP had it. The DSP works in place, so the
+ * CPU copies a frame out of the queue first.
+ *
+ * Each frame is kept back until the next one is decoded, as it's only known then
+ * whether it's the last one, which gets its end cut. */
+#ifdef DECODE_THREAD
+#define DECODE_QUEUE    8
+#define WINDOW_BYTES    (24*1024)
+#else
+#define DECODE_QUEUE    2
+#define WINDOW_BYTES    INPUT_CHUNK_SIZE
+#endif
+
+/* shared by the two cores only with the thread */
+#if defined(UNCACHED_ADDR) && defined(DECODE_THREAD)
+#define SHARED_ADDR(p)  UNCACHED_ADDR(p)
+#else
+#define SHARED_ADDR(p)  (p)
+#endif
+
+struct decoded_frame {
+    int length;              /* samples per channel */
+    int channels;
+    unsigned int samplerate;
+    size_t bytes;            /* of the input, anything skipped before it too */
+};
+
+static struct {
+    size_t size;             /* of the window, 0 if there's none */
+    size_t read;             /* of the window, up to the end of the last frame */
+    int made;                /* frames from the window */
+    bool over;               /* the window is finished */
+    bool failed;             /* by an error that can't be recovered from */
+    volatile unsigned int head;
+    volatile unsigned int tail;
+    volatile bool running;
+    volatile bool stop;
+    volatile bool die;
+    struct decoded_frame decoded[DECODE_QUEUE];
+#ifdef DECODE_THREAD
+    struct semaphore pending;
+    struct semaphore ready;
+    struct semaphore room;
+#endif
+} job IBSS_ATTR;
+
+static mad_fixed_t decoded_pcm[DECODE_QUEUE][2][1152] MEM_ALIGN_ATTR;
+#ifndef DECODE_THREAD
+/* the queue's frame goes to pcmbuf_insert() as it is */
+#elif CONFIG_CPU == PP5020
+/* The PP5020 has 48 KB of IRAM for a codec, not the PP5022's 80: the frame
+   the DSP works on goes to DRAM, as only the CPU reaches it. stream_buffer,
+   which only MP3 in ASF fills, could go instead, with the COP reading it
+   uncached: which costs less is to be measured */
+static mad_fixed_t dsp_pcm[2][1152] MEM_ALIGN_ATTR;
+#else
+static mad_fixed_t dsp_pcm[2][1152] IBSS_ATTR MEM_ALIGN_ATTR;
+#endif
+
+static inline mad_fixed_t *decoded_samples(unsigned int n, int ch)
+{
+    mad_fixed_t *samples = decoded_pcm[n % DECODE_QUEUE][ch];
+    return SHARED_ADDR(samples);
+}
 
 static void reset_stream_buffer(void)
 {
@@ -147,13 +212,8 @@ static void init_mad(void)
     ci->memset(&frame , 0, sizeof(struct mad_frame));
     ci->memset(&synth , 0, sizeof(struct mad_synth));
 
-#ifdef MPA_SYNTH_ON_COP
-    frame.sbsample_prev = &sbsample_prev;
-    frame.sbsample      = &sbsample;
-#else
     frame.sbsample_prev = &sbsample;
     frame.sbsample      = &sbsample;
-#endif
 
     /* We do this so libmad doesn't try to call codec_calloc(). This needs to
      * be called before mad_stream_init(), mad_frame_inti() and 
@@ -270,108 +330,191 @@ static void set_elapsed(struct mp3entry* id3)
     ci->set_elapsed(elapsed);
 }
 
-#ifdef MPA_SYNTH_ON_COP
-
-/*
- * Run the synthesis filter on the COProcessor 
- */
-
-static int mad_synth_thread_stack[DEFAULT_STACK_SIZE/sizeof(int)] IBSS_ATTR;
-
-static const unsigned char * const mad_synth_thread_name = "mp3dec";
-static unsigned int mad_synth_thread_id = 0;
-
-
-static void mad_synth_thread(void)
+/* The next frame of the window, or what ends it: true if a frame was made */
+static bool decode_step(void)
 {
-    while(1) {
-        ci->semaphore_release(&synth_done_sem);
-        ci->semaphore_wait(&synth_pending_sem, TIMEOUT_BLOCK);
-        
-        if(die)
+    if (mad_frame_decode(&frame, &stream)) {
+        if (stream.error == MAD_ERROR_BUFLEN) {
+            job.over = true;
+        } else if (!MAD_RECOVERABLE(stream.error)) {
+            /* Some other unrecoverable error */
+            job.failed = true;
+            job.over = true;
+        }
+        /* Otherwise probably syncing after a seek */
+        return false;
+    }
+
+    mad_synth_frame(&synth, &frame);
+
+    const size_t read = stream.next_frame - stream.buffer;
+    struct decoded_frame *f = &job.decoded[job.head % DECODE_QUEUE];
+    f->length = synth.pcm.length;
+    f->channels = MAD_NCHANNELS(&frame.header);
+    f->samplerate = frame.header.samplerate;
+    f->bytes = read - job.read;
+    job.read = read;
+    job.made++;
+
+    /* In case of a mono file, the second channel is ignored. */
+    for (int ch = 0; ch < f->channels; ch++) {
+        memcpy(decoded_samples(job.head, ch), synth.pcm.samples[ch],
+               f->length * sizeof (mad_fixed_t));
+    }
+
+    return true;
+}
+
+/* No window in progress and an empty queue, the COP being idle */
+static void decode_clear(void)
+{
+    job.running = false;
+    job.head = job.tail = 0;
+    job.size = 0;
+    job.read = 0;
+    job.made = 0;
+    job.over = false;
+    job.failed = false;
+}
+
+#ifdef DECODE_THREAD
+/* a line of the cache of its own, as the COP writes it and the CPU what is
+   beside it */
+static long decode_stack[CACHEALIGN_UP((DEFAULT_STACK_SIZE + 0x2000) / sizeof(long))]
+    CACHEALIGN_ATTR;
+static unsigned int decode_thread_id;
+
+static void decode_thread(void)
+{
+    while (1) {
+        ci->semaphore_wait(&job.pending, TIMEOUT_BLOCK);
+
+        if (job.die)
             break;
 
-        mad_synth_frame(&synth, &frame);
-    }    
+        while (!job.over && !job.stop) {
+            if (job.head - job.tail == DECODE_QUEUE) {
+                ci->semaphore_wait(&job.room, TIMEOUT_BLOCK);
+                continue;
+            }
+
+            if (decode_step()) {
+                job.head++;
+                ci->semaphore_release(&job.ready);
+            }
+            /* a frame at a time, for the COP's other threads */
+            ci->yield();
+        }
+
+        job.running = false;
+        ci->semaphore_release(&job.ready);
+    }
 }
 
-/* wait for the synth thread to go idle which indicates a PCM frame has been
- * synthesized */
-static inline void mad_synth_thread_wait_pcm(void)
+static bool decode_thread_create(void)
 {
-    ci->semaphore_wait(&synth_done_sem, TIMEOUT_BLOCK);
+    ci->semaphore_init(&job.pending, 1, 0);
+    ci->semaphore_init(&job.ready, 1, 0);
+    ci->semaphore_init(&job.room, 1, 0);
+
+    /* The CPU could have the memory of the queue in its cache from when the
+       codec was loaded, to be written over frames some time later */
+    ci->commit_discard_dcache();
+
+    decode_thread_id = ci->create_thread(decode_thread, decode_stack,
+                                         sizeof(decode_stack), 0, "mp3dec"
+                                         IF_PRIO(, PRIORITY_PLAYBACK)
+                                         IF_COP(, COP));
+    return decode_thread_id != 0;
 }
 
-/* increment the done semaphore - used after a wait for idle to preserve the
- * semaphore count */
-static inline void mad_synth_thread_unwait_pcm(void)
-{
-    ci->semaphore_release(&synth_done_sem);
-}
-
-/* after synth thread has gone idle - switch decoded frames and commence
- * synthesis on it */
-static void mad_synth_thread_ready(void)
-{
-    mad_fixed_t (*temp)[2][36][32];
-
-    /*circular buffer that holds 2 frames' samples*/
-    temp=frame.sbsample;
-    frame.sbsample = frame.sbsample_prev;
-    frame.sbsample_prev=temp;
-
-    ci->semaphore_release(&synth_pending_sem);
-}
-
-static bool mad_synth_thread_create(void)
-{
-    ci->semaphore_init(&synth_done_sem, 1, 0);
-    ci->semaphore_init(&synth_pending_sem, 1, 0);
-       
-    mad_synth_thread_id = ci->create_thread(mad_synth_thread, 
-                            mad_synth_thread_stack,
-                            sizeof(mad_synth_thread_stack), 0,
-                            mad_synth_thread_name 
-                            IF_PRIO(, PRIORITY_PLAYBACK)
-                            IF_COP(, COP));
-    
-    if (mad_synth_thread_id == 0)
-        return false;
-
-    return true;
-}
-
-static void mad_synth_thread_quit(void)
+static void decode_thread_quit(void)
 {
     /* mop up COP thread */
-    die = 1;
-    ci->semaphore_release(&synth_pending_sem);
-    ci->thread_wait(mad_synth_thread_id);
+    job.die = true;
+    ci->semaphore_release(&job.pending);
+    ci->thread_wait(decode_thread_id);
     ci->commit_discard_dcache();
 }
-#else
-static inline void mad_synth_thread_ready(void)
+
+/* The window is to be decoded: what it holds may still be in the CPU's cache */
+static void decode_run(void)
 {
-     mad_synth_frame(&synth, &frame);
+    ci->commit_dcache();
+    ci->semaphore_release(&job.pending);
 }
 
-static inline bool mad_synth_thread_create(void)
+/* For two frames, or for fewer if the window ends first */
+static void decode_wait(void)
+{
+    while (job.head - job.tail < 2 && job.running)
+        ci->semaphore_wait(&job.ready, TIMEOUT_BLOCK);
+}
+
+static void decode_taken(void)
+{
+    job.tail++;
+    ci->semaphore_release(&job.room);
+}
+
+static void decode_stop(void)
+{
+    job.stop = true;
+    ci->semaphore_release(&job.room);
+
+    while (job.running)
+        ci->semaphore_wait(&job.ready, TIMEOUT_BLOCK);
+
+    job.stop = false;
+    decode_clear();
+}
+
+/* For a new file: the last one could have ended at any point */
+static void decode_reset(void)
+{
+    decode_stop();
+    ci->semaphore_init(&job.ready, 1, 0);
+    ci->semaphore_init(&job.room, 1, 0);
+}
+#else
+static inline bool decode_thread_create(void)
 {
     return true;
 }
 
-static inline void mad_synth_thread_quit(void)
+static inline void decode_thread_quit(void)
 {
 }
 
-static inline void mad_synth_thread_wait_pcm(void)
+static inline void decode_run(void)
 {
 }
 
-static inline void mad_synth_thread_unwait_pcm(void)
+static void decode_wait(void)
 {
+    while (job.head - job.tail < 2 && job.running) {
+        if (decode_step())
+            job.head++;
+        if (job.over)
+            job.running = false;
+    }
 }
-#endif /* MPA_SYNTH_ON_COP */
+
+static inline void decode_taken(void)
+{
+    job.tail++;
+}
+
+static inline void decode_stop(void)
+{
+    decode_clear();
+}
+
+static inline void decode_reset(void)
+{
+    decode_clear();
+}
+#endif /* DECODE_THREAD */
 
 /* this is the codec entry point */
 enum codec_status codec_main(enum codec_entry_call_reason reason)
@@ -384,12 +527,12 @@ enum codec_status codec_main(enum codec_entry_call_reason reason)
         ci->configure(DSP_SET_SAMPLE_DEPTH, MAD_F_FRACBITS);
 
         /* does nothing on 1 processor systems except return true */
-        if(!mad_synth_thread_create())
+        if(!decode_thread_create())
             return CODEC_ERROR;
     }
     else if (reason == CODEC_UNLOAD) {
         /* mop up COP thread - MT only */
-        mad_synth_thread_quit();
+        decode_thread_quit();
     }
 
     return CODEC_OK;
@@ -435,9 +578,12 @@ enum codec_status codec_run(void)
     int stop_skip, start_skip;
     int current_stereo_mode = -1;
     unsigned long current_frequency = 0;
-    int framelength;
     int padding = MAD_BUFFER_GUARD; /* to help mad decode the last frame */
     intptr_t param;
+    bool input_over = false;
+
+    /* The COP has to be idle for this */
+    decode_reset();
 
     /* Reinitializing seems to be necessary to avoid playback quircks when seeking. */
     init_mad();
@@ -514,7 +660,6 @@ enum codec_status codec_run(void)
 
     if (ci->id3->is_asf_stream)
         reset_stream_buffer();
-    framelength = 0;
 
     /* This is the decoding loop. */
     while (1) {
@@ -524,9 +669,8 @@ enum codec_status codec_run(void)
             break;
 
         if (action == CODEC_ACTION_SEEK_TIME) {
-            /*make sure the synth thread is idle before seeking - MT only*/
-            mad_synth_thread_wait_pcm();
-            mad_synth_thread_unwait_pcm();
+            /*make sure the COP is idle before seeking - MT only*/
+            decode_stop();
 
             if (param == 0) {
                 samples_to_skip = start_skip;
@@ -540,75 +684,82 @@ enum codec_status codec_run(void)
                 break;
 
             init_mad();
-            framelength = 0;
+            input_over = false;
         }
 
-        /* Lock buffers */
-        if (stream.error == 0) {
-            inputbuffer = get_stream_data(&size, INPUT_CHUNK_SIZE);
-            if (size == 0 || inputbuffer == NULL) {
-                if (ci->id3->is_asf_stream && stream_data_available < 0)
-                    return CODEC_ERROR;
-                break;
-            }
-            mad_stream_buffer(&stream, (unsigned char *)inputbuffer,
-                              size + padding);
-        }
-
-        if (mad_frame_decode(&frame, &stream)) {
-            if (stream.error == MAD_ERROR_BUFLEN) {
-                /* This makes the codec support partially corrupted files */
-                if (file_end == 30)
-                    break;
-
-                /* Fill the buffer */
-                if (stream.next_frame)
-                {
-                    size_t frame_size = stream.next_frame - stream.buffer;
-                    if (frame_size == 0)
-                        break;
-
-                    advance_stream_buffer(frame_size);
-                }
-                else
-                    advance_stream_buffer(size);
-                stream.error = 0; /* Must get new inputbuffer next time */
-                file_end++;
-                continue;
-            } else if (MAD_RECOVERABLE(stream.error)) {
-                /* Probably syncing after a seek */
-                continue;
-            } else {
-                /* Some other unrecoverable error */
+        /* The COP is finished with a window: it can go on with the next one
+           while the queue is still being emptied */
+        if (!job.running && !input_over) {
+            if (job.failed)
                 return CODEC_ERROR;
+
+            if (job.size > 0) {
+                /* Past all the frames, and anything after them that's not
+                   going to be one */
+                for (unsigned int n = job.tail; n != job.head; n++) {
+                    struct decoded_frame *f = &job.decoded[n % DECODE_QUEUE];
+                    advance_stream_buffer(f->bytes);
+                    f->bytes = 0;
+                }
+
+                size_t read = job.size;
+                if (stream.next_frame)
+                    read = MIN((size_t)(stream.next_frame - stream.buffer), read);
+
+                const size_t rest = read > job.read ? read - job.read : 0;
+                advance_stream_buffer(rest);
+
+                /* This makes the codec support partially corrupted files */
+                if (job.made > 0)
+                    file_end = 0;
+                else if (rest == 0 || ++file_end == 30)
+                    input_over = true;
+            }
+
+            if (!input_over) {
+                /* Lock buffers */
+                inputbuffer = get_stream_data(&size, WINDOW_BYTES);
+                if (size == 0 || inputbuffer == NULL) {
+                    if (ci->id3->is_asf_stream && stream_data_available < 0)
+                        return CODEC_ERROR;
+                    input_over = true;
+                } else {
+                    /* ASF's data was already put in IRAM */
+                    mad_stream_buffer(&stream, (unsigned char *)
+                                      (ci->id3->is_asf_stream ?
+                                       inputbuffer : SHARED_ADDR(inputbuffer)),
+                                      size + padding);
+                    stream.error = 0;
+                    job.size = size;
+                    job.read = 0;
+                    job.made = 0;
+                    job.over = false;
+                    job.running = true;
+                    decode_run();
+                }
             }
         }
 
-        /* Do the pcmbuf insert here. Note, this is the PREVIOUS frame's pcm
-           data (not the one just decoded above). When we exit the decoding
-           loop we will need to process the final frame that was decoded. */
-        mad_synth_thread_wait_pcm();
+        decode_wait();
 
-        if (framelength > 0) {
-            
-            /* In case of a mono file, the second array will be ignored. */
-            ci->pcmbuf_insert(&synth.pcm.samples[0][samples_to_skip],
-                              &synth.pcm.samples[1][samples_to_skip],
-                              framelength);
+        const unsigned int queued = job.head - job.tail;
 
-            /* Only skip samples for the first frame added. */
-            samples_to_skip = 0;
+        if (queued < 2 && !input_over) {
+            continue; /* Needs more input to tell */
+        } else if (queued == 0) {
+            break;
         }
 
-        /* Initiate PCM synthesis on the COP (MT) or perform it here (ST) */
-        mad_synth_thread_ready();
+        struct decoded_frame *f = &job.decoded[job.tail % DECODE_QUEUE];
+
+        advance_stream_buffer(f->bytes);
 
         /* Check if sample rate and stereo settings changed in this frame. */
-        if (frame.header.samplerate != current_frequency) {
-            current_frequency = frame.header.samplerate;
+        if (f->samplerate != current_frequency) {
+            current_frequency = f->samplerate;
             ci->configure(DSP_SET_FREQUENCY, current_frequency);
         }
-        if (MAD_NCHANNELS(&frame.header) == 2) {
+        if (f->channels == 2) {
             if (current_stereo_mode != STEREO_NONINTERLEAVED) {
                 ci->configure(DSP_SET_STEREO_MODE, STEREO_NONINTERLEAVED);
                 current_stereo_mode = STEREO_NONINTERLEAVED;
@@ -620,33 +771,46 @@ enum codec_status codec_run(void)
             }
         }
 
-        if (stream.next_frame)
-            advance_stream_buffer(stream.next_frame - stream.buffer);
-        else
-            advance_stream_buffer(size);
-        stream.error = 0; /* Must get new inputbuffer next time */
-        file_end = 0;
-
-        framelength = synth.pcm.length - samples_to_skip;
+        int framelength = f->length - samples_to_skip;
         if (framelength <= 0) {
             framelength = 0;
-            samples_to_skip -= synth.pcm.length;
+            samples_to_skip -= f->length;
         }
 
         samplesdone += framelength;
         ci->set_elapsed((samplesdone * 1000LL) / current_frequency);
+
+        /* Cut the required samples from the end of the last frame. */
+        const int count = framelength - (queued == 1 ? stop_skip : 0);
+
+        if (count > 0) {
+#ifdef DECODE_THREAD
+            for (int ch = 0; ch < f->channels; ch++) {
+                memcpy(&dsp_pcm[ch][samples_to_skip],
+                       decoded_samples(job.tail, ch) + samples_to_skip,
+                       count * sizeof (mad_fixed_t));
+            }
+
+            /* In case of a mono file, the second array will be ignored. */
+            ci->pcmbuf_insert(&dsp_pcm[0][samples_to_skip],
+                              &dsp_pcm[1][samples_to_skip],
+                              count);
+#else
+            /* the frame is taken: the DSP may work on it in place */
+            ci->pcmbuf_insert(decoded_samples(job.tail, 0) + samples_to_skip,
+                              decoded_samples(job.tail, 1) + samples_to_skip,
+                              count);
+#endif
+        }
+
+        /* Only skip samples for the first frame added. */
+        if (framelength > 0)
+            samples_to_skip = 0;
+
+        decode_taken();
     }
 
-    /* wait for synth idle - MT only*/
-    mad_synth_thread_wait_pcm();
-    mad_synth_thread_unwait_pcm();
-
-    /* Finish the remaining decoded frame.
-       Cut the required samples from the end. */
-    if (framelength > stop_skip){
-        ci->pcmbuf_insert(synth.pcm.samples[0], synth.pcm.samples[1],
-                          framelength - stop_skip);
-    }
+    decode_stop();
 
     return CODEC_OK;
 }
