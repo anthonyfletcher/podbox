@@ -396,6 +396,10 @@ static uint8_t sendFf[4] USB_DEVBSS_ATTR;
 static bool sent_fb_this_frame = false;
 int fb_startframe = 0;
 bool send_fb = false;
+/* A feedback packet the host has not collected yet. Priming the next one
+   waits for the controller with interrupts off, for up to 250 ms on the 5G,
+   and every OUT packet in that time is lost. */
+static bool fb_pending;
 
 /* debug screen sample count display variables */
 static unsigned long samples_received;
@@ -755,6 +759,7 @@ static void usb_audio_start_playback(void)
     rx_usb_idx = 0;
 
     // feedback initialization
+    fb_pending = false;
     fb_startframe = usb_drv_get_frame_number();
     samples_fb = 0;
     samples_received_report = 0;
@@ -1434,6 +1439,9 @@ static bool usb_audio_fast_transfer_complete(int ep, int dir, int status, int le
     (void) dir;
     bool retval = false;
 
+    if (dir == USB_DIR_IN && EP_NUM(ep) == EP_NUM(EP_ISO_FEEDBACK_IN))
+        fb_pending = false;
+
     if(ep == EP_ISO_OUT && usb_as_playback_intf_alt == 1)
     {
         // check for dropped frames
@@ -1572,7 +1580,13 @@ feedback:
 
             encodeFBfixedpt(sendFf, samples_fb, usb_drv_port_speed());
             logf("usbaudio: frame %d fbval 0x%02X%02X%02X%02X", usb_drv_get_frame_number(), sendFf[3], sendFf[2], sendFf[1], sendFf[0]);
-            usb_drv_send_nonblocking(EP_ISO_FEEDBACK_IN, sendFf, usb_drv_port_speed()?4:3);
+            /* skipped while the last is still waiting */
+            if (!fb_pending)
+            {
+                fb_pending = true;
+                usb_drv_send_nonblocking(EP_ISO_FEEDBACK_IN, sendFf,
+                                         usb_drv_port_speed()?4:3);
+            }
             if (st_feedbacks++ % 64 == 0)
                 usb_log(USB_LOG_FEEDBACK, 0, 0,
                         sendFf[0] | sendFf[1] << 8 | sendFf[2] << 16 |
