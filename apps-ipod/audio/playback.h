@@ -26,6 +26,9 @@
  * Returns the handle id of the buffered albumart for the given slot id
  **/
 int playback_current_aa_hid(int slot);
+/* The current track's art is loading: playback_current_aa_hid() still gives
+ * the last track's */
+bool playback_art_pending(void);
 
 /*
  * Hands out an albumart slot for buffering albumart using the size

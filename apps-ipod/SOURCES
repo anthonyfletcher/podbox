@@ -73,6 +73,9 @@ metadata/tag_trim.c
 #ifdef HAVE_ALBUMART
 metadata/albumart.c
 metadata/art_cache.c
+#ifdef CPU_ARM
+metadata/art_cache_arm.S
+#endif
 metadata/art_banner.c
 metadata/name_index.c
 metadata/art_name.c

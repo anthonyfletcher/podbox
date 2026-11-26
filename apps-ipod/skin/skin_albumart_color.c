@@ -1640,6 +1640,10 @@ void dynamic_colors_check_extraction(int aa_slot)
         needs_extraction = false;
         return;
     }
+    /* The colours arrive with the cover: the redraw that brings the cover
+     * asks again */
+    if (playback_art_pending())
+        return;
     /* The cache first. It needs no album-art slot, so this works on a theme
      * that declares no %Cl -- which is why there is no "give up without a
      * slot" test here any more. */
@@ -2001,9 +2005,11 @@ bool dynamic_colors_screen_clear_needed(void)
     return false;
 }
 
+/* Not while the cover is loading: nothing comes of asking until its redraw */
 bool dynamic_colors_pending(void)
 {
-    return needs_extraction && global_settings.dynamic_colors;
+    return needs_extraction && global_settings.dynamic_colors &&
+           !playback_art_pending();
 }
 
 bool dynamic_colors_roles(unsigned int *dominant, unsigned int *vivid)

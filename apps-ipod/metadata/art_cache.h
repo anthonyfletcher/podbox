@@ -79,6 +79,12 @@ enum bg_result art_cache_tool_run(bool rebuild);
 int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
                        const struct img_filter *filter);
 
+/* Up to ART_CACHE_MULTI_MAX sizes of one thumbnail from a single read of it:
+ * each bms[k] as art_cache_load_aat() would make it, unfiltered, its data
+ * already holding width x height fb_data. True when all n were made. */
+#define ART_CACHE_MULTI_MAX 4
+bool art_cache_load_aat_multi(int fd, struct bitmap *const *bms, int n);
+
 
 /* True while a generation pass is running. Drives the status-bar %lc token. */
 bool art_cache_is_busy(void);

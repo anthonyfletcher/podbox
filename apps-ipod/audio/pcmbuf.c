@@ -90,6 +90,9 @@
 #define MIN_BUFFER_SIZE     (BYTERATE * 3)
 /* 1 seconds of buffer is low data */
 #define LOW_DATA            DATA_LEVEL(4)
+/* After a manual skip, where the wait is heard: the decoder fills faster than
+   it plays, so the rest of LOW_DATA follows while it does */
+#define QUICK_START_DATA    DATA_LEVEL(2)
 
 /* Describes each audio packet - keep it small since there are many of them */
 struct chunkdesc
@@ -125,6 +128,8 @@ static size_t chunk_transidx;
 static size_t pcmbuf_watermark = 0;
 
 static bool low_latency_mode = false;
+/* A manual skip's track starts at QUICK_START_DATA rather than LOW_DATA */
+static bool quick_start = false;
 
 static bool pcmbuf_sync_position = false;
 
@@ -199,6 +204,7 @@ extern void audio_pcmbuf_position_callback(unsigned long elapsed,
 extern void audio_pcmbuf_track_change(bool pcmbuf);
 extern bool audio_pcmbuf_may_play(void);
 extern void audio_pcmbuf_sync_position(void);
+extern void audio_pcmbuf_data_written(void);
 
 
 /** Index arithmetic and fill state **/
@@ -505,8 +511,14 @@ void * pcmbuf_request_buffer(int *count)
         /* Boost CPU for pre-buffer */
         trigger_cpu_boost();
 
+        /* After a manual skip the silence lasts until this fill is done:
+           the codec takes the CPU from the screen meanwhile */
+        if (quick_start)
+            boost_codec_thread(0);
+
         /* If pre-buffered to the watermark, start playback */
-        if (!pcmbuf_data_critical())
+        if (pcmbuf_unplayed_bytes() >=
+            (quick_start ? QUICK_START_DATA : LOW_DATA))
             start_audio_playback();
     }
 
@@ -547,6 +559,7 @@ void pcmbuf_write_complete(int count, unsigned long elapsed, off_t offset)
 
     /* Revert to position updates by PCM */
     pcmbuf_sync_position = false;
+    audio_pcmbuf_data_written();
 }
 
 
@@ -775,6 +788,7 @@ void pcmbuf_start_track_change(enum pcm_track_change_type type)
         /* Discard old data; caller needs no transition notification */
         logf("manual track change");
         pcmbuf_play_stop();
+        quick_start = true;
     }
 }
 
@@ -853,6 +867,7 @@ void pcmbuf_play_start(void)
             .sampr_changed = pcmbuf_sampr_callback,
         };
         mixer_channel_play_data(PCM_MIXER_CHAN_PLAYBACK, &cbs, NULL, 0);
+        quick_start = false;
 #if defined(HAVE_CS42L55)
         /* Power up codec DAC after I2S/MCLK is running —
          * CS42L55 needs MCLK to properly exit PDN_CODEC */

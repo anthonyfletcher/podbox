@@ -431,16 +431,60 @@ static void aa_fallback_path(char *out, int out_len, int size_index)
              art_sizes[size_index].name);
 }
 
-/* Streaming area-average downscale of an open .aat into `bm` (fd is consumed).
+/* Streaming area-average downscale of an open .aat (fd is consumed).
  *
  * The source is read once, top to bottom: each destination row averages the
- * contiguous band of source rows that map to it, so at most a few source rows
- * are resident at a time (aat_band[]). Downscale only -- the WPS never asks for
- * more than the 300px cache. Returns the pixel byte count (like the decoders,
- * so load_image can add sizeof(struct bitmap)), or <= 0 on failure. */
-#define AAT_BAND_MAX 8    /* source rows resident per output row */
-static fb_data aat_band[AAT_BAND_MAX * ART_CACHE_MAX_DIM];
-/* Held while aat_band[] is in use: buffering, the art pass and the Report
+ * contiguous band of source rows that map to it. aat_buf[] is a window on the
+ * file, refilled in whole sectors from sector-aligned offsets into 16-byte
+ * aligned memory, which is what lets the disk DMA straight into it; the rows
+ * start 12 bytes in, after the header, so none starts a sector. A one-size
+ * load at the source's size reads straight into the bitmap. Downscale only --
+ * the WPS never asks for more than the 300px cache. */
+#define AAT_BAND_MAX 8    /* source rows averaged per output row */
+/* The largest logical sector of either player */
+#define AAT_SECTOR 2048
+#define AAT_BUF_BYTES (12 * AAT_SECTOR)
+static uint8_t aat_buf[AAT_BUF_BYTES] __attribute__((aligned(32)));
+/* Each output's first source column of each of its columns, and the end of
+ * the last */
+static unsigned short aat_sx[ART_CACHE_MULTI_MAX][ART_CACHE_MAX_DIM + 1];
+/* ceil(2^31 / n) for every pixel count n an average can have; the sum times
+ * it, >> 31, is the sum / n exactly (the ARM7 has no divide). [0] is 0. */
+#define AAT_RECIP_MAX (AAT_BAND_MAX * ART_CACHE_MAX_DIM)
+static uint32_t aat_recip[AAT_RECIP_MAX + 1];
+
+/* One output row: each of the dw pixels of out averages `rows` source rows of
+ * src (sw pixels apart) across columns [sx[x], sx[x + 1]). ARM has it in
+ * art_cache_arm.S; this is the simulator's, and the reference for that. */
+#ifdef CPU_ARM
+void aat_avg_row(fb_data *out, const fb_data *src, int sw, int rows,
+                 const unsigned short *sx, int dw, const uint32_t *recip);
+#else
+static void aat_avg_row(fb_data *out, const fb_data *src, int sw, int rows,
+                        const unsigned short *sx, int dw,
+                        const uint32_t *recip)
+{
+    for (int dx = 0; dx < dw; dx++)
+    {
+        int sx0 = sx[dx], sx1 = sx[dx + 1];
+        uint64_t m = recip[rows * (sx1 - sx0)];
+        unsigned r = 0, g = 0, b = 0;
+
+        for (int sy = 0; sy < rows; sy++)
+            for (int x = sx0; x < sx1; x++)
+            {
+                fb_data p = src[sy * sw + x];
+                r += RGB_UNPACK_RED(p);
+                g += RGB_UNPACK_GREEN(p);
+                b += RGB_UNPACK_BLUE(p);
+            }
+        out[dx] = LCD_RGBPACK((unsigned)((r * m) >> 31),
+                              (unsigned)((g * m) >> 31),
+                              (unsigned)((b * m) >> 31));
+    }
+}
+#endif
+/* Held while aat_buf[] is in use: buffering, the art pass and the Report
  * all read thumbnails, and read() locks only the file. */
 static struct mutex aat_mutex;
 
@@ -448,86 +492,178 @@ static struct mutex aat_mutex;
  * Reading a cached thumbnail                                              *
  * ---------------------------------------------------------------------- */
 
-int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
-                       const struct img_filter *filter)
+/* Source row range [sy0, sy0 + rows) that output row dy of dh averages */
+static int aat_rows(int dy, int dh, int sh, int *rows)
+{
+    int sy0 = dy * sh / dh;
+    int n = (dy + 1) * sh / dh - sy0;
+
+    *rows = n > AAT_BAND_MAX ? AAT_BAND_MAX : n; /* extreme ratios: the top */
+    return sy0;
+}
+
+bool art_cache_load_aat_multi(int fd, struct bitmap *const *bms, int n)
 {
     struct art_cache_header hdr;
-    int dw = bm->width, dh = bm->height;
-    int sw, sh, dy, dx;
-    int rc = dw * dh * FB_DATA_SZ;
+    int sw, sh, k;
 
+    if (n <= 0 || n > ART_CACHE_MULTI_MAX)
+        return false;
+
+    mutex_lock(&aat_mutex);
+
+    /* The window: aat_buf[0] is file offset `win`, and [win, hi) is read.
+     * The header comes in with the first sectors. */
+    off_t win = 0, hi;
     lseek(fd, 0, SEEK_SET);
-    if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
-        hdr.magic != ART_CACHE_MAGIC || hdr.version != ART_CACHE_FORMAT_VERSION)
-        return -1;
+    hi = read(fd, aat_buf, AAT_BUF_BYTES);
+    if (hi < (off_t)sizeof(hdr))
+        goto fail;
+    memcpy(&hdr, aat_buf, sizeof(hdr));
+    if (hdr.magic != ART_CACHE_MAGIC || hdr.version != ART_CACHE_FORMAT_VERSION)
+        goto fail;
 
     /* This reads the file a band of rows at a time, so it can only make sense
      * of a row-major one. Refused rather than transposed: no caller wants a
      * column-major source, and silently reading one the wrong way round would
      * produce a plausible-looking but mirrored thumbnail. */
     if (hdr.layout != AA_ROWS)
-        return -1;
+        goto fail;
 
     sw = hdr.width;
     sh = hdr.height;
-    /* Both dimensions, not just the one that sizes aat_band[]. sh drives
+    /* Both dimensions, not just the one that sizes aat_sx[]. sh drives
      * the row arithmetic below, and a header claiming a huge height
      * overflows dy * sh, which can leave sy1 behind sy0 -- `rows` is then
-     * negative, the clamp above it only tests the high side, and read()
-     * takes it as a size_t. 300 is the largest the cache ever writes.
-     * A source too elongated to crop is stored non-square, and is refused:
-     * scaling it to the size asked for would stretch it. */
+     * negative, and read() takes it as a size_t. 300 is the largest the
+     * cache ever writes. A source too elongated to crop is stored
+     * non-square, and is refused: scaling it would stretch it. */
     if (sw <= 0 || sh <= 0 || sw > ART_CACHE_MAX_DIM ||
-        sh > ART_CACHE_MAX_DIM || sw != sh ||
-        dw <= 0 || dh <= 0 || dw > sw || dh > sh)   /* downscale only */
-        return -1;
-    if ((size_t)dw * dh * FB_DATA_SZ > (size_t)max_size)
-        return -1;
-
-    mutex_lock(&aat_mutex);
-    for (dy = 0; dy < dh; dy++)
+        sh > ART_CACHE_MAX_DIM || sw != sh)
+        goto fail;
+    for (k = 0; k < n; k++)
     {
-        int sy0 = dy * sh / dh;
-        int sy1 = (dy + 1) * sh / dh;
-        int rows = sy1 - sy0;
-        fb_data *out = (fb_data *)bm->data + (size_t)dy * dw;
+        int dw = bms[k]->width, dh = bms[k]->height;
 
-        if (rows > AAT_BAND_MAX)
-            rows = AAT_BAND_MAX;    /* extreme ratios: sample the top of the band */
-        if (read(fd, aat_band, (size_t)rows * sw * FB_DATA_SZ) !=
-            (ssize_t)((size_t)rows * sw * FB_DATA_SZ))
+        if (dw <= 0 || dh <= 0 || dw > sw || dh > sh)   /* downscale only */
+            goto fail;
+    }
+
+    const off_t row_bytes = (off_t)sw * FB_DATA_SZ;
+    const off_t file_end = (off_t)sizeof(hdr) + sh * row_bytes;
+    bool ok = true;
+
+    /* One output, the source's size: the rows are the bitmap */
+    if (n == 1 && bms[0]->width == sw && bms[0]->height == sh)
+    {
+        lseek(fd, sizeof(hdr), SEEK_SET);
+        ok = read(fd, bms[0]->data, row_bytes * sh) == row_bytes * sh;
+        mutex_unlock(&aat_mutex);
+        return ok;
+    }
+
+    if (aat_recip[1] == 0)
+        for (unsigned m = 1; m <= AAT_RECIP_MAX; m++)
+            aat_recip[m] = ((1u << 31) + m - 1) / m;
+
+    int dy[ART_CACHE_MULTI_MAX];
+    for (k = 0; k < n; k++)
+    {
+        int dw = bms[k]->width;
+
+        for (int dx = 0; dx <= dw; dx++)
+            aat_sx[k][dx] = dx * sw / dw;
+        dy[k] = 0;
+    }
+
+    /* Each refill keeps the bytes from the first row an unfinished output
+     * row needs -- under AAT_BAND_MAX rows -- moved down to a 16-byte
+     * boundary, and reads on in whole sectors after them. hi stays a sector
+     * boundary until the file's end, and win a 16-byte one, so every read
+     * lands aligned. */
+
+    while (ok)
+    {
+        off_t low = file_end;
+        int rows;
+
+        /* every output row the window holds whole */
+        for (k = 0; k < n; k++)
         {
-            rc = -1;
+            struct bitmap *bm = bms[k];
+            int dw = bm->width, dh = bm->height;
+
+            while (dy[k] < dh)
+            {
+                int sy0 = aat_rows(dy[k], dh, sh, &rows);
+                off_t at = (off_t)sizeof(hdr) + sy0 * row_bytes;
+
+                if (at + rows * row_bytes > hi)
+                {
+                    if (at < low)
+                        low = at;
+                    break;
+                }
+                aat_avg_row((fb_data *)bm->data + (size_t)dy[k] * dw,
+                            (const fb_data *)(aat_buf + (at - win)),
+                            sw, rows, aat_sx[k], dw, aat_recip);
+                dy[k]++;
+            }
+        }
+        if (low == file_end)
+            break;                  /* all made */
+        if (hi >= file_end)
+        {
+            ok = false;             /* a row past the end: a short file */
             break;
         }
-        /* skip the remainder of a clamped band so the file stays aligned */
-        if (sy1 - sy0 > rows)
-            lseek(fd, (off_t)(sy1 - sy0 - rows) * sw * FB_DATA_SZ, SEEK_CUR);
 
-        for (dx = 0; dx < dw; dx++)
+        /* refill */
+        if (low >= hi)
         {
-            int sx0 = dx * sw / dw;
-            int sx1 = (dx + 1) * sw / dw;
-            unsigned r = 0, g = 0, b = 0, n = 0;
-            int sy, sx;
+            /* nothing kept: on from low's sector, which hi is at or before */
+            off_t to = low & ~(off_t)(AAT_SECTOR - 1);
 
-            for (sy = 0; sy < rows; sy++)
-                for (sx = sx0; sx < sx1; sx++)
-                {
-                    fb_data p = aat_band[sy * sw + sx];
-                    r += RGB_UNPACK_RED(p);
-                    g += RGB_UNPACK_GREEN(p);
-                    b += RGB_UNPACK_BLUE(p);
-                    n++;
-                }
-            out[dx] = n ? LCD_RGBPACK(r / n, g / n, b / n) : 0;
+            if (to > hi)
+                lseek(fd, to, SEEK_SET);
+            win = hi = to;
         }
+        else
+        {
+            off_t to = low & ~(off_t)15;
+
+            memmove(aat_buf, aat_buf + (to - win), hi - to);
+            win = to;
+        }
+        off_t want = (AAT_BUF_BYTES - (hi - win)) & ~(off_t)(AAT_SECTOR - 1);
+        if (want > file_end - hi)
+            want = file_end - hi;
+        ssize_t got = read(fd, aat_buf + (hi - win), want);
+        if (got <= 0)
+            ok = false;
+        else
+            hi += got;
     }
     mutex_unlock(&aat_mutex);
+    return ok;
 
-    if (rc > 0 && filter)
-        img_filter_apply_banded((fb_data *)bm->data, dw, dh, filter);
+fail:
+    mutex_unlock(&aat_mutex);
+    return false;
+}
 
+int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
+                       const struct img_filter *filter)
+{
+    int rc = bm->width * bm->height * FB_DATA_SZ;
+
+    if (bm->width <= 0 || bm->height <= 0 || rc > max_size)
+        return -1;
+    if (!art_cache_load_aat_multi(fd, &bm, 1))
+        return -1;
+    if (filter)
+        img_filter_apply_banded((fb_data *)bm->data, bm->width, bm->height,
+                                filter);
     return rc;
 }
 

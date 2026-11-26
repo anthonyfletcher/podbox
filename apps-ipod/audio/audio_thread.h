@@ -27,6 +27,7 @@ enum
 
     /* pcmbuf -> audio */
     Q_AUDIO_TRACK_CHANGED,
+    Q_AUDIO_ART_FILL,           /* the first audio of a track is decoded */
 
     /* audio -> audio */
     Q_AUDIO_FILL_BUFFER,        /* continue buffering next track */

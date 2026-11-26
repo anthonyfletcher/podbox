@@ -1006,7 +1006,11 @@ static int load_image(int fd, const char *path,
          * rather than the theme's treatment of it -- a bw chain here would
          * turn every derived colour grey. Skin art has its own filter, on the
          * %Cl that loads it. */
+        /* A skip waits on this: at the unboosted clock it is most of the
+         * time from the press to the cover */
+        cpu_boost(true);
         rc = art_cache_load_aat(fd, bmp, data_size, NULL);
+        cpu_boost(false);
     }
     else {
         struct image_src src = {
@@ -1234,6 +1238,126 @@ int bufopen(const char *file, off_t offset, enum data_type type,
 
     /* Currently only used for aa loading */
     (void)user_data;
+}
+
+/* Each handle is linked as it is added, at its exact size, so the next is
+ * placed after it, and pinned so it stays where the fill will write. The
+ * caller hands the ids to no one before bufopen_aat_fill() has filled them. */
+int bufopen_aat_reserve(const char *file,
+                        struct bufopen_bitmap_data *const *ud, int n,
+                        int *hids)
+{
+    struct memory_handle *hs[ART_CACHE_MULTI_MAX];
+    int added = 0, rc = 0;
+
+    if (n < 1 || n > ART_CACHE_MULTI_MAX)
+        return ERR_FILE_ERROR;
+
+    mutex_lock(&llist_mutex);
+
+    for (; added < n; added++)
+    {
+        const struct dim *dim = ud[added]->dim;
+        size_t size = sizeof(struct bitmap) +
+                      BM_SIZE(dim->width, dim->height, FORMAT_NATIVE, false);
+        size_t data;
+        struct memory_handle *h = add_handle(H_ALLOCALL, size, file, &data);
+
+        if (!h)
+        {
+            rc = ERR_BUFFER_FULL;
+            break;
+        }
+        h->type     = TYPE_BITMAP;
+        h->fd       = -1;
+        h->data     = data;
+        h->ridx     = data;
+        h->widx     = ringbuf_add(data, size);
+        h->filesize = size;
+        h->start    = 0;
+        h->pos      = 0;
+        h->end      = size;
+        h->pinned   = 1;
+
+        struct bitmap *bm = ringbuf_ptr(data);
+        bm->width = dim->width;
+        bm->height = dim->height;
+        bm->data = ringbuf_ptr(data + sizeof(struct bitmap));
+        bm->maskdata = NULL;
+
+        link_handle(h);
+        hs[added] = h;
+    }
+
+    if (rc != 0)
+        while (added > 0)
+            unlink_handle(hs[--added]);    /* the last first */
+
+    for (int k = 0; k < added; k++)
+        hids[k] = hs[k]->id;
+
+    mutex_unlock(&llist_mutex);
+    return rc;
+}
+
+/* The pixels for handles from bufopen_aat_reserve(), unpinned after. On a
+ * failure the handles are closed. */
+int bufopen_aat_fill(const char *file, const int *hids, int n)
+{
+    struct bitmap *bms[ART_CACHE_MULTI_MAX];
+    int rc = 0;
+
+    mutex_lock(&llist_mutex);
+    for (int k = 0; k < n; k++)
+    {
+        struct memory_handle *h = find_handle(hids[k]);
+        if (!h)
+            rc = ERR_HANDLE_NOT_FOUND;
+        else
+            bms[k] = ringbuf_ptr(h->data);
+    }
+    mutex_unlock(&llist_mutex);
+
+    if (rc == 0)
+    {
+        int fd = open(file, O_RDONLY);
+        cpu_boost(true);
+        if (fd < 0 || !art_cache_load_aat_multi(fd, bms, n))
+            rc = ERR_FILE_ERROR;
+        cpu_boost(false);
+        if (fd >= 0)
+            close(fd);
+    }
+
+    mutex_lock(&llist_mutex);
+    for (int k = 0; k < n; k++)
+    {
+        struct memory_handle *h = find_handle(hids[k]);
+        if (h && h->pinned > 0)
+            h->pinned--;
+    }
+    mutex_unlock(&llist_mutex);
+
+    for (int k = 0; k < n; k++)
+    {
+        if (rc != 0)
+            bufclose(hids[k]);
+        else
+        {
+            LOGFQUEUE("buffering > Q_HANDLE_ADDED %d", hids[k]);
+            queue_post(&buffering_queue, Q_HANDLE_ADDED, hids[k]);
+        }
+    }
+    return rc;
+}
+
+/* Reserved and filled at once */
+int bufopen_aat_multi(const char *file,
+                      struct bufopen_bitmap_data *const *ud, int n,
+                      int *hids)
+{
+    int rc = bufopen_aat_reserve(file, ud, n, hids);
+    return rc != 0 ? rc : bufopen_aat_fill(file, hids, n);
 }
 
 /* Open a new handle from data that needs to be copied from memory.

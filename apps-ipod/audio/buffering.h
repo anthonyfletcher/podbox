@@ -68,6 +68,20 @@ void buffering_drop_damage(void);
 
 int bufopen(const char *file, off_t offset, enum data_type type,
             void *user_data);
+struct bufopen_bitmap_data;
+/* n TYPE_BITMAP handles of one art cache thumbnail, at each ud[k]'s size,
+ * from a single read of it: 0 with their ids in hids, or ERR_BUFFER_FULL or
+ * ERR_FILE_ERROR with none opened. */
+int bufopen_aat_multi(const char *file,
+                      struct bufopen_bitmap_data *const *ud, int n,
+                      int *hids);
+/* The same in two steps: the handles' space now, the pixels later, so other
+ * handles can be opened after them first. Nothing may read a handle between
+ * the two. The fill closes them all on a failure. */
+int bufopen_aat_reserve(const char *file,
+                        struct bufopen_bitmap_data *const *ud, int n,
+                        int *hids);
+int bufopen_aat_fill(const char *file, const int *hids, int n);
 int bufalloc(const void *src, size_t size, enum data_type type);
 bool bufclose(int handle_id);
 int bufseek(int handle_id, size_t newpos);
