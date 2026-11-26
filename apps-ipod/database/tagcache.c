@@ -6261,6 +6261,91 @@ static bool allocate_tagcache(void)
     return true;
 }
 
+/* Bytes the load reads at a time, as buffering.c reads a track: long enough
+ * for multi-sector transfers, short enough to yield between */
+#define LOAD_CHUNK (32*1024)
+
+/* Up to len bytes from fd's current position into buf, in chunks that end on
+ * file offsets LOAD_CHUNK apart, so every read but the first starts on a
+ * sector and skips the one-sector file cache. The bytes read, or -1 when an
+ * event in the queue stopped it. */
+static ssize_t load_read(int fd, char *buf, size_t len)
+{
+    off_t pos = lseek(fd, 0, SEEK_CUR);
+    size_t done = 0;
+
+    while (done < len)
+    {
+        size_t n = MIN(len - done, LOAD_CHUNK - (pos + done) % LOAD_CHUNK);
+        ssize_t rc = read(fd, buf + done, n);
+
+        if (rc > 0)
+            done += rc;
+        if (rc != (ssize_t)n)
+            break;
+        if (do_timed_yield() && check_event_queue_no_usb())
+            return -1;
+    }
+
+    return done;
+}
+
+/* Whether entry idx_id of the master, of 'entries', names the tag file entry
+ * of tag 'tag' at file offset pos. -1 is no entry, and allowed but for the
+ * filename. */
+static bool load_entry_ok(int tag, int idx_id, off_t pos, int entries)
+{
+    if (idx_id == -1 && tag != tag_filename) /* filename NOT optional */
+        return true;
+
+    if (idx_id < 0 || idx_id >= entries)
+    {
+        logf("corrupt tagfile entry:tag=%d:idxid=%d", tag, idx_id);
+        return false;
+    }
+
+    struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
+
+    /* Not for a deleted entry: delete_entry() replaces tag_seek with a CRC of
+     * the tag text, so that runtime statistics survive a file coming back,
+     * and a CRC is no file position. Taken as corruption it would abandon the
+     * load, keeping the database out of RAM on every boot for one deleted
+     * track. Searches skip deleted entries, so nothing reads the hash as a
+     * seek. */
+    if (!(idx->flag & FLAG_DELETED) && idx->tag_seek[tag] != pos)
+    {
+        logf("corrupt data structures!:");
+        logf("  tag_seek[%d]=%" PRId32 ":pos=%ld", tag,
+             idx->tag_seek[tag], (long) pos);
+        return false;
+    }
+
+    return true;
+}
+
+/* For a file read through a window of 'size' bytes at win, of which *have are
+ * read and *off used: whether 'need' bytes from *off are there, moving the
+ * unused rest to the start and reading after it when they are not. False at
+ * the end of the file, or when an event stopped the read. */
+static bool load_window(int fd, char *win, size_t size, size_t *have,
+                        size_t *off, size_t need)
+{
+    if (*have - *off >= need)
+        return true;
+
+    size_t rest = *have - *off;
+
+    memmove(win, win + *off, rest);
+    *off = 0;
+    *have = rest;
+
+    ssize_t got = load_read(fd, win + rest, size - rest);
+    if (got < 0)
+        return false;
+
+    *have += got;
+    return *have >= need;
+}
 
 static bool load_tagcache(void)
 {
@@ -6276,9 +6361,17 @@ static bool load_tagcache(void)
      * a release build -- so a load that fails on a device says nothing at all,
      * and the database is silently left on the disk for the session. */
     int failtag = -1;
+    /* Nothing here reads the directory cache. A build still under way, as at
+     * boot, is held back until the load is done: the two would read the disk
+     * at once and each slow the other. Held back, it keeps its buffer and
+     * starts again from the top. */
+    struct dircache_info dcinfo;
+    dircache_get_info(&dcinfo);
+    bool dircache_held = global_settings.dircache
+                         && dcinfo.status != DIRCACHE_READY;
 
-    /* Wait for any in-progress dircache build to complete */
-    dircache_wait();
+    if (dircache_held)
+        dircache_suspend();
 
     logf("loading tagcache to ram...");
 
@@ -6303,21 +6396,27 @@ static bool load_tagcache(void)
     current_tcmh = tcmh;
 
     /* Load the master index table. */
-    for (int i = 0; i < tcmh.tch.entry_count; i++)
-    {
-        bytesleft -= sizeof(struct index_entry);
-        if (bytesleft < 0)
-        {
-            logf("too big tagcache.");
-            goto failure;
-        }
+    ssize_t index_size =
+        tcmh.tch.entry_count * (ssize_t)sizeof(struct index_entry);
 
-        int rc = read_index_entries(fd, &tcramcache.hdr->indices[i], 1);
-        if (rc != sizeof (struct index_entry))
-        {
-            logf("read error #10");
-            goto failure;
-        }
+    bytesleft -= index_size;
+    if (bytesleft < 0)
+    {
+        logf("too big tagcache.");
+        goto failure;
+    }
+
+    if (load_read(fd, (char *)tcramcache.hdr->indices, index_size)
+        != index_size)
+    {
+        logf("read error #10");
+        goto failure;
+    }
+
+    if (tc_stat.econ)
+    {
+        for (int i = 0; i < tcmh.tch.entry_count; i++)
+            swap_index_entry(&tcramcache.hdr->indices[i]);
     }
 
     close(fd);
@@ -6382,7 +6481,73 @@ static bool load_tagcache(void)
         if (fd < 0)
             goto failure;
 
-        /* Load the entries for this tag */
+        /* Any tag but the filename: the file as it stands is the block, read
+         * whole and then checked. Entries are padded to
+         * TAGFILE_ENTRY_CHUNK_LENGTH, so none needs aligning, and the master's
+         * seeks are offsets into it. */
+        if (tag != tag_filename)
+        {
+            off_t body = ffilesize(fd) - (off_t)sizeof(struct tagcache_header);
+            ssize_t got = load_read(fd, p, body > 0
+                                           ? MIN(body, (off_t)bytesleft) : 0);
+
+            if (got < 0)
+                goto failure;
+            /* Taken now and the unused part handed back below, so a load
+             * that fails on the cap reports the buffer as run out */
+            bytesleft -= got;
+            char *end = p + got;
+
+            for (tcramcache.hdr->entry_count[tag] = 0;
+                 tcramcache.hdr->entry_count[tag] < tch->entry_count;
+                 tcramcache.hdr->entry_count[tag]++)
+            {
+                if (do_timed_yield() && check_event_queue_no_usb())
+                    goto failure;
+
+                struct tagfile_entry *fe = (struct tagfile_entry *)p;
+
+                if (end - p < (ssize_t)sizeof(*fe))
+                {
+                    logf("read error #11");
+                    goto failure;
+                }
+                swap_tagfile_entry(fe);
+                if (fe->tag_length < 0
+                    || fe->tag_length > end - fe->tag_data)
+                {
+                    logf("read error #13");
+                    goto failure;
+                }
+                if (!load_entry_ok(tag, fe->idx_id,
+                                   p - tcramcache.hdr->tags[tag],
+                                   tcmh.tch.entry_count))
+                    goto failure;
+
+                p = fe->tag_data + fe->tag_length;
+            }
+
+            bytesleft += end - p;
+            tcramcache.hdr->tag_size[tag] = p - tcramcache.hdr->tags[tag];
+            close(fd);
+            continue;
+        }
+
+        /* The filename is not kept: only the tag file's header, and each
+         * path's key in the path index. Its file is read a window at a time
+         * into the room after the header, which the next tag's block then
+         * takes. */
+        char *win = p;
+        size_t win_size = MIN(bytesleft, (ssize_t)LOAD_CHUNK);
+        size_t have = 0, off = 0;
+        off_t pos = sizeof(struct tagcache_header);
+
+        if (win_size < sizeof(struct tagfile_entry) + TAGCACHE_BUFSZ)
+        {
+            logf("Too big tagcache #10.75");
+            goto failure;
+        }
+
         for (tcramcache.hdr->entry_count[tag] = 0;
              tcramcache.hdr->entry_count[tag] < tch->entry_count;
              tcramcache.hdr->entry_count[tag]++)
@@ -6391,121 +6556,57 @@ static bool load_tagcache(void)
             if (do_timed_yield() && check_event_queue_no_usb())
                 goto failure;
 
-            p = TC_ALIGN_PTR(p, struct tagfile_entry, &rc);
-            bytesleft -= rc;
-            if (bytesleft < (ssize_t)sizeof(struct tagfile_entry))
-            {
-                logf("Too big tagcache #10.75");
-                goto failure;
-            }
+            struct tagfile_entry fe;
 
-            struct tagfile_entry *fe = (struct tagfile_entry *)p;
-            off_t pos = lseek(fd, 0, SEEK_CUR);
-
-            /* Load the header for the tag itself */
-            if (read_tagfile_entry(fd, fe) != sizeof(struct tagfile_entry))
+            if (!load_window(fd, win, win_size, &have, &off, sizeof(fe)))
             {
                 /* End of lookup table. */
                 logf("read error #11");
                 goto failure;
             }
+            memcpy(&fe, win + off, sizeof(fe));
+            swap_tagfile_entry(&fe);
 
-            int idx_id = fe->idx_id; /* fe is scratch for tag_filename */
-            struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
+            if (!load_entry_ok(tag, fe.idx_id, pos, tcmh.tch.entry_count))
+                goto failure;
 
-            if (idx_id != -1 || tag == tag_filename) /* filename NOT optional */
+            int idx_id = fe.idx_id;
+            char filename[TAGCACHE_BUFSZ];
+
+            if (fe.tag_length < 0 || fe.tag_length >= (long)sizeof(filename)-1)
             {
-                if (idx_id < 0 || idx_id >= tcmh.tch.entry_count)
-                {
-                    logf("corrupt tagfile entry:tag=%d:idxid=%d", tag, idx_id);
-                    goto failure;
-                }
-
-                /* Not for a deleted entry: delete_entry() replaces tag_seek
-                 * with a CRC of the tag text, so that runtime statistics
-                 * survive a file coming back, and a CRC is no file position.
-                 * Taken as corruption it would abandon the load, keeping the
-                 * database out of RAM on every boot for one deleted track.
-                 * Searches skip deleted entries, so nothing reads the hash
-                 * as a seek. */
-                if (!(idx->flag & FLAG_DELETED) && idx->tag_seek[tag] != pos)
-                {
-                    logf("corrupt data structures!:");
-                    logf("  tag_seek[%d]=%" PRId32 ":pos=%ld", tag,
-                         idx->tag_seek[tag], (long) pos);
-                    goto failure;
-                }
+                logf("too long filename");
+                goto failure;
             }
 
-            /* Filenames are not kept: only the tag file's header, and each
-               path's key in the path index. fe is scratch, reused for every
-               entry. */
-            if (tag == tag_filename)
+            size_t len = sizeof(fe) + fe.tag_length;
+
+            if (!load_window(fd, win, win_size, &have, &off, len))
             {
-                char filename[TAGCACHE_BUFSZ];
-                if (fe->tag_length >= (long)sizeof(filename)-1)
-                {
-                    read(fd, filename, 10);
-                    str_setlen(filename, 10);
-                    logf("TAG:%s", filename);
-                    logf("too long filename");
-                    goto failure;
-                }
+                logf("read error #12");
+                goto failure;
+            }
+            const char *name = win + off + sizeof(fe);
 
-                if (idx->flag & FLAG_DELETED)
-                {
-                    /* seek over tag data instead of reading */
-                    if (lseek(fd, fe->tag_length, SEEK_CUR) < 0)
-                    {
-                        logf("read error #11.5");
-                        goto failure;
-                    }
+            off += len;
+            pos += len;
 
-                    continue;
-                }
-
-                if (read(fd, filename, fe->tag_length) != fe->tag_length)
-                {
-                    logf("read error #12");
-                    goto failure;
-                }
-                filename[fe->tag_length] = '\0';
-
-                if (path_n < tcmh.tch.entry_count)
-                {
-                    uint64_t key = path_key(filename);
-
-                    slots[path_n].key_lo = (uint32_t)key;
-                    slots[path_n].key_hi = (uint32_t)(key >> 32);
-                    slots[path_n].idx_id = idx_id;
-                    path_n++;
-                }
-                albums_note_path(idx_id, filename);
+            if (tcramcache.hdr->indices[idx_id].flag & FLAG_DELETED)
                 continue;
-            }
 
-            bytesleft -= sizeof(struct tagfile_entry) + fe->tag_length;
-            if (bytesleft < 0)
+            memcpy(filename, name, fe.tag_length);
+            filename[fe.tag_length] = '\0';
+
+            if (path_n < tcmh.tch.entry_count)
             {
-                logf("too big tagcache #2");
-                logf("tl: %" PRId32, fe->tag_length);
-                logf("bl: %ld", (long) bytesleft);
-                goto failure;
-            }
+                uint64_t key = path_key(filename);
 
-            p = fe->tag_data;
-            rc = read(fd, p, fe->tag_length);
-            p += rc;
-
-            if (rc != fe->tag_length)
-            {
-                logf("read error #13");
-                logf("rc=0x%04x", (unsigned int)rc); /* 0x431 */
-                logf("len=0x%04" PRIx32, fe->tag_length); /* 0x4000 */
-                logf("pos=0x%04lx", (unsigned long) lseek(fd, 0, SEEK_CUR)); /* 0x433 */
-                logf("tag=0x%02x", tag); /* 0x00 */
-                goto failure;
+                slots[path_n].key_lo = (uint32_t)key;
+                slots[path_n].key_hi = (uint32_t)(key >> 32);
+                slots[path_n].idx_id = idx_id;
+                path_n++;
             }
+            albums_note_path(idx_id, filename);
         }
 
         tcramcache.hdr->tag_size[tag] = p - tcramcache.hdr->tags[tag];
@@ -6520,10 +6621,11 @@ static bool load_tagcache(void)
 
     tc_stat.ramcache_used = tc_stat.ramcache_allocated - bytesleft;
     debug_log(DEBUG_LOG_TAGCACHE,
-              "load: %d entries, %d paths, %d albums, %d artists, %ld ms",
+              "load: %d entries, %d paths, %d albums, %d artists, %ld ms%s",
               (int)tcmh.tch.entry_count, path_n,
               tcramcache.hdr->album_count, tcramcache.hdr->artist_count,
-              (current_tick - load_start) * 1000 / HZ);
+              (current_tick - load_start) * 1000 / HZ,
+              dircache_held ? ", dircache held back" : "");
     logf("tagcache loaded into ram!");
     logf("utilization: %d%%", 100*tc_stat.ramcache_used / tc_stat.ramcache_allocated);
 
@@ -6547,6 +6649,10 @@ failure:
         close(fd);
 
     tcrc_buffer_unlock();
+
+    if (dircache_held)
+        dircache_resume();
+
     return ok;
 }
 

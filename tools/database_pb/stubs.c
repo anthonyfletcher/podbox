@@ -391,6 +391,10 @@ void dircache_wait(void)
 {
 }
 
+void dircache_suspend(void)
+{
+}
+
 int dircache_resume(void)
 {
     return 0;
