@@ -38,7 +38,6 @@
 #include "buffering.h"
 #include "dsp_core.h"
 #include "dsp_sample_io.h"
-#include "eq_cop.h"
 #include "metadata.h"
 #include "audio/codec_cop.h"
 #include "system/debug_log.h"
@@ -766,9 +765,6 @@ void INIT_ATTR codec_thread_init(void)
             IF_COP(, CPU));
     queue_enable_queue_send(&codec_queue, &codec_queue_sender_list,
                             codec_thread_id);
-
-    /* The EQ runs in this thread's DSP; its bands go to the COP */
-    eq_cop_init();
 }
 
 /* Obtain codec thread's current priority */

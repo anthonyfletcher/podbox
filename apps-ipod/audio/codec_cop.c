@@ -321,10 +321,6 @@ static void cop_pcmbuf_insert(const void *ch1, const void *ch2, int count)
         count -= n;
     }
     while (count > 0);
-
-    /* The equalizer's worker shares this core (eq_cop.c), and the host is
-       waiting on it for this very PCM */
-    yield();
 }
 
 static void cop_set_elapsed(unsigned long value)

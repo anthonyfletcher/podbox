@@ -18,7 +18,6 @@ dsp/dsp_sample_output.c
 dsp/dither.c
 dsp/eq.c
 dsp/eq_filter.c
-dsp/eq_cop.c
 dsp/resample.c
 dsp/pga.c
 # ifdef HAVE_PITCHCONTROL

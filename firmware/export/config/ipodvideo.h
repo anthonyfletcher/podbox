@@ -239,10 +239,10 @@
 
 #define HAVE_HARDWARE_CLICK
 
-/* The equalizer's worker on the COP, and one for a codec's run there, which
- * MP3's synthesis thread never runs beside. ROLO stops playback first, so
- * a sync from a screen whose loader holds a slot finds one free. 164 bytes
- * of core IRAM each. */
+/* One for a codec's run on the COP, or MP3's decoding thread there, which
+ * never run together; and one spare. ROLO stops playback first, so a sync
+ * from a screen whose loader holds a slot finds one free. 164 bytes of core
+ * IRAM each. */
 #ifndef BOOTLOADER
 #define TARGET_EXTRA_THREADS 2
 #endif

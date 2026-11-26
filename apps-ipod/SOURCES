@@ -163,7 +163,6 @@ screens/system/playlist_search.c
 screens/system/beat_debug.c
 screens/system/probe_debug.c
 #if NUM_CORES > 1 && (CONFIG_PLATFORM & PLATFORM_NATIVE)
-screens/system/eq_cop_check.c
 screens/system/codec_cop_check.c
 #endif
 screens/system/sound_scan.c

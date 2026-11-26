@@ -22,7 +22,6 @@
 #include "fixedpoint.h"
 #include "fracmul.h"
 #include "eq_filter.h"
-#include "eq_cop.h"
 #include "dsp_proc_entry.h"
 #include "dsp_core.h"
 #include "dsp_misc.h"
@@ -50,8 +49,6 @@ static struct eq_state
 {
     uint32_t enabled;                        /* Mask of enabled bands */
     uint8_t bands[EQ_NUM_BANDS+1];           /* Indexes of enabled bands */
-    /* Each band's filter type, beside the rest for the COP (eq_cop.c) */
-    uint8_t types[EQ_NUM_BANDS];
     struct dsp_filter filters[EQ_NUM_BANDS]; /* Data for each filter */
 } eq_data IBSS_ATTR;
 
@@ -64,18 +61,8 @@ static void eq_flush(void)
     if (eq_data.enabled == 0)
         return; /* Not initialized yet/no bands on */
 
-    eq_cop_lock();
     FOR_EACH_ENB_BAND(b)
         filter_flush(&eq_data.filters[*b]);
-    eq_cop_unlock();
-}
-
-/* Every enabled band over one block, on either core */
-static void eq_bands(int32_t * const buf[], int count, unsigned int channels)
-{
-    FOR_EACH_ENB_BAND(b)
-        eq_filter_process(&eq_data.filters[*b], eq_data.types[*b], buf,
-                          count, channels);
 }
 
 static void update_band_filter(int band, unsigned int fout)
@@ -92,10 +79,8 @@ static void update_samplerate(unsigned int fout)
     if (eq_data.enabled == 0)
         return; /* Not initialized yet/no bands on */
 
-    eq_cop_lock();
     FOR_EACH_ENB_BAND(b)
         update_band_filter(*b, fout);
-    eq_cop_unlock();
 }
 
 /** DSP interface **/
@@ -112,15 +97,12 @@ void dsp_set_eq_coefs(int band, const struct eq_band_setting *setting)
     if (band < 0 || band >= EQ_NUM_BANDS)
         return;
 
-    eq_cop_lock();
-
     /* A band's history means something different to each filter type */
     if (setting->type != settings[band].type)
         eq_filter_convert(&eq_data.filters[band], settings[band].type,
                           setting->type);
 
     settings[band] = *setting; /* cache setting */
-    eq_data.types[band] = setting->type;
 
     struct dsp_config *dsp = dsp_get_config(CODEC_IDX_AUDIO);
 
@@ -139,10 +121,7 @@ void dsp_set_eq_coefs(int band, const struct eq_band_setting *setting)
     }
 
     if (mask == eq_data.enabled)
-    {
-        eq_cop_unlock();
         return; /* No change in band-enable state */
-    }
 
     if (mask & BIT_N(band))
         filter_flush(&eq_data.filters[band]); /* Coming online */
@@ -158,8 +137,6 @@ void dsp_set_eq_coefs(int band, const struct eq_band_setting *setting)
         eq_data.bands[band] = (uint8_t)find_first_set_bit(mask);
 
     eq_data.bands[band] = EQ_NUM_BANDS;
-
-    eq_cop_unlock();
 }
 
 /* Enable or disable the equalizer */
@@ -185,46 +162,12 @@ static void eq_process(struct dsp_proc_entry *this,
     int count = buf->remcount;
     unsigned int channels = buf->format.num_channels;
 
-    eq_cop_lock();
-    if (!eq_cop_run(eq_bands, buf->p32, count, channels))
-        eq_bands(buf->p32, count, channels);
-    eq_cop_unlock();
+    FOR_EACH_ENB_BAND(b)
+        eq_filter_process(&eq_data.filters[*b], settings[*b].type, buf->p32,
+                          count, channels);
 
     (void)this;
 }
-
-#if NUM_CORES > 1 && (CONFIG_PLATFORM & PLATFORM_NATIVE)
-/* The two cores over the same input from the same, cleared, history, in
-   blocks as the DSP passes them; the live bands are put back after */
-bool dsp_eq_check_run(int32_t *buf[2], int count, bool on_cop)
-{
-    static struct dsp_filter saved[EQ_NUM_BANDS];
-    bool ran = true;
-
-    if (eq_data.enabled == 0)
-        return true; /* No band on, and no band list yet */
-
-    eq_cop_lock();
-    memcpy(saved, eq_data.filters, sizeof(saved));
-    FOR_EACH_ENB_BAND(b)
-        filter_flush(&eq_data.filters[*b]);
-
-    for (int done = 0; done < count && ran; done += EQ_CHECK_BLOCK)
-    {
-        int32_t *at[2] = { buf[0] + done, buf[1] + done };
-        int n = MIN(count - done, EQ_CHECK_BLOCK);
-
-        if (on_cop)
-            ran = eq_cop_run(eq_bands, at, n, 2);
-        else
-            eq_bands(at, n, 2);
-    }
-
-    memcpy(eq_data.filters, saved, sizeof(saved));
-    eq_cop_unlock();
-    return ran;
-}
-#endif
 
 /* DSP message hook */
 static intptr_t eq_configure(struct dsp_proc_entry *this,
