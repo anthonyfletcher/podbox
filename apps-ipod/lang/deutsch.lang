@@ -28226,6 +28226,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_CAROUSEL_REFLECTION
+  desc: in the Carousel settings menu -- the mirrored strip drawn under each cover
+  user: core
+  <source>
+    *: "Reflection"
+  </source>
+  <dest>
+    *: "Spiegelung"
+  </dest>
+  <voice>
+    *: "Spiegelung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_SHORT
+  desc: Carousel Reflection choice -- a shallow reflection
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "Kurz"
+  </dest>
+  <voice>
+    *: "Kurz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_TALL
+  desc: Carousel Reflection choice -- a deeper reflection
+  user: core
+  <source>
+    *: "Tall"
+  </source>
+  <dest>
+    *: "Lang"
+  </dest>
+  <voice>
+    *: "Lang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_FEATURED_ART
+  desc: in Settings, art rows on the Featured Artists list
+  user: core
+  <source>
+    *: "Featured Artist Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen: Gastkünstler"
+  </dest>
+  <voice>
+    *: "Bildzeilen für Gastkünstler"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_ON_REPEAT
   desc: playlist catalogue row and setting -- the most played tracks of a recent span
   user: core
@@ -28321,5 +28377,36 @@
   </dest>
   <voice>
     *: "Erst die Uhr stellen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CODEC_SUPPLY_FULL
+  desc: in sound settings, iPod Video: power the audio chip at 3.0 V
+  user: core
+  <source>
+    *: none
+    codec_supply: "Full Codec Voltage"
+  </source>
+  <dest>
+    *: none
+    codec_supply: "Volle Codec-Spannung"
+  </dest>
+  <voice>
+    *: none
+    codec_supply: "Volle Codec-Spannung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_WHEEL_GLIDE
+  desc: in carousel settings: a flick of the wheel coasts on
+  user: core
+  <source>
+    *: "Wheel Glide"
+  </source>
+  <dest>
+    *: "Rad-Nachlauf"
+  </dest>
+  <voice>
+    *: "Rad-Nachlauf"
   </voice>
 </phrase>

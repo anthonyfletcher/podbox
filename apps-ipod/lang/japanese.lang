@@ -28214,6 +28214,62 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_CAROUSEL_REFLECTION
+  desc: in the Carousel settings menu -- the mirrored strip drawn under each cover
+  user: core
+  <source>
+    *: "Reflection"
+  </source>
+  <dest>
+    *: "反射"
+  </dest>
+  <voice>
+    *: "反射"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_SHORT
+  desc: Carousel Reflection choice -- a shallow reflection
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "短い"
+  </dest>
+  <voice>
+    *: "短い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_REFLECTION_TALL
+  desc: Carousel Reflection choice -- a deeper reflection
+  user: core
+  <source>
+    *: "Tall"
+  </source>
+  <dest>
+    *: "長い"
+  </dest>
+  <voice>
+    *: "長い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_FEATURED_ART
+  desc: in Settings, art rows on the Featured Artists list
+  user: core
+  <source>
+    *: "Featured Artist Art Rows"
+  </source>
+  <dest>
+    *: "参加アーティスト行のアート"
+  </dest>
+  <voice>
+    *: "参加アーティスト行のアート"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_ON_REPEAT
   desc: playlist catalogue row and setting -- the most played tracks of a recent span
   user: core
@@ -28309,5 +28365,36 @@
   </dest>
   <voice>
     *: "先に時計を設定してください"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CODEC_SUPPLY_FULL
+  desc: in sound settings, iPod Video: power the audio chip at 3.0 V
+  user: core
+  <source>
+    *: none
+    codec_supply: "Full Codec Voltage"
+  </source>
+  <dest>
+    *: none
+    codec_supply: "コーデック最大電圧"
+  </dest>
+  <voice>
+    *: none
+    codec_supply: "コーデック最大電圧"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_WHEEL_GLIDE
+  desc: in carousel settings: a flick of the wheel coasts on
+  user: core
+  <source>
+    *: "Wheel Glide"
+  </source>
+  <dest>
+    *: "ホイールの慣性スクロール"
+  </dest>
+  <voice>
+    *: "ホイールの慣性スクロール"
   </voice>
 </phrase>
