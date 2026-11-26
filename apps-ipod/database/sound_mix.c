@@ -1839,6 +1839,47 @@ int sound_mix_reorder(struct playlist_info *playlist)
     return missed;
 }
 
+int sound_mix_order_keys(uint64_t *keys, int n)
+{
+    static uint8_t  have[SOUND_MIX_MAX];
+    static int16_t  order[SOUND_MIX_MAX];
+    static uint64_t was[SOUND_MIX_MAX];
+    struct sound_index_reader r;
+    struct sound_record rec;
+    int placed = 0;
+    int i;
+
+    if (n < 2 || n > SOUND_MIX_MAX || !sound_index_exists())
+        return 0;
+
+    mix_lock();
+    if (sound_index_reader_open(&r) == SOUND_OK)
+    {
+        for (i = 0; i < n; i++)
+        {
+            have[i] = sound_index_find(&r, keys[i], &rec)
+                      && sound_record_usable(&rec);
+            if (have[i])
+            {
+                sound_mix_axes(&rec, &cand_ax[i]);
+                placed++;
+            }
+        }
+        sound_index_reader_close(&r);
+
+        if (placed > 0 && sound_mix_chain(cand_ax, have, n, 0, order) == n)
+        {
+            memcpy(was, keys, n * sizeof (*keys));
+            for (i = 0; i < n; i++)
+                keys[i] = was[order[i]];
+        }
+        else
+            placed = 0;
+    }
+    mutex_unlock(&mix_mutex);
+    return placed;
+}
+
 int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
                          int want)
 {

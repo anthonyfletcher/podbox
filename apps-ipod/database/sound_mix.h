@@ -212,6 +212,11 @@ int sound_mix_chain(const struct sound_axes *ax, const uint8_t *have,
  * is refused rather than reordered in part. */
 int sound_mix_reorder(struct playlist_info *playlist);
 
+/* Put a list of path_key()s into that order, in place, led by keys[0]. At
+ * most SOUND_MIX_MAX; a longer list, or one the index has nothing for, is
+ * left as it was. Returns how many were placed by how they sound. */
+int sound_mix_order_keys(uint64_t *keys, int n);
+
 /* Forget what built the current playlist. Called where a playlist is created,
  * which is the moment the terms behind the old one stop applying. */
 void sound_mix_forget(void);

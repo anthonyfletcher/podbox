@@ -469,17 +469,18 @@ Adding a folder to a playlist also adds everything in its subfolders.
 
 [on repeat]
 Which plays On Repeat counts. Weekly uses last week's and keeps the same
-playlist all week, changing when the Weekly moods do. Monthly uses last
-month's and keeps it all month. Rolling uses the seven days up to now, so it
-can change every time.
+tracks all week, changing when the Weekly moods do. Monthly uses last month's
+and keeps them all month. Rolling uses the seven days up to now, so it can
+change every time.
 
 On Repeat is on the Playlists screen, above the saved playlists, and in a
 car's or dock's playlists, whenever there is something in it. It is read from
 Playback > Logging, so it knows nothing played while that was off.
 
 [on repeat length]
-The most tracks On Repeat holds, most played first unless Shuffle is on. A
-quiet week gives fewer.
+The most tracks On Repeat holds; a quiet week gives fewer. They play in a new
+order each time, shuffled -- or with the Playlist Engine on and Shuffle off,
+from a random first track with each followed by one that sounds like it.
 
 [warn when erasing dynamic playlist]
 Asks before replacing a queue you have built up by hand, which is otherwise

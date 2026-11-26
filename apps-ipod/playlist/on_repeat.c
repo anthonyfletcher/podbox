@@ -18,13 +18,14 @@
  * Parts, in order:
  *   - the span each setting names
  *   - what was last worked out
- *   - counting and ranking
+ *   - counting, ranking and ordering
  *   - whether there is anything to offer
  *   - playing it
  ****************************************************************************/
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "config.h"
 #include "system.h"
 #include "kernel.h"
@@ -36,6 +37,7 @@
 #include "database/path_key.h"
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
+#include "database/sound_mix.h"
 #include "playlist/playlist.h"
 #include "playlist/on_repeat.h"
 #include "audio/playback.h"
@@ -184,7 +186,7 @@ static void remember(bool any, unsigned long from, long day,
     seen.log_size = log_size;
 }
 
-/** Counting and ranking **/
+/** Counting, ranking and ordering **/
 
 static void count_cb(const struct pv_entry *e, void *ctx)
 {
@@ -257,6 +259,29 @@ static struct rep_slot *rep_best(void)
     return best;
 }
 
+/* The ranking decides which tracks are in, not the order they play in: a
+ * finished span holds the same tracks every time, so rank order would be the
+ * same playlist every time. Shuffled, and with the engine on, chained by sound
+ * from the shuffle's first track. */
+static void rep_order(uint64_t *keys, int n)
+{
+    int i;
+
+    if (n < 2)
+        return;
+    srand((unsigned)current_tick);
+    for (i = n - 1; i > 0; i--)
+    {
+        int j = rand() % (i + 1);
+        uint64_t k = keys[i];
+
+        keys[i] = keys[j];
+        keys[j] = k;
+    }
+    if (global_settings.playlist_engine)
+        sound_mix_order_keys(keys, n);
+}
+
 int on_repeat_keys(uint64_t *keys, int max, const volatile bool *stop)
 {
     struct rep_slot *s;
@@ -309,6 +334,7 @@ int on_repeat_keys(uint64_t *keys, int max, const volatile bool *stop)
 
     busy = false;
     mutex_unlock(&rep_mutex);
+    rep_order(keys, n);
     return n;
 }
 

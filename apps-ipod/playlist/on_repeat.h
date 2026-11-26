@@ -14,8 +14,9 @@
 #define ON_REPEAT_MAX 100
 
 /* The most played tracks of the span the On Repeat setting names, as
- * path_key()s of tracks the database holds, best first, at most 'max' of
- * them. Leaves out books and podcasts kept apart from the music. Reads the
+ * path_key()s of tracks the database holds, at most 'max' of them, in a new
+ * shuffled order each call -- chained by sound when the playlist engine is
+ * on. Leaves out books and podcasts kept apart from the music. Reads the
  * playback log, so seconds on a cold disk; callable from any thread, and a
  * second caller waits for the first. The read ends early once *stop turns
  * true; stop may be NULL. Returns how many, 0 without reading while the
