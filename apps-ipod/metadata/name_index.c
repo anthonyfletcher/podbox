@@ -71,6 +71,7 @@
 #define NI_RUNS_MAX     128
 #define NI_MENTIONS_MAX (NI_RUNS_MAX * NI_RUN)
 #define NI_FENCE        256         /* records from one fence to the next */
+#define NI_FENCES(n)    (((n) + NI_FENCE - 1) / NI_FENCE)   /* of n records */
 #define NI_FENCES_MAX   (NI_MENTIONS_MAX / NI_FENCE)
 #define NI_HEADS_MAX    0xfffe      /* a file's headings: a section is 16 bits */
 #define NI_CHUNK        2048
@@ -296,6 +297,19 @@ static void ni_copy(struct ni_out *o, int fd, uint32_t off, uint32_t len,
     }
 }
 
+/* The first `len` bytes of the file at `path` copied to the index through
+ * the merge's memory; false when it cannot be opened */
+static bool ni_copy_file(struct ni_work *w, const char *path, uint32_t len)
+{
+    int fd = open(path, O_RDONLY);
+
+    if (fd < 0)
+        return false;
+    ni_copy(&w->out, fd, 0, len, w->u.merge, sizeof(w->u));
+    close(fd);
+    return true;
+}
+
 static void ni_pad(struct ni_out *o)
 {
     static const char zero[3];
@@ -316,6 +330,13 @@ static int ni_compare(const void *a, const void *b)
 {
     return ni_order(&((const struct ni_entry *)a)->m,
                     &((const struct ni_entry *)b)->m);
+}
+
+/* Where a run's mentions start in NI_RUNS_FILE, after its files and albums */
+static uint32_t ni_run_mentions(const struct ni_run *run)
+{
+    return run->off + run->nfiles * sizeof(struct name_file)
+           + run->nalbums * sizeof(uint16_t);
 }
 
 /* The run read so far into NI_RUNS_FILE, sorted; false when there is no
@@ -347,9 +368,7 @@ static bool ni_flush_run(struct ni_work *w, bool last)
         ni_put(&w->runfile, &len, 1);
         ni_put(&w->runfile, w->u.r.pool + e->name, len);
     }
-    run->bytes = w->runfile.total - run->off
-                 - w->nfiles * sizeof(w->u.r.files[0])
-                 - w->nalbums * sizeof(uint16_t);
+    run->bytes = w->runfile.total - ni_run_mentions(run);
     w->count = w->nfiles = w->nalbums = 0;
     w->used = 0;
     return true;
@@ -554,9 +573,7 @@ static bool ni_merge(struct ni_work *w, int fd, uint32_t *nmentions,
         return false;
     for (i = 0; i < w->nruns; i++)
     {
-        r[i].pos = w->runs[i].off
-                   + w->runs[i].nfiles * sizeof(struct name_file)
-                   + w->runs[i].nalbums * sizeof(uint16_t);
+        r[i].pos = ni_run_mentions(&w->runs[i]);
         r[i].end = r[i].pos + w->runs[i].bytes;
         r[i].buf = buf + i * size;
         r[i].size = size;
@@ -647,8 +664,8 @@ static bool ni_write(struct ni_work *w, uint32_t text_fp, uint32_t img_fp)
     for (i = 0; i < w->nruns; i++)
         t.nalbums += w->runs[i].nalbums;
     t.nnames = nnames;
-    t.nmfence = (nmentions + NI_FENCE - 1) / NI_FENCE;
-    t.nnfence = (nnames + NI_FENCE - 1) / NI_FENCE;
+    t.nmfence = NI_FENCES(nmentions);
+    t.nnfence = NI_FENCES(nnames);
     t.pool = w->pool.total;
     ni_put(&w->out, &t, sizeof(t));
     ni_put(&w->out, w->mfence, t.nmfence * sizeof(uint32_t));
@@ -664,21 +681,8 @@ static bool ni_write(struct ni_work *w, uint32_t text_fp, uint32_t img_fp)
                 w->u.merge, sizeof(w->u));
     ni_pad(&w->out);
     close(fd);
-    if (ok && (fd = open(NI_NAMES_FILE, O_RDONLY)) >= 0)
-    {
-        ni_copy(&w->out, fd, 0, nnames * sizeof(struct ni_name),
-                w->u.merge, sizeof(w->u));
-        close(fd);
-    }
-    else
-        ok = false;
-    if (ok && (fd = open(NI_POOL_FILE, O_RDONLY)) >= 0)
-    {
-        ni_copy(&w->out, fd, 0, t.pool, w->u.merge, sizeof(w->u));
-        close(fd);
-    }
-    else
-        ok = false;
+    ok = ok && ni_copy_file(w, NI_NAMES_FILE, nnames * sizeof(struct ni_name));
+    ok = ok && ni_copy_file(w, NI_POOL_FILE, t.pool);
     ni_pad(&w->out);
     ni_flush(&w->out);
     ok = libfile_finish(&lw, ok && w->out.ok);
@@ -720,12 +724,8 @@ static bool ni_build(struct ni_work *w, uint32_t text_fp, uint32_t img_fp)
             done = false;
             break;
         }
-        if (w->files == NI_FILES_MAX)
-        {
-            w->full = true;
-            break;
-        }
-        if (w->nfiles == NI_RUN_FILES && !ni_flush_run(w, false))
+        if (w->files == NI_FILES_MAX
+            || (w->nfiles == NI_RUN_FILES && !ni_flush_run(w, false)))
         {
             w->full = true;
             break;
@@ -959,8 +959,8 @@ static bool ni_layout(struct name_index *ix, uint32_t count,
 {
     if (t->nfiles > NI_FILES_MAX || t->nalbums > t->nfiles
         || t->nnames > count
-        || t->nmfence != (count + NI_FENCE - 1) / NI_FENCE
-        || t->nnfence != (t->nnames + NI_FENCE - 1) / NI_FENCE
+        || t->nmfence != NI_FENCES(count)
+        || t->nnfence != NI_FENCES(t->nnames)
         || t->pool > ix->size)
         return false;
     ix->count = count;
@@ -1064,7 +1064,7 @@ void name_index_close(struct name_index *ix)
 uint32_t name_index_first(struct name_index *ix, uint32_t key)
 {
     return ni_lower(ix, ix->mentions, ix->count, sizeof(struct name_mention),
-                    ix->mfence, (ix->count + NI_FENCE - 1) / NI_FENCE, key);
+                    ix->mfence, NI_FENCES(ix->count), key);
 }
 
 bool name_index_mention(struct name_index *ix, uint32_t i,
@@ -1142,7 +1142,7 @@ bool name_index_section(struct name_index *ix, const struct name_file *f,
 static bool ni_name(struct name_index *ix, uint32_t key, struct ni_name *nm)
 {
     uint32_t i = ni_lower(ix, ix->names, ix->nnames, sizeof(*nm), ix->nfence,
-                          (ix->nnames + NI_FENCE - 1) / NI_FENCE, key);
+                          NI_FENCES(ix->nnames), key);
 
     return i < ix->nnames
            && ni_read(ix, ix->names + i * sizeof(*nm), nm, sizeof(*nm))

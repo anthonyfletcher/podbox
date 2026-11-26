@@ -533,9 +533,9 @@ bool art_cache_load_aat_multi(int fd, struct bitmap *const *bms, int n)
     sw = hdr.width;
     sh = hdr.height;
     /* Both dimensions, not just the one that sizes aat_sx[]. sh drives
-     * the row arithmetic below, and a header claiming a huge height
-     * overflows dy * sh, which can leave sy1 behind sy0 -- `rows` is then
-     * negative, and read() takes it as a size_t. 300 is the largest the
+     * aat_rows(), and a header claiming a huge height overflows dy * sh,
+     * giving a negative row count that the window check below passes and
+     * aat_avg_row() then indexes aat_recip[] with. 300 is the largest the
      * cache ever writes. A source too elongated to crop is stored
      * non-square, and is refused: scaling it would stretch it. */
     if (sw <= 0 || sh <= 0 || sw > ART_CACHE_MAX_DIM ||
@@ -2660,6 +2660,10 @@ static void aa_people_spare(bool *aborted)
         aa_unreached = true;
         return;
     }
+    /* Featured Artists' guests are known only from a table built from the
+     * RAM copy, so their pictures are not spared here: the sweep must wait */
+    if (aa_central_people() && global_settings.featured_artists)
+        aa_unreached = true;
     if (!tagcache_search(&tcs, tag_albumartist))
     {
         aa_unreached = true;

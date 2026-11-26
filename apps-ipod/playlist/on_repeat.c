@@ -211,6 +211,10 @@ static void count_cb(const struct pv_entry *e, void *ctx)
             least = s;
     }
 
+    /* A book or podcast kept apart takes no slot from the music */
+    if (pv_names_kept_apart_idx(tagcache_find_key(key)))
+        return;
+
     if (used < REP_SLOTS)
     {
         s = &slots[used++];
@@ -266,6 +270,13 @@ int on_repeat_keys(uint64_t *keys, int max, const volatile bool *stop)
     {
         mutex_unlock(&rep_mutex);
         return -1;
+    }
+    /* Without the RAM copy no key is found, and that "nothing" would be
+     * remembered past the load */
+    if (!tagcache_is_in_ram())
+    {
+        mutex_unlock(&rep_mutex);
+        return 0;
     }
     busy = true;
 
@@ -348,6 +359,17 @@ bool on_repeat_offered(bool may_read)
 
 /** Playing it **/
 
+/* The file of 'key', when it is still there */
+static bool rep_path(struct tagcache_search *tcs, uint64_t key, char *path,
+                     size_t size)
+{
+    int idx = tagcache_find_key(key);
+
+    return idx >= 0
+           && tagcache_retrieve(tcs, idx, tag_filename, path, size)
+           && file_exists(path);
+}
+
 static bool rep_start(const uint64_t *keys, int n)
 {
     struct playlist_insert_context context;
@@ -357,7 +379,10 @@ static bool rep_start(const uint64_t *keys, int n)
 
     if (!tagcache_search(&tcs, tag_filename))
         return false;
-    if (playlist_create(NULL, NULL) < 0)
+    /* The playlist is replaced only once there is a track to put in it */
+    for (i = 0; i < n && !rep_path(&tcs, keys[i], path, sizeof(path)); i++)
+        ;
+    if (i == n || playlist_create(NULL, NULL) < 0)
     {
         tagcache_search_finish(&tcs);
         return false;
@@ -366,14 +391,10 @@ static bool rep_start(const uint64_t *keys, int n)
     if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
                                        false, false) >= 0)
     {
-        for (i = 0; i < n; i++)
+        /* 'path' already holds keys[i]'s */
+        for (; i < n; i++)
         {
-            int idx = tagcache_find_key(keys[i]);
-
-            if (idx < 0
-                || !tagcache_retrieve(&tcs, idx, tag_filename, path,
-                                      sizeof(path))
-                || !file_exists(path))
+            if (added > 0 && !rep_path(&tcs, keys[i], path, sizeof(path)))
                 continue;
             if (playlist_insert_context_add(&context, path) < 0)
                 break;
@@ -414,7 +435,8 @@ int on_repeat_play(void)
     }
     if (n == 0)
     {
-        splash(HZ * 2, global_settings.playback_log
+        splash(HZ * 2, !tagcache_is_in_ram() ? ID2P(LANG_TAGCACHE_BUSY)
+                       : global_settings.playback_log
                        ? ID2P(LANG_ON_REPEAT_NONE)
                        : ID2P(LANG_ON_REPEAT_NO_LOG));
         return GO_TO_PREVIOUS;

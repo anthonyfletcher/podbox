@@ -308,6 +308,7 @@ void backlight_set_fade_out(int value) { (void)value; }
 void backlight_set_on_button_hold(int index) { (void)index; }
 void backlight_set_timeout(int value) { (void)value; }
 void backlight_set_timeout_plugged(int value) { (void)value; }
+void codec_supply_set(bool full) { (void)full; }
 
 bool context_hidden_is_changed(void *setting, void *defaultval)
 {

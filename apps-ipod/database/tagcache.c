@@ -1138,6 +1138,7 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
         const struct index_entry *e = &hdr->indices[scratch[i]];
         long plays = e->tag_seek[tag_playcount];
         long track = e->tag_seek[tag_tracknumber];
+        uint32_t series = FLAG_SERIES(e->flag);
 
         if (r < 0 || rows[r].album_seek != e->tag_seek[tag_album]
             || rows[r].artist_seek != e->tag_seek[tag_albumartist])
@@ -1165,10 +1166,8 @@ static bool albums_group(int32_t *scratch, int entries, char **pp,
         }
         if (e->tag_seek[tag_year] > rows[r].year)
             rows[r].year = e->tag_seek[tag_year];
-        if (FLAG_SERIES(e->flag) && (!rows[r].series_part
-                                     || FLAG_SERIES(e->flag)
-                                        < rows[r].series_part))
-            rows[r].series_part = FLAG_SERIES(e->flag);
+        if (series && (!rows[r].series_part || series < rows[r].series_part))
+            rows[r].series_part = series;
         if (plays > 0)
         {
             rows[r].playcount += plays;
@@ -6166,6 +6165,8 @@ static size_t ramcache_size(struct master_header *tcmh)
         return 0;
 
     close(fd);
+    if (tcmh->tch.entry_count < 0)
+        return 0;
 
     size_t size = tcmh->tch.datasize + 256 + TAGCACHE_RESERVE +
         sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
@@ -6386,7 +6387,7 @@ static bool load_tagcache(void)
 
     struct master_header tcmh;
     if (read_master_header(fd, &tcmh) != sizeof(struct master_header) ||
-        tcmh.tch.magic != TAGCACHE_MAGIC)
+        tcmh.tch.magic != TAGCACHE_MAGIC || tcmh.tch.entry_count < 0)
     {
         logf("incorrect header");
         goto failure;

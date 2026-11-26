@@ -86,7 +86,7 @@ long pv_log_read_range_stop(enum pv_source src, unsigned long from,
 
 /* An offset to read from with pv_log_read_range() that misses no entry dated
  * 'ts' or later: the start of the last file of the family whose first dated
- * entry is earlier. Costs an open and one buffer's read per file. */
+ * entry is earlier. Costs an open and a 512-byte read per file. */
 unsigned long pv_log_offset_since(enum pv_source src, unsigned long ts);
 
 /* What 'src' holds, without reading any of it. Sizes only, so this is an open

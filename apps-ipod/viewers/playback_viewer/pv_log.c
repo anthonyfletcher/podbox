@@ -358,11 +358,15 @@ enum pv_source pv_log_pick_source(void)
     return found ? PV_SRC_PLAYBACK : PV_SRC_NONE;
 }
 
-/* The first dated entry among the opening bytes of 'fd', or 0 when none of
- * them carries one. Reads into rd_buf, which is free while no reader runs. */
+#define PV_FIRST_SZ 512
+
+/* The first dated entry among the first PV_FIRST_SZ bytes of 'fd', or 0 when
+ * none of them carries one, which has the caller read the file whole. A date
+ * opens its line, and one the read cuts short is too small to count. Reads
+ * into rd_buf, which is free while no reader runs. */
 static unsigned long file_first_ts(int fd)
 {
-    int len = read(fd, rd_buf, sizeof(rd_buf) - 1);
+    int len = read(fd, rd_buf, PV_FIRST_SZ);
     char *p = rd_buf;
 
     if (len <= 0)
@@ -383,42 +387,46 @@ static unsigned long file_first_ts(int fd)
     return 0;
 }
 
+/* Whether the file open on 'fd' starts before 'ts', moving 'at' to its start
+ * when it does; 'total' is where it starts. Closes 'fd'. A file that starts
+ * at or after 'ts' holds nothing earlier, and neither does anything after
+ * it. */
+static bool starts_before(int fd, unsigned long ts, unsigned long *at,
+                          unsigned long *total)
+{
+    unsigned long sz = (unsigned long)ffilesize(fd);
+    unsigned long first = file_first_ts(fd);
+
+    close(fd);
+    if (first >= ts)
+        return false;
+    *at = *total;
+    *total += sz;
+    return true;
+}
+
 unsigned long pv_log_offset_since(enum pv_source src, unsigned long ts)
 {
     unsigned long at = 0, total = 0;
     char path[MAX_PATH];
-    int n, fd;
+    bool more = true;
+    int fd;
 
     if (src == PV_SRC_NONE)
         return 0;
 
     rd_lock();     /* file_first_ts() reads into rd_buf */
-    for (n = 1; n <= PV_LOG_MAX_NUMBERED + 1; n++)
+    for (int n = 1; more && n <= PV_LOG_MAX_NUMBERED; n++)
     {
-        unsigned long first, sz;
-
-        if (n <= PV_LOG_MAX_NUMBERED)
-            snprintf(path, sizeof(path), "%s_%04d.log", PV_LOG_STEM, n);
-        fd = open(n <= PV_LOG_MAX_NUMBERED ? path : PV_LOG_PATH, O_RDONLY);
+        snprintf(path, sizeof(path), "%s_%04d.log", PV_LOG_STEM, n);
+        fd = open(path, O_RDONLY);
         if (fd < 0)
-        {
-            if (n > PV_LOG_MAX_NUMBERED)
-                break;
-            n = PV_LOG_MAX_NUMBERED;    /* numbered run ended: the live log */
-            continue;
-        }
-
-        sz = (unsigned long)ffilesize(fd);
-        first = file_first_ts(fd);
-        close(fd);
-
-        /* A file that starts at or after 'ts' holds nothing earlier, and
-         * neither does anything after it */
-        if (first >= ts)
             break;
-        at = total;
-        total += sz;
+        more = starts_before(fd, ts, &at, &total);
     }
+
+    if (more && (fd = open(PV_LOG_PATH, O_RDONLY)) >= 0)
+        starts_before(fd, ts, &at, &total);
     rd_unlock();
     return at;
 }

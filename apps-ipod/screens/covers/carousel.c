@@ -3179,7 +3179,26 @@ static void show_next_slide(void)
     }
 }
 
-static void spin_to(int pick);
+/* Spin to slide 'pick', as a random pick or a jump does: a cut to a few
+ * covers short of it, by Random Spin Length, and a fast scroll the rest. */
+static void spin_to(int pick)
+{
+    int spin = pf_random_spin[global_settings.album_covers_random_spin
+                              % ARRAYLEN(pf_random_spin)];
+    int from = (pick > center_index) ? MAX(center_index, pick - spin)
+                                     : MIN(center_index, pick + spin);
+
+    if (from != center_index)
+        set_current_slide(from);
+    target = pick;
+
+    /* Paced as a fast flick, so the flat view snaps the covers going past and
+     * deals the last few, rather than dealing every one at a browsing pace. */
+    pf_flat_last_input = current_tick;
+    pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
+    start_animation();
+    pf_random_spinning = true;
+}
 
 static bool random_was_recent(int index, int depth)
 {
@@ -3219,27 +3238,6 @@ static void show_random_slide(void)
         pf_random_count++;
 
     spin_to(pick);
-}
-
-/* Spin to slide 'pick', as a random pick or a jump does: a cut to a few
- * covers short of it, by Random Spin Length, and a fast scroll the rest. */
-static void spin_to(int pick)
-{
-    int spin = pf_random_spin[global_settings.album_covers_random_spin
-                              % ARRAYLEN(pf_random_spin)];
-    int from = (pick > center_index) ? MAX(center_index, pick - spin)
-                                     : MIN(center_index, pick + spin);
-
-    if (from != center_index)
-        set_current_slide(from);
-    target = pick;
-
-    /* Paced as a fast flick, so the flat view snaps the covers going past and
-     * deals the last few, rather than dealing every one at a browsing pace. */
-    pf_flat_last_input = current_tick;
-    pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
-    start_animation();
-    pf_random_spinning = true;
 }
 
 /* Wheel Glide's feel. A flick's speed in covers a second, carried on for

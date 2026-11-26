@@ -71,8 +71,10 @@ static int pair_ct;
 static int titles_scanned;
 static bool truncated;
 /* While a build fills the table, which yields: the UI thread and the art
- * cache's pass both build it, and the other one is told it is empty */
+ * cache's pass both build it. db_featured_ensure() on the other thread waits
+ * for it; every other reader is told the table is empty. */
 static bool building;
+static unsigned int builder;        /* the thread building, while 'building' */
 
 /* The build runs on the UI thread or in the art cache's pass and, from RAM,
  * never blocks; this hands the processor round every HZ/25 so playback and
@@ -471,6 +473,7 @@ bool db_featured_build(void)
         return false;
 
     building = true;
+    builder = thread_self();
     cpu_boost(true);
 
     /* The user's names first: the set is capped, and the album artists
@@ -498,8 +501,8 @@ void db_featured_ensure(void)
 {
     struct tagcache_marks now;
 
-    if (building)
-        return;                 /* the other thread's build, under way */
+    while (building && builder != thread_self())
+        sleep(1);               /* the other thread's build, under way */
     if (!global_settings.featured_artists)
     {
         /* The setting can go off while the table is standing, and the rows

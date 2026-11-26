@@ -2221,12 +2221,54 @@ static void art_log_result(int hid)
     debug_log_sync(DEBUG_LOG_PLAYBACK, "art: failed, %s", why);
 }
 
+/* The current track's cache art, reserved on the buffer and filled once its
+ * codec has made the first audio, or after ART_FILL_WAIT: the codec needs the
+ * audio handle, which is placed after the art, and the disk to itself. n is 0
+ * when nothing waits. */
+#define ART_FILL_WAIT (HZ*4/10)
+static struct
+{
+    int n;
+    int self_hid;                       /* the track's */
+    int slot[ART_CACHE_MULTI_MAX];
+    int hid[ART_CACHE_MULTI_MAX];
+    char path[MAX_PATH];
+    long due;                           /* tick to fill by */
+    bool refill;                        /* a Q_AUDIO_FILL_BUFFER held back */
+} art_fill;
+static volatile bool art_fill_wait_pcm; /* the codec's first audio posts */
+
+/* Whether hid is reserved art not yet filled, which no track may be given */
+static bool art_fill_waiting(int hid)
+{
+    for (int k = 0; k < art_fill.n; k++)
+        if (art_fill.hid[k] == hid)
+            return true;
+    return false;
+}
+
+/* Close the waiting art unfilled, for a track that has gone or a stop. Only
+ * the folder cache holds the handles besides art_fill. */
+static void art_fill_abandon(void)
+{
+    for (int k = 0; k < art_fill.n; k++)
+    {
+        if (last_folder_aa_hid[art_fill.slot[k]] == art_fill.hid[k])
+            last_folder_aa_hid[art_fill.slot[k]] = 0;
+        buf_pin_handle(art_fill.hid[k], false);
+        bufclose(art_fill.hid[k]);
+    }
+    art_fill.n = 0;
+    art_fill_wait_pcm = false;
+}
+
 static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user_data, bool is_current_track, int i)
 {
     user_data->embedded_albumart = NULL;
 
     bool same_path = strcmp(last_folder_aa_path, path) == 0;
-    if (same_path && last_folder_aa_hid[i] != 0)
+    if (same_path && last_folder_aa_hid[i] != 0 &&
+        !art_fill_waiting(last_folder_aa_hid[i]))
         return last_folder_aa_hid[i];
 
     /* To simplify caching logic a bit we keep track only for first AA path */
@@ -2247,22 +2289,26 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
     return hid;
 }
 
-/* The current track's cache art, reserved on the buffer and filled once its
- * codec has made the first audio, or after ART_FILL_WAIT: the codec needs the
- * audio handle, which is placed after the art, and the disk to itself. n is 0
- * when nothing waits. */
-#define ART_FILL_WAIT (HZ*4/10)
-static struct
+/* Whether the thumbnail at 'path' can make each of the n sizes in ud, by its
+ * header: what art_cache_load_aat_multi() refuses before reading the pixels */
+static bool aat_makes_sizes(const char *path,
+                            const struct bufopen_bitmap_data *ud, int n)
 {
-    int n;
-    int self_hid;                       /* the track's */
-    int slot[ART_CACHE_MULTI_MAX];
-    int hid[ART_CACHE_MULTI_MAX];
-    char path[MAX_PATH];
-    long due;                           /* tick to fill by */
-    bool refill;                        /* a Q_AUDIO_FILL_BUFFER held back */
-} art_fill;
-static volatile bool art_fill_wait_pcm; /* the codec's first audio posts */
+    struct art_cache_header hdr;
+    int fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return false;
+    bool ok = read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr);
+    close(fd);
+
+    ok = ok && hdr.magic == ART_CACHE_MAGIC &&
+         hdr.version == ART_CACHE_FORMAT_VERSION && hdr.layout == AA_ROWS &&
+         hdr.width == hdr.height && hdr.width <= ART_CACHE_MAX_DIM;
+    for (int k = 0; ok && k < n; k++)
+        ok = ud[k].dim->width > 0 && ud[k].dim->height > 0 &&
+             ud[k].dim->width <= hdr.width && ud[k].dim->height <= hdr.height;
+    return ok;
+}
 
 /* Slot i's art from the cache thumbnail at 'path', and with it every later
  * slot still waiting for art, which takes the same thumbnail: one read of the
@@ -2277,10 +2323,15 @@ static int load_cached_art_slots(char *path,
     struct bufopen_bitmap_data ud[ART_CACHE_MULTI_MAX];
     struct bufopen_bitmap_data *udp[ART_CACHE_MULTI_MAX];
     int slot[ART_CACHE_MULTI_MAX], hids[ART_CACHE_MULTI_MAX];
-    bool same_path = strcmp(last_folder_aa_path, path) == 0;
     int n = 0;
 
-    if (same_path && last_folder_aa_hid[i] != 0)
+    /* One left by a track since cleared from the list */
+    if (art_fill.n && !track_buf_info_get(art_fill.self_hid))
+        art_fill_abandon();
+
+    bool same_path = strcmp(last_folder_aa_path, path) == 0;
+    if (same_path && last_folder_aa_hid[i] != 0 &&
+        !art_fill_waiting(last_folder_aa_hid[i]))
         return last_folder_aa_hid[i];
 
     ud[0] = *user_data;
@@ -2296,17 +2347,11 @@ static int load_cached_art_slots(char *path,
         ud[n].embedded_albumart = NULL;
         slot[n++] = j;
     }
-    /* One left by a track since cleared from the list: its handles went */
-    if (art_fill.n && !track_buf_info_get(art_fill.self_hid))
-        art_fill.n = 0;
 
     /* Deferred, a failure would come too late for the other sources: only
      * sizes the thumbnail can make, which leaves a damaged file */
-    bool defer = is_current_track && art_fill.n == 0;
-    for (int k = 0; k < n; k++)
-        if (ud[k].dim->width > ART_CACHE_MAX_DIM ||
-            ud[k].dim->height > ART_CACHE_MAX_DIM)
-            defer = false;
+    bool defer = is_current_track && art_fill.n == 0 &&
+                 aat_makes_sizes(path, ud, n);
     if (n == 1 && !defer)
         return load_album_art_from_path(path, user_data, is_current_track, i);
 
@@ -2377,12 +2422,12 @@ static void art_fill_now(struct track_info *infop)
     struct track_info *ti = infop;
     if (!ti || ti->self_hid != art_fill.self_hid)
     {
-        /* Cleared from the list, handles and all: whatever reset that is
-           buffers afresh */
+        /* Cleared from the list: the art goes with it, and whatever reset
+           that is buffers afresh */
         struct track_buf_info *tbip = track_buf_info_get(art_fill.self_hid);
         if (!tbip)
         {
-            art_fill.n = 0;
+            art_fill_abandon();
             return;
         }
         ti = &tbip->info;
@@ -3728,6 +3773,10 @@ static void audio_start_playback(const struct audio_resume_info *resume_info,
     static struct audio_resume_info resume = { 0, 0 };
     enum play_status old_status = play_status;
 
+    /* A restart plays on where the queue was, failures and all */
+    if (!(flags & AUDIO_START_RESTART))
+        codec_failures_in_a_row = 0;
+
     bool skip_resume_adjustments = false;
     if (resume_info)
     {
@@ -3915,6 +3964,7 @@ static void audio_stop_playback(bool allow_fade)
     remove_event(BUFFER_EVENT_FINISHED, buffer_event_finished_callback);
     remove_event_ex(BUFFER_EVENT_BUFFER_LOW, buffer_event_buffer_low_callback, NULL);
 
+    art_fill_abandon();
     track_list_clear(TRACK_LIST_CLEAR_ALL);
 
     /* Update our state */
@@ -3985,6 +4035,7 @@ static void audio_on_skip(void)
 
     /* Manual skip */
     track_event_flags = TEF_NONE;
+    codec_failures_in_a_row = 0;
 
     if (toskip == 1 && global_settings.repeat_mode == REPEAT_ONE)
     {
@@ -4079,6 +4130,7 @@ static void audio_on_dir_skip(int direction)
 
     /* Manual skip */
     track_event_flags = TEF_NONE;
+    codec_failures_in_a_row = 0;
 
     audio_playlist_track_finish();
 

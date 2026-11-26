@@ -940,8 +940,15 @@ static int ata_rw_chunk(uint64_t sector, uint32_t cnt, void* buffer, bool write)
 
 static int ata_transfer_sectors(uint64_t sector, int count, void* buffer, int write)
 {
-    if (!ata_powered)
+    if (!ata_powered && IS_ERR(ata_power_up()))
+    {
+        /* One power cycle and a second try, as ata_reset() gives a drive
+         * that stops answering. A failed power-up leaves ata_powered false,
+         * so ata_power_down() would not cut the rail. */
+        ide_power_enable(false);
+        sleep(HZ * 3);
         PASS_RC(ata_power_up(), 1, 0);
+    }
     if (sector + count > total_sectors)
         RET_ERR(0);
     ata_set_active();

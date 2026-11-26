@@ -196,7 +196,8 @@ void parse_replaygain(const char* key, const char* value,
                                        "r128_track_gain", "r128_album_gain",
                                        NULL};
 
-    /* Every format's reader hands its unrecognised user tags here */
+    /* Every format's reader hands its unrecognised user tags here; ASF's
+     * hands only this one and its ReplayGain keys */
     if (series_part_user_tag(key, value, entry))
         return;
 

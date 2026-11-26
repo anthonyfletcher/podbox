@@ -3008,21 +3008,29 @@ static int tv_menu(void)
 
 static char tv_note_text[TV_NOTE_BYTES];
 
-/* Lays the page at `pos` of `part` out again after the engine has read
- * elsewhere: a document without parts is read again from its start */
-static void tv_reopen(int part, off_t pos)
+/* Reads `part` again from its start, with an empty window and page stack,
+ * after the engine has read elsewhere: a document without parts from its
+ * start. False if there is nothing to read. */
+static bool tv_reread(int part)
 {
     if (tv.nparts)
-        tv_enter_part(part);
-    else if (ts_rewind(tv.src) == BS_OK)
-    {
-        tv.win_start = 0;
-        tv.win_len = 0;
-        tv.eof = false;
-        tv.pos = tv.next = 0;
-        tv.sp = 0;
-        tv_ensure(0, 1);
-    }
+        return tv_enter_part(part);
+    if (ts_rewind(tv.src) != BS_OK)
+        return false;
+    tv.win_start = 0;
+    tv.win_len = 0;
+    tv.eof = false;
+    tv.pos = tv.next = 0;
+    tv.sp = 0;
+    tv_ensure(0, 1);
+    return true;
+}
+
+/* Lays the page at `pos` of `part` out again after the engine has read
+ * elsewhere */
+static void tv_reopen(int part, off_t pos)
+{
+    tv_reread(part);
     tv_resume_to(pos);
 }
 
@@ -3251,7 +3259,8 @@ static off_t tv_find_stream(off_t skip)
     {
         long b = button_get(false);
 
-        if (b != BUTTON_NONE && !(b & BUTTON_REL))
+        /* a new press stops it; the held press that chose Find does not */
+        if (b != BUTTON_NONE && !(b & (BUTTON_REL | BUTTON_REPEAT)))
         {
             tv_find_stopped = b;
             return -2;
@@ -3275,6 +3284,27 @@ static off_t tv_find_stream(off_t skip)
     return -1;
 }
 
+/* Back to the page at `pos` of `part` after a search read elsewhere. The
+ * search leaves the page stack as it was, so only the text up to the page
+ * is read again, not laid out; laid out after all when that falls short. */
+static void tv_find_return(int part, off_t pos)
+{
+    int sp = tv.sp;
+
+    if (tv_reread(part))
+    {
+        cpu_boost(true);
+        tv_reach(pos);
+        cpu_boost(false);
+        if (pos < tv.win_start + (off_t)tv.win_len)
+        {
+            tv.sp = sp;
+            return;
+        }
+    }
+    tv_reopen(part, pos);
+}
+
 /* The search on from `from` in chapter `part` to the book's end, chapter by
  * chapter, each read alone from its start. A find's page is the page on
  * screen after; otherwise it is the page it was. 1 found, 0 not, -2 stopped,
@@ -3289,9 +3319,9 @@ static int tv_find_from(int part, off_t from)
     for (p = part; p < last && hit == -1; p++)
     {
         if (tv.nparts > 1)
-            splashf(0, "%s\n%d/%d", str(LANG_WAIT), p + 1, tv.nparts);
+            tv_splashf("%s\n%d/%d", str(LANG_WAIT), p + 1, tv.nparts);
         else
-            splashf(0, "%s", str(LANG_WAIT));
+            tv_splashf("%s", str(LANG_WAIT));
         if (tv.nparts ? ts_seek_part(tv.src, p) != BS_OK
                       : ts_rewind(tv.src) != BS_OK)
             continue;
@@ -3306,7 +3336,7 @@ static int tv_find_from(int part, off_t from)
         tv_found_off = hit;
         return 1;
     }
-    tv_reopen(was_part, was);
+    tv_find_return(was_part, was);
     if (hit == -2 && (tv_find_stopped & SYS_EVENT)
         && default_event_handler_ex(tv_find_stopped, tv_event_save, NULL)
            == SYS_USB_CONNECTED)

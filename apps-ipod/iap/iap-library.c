@@ -1521,7 +1521,8 @@ static void find_rows(void)
             rows.folders[rows.n_folders++] = all[i];
             rows.books = find_books();
         }
-    rows.on_repeat = global_settings.iap_browse_size != 0;
+    rows.on_repeat = global_settings.iap_browse_size != 0
+                     && tagcache_is_in_ram();
     rows.catalog = count_catalog();
 }
 

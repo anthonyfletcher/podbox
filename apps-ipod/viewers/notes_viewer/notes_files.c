@@ -30,7 +30,6 @@
  ****************************************************************************/
 
 #include <stdbool.h>
-#include <stdlib.h>                 /* qsort */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -209,16 +208,61 @@ static uint64_t nw_value(int table, int page)
     }
 }
 
-static int nw_sorting;          /* the table qsort() is sorting */
+#define NW_SORT_YIELD 256           /* heap steps between yields */
 
-static int nw_order(const void *a, const void *b)
+/* Whether page `x` comes before page `y` in `table`: by the field, then by
+ * page */
+static bool nw_before(int table, int x, int y)
 {
-    int x = *(const uint16_t *)a, y = *(const uint16_t *)b;
-    uint64_t vx = nw_value(nw_sorting, x), vy = nw_value(nw_sorting, y);
+    uint64_t vx = nw_value(table, x), vy = nw_value(table, y);
 
-    if (vx != vy)
-        return vx < vy ? -1 : 1;
-    return x - y;
+    return vx != vy ? vx < vy : x < y;
+}
+
+/* t[root] sifted down the heap that is t's first `end` entries, ordered by
+ * nw_before() */
+static void nw_sift(int table, uint16_t *t, int root, int end)
+{
+    uint16_t v = t[root];
+    int child;
+
+    while ((child = 2 * root + 1) < end)
+    {
+        if (child + 1 < end && nw_before(table, t[child], t[child + 1]))
+            child++;
+        if (!nw_before(table, v, t[child]))
+            break;
+        t[root] = t[child];
+        root = child;
+    }
+    t[root] = v;
+}
+
+/* Table `table` sorted in place by a heap sort, which needs no memory and
+ * yields every NW_SORT_YIELD steps: after a walk this runs unboosted on the
+ * background thread, and 65,535 pages unbroken would starve the codec. The
+ * index answers nothing meanwhile, since nw.loaded is false. */
+static void nw_sort(int table)
+{
+    uint16_t *t = nw.table[table];
+    int n = nw.count[table], i;
+
+    for (i = n / 2; i-- > 0; )
+    {
+        nw_sift(table, t, i, n);
+        if (i % NW_SORT_YIELD == 0)
+            yield();
+    }
+    for (i = n; i-- > 1; )
+    {
+        uint16_t top = t[0];
+
+        t[0] = t[i];
+        t[i] = top;
+        nw_sift(table, t, 0, i);
+        if (i % NW_SORT_YIELD == 0)
+            yield();
+    }
 }
 
 /* The tables made from the pages; false when the pages do not have the
@@ -235,8 +279,7 @@ static bool nw_index(void)
     {
         if (at[t] != nw.count[t])
             return false;
-        nw_sorting = t;
-        qsort(nw.table[t], at[t], sizeof(uint16_t), nw_order);
+        nw_sort(t);
     }
     return true;
 }
@@ -741,9 +784,11 @@ static const struct notes_page *nw_in_dir(const char *dir, size_t dirlen,
 {
     static char folder[MAX_PATH];
     int best = -1, i, at = -1;
+    uint64_t key;
 
     snprintf(folder, sizeof(folder), "%.*s", (int)dirlen, dir);
-    while ((i = notes_pages_in(path_key(folder), &at)) >= 0)
+    key = path_key(folder);
+    while ((i = notes_pages_in(key, &at)) >= 0)
         if (nw.pages[i].kind == kind && notes_page_wins(i, best))
             best = i;
     return best >= 0 ? &nw.pages[best] : NULL;
@@ -751,7 +796,7 @@ static const struct notes_page *nw_in_dir(const char *dir, size_t dirlen,
 
 void notes_page_name(const struct notes_page *pg, char *name, size_t size)
 {
-    char path[MAX_PATH];
+    static char path[MAX_PATH];     /* the UI thread's alone */
     const char *end, *start;
 
     name[0] = '\0';

@@ -87,7 +87,8 @@ bool db_featured_build(void);
 
 /* Build it if it has not been built, or if the database has changed since it
  * was. Everything that reads the table calls this first; after the first one
- * per boot it costs a pair of comparisons. The same two callers.
+ * per boot it costs a pair of comparisons. The same two callers; one that
+ * finds the other's build under way waits for it to finish.
  *
  * A play does not count as a change. tagcache's serial moves for every track
  * finished and its commitid only when the library itself does, and a credit

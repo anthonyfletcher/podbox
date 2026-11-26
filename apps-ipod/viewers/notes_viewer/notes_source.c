@@ -473,15 +473,15 @@ static void ns_joint_artist(char *buf, size_t size)
     int i;
 
     strlcpy(raw, buf, sizeof(raw));
-    if (!global_settings.split_album_artists
-        || db_names_split(raw, &names) < 2)
-        return;
     if (!ns_bracketed)
     {
         if (db_names_display(raw, buf, size) != buf)
             strlcpy(buf, raw, size);
         return;
     }
+    if (!global_settings.split_album_artists
+        || db_names_split(raw, &names) < 2)
+        return;
     for (i = 0; i < names.count && len < size; i++)
         len += snprintf(buf + len, size - len, "%s%.*s",
                         !i ? "" : i == names.count - 1 ? "] & [" : "], [",
@@ -1389,7 +1389,7 @@ static bool ns_page_link(struct ns_out *o, int page)
 {
     const struct notes_page *pg = notes_page_get(page);
     unsigned int generation = notes_pages_generation();
-    char path[MAX_PATH];
+    static char path[MAX_PATH];
     size_t len;
 
     if (!pg)
@@ -1438,18 +1438,21 @@ static bool ns_kind_ok(const struct ns_piece *pc, const struct notes_page *pg)
            || (ns_has(pc, "filter", "other") && pg->kind == NOTES_PAGE_OTHER);
 }
 
-/* The page the names index's file `f` is, or -1: by its number in the
- * page index while that is still the same file, else by its path's hash */
+/* The page the names index's file `f` is, or -1: the page of its path's
+ * hash nearest the number it had, the lower of two as near, since pages
+ * only shift as others are added or removed */
 static int ns_index_page(const struct name_file *f)
 {
-    const struct notes_page *pg = notes_page_get(f->page);
-    int p, pages = notes_page_count();
+    const struct notes_page *pg;
+    int d, pages = notes_page_count(), p = MIN((int)f->page, pages - 1);
 
-    if (pg && pg->hash == f->hash)
-        return f->page;
-    for (p = 0; p < pages; p++)
-        if ((pg = notes_page_get(p)) && pg->hash == f->hash)
-            return p;
+    for (d = 0; p - d >= 0 || p + d < pages; d++)
+    {
+        if ((pg = notes_page_get(p - d)) && pg->hash == f->hash)
+            return p - d;
+        if (d && (pg = notes_page_get(p + d)) && pg->hash == f->hash)
+            return p + d;
+    }
     return -1;
 }
 

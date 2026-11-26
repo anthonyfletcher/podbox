@@ -575,7 +575,9 @@ static int asf_parse_header(int fd, struct mp3entry* id3,
 
                             lseek(fd, after_pic_pos, SEEK_SET);
 #endif
-                        } else if (!strncmp("replaygain_", utf8buf, 11)) {
+                        } else if (!strncmp("replaygain_", utf8buf, 11) ||
+                                   (type == 0 &&
+                                    !strcasecmp("series-part", utf8buf))) {
                             char *value = id3buf;
                             asf_utf16LEdecode(fd, length, &id3buf, &id3buf_remaining);
                             parse_replaygain(utf8buf, value, id3);

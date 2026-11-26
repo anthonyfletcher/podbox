@@ -66,7 +66,7 @@ int notes_pages_by(int field, uint32_t value, int *at);
 /* The same for the pages beside the music in the folder path_key() `dir` */
 int notes_pages_in(uint64_t dir, int *at);
 /* The name a page's file gives it: its file name without the extension, or
- * beside the music its folder's name */
+ * beside the music its folder's name. The UI thread's only. */
 void notes_page_name(const struct notes_page *pg, char *name, size_t size);
 /* `len` bytes of `name` without a trailing " (qualifier)" */
 size_t notes_bare_len(const char *name, size_t len);

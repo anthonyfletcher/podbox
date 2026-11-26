@@ -164,12 +164,17 @@ static void crc_init(void)
     }
 }
 
-static uint32_t crc32(const uint8_t *b, uint32_t n)
+/* c carried on over n more bytes; a CRC starts and ends inverted */
+static uint32_t crc_more(uint32_t c, const uint8_t *b, uint32_t n)
 {
-    uint32_t c = 0xffffffffu;
     while (n--)
         c = crc_table[(c ^ *b++) & 0xff] ^ (c >> 8);
-    return c ^ 0xffffffffu;
+    return c;
+}
+
+static uint32_t crc32(const uint8_t *b, uint32_t n)
+{
+    return crc_more(0xffffffffu, b, n) ^ 0xffffffffu;
 }
 
 /* Lazy chunk c, read from the cart file through the host and checked,
@@ -670,6 +675,20 @@ static int load_runtime(struct vm *vm)
 
 /* ---- arcade_load() ----------------------------------------------------- */
 
+/* A chunk of len bytes left in the cart file: passes over it, reads its
+ * checksum into *crc and folds that into cart_hash; 1, or 0 with the error
+ * set */
+static int leave_chunk(struct vm *vm, arcade_read_fn read, void *ctx,
+                       uint32_t len, uint32_t *crc)
+{
+    uint8_t sum[4];
+    if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
+        return bad(vm, "truncated");
+    *crc = rd_le32(sum);
+    vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^ *crc;
+    return 1;
+}
+
 static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
 {
     uint8_t hd[8];
@@ -734,27 +753,20 @@ static int read_chunks(struct vm *vm, arcade_read_fn read, void *ctx)
         }
         /* the line table left in the file, read only for an error */
         if (want == 4 && vm->host && vm->host->cart_read) {
-            uint8_t sum[4];
-            if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
-                return bad(vm, "truncated");
+            if (!leave_chunk(vm, read, ctx, len, &vm->lines_crc))
+                return 0;
             vm->lines_at = pos + 8;
             vm->lines_len = len;
-            vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
-                            rd_le32(sum);
             continue;
         }
         /* a format 3 cart's maps left there too: core_draw.c reads them,
          * and holds only the active map's objects */
         if (want == 7 && clen[0] >= 2 && rd16(chunk[0]) >= 3 &&
             vm->host && vm->host->cart_read) {
-            uint8_t sum[4];
-            if (read(ctx, NULL, len) != len || read(ctx, sum, 4) != 4)
-                return bad(vm, "truncated");
+            if (!leave_chunk(vm, read, ctx, len, &vm->maps_left.crc))
+                return 0;
             vm->maps_left.at = pos + 8;
             vm->maps_left.len = len;
-            vm->maps_left.crc = rd_le32(sum);
-            vm->cart_hash = (vm->cart_hash << 5 | vm->cart_hash >> 27) ^
-                            rd_le32(sum);
             continue;
         }
         uint32_t off = perm_alloc(vm, len + 4);
@@ -925,10 +937,30 @@ static void lname(struct lcur *c, char *dst, uint32_t cap, uint32_t n)
     dst[c->bad ? 0 : k] = 0;
 }
 
+/* Whether LINE left in the cart file still matches its checksum; the one
+ * in the arena was checked as it loaded */
+static int lines_sound(const struct vm *vm)
+{
+    uint32_t c = 0xffffffffu;
+    for (uint32_t at = 0; at < vm->lines_len; ) {
+        uint32_t n = vm->lines_len - at;
+        if (n > sizeof(lwin))
+            n = sizeof(lwin);
+        if (vm->host->cart_read(vm->host->ctx, vm->lines_at + at, lwin,
+                                n) != n)
+            return 0;
+        c = crc_more(c, lwin, n);
+        at += n;
+    }
+    return (c ^ 0xffffffffu) == vm->lines_crc;
+}
+
 /* Fills w from LINE for err_fn and err_pc; returns 0 when unknown. */
 static int find_where(const struct vm *vm, struct where *w)
 {
     if ((!vm->lines && !vm->lines_at) || !vm->err_where)
+        return 0;
+    if (!vm->lines && !lines_sound(vm))
         return 0;
     struct lcur c = { vm, 0, 0, 0, 0 };
     uint32_t files[64], flen[64];

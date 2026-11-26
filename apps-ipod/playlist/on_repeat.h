@@ -18,8 +18,9 @@
  * them. Leaves out books and podcasts kept apart from the music. Reads the
  * playback log, so seconds on a cold disk; callable from any thread, and a
  * second caller waits for the first. The read ends early once *stop turns
- * true; stop may be NULL. Returns how many, or -1 when the clock is not set
- * and so there is no span. */
+ * true; stop may be NULL. Returns how many, 0 without reading while the
+ * database is not in RAM, or -1 when the clock is not set and so there is no
+ * span. */
 int on_repeat_keys(uint64_t *keys, int max, const volatile bool *stop);
 
 /* Whether on_repeat_offered() would answer without reading the log */
