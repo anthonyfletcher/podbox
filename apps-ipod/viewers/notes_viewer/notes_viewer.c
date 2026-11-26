@@ -1450,9 +1450,10 @@ static int nv_wheel_px(void)
     return MAX(1, button_apply_acceleration(get_action_data())) * nv.lh;
 }
 
-/* A click of the wheel: on to the next link on the line, else the text on,
- * else -- at the end of a page, or a page that does not scroll -- the
- * current link on */
+/* A click of the wheel: on to the next link on the line if it is on screen,
+ * else the text on, else -- at the end of a page, or a page that does not
+ * scroll -- the current link on. A name that wraps joins two lines, so in a
+ * list of names the next link "on the line" can be lines off screen. */
 static void nv_wheel(int dir)
 {
     int was = nv.scroll, cur = nv.cur;
@@ -1460,7 +1461,7 @@ static void nv_wheel(int dir)
     nv_boost();
     if (dir > 0)
     {
-        if (nv_same_line(cur, cur + 1))
+        if (nv_same_line(cur, cur + 1) && nv_link_shown(cur + 1))
             nv.cur++;
         else if (nv.scroll < nv.max_scroll)
         {
@@ -1477,7 +1478,7 @@ static void nv_wheel(int dir)
     {
         int nat = nv_natural(true);
 
-        if (nv_same_line(cur, cur - 1))
+        if (nv_same_line(cur, cur - 1) && nv_link_shown(cur - 1))
             nv.cur--;
         else if (cur > 0 && nat >= 0 && cur > nat && nv_link_shown(cur - 1))
             nv.cur--;           /* the reading line comes back up */
