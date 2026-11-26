@@ -228,7 +228,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-08-28 | `70fd3e1f1e` | ipodcolor: fall back to UDMA 1 | **N/A** | The 5G keeps UDMA 2. |
 | 2026-08-28 | `28e5a125ab` | configure: macos: fix checkwps error messages | **N/A** | macOS only. |
 | 2026-09-11 | `b7fe01393a` | usb-drv-arc: defer SET_ADDRESS until status completion | **Superseded** | The fix this fork carried as `0f1436aea2`. Both replaced by `841007dfa1`. |
-| 2026-09-20 | `841007dfa1` | usb: let controller drivers handle SET_ADDRESS requests | **Adopted** | It broke hosts that send `SET_ADDRESS` first. Fixed here (`a0103fa46a`) and not yet reported upstream; see `upstream-divergence.md`. |
+| 2026-09-20 | `841007dfa1` | usb: let controller drivers handle SET_ADDRESS requests | **Adopted** | It broke hosts that send `SET_ADDRESS` first. Fixed here (`a0103fa46a`); see `upstream-divergence.md`. |
 | 2026-09-20 | `9aa2d7fe94` `d1fab121f8` | usb: accept a replacement SETUP; usb arc: flush both EP0 directions when SETUP replaces a transfer | **Adopted** | |
 | 2026-09-20 | `63978def70` `b1385d831e` | usb arc: discard stale transfers and audio work on bus reset; reset data toggles when clearing halt | **Adopted** | |
 | 2026-09-20 | `3bd18f5a44` | usb iap: correct sample rate descriptors and packet cadence | **Adopted** | |

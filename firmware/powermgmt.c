@@ -1024,11 +1024,11 @@ void init_battery_tables(void)
             if (bl_op == eCHARGE)
             {
 #if CONFIG_CHARGING
-                memcpy(device_battery_tables.charge, &tmparr, PWRELEMS);
+                memcpy(device_battery_tables.charge, tmparr, sizeof(tmparr));
 #endif
                 break;
             }
-            memcpy(device_battery_tables.discharge, &tmparr, PWRELEMS);
+            memcpy(device_battery_tables.discharge, tmparr, sizeof(tmparr));
             break;
         } /* switch */
     } /* for */
