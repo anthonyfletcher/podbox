@@ -45,6 +45,7 @@
 #include "usb_log.h"
 #include "button.h"
 #include "hang_catch.h"
+#include "panic.h"
 
 #define HANG_SECS   10
 /* Longer than the core check: the UI thread can wait this long on the
@@ -207,7 +208,7 @@ static void NORETURN_ATTR hang_show(void)
         stuck_log();
     else
         hang_log(t, calls, n);
-    disable_interrupt(IRQ_FIQ_STATUS);
+    panic_screen_enter();
     lcd_set_viewport(NULL);
 #if LCD_DEPTH > 1
     lcd_set_backdrop(NULL);
@@ -223,6 +224,7 @@ static void NORETURN_ATTR hang_show(void)
         lcd_putsf(1, y++, "%s held the core %ds",
                   t && t->name ? t->name : "?", HANG_SECS);
         lcd_putsf(1, y++, "lr:%08lx", (unsigned long)hang_lr);
+        lcd_update();
         rb_backtrace(hang_pc, hang_sp, &y);
         lcd_puts(1, y++, "stack:");
         for (int i = 0; i < n; i += 4)
@@ -235,7 +237,9 @@ static void NORETURN_ATTR hang_show(void)
     lcd_update();
 
     /* Waiting for a button, as a panic leaves it */
-#ifdef HAVE_ADJUSTABLE_CPU_FREQ
+    /* Not on S5L: its frequency change takes the PMU's I2C mutex, which
+     * cannot be taken with interrupts off. */
+#if defined(HAVE_ADJUSTABLE_CPU_FREQ) && CONFIG_CPU != S5L8702 && CONFIG_CPU != S5L8720
     if (cpu_boost_lock())
     {
         set_cpu_frequency(0);

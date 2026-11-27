@@ -117,6 +117,10 @@ void UnwInitState(UnwState * const       state,   /**< Pointer to structure to f
  */
 Boolean UnwReportRetAddr(UnwState * const state, Int32 addr)
 {
+    /* A zero return address ends the chain: nothing called from there. */
+    if ((addr & ~1u) == 0)
+        return FALSE;
+
     /* Cast away const from reportData.
      *  The const is only to prevent the unw module modifying the data.
      */

@@ -26,4 +26,8 @@
 
 void panicf( const char *fmt, ... ) ATTRIBUTE_PRINTF(1, 2) NORETURN_ATTR;
 
+/* Called by each fatal screen before it draws: interrupts off, and a second
+ * fatal halts without replacing the first one's text. */
+void panic_screen_enter(void);
+
 #endif /* __PANIC_H__ */

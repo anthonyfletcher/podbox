@@ -77,6 +77,10 @@ UnwResult UnwStartThumb(UnwState * const state)
     {
         Int16 instr;
 
+        /* A NULL call: what is at 0 is the vector page, not code */
+        if ((state->regData[15].v & ~1u) == 0)
+            return UNWIND_RESET;
+
         /* Attempt to read the instruction */
         if(!state->cb->readH(state->regData[15].v & (~0x1), &instr))
         {

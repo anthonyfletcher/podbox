@@ -23,6 +23,7 @@
 #include "lcd.h"
 #include "font.h"
 #include "gcc_extensions.h"
+#include "panic.h"
 
 #include <get_sp.h>
 #include <backtrace.h>
@@ -96,6 +97,8 @@ void NORETURN_ATTR UIE(unsigned int pc, unsigned int num)
      */
     static bool triggered = false;
 
+    panic_screen_enter();
+
 #if LCD_DEPTH > 1
     lcd_set_backdrop(NULL);
     lcd_set_drawinfo(DRMODE_SOLID, LCD_BLACK, LCD_WHITE);
@@ -141,6 +144,8 @@ void NORETURN_ATTR UIE(unsigned int pc, unsigned int num)
         }
     }   /* num == 1 || num == 2 // prefetch/data abort */
 #endif /* !defined(CPU_ARM7TDMI */
+
+    lcd_update(); /* on screen before the unwinder, which can fault */
 
 #ifdef HAVE_RB_BACKTRACE
     if (!triggered)

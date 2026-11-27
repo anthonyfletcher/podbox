@@ -46,6 +46,27 @@ static char panic_buf[128];
 
 #define LINECHARS (LCD_WIDTH/SYSFONT_WIDTH) - 2
 
+static volatile bool panic_screen_active;
+
+void panic_screen_enter(void)
+{
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
+#if defined(CPU_ARM_CLASSIC)
+    disable_interrupt(IRQ_FIQ_STATUS);
+#else
+    set_irq_level(DISABLE_INTERRUPTS);
+#endif
+#endif
+    /* A fault while drawing a fatal screen halts with the first one
+     * showing, rather than drawing over it. */
+    if (panic_screen_active)
+    {
+        system_exception_wait();
+        while (1);
+    }
+    panic_screen_active = true;
+}
+
 #if defined(CPU_ARM) && defined(HAVE_RB_BACKTRACE)
 void panicf_f( const char *fmt, ...) USED_ATTR;
 
@@ -83,14 +104,7 @@ void panicf( const char *fmt, ...)
 #endif
     va_list ap;
 
-#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
-    /* Disable interrupts */
-#if defined(CPU_ARM_CLASSIC)
-    disable_interrupt(IRQ_FIQ_STATUS);
-#else
-    set_irq_level(DISABLE_INTERRUPTS);
-#endif
-#endif /* SIMULATOR */
+    panic_screen_enter();
 
     va_start( ap, fmt );
     vsnprintf( panic_buf, sizeof(panic_buf), fmt, ap );
@@ -112,12 +126,16 @@ void panicf( const char *fmt, ...)
         /* wrap panic line */
         int i, len = strlen(panic_buf);
         for (i=0; i<len; i+=LINECHARS) {
-            unsigned char c = panic_buf[i+LINECHARS];
-            panic_buf[i+LINECHARS] = 0;
+            int end = MIN(i + LINECHARS, len);
+            unsigned char c = panic_buf[end];
+            panic_buf[end] = 0;
             lcd_puts(1, y++, (unsigned char *)panic_buf+i);
-            panic_buf[i+LINECHARS] = c;
+            panic_buf[end] = c;
         }
     }
+
+    /* On screen before the unwinder, which can fault in turn. */
+    lcd_update();
 
 #if defined(HAVE_RB_BACKTRACE)
     rb_backtrace(pc, sp, &y);
@@ -129,7 +147,9 @@ void panicf( const char *fmt, ...)
     lcd_update();
     DEBUGF("%s", panic_buf);
 
-#ifdef HAVE_ADJUSTABLE_CPU_FREQ
+    /* An S5L frequency change takes the PMU's I2C mutex, which cannot be
+     * taken with interrupts off: it would deadlock or panic over this one. */
+#if defined(HAVE_ADJUSTABLE_CPU_FREQ) && CONFIG_CPU != S5L8702 && CONFIG_CPU != S5L8720
     if (cpu_boost_lock())
     {
         set_cpu_frequency(0);
