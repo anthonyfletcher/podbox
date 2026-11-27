@@ -30,6 +30,9 @@ CC     ?= gcc
 WINCC  ?= x86_64-w64-mingw32-gcc
 
 DEFINES := -DSIMULATOR -DIPOD_VIDEO -DTARGET_ID=15
+# config.h sets UNICODE32 only from MEMORYSIZE, which only tools/configure
+# passes. Without it a path holding a character past U+FFFF cannot be opened.
+DEFINES += -DUNICODE32
 
 INCLUDES = -I. -I$(APPS)/sim/include -I$(BUILD) -I$(BUILD)/lang \
            -I$(FIRM)/target/arm/ipod/video -I$(FIRM)/target/hosted/sdl \
