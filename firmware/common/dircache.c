@@ -109,6 +109,8 @@ struct sab
         int volatile      idx;       /* cache index of directory */
         int               *downp;    /* pointer to ce->down */
         int *volatile     prevp;     /* previous item accessed */
+        long              dircluster; /* its first cluster, which is its
+                                         entries' parent cluster */
     } stack[];                       /* "recursion" stack */
 };
 
@@ -1261,7 +1263,12 @@ static void sab_process_sub(struct sab *sabp)
         fat_rewind(&streamp->fatstr);
         uncached_rewinddir_internal(infop);
 
+        /* kept with its component: a subfolder picked after the scan has
+           come back up from a deeper one is this folder's, and a wrong
+           parent cluster binds its stream to any open file with its entry
+           number in the folder read last, whose bytes are then cached */
         const long dircluster = streamp->infop->fatfile.firstcluster;
+        compp->dircluster = dircluster;
 
         /* first pass: read directory */
         while (1)
@@ -1386,7 +1393,7 @@ static void sab_process_sub(struct sab *sabp)
         /* set up info for next open
          * IF_MV: "volume" was set when scan began */
         infop->fatfile.firstcluster = ce->firstcluster;
-        infop->fatfile.dircluster   = dircluster;
+        infop->fatfile.dircluster   = compp->dircluster; /* ce's parent's */
         infop->fatfile.e.entry      = ce->direntry;
         infop->fatfile.e.entries    = ce->direntries;
         infop->dcfile.idx           = idx;
