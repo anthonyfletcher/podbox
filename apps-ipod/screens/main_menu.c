@@ -301,11 +301,16 @@ static int info_action_callback(int action, struct gui_synclist *lists)
     }
     else if (action == ACTION_STD_OK)
     {
+        /* The recount walks the whole FAT, seconds on a large disk, so only
+         * the disk row asks for it */
         action = ACTION_REDRAW;
-        info->new_data = true;
-        splash(0, ID2P(LANG_SCANNING_DISK));
-        for (int i = 0; i < NUM_VOLUMES; i++)
-            volume_recalc_free(IF_MV(i));
+        if (gui_synclist_get_sel_pos(lists) >= INFO_DISK1)
+        {
+            info->new_data = true;
+            splash(0, ID2P(LANG_SCANNING_DISK));
+            for (int i = 0; i < NUM_VOLUMES; i++)
+                volume_recalc_free(IF_MV(i));
+        }
         gui_synclist_speak_item(lists);
     }
     else if (action == ACTION_NONE)
