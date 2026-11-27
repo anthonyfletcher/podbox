@@ -28,5 +28,9 @@ extern void serial_tx(const unsigned char * buf);
 extern void serial_tx_raw(const unsigned char *buf, int len);
 extern void tx_writec(unsigned char c);
 extern int tx_rdy(void);
+#if defined(IPOD_6G) && defined(IPOD_ACCESSORY_PROTOCOL)
+/* Closes the accessory port for good, as a reset would (before ROLO) */
+extern void serial_accessory_release(void);
+#endif
 
 #endif

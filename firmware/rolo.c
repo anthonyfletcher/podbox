@@ -37,6 +37,11 @@
 #include "rolo.h"
 
 #include "loader_strerror.h"
+#if defined(IPOD_6G) && defined(IPOD_ACCESSORY_PROTOCOL)
+#include "serial.h"
+#include "powermgmt.h"
+#define ROLO_ACCESSORY_OFF (2*HZ)
+#endif
 #if defined(MI4_FORMAT)
 #include "mi4-loader.h"
 #define LOAD_FIRMWARE(a,b,c) load_mi4(a,b,c)
@@ -308,6 +313,14 @@ int rolo_load(const char* filename)
     lcd_clear_display();
     lcd_puts(0, 0, "ROLO");
     lcd_update();
+#endif
+
+#if defined(IPOD_6G) && defined(IPOD_ACCESSORY_PROTOCOL)
+    /* The dock connector as a reset leaves it, for about as long as the
+     * bootloader would, so a seated dock identifies to the new image. */
+    serial_accessory_release();
+    accessory_supply_set(false);
+    sleep(ROLO_ACCESSORY_OFF);
 #endif
 
     lcd_puts(0, 1, "Executing...");

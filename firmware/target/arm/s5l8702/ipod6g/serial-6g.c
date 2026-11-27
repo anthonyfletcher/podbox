@@ -227,6 +227,18 @@ void serial_setup(void)
     tick_add_task(serial_acc_tick);
 }
 
+/* Before ROLO. A seated dock identifies again only when it sees the line go
+ * down, as it does through a reset's bootloader; ROLO alone would reopen
+ * the port within a tick. Closed here, and the tick no longer reopens it. */
+void serial_accessory_release(void)
+{
+    tick_remove_task(serial_acc_tick);
+    int level = disable_irq_save();
+    acc_plugged = false;
+    uartc_close(ser_port.uartc);
+    restore_irq(level);
+}
+
 void serial_bitrate(int rate)
 {
     bitrate = rate;
