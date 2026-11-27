@@ -259,7 +259,7 @@ export function renderInspector(ide) {
     cols.append(colourField(ide, v, 'Vf', 'Text colour'), colourField(ide, v, 'Vb', 'Background'));
     f.append(cols);
     f.append(el('div', 'note', 'A colour can also be a word that follows the album art: accent, dominant ' +
-                               'or vivid, with the theme\'s Dynamic Colors on.'));
+                               'or vivid, with the theme\'s Dynamic Colours on.'));
     const used = [...(v.tags || new Map()).keys()].filter((t) => !['V', 'Vl', 'Vi', 'Vf', 'Vb'].includes(t));
     if (used.length) {
         f.append(el('div', 'sec', 'What it shows'));

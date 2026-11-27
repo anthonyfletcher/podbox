@@ -718,6 +718,10 @@ release), the game template (`arcade/template` and the Arcade skill ->
 pushes them from this computer. Those repositories are outputs: change
 `arcade/builder` and `arcade/template`, never them. The WebAssembly engine
 and the text font come from the release's tree on the build server.
+The same publish puts the Theme IDE on `gh-pages` as `theme-ide/`, built
+there by `tools/theme-ide/build.sh`. Each publish replaces the whole branch,
+so a page meant for `gh-pages` goes in through this script or is deleted
+by the next release.
 
 Releases belong to this fork. Upstream remotes are not writable from here.
 

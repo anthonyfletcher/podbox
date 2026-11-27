@@ -8,7 +8,8 @@
 #                          firmware's does, so @latest builds for it
 #   podbox-game            the template repository: arcade/template, and
 #                          the Arcade skill (arcade/builder/template.mjs)
-#   this repo's gh-pages   the IDE as ide/index.html, for GitHub Pages
+#   this repo's gh-pages   the IDE as ide/index.html, and the Theme IDE as
+#                          theme-ide/, for GitHub Pages
 #
 # Those repositories are outputs: change arcade/builder and arcade/template
 # here, never them. release.sh runs this after the firmware releases are
@@ -19,7 +20,8 @@
 # packages installed fresh, and pushed from this computer with its own git
 # credentials. From the build server it takes the two things only the
 # server makes: the WebAssembly engine (built there, in the release's own
-# tree, with wasi-sdk) and the IDE's text font (from that build's zip).
+# tree, with wasi-sdk), the IDE's text font (from that build's zip) and the
+# Theme IDE, page and player (built there with Emscripten).
 #
 # Usage: ./release-arcade.sh --server U@H --remote-dir DIR --commit SHA [--dry-run]
 #
@@ -70,6 +72,18 @@ scp -q -r "$SERVER:/tmp/release-arcade-font/.rockbox/games" "$WORK/font"
 
 say "The IDE"
 (cd "$WORK/src/arcade/sdk" && node ide/build.js --font "$WORK/font/font.bin")
+
+say "The Theme IDE from the release's tree"
+ssh "$SERVER" "cd '$REMOTE_DIR' && bash tools/theme-ide/build.sh >/dev/null"
+mkdir -p "$WORK/pages/theme-ide"
+ssh "$SERVER" "cd '$REMOTE_DIR/tools/theme-ide/dist' && tar cf - ." |
+    tar xf - -C "$WORK/pages/theme-ide"
+mkdir -p "$WORK/pages/theme-ide/player"
+ssh "$SERVER" "cd '$REMOTE_DIR/tools/theme-ide/player' && tar cf - ." |
+    tar xf - -C "$WORK/pages/theme-ide/player"
+[ -s "$WORK/pages/theme-ide/ide.js" ] &&
+    [ -s "$WORK/pages/theme-ide/player/rockboxui.wasm" ] ||
+    die "the Theme IDE did not build"
 
 say "The build action"
 node "$WORK/src/arcade/builder/build.mjs" "$WORK/builder" "$WORK/font/font.bin"
@@ -133,3 +147,4 @@ say "Published the Arcade at $SHORT"
 echo "  https://github.com/$OWNER/podbox-arcade-builder"
 echo "  https://github.com/$OWNER/podbox-game"
 echo "  https://$OWNER.github.io/podbox/ide/"
+echo "  https://$OWNER.github.io/podbox/theme-ide/"

@@ -12,6 +12,10 @@ things that silently catch people out.
 It assumes you already write Rockbox skins. If you do not, start with the skin
 section of the [Rockbox manual](https://www.rockbox.org/manual.shtml).
 
+The [Theme IDE](https://anthonyfletcher.github.io/podbox/theme-ide/) is the
+quickest place to try anything here: it runs in a browser, edits your theme's
+folder, and shows each change on PodBox itself, beside the editor.
+
 **Themes written for this build will not work correctly on stock Rockbox.** The
 extra tags are not recognised there and the extra `.cfg` settings are ignored. A
 theme that only uses standard tags remains portable in both directions.
@@ -740,6 +744,11 @@ owner still has to set a button to Theme Toggle. A `toggle` that names no good
 ---
 
 ## 9. Checking your theme
+
+The [Theme IDE](https://anthonyfletcher.github.io/podbox/theme-ide/) checks as
+you type: its **Problems** panel lists what would go wrong on an iPod in every
+screen of the theme, and its player shows the result, colours and lists
+included. Nothing to build or install.
 
 `checkwps` parses a skin and reports syntax errors and missing fonts or bitmaps.
 It is not in the player zip: build it on Linux with

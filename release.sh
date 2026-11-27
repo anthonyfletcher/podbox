@@ -46,8 +46,8 @@
 #                 Required on any branch but master.
 #   --no-sim      skip the simulator; leave the Simulator release as it is
 #   --no-voices   skip the voice files; leave the Voices release as it is
-#   --no-arcade   leave the Arcade's build action, game template and IDE
-#                 page as they are (release-arcade.sh publishes them)
+#   --no-arcade   leave the Arcade's build action, game template and the
+#                 two IDE pages as they are (release-arcade.sh publishes them)
 #   --no-tools    leave the Tools release (the library fetch tools for
 #                 Windows and macOS) as it is
 #

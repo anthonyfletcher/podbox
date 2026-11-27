@@ -25,7 +25,8 @@ that folder.
 
 The page also works without the server -- **File › Open theme folder** --
 and in Chrome or Edge it can then save too. Other browsers can only read the
-folder.
+folder. Each release publishes it this way at
+<https://anthonyfletcher.github.io/podbox/theme-ide/>, nothing to install.
 
 [pywebview]: https://pywebview.flowrl.com/
 

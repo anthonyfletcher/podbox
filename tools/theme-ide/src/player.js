@@ -117,6 +117,7 @@ export const Player = {
             t = theme();
             await this.writeTheme(t.files);
         } while (theme().key !== t.key);
+        if (!t.files.length) await this.fetchFonts(this.diskSkins());
         const cfg = t.cfg;
         if (cfg) {
             const read = (p) => { try { return FS.readFile(p, { encoding: 'utf8' }); } catch (e) { return ''; } };
@@ -157,6 +158,20 @@ export const Player = {
                 if (r.ok) this.write('fonts/' + name, new Uint8Array(await r.arrayBuffer()));
             } catch (e) { /* not a standard font */ }
         }));
+    },
+
+    /* the disk's own config and skins, as files for fetchFonts: with no
+       theme open, these are what the player shows */
+    diskSkins() {
+        const out = [];
+        const add = (p) => { try { out.push({ path: p, data: FS.readFile(p) }); } catch (e) { /* none */ } };
+        add('/simdisk/.rockbox/config.cfg');
+        for (const d of ['/simdisk/.rockbox/themes', '/simdisk/.rockbox/wps']) {
+            let names = [];
+            try { names = FS.readdir(d); } catch (e) { /* none */ }
+            for (const n of names) add(d + '/' + n);
+        }
+        return out;
     },
 
     running() { return this.state === 'running'; },
