@@ -59,7 +59,6 @@ static int set_parallel      = 1;       /* album covers parallel slides       */
 /* the viewport split, from init() */
 static int pf_half_height, pf_lower_half;
 
-#define PF_REFLECT_BANDS 6
 static int pf_reflect;                  /* rows of reflection, 0 for none */
 static int reflect_rows = 24;           /* PF_REFLECT_TALL, or -r N */
 
@@ -505,10 +504,7 @@ static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
     const int p_start_upper = (half_height - 1 - voff) * PFREAL_ONE;
     const int p_start_lower = (half_height - voff) * PFREAL_ONE;
     const int refl = MIN(pf_reflect, sh);
-    int rlim[PF_REFLECT_BANDS];
-    for (int b = 0; b < PF_REFLECT_BANDS; b++)
-        rlim[b] = sh * PFREAL_ONE
-                - (b + 1) * refl * PFREAL_ONE / PF_REFLECT_BANDS;
+    const int rbase = sh - refl;
 
     for (x = xi; x < x_to; x++) {
         if (xs < slide_left) xs = slide_left;
@@ -551,23 +547,19 @@ static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
                 unsigned int recip = 0xffffffffu / dy;
                 int rem = (plim == sh * PFREAL_ONE) ? lower_half - n_lo : 0;
                 int q = 2 * sh * PFREAL_ONE - 1 - (p_start_lower + n_lo * dy);
-                int done = 0;
+                int n = (rem > 0 && q >= rbase * PFREAL_ONE)
+                      ? div_by_recip(q - rbase * PFREAL_ONE, dy, recip) + 1 : 0;
 
-                for (int b = 0; b < PF_REFLECT_BANDS; b++) {
-                    int upto = (rem > 0 && q >= rlim[b])
-                             ? div_by_recip(q - rlim[b], dy, recip) + 1 : 0;
-                    upto = MIN(upto, rem);
-                    for (int r = done; r < upto; r++) {
-                        int src = (q - r * dy) >> PFREAL_SHIFT;
-                        if (src < sh - refl || src >= sh)
-                            refl_bad_reads++;
-                        px++;
-                        refl_px++;
-                        if (y >= 0 && y < FBH)
-                            fb_top[y*LCD_WIDTH + x] = fb_mark_id;
-                        y++;
-                    }
-                    done = MAX(done, upto);
+                n = MIN(n, rem);
+                for (int r = 0; r < n; r++) {
+                    int src = (q - r * dy) >> PFREAL_SHIFT;
+                    if (src < rbase || src >= sh)
+                        refl_bad_reads++;
+                    px++;
+                    refl_px++;
+                    if (y >= 0 && y < FBH)
+                        fb_top[y*LCD_WIDTH + x] = fb_mark_id;
+                    y++;
                 }
             }
         }

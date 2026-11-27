@@ -221,15 +221,12 @@ static void pf_update_dynamic_colors(void)
 #define PF_TEXT_WIDTH  (LCD_WIDTH - 2 * PF_TEXT_MARGIN)
 
 /* The reflection: the bottom rows of each cover (PF_REFLECT_SHORT or _TALL, by
- * the Reflection setting), mirrored below it and faded toward the background in
- * PF_REFLECT_BANDS steps, starting at PF_REFLECT_ALPHA out of 256. Each band is
- * one alpha, so its pixels go through the same faded run as a side slide's and
- * the loop gains no per-pixel work. The covers move up by half of it, so it
- * takes none of the caption's rows, and the caption sits PF_REFLECT_GAP rows
- * under it rather than centred in what is left. */
+ * the Reflection setting), mirrored below it and faded toward the background a
+ * step per row, starting at PF_REFLECT_ALPHA out of 256. The covers move up by
+ * half of it, so it takes none of the caption's rows, and the caption sits
+ * PF_REFLECT_GAP rows under it rather than centred in what is left. */
 #define PF_REFLECT_SHORT 12
 #define PF_REFLECT_TALL  24
-#define PF_REFLECT_BANDS 6
 #define PF_REFLECT_ALPHA 96
 #define PF_REFLECT_GAP   2
 
@@ -2689,44 +2686,51 @@ static int draw_tile_half(struct pf_col *cols, int ncols, int step,
     return total;
 }
 
-/* A column's reflection carries on downward from where its lower half stopped,
- * reading the cover upward again; n[b] is how many of its rows fall in band b. */
-struct pf_refl
+/* A column's reflection, downward, each pixel faded by its source row's entry in
+ * `t`: t[0] is source row `base`, the reflection's faintest. Trap: one faded run
+ * per alpha instead costs ~100 cycles a column per step on the 5G, and a step
+ * per row then adds ~40% to the whole render; this lookup costs nothing. */
+static void NO_INLINE draw_run_reflect(struct pf_col *k, int step,
+                                       const struct pf_fade *t, int base)
 {
-    struct pf_col k;    /* k.n is unused */
-    unsigned char n[PF_REFLECT_BANDS];
-};
+    const pix_t *src = k->src;
+    pix_t *pixel = k->px;
+    unsigned int p = k->p;
+    const int dp = k->dp;
 
-/* Band by band across the tile, so each band's rows are written while the
- * cache lines the band before it fetched are still in. */
-static int draw_tile_reflect(struct pf_refl *rf, int ncols,
-                             const struct pf_fade *fb)
+    for (int n = k->n; n > 0; n--)
+    {
+        unsigned int row = p >> PFREAL_SHIFT;
+        const struct pf_fade *f = &t[row - base];
+
+        *pixel = fade_color(src[row], f->a, f->rb, f->g);
+        p += dp; pixel += step;
+    }
+}
+
+static int draw_tile_reflect(struct pf_col *rf, int ncols,
+                             const struct pf_fade *t, int base)
 {
     int total = 0;
 
-    for (int b = 0; b < PF_REFLECT_BANDS; b++)
-        for (int c = 0; c < ncols; c++)
+    for (int c = 0; c < ncols; c++)
+        if (rf[c].n > 0)
         {
-            int n = rf[c].n[b];
-
-            if (n > 0)
-            {
-                total += n;
-                draw_run_faded(&rf[c].k, n, BUFFER_WIDTH, &fb[b]);
-            }
+            total += rf[c].n;
+            draw_run_reflect(&rf[c], BUFFER_WIDTH, t, base);
         }
     return total;
 }
 
 static void draw_tile(struct pf_col *up, struct pf_col *lo,
-                      struct pf_refl *rf, int ncols,
-                      const struct pf_fade *f, const struct pf_fade *fb)
+                      struct pf_col *rf, int ncols, const struct pf_fade *f,
+                      const struct pf_fade *t, int base)
 {
     int px = draw_tile_half(up, ncols, -BUFFER_WIDTH, f)
            + draw_tile_half(lo, ncols, BUFFER_WIDTH, f);
 
-    if (fb)
-        px += draw_tile_reflect(rf, ncols, fb);
+    if (t)
+        px += draw_tile_reflect(rf, ncols, t, base);
 #if PF_SHOW_STATS
     pf_px += px;
 #else
@@ -2819,26 +2823,23 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
     fade_prepare(&fd, alpha);
     const struct pf_fade *f = (alpha == 256) ? NULL : &fd;
 
-    /* The reflection's bands, as source rows: band b runs from rlim[b - 1]
-     * (the cover's bottom edge, for band 0) up to rlim[b]. Each band's alpha is
-     * the one at its middle, scaled by the slide's own. */
+    /* The reflection's fade, one entry per source row from rbase, its faintest,
+     * down to the cover's bottom edge: each row's alpha is the one at its
+     * middle, scaled by the slide's own. */
     const int refl = MIN(pf_reflect, sh);
-    struct pf_fade rfd[PF_REFLECT_BANDS];
-    int rlim[PF_REFLECT_BANDS];
-    const struct pf_fade *fb = NULL;
+    const int rbase = sh - refl;
+    struct pf_fade rfd[PF_REFLECT_TALL];
+    const struct pf_fade *t = NULL;
 
     if (refl > 0)
     {
-        for (int b = 0; b < PF_REFLECT_BANDS; b++)
+        for (int i = 0; i < refl; i++)
         {
-            int a = PF_REFLECT_ALPHA * (2 * (PF_REFLECT_BANDS - b) - 1)
-                  / (2 * PF_REFLECT_BANDS);
+            int a = PF_REFLECT_ALPHA * (2 * i + 1) / (2 * refl);
 
-            fade_prepare(&rfd[b], (unsigned)(a * alpha) >> 8);
-            rlim[b] = sh * PFREAL_ONE
-                    - (b + 1) * refl * PFREAL_ONE / PF_REFLECT_BANDS;
+            fade_prepare(&rfd[i], (unsigned)(a * alpha) >> 8);
         }
-        fb = rfd;
+        t = rfd;
     }
 
     /* Walked a column at a time, which is the order the source is stored in
@@ -2851,7 +2852,7 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
      * column walk: the column-major source is then read across its stride,
      * and the misses move from the stores onto the loads. */
     struct pf_col tile_up[PF_TILE_W], tile_lo[PF_TILE_W];
-    struct pf_refl tile_rf[PF_TILE_W];
+    struct pf_col tile_rf[PF_TILE_W];
     int ncols = 0;
 
 #define LCDADDR(x, y) (&buffer[(y)*BUFFER_WIDTH + (x)])
@@ -2911,33 +2912,26 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
         /* The reflection takes the rows the lower half left, if the cover's
          * bottom edge came before the screen's. Its source row is the lower
          * half's, mirrored about that edge: p past the edge reads 2 sh - p. */
-        if (fb)
+        if (t)
         {
-            struct pf_refl *r = &tile_rf[ncols];
+            struct pf_col *r = &tile_rf[ncols];
             int rem = (plo == sh * PFREAL_ONE) ? lower_half - l->n : 0;
             int q = 2 * sh * PFREAL_ONE - 1 - (p_start_lower + l->n * dy);
-            int done = 0;
+            int n = (rem > 0 && q >= rbase * PFREAL_ONE)
+                  ? div_by_recip(q - rbase * PFREAL_ONE, dy, recip) + 1 : 0;
 
-            r->k.src = ptr;
-            r->k.px = LCDADDR(x, half_height + l->n);
-            r->k.p = q;
-            r->k.dp = -dy;
-            for (int b = 0; b < PF_REFLECT_BANDS; b++)
-            {
-                int upto = (rem > 0 && q >= rlim[b])
-                         ? div_by_recip(q - rlim[b], dy, recip) + 1 : 0;
-
-                upto = MIN(upto, rem);
-                r->n[b] = MAX(upto - done, 0);
-                done = MAX(done, upto);
-            }
+            r->src = ptr;
+            r->px = LCDADDR(x, half_height + l->n);
+            r->p = q;
+            r->dp = -dy;
+            r->n = MIN(n, rem);
         }
 
         /* A tile ends where a cache line does, not after PF_TILE_W columns
          * counted from wherever the slide happens to start. */
         if (++ncols == PF_TILE_W || (x & (PF_TILE_W - 1)) == PF_TILE_W - 1)
         {
-            draw_tile(tile_up, tile_lo, tile_rf, ncols, f, fb);
+            draw_tile(tile_up, tile_lo, tile_rf, ncols, f, t, rbase);
             ncols = 0;
         }
 
@@ -2951,7 +2945,7 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
 
     }
     if (ncols > 0)
-        draw_tile(tile_up, tile_lo, tile_rf, ncols, f, fb);
+        draw_tile(tile_up, tile_lo, tile_rf, ncols, f, t, rbase);
 }
 
 static void render_slide(struct slide_data *slide, const int alpha)
