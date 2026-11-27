@@ -285,7 +285,9 @@ static bool ss_abort(void)
 {
     int button;
 
-    if (!charger_inserted())
+    /* Any power in, not a qualified charger: the 6G qualifies its charger
+     * separately, and a full battery need not be charging. */
+    if (!power_input_present())
     {
         ss_unplugged = true;
         return true;
@@ -417,9 +419,9 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
  * False if the user stopped instead of plugging in. */
 static bool ss_wait_for_charger(void)
 {
-    if (!charger_inserted() && global_settings.talk_menu)
+    if (!power_input_present() && global_settings.talk_menu)
         talk_text("Connect the charger to continue", false);
-    while (!charger_inserted())
+    while (!power_input_present())
     {
         int button;
 
