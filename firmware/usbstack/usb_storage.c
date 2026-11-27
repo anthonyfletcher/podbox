@@ -325,6 +325,7 @@ static void history_csw(int status);
 static void history_taken(void);
 static void history_dump(void);
 static void reject_command(const struct command_block_wrapper *cbw);
+static void answer_no_blocks(const struct command_block_wrapper *cbw);
 static void account_data_transfer(int dir, int status, int length);
 static void send_command_result(void *data,int size);
 static void send_command_failed_result(void);
@@ -1317,6 +1318,9 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
                 cur_sense_data.ascq=0;
             }
+            else if(cur_cmd.count == 0) {
+                answer_no_blocks(cbw);
+            }
             else {
                 logf("scsi read %llu %d", cur_cmd.sector, cur_cmd.count);
 #ifdef USB_USE_RAMDISK
@@ -1354,6 +1358,9 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
                 cur_sense_data.ascq=0;
+            }
+            else if(cur_cmd.count == 0) {
+                answer_no_blocks(cbw);
             }
             else {
                 logf("scsi read %llu %d", cur_cmd.sector, cur_cmd.count);
@@ -1400,6 +1407,9 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 reject_command(cbw);
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
             }
+            else if(cur_cmd.count == 0) {
+                answer_no_blocks(cbw);
+            }
             else {
                 host_wrote = true;
                 receive_block_data(cur_cmd.data[0],
@@ -1435,6 +1445,9 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 /* the host is about to send the data: stall it */
                 reject_command(cbw);
                 cur_sense_data.asc=ASC_LBA_OUT_OF_RANGE;
+            }
+            else if(cur_cmd.count == 0) {
+                answer_no_blocks(cbw);
             }
             else {
                 host_wrote = true;
@@ -1580,6 +1593,19 @@ static void reject_command(const struct command_block_wrapper *cbw)
         usb_drv_stall(in ? EP_IN : EP_OUT, true, in);
     }
     send_csw(UMS_STATUS_FAIL);
+}
+
+/* A READ or WRITE of no blocks, which SCSI takes as no error: answered at
+   once, a data phase the host meant halted as in reject_command(). Neither
+   on to the disk, whose ATA command takes a count of 0 for 256 sectors, nor
+   a receive or a send of nothing, where the host waits for the status. */
+static void answer_no_blocks(const struct command_block_wrapper *cbw)
+{
+    if(cur_cmd.data_residue) {
+        bool in = (cbw->flags & USB_DIR_IN) != 0;
+        usb_drv_stall(in ? EP_IN : EP_OUT, true, in);
+    }
+    send_csw(UMS_STATUS_GOOD);
 }
 
 static void send_block_data(void *data,int size)

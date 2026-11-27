@@ -225,8 +225,10 @@ void queue_init(struct event_queue *q, bool register_queue)
         {
             /* Add it to the all_queues array */
             *p = q;
-            corelock_unlock(&all_queues.cl);
         }
+        /* or it was there already, and stays: the lock let go either way,
+           else the next queue_init(), queue_delete() or broadcast spins */
+        corelock_unlock(&all_queues.cl);
     }
 
     restore_irq(oldlevel);
