@@ -54,6 +54,7 @@
 
 #ifdef USB_ENABLE_IAP
 #include "usb_iap.h"
+#include "usb_placeholder.h"
 #endif
 
 /* include order matters, include driver header before usb_drv.h */
@@ -965,6 +966,12 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             }
 
             config_descriptor.bNumInterfaces = config_states[index].num_interfaces;
+#ifdef USB_ENABLE_IAP
+            if(config_descriptor.bNumInterfaces == 0) {
+                size += usb_placeholder_descriptor(reqdata + size);
+                config_descriptor.bNumInterfaces = 1;
+            }
+#endif
             config_descriptor.bConfigurationValue = index + 1;
             config_descriptor.wTotalLength = (uint16_t)size;
 #ifdef USB_ENABLE_IAP

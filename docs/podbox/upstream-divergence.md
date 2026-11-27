@@ -187,6 +187,7 @@ iAP2.
 | `usbstack/usb_core.c` | bcdUSB 2.10 rather than 2.00, and a BOS descriptor answered: one USB 2.0 Extension, LPM not supported | An iPhone reports 2.10, and a car may judge the device by it: a Mercedes GLC asks 0x53 and then refuses a player reporting 2.00. Windows, the ND-S1, the Zeppelin Mini and the Mazda take either. |
 | `usb.c`, `export/usb.h` | New `usb_set_iap2_mode()`, applied at the next cable insertion as `usb_set_iap()` is; the disk withheld while iAP2 is answered; new `usb_car_found()` and the `USB_CAR_RECONNECT` event: a car found while the sound card is on makes the player leave the bus and come back without it, until unplugged | The Mazda stops with an authentication error when it finds the sound card beside the disk. Applied mid-session, Off would leave a car's link running with nothing answering it. |
 | `usbstack/usb_iap.h` | `USB_IAP2_MODE_*`, `usb_iap_set_iap2_mode()`, `usb_iap2_offered()`, `usb_iap_answer_iap2()`, vendor request 0x53; `usb_iap_end_reset_hold()`, which `usb.c`, `usb_core.c` and `platform.c` call | Off refuses the probe, On answers it and offers no disk, Auto answers once the host has sent 0x53. |
+| `usbstack/usb_placeholder.c`, `.h` (new), `usbstack/usb_core.c`, `SOURCES` | A configuration with no interfaces is described with one, application-specific and without endpoints | Answering iAP2 leaves configuration 1 empty, and Windows stops with `WDF_VIOLATION` on selecting it (issue #74). |
 
 ### The USB log
 

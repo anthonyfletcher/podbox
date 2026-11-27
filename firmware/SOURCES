@@ -1000,6 +1000,7 @@ usbstack/iap/platform.c
 usbstack/usb_iap.c
 usbstack/usb_iap2.c
 usbstack/usb_iap2_control.c
+usbstack/usb_placeholder.c
 #endif
 #ifdef HAVE_USB_HOST
 usbstack/usb_host.c
