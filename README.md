@@ -11,9 +11,25 @@ playing.
 
 It goes further than the iPod ever did: build playlists from how your music actually sounds,
 look back on a year of listening, read lyrics as they are sung, keep your place in every
-audiobook, and play games made for the click wheel - all on the player.
+audiobook, read eBooks, and play games made for the click wheel - all on the player.
 
 <a href='https://ko-fi.com/P3J3200FZY' target='_blank'><img height='36' style='border:0px;height:36px;' src='docs/podbox/images/support_me_on_kofi_dark.png' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+
+**[Features](#features) · [Install](#installation) · [Library setup](#setting-up-your-music-library) ·
+[First run](#first-run) · [Themes](#installing-themes) · [Connectivity](#connectivity) ·
+[Help](#reporting-a-problem)**
+
+# Quick start
+
+1. Check you have an iPod Classic (6th or 7th generation) or an iPod Video (5th or 5.5th
+   generation), with the Rockbox bootloader installed
+2. Coming from Rockbox or RockPod? Read [what changes](#coming-from-rockbox-or-rockpod) first
+3. Download `rockbox-ipod6g.zip` (Classic) or `rockbox-ipodvideo-5g.zip` (Video) from the
+   [latest release](https://github.com/anthonyfletcher/podbox/releases/tag/latest)
+4. Unzip it into the root of the iPod's disk, so that the `.rockbox` folder sits alongside your
+   music, and eject
+
+The full steps are under [Installation](#installation).
 
 # Features
 
@@ -22,18 +38,21 @@ audiobook, and play games made for the click wheel - all on the player.
 <img src="docs/podbox/images/ss_grid_art_colours.png" alt="Screenshot"/>
 
 The interface re-colours itself from the art of what is playing. PodBox ships with
-[Scrim](themes/scrim/README.md), a new theme built around it, with art filters, translucent
+[Scrim](themes/scrim/README.md), a new original theme built around it, with art filters, translucent
 panels and a spectrum visualiser. It comes in two variants with different Now Playing screens.
 
-> **Find more themes in [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes)**,
-> where people share the themes they make. The [extra themes](#installing-themes) made for PodBox
-> are a separate download.
+> **Want another look?** See [Installing themes](#installing-themes)
+
+Features include: **dynamic colours, menus you arrange yourself, a choice of art and button actions on Now Playing, title trimming, themed dialogs, and multi-row selection**
+
+<details>
+<summary>Details</summary>
 
 - Dynamic colours from the album or artist art, applied to every colour the theme uses
   - Theme dependent
-  - `Settings > Appearance > Interface Colours > Dynamic Colors`
+  - `Settings > Appearance > Interface Colours > Dynamic Colours`
 - Choose whether the album's lighter or darker colour becomes the background
-  - `Settings > Appearance > Interface Colours > Dynamic Colors Background`
+  - `Settings > Appearance > Interface Colours > Dynamic Colours Background`
 - Choose whether long text scrolls, or is cut short with "..."
   - `Settings > Appearance > Scrolling > Enabled`, on by default
 - Your appearance changes are saved with the theme you made them in, so switch back to a theme
@@ -62,6 +81,10 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   - `Settings > Playback > Now Playing Screen > Select Action`, `Menu Action`,
     `Long Press Play Action` and `Select + Play Action`
   - `Go to Album Via` chooses whether the album opens on its own or inside Music
+  - What Now Playing shows is under `Settings > Appearance > Now Playing Screen`, and what its
+    buttons do under `Settings > Playback > Now Playing Screen`
+- Start a sleep timer from the Now Playing screen, with your usual length already chosen
+  - Hold `Select` and select `Sleep Timer`
 - Message, input, confirmation, search, colour, date and time and folder dialogs share one
   themed design
   - `Settings > Appearance > Dialogs`
@@ -77,6 +100,8 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
   - `Menu` leaves without doing anything
 - `Back` and `Menu` behave the same way in every menu
 
+</details>
+
 ## Music
 
 <img src="docs/podbox/images/ss_grid_art_rows.png" alt="Screenshot"/>
@@ -84,10 +109,17 @@ panels and a spectrum visualiser. It comes in two variants with different Now Pl
 Rockbox's Database menu is now **Music**, and every view in it can be switched off, reordered
 or promoted onto the main menu.
 
+Features include: **art in lists, more ways to sort, albums listed under multiple artists,
+random and shuffled albums, playback history, and listening progress**
+
+<details>
+<summary>Details</summary>
+
 - Album covers and artist photos beside their rows
   - Theme dependent
   - See [Artwork](#artwork) for setting up your art
   - `Settings > Appearance > Interface Elements > Art Rows > Album Art Rows`/`Artist Art Rows`
+  - Show an artist's latest album cover when you have no photo of them - Off by default. `Settings > Appearance > Interface Elements > Art Rows > Album Cover If No Photo`
 - Show each album's release year before or after its name
   - Off by default. `Settings > Library > Music > Show Year in Album Lists`
 - Sort albums by name, by year (oldest or newest first), or by artist and then name or year
@@ -115,12 +147,18 @@ or promoted onto the main menu.
   - Theme dependent. Scrim shows it, and `Album Header` in its Theme Options turns it off
 - See your most played, most recently played and forgotten albums and artists
   - `Music > Playback History`
+- Play what you have had on repeat: your most played tracks of last week, last month or the
+  last seven days
+  - `On Repeat` on the Playlists screen, once there is something in it
+  - `Settings > Playback > Playlists > On Repeat` picks the span, and `On Repeat Length` how many
+    tracks it holds, 30 by default
+  - It counts the plays `Settings > Playback > Logging` records
 - See how much of an album or artist you have listened to
   - Hold `Select` on the album or artist and select `Listening Progress`
-- Start a sleep timer from the Now Playing screen, with your usual length already chosen
-  - Hold `Select` and select `Sleep Timer`
 - Add your own views to the Music menu or an artist's groupings above their albums
   - See [`music-menu-guide.md`](docs/podbox/music-menu-guide.md)
+
+</details>
 
 ## Search
 
@@ -129,20 +167,35 @@ or promoted onto the main menu.
 Results appear as you type, across tracks, albums and artists. The grid keyboard is gone,
 replaced by a single-line editor driven by the click wheel.
 
+Features include: **results as you type, across tracks, albums and artists, in the order you
+choose**
+
+<details>
+<summary>Details</summary>
+
 - `Music > Search`
 - Choose how results are ordered in `Settings > Library > Search`
+
+</details>
 
 ## Audiobooks
 
 <img src="docs/podbox/images/ss_grid_audio_books.png"/>
 
-Audiobooks remember where you stopped, with nothing to save by hand, and can live in a menu of
+Audiobooks remember where you stopped, with nothing to save by hand, and live in a menu of
 their own.
+
+Features include: **covers and author photos, lists of books in progress
+and finished, listening stats, series in order, bookmarks, chapters, a speed and skip length of
+their own, a rewind when you resume and a sleep timer that stops at the end of a chapter**
+
+<details>
+<summary>Details</summary>
 
 - Give audiobooks their own main menu entry, and keep them out of Music and the carousels
   - `Auto` by default, whenever there are audiobooks. `Settings > Library > Music > Segregate Audiobooks`
-  - A book is a track whose genre contains "audiobook", "audio book" or "spoken word", or is
-    "book", "books", "spoken" or "speech"
+  - <a id="spoken-word-genres"></a>A book is a track whose genre contains "audiobook",
+    "audio book" or "spoken word", or is "book", "books", "spoken" or "speech"
 - Book covers and author photos beside their rows
   - Theme dependent
   - `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows` (on by default)/`Audiobook Author Art Rows`
@@ -186,11 +239,18 @@ their own.
   - While a book plays, hold `Select` on the Now Playing screen, choose `Sleep Timer` and then
     `End of Chapter`
 
+</details>
+
 ## Podcasts
 
 <img src="docs/podbox/images/ss_grid_podcasts.png"/>
 
 Each episode keeps its place, and a show opens on its newest episode.
+
+Features include: **lists of episodes in progress and finished, listening stats, and episode notes**
+
+<details>
+<summary>Details</summary>
 
 - Give podcasts their own main menu entry, and keep them out of Music and the carousels
   - `Auto` by default, whenever there are podcasts. `Settings > Library > Music > Segregate Podcasts`
@@ -212,6 +272,8 @@ Each episode keeps its place, and a show opens on its newest episode.
 - Choose whether Search lists matching episodes or shows first
   - `Settings > Library > Search > Podcast Order`
 
+</details>
+
 ## Album Covers and Artist Portraits
 
 <img src="docs/podbox/images/ss_grid_carousel.png" alt="Screenshot"/>
@@ -220,12 +282,20 @@ Two carousels on the main menu, **Album Covers** and **Artist Portraits**, let y
 through your library by its art. Open a cover to go into that album, or an artist to go into
 their albums. Both run much faster than Rockbox's PictureFlow, particularly on the iPod Video.
 
+Features include: **improved sort and appearance controls, a reflection under the covers, a
+random spin and wheel glide**
+
+<details>
+<summary>Details</summary>
+
 - Choose whether opening an album lists its tracks or starts playing it
   - `Settings > Library > Carousel > On Album Select`
 - Show the covers in 3D, or flat and face-on either side of the current one
   - `Settings > Appearance > Carousel > View Mode`
 - Change the look of the covers with art filters
   - `Settings > Appearance > Carousel > Artwork Filter`
+- Show a reflection under the covers
+  - `Settings > Appearance > Carousel > Reflection`: `Off`, `Short` (the default) or `Tall`
 - Sort the carousels the same way as Music, or separately
   - Off by default. `Settings > Library > Carousel > Sort > Same as Music`
 - Give the carousel a fixed background colour that dynamic colours leave alone
@@ -233,81 +303,148 @@ their albums. Both run much faster than Rockbox's PictureFlow, particularly on t
 - Spin to a random album or artist
   - Hold `Play`
   - `Settings > Library > Carousel > Random Spin Length` sets how far it spins
-- Show an artist's latest album cover when you have no photo of them
-  - Off by default. `Settings > Appearance > Interface Elements > Art Rows > Album Cover If No Photo`
+- Spin to the next letter, or the next year when sorted by year
+  - Press `Left` or `Right`; hold to keep going
+- Flick the wheel and let go, and the covers glide on and slow to a stop; rest a finger on the
+  wheel to stop them
+  - Off by default. `Settings > Library > Carousel > Wheel Glide`
+
+</details>
 
 ## Featured Artists
 
 <img src="docs/podbox/images/ss_grid_featured_in.png"/>
 
+The guests your tags already name - *Song (feat. Somebody)* - become artists you can browse,
+even when you have none of their albums.
+
+Features include: **a list of the artists who guest on your tracks, and from any artist, the
+tracks they guest on**
+
+<details>
+<summary>Details</summary>
+
 - See the artists featured on your tracks, and from any artist, the tracks they guest on
   - Off by default. `Settings > Library > Music > Featured Artists`
   - Then `Music > Featured Artists`
+- Show each guest's photo beside their row, from `Artwork/People/<Name>.jpg`
+  - Off by default. `Settings > Appearance > Interface Elements > Art Rows > Featured Artist Art Rows`
+  - Fetch them with [`fetch_pb art --featured-artists`](tools/fetch/art_fetch.md)
   - See [`featured-artists-guide.md`](docs/podbox/featured-artists-guide.md) for more
 
-## Lyrics, documents and pictures
+</details>
 
-<img src="docs/podbox/images/ss_grid_apps.png" alt="Screenshot"/>
+## Lyrics, Liner Notes and Artist Biographies
 
-A lyrics viewer follows the song line by line. The text viewer reads txt, lrc, fb2, epub, mobi,
-azw3, pdb, docx, pdf, md, html and rtf, and the image viewer shows JPEG (including CMYK), PNG,
-GIF, WebP and BMP pictures.
+<img src="docs/podbox/images/ss_grid_notes_lyrics.png"/>
+
+Every artist and album in your library also has a
+page, with links between them, like a small wiki of your music. Write your own liner notes and
+biographies, or fetch them from Wikipedia and MusicBrainz, and the player fills in the rest from
+your library. Lyrics follow the playing song line by line.
+
+Features include: **notes that open at the playing track, links to
+follow and play from, lyrics and pages fetched for your whole library, and track lists and
+discographies made from your library, lyrics in time with the song**
+
+<details>
+<summary>Details</summary>
 
 - See the lyrics of what is playing
-  - Press `Select + Play` on the Now Playing screen
+  - Press `Select + Play` on the Now Playing screen, by default
   - `Settings > Library > Viewers > Lyrics Viewer` for how they are shown
-- Read your music as a wiki: a page for every artist and album, the liner notes and
-  biographies you write, and links between them to follow and play from
-  - Turn on `Settings > Library > Music > Liner Notes and Biographies > Enabled`
-  - Write pages as Markdown files in `/Notes`, then hold `Select` on the Now Playing screen
-  - Or fetch them from Wikipedia and MusicBrainz with [`podbox_fetch notes`](tools/fetch/notes_fetch.md)
-  - See [`notes-guide.md`](docs/podbox/notes-guide.md) for more
+  - Fetch timed lyrics for your whole library with
+    [`fetch_pb lyrics`](tools/fetch/lyric_fetch.md). See [Lyrics](#lyrics)
+- Turn on liner notes and biographies
+  - Off by default. `Settings > Library > Music > Liner Notes and Biographies > Enabled`
+- Read the notes for what is playing, opened at the playing track
+  - Hold `Select` on the Now Playing screen and select `Liner Notes`
+  - Or set a Now Playing button to `Liner Notes`: `Settings > Playback > Now Playing Screen`
+- Open a page from the library
+  - Hold `Select` on an album for `Liner Notes`, or on an artist for `Biography` or `Mentions`
+- Write your own pages as Markdown files in `/Notes`, or beside the music as `bio.md` and
+  `notes.md`
+  - A name in square brackets, such as `[Steve Gadd]`, becomes a link, however it is spelt
+- Fetch pages for your whole library from Wikipedia and MusicBrainz with
+  [`fetch_pb notes`](tools/fetch/notes_fetch.md)
+  - It never changes a page you wrote. See [Liner Notes and Biographies](#liner-notes-and-biographies)
+- An artist with no page of their own still has one: their albums, and the pages that name
+  them. An album's lists its tracks
+- Follow links with the wheel and `Select`, and go back with `|<<`
+  - A link to a track plays its album from that track; `Play` on an album's page plays the album
+- Lists that fill themselves in: an artist's albums, an album's tracks, the tracks played last,
+  the pages that mention this one
+  - Write `{{albums}}`, `{{tracks}}`, `{{played}}` or `{{mentions}}` where you want them
+- Each page is tinted from its cover or the artist's picture, shown as a banner at the top
+  - `Settings > Library > Music > Liner Notes and Biographies > Colours` and `Banners`
+- See [`notes-guide.md`](docs/podbox/notes-guide.md) for more
+
+</details>
+
+## Books, Documents and Pictures
+
+<img src="docs/podbox/images/ss_grid_books.png" alt="Screenshot"/>
+
+Books keeps every EPUB, FB2 and Kindle book on the player in one library, with its cover, your
+place, your bookmarks and your reading stats. The text viewer also reads txt, pdb, docx, pdf,
+md, html, rtf and lrc, and the image viewer shows JPEG (including CMYK), PNG, GIF, WebP and BMP
+pictures.
+
+Features include: **a Books library with reading stats and bookmarks, a choice of font, size and
+colours, footnotes, pictures in books and reading sideways in one hand**
+
+<details>
+<summary>Details</summary>
+
+- `Books` on the main menu lists every EPUB, FB2 and Kindle (MOBI, AZW3) book on the player
+  - A MOBI locked to a Kindle account will not open
+  - It opens on `In Progress`, as `Audiobooks` does, with `Search` and `Finished` above it and
+    `Not Started` below. `In Progress` and `Finished` put the book you read last first
+  - `Search` finds books by title or author
+  - `By Title`, `By Author`, `By Subject` and `By Series`: a book is listed under every subject
+    it names, and a series in its own order
+  - Press `>>|` on a book's last page to close it and move it to `Finished`
+  - Hold `Select` on a book for `Mark as...` (to move it between the lists), `Browse Chapters`,
+    `Bookmarks`, `Book Info`, `Reading Stats` and `Show in Files`
+- `Continue Reading` on the main menu reopens your last document where you left off
+- Bookmark a page: hold `Menu` while reading and select `Create Bookmark`
+  - `Bookmarks`, in the same menu or on the book's menu, lists them by chapter and the page's
+    first words. Select one to go back to it; hold `Select` to delete it
+- Find text: hold `Menu` while reading and select `Find`
+  - It searches from the page you are on to the end of the book and opens the page it finds;
+    `Find Next` carries on from there. Any button stops it
+- `Reading Stats`, on a book's menu or at the foot of `Books`, for one book or for all of them
+  - Time spent reading, pages a day, words a minute and the time left at that speed, when you
+    started and finished, your longest sitting and your best streak of days
+  - A page flicked past, or read again in the same sitting, does not count
 - Choose how documents look: font, text size, margin, line spacing, justification, paragraph
   indent and colours
   - `Settings > Library > Viewers > Text Viewer`
   - `Larger Text` and `Smaller Text` step through the sizes the font comes in
-  - The backlight can stay on while you read, with a brightness of its own:
+  - The backlight can stay on while you read, at a brightness of its own:
     `Reading Backlight` and `Reading Brightness`
-- `Continue Reading` on the main menu reopens your last document where you left off
-- `Books` on the main menu shows every EPUB, FB2 and Kindle (MOBI, AZW3) book on the player,
-  with its cover
-  - A MOBI locked to a Kindle account will not open
-  - Opens on `In Progress`, as `Audiobooks` does, with `Search` and `Finished` above it and
-    `Not Started` below. `Search` finds books by title or author. `In Progress` and `Finished`
-    list the book you read last first
-  - Press `>>|` on a book's last page and it closes, shown in `Finished`
-  - `By Title`, `By Author`, `By Subject` for the subjects the books name, each book under
-    every one of its subjects, and `By Series` for the series they name, in their order
-  - Hold `Select` on a book for `Mark as...`, which moves it between the lists, `Browse Chapters`,
-    `Bookmarks`, `Book Info`, `Reading Stats` and `Show in Files`
-  - Bookmark a page: hold `Menu` while reading and select `Create Bookmark`; `Bookmarks` in the
-    same menu, or on the book's menu, goes back to one, and holding `Select` on one deletes it
-  - `Reading Stats`, on a book's menu or at the foot of `Books`, shows your time reading, pages a day, reading speed in words a minute, the
-    time left at that speed, when you started and finished, your longest sitting and your best
-    streak of days, for one book or for all of them. A page flicked past, or read again in the
-    same sitting, does not count
-  - See pictures inside books
-- Zoom into a picture and move around it
-  - Hold `Menu` in the image viewer and select `Zoom` for a list of zoom levels
-  - Hold `Select`, or select `Pan` in the same menu, to switch pan mode on: the wheel moves the
-    picture up and down and `|<<` and `>>|` move it sideways. Click `Menu` to switch it off
 - Footnotes are taken out of the text, and each reference reads as `[1]`. Hold `Select` on a
   page to read the notes it refers to
-- A book's cover is its first page, and its pictures each have a page of their own
+- A book's cover is its first page, and each of its pictures has a page of its own
   - On by default. `Settings > Library > Viewers > Text Viewer > Pictures`
 - Hold `|<<` for the start of the chapter and `>>|` for the next one
+- Turn the wheel to move through the book a percent at a time; `Select` goes there, any other
+  button stays put
+  - Off by default. `Settings > Library > Viewers > Text Viewer > Wheel Scrubs`
 - Read holding the player sideways in one hand, turning pages with `Play` and `Menu`
   - `Settings > Library > Viewers > Text Viewer > Reading Orientation`, or double-click
     `Play` on an upright page
   - The button at the top works as `Menu` does upright: click it to leave, hold it for the
     settings. Double-click the button at the bottom to swap hands, and hold it to stand the
     page upright again. Hold the page-turning buttons to move by chapters
-- Turn the wheel to move through the book a percent at a time; `Select` goes there, any other
-  button stays put
-  - Off by default. `Settings > Library > Viewers > Text Viewer > Wheel Scrubs`
-- See every document and every image on the player in a list of each, search them, and list
-  them by type
+- Zoom into a picture and move around it
+  - Hold `Menu` in the image viewer and select `Zoom` for a list of zoom levels
+  - Hold `Select`, or select `Pan` in the same menu, to switch pan mode on: the wheel moves the
+    picture up and down and `|<<` and `>>|` move it sideways. Click `Menu` to switch it off
+- List every document and every picture on the player, search them, and sort them by type
   - Hidden by default. Add it with `Settings > Appearance > Menus > Edit Main Menu`
+
+</details>
 
 ## Playback Report
 
@@ -316,10 +453,16 @@ GIF, WebP and BMP pictures.
 Your year in listening, like the summaries streaming services send at the end of the year, worked
 out on the player from what it has logged. Based on [Spun](https://github.com/majorsiebe/Stats_for_iPod).
 
+Features include: **minutes and plays, a card for every week, your top artists, songs and
+albums, the songs you skip, and earned achievements**
+
+<details>
+<summary>Details</summary>
+
 - `Playback Report` on the main menu
   - It reads the log that `Settings > Playback > Logging` writes, on by default, whichever
     logging choice is set
-  - It counts your whole history, from the first entry of the log.
+  - It opens on All Time, your whole history from the first entry of the log
 - The report is a row of cards in sections. The wheel scrolls along a section, and `Left`/`Right`
   move between sections
   - **In Numbers** - minutes listened, plays, different tracks, plays skipped and your peak hour,
@@ -332,7 +475,7 @@ out on the player from what it has logged. Based on [Spun](https://github.com/ma
   - **Skips** - the share of plays you skipped, the songs you skip most, and your most-played
     songs that you have never skipped. A play counts as skipped if you stopped it after
     5 seconds but before half the song (or 4 minutes) had played
-  - **Achievements** - 340 badges for milestones in minutes, plays, skips, the number of
+  - **Achievements** - over 300 badges for milestones in minutes, plays, skips, the number of
     different songs, artists and albums, night listening, streaks and record days. Each shows
     the date you earned it, and the next badge in each series shows how close you are.
     Badges count your whole history, whatever year is on screen
@@ -346,13 +489,22 @@ out on the player from what it has logged. Based on [Spun](https://github.com/ma
   the one song
 - Hold `Menu` to choose a year or All Time, and for the settings
 
-## Playlist engine
+</details>
+
+## Playlist Engine
 
 <img src="docs/podbox/images/ss_grid_playlist_engine.png" alt="Screenshot"/>
 
 PodBox listens to your library and measures how each track actually sounds - its tempo,
 loudness, tonal balance, key and how busy it is - then builds playlists of tracks that work
 together.
+
+Features include: **Play Similar, moods, journeys from one mood to another, Wind Down,
+ordering a playlist by sound, music that keeps going when a list runs out, and what a track,
+an album or your whole library sounds like**
+
+<details>
+<summary>Details</summary>
 
 - Turn it on with `Settings > Library > Playlist Engine > Enabled`, which starts the analysis.
   This takes a long time on the player; `soundscan.exe` does it much faster from a Windows PC
@@ -382,6 +534,8 @@ together.
   and the spread of tempos, keys and loudness by decade
   - `Settings > Library > Playlist Engine > Library Sound`
 
+</details>
+
 ## Equalizer
 
 <img src="docs/podbox/images/ss_grid_eq.png" alt="Screenshot"/>
@@ -389,6 +543,12 @@ together.
 The equalizer is drawn as a curve, the sound it really makes, and you shape it while the music
 plays. Simple mode gives ten bands to raise and lower; Enhanced mode sets each band's frequency,
 Q and type as well.
+
+Features include: **a curve you shape while the music plays, presets you hear as you scroll, and
+boosts that never clip**
+
+<details>
+<summary>Details</summary>
 
 - `Settings > Sound > Equalizer > Edit EQ`
   - The wheel sets a band's gain, `Left`/`Right` choose the band
@@ -400,9 +560,8 @@ Q and type as well.
   - `Settings > Sound > Equalizer > EQ Presets`
 - Boosting does not clip: Auto Headroom (on by default) turns the equalizer down by its highest
   boost, and shows by how much
-- Play 16-bit files bit for bit: with `Settings > Sound > Dithering` on `Auto` and
-  `Settings > Playback > Replaygain > Replaygain Type` on `Off` (both the default on a new
-  install), a 16-bit file reaches the DAC exactly as it is in the file
+
+</details>
 
 ## Games
 
@@ -425,6 +584,12 @@ away.
 **Brick Mania** is a bat-and-ball game for the click wheel: ten levels of bricks, power-ups to
 catch, and a combo for every brick broken without touching the paddle.
 
+Features include: **an Arcade library, games that resume where you left them and high
+scores and achievements**
+
+<details>
+<summary>Details</summary>
+
 - Play: `Arcade`, then the game
   - Hold `Select` on a game for its high scores, its help, or to delete a saved game
 - Press `Menu` to quit. A game you quit is marked `Paused` and starts again where you left it
@@ -434,10 +599,18 @@ catch, and a combo for every brick broken without touching the paddle.
 - See every game's best scores and achievements in `Arcade > High Scores`
 - Remove the Arcade from the main menu with `Settings > Appearance > Menus > Edit Main Menu`
 
+</details>
+
 ### Making your own
 
 Games are written in a small part of JavaScript, with their sprites, maps and sound effects
 made alongside the code.
+
+Features include: **an IDE that runs in a browser, a GitHub template that builds your game on
+every push, a manual and command-line tools**
+
+<details>
+<summary>Details</summary>
 
 - [The Arcade IDE](https://anthonyfletcher.github.io/podbox/ide/) runs in a browser with nothing
   to install: write, draw, run and save a game, and share it as a web page
@@ -451,6 +624,8 @@ made alongside the code.
 - Share what you make in
   [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/games)
 
+</details>
+
 ## Settings
 
 <img src="docs/podbox/images/ss_grid_settings.png"/>
@@ -458,6 +633,12 @@ made alongside the code.
 Settings are regrouped into Sound, Playback, Library, Appearance, Battery & Power and System,
 and every one of them can explain itself. See [`settings-guide.md`](docs/podbox/settings-guide.md)
 for the full list.
+
+Features include: **searching for a setting, hiding the ones most people never change, a list
+of settings you've changed, and an explanation of every setting**
+
+<details>
+<summary>Details</summary>
 
 - Find a setting by name or by what it does
   - `Settings > Search` (scroll up from the top of Settings)
@@ -470,7 +651,15 @@ for the full list.
 - Shut down or restart from the menu
   - `Settings > System > Startup/Shutdown`
 
+</details>
+
 ## Language and Voice
+
+Features include: **eleven languages, your own wording for any text, a built-in voice that
+reads the menus and your library's names, and documents read aloud**
+
+<details>
+<summary>Details</summary>
 
 - Everything PodBox adds is translated into English (US), Deutsch, Français, Español, Italiano,
   Nederlands, Português (Brasil), Polski, Svenska, 日本語 and 简体中文
@@ -499,12 +688,21 @@ for the full list.
 - The built-in voice reads English. Names in other Latin-alphabet languages are read as English
   would read them; Greek, Cyrillic and Japanese kana are read from their letters; other scripts,
   such as Chinese or Arabic, are named rather than read
-- Rockbox voice files are also supported, with higher quality output but limited range to language
-  strings
+- Rockbox voice files are also supported, which sound better but only cover the menu text, not
+  your library's names
   - Choose one with `Settings > System > Language & Text > Voice > Voice`: `Voice File for Menus`
     speaks the menus in it and names in the built-in voice, `Voice File Only` uses it alone
 
-## Performance improvements
+</details>
+
+## Performance Improvements
+
+Features include: **faster decoding and sound processing, bit-perfect 16-bit files, art cached for speed,
+and - on the iPod Video - a second DMA engine for the screen and the second processor for the
+music**
+
+<details>
+<summary>Details</summary>
 
 - Faster decoding with more ARM assembly resulting in less CPU usage - particularly beneficial for the iPod Video
 - Faster equalizer, Auditory Fatigue Reduction and Perceptual Bass Enhancement with more ARM
@@ -515,10 +713,22 @@ for the full list.
   - `System > Background Tasks` to see what it is doing
 - The iPod Video's screen is updated by a second DMA engine while music plays, leaving more of
   the CPU to the decoder
-- The iPod Video's second processor decodes the music and runs the equalizer, leaving the main
-  one for the screen, the menus and games
+- The iPod Video's second processor decodes the music, MP3 included, leaving the main one for
+  the equalizer, the screen, the menus and games
 - Album and artist lists come straight from the database held in memory, so Album Covers, the
   charts and Random Album open quickly
+- Play 16-bit files bit for bit: with `Settings > Sound > Dithering` on `Auto` and
+  `Settings > Playback > Replaygain > Replaygain Type` on `Off` (both the default on a new
+  install), a 16-bit file reaches the DAC exactly as it is in the file
+- On the iPod Video, power the audio chip at 3.0 V as Apple's firmware does, for a little less
+  hiss and a little more headroom
+  - Off by default. `Settings > Sound > Full Codec Voltage`
+- The database loads into memory about five times faster at start-up
+- Saving a library update takes less time on a large library
+- A queue in which nothing can play stops, instead of trying the same tracks for ever under
+  Repeat
+
+</details>
 
 ---
 
@@ -534,6 +744,22 @@ for the full list.
 Nothing else — not the Nano, Mini, Shuffle or Touch. If you have one of those,
 you want [Rockbox](https://www.rockbox.org) itself, which supports 80+ players.
 
+- **The 30 GB iPod Video**, with 32 MB of memory, is the one PodBox is tested on. The 60 and
+  80 GB models have 64 MB and have not been tested yet
+- **Flash storage** - iFlash boards and SD card adapters - works and is tested
+- **Large libraries** work; no upper limit has been tested
+
+## Coming from Rockbox or RockPod
+
+- **There are no plugins.** The viewers you need are built in, and PodBox has its own games, in
+  the [Arcade](#games); Rockbox's games and other plugins are gone
+- **PodBox keeps its own library database** in `.rockbox/library/`, and upgrades the Rockbox
+  database it finds the first time it starts. Rockbox's desktop database tool does not write
+  it - use `database_pb.exe` (see [First run](#first-run))
+- **Any Rockbox theme works**, but without changes it will not show dynamic colours or art in
+  lists
+- **Settings have moved.** Use `Settings > Search` to find one
+
 ## Installing PodBox
 
 > **New to Rockbox?** A player that has never run Rockbox needs its bootloader installed once
@@ -545,10 +771,6 @@ Download the zip for your player from the
 [latest release](https://github.com/anthonyfletcher/podbox/releases/tag/latest) —
 `rockbox-ipod6g.zip` for the Classic, `rockbox-ipodvideo-5g.zip` for the Video — and unzip it
 into the root of the iPod's disk, so that the `.rockbox` folder sits alongside your music.
-
-Updating is the same: unzip the new release over the old one. **If you use any of the
-[extra themes](#installing-themes), update them at the same time** — they are rebuilt for each
-release, and a theme made for new firmware can fail on old firmware.
 
 The zips include three Windows tools (see [First run](#first-run)). If your browser or
 antivirus blocks them, the `-no-tools` zips are the same without them.
@@ -564,16 +786,21 @@ To try PodBox before installing it, the
 [Simulator release](https://github.com/anthonyfletcher/podbox/releases/tag/Simulator) runs it in
 a window on a Windows PC.
 
-## Coming from Rockbox or RockPod
+## Updating
 
-- **There are no plugins.** The viewers you need are built in, and PodBox has its own games, in
-  the [Arcade](#games); Rockbox's games and other plugins are gone
-- **PodBox builds its own library database** in `.rockbox/library/`, the first time it starts.
-  Rockbox's desktop database tool does not write it - use `database_pb.exe` (see
-  [First run](#first-run))
-- **Any Rockbox theme works**, but without changes it will not show dynamic colours or art in
-  lists
-- **Settings have moved.** Use `Settings > Search` to find one
+Copy the iPod's `.rockbox` folder to your computer first, then unzip the new release over the
+old one. Your settings, library database, play counts and places in books are kept: the zip
+contains none of them.
+
+**If you use any of the [extra themes](#installing-themes), update them at the same time.**
+They are rebuilt for each release, and a theme made for new firmware can fail on old firmware.
+
+## Going back
+
+- **To Rockbox:** delete `.rockbox` and install Rockbox as its own guide says, or put back the
+  copy you made before installing PodBox
+- **To Apple's firmware, for one start:** slide the hold switch on as the iPod starts, or with
+  the PodBox bootloader, hold `Menu`
 
 # Setting up your music library
 
@@ -623,8 +850,8 @@ Podcasts
 
 What makes a book or a podcast is its tags, not its folder:
 
-- the genre is "audiobook", "spoken word" or "book" for a book, and "podcast" or "podcasts" for
-  a podcast
+- the genre is one of the [spoken word genres](#spoken-word-genres) for a book, and "podcast"
+  or "podcasts" for a podcast
 - the album is the book's title or the show's name, on every track
 - the album artist is the author or the host
 - an episode's place in its show comes from its title (`S01E04`, `Episode 12`, `#12` or a
@@ -671,20 +898,40 @@ differently still finds its art: see the [Artwork guide](docs/podbox/artwork-gui
 
 To fill your library with album and artist art, try
 [rockbox-library-manager](https://github.com/cyberdeliaAI/rockbox-library-manager), or the
-command-line [`podbox_fetch art`](tools/fetch/art_fetch.md), from the
+command-line [`fetch_pb art`](tools/fetch/art_fetch.md), from the
 [Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools) for Windows and macOS.
 
 ## Lyrics
 
-Lyrics are found when they are:
+Lyrics are found when they are in a `.lrc`, `.lrc8` or `.snc` file beside the track with the
+same name, e.g. `Artist/Album/01 Track.lrc`, or embedded in the file.
 
-- embedded in your audio files, or stored beside the track with the same name and a different
-  extension, e.g. `Artist/Album/01 Track.lrc`
-- in a `.lrc`, `.lrc8` or `.snc` file
-
-To fetch them for your library, run [`podbox_fetch lyrics`](tools/fetch/lyric_fetch.md) from the
+To fetch them for your library, run [`fetch_pb lyrics`](tools/fetch/lyric_fetch.md) from the
 [Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools) against your mounted
 iPod. It saves timed lyrics from LRCLIB beside each track it finds them for.
+
+## Liner Notes and Biographies
+
+The player reads pages written in Markdown from `/Notes`: `Albums/<Artist> - <Album>.md` for an
+album, `People/<Name>.md` for an artist or anyone an album credits. Turn them on with
+`Settings > Library > Music > Liner Notes and Biographies > Enabled`. The
+[Liner Notes guide](docs/podbox/notes-guide.md) says how to write your own.
+
+To fill them for your library, run [`fetch_pb notes`](tools/fetch/notes_fetch.md) from the
+[Tools release](https://github.com/anthonyfletcher/podbox/releases/tag/Tools) against your mounted
+iPod:
+
+```bash
+.\fetch_pb notes E:\ --contact you@example.com    # the first time: Wikipedia asks for a contact
+.\fetch_pb notes E:\ --depth 1                    # producers, songwriters and band members too
+```
+
+Each album gets the opening of its Wikipedia article and its credits from MusicBrainz, and each
+artist a biography; the player adds the track lists, the albums and the links between the pages.
+`--tracks` adds a page about each album's songs. It never changes a page you wrote, and keeps
+what it fetched in `.rockbox/fetch` on the iPod: leave that folder there, or the next run
+cannot tell its pages from yours. A first run over a few hundred albums takes half an hour to an
+hour. After it, `Settings > Library > Maintenance > Rebuild File Index` shows the new pages.
 
 # First run
 
@@ -693,7 +940,14 @@ which slows things down for a while (particularly on the iPod Video). `System > 
 shows how far it has got.
 
 All three jobs below run much faster from a Windows PC. Connect the iPod after PodBox has started
-at least once, and run the tools from `.rockbox/tools/` in a command prompt:
+at least once, and run the tools from `.rockbox/tools/` in a command prompt, for example:
+
+```bat
+E:\.rockbox\tools\database_pb.exe
+```
+
+The tools are for Windows only. On a Mac or Linux, leave the player to do the work itself.
+
 
 1. **`database_pb.exe`** builds the database. It does what
    `Settings > Library > Maintenance > Update Database` does, keeping play counts, ratings and
@@ -702,7 +956,7 @@ at least once, and run the tools from `.rockbox/tools/` in a command prompt:
 2. **`artcache_pb.exe`** builds the art cache - run it after `database_pb.exe` if you have added
    music. It does what `Update Art Cache` does, and `artcache_pb.exe --rebuild` what
    `Rebuild Art Cache` does.
-3. **`soundscan.exe`** analyses your music for the [playlist engine](#playlist-engine), in about
+3. **`soundscan.exe`** analyses your music for the [Playlist Engine](#playlist-engine), in about
    an hour rather than many on the player. Then turn the engine on with
    `Settings > Library > Playlist Engine > Enabled`.
 
@@ -710,6 +964,8 @@ at least once, and run the tools from `.rockbox/tools/` in a command prompt:
 
 Scrim, the theme PodBox ships with, gets the most out of it. Any Rockbox theme works, but without
 changes it will not show dynamic colours or art in lists.
+
+<img src="docs/podbox/images/ss_grid_iclassic.png" alt="iClassic Square: the main menu and Now Playing"/>
 
 More [themes](themes/README.md) made for PodBox are a separate download, one zip each or all of
 them in `all-themes.zip`, from the
@@ -720,27 +976,33 @@ them in `all-themes.zip`, from the
 
 Unzip onto the root of the iPod, the same way you installed PodBox, then pick
 it under `Settings > Appearance > Load Theme`. Each zip carries the fonts its theme needs, so
-they can be installed in any order and on their own.
-
-**Update your themes whenever you update PodBox.** Themes are rebuilt for each release, and a
-theme made for new firmware can fail on old firmware.
+they can be installed in any order and on their own. Update them whenever you
+[update PodBox](#updating).
 
 > **Find more themes in [Discussions](https://github.com/anthonyfletcher/podbox/discussions/categories/themes)**,
 > where people share the themes they make.
+
+### Making your own
+
+[The Theme IDE](https://anthonyfletcher.github.io/podbox/theme-ide/) runs in a browser with
+nothing to install: open a theme folder, edit its skins, and see each change on PodBox itself,
+running beside the editor with a library of music to play. Chrome or Edge save to the folder in
+place; other browsers can only read it. The [theme guide](docs/podbox/theme-guide.md) covers
+what a theme can do on PodBox that it cannot on stock Rockbox.
 
 ---
 
 # Connectivity
 
 Everything below works on both the iPod Video and the iPod Classic, apart from the earphone
-remote (see [Headphones](#headphones-improved)), but it has been tested with only a small number
+remote (see [Headphones](#headphones)), but it has been tested with only a small number
 of accessories. If you'd like to help with testing, please follow
 [this guide](docs/podbox/connectivity-testing-guide.md).
 
 The USB and accessory settings below are under `Settings > System`, and some are shown only with
 `Settings > Settings Mode` set to `Everything`.
 
-### Sound card (New)
+### Sound Card
 
 <img src="docs/podbox/images/conn_sound_card.svg" alt="The iPod as a USB sound card for a computer"/>
 
@@ -750,7 +1012,7 @@ socket, using the iPod's DAC.
 - `Settings > System > USB > USB Sound Card` - off by default; turning it on can need a restart
 - The click wheel sets the iPod's volume while the computer plays through it
 
-### USB Host (New)
+### USB Host
 
 <img src="docs/podbox/images/conn_usb_dac.svg" alt="The iPod sending digital audio to a USB DAC, which is powered by its own supply or by an injector in the cable"/>
 
@@ -764,7 +1026,7 @@ headphone amp or DAC, which does the conversion instead of the iPod.
   kHz will not
 - A DAC also works through a USB hub; the iPod uses the first device it finds on the hub
 
-### Docks and receivers (Improved)
+### Docks and Receivers
 
 <img src="docs/podbox/images/conn_spdif_dock.svg" alt="The iPod on a speaker dock; or plugged into an amplifier's USB socket, the amplifier showing the track playing"/>
 
@@ -779,8 +1041,8 @@ connector.
 A receiver or dock that browses an iPod shows what is playing and can browse
 and play your library from its own screen and remote
 - Artist, album and title of the playing track
-- Playlists, Artists, Albums, Genres, Composers and Songs, as far as the
-  accessory offers them, sorted the way the Music menu sorts them
+- Playlists (On Repeat among them), Artists, Albums, Genres, Composers and Songs, as far as
+  the accessory offers them, sorted the way the Music menu sorts them
 - `Settings > System > Accessories > Accessory Browsing` sets how many songs a list can hold -
   10,000 by default.
 
@@ -790,7 +1052,7 @@ Your iPod can mirror its screen on a TV - through a dock with a video output
 - `Standard` - PAL or NTSC, iPod Video only
 - On an iPod Video the iPod's own screen goes black while it's on
 
-### Modern Cars (New/Experimental)
+### Modern Cars
 
 <img src="docs/podbox/images/conn_car.svg" alt="The iPod plugged into a car's USB socket; the car's screen shows the track playing"/>
 
@@ -806,7 +1068,7 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
   Shown only while `Accessory Protocol` is on
 - `Settings > System > Accessories > Accessory Artwork` specifies where the cover comes from.
   `Prefer Cache` by default, which appears almost at once. `As Album Art`, `Prefer Embedded` and
-  `Prefer Image File` send the original image - sharper, but slower to appear and more work for a iPod Video.
+  `Prefer Image File` send the original image - sharper, but slower to appear and more work for an iPod Video.
   Only JPEGs under 512 KB are sent as they are. A dock or older car gets the art cache's cover
   whichever is chosen; `Off` sends no cover to anything
 
@@ -814,11 +1076,11 @@ A car stereo that plays music from USB drives, but does not see the iPod, may re
 `Settings > System > USB > USB Mode` set to `Drive Only`. Docks and cars that play from the iPod
 over USB do not work until it is set back.
 
-### Headphones (Improved)
+### Headphones
 
 <img src="docs/podbox/images/conn_remote.svg" alt="Controlling the iPod from the earphone remote"/>
 
-You can control your iPod using the earphone remote (supported on the iPod classic
+You can control your iPod using the earphone remote (supported on the iPod Classic
 120GB - Late 2008 and 160GB - Late 2009 thin versions only)
 - Works on all types of headphones - not just the Apple earpods.
 - Click for play/pause, two clicks for the next track, three for the previous
@@ -843,7 +1105,8 @@ See [`technically-curious.md`](docs/podbox/technically-curious.md) for the histo
 how to build your own version.
 
 Theme builders: see [`theme-guide.md`](docs/podbox/theme-guide.md) for guidance on creating
-themes for PodBox.
+themes for PodBox, and the [Theme IDE](https://anthonyfletcher.github.io/podbox/theme-ide/) to
+edit one beside the player.
 
 # Credits and licence
 
@@ -872,7 +1135,6 @@ Built on the work of:
 - the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes)),
   the starting point for the app layer, the iPod hardware work in `firmware/`, and much of
   the serial accessory protocol
-- the [Spun](https://github.com/majorsiebe/Stats_for_iPod) project (Siebe Majoor: aka [@majorsiebe](https://github.com/majorsiebe))
 
 ## Other credits
 
@@ -880,10 +1142,10 @@ Built on the work of:
 
 - Themify 2
   - Created by: Evan Kenny aka [Dook](https://d00k.net/)
-  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+  - Licence: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 - iClassic Square (and its Dark and Light versions)
   - Created by: Humberto Santana
-  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+  - Licence: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
 ### Fonts
 
@@ -922,44 +1184,6 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Licensed under the SIL Open Font License, Version 1.1, and Misaki under its
     own free licence — [full text](arcade/sdk/fonts/LICENSE-world.txt)
 
-### The Arcade IDE
-
-The Arcade's game editor, in `arcade/sdk/`, is built with these projects. The
-licences of all the code it takes in are kept in full in the built file.
-
-- [CodeMirror](https://codemirror.net) and [Lezer](https://lezer.codemirror.net),
-  the code editor
-  - Copyright Marijn Haverbeke and others; Lezer's JSON grammar Arun Srinivasan
-  - Licensed under the MIT License
-- [Acorn](https://github.com/acornjs/acorn), which reads a game's code
-  - Copyright its contributors
-  - Licensed under the MIT License
-- [dockview](https://dockview.dev), the panels
-  - Copyright mathuo
-  - Licensed under the MIT License
-- [fflate](https://github.com/101arrowz/fflate), compression
-  - Copyright Arjun Barrett
-  - Licensed under the MIT License
-- [Lucide](https://lucide.dev), the icons
-  - Copyright Lucide Contributors, and Cole Bemis for the Feather icons it began from
-  - Licensed under the ISC License
-- [vanilla-colorful](https://github.com/web-padawan/vanilla-colorful), the colour picker
-  - Copyright 2020 Serhii Kulykov
-  - Licensed under the MIT License
-- [sfxr](https://www.drpetter.se/project_sfxr.html), the sound generators
-  - Copyright 2007 Tomas Pettersson
-  - Licensed under the MIT License
-- [wasi-libc](https://github.com/WebAssembly/wasi-libc), a few C library routines
-  in the engine the editor and exported web pages run
-  - Copyright the wasi-libc contributors, with parts from musl (Rich Felker, et al.)
-    and cloudlibc (Nuxi)
-  - Licensed under the MIT License, musl's parts under the MIT License and
-    cloudlibc's under the BSD 2-Clause License —
-    [full text](arcade/sdk/wasm/LICENSE-libc.txt)
-- [esbuild](https://esbuild.github.io), which builds the editor
-  - Copyright Evan Wallace
-  - Licensed under the MIT License
-
 ### Docks, receivers and remotes (iAP)
 
 Thank you to the following, whose code or findings the dock and remote support is built on.
@@ -975,6 +1199,9 @@ Which came from where is in [`iap-sources.md`](docs/podbox/iap-sources.md).
 - ipod-gadget and ipod by Andrew Onyshchuk aka [@oandrew](https://github.com/oandrew)
   (https://github.com/oandrew/ipod-gadget)
   - How cars behave, and the identities behind `Identify As`
+- RodBox by [@RodrigoM09](https://github.com/RodrigoM09) (https://github.com/RodrigoM09/RodBox)
+  - Over USB: telling a car each track's ID and what it can do with it, and of a new track
+    before its cover is ready; a rate change acknowledged only by the dock it was sent to
 
 ### Modern cars (iAP2)
 
@@ -1011,23 +1238,114 @@ layouts and behaviour to support the iAP2 development. Which fact came from wher
   transcription
   - How the words the dictionary lacks are said
 
+### The Arcade IDE and the Theme IDE
+
+The Arcade's game editor, in `arcade/sdk/`, and the Theme IDE, in `tools/theme-ide/`, are
+built with these projects. Each carries the licences of all the code it takes in, in full: the
+Arcade IDE inside its built file, the Theme IDE in `LICENSES.txt` beside its page and its player.
+
+- [CodeMirror](https://codemirror.net) and [Lezer](https://lezer.codemirror.net),
+  the code editor in both
+  - Copyright Marijn Haverbeke and others; Lezer's JSON grammar Arun Srinivasan
+  - Licensed under the MIT License
+- [dockview](https://dockview.dev), the panels in both
+  - Copyright mathuo
+  - Licensed under the MIT License
+- [Lucide](https://lucide.dev), the icons in both
+  - Copyright Lucide Contributors, and Cole Bemis for the Feather icons it began from
+  - Licensed under the ISC License
+- [esbuild](https://esbuild.github.io), which builds both
+  - Copyright Evan Wallace
+  - Licensed under the MIT License
+- [Acorn](https://github.com/acornjs/acorn), which reads a game's code in the Arcade IDE
+  - Copyright its contributors
+  - Licensed under the MIT License
+- [fflate](https://github.com/101arrowz/fflate), compression in the Arcade IDE
+  - Copyright Arjun Barrett
+  - Licensed under the MIT License
+- [vanilla-colorful](https://github.com/web-padawan/vanilla-colorful), the Arcade IDE's
+  colour picker
+  - Copyright 2020 Serhii Kulykov
+  - Licensed under the MIT License
+- [sfxr](https://www.drpetter.se/project_sfxr.html), the Arcade IDE's sound generators
+  - Copyright 2007 Tomas Pettersson
+  - Licensed under the MIT License
+- [wasi-libc](https://github.com/WebAssembly/wasi-libc), a few C library routines
+  in the engine the Arcade IDE and exported web pages run
+  - Copyright the wasi-libc contributors, with parts from musl (Rich Felker, et al.)
+    and cloudlibc (Nuxi)
+  - Licensed under the MIT License, musl's parts under the MIT License and
+    cloudlibc's under the BSD 2-Clause License —
+    [full text](arcade/sdk/wasm/LICENSE-libc.txt)
+- [Emscripten](https://emscripten.org), which builds the player the Theme IDE runs, and its C
+  library
+  - Copyright the Emscripten authors, with parts from musl (Rich Felker, et al.)
+  - Licensed under the MIT License and the University of Illinois/NCSA Open Source License
+- [SDL](https://www.libsdl.org), Emscripten's port, the Theme IDE player's screen and sound
+  - Copyright Sam Lantinga
+  - Licensed under the zlib License
+
+### The library tools
+
+`fetch_pb`, in `tools/fetch/`, is built with these projects. Its download carries the
+licences of everything inside it in full, in `LICENSES.txt`.
+
+- [mutagen](https://github.com/quodlibet/mutagen), which reads the audio files' tags
+  - Copyright Joe Wreschnig, Michael Urman, Christoph Reiter and others
+  - Licensed under the GNU General Public License v2.0 or later
+- [Pillow](https://python-pillow.org), the images
+  - Copyright Jeffrey A. Clark and contributors, and Secret Labs AB and Fredrik Lundh for PIL
+  - Licensed under the MIT-CMU License
+- [Requests](https://requests.readthedocs.io), the web requests
+  - Copyright Kenneth Reitz
+  - Licensed under the Apache License 2.0
+- [PyYAML](https://pyyaml.org), which reads LRCLIB's word timing
+  - Copyright Ingy döt Net and Kirill Simonov
+  - Licensed under the MIT License
+- [truststore](https://github.com/sethmlarson/truststore), the computer's own certificates
+  - Copyright Seth Michael Larson, David Glick and Quentin Pradet
+  - Licensed under the MIT License
+- [PyInstaller](https://pyinstaller.org), which makes the program
+  - Copyright the PyInstaller Development Team
+  - Licensed under the GNU General Public License v2.0, with an exception for the programs
+    it makes
+
 ### Other improvements
 
 - ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
   - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
     the CPU decodes music
   - The design of automatic dither and its bit-perfect test
+  - Full Codec Voltage: the iPod Video's audio chip at Apple's 3.0 V
+  - A quicker save of a library update, and stopping a queue in which nothing can play
+  - The ID3 genres numbered 148 to 191, and refusing FLAC files too deep to decode
 - RockWheel by Sergei Sarkisian aka [@ssarkisy](https://github.com/ssarkisy)
   (https://github.com/ssarkisy/RockWheel), GPL v2 or later
   - Faster seeks in long files, smooth volume fades, the directory cache's name space,
     an MP3 lead-in fix and lighter AAC decoding
-  - Decoding on the iPod Video's second processor: the design, and the code PodBox's is
-    ported from
-  - Screen Transitions: the idea, when a slide starts and how it eases
-  - The equaliser: a band checked at both of the iPod Video's sample rates, the curve
-    rounded to the nearest, and a change made while paused heard as soon as it plays
+  - Decoding on the iPod Video's second processor design, and MP3's decoding
+    thread there
+  - Screen transitions design
+  - Small tweaks to the equalizer taken from this project
+  - Wheel Glide design, and a fix to the carousel's cover loader
+- Spun by Siebe Majoor aka [@majorsiebe](https://github.com/majorsiebe)
+  (https://github.com/majorsiebe/Stats_for_iPod)
+- RodBox by [@RodrigoM09](https://github.com/RodrigoM09)
+  (https://github.com/RodrigoM09/RodBox), GPL v2
+  - Disk and USB drive fixes
+  - The iPod Classic's earphone remote fixes
+  - Quiet tracks no longer measure as silent in the playlist engine
+- rockbox-library-manager by cyberdeliaAI (https://github.com/cyberdeliaAI/rockbox-library-manager)
+  - Album covers from Deezer, Apple and Discogs
+  - Matching an album by its title and artist: a close match is used, and a near one listed
+    as unsure for you to check
+- ipod-liner-notes and ipod-artist-photos by Polytracker (https://github.com/Polytracker/ipod-liner-notes,
+  https://github.com/Polytracker/ipod-artist-photos)
+  - Liner notes from MusicBrainz credits, and which of the credits count
+  - Taking back the files a tool wrote, which became `--undo`
+  - Asking Last.fm again when it turns a request away
 
-### Album Artwork
+### Album Artwork in Screenshots
 
 - Angine de Poitrine - Vol.II - [Website](https://anginedepoitrine.com/)
   - Artwork: Arielle Corbeau - [Website](https://www.instagram.com/ariellecorbeau)

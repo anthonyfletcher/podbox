@@ -293,7 +293,9 @@ leaves the picture out: every page starts with its name.
 A page in `/Notes` shows its own picture -- `Steely Dan.jpg` beside `Steely
 Dan.md`, `Electric Lady.jpg` beside `Studios/Electric Lady.md` -- if you give
 it one, scaled and cropped to the banner, which is 320 by 132. A wide picture
-suits it best. Without one, an artist's page uses the artist's picture from
+suits it best. A page deeper down takes its picture from its folder at the
+top of `/Notes`: `Studios/Abbey Road.jpg` for `Studios/London/Abbey Road.md`,
+and `People/Steely Dan.jpg` for `People/Bands/Steely Dan.md`. Without one, an artist's page uses the artist's picture from
 the player's artwork, and an album's its cover. Other pages without one have
 no picture: their name is set at the top.
 
