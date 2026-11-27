@@ -190,7 +190,7 @@ enum codec_status codec_run(void)
     samplesdone = 0;
 
     /* check for a mid-track resume and force a seek time accordingly */
-    if (resume_offset) {
+    if (resume_offset && packet_size && rmctx.bit_rate) {
         resume_offset -= MIN(resume_offset, data_offset);
         /* put number of subpackets to skip in resume_offset */
         resume_offset /= packet_size;
@@ -224,7 +224,10 @@ enum codec_status codec_run(void)
 
             if (n)
                 rm_ac3_swap_bytes(filebuf, (rmctx.flags & RM_RAW_DATASTREAM) ? n : rmctx.block_align);
-            packet_offset = param / ((rmctx.block_align*8*1000)/rmctx.bit_rate);
+            /* without a bitrate to find a packet's time by, the start */
+            packet_offset = 0;
+            if (rmctx.bit_rate && (rmctx.block_align*8*1000)/rmctx.bit_rate)
+                packet_offset = param / ((rmctx.block_align*8*1000)/rmctx.bit_rate);
             ci->seek_buffer(data_offset + packet_offset * packet_size);
             rmctx.audio_pkt_cnt = packet_offset;
             samplesdone = packet_offset * A52_SAMPLESPERFRAME;

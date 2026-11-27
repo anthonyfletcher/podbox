@@ -157,7 +157,9 @@ bool get_flac_metadata(int fd, struct mp3entry* id3)
             {
                 /* Calculate track length (in ms) and estimate the bitrate (in kbit/s) */
                 id3->length = ((int64_t) totalsamples * 1000) / id3->frequency;
-                id3->bitrate = (id3->filesize * 8) / id3->length;
+                /* under a millisecond: 0 ms and no bitrate, as for no
+                   samples */
+                id3->bitrate = id3->length ? (id3->filesize * 8) / id3->length : 0;
             }
             else if (totalsamples == 0)
             {

@@ -77,12 +77,19 @@ static int set_replaygain_sv8(struct mp3entry* id3,
     return used;
 }
 
-static int sv8_get_size(uint8_t *buffer, int index, uint64_t *p_size)
+/* buflen bounds the varint: a header all of whose bytes continue would
+   otherwise read past it.  Stops and leaves index == buflen then. */
+static int sv8_get_size(uint8_t *buffer, int buflen, int index, uint64_t *p_size)
 {
     unsigned char tmp;
     uint64_t size = 0;
 
     do {
+        if (index < 0 || index >= buflen)
+        {
+            *p_size = size;
+            return buflen;
+        }
         tmp = buffer[index++];
         size = (size << 7) | (tmp & 0x7F);
     } while((tmp & 0x80));
@@ -143,31 +150,38 @@ bool get_musepack_metadata(int fd, struct mp3entry *id3)
             if (read(fd, sv8_header, 32) != 32) return false;
             
             /* Read the size of 'SH'-tag */
-            k = sv8_get_size(sv8_header, k, &size);
+            k = sv8_get_size(sv8_header, sizeof(sv8_header), k, &size);
             
             /* Skip crc32 */
             k += 4;
         
             /* Read stream version */
+            if (k >= (int)sizeof(sv8_header)) return false;
             streamversion = sv8_header[k++];
             if (streamversion != 8) return false; /* Only SV8 is allowed. */
             
             /* Number of samples */
-            k = sv8_get_size(sv8_header, k, &samples);
+            k = sv8_get_size(sv8_header, sizeof(sv8_header), k, &samples);
             
             /* Number of leading zero-samples */
-            k = sv8_get_size(sv8_header, k, &dummy);
+            k = sv8_get_size(sv8_header, sizeof(sv8_header), k, &dummy);
             
             /* Sampling frequency */
+            if (k >= (int)sizeof(sv8_header)) return false;
             id3->frequency = sfreqs[(sv8_header[k++] >> 5) & 0x0003];
             
             /* Number of channels */
             //uint8_t channels = (sv8_header[k++] >> 4) + 1;
 
-            /* Skip to next tag: k = size -2 */
-            k = size - 2;
+            /* Skip to next tag: k = size -2.  The replay gain is read
+               only when it lies inside the 32 bytes read. */
+            if (size < 2 || size > sizeof(sv8_header))
+                k = sizeof(sv8_header);
+            else
+                k = size - 2;
 
-            if (!memcmp(sv8_header+k, "RG", 2)) { /* Replay Gain ID */
+            if (k + 2 <= (int)sizeof(sv8_header)
+                && !memcmp(sv8_header+k, "RG", 2)) { /* Replay Gain ID */
                 long peak, gain; 
                 int bufused = 0;
                 
@@ -175,10 +189,11 @@ bool get_musepack_metadata(int fd, struct mp3entry *id3)
                 
                 /* sv8_get_size must be called to skip the right amount of
                  * bits within the header data. */
-                k = sv8_get_size(sv8_header, k, &size);
+                k = sv8_get_size(sv8_header, sizeof(sv8_header), k, &size);
                 
-                /* Read and set replay gain */
-                if (sv8_header[k++] == 1) {
+                /* Read and set replay gain: a version byte, then the
+                   title's and the album's gain and peak, 2 bytes each */
+                if (k + 9 <= (int)sizeof(sv8_header) && sv8_header[k++] == 1) {
                     /* Title's peak and gain */
                     gain = (int16_t) ((sv8_header[k]<<8) + sv8_header[k+1]); k += 2;
                     peak = (uint16_t)((sv8_header[k]<<8) + sv8_header[k+1]); k += 2;

@@ -93,13 +93,17 @@ bool read_ape_tags(int fd, struct mp3entry* id3)
             + sizeof(id3->id3v1buf);
         unsigned int tag_remaining = header.length - APETAG_HEADER_LENGTH;
         unsigned int i;
+        /* each item is at least its header, so the tag's own length caps
+           the count whatever the (file-given) item_count claims */
+        unsigned int item_count = MIN(header.item_count,
+                                      tag_remaining / sizeof(struct apetag_item_header));
 
         if (lseek(fd, -((int)header.length) - after, SEEK_END) < 0)
         {
             return false;
         }
 
-        for (i = 0; i < header.item_count; i++)
+        for (i = 0; i < item_count; i++)
         {
             struct apetag_item_header item;
             char name[TAG_NAME_LENGTH];
@@ -126,6 +130,16 @@ bool read_ape_tags(int fd, struct mp3entry* id3)
             if (r == -1)
             {
                 return false;
+            }
+
+            /* an item longer than the tag's own bytes left (r, read for the
+               name, is <= tag_remaining) would wrap tag_remaining and
+               unbound the loop: the items before it are kept, the rest
+               not read; a negative (file-given) length is huge here, so it
+               ends the items too */
+            if ((uint32_t)item.length > tag_remaining - (unsigned int)r)
+            {
+                break;
             }
 
             tag_remaining -= r + item.length;

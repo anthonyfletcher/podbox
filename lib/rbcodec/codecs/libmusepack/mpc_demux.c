@@ -50,8 +50,13 @@
 // defines
 #define MAX_BUFFER_SIZE (DEMUX_BUFFER_SIZE + MAX_FRAME_SIZE)
 
+// mpc_bits_read() reads up to 4 bytes behind its place, which is the
+// buffer's start after a clear or a refill: it masks those bits off, but
+// the bytes must be there
+#define BUFFER_LOOKBEHIND 4
+
 // globals
-static mpc_uint8_t g_buffer[MAX_BUFFER_SIZE] IBSS_ATTR_MPC_BITBUFFER;
+static mpc_uint8_t g_buffer[BUFFER_LOOKBEHIND + MAX_BUFFER_SIZE] IBSS_ATTR_MPC_BITBUFFER;
 static mpc_seek_t g_seek_table[MAX_SEEK_TABLE_SIZE];
 static mpc_demux g_mpc_demux IBSS_ATTR;
 
@@ -69,7 +74,7 @@ static void mpc_demux_clear_buff(mpc_demux * d)
     d->bits_reader.buffered_code = 0;
     d->block_bits                = 0;
     d->block_frames              = 0;
-    memset(d->buffer, 0, sizeof(g_buffer));
+    memset(d->buffer, 0, MAX_BUFFER_SIZE);
 }
 
 static mpc_uint32_t
@@ -533,7 +538,7 @@ mpc_demux * mpc_demux_init(mpc_reader * p_reader)
 
     if (p_tmp != 0) {
         memset(p_tmp, 0, sizeof(mpc_demux));
-        p_tmp->buffer  = g_buffer;
+        p_tmp->buffer  = g_buffer + BUFFER_LOOKBEHIND;
         p_tmp->r       = p_reader;
 /* rockbox: not used
         p_tmp->chap_nb = -1;

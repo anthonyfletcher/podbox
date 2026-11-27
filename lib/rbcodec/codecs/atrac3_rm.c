@@ -118,7 +118,7 @@ enum codec_status codec_run(void)
     }
 
     /* check for a mid-track resume and force a seek time accordingly */
-    if(resume_offset) {
+    if(resume_offset && rmctx.bit_rate) {
         resume_offset -= MIN(resume_offset, rmctx.data_offset + DATA_HEADER_SIZE);
         num_units = (int)resume_offset / scrambling_unit_size;
         /* put number of packets to skip in resume_offset */
@@ -175,8 +175,10 @@ seek_start :
                 rmctx.audio_pkt_cnt = 0;
                 rmctx.frame_number = 0;
 
-                /* Seek to the start of the track */
-                if (param == 0) {
+                /* Seek to the start of the track, also without a
+                   bitrate to find a frame's time by */
+                if (param == 0 || !rmctx.bit_rate
+                    || sps*1000*8/rmctx.bit_rate == 0) {
                     elapsed = 0;
                     ci->set_elapsed(0);
                     ci->seek_complete();
@@ -223,6 +225,14 @@ seek_start :
                     rmctx.audiotimestamp = 0;
                 time_offset = param - rmctx.audiotimestamp;
                 i = (time_offset/((sps * 8 * 1000)/rmctx.bit_rate));
+                /* a frame of this unit: a resume's target, whole units by
+                   the bitrate, falls just short of the next unit's
+                   timestamp, so i comes out as spn; its last frame is the
+                   one nearest, and the next unit follows */
+                if (i < 0)
+                    i = 0;
+                else if (i >= spn)
+                    i = spn - 1;
                 elapsed = param;
                 ci->set_elapsed(elapsed);
                 ci->seek_complete();
@@ -243,7 +253,8 @@ seek_start :
             if(datasize)
                 ci->pcmbuf_insert(q.outSamples, q.outSamples + 1024, q.samples_per_frame / rmctx.nb_channels);
             playback_on = 1;
-            elapsed = rmctx.audiotimestamp+(1000*8*sps/rmctx.bit_rate)*i;
+            elapsed = rmctx.audiotimestamp+(rmctx.bit_rate ?
+                      1000*8*sps/rmctx.bit_rate : 0)*i;
             ci->set_elapsed(elapsed);
             rmctx.frame_number++;
         }

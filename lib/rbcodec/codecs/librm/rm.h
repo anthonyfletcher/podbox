@@ -28,6 +28,7 @@
 #define RM_PKT_V1 0x0200
 
 #define MAX_EXTRADATA_SIZE 16
+#define RM_MAX_FRAMES 100 /* of an interleaving unit, in RMPacket */
 #define DATA_HEADER_SIZE 18
 #define PACKET_HEADER_SIZE 12
 
@@ -40,7 +41,7 @@ enum codecs {
 
 typedef struct rm_packet
 {
-    uint8_t *frames[100]; /* Pointers to ordered audio frames in buffer */
+    uint8_t *frames[RM_MAX_FRAMES]; /* Pointers to ordered audio frames in buffer */
     uint16_t version;
     uint16_t length;
     uint32_t timestamp;

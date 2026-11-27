@@ -67,6 +67,12 @@ bool get_adx_metadata(int fd, struct mp3entry* id3)
     id3->frequency = get_long_be(&buf[8]);
     /* 32 samples per 18 bytes */
     id3->bitrate = id3->frequency * channels * 18 * 8 / 32 / 1000;
+    /* both divide below: a rate of 0, or one too low for a bitrate
+       (under 223 Hz), isn't a rate */
+    if (id3->bitrate == 0) {
+        DEBUGF("get_adx_metadata: bad sample rate %lu\n", id3->frequency);
+        return false;
+    }
     id3->length = get_long_be(&buf[12]) / id3->frequency * 1000;
     id3->vbr = false;
     id3->filesize = ffilesize(fd);

@@ -268,6 +268,12 @@ abort_books:
       ci->book_param[i]=NULL;
     }
   }
+  /* and the books made before the bad one: a second call would find
+     fullbooks set, skip the books and decode with the rest all 0 */
+  for(i=0;i<ci->books;i++)
+    vorbis_book_clear(ci->fullbooks+i);
+  _ogg_free(ci->fullbooks);
+  ci->fullbooks=NULL;
   vorbis_dsp_clear(v);
   return -1;
 }

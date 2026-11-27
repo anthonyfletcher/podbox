@@ -326,13 +326,11 @@ size_t base64_decode(const char *in, size_t in_len, unsigned char *out)
             break;
         }
         int index = in[i] - B64_START_CHAR;
-#ifdef SIMULATOR
         if (index < 0 || index >= (int)ARRAYLEN(b64_codes) || b64_codes[index] < 0)
         {
             DEBUGF("Invalid base64 char: '%c', char code: %i.\n", in[i], in[i]);
             break;
         }
-#endif
         val = (val << 6) | b64_codes[index];
 
         if ((++i & 3) == 0)

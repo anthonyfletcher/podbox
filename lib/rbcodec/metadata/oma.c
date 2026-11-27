@@ -137,7 +137,12 @@ static int oma_read_header(int fd, struct mp3entry* id3)
 
     switch (buf[32]) {
         case OMA_CODECID_ATRAC3:
-            id3->frequency = srate_tab[(codec_params >> 13) & 7]*100;
+            {
+                /* a 3-bit field, but the table holds 6: 6 and 7 aren't rates */
+                unsigned int sri = (codec_params >> 13) & 7;
+                id3->frequency = (sri < ARRAYLEN(srate_tab) ? srate_tab[sri] : 0)
+                                 * 100;
+            }
             if (id3->frequency != 44100) {
                 DEBUGF("Unsupported sample rate, send sample file to developers: %d\n", id3->frequency);
                 return -1;
@@ -175,6 +180,10 @@ static int oma_read_header(int fd, struct mp3entry* id3)
 bool get_oma_metadata(int fd, struct mp3entry* id3)
 {
     if(oma_read_header(fd, id3) < 0)
+        return false;
+
+    /* a frame size of 0 gives no bitrate to divide by */
+    if (id3->bitrate == 0)
         return false;
 
     /* Currently, there's no means of knowing the duration *

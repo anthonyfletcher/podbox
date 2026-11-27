@@ -105,7 +105,7 @@ enum codec_status codec_run(void)
     }
     
     /* check for a mid-track resume and force a seek time accordingly */
-    if (resume_offset) {
+    if (resume_offset && rmctx.bit_rate) {
         resume_offset -= MIN(resume_offset, rmctx.data_offset + DATA_HEADER_SIZE);
         /* put number of subpackets to skip in resume_offset */
         resume_offset /= (rmctx.block_align + PACKET_HEADER_SIZE +

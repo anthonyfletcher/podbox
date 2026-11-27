@@ -168,6 +168,8 @@ static int real_read_audio_stream_info(int fd, RMContext *rmctx)
            case FOURCC('c','o','o','k'):               
                rmctx->codec_type = CODEC_COOK;
                read_uint32be(fd, &rmctx->extradata_size);
+               if (rmctx->extradata_size > MAX_EXTRADATA_SIZE)
+                   return -1;
                skipped += 4;
                read(fd, rmctx->codec_extradata, rmctx->extradata_size);
                skipped += rmctx->extradata_size;
@@ -177,6 +179,8 @@ static int real_read_audio_stream_info(int fd, RMContext *rmctx)
            case FOURCC('r','a','c','p'):
                rmctx->codec_type = CODEC_AAC;
                read_uint32be(fd, &rmctx->extradata_size);
+               if (rmctx->extradata_size > MAX_EXTRADATA_SIZE)
+                   return -1;
                skipped += 4;
                read(fd, rmctx->codec_extradata, rmctx->extradata_size);
                skipped += rmctx->extradata_size;
@@ -189,6 +193,8 @@ static int real_read_audio_stream_info(int fd, RMContext *rmctx)
            case FOURCC('a','t','r','c'):  
                rmctx->codec_type = CODEC_ATRAC;
                read_uint32be(fd, &rmctx->extradata_size);
+               if (rmctx->extradata_size > MAX_EXTRADATA_SIZE)
+                   return -1;
                skipped += 4;
                read(fd, rmctx->codec_extradata, rmctx->extradata_size);
                skipped += rmctx->extradata_size;
@@ -436,7 +442,7 @@ static inline int rm_parse_header(int fd, RMContext *rmctx, struct mp3entry *id3
                *   by constructing a partially filled unit out of the few 
                *   remaining samples at the end of decoding.
                ***/
-                if(rmctx->nb_packets % rmctx->sub_packet_h)
+                if(rmctx->sub_packet_h && rmctx->nb_packets % rmctx->sub_packet_h)
                     rmctx->nb_packets += rmctx->sub_packet_h - (rmctx->nb_packets % rmctx->sub_packet_h);
 
                 DEBUGF("    data_nb_packets = %ld\n",rmctx->nb_packets);
@@ -475,6 +481,26 @@ bool get_rm_metadata(int fd, struct mp3entry* id3)
     memset(rmctx,0,sizeof(RMContext));
     if(rm_parse_header(fd, rmctx, id3) < 0)
         return false;
+
+    /* what the codecs divide by: the rate in kHz, and for cook and atrac
+       (cook is also what a file without a stream header gets) units of
+       sub_packet_h packets of block_align bytes, each cut in frames of
+       sub_packet_size, a unit's frames ordered in RMPacket's
+       RM_MAX_FRAMES */
+    if (rmctx->sample_rate < 1000)
+        return false;
+    if (rmctx->codec_type == CODEC_COOK || rmctx->codec_type == CODEC_ATRAC)
+    {
+        uint32_t frames = 0;
+
+        if (rmctx->sub_packet_size
+            && rmctx->block_align % rmctx->sub_packet_size == 0)
+            frames = (uint32_t)rmctx->sub_packet_h
+                     * (rmctx->block_align / rmctx->sub_packet_size);
+        if (frames == 0 || frames > RM_MAX_FRAMES
+            || rmctx->nb_channels == 0 || rmctx->nb_channels > 2)
+            return false;
+    }
 
     if (!setid3v1title(fd, id3)) {
     /* file has no id3v1 tags, use the tags from CONT chunk */

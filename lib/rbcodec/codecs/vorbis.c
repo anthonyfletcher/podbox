@@ -238,6 +238,12 @@ enum codec_status codec_run(void)
             break;
         } else if (n < 0) {
             DEBUGF("Vorbis: Error decoding frame\n");
+            /* no decoder could be made for the stream (a bad setup
+               header): every read would fail the same way */
+            if (n == OV_EBADLINK) {
+                error = CODEC_ERROR;
+                goto done;
+            }
         } else {
             ci->pcmbuf_insert(pcm[0], pcm[1], n);
             ci->set_offset(ov_raw_tell(&vf));

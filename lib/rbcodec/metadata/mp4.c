@@ -759,6 +759,8 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
 
                 if (first_type != MP4_hdlr)
                 {
+                    if (size < 4)
+                        break;
                     lseek(fd, 4, SEEK_CUR);  /* Skip version */
                     size -= 4;
                 }
@@ -836,6 +838,11 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             break;
 
         case MP4_stsd:
+            /* version, flags and the count: a size under that would wrap,
+               and free the atoms inside from their parents' bounds, a stts
+               atom's count with them */
+            if (size < 8)
+                break;
             lseek(fd, 8, SEEK_CUR);
             size -= 8;
             rc = read_mp4_container(fd, id3, size, tracks);
@@ -843,6 +850,8 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             break;
 
         case MP4_hdlr:
+            if (size < 12)
+                break;
             lseek(fd, 8, SEEK_CUR);
             read_uint32be(fd, &handler);
             size -= 12;
@@ -899,6 +908,10 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                 uint32_t subsize;
                 uint32_t subtype;
 
+                /* the sample entry's 28 bytes, then an atom's header */
+                if (size < 36)
+                    break;
+
                 /* Move to the next expected mp4 atom. */
                 lseek(fd, 28, SEEK_CUR);
                 read_mp4_atom(fd, &subsize, &subtype, size);
@@ -921,6 +934,10 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                 uint32_t subsize;
                 uint32_t subtype;
 
+                /* the sample entry's 28 bytes, then an atom's header */
+                if (size < 36)
+                    break;
+
                 /* Move to the next expected mp4 atom. */
                 lseek(fd, 28, SEEK_CUR);
                 read_mp4_atom(fd, &subsize, &subtype, size);
@@ -935,7 +952,7 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                     errno = 0; /* will most likely be set while parsing */
                 }
 #endif
-                if (subtype == MP4_alac)
+                if (subtype == MP4_alac && size >= 28)
                 {
                     lseek(fd, 24, SEEK_CUR);
                     read_uint32be(fd, &frequency);

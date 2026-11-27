@@ -1646,6 +1646,10 @@ static uint8_t section_data(NeAACDecHandle hDecoder, ic_stream *ics, bitfile *ld
                incremented and we cannot leave the while loop */
             if ((ld->error != 0) || (ld->no_more_reading))
                 return 14;
+            /* a section of no length leaves k as it is: i must stop at
+               the arrays' end by itself */
+            if (i >= 8*15)
+                return 15;
 
 #ifdef ERROR_RESILIENCE
             if (hDecoder->aacSectionDataResilienceFlag)

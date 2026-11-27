@@ -101,6 +101,11 @@ enum codec_status codec_run(void)
     
     byterate  = (mpc_uint32_t)(info.average_bitrate) / 8;
     frequency = info.sample_freq / 100; /* 0.1 kHz accuracy */
+    /* both are divisors below, for the position and the elapsed time: a
+       crafted stream's bitrate under 8 bit/s leaves byterate 0 (frequency
+       comes from a table, checked by the demuxer; tested here too) */
+    if (byterate == 0 || frequency == 0)
+        return CODEC_ERROR;
     ci->configure(DSP_SET_FREQUENCY, info.sample_freq);
 
     /* Remark: rockbox offset is the file offset in bytes. So, estimate the 
