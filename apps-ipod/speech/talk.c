@@ -161,6 +161,13 @@ static int cache_hits, cache_misses;
 static struct queue_entry queue[QUEUE_SIZE]; /* queue of scheduled clips */
 static struct queue_entry silence, *last_clip;
 
+/* no pause clip: queued after a clip, it gives nothing to play */
+static void clear_silence(void)
+{
+    silence.handle = -1;
+    silence.length = silence.remaining = 0;
+}
+
 /** Private implementation **/
 
 static int index_handle, talk_handle;
@@ -324,7 +331,7 @@ static int index2id(int index)
 static int free_oldest_clip(void)
 {
     unsigned i;
-    int oldest = 0;
+    int oldest = -1, other = -1, pause = -1;
     bool thumb = false;
     long age, now, next_age;
     struct clip_entry* clipbuf;
@@ -333,6 +340,13 @@ static int free_oldest_clip(void)
     {
         if (cc[i].handle)
         {
+            if (cc[i].voice_id == VOICE_PAUSE)
+            {
+                if (pause < 0)
+                    pause = i;
+            }
+            else if (other < 0)
+                other = i;
             next_age = (now - cc[i].tick);
             if (thumb && cc[i].voice_id == VOICEONLY_DELIMITER && next_age > age)
             {
@@ -357,9 +371,17 @@ static int free_oldest_clip(void)
             }
         }
     }
-    /* free the last one if no oldest one could be determined */
+    /* none older than this tick: another clip, the pause clip last. -1
+       only once the cache holds none: the callers' loops stop asking then,
+       as for a clip bigger than the whole buffer (a damaged file's size) */
+    if (oldest < 0)
+        oldest = other >= 0 ? other : pause;
+    if (oldest < 0)
+        return -1;
     cc = &cc[oldest];
     cc->handle = buflib_free(&clip_ctx, cc->handle);
+    if (cc->voice_id == VOICE_PAUSE)
+        clear_silence(); /* its memory is free */
     /* need to clear the LOADED bit too (not for thumb clips) */
     if (cc->voice_id != VOICEONLY_DELIMITER)
     {
@@ -478,7 +500,11 @@ static int get_clip(long id, struct queue_entry *q)
         cache_misses++;
         /* free clips from cache until this one succeeds to allocate */
         while ((handle = buflib_alloc(&clip_ctx, clipsize)) < 0)
+        {
             oldest = free_oldest_clip();
+            if (oldest < 0)
+                return -1;
+        }
         /* handle should now hold a valid alloc. Load from disk
          * and insert into cache */
         fd = open_voicefile();
@@ -535,6 +561,24 @@ static bool load_index_table(int fd, const struct voicefile_header *hdr)
     {
         buf->offset = swap32(buf->offset);
         buf->size = swap32(buf->size);
+    }
+
+    /* A damaged file's clips, refused as a file of another version is: a
+       size with the top bit set reads as LOADED_MASK, and get_clip() would
+       look past the end of the cache for it; a clip past the end of the
+       file can't be read, and its size would claim the voice buffer. */
+    const int64_t file_size = ffilesize(fd);
+    const struct clip_entry *clips = core_get_data(index_handle);
+    for (int i = 0; i < hdr->id1_max + hdr->id2_max; i++)
+    {
+        if (clips[i].size == 0) /* not in the file */
+            continue;
+        if ((clips[i].size & LOADED_MASK) || clips[i].offset < 0
+            || (int64_t)clips[i].offset + clips[i].size > file_size)
+        {
+            index_handle = core_free(index_handle);
+            return false;
+        }
     }
 
     return true;
@@ -660,7 +704,9 @@ static bool load_voicefile_data(int fd)
     load_initial_clips(fd);
     /* make sure to have the silence clip, if available return value can
      * be cached globally even for TALK_PROGRESSIVE_LOAD because the
-     * VOICE_PAUSE clip is specially handled */
+     * VOICE_PAUSE clip is specially handled. None if it doesn't load: not
+     * the handle of a buffer before this one */
+    clear_silence();
     get_clip(VOICE_PAUSE, &silence);
 
     return true;
@@ -1002,19 +1048,30 @@ void talk_init(void)
          * size is eventually capped later on in load_voicefile_data() */
         int num_clips = voicefile.id1_max + voicefile.id2_max;
         int non_empty = num_clips;
-        int total_size = 0, avg_size;
+        int64_t clips_size = 0;
+        int total_size, avg_size = 0;
         struct clip_entry *clips = core_get_data(index_handle);
         /* check for the average clip size to estimate the maximum number of
          * clips the buffer can hold */
         for (int i = 0; i<num_clips; i++)
         {
             if (clips[i].size)
-                total_size += ALIGN_UP(clips[i].size, sizeof(void *));
+                clips_size += ALIGN_UP(clips[i].size, sizeof(void *));
             else
                 non_empty -= 1;
         }
-        avg_size = total_size / non_empty;
-        max_clips = MIN((int)(MAX_CLIP_BUFFER_SIZE/avg_size) + 1, non_empty);
+        /* each clip lies within the file (load_index_table()); those of a
+           damaged file may overlap, and claim no more than the file holds */
+        total_size = MIN(clips_size, (int64_t)ffilesize(filehandle));
+        /* a damaged file's index may have no clip: room for the thumbnails'
+           clips only, and no division by zero (settings.c opens the voice
+           file at every boot) */
+        if (non_empty > 0)
+            avg_size = total_size / non_empty;
+        if (avg_size > 0)
+            max_clips = MIN((int)(MAX_CLIP_BUFFER_SIZE/avg_size) + 1, non_empty);
+        else
+            max_clips = 0;
         /* account for possible thumb clips */
         total_size += THUMBNAIL_RESERVE;
         max_clips += 16;
@@ -1227,7 +1284,14 @@ static int _talk_file(const char* filename,
     {
         /* free clips from cache until this one succeeds to allocate */
         while ((handle = buflib_alloc(&clip_ctx, size)) < 0)
+        {
             oldest = free_oldest_clip();
+            if (oldest < 0)
+            {
+                close(fd);
+                return 0;
+            }
+        }
 
         size = read_to_handle_ex(fd, &clip_ctx, handle, 0, size);
     }

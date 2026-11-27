@@ -262,6 +262,11 @@ static int decode(const uint8_t *inbuf, size_t inbufsize,
     int8_t init_index[2];
 
     *outbufcount = 0;
+    /* a damaged file's last block, cut inside its header: nothing to decode,
+       and the decode_*bit() counts below would wrap (3 and 5 bits) or go
+       negative (2 and 4) */
+    if (inbufsize < 4 * (size_t)fmt->channels)
+        return CODEC_OK;
     for (ch = 0; ch < fmt->channels; ch++)
     {
         init_pcmdata[ch] = inbuf[0] | (inbuf[1] << 8);

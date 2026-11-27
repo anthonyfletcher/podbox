@@ -81,7 +81,7 @@ bool get_tta_metadata(int fd, struct mp3entry* id3)
     lseek(fd, id3->id3v2len, SEEK_SET);
 
     /* read TTA header */
-    if (read(fd, ttahdr, TTA_HEADER_SIZE) < 0)
+    if (read(fd, ttahdr, TTA_HEADER_SIZE) != TTA_HEADER_SIZE)
         return false;
 
     /* check for TTA3 signature */
@@ -92,11 +92,16 @@ bool get_tta_metadata(int fd, struct mp3entry* id3)
 
     unsigned short channels  = (GET_HEADER(ttahdr, NUM_CHANNELS));
     id3->frequency = (GET_HEADER(ttahdr, SAMPLE_RATE));
-    id3->length    = ((GET_HEADER(ttahdr, DATA_LENGTH)) / id3->frequency) * 1000LL;
     bps            = (GET_HEADER(ttahdr, BITS_PER_SAMPLE));
+    origsize = (GET_HEADER(ttahdr, DATA_LENGTH)) * ((bps + 7) / 8) * channels;
+    /* a damaged header: a rate, a length, a depth or channels of 0, or a size
+       that wraps to 0, divides by zero here and in the codec */
+    if (id3->frequency == 0 || origsize == 0)
+        return false;
+
+    id3->length    = ((GET_HEADER(ttahdr, DATA_LENGTH)) / id3->frequency) * 1000LL;
 
     datasize = id3->filesize - id3->first_frame_offset;
-    origsize = (GET_HEADER(ttahdr, DATA_LENGTH)) * ((bps + 7) / 8) * channels;
 
     id3->bitrate = (int) ((uint64_t) datasize * id3->frequency * channels * bps
                                                / (origsize * 1000LL));

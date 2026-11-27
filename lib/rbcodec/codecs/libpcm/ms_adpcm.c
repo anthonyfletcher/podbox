@@ -101,6 +101,14 @@ static int decode(const uint8_t *inbuf, size_t inbufsize,
     size_t nsamples = 0;
     int size = fmt->samplesperblock;
 
+    /* a damaged file's last block, cut inside its header: nothing to decode,
+       and the size would wrap */
+    if (inbufsize < 7 * (size_t)fmt->channels)
+    {
+        *outbufcount = 0;
+        return CODEC_OK;
+    }
+
     /* read block header */
     for (ch = 0; ch < fmt->channels; ch++)
     {
@@ -136,7 +144,8 @@ static int decode(const uint8_t *inbuf, size_t inbufsize,
     inbufsize -= 7 * fmt->channels;
     ch = fmt->channels - 1;
 
-    while (size-- > 0)
+    /* a block of a header only has no byte to decode */
+    while (size-- > 0 && inbufsize > 0)
     {
         *outbuf++ = create_pcmdata(0,  *inbuf >> 4 ) << (PCM_OUTPUT_DEPTH - 16);
         *outbuf++ = create_pcmdata(ch, *inbuf & 0xf) << (PCM_OUTPUT_DEPTH - 16);
@@ -144,8 +153,6 @@ static int decode(const uint8_t *inbuf, size_t inbufsize,
 
         inbuf++;
         inbufsize--;
-        if (inbufsize <= 0)
-            break;
     }
 
     if (fmt->channels == 2)

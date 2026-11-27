@@ -71,6 +71,9 @@ struct bmp_header {
     uint32_t clr_important; /* important color count */
 } STRUCT_PACKED;
 
+/* the largest width or height read_bmp_fd() takes: struct dim's short */
+#define BMP_MAX_DIM 32767
+
 /* masks for supported BI_BITFIELDS encodings (16/32 bit) */
 static const struct uint8_rgb bitfields[][4] = {
     /* 15bit */
@@ -149,8 +152,9 @@ struct bmp_args {
      * but aligning to cache should be even faster */
     unsigned char buf[BM_MAX_WIDTH * 4] CACHEALIGN_AT_LEAST_ATTR(2);
     int fd;
-    short padded_width;
-    short read_width;
+    /* a row's bytes: up to 4 * BMP_MAX_DIM, past a short */
+    int padded_width;
+    int read_width;
     short width;
     short depth;
     enum color_order order;
@@ -414,25 +418,46 @@ int read_bmp_fd(int fd,
         return -3;
     }
 
-    src_dim.width = letoh32(bmph.width);
-    src_dim.height = letoh32(bmph.height);
-    if (src_dim.height < 0) {     /* Top-down BMP file */
-        src_dim.height = -src_dim.height;
-        rset.rowstep = 1;
-    } else {              /* normal BMP */
-        rset.rowstep = -1;
-    }
-
-    /* A dimension of zero divides by zero in recalc_dimension(), and a
-     * negative one survives it and reaches the scalers, where the loop
-     * bound is cast to unsigned and becomes enormous. Neither is a
-     * picture. */
-    if (src_dim.width < 1 || src_dim.height < 1) {
-        DEBUGF("read_bmp_fd: BMP has no area.");
+    /* A damaged header sizes no read, buffer or division: a width and a
+     * height that struct dim holds (a negative height is a top-down
+     * picture; zero or a negative width is no picture), a depth
+     * read_part_line() converts, and a compression that depth has:
+     * BI_BITFIELDS for 16 and 32 bits only, its masks checked below. */
+    const int32_t width = letoh32(bmph.width);
+    const int32_t height = letoh32(bmph.height);
+    if (width <= 0 || width > BMP_MAX_DIM ||
+        height == 0 || height < -BMP_MAX_DIM || height > BMP_MAX_DIM) {
+        DEBUGF("read_bmp_fd: unsupported size %ldx%ld\n",
+               (long)width, (long)height);
         return -3;
     }
 
     depth = letoh16(bmph.bit_count);
+    switch (depth) {
+      case 1: case 4: case 8: case 15: case 16: case 24: case 32:
+        break;
+      default:
+        DEBUGF("read_bmp_fd: unsupported depth %d\n", depth);
+        return -5;
+    }
+
+    compression = letoh32(bmph.compression);
+    if (compression != 0 &&
+        !(compression == 3 && (depth == 16 || depth == 32))) {
+        DEBUGF("read_bmp_fd: Unsupported compression (type %d)\n",
+               compression);
+        return -8;
+    }
+
+    src_dim.width = width;
+    if (height < 0) {     /* Top-down BMP file */
+        src_dim.height = -height;
+        rset.rowstep = 1;
+    } else {              /* normal BMP */
+        src_dim.height = height;
+        rset.rowstep = -1;
+    }
+
     /* 4-byte boundary aligned */
     read_width = ((src_dim.width * (depth == 15 ? 16 : depth) + 7) >> 3);
     padded_width = (read_width + 3) & ~3;
@@ -511,8 +536,10 @@ int read_bmp_fd(int fd,
     }
 
     hdr_size = letoh32(bmph.struct_size);
-    compression = letoh32(bmph.compression);
     if (depth <= 8) {
+        /* a damaged file's pixels may pick colours its table doesn't have,
+           or it has more than 256 and none is read: black, not the stack */
+        memset(palette, 0, sizeof(palette));
         numcolors = letoh32(bmph.clr_used);
         if (numcolors == 0)
             numcolors = BIT_N(depth);

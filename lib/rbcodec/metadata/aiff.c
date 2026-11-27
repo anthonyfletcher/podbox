@@ -98,9 +98,14 @@ bool get_aiff_metadata(int fd, struct mp3entry* id3)
 
             numSampleFrames = get_long_be(&buf[2]);
 
-            /* sampleRate */
-            id3->frequency = get_long_be(&buf[10]);
-            id3->frequency >>= (16+14-buf[9]);
+            /* sampleRate, an 80-bit float: the top 32 bits of its mantissa
+               moved right by 30 less its exponent's low byte. A damaged
+               header's rate is refused: 2^32 Hz or more (a shift under 0)
+               or under 1 Hz, which the length below divides by */
+            const int shift = 16 + 14 - buf[9];
+            id3->frequency = shift >= 0 ? get_long_be(&buf[10]) >> shift : 0;
+            if (id3->frequency == 0)
+                return false;
 
             /* save format infos */
             id3->bitrate = ((buf[6]<<8)|buf[7]) * numChannels * id3->frequency;

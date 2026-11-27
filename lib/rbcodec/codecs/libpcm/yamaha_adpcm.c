@@ -163,6 +163,13 @@ static int decode(const uint8_t *inbuf, size_t inbufsize,
     /* read block header */
     if (has_block_header)
     {
+        /* a damaged file's last block, cut inside its header: nothing to
+           decode, and the size would wrap */
+        if (inbufsize < 4 * (size_t)fmt->channels)
+        {
+            *outbufcount = 0;
+            return CODEC_OK;
+        }
         for (ch = 0; ch < fmt->channels; ch++)
         {
             cur_data.pcmdata[ch] = inbuf[0] | (SE(inbuf[1]) << 8);

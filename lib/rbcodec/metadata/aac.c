@@ -135,6 +135,16 @@ bool get_aac_metadata(int fd, struct mp3entry *entry)
         return get_mp4_metadata(fd, entry);
     }
 
+    /* a damaged header's reserved sampling index (13-15), which no decoder
+       plays */
+    if (entry->frequency == 0)
+        return false;
+    /* a bitrate under 0.5 kbps rounds to 0: silent low-rate frames, or a
+       damaged ADIF field; the length here and aac_bsf.c's elapsed time
+       divide by it */
+    if (entry->bitrate == 0)
+        entry->bitrate = 1;
+
     entry->length = (unsigned long)((entry->filesize * 8LL + (entry->bitrate >> 1)) / entry->bitrate);
 
     return true;
