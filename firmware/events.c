@@ -27,9 +27,19 @@
  * panics */
 #define MAX_SYS_EVENTS 48
 
+/* the runs of a oneshot in one send, the first and those asked for during
+   one: a callback asked for again at every run gives its sender back then */
+#define ONESHOT_RUNS 4
+
 struct sysevent {
     unsigned short id;
+    /* the registration's number in its slot, new at each: a run's return
+       knows its own from a later one's that took the slot meanwhile */
+    unsigned short gen;
     bool oneshot;
+    /* a oneshot's handler is running, as a storage idle callback that
+       yields in its writes, and was asked for again meanwhile */
+    bool running, again;
     union {
         void (*cb)(unsigned short id, void *event_data);
         void (*cb_ex)(unsigned short id, void *event_data, void *user_data);
@@ -54,6 +64,14 @@ static bool do_add_event(unsigned short id, bool oneshot,
 
         if (ev->id == id && ev->handler.cb == handler && user_data == ev->user_data)
         {
+            /* a oneshot asked for while it runs, as a mark changed during
+               its save: it runs again after it, instead of being lost as
+               its slot is freed */
+            if (ev->running)
+            {
+                ev->again = true;
+                return true;
+            }
             return false;
         }
     }
@@ -66,6 +84,9 @@ static bool do_add_event(unsigned short id, bool oneshot,
         ev->handler.cb = handler;
         ev->user_data = user_data;
         ev->oneshot = oneshot;
+        ev->gen++;
+        ev->running = false;
+        ev->again = false;
 
         return true;
     }
@@ -93,6 +114,8 @@ static void do_remove_event(unsigned short id, void *handler, void *user_data)
         if (ev->id == id && ev->handler.cb == handler && user_data == ev->user_data)
         {
             ev->handler.cb = NULL;
+            ev->running = false; /* its run, if any, then leaves the slot */
+            ev->again = false;
             return;
         }
     }
@@ -110,21 +133,46 @@ void remove_event_ex(unsigned short id,
     do_remove_event(id, handler, user_data);
 }
 
+/* A oneshot (only _ex events have one) runs once at a time: a send while it
+   runs, as another thread's call_storage_idle_notifys(true) during its
+   writes' yields, passes it by. Asked for again meanwhile, it runs again at
+   once from the send that runs it, which completes the request before it
+   returns: the storage thread's, before the disk sleeps or USB is answered.
+   A forced send that passed it by leaves no request for an idle that may
+   not come. Then it is freed, unless still asked for after ONESHOT_RUNS:
+   then at the next send. The senders are threads of one core, which switch
+   only at a yield: no lock, as before. */
 void send_event(unsigned short id, void *data)
 {
     for (size_t i = 0; i < MAX_SYS_EVENTS; i++)
     {
         struct sysevent *ev = &events[i];
-        if (ev->id == id && ev->handler.cb != NULL)
+        if (ev->id != id || ev->handler.cb == NULL)
+            continue;
+
+        if (ev->user_data == &invalid_userdata)
+            ev->handler.cb(id, data);
+        else if (!ev->oneshot)
+            ev->handler.cb_ex(id, data, ev->user_data);
+        else if (!ev->running)
         {
-            if (ev->user_data != &invalid_userdata)
+            const unsigned short gen = ev->gen;
+            ev->running = true;
+            for (int run = 1; ; run++)
             {
+                ev->again = false;
                 ev->handler.cb_ex(id, data, ev->user_data);
-                if (ev->oneshot) /* only _ex events have option of oneshot */
+                /* removed meanwhile, and the slot maybe another's: left */
+                if (ev->gen != gen || !ev->running)
+                    break;
+                if (ev->again && run < ONESHOT_RUNS)
+                    continue;
+                ev->running = false;
+                if (!ev->again)
                     ev->handler.cb = NULL;
+                ev->again = false;
+                break;
             }
-            else
-                ev->handler.cb(id, data);
         }
     }
 }
