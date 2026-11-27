@@ -56,7 +56,9 @@
 #define UAC2_SAM_FREQ       (0x01 << 8)
 #define UAC1_EP_GENERAL     0x01
 #define UAC1_GET_CUR        0x81
+#define UAC1_GET_MIN        0x82
 #define UAC1_GET_MAX        0x83
+#define UAC1_GET_RES        0x84
 #define UAC2_RANGE          0x02
 #define UAC_FEATURE_UNIT    0x06
 #define UAC1_FU_MUTE        0x01
@@ -217,26 +219,60 @@ static void offer_rates(int rates)
     }
 }
 
-/* A feature unit can start muted or low, and the player applies its own
- * volume: unmute it and turn it up to its maximum. Each control is set on
- * the master channel where the unit has it there, and on channels 1 and 2
- * where it does not -- mute on the master and volume per channel is
- * common. Class 1 reads the maximum with GET_MAX; class 2 reads a RANGE,
- * the count of subranges and then the first one's minimum, maximum and
- * resolution. */
+/* The highest volume step at or below 0 dB: a DAC's maximum can be above it,
+ * and the player applies its own volume, so more clips. Class 1 reads
+ * GET_MIN, GET_MAX and GET_RES; class 2 a RANGE of one subrange. A control
+ * that answers otherwise is left as it is. */
+static bool dac_safe_volume(int ch, uint8_t value[2])
+{
+    uint8_t bounds[3][2];
+    int index = (fu_unit << 8) | status.ac_iface;
+    int selector = (UAC1_FU_VOLUME << 8) | ch;
+    int type = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+    if (status.uac == 1)
+    {
+        const int requests[] = { UAC1_GET_MIN, UAC1_GET_MAX, UAC1_GET_RES };
+        for (int i = 0; i < 3; i++)
+            if (usb_drv_host_control(dev_addr, type, requests[i], selector,
+                                     index, bounds[i], 2) != 2)
+                return false;
+    }
+    else
+    {
+        uint8_t b[8];
+        if (usb_drv_host_control(dev_addr, type, UAC2_RANGE, selector,
+                                 index, b, sizeof b) != sizeof b ||
+            b[0] != 1 || b[1] != 0)
+            return false;
+        memcpy(bounds, &b[2], sizeof bounds);
+    }
+    int low = (int16_t)(bounds[0][0] | bounds[0][1] << 8);
+    int high = (int16_t)(bounds[1][0] | bounds[1][1] << 8);
+    unsigned step = bounds[2][0] | bounds[2][1] << 8;
+    int ceiling = MIN(high, 0);
+    if (low > ceiling)
+        return false;
+    int target = step ? low + (int)((unsigned)(ceiling - low) / step * step) : ceiling;
+    value[0] = (unsigned)target & 0xff;
+    value[1] = ((unsigned)target >> 8) & 0xff;
+    return true;
+}
+
+/* A feature unit can start muted or low: unmute it and set its volume by
+ * dac_safe_volume(). Each control is set on the master channel where the
+ * unit has it there, and on channels 1 and 2 where it does not. A volume is
+ * read back, and the log says whether it took. */
 static void dac_unmute(void)
 {
     int index = (fu_unit << 8) | status.ac_iface;
-
     if (fu_unit == 0)
         return;
     for (int bit = 0; bit < 2; bit++)
     {
         for (int ch = 0; ch < 3; ch++)
         {
-            uint8_t b[8] = { 0 };
+            uint8_t b[2] = { 0 };
             int n;
-
             if (!(fu_ctl[ch] & (1 << bit)))
                 continue;
             if (bit == 0)
@@ -248,38 +284,25 @@ static void dac_unmute(void)
                 usb_log(USB_LOG_HOST_ENUM, n == 1, ch,
                         (uintptr_t)"dac unmute", usb_drv_host_last_status());
             }
-            else if (status.uac == 1)
+            else if (dac_safe_volume(ch, b))
             {
-                n = usb_drv_host_control(dev_addr, USB_DIR_IN |
+                int selector = (UAC1_FU_VOLUME << 8) | ch;
+                uint8_t actual[2];
+                n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-                                         UAC1_GET_MAX,
-                                         (UAC1_FU_VOLUME << 8) | ch,
-                                         index, b, 2);
-                if (n == 2)
-                    n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
-                                             USB_TYPE_CLASS |
-                                             USB_RECIP_INTERFACE, UAC2_CUR,
-                                             (UAC1_FU_VOLUME << 8) | ch,
-                                             index, b, 2);
-                usb_log(USB_LOG_HOST_ENUM, n == 2, ch,
+                                         UAC2_CUR, selector, index, b, 2);
+                bool verified = n == 2 &&
+                    usb_drv_host_control(dev_addr, USB_DIR_IN |
+                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+                                          status.uac == 1 ? UAC1_GET_CUR : UAC2_CUR,
+                                          selector, index, actual, 2) == 2 &&
+                    memcmp(b, actual, 2) == 0;
+                usb_log(USB_LOG_HOST_ENUM, verified, ch,
                         (uintptr_t)"dac volume", b[0] | b[1] << 8);
             }
             else
-            {
-                n = usb_drv_host_control(dev_addr, USB_DIR_IN |
-                                         USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-                                         UAC2_RANGE,
-                                         (UAC1_FU_VOLUME << 8) | ch,
-                                         index, b, 8);
-                if (n == 8)
-                    n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
-                                             USB_TYPE_CLASS |
-                                             USB_RECIP_INTERFACE, UAC2_CUR,
-                                             (UAC1_FU_VOLUME << 8) | ch,
-                                             index, &b[4], 2);
-                usb_log(USB_LOG_HOST_ENUM, n == 2, ch,
-                        (uintptr_t)"dac volume", b[4] | b[5] << 8);
-            }
+                usb_log(USB_LOG_HOST_ENUM, 0, ch,
+                        (uintptr_t)"dac volume unchanged", 0);
             if (ch == 0)
                 break;
         }
