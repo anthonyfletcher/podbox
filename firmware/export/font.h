@@ -127,7 +127,9 @@ void font_lock(int font_id, bool lock);
 /* Closes the file descriptor if the font file (if cached) but keeps
  * the cache intact, so font_get_{bits,width} still work. */
 void font_disable_all(void);
-/* Re-opens the file descriptor of the font file. Should be called as
+/* Re-opens the file descriptor of the font file, if the file is still the one
+ * the font was loaded from; another in its place keeps the font as
+ * font_disable_all() left it, until it's unloaded. Should be called as
  * counter-part of font_disable_all(); */
 void font_enable_all(void);
 

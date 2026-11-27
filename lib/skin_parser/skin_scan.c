@@ -124,7 +124,13 @@ char* scan_string(const char** document)
         }
 
         if(*cursor == TAGSYM)
+        {
             cursor++;
+            /* a '%' that ends the text escapes nothing: past it was past the
+               end */
+            if(*cursor == '\0')
+                break;
+        }
 
         if(*cursor == '\n')
         {
@@ -135,8 +141,11 @@ char* scan_string(const char** document)
         length++;
         cursor++;
     }
+    const char* end = cursor;
 
-    /* Copying the string */
+    /* Copying the string as it was counted: an escaped '#' is a character,
+       not a comment to the end of the line, which took the copy past what
+       was counted */
     cursor = *document;
     buffer = skin_alloc_string(length);
     if (!buffer)
@@ -144,9 +153,6 @@ char* scan_string(const char** document)
     buffer[length] = '\0';
     for(i = 0; i < length; i++)
     {
-        if(*cursor == TAGSYM)
-            cursor++;
-
         if(*cursor == COMMENTSYM)
         {
             skip_comment(&cursor);
@@ -154,11 +160,14 @@ char* scan_string(const char** document)
             continue;
         }
 
+        if(*cursor == TAGSYM)
+            cursor++;
+
         buffer[i] = *cursor;
         cursor++;
     }
 
-    *document = cursor;
+    *document = end;
     return buffer;
 }
 

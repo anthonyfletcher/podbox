@@ -49,6 +49,11 @@ void font_cache_create(
 
     int cache_size = buf_size /
         (font_cache_entry_size + LRU_SLOT_OVERHEAD + sizeof(short));
+    /* no more than the index's and the LRU's shorts count: with more, as for
+       config.cfg's "glyphs" past 32767, their loops went round to negative
+       places, written before the buffer without end */
+    if (cache_size > FONT_CACHE_MAX_GLYPHS)
+        cache_size = FONT_CACHE_MAX_GLYPHS;
 
 #ifdef UNICODE32
     /* Ensure LRU index size is a multiple of 32 bits */

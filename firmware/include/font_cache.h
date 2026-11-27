@@ -44,8 +44,12 @@ struct font_cache_entry
     unsigned char bitmap[1]; /* place holder */
 };
 
+/* The most glyphs a cache holds: its index's and the LRU's shorts count them,
+   and an even number (UNICODE32) */
+#define FONT_CACHE_MAX_GLYPHS 32766
+
 /* void (*f) (void*, struct font_cache_entry*); */
-/* Create an auto sized font cache from buf */
+/* Create an auto sized font cache from buf, of FONT_CACHE_MAX_GLYPHS at most */
 void font_cache_create(
     struct font_cache* fcache, void* buf, int buf_size, int bitmap_bytes_size);
 

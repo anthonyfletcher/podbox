@@ -415,12 +415,16 @@ static int readline_cb(int n, char *buf, void *parameters)
                 case SHORTCUT_BROWSER:
                 {
                     char *p = strmemccpy(sc->u.path, value, MAX_PATH);
-                    if (p && dir_exists(value))
+                    /* the path's length, with room for a slash after it or
+                       not: one of MAX_PATH - 1 had it written past u.path,
+                       and an empty one read before it */
+                    const size_t len = p ? (size_t)(p - sc->u.path) - 1 : 0;
+                    if (len > 0 && len + 1 < MAX_PATH
+                        && sc->u.path[len - 1] != '/' && dir_exists(value))
                     {
                         /* ensure ending slash */
-                        *p = '\0';
-                        if (*(p-2) != '/')
-                            *(p-1) = '/';
+                        sc->u.path[len] = '/';
+                        sc->u.path[len + 1] = '\0';
                     }
                     break;
                 }
