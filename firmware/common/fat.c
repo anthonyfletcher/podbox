@@ -295,6 +295,13 @@ static struct bpb
 static uint8_t fat_bounce_buffers[NUM_VOLUMES][BOUNCE_SECTOR_SIZE*FAT_BOUNCE_SECTORS] STORAGE_ALIGN_ATTR;
 #define FAT_BOUNCE_BUFFER(bpb) \
     (fat_bounce_buffers[IF_MV_VOL((bpb)->volume)])
+/* Held from the first copy into a volume's bounce buffer to the last copy
+ * out of it. File reads and writes run concurrently and the driver blocks
+ * inside the transfer, so without it a second thread overwrites the buffer
+ * that the first is still transferring. */
+static struct mutex fat_bounce_mutexes[NUM_VOLUMES];
+#define FAT_BOUNCE_MUTEX(bpb) \
+    (&fat_bounce_mutexes[IF_MV_VOL((bpb)->volume)])
 #endif
 
 #define IS_FAT_SECTOR(bpb, sector) \
@@ -2555,6 +2562,7 @@ static long transfer(struct bpb *fat_bpb, sector_t start, long count,
 #ifdef STORAGE_NEEDS_BOUNCE_BUFFER
     if(UNLIKELY(STORAGE_OVERLAP((uintptr_t)buf))) {
         void* xfer_buf = FAT_BOUNCE_BUFFER(fat_bpb);
+        mutex_lock(FAT_BOUNCE_MUTEX(fat_bpb));
         while(count > 0) {
             int xfer_count = MIN(count*LOG_SECTOR_SIZE(fat_bpb), (FAT_BOUNCE_SECTORS * BOUNCE_SECTOR_SIZE)) / LOG_SECTOR_SIZE(fat_bpb);
 
@@ -2575,6 +2583,7 @@ static long transfer(struct bpb *fat_bpb, sector_t start, long count,
             start += xfer_count;
             count -= xfer_count;
         }
+        mutex_unlock(FAT_BOUNCE_MUTEX(fat_bpb));
     } else {
 #endif
         if(write) {
@@ -3255,6 +3264,11 @@ void fat_init(void)
     {
         dc_discard_all(IF_MV(i));
         fat_bpbs[i].mounted = false;
+#ifdef STORAGE_NEEDS_BOUNCE_BUFFER
+        /* Callers hold the file system writer lock and every transfer
+         * holds that lock too, so no thread holds or waits on these. */
+        mutex_init(&fat_bounce_mutexes[i]);
+#endif
     }
 
     dc_unlock_cache();
