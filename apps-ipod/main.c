@@ -574,6 +574,22 @@ static void init_tagcache(void)
 
 #include "errno.h"
 
+#ifndef SIMULATOR
+/* The main stack sits directly above the thread table, so an overflow
+ * corrupts other threads silently. crt0 fills it with 0xdeadbeef: name the
+ * fault once the fill is eaten to within 256 bytes of the bottom. */
+static void main_stack_guard(void)
+{
+    extern uintptr_t stackbegin[];
+    static bool fired;
+    if (!fired && stackbegin[256 / sizeof(uintptr_t)] != 0xdeadbeef)
+    {
+        fired = true;
+        panicf("Main stack overflow");
+    }
+}
+#endif
+
 static void init(void) INIT_ATTR;
 static void init(void)
 {
@@ -583,6 +599,9 @@ static void init(void)
     system_init();
     core_allocator_init();
     kernel_init();
+#ifndef SIMULATOR
+    tick_add_task(main_stack_guard);
+#endif
 
 
 

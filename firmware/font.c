@@ -1000,8 +1000,10 @@ static NO_INLINE void glyph_cache_load(const char *font_path, struct font *pf)
         int i, size, fd;
         unsigned char tmp[sizeof(ucschar_t)];
         ucschar_t ch;
-        ucschar_t glyphs[MAX_SORT];
-        ucschar_t glyphs_lru_order[MAX_SORT];
+        /* Static: 2 KB, too much for the main stack. Fonts load only on
+         * the UI thread. */
+        static ucschar_t glyphs[MAX_SORT];
+        static ucschar_t glyphs_lru_order[MAX_SORT];
         unsigned int glyph_file_skip=0, glyph_file_size=0;
 
         int sort_size = pf->cache._capacity;
@@ -1018,12 +1020,13 @@ static NO_INLINE void glyph_cache_load(const char *font_path, struct font *pf)
             /* Header */
             uint32_t hdr = 0;
             read(fd, &hdr, sizeof(hdr));
-            if (hdr != FC_HEADER_VAL)
-                goto latin;
-            /* only read what fits */
             glyph_file_size = ffilesize( fd );
-            if (glyph_file_size < sizeof(uint32_t))
+            if (hdr != FC_HEADER_VAL || glyph_file_size < sizeof(uint32_t))
+            {
+                close(fd);
                 goto latin;
+            }
+            /* only read what fits */
             glyph_file_size -= sizeof(uint32_t);
             if ( glyph_file_size > (int)sizeof(ucschar_t)*pf->cache._capacity ) {
                 glyph_file_skip = glyph_file_size - sizeof(ucschar_t)*pf->cache._capacity;
@@ -1031,7 +1034,7 @@ static NO_INLINE void glyph_cache_load(const char *font_path, struct font *pf)
             }
             while(1) {
                 for ( size = 0;
-                      read( fd, tmp, sizeof(tmp) ) == sizeof(tmp) && size < sort_size;
+                      size < sort_size && read( fd, tmp, sizeof(tmp) ) == sizeof(tmp);
                       size++ )
                 {
 #ifdef UNICODE32
