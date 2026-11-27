@@ -21,7 +21,7 @@ Two kinds of row are shown in both modes:
 
 - **the Maintenance actions**, so Update Database is always there for *my new
   album isn't showing up*;
-- **Dynamic Colors and Dynamic Colors Background**, so a screen the artwork
+- **Dynamic Colours and Dynamic Colours Background**, so a screen the artwork
   has recoloured can always be put back.
 
 ---
@@ -60,6 +60,7 @@ Settings
 | Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. Mono is the useful one if you often listen with a single earbud. | Stereo |  |
 | Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100% |  |
 | Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. Inaudible on almost all material through headphones. Automatic adds it only where it is needed. A 16-bit file plays exactly as it is in the file, bit for bit, unless Replaygain or a sound effect changes it; 24-bit and lossy files are dithered. A USB DAC gets the same, with the volume at 0 dB or above. Always dithers everything. | Auto on a new install | **Adv** |
+| Full Codec Voltage | Powers the audio chip at 3.0 V, as Apple's firmware does, instead of 2.5 V. On paper that is a little less hiss and a little more headroom before loud music distorts. Changed while a track is playing or paused, it takes effect the next time the player starts. | No | **Adv** |
 | Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. If you can hear it working, it is set too high. | Off |  |
 
 ### Sound Settings — Crossfeed
@@ -306,6 +307,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | No |  |
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | Show tracks |  |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175% |  |
+| Wheel Glide | After a quick flick of the wheel, the covers coast on and slow to a stop, each album clicking as it passes. Rest a finger on the wheel to stop them, or flick again the same way to go further. | No |  |
 | Random Spin Length | How many covers go past when holding Play picks an album at random, or Left and Right jump to the next letter or year. Long makes more of a show of it and takes a little longer to land. | Medium |  |
 
 **Appearance** opens `Settings > Appearance > Carousel`, below.
@@ -393,8 +395,8 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | No |  |
-| Dynamic Colors Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | Auto |  |
+| Dynamic Colours | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | No |  |
+| Dynamic Colours Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | Auto |  |
 | Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
 | Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
 | Line Selector Colours ▸ Primary Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
@@ -485,7 +487,7 @@ Also reached as **Appearance** under `Settings > Library > Carousel`.
 | Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default, which Dialog Colour Mode Auto replaces with a darker shade of the background; any other colour is used as given. | 000000 |  |
 | Button Border Width | The thickness of a dialog button's border, in pixels. | 2 px | **Adv** |
 | Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 px | **Adv** |
-| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, works from the theme's own two colours, or the album's while Dynamic Colors is running: the selected button is filled with the text colour, the box is lifted slightly off a dark screen, and outlines are muted. On a dark theme the album's colours are taken dark for the box and light for the text, as the screen behind it does. Off is the same two colours drawn flat, with plain outlines. On ignores both and uses the nine colours below, which appear only in that mode. | Auto |  |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, works from the theme's own two colours, or the album's while Dynamic Colours is running: the selected button is filled with the text colour, the box is lifted slightly off a dark screen, and outlines are muted. On a dark theme the album's colours are taken dark for the box and light for the text, as the screen behind it does. Off is the same two colours drawn flat, with plain outlines. On ignores both and uses the nine colours below, which appear only in that mode. | Auto |  |
 | Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
 | Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
 | Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |

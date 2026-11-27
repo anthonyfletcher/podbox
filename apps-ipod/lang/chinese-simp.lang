@@ -17345,7 +17345,7 @@
   user: core
   <source>
     *: none
-    lcd_color: "Dynamic Colors"
+    lcd_color: "Dynamic Colours"
   </source>
   <dest>
     *: none
@@ -22723,7 +22723,7 @@
   user: core
   <source>
     *: none
-    lcd_color: "Dynamic Colors Background"
+    lcd_color: "Dynamic Colours Background"
   </source>
   <dest>
     *: none

@@ -89,6 +89,14 @@ in the file, bit for bit, unless Replaygain or a sound effect changes it; 24-bit
 and lossy files are dithered. A USB DAC gets the same, with the volume at 0 dB
 or above. Always dithers everything.
 
+[codec supply full]
+Powers the audio chip at 3.0 V, as Apple's firmware does, instead of 2.5 V. On
+paper that is a little less hiss and a little more headroom before loud music
+distorts.
+
+Changed while a track is playing or paused, it takes effect the next time the
+player starts.
+
 [disk spindown]
 How long the drive sits idle before it is allowed to stop.
 
@@ -1010,6 +1018,11 @@ How many covers go past when holding Play picks an album at random, or Left
 and Right jump to the next letter or year. Long makes more of a show of it and
 takes a little longer to land.
 
+[album covers wheel glide]
+After a quick flick of the wheel, the covers coast on and slow to a stop, each
+album clicking as it passes. Rest a finger on the wheel to stop them, or flick
+again the same way to go further.
+
 [album covers transition speed]
 How quickly the 3D view settles after scrolling. No effect in Flat, which times
 itself off the wheel instead.
@@ -1152,7 +1165,7 @@ darker colour, which may be harder to read where a skin draws it over the art.
 How the confirmation and message boxes are coloured.
 
 Auto, the default, works from the theme's own two colours, or the album's
-while Dynamic Colors is running: the selected button is filled with the text
+while Dynamic Colours is running: the selected button is filled with the text
 colour, the box is lifted slightly off a dark screen, and outlines are muted.
 On a dark theme the album's colours are taken dark for the box and light for
 the text, as the screen behind it does.

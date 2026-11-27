@@ -1161,7 +1161,7 @@ Three things worth knowing:
   color`, the line selector — are the theme's roles, and they do not take the
   prefix.
 
-With `Settings > Appearance > Interface Colours > Dynamic Colors` off,
+With `Settings > Appearance > Interface Colours > Dynamic Colours` off,
 `!rrggbb` and `rrggbb` are the same colour; nothing is being remapped either
 way.
 
@@ -1233,7 +1233,7 @@ tone of the same colour is written, such as the lower half of a glossy bar:
 
 ### With no album colours
 
-Before anything has played, or with **Dynamic Colors** off, a word is the
+Before anything has played, or with **Dynamic Colours** off, a word is the
 theme's foreground colour (`dominant`: its background), bounded and shaded the
 same way. Add `:rrggbb` to give a colour of your own instead, used exactly as
 written, so the skin looks as designed until something plays:
