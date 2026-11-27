@@ -102,10 +102,10 @@ static struct {
     volatile unsigned int head;
     volatile unsigned int tail;
     volatile bool running;
-    volatile bool stop;
-    volatile bool die;
     struct decoded_frame decoded[DECODE_QUEUE];
 #ifdef DECODE_THREAD
+    volatile bool stop;
+    volatile bool die;
     struct semaphore pending;
     struct semaphore ready;
     struct semaphore room;
@@ -669,7 +669,8 @@ enum codec_status codec_run(void)
             break;
 
         if (action == CODEC_ACTION_SEEK_TIME) {
-            /*make sure the COP is idle before seeking - MT only*/
+            /* the queue and the window are from before the seek; with two
+               cores the COP is stopped first */
             decode_stop();
 
             if (param == 0) {

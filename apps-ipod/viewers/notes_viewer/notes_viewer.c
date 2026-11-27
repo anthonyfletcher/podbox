@@ -1478,10 +1478,10 @@ static void nv_wheel(int dir)
     {
         int nat = nv_natural(true);
 
-        if (nv_same_line(cur, cur - 1) && nv_link_shown(cur - 1))
+        /* on along the line, or the reading line comes back up */
+        if (nv_link_shown(cur - 1)
+            && (nv_same_line(cur, cur - 1) || (nat >= 0 && cur > nat)))
             nv.cur--;
-        else if (cur > 0 && nat >= 0 && cur > nat && nv_link_shown(cur - 1))
-            nv.cur--;           /* the reading line comes back up */
         else if (nv.scroll > 0)
         {
             nv.scroll -= nv_wheel_px();

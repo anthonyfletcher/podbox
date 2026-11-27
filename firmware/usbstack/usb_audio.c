@@ -398,8 +398,12 @@ int fb_startframe = 0;
 bool send_fb = false;
 /* A feedback packet the host has not collected yet. Priming the next one
    waits for the controller with interrupts off, for up to 250 ms on the 5G,
-   and every OUT packet in that time is lost. */
+   and every OUT packet in that time is lost, so the next is skipped. After
+   FB_PATIENCE skips one is sent anyway: the 6G's controller stops offering
+   a packet the host leaves untaken, and only a new one starts it again. */
+#define FB_PATIENCE 8
 static bool fb_pending;
+static int fb_skipped;
 
 /* debug screen sample count display variables */
 static unsigned long samples_received;
@@ -760,6 +764,7 @@ static void usb_audio_start_playback(void)
 
     // feedback initialization
     fb_pending = false;
+    fb_skipped = 0;
     fb_startframe = usb_drv_get_frame_number();
     samples_fb = 0;
     samples_received_report = 0;
@@ -1436,7 +1441,6 @@ static void usb_audio_notify_event(intptr_t data)
 
 static bool usb_audio_fast_transfer_complete(int ep, int dir, int status, int length)
 {
-    (void) dir;
     bool retval = false;
 
     if (dir == USB_DIR_IN && EP_NUM(ep) == EP_NUM(EP_ISO_FEEDBACK_IN))
@@ -1580,12 +1584,13 @@ feedback:
 
             encodeFBfixedpt(sendFf, samples_fb, usb_drv_port_speed());
             logf("usbaudio: frame %d fbval 0x%02X%02X%02X%02X", usb_drv_get_frame_number(), sendFf[3], sendFf[2], sendFf[1], sendFf[0]);
-            /* skipped while the last is still waiting */
-            if (!fb_pending)
+            /* skipped while the last is still waiting; pending only once
+               queued, as a failed send never completes */
+            if (!fb_pending || ++fb_skipped >= FB_PATIENCE)
             {
-                fb_pending = true;
-                usb_drv_send_nonblocking(EP_ISO_FEEDBACK_IN, sendFf,
-                                         usb_drv_port_speed()?4:3);
+                fb_skipped = 0;
+                fb_pending = usb_drv_send_nonblocking(EP_ISO_FEEDBACK_IN,
+                                 sendFf, usb_drv_port_speed()?4:3) == 0;
             }
             if (st_feedbacks++ % 64 == 0)
                 usb_log(USB_LOG_FEEDBACK, 0, 0,
