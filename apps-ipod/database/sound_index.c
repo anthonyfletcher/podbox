@@ -771,8 +771,15 @@ int sound_index_finish(bool prune)
         return SOUND_ERR_IO;
     }
 
-    fsync(out_fd);
-    close(out_fd);
+    /* Both operations may report a delayed write failure. Close exactly
+     * once, but retain the last finished index if either reports an error. */
+    int sync_rc = fsync(out_fd);
+    int close_rc = close(out_fd);
+    if (sync_rc < 0 || close_rc < 0)
+    {
+        remove(SOUND_FILE ".new");
+        return SOUND_ERR_IO;
+    }
 
     /* In place only once the replacement is whole: a scan of this length must
      * not be able to destroy the previous index by failing near the end. */
