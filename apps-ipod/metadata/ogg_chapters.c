@@ -78,8 +78,13 @@ static bool parse_time(const char *s, unsigned long *ms)
     return true;
 }
 
+/* Which entries have a time, one bit each */
+#define TIMED_BYTES ((MAX_TRACKS + 7) / 8)
+#define IS_TIMED(t, n) ((t)[(n) / 8] & (1 << ((n) % 8)))
+
 /* A CHAPTERnnn= or CHAPTERnnnNAME= comment onto entry nnn */
-static void read_comment(const char *c, struct cuesheet *cue, bool *timed)
+static void read_comment(const char *c, struct cuesheet *cue,
+                         unsigned char *timed)
 {
     unsigned long n;
     int count;
@@ -91,10 +96,13 @@ static void read_comment(const char *c, struct cuesheet *cue, bool *timed)
     if (!count || n >= MAX_TRACKS)
         return;
     if (*c == '=')
-        timed[n] = parse_time(c + 1, &cue->tracks[n].offset);
+    {
+        timed[n / 8] &= ~(1 << (n % 8));
+        if (parse_time(c + 1, &cue->tracks[n].offset))
+            timed[n / 8] |= 1 << (n % 8);
+    }
     else if (!strncasecmp(c, "NAME=", 5))
-        strmemccpy(cue->tracks[n].title, c + 5,
-                   sizeof(cue->tracks[n].title));
+        cue->tracks[n].title = cue_add_text(cue, c + 5);
 }
 
 /* ---- ogg_chapters_possible() and read_ogg_chapters() ------------------ */
@@ -113,7 +121,7 @@ bool ogg_chapters_possible(const char *path, bool spoken)
 int read_ogg_chapters(const char *path, struct cuesheet *cue)
 {
     static struct cue_track_info held;
-    bool timed[MAX_TRACKS];
+    unsigned char timed[TIMED_BYTES];
     unsigned char head[92];
     char c[COMMENT_HEAD + 1];
     struct ogg_file ogg;
@@ -160,7 +168,7 @@ int read_ogg_chapters(const char *path, struct cuesheet *cue)
     {
         int p = found;
 
-        if (!timed[n])
+        if (!IS_TIMED(timed, n))
             continue;
         held = cue->tracks[n];
         while (p > 0 && cue->tracks[p - 1].offset > held.offset)

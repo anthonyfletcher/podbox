@@ -11,6 +11,7 @@
 #define _CUESHEET_H_
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "file.h"
 #include "metadata.h"
 
@@ -19,13 +20,20 @@
 struct screen;
 
 #define MAX_NAME 80    /* Max length of information strings */
-#define MAX_TRACKS 99  /* Max number of tracks in a cuesheet */
+#define MAX_TRACKS 999 /* Max number of tracks or chapters in a cuesheet */
 
+/* Every track's names, together. A long book's chapters share it, so a
+ * chapter costs the length of its name rather than the longest name
+ * allowed; past this many bytes the later names come out empty. */
+#define CUE_TEXT_SIZE 57344
+
+/* A track's names are offsets into its cuesheet's text, read through
+ * cue_text(); 0 is the empty name. */
 struct cue_track_info {
-    char title[MAX_NAME*3+1];
-    char performer[MAX_NAME*3+1];
-    char songwriter[MAX_NAME*3+1];
     unsigned long offset; /* ms from start of track */
+    uint16_t title;
+    uint16_t performer;
+    uint16_t songwriter;
 };
 
 struct cuesheet {
@@ -50,7 +58,23 @@ struct cuesheet {
        track list does. Only a book reached from the shelf has one: a book
        already playing is where it was left. */
     bool resume_row;
+
+    uint16_t text_used;
+    char text[CUE_TEXT_SIZE];
 };
+
+static inline const char *cue_text(const struct cuesheet *cue, uint16_t at)
+{
+    return cue->text + at;
+}
+
+/* Empties "cue" for a parse to fill */
+void cue_init(struct cuesheet *cue);
+
+/* Stores a name in the cuesheet's text, cut at a character to the room
+ * left, and returns where for a cue_track_info field: 0 when it is empty
+ * or nothing fits. */
+uint16_t cue_add_text(struct cuesheet *cue, const char *s);
 
 struct cuesheet_file {
     char path[MAX_PATH];

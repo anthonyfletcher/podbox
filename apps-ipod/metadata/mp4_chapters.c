@@ -15,7 +15,7 @@
  * holding the names as timed text, which the audio track points at through
  * a "tref/chap"; reading that one means walking the sample tables to find
  * where each name lies. A file carrying both is read from chpl, the cheaper
- * of the two.
+ * of the two, unless chpl is full at 255 entries and chap holds more.
  *
  * A list of one entry is not a chapter list -- a lone chpl record is how
  * Nero marks encoder delay -- so two are needed before either is believed.
@@ -70,6 +70,10 @@
  * as well when the version is not 0. */
 #define CHPL_FLAGS      3
 #define CHPL_RESERVED   4
+
+/* Its count is a byte, so a longer book fills it and carries the rest only
+ * in the chap track. */
+#define CHPL_MAX        255
 
 /* chpl timestamps are in units of 100ns. */
 #define CHPL_TICKS_PER_MS 10000
@@ -171,6 +175,7 @@ static int read_chpl(int fd, off_t udta_end, struct cuesheet *cue)
     for (i = 0; i < count && found < MAX_TRACKS; i++)
     {
         struct cue_track_info *track = &cue->tracks[found];
+        char title[MAX_NAME*3+1];
         uint64_t timestamp;
         uint8_t len = 0;
         size_t want;
@@ -182,12 +187,13 @@ static int read_chpl(int fd, off_t udta_end, struct cuesheet *cue)
 
         track->offset = timestamp / CHPL_TICKS_PER_MS;
 
-        want = MIN((size_t)len, sizeof(track->title) - 1);
+        want = MIN((size_t)len, sizeof(title) - 1);
 
-        if (want > 0 && read(fd, track->title, want) != (ssize_t)want)
+        if (want > 0 && read(fd, title, want) != (ssize_t)want)
             break;
 
-        track->title[want] = '\0';
+        title[want] = '\0';
+        track->title = cue_add_text(cue, title);
 
         if (len > want && lseek(fd, len - want, SEEK_CUR) < 0)
             break;
@@ -387,13 +393,15 @@ static bool sample_size(int fd, const struct sample_tables *st, int index,
  * it opens with a byte order mark. Whatever follows the name is styling and
  * is ignored. */
 static void read_sample_title(int fd, off_t pos, uint32_t size,
+                              struct cuesheet *cue,
                               struct cue_track_info *track)
 {
     unsigned char raw[MAX_NAME*3+1];
+    unsigned char title[MAX_NAME*3+1];
     uint16_t len;
     size_t want;
 
-    track->title[0] = '\0';
+    track->title = 0;
 
     if (size < 2 || lseek(fd, pos, SEEK_SET) != pos
         || read_uint16be(fd, &len) != 2 || len == 0)
@@ -408,17 +416,17 @@ static void read_sample_title(int fd, off_t pos, uint32_t size,
                      || (raw[0] == 0xfe && raw[1] == 0xff)))
     {
         bool le = raw[0] == 0xff;
-        unsigned char *end = utf16decode(raw + 2,
-                                         (unsigned char *)track->title,
+        unsigned char *end = utf16decode(raw + 2, title,
                                          chapter_utf16_units(raw + 2,
                                                    (int)(want - 2) / 2, le),
-                                         sizeof(track->title) - 1, le);
+                                         sizeof(title) - 1, le);
         *end = '\0';
+        track->title = cue_add_text(cue, (const char *)title);
         return;
     }
 
-    memcpy(track->title, raw, want);
-    track->title[want] = '\0';
+    raw[want] = '\0';
+    track->title = cue_add_text(cue, (const char *)raw);
 }
 
 /* When each sample starts, in milliseconds. The durations are run-length
@@ -482,7 +490,7 @@ static int read_sample_titles(int fd, const struct sample_tables *st,
         if (!sample_size(fd, st, found, &size))
             return found;
 
-        read_sample_title(fd, pos, size, &cue->tracks[found]);
+        read_sample_title(fd, pos, size, cue, &cue->tracks[found]);
 
         pos += size;
         left--;
@@ -492,18 +500,16 @@ static int read_sample_titles(int fd, const struct sample_tables *st,
     return found;
 }
 
-/* The chapter track Apple's books carry. */
-static int read_chap(int fd, off_t moov_start, off_t moov_end,
-                     struct cuesheet *cue)
+/* The sample tables of the chapter track Apple's books carry. */
+static bool find_chap(int fd, off_t moov_start, off_t moov_end,
+                      struct sample_tables *st)
 {
-    struct sample_tables st;
     uint32_t wanted = 0, kind;
     off_t trak_end, payload;
-    int times, titles;
 
     /* The audio track names its chapter track by id. */
     if (lseek(fd, moov_start, SEEK_SET) != moov_start)
-        return 0;
+        return false;
 
     while (!wanted && next_box(fd, moov_end, &kind, &trak_end))
     {
@@ -511,11 +517,11 @@ static int read_chap(int fd, off_t moov_start, off_t moov_end,
             wanted = chapter_track_id(fd, trak_end);
 
         if (lseek(fd, trak_end, SEEK_SET) != trak_end)
-            return 0;
+            return false;
     }
 
     if (!wanted || lseek(fd, moov_start, SEEK_SET) != moov_start)
-        return 0;
+        return false;
 
     /* Then the track carrying that id holds the names. */
     while (next_box(fd, moov_end, &kind, &trak_end))
@@ -524,20 +530,39 @@ static int read_chap(int fd, off_t moov_start, off_t moov_end,
 
         if (payload >= 0 && kind == MP4_trak
             && track_id(fd, trak_end) == wanted
-            && lseek(fd, payload, SEEK_SET) == payload
-            && read_sample_tables(fd, trak_end, &st))
-        {
-            times = read_start_times(fd, &st, cue);
-            titles = read_sample_titles(fd, &st, times, cue);
-
-            return MIN(times, titles);
-        }
+            && lseek(fd, payload, SEEK_SET) == payload)
+            return read_sample_tables(fd, trak_end, st);
 
         if (lseek(fd, trak_end, SEEK_SET) != trak_end)
             break;
     }
 
-    return 0;
+    return false;
+}
+
+/* How many chapters the chap track holds, from its durations alone, which
+ * sit in moov and cost nothing like reading each name. */
+static uint32_t chap_count(int fd, const struct sample_tables *st)
+{
+    uint32_t e, count, n = 0;
+
+    for (e = 0; e < st->stts.count && n <= MAX_TRACKS; e++)
+    {
+        if (!read_u32_at(fd, st->stts.pos + 8*e, &count))
+            break;
+        n += MIN(count, (uint32_t)MAX_TRACKS + 1);
+    }
+
+    return n;
+}
+
+static int read_chap(int fd, const struct sample_tables *st,
+                     struct cuesheet *cue)
+{
+    int times = read_start_times(fd, st, cue);
+    int titles = read_sample_titles(fd, st, times, cue);
+
+    return MIN(times, titles);
 }
 
 /* An .m4a is looked in only when it is a book: every music track in one
@@ -553,6 +578,7 @@ bool mp4_chapters_possible(const char *path, bool spoken)
 int read_mp4_chapters(const char *path, struct cuesheet *cue)
 {
     off_t file_end, moov_start, moov_end, udta_end;
+    struct sample_tables st;
     int found = 0;
     int fd;
 
@@ -576,8 +602,25 @@ int read_mp4_chapters(const char *path, struct cuesheet *cue)
         if (find_box(fd, MP4_udta, moov_end, &udta_end))
             found = read_chpl(fd, udta_end, cue);
 
-        if (found < MIN_CHAPTERS)
-            found = read_chap(fd, moov_start, moov_end, cue);
+        if ((found < MIN_CHAPTERS || found == CHPL_MAX)
+            && find_chap(fd, moov_start, moov_end, &st)
+            && (found < MIN_CHAPTERS || chap_count(fd, &st) > CHPL_MAX))
+        {
+            int chpl = found;
+
+            cue_init(cue);
+            found = read_chap(fd, &st, cue);
+
+            /* A chap track that reads short leaves chpl the longer list */
+            if (chpl == CHPL_MAX && found <= chpl)
+            {
+                cue_init(cue);
+                found = 0;
+                if (lseek(fd, moov_start, SEEK_SET) == moov_start
+                    && find_box(fd, MP4_udta, moov_end, &udta_end))
+                    found = read_chpl(fd, udta_end, cue);
+            }
+        }
     }
 
     close(fd);

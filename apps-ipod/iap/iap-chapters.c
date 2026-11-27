@@ -46,7 +46,7 @@ bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
     chapter->elapsed_ms = id3->elapsed > start ? id3->elapsed - start : 0;
     if (chapter->elapsed_ms > chapter->length_ms)
         chapter->elapsed_ms = chapter->length_ms;
-    chapter->name = cue->tracks[index].title;
+    chapter->name = cue_text(cue, cue->tracks[index].title);
     return true;
 }
 

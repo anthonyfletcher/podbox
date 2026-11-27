@@ -333,7 +333,7 @@ Reads the chapter list a file carries inside it, so one long file shows its
 chapter names, skips between them and marks them on the progress bar. Spoken
 Word reads them from audiobooks and podcasts only; All reads them from music
 too, such as a symphony marked by movement. It reads .m4b, .m4a, .mp3, Ogg and
-Opus files, and lists the first 99 chapters of a longer list.
+Opus files, and lists the first 999 chapters of a longer list.
 
 [folder navigation]
 At the end of a folder, move on rather than stopping: to the next folder, or to

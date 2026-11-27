@@ -176,6 +176,7 @@ static bool read_chap_frame(int fd, off_t frame_end, int major,
                             struct cuesheet *cue, int found)
 {
     struct cue_track_info *track;
+    char title[MAX_NAME*3+1];
     unsigned char times[CHAP_TIMES];
     uint32_t sub_id;
     off_t sub_end;
@@ -191,13 +192,14 @@ static bool read_chap_frame(int fd, off_t frame_end, int major,
         return false;
 
     track = slot_for(cue, found, plain32(times));
-    track->title[0] = '\0';
+    track->title = 0;
 
     while (next_frame(fd, frame_end, major, &sub_id, &sub_end))
     {
         if (sub_id == ID3_TIT2)
         {
-            read_frame_text(fd, sub_end, track->title, sizeof(track->title));
+            read_frame_text(fd, sub_end, title, sizeof(title));
+            track->title = cue_add_text(cue, title);
             break;
         }
 

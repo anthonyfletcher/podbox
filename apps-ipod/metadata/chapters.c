@@ -49,7 +49,7 @@ bool parse_chapters_path(const char *path, const char *book,
 {
     int found = 0;
 
-    memset(cue, 0, sizeof(struct cuesheet));
+    cue_init(cue);
 
     if (mp4_chapters_possible(path, true))
         found = read_mp4_chapters(path, cue);
