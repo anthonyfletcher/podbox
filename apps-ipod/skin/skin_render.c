@@ -1601,14 +1601,17 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
 /* The WPS's full-screen clear copies the backdrop, so it has to wait for the
  * %VB viewports ahead of it to redraw the buffer. Trap: the .sbs shares that
  * buffer (backdrops are matched by name) and draws into it while the WPS is
- * away, so clearing first puts the .sbs's layer on the WPS. */
-static void clear_wps_screen(struct screen *display)
+ * away, so clearing first puts the .sbs's layer on the WPS. ground_bg is
+ * the skin's background as parsed. Trap: never resolve the default
+ * viewport's bg_pattern instead -- it can already hold a resolved colour,
+ * which resolving turns a second time. */
+static void clear_wps_screen(struct screen *display, unsigned ground_bg)
 {
-    struct viewport *first_vp = display->set_viewport_ex(NULL, 0);
-    unsigned saved_bg = first_vp->bg_pattern;
-    first_vp->bg_pattern = dynamic_colors_resolve(saved_bg);
+    display->set_viewport_ex(NULL, 0);
+    unsigned saved_bg = display->get_background();
+    display->set_background(dynamic_colors_resolve(ground_bg));
     display->clear_viewport();
-    first_vp->bg_pattern = saved_bg;
+    display->set_background(saved_bg);
 }
 
 void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
@@ -1634,6 +1637,15 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     if (!skin_buffer)
         return;
 
+    /* The ground between the viewports, as the skin's default viewport was
+     * parsed: an original, so it can be resolved (see clear_wps_screen()). */
+    unsigned ground_bg = global_settings.bg_color;
+    viewport = SKINOFFSETTOPTR(skin_buffer, data->tree);
+    skin_viewport = viewport ?
+                    SKINOFFSETTOPTR(skin_buffer, viewport->data) : NULL;
+    if (skin_viewport)
+        ground_bg = skin_viewport->dc_orig_bg;
+
     /* Framebuffer is likely dirty */
     bool screen_clear_owed = false;
     if ((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL)
@@ -1649,17 +1661,24 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         {
             bool dirty = (first_vp->flags & VP_FLAG_VP_SET_CLEAN)
                           == VP_FLAG_VP_DIRTY;
+            bool is_wps = gwps == skin_get_gwps(WPS, display->screen_type);
             /* A %VB skin always owes it: gwps_enter_wps()'s clear_display()
              * marks the screen clean, but what it copied was the .sbs's
              * layer, and whatever no foreground viewport covers keeps it.
-             * Only the WPS skin itself: a %we bar clearing here would blank
-             * the WPS under it. */
+             * Only the WPS skin clears, for that and for a palette's new
+             * background alike: a %we bar clearing here blanks the WPS
+             * under it, which then repaints only its changing lines. Trap:
+             * the bar must not even ask about the palette's clear -- the
+             * flag is taken once, and the WPS needs it. */
             screen_clear_owed = dirty
-                || (data->use_extra_framebuffer
-                    && gwps == skin_get_gwps(WPS, display->screen_type))
-                || dynamic_colors_resolve(first_vp->bg_pattern)
-                   != first_vp->bg_pattern
-                || dynamic_colors_screen_clear_needed();
+                || (is_wps
+                    && (data->use_extra_framebuffer
+                        || dynamic_colors_resolve(ground_bg) != ground_bg
+                        || dynamic_colors_screen_clear_needed()));
+            /* The clear takes a %we bar's static lines with it, such as its
+             * screen label, so the bar owes a full pass of its own. */
+            if (is_wps && screen_clear_owed)
+                skin_request_full_update(CUSTOM_STATUSBAR);
         }
         screen_clear_owed |= flip_clear_owed;
     }
@@ -1747,7 +1766,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
              * nothing, so it does not count as the first foreground one. */
             if (screen_clear_owed && refresh_mode)
             {
-                clear_wps_screen(display);
+                clear_wps_screen(display, ground_bg);
                 screen_clear_owed = false;
             }
         }
@@ -1815,7 +1834,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     skin_backdrop_set_buffer(-1, skin_viewport);
     skin_backdrop_show(data->backdrop_id);
     if (screen_clear_owed)
-        clear_wps_screen(display);
+        clear_wps_screen(display, ground_bg);
 
     if (backdrop_flipped && !flip_repainting)
     {
