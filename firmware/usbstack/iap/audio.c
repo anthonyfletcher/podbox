@@ -569,7 +569,6 @@ bool iap_audio_set_sampr(uint32_t sampr) {
 
     usb_log(USB_LOG_IAP_RATE, set_freq >= 0 && freq != set_freq, 0, sampr,
             set_freq >= 0 ? RATE(set_freq) : 0);
-    host_set_rate = true;
 
     if(set_freq >= 0 && freq != set_freq) {
         /* Accessories should only set the frequency we requested via
@@ -580,6 +579,9 @@ bool iap_audio_set_sampr(uint32_t sampr) {
         return true;
     }
 
+    /* after the stale request's return: an ignored one must not stop the
+     * half-second fallback that announces the rate again */
+    host_set_rate = true;
     cur_freq = freq;
 
     LOG("sampr=%lu, set_freq=%d cur_freq=%d", sampr, set_freq, cur_freq);
