@@ -168,6 +168,11 @@ void *skin_find_item(const char *label, enum skin_find_what what,
     void *ret = NULL;
     if (!databuf)
         databuf = skin_buffer;
+    /* The skin is unloaded (settings_apply_skins() frees every skin before
+     * reloading). Against a NULL base SKINOFFSETTOPTR gives the raw offset,
+     * not NULL, and the walk below would read the vector page as elements. */
+    if (!databuf)
+        return NULL;
     switch (what)
     {
         case SKIN_FIND_UIVP:

@@ -140,9 +140,10 @@ void sb_process(enum screen_type screen, struct wps_data *data, bool preprocess)
         * not part of the statusbar,
         * hence .sbs's without any other vps are unsupported*/
         struct skin_viewport *vp = skin_find_item(VP_DEFAULT_LABEL_STRING, SKIN_FIND_VP, data);
-        struct skin_element *tree = SKINOFFSETTOPTR(get_skin_buffer(data), data->tree);
+        char *buf = get_skin_buffer(data);
+        struct skin_element *tree = buf ? SKINOFFSETTOPTR(buf, data->tree) : NULL;
         struct skin_element *next_vp = NULL;
-        if (tree) next_vp = SKINOFFSETTOPTR(get_skin_buffer(data), tree->next);
+        if (tree) next_vp = SKINOFFSETTOPTR(buf, tree->next);
 
         if (vp)
         {
@@ -187,6 +188,8 @@ struct viewport *sb_skin_get_info_vp(enum screen_type screen)
     if (sbs_loaded[screen] == false)
         return NULL;
     struct wps_data *data = skin_get_gwps(CUSTOM_STATUSBAR, screen)->data;
+    if (!get_skin_buffer(data))     /* unloaded: see skin_find_item() */
+        return NULL;
     struct skin_viewport *vp = NULL;
     char *label;
     if (oldinfovp_label[screen] &&
