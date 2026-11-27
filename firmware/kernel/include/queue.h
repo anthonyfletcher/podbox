@@ -142,6 +142,8 @@ extern void queue_wait(struct event_queue *q, struct queue_event *ev);
 extern void queue_wait_w_tmo(struct event_queue *q, struct queue_event *ev,
                              int ticks);
 extern void queue_post(struct event_queue *q, long id, intptr_t data);
+extern bool queue_post_behind(struct event_queue *q, long behind, long id,
+                              intptr_t data);
 #ifdef HAVE_EXTENDED_MESSAGING_AND_NAME
 extern void queue_enable_queue_send(struct event_queue *q,
                                     struct queue_sender_list *send,

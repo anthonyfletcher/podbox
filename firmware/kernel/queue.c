@@ -434,6 +434,39 @@ void queue_post(struct event_queue *q, long id, intptr_t data)
     restore_irq(oldlevel);
 }
 
+/* As queue_post(), from an interrupt too, but only if every event q holds has
+   the id 'behind' and there is room: then the new one goes at the tail, behind
+   them, and true is returned. Otherwise nothing is posted. Looked at and
+   posted under the queue's lock, so nothing is read or posted in between. */
+bool queue_post_behind(struct event_queue *q, long behind, long id,
+                       intptr_t data)
+{
+    int oldlevel = disable_irq_save();
+    corelock_lock(&q->cl);
+
+    unsigned int rd = q->read, wr = q->write;
+    bool post = wr - rd < QUEUE_LENGTH;
+
+    for(; post && rd != wr; rd++)
+        post = q->events[rd & QUEUE_LENGTH_MASK].id == behind;
+
+    if(post)
+    {
+        wr = q->write++ & QUEUE_LENGTH_MASK;
+
+        q->events[wr].id   = id;
+        q->events[wr].data = data;
+
+        queue_do_unblock_sender(q->send, wr);
+        queue_wake_waiter(q);
+    }
+
+    corelock_unlock(&q->cl);
+    restore_irq(oldlevel);
+
+    return post;
+}
+
 #ifdef HAVE_EXTENDED_MESSAGING_AND_NAME
 /* IRQ handlers are not allowed use of this function - we only aim to
    protect the queue integrity by turning them off. */

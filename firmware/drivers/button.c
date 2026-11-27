@@ -163,7 +163,8 @@ static void check_audio_peripheral_state(void)
 /* disabled function is shared between Main & Remote LCDs */
 static bool filter_first_keypress_disabled(int button, int data)
 {
-    button_queue_try_post(button, data);
+    /* a new press: behind any wake-ups, else dropped as a busy screen's */
+    button_queue_post_press(button, data);
     return false;
 }
 
@@ -413,7 +414,7 @@ static void button_tick(void)
                         buttonlight_on();
                     }
 #else /* no backlight, nothing to skip */
-                    button_queue_try_post(btn, data);
+                    button_queue_post_press(btn, data);
 #endif
                     post = false;
                 }
