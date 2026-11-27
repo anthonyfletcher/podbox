@@ -18,3 +18,5 @@
 - **Books** reads every ebook again, in the background, the first time the
   iPod starts, so an EPUB whose cover is only the picture on its first page
   now shows that cover.
+- A book's chapter list now goes up to 999 chapters instead of 99, and an
+  .m4b of more than 255 chapters shows all of them.

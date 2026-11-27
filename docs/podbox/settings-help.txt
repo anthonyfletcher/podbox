@@ -497,7 +497,7 @@ Play Now instead, which plays it at once and keeps the rest of the queue.
 
 [keep current track when replacing playlist]
 Leaves the playing track in place when a new selection replaces the queue, so
-the music does not stop mid-song.
+the music does not stop mid-song. Shuffle Songs always starts at once.
 
 [show shuffled adding options]
 Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder,

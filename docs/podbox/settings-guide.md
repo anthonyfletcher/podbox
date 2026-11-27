@@ -123,7 +123,7 @@ Settings
 | Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | Off | **Adv** |
 | Auto-Change Directory | At the end of a folder, move on rather than stopping: to the next folder, or to one picked at random. The In Start Directory choices never leave the folder set with Start Directory in the file browser. Random picks one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | No |  |
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | No | **Adv** |
-| Chapter Marks | Reads the chapter list a file carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. Spoken Word reads them from audiobooks and podcasts only; All reads them from music too, such as a symphony marked by movement. It reads .m4b, .m4a, .mp3, Ogg and Opus files, and lists the first 99 chapters of a longer list. | Spoken Word | **Adv** |
+| Chapter Marks | Reads the chapter list a file carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. Spoken Word reads them from audiobooks and podcasts only; All reads them from music too, such as a symphony marked by movement. It reads .m4b, .m4a, .mp3, Ogg and Opus files, and lists the first 999 chapters of a longer list. | Spoken Word | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | Skip Track | **Adv** |
 | Spoken Word Skip Length | Skip Length for audiobooks and podcasts alone, so a book can skip 30 seconds while music skips whole tracks. Same as Music uses Skip Length. | Same as Music | **Adv** |
 | Spoken Word Speed | Plays audiobooks and podcasts faster or slower without changing the voice's pitch; music always plays at its own speed. Also in Now Playing's menu while spoken word plays. The first change from 100% restarts the playing track once. | 100% |  |
@@ -182,7 +182,7 @@ Settings
 | On Repeat Length | The most tracks On Repeat holds; a quiet week gives fewer. They play in a new order each time, shuffled -- or with the Playlist Engine on and Shuffle off, from a random first track with each followed by one that sounds like it. | 30 |  |
 | Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. Choosing one track while the queue plays offers Play Now instead, which plays it at once and keeps the rest of the queue. | Yes |  |
 | Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |
-| Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | Yes | **Adv** |
+| Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. Shuffle Songs always starts at once. | Yes | **Adv** |
 | Queue ▸ Show Shuffled Adding Options | Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder, album or playlist. | Yes | **Adv** |
 
 ### Playback — Automatic Resume

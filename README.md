@@ -1312,6 +1312,8 @@ licences of everything inside it in full, in `LICENSES.txt`.
 
 ### Other improvements
 
+- Spun by Siebe Majoor aka [@majorsiebe](https://github.com/majorsiebe)
+  (https://github.com/majorsiebe/Stats_for_iPod)
 - ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
   - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
     the CPU decodes music
@@ -1328,13 +1330,21 @@ licences of everything inside it in full, in `LICENSES.txt`.
   - Screen transitions design
   - Small tweaks to the equalizer taken from this project
   - Wheel Glide design, and a fix to the carousel's cover loader
-- Spun by Siebe Majoor aka [@majorsiebe](https://github.com/majorsiebe)
-  (https://github.com/majorsiebe/Stats_for_iPod)
+  - Damaged music, picture, font, skin and voice files refused rather than
+    crashed on, and file system and USB disk fixes
+  - A button press no longer lost at a change of track
 - RodBox by [@RodrigoM09](https://github.com/RodrigoM09)
   (https://github.com/RodrigoM09/RodBox), GPL v2
   - Disk and USB drive fixes
   - The iPod Classic's earphone remote fixes
   - Quiet tracks no longer measure as silent in the playlist engine
+  - Analyze Music fixes, and a USB DAC's volume kept at or below 0 dB
+- AstraPod by [@gfhdhytghd](https://github.com/gfhdhytghd)
+  (https://github.com/gfhdhytghd/AstraPod), GPL v2
+  - The USB Sound Card's mute, and the track's tags copied whole for a dock
+  - The iPod Classic's USB and file system fixes, and a dock that sees the
+    player restart
+  - Crash screens that keep the first fault, and less on the main stack
 - rockbox-library-manager by cyberdeliaAI (https://github.com/cyberdeliaAI/rockbox-library-manager)
   - Album covers from Deezer, Apple and Discogs
   - Matching an album by its title and artist: a close match is used, and a near one listed
