@@ -326,9 +326,16 @@ int db_names_count(void)
     return building ? 0 : part_ct;
 }
 
+/* Part n is there to read: a build in another thread empties the table, and
+ * a caller's n is from before the yield that let it start */
+static bool part_ok(int n)
+{
+    return !building && n >= 0 && n < part_ct;
+}
+
 const char *db_names_name(int n)
 {
-    return arena + parts[n].name_off;
+    return part_ok(n) ? arena + parts[n].name_off : "";
 }
 
 long db_names_handle(int n)
@@ -338,7 +345,7 @@ long db_names_handle(int n)
 
 long db_names_own_seek(int n)
 {
-    return parts[n].own_seek;
+    return part_ok(n) ? parts[n].own_seek : -1;
 }
 
 int db_names_index(long handle)
@@ -409,6 +416,8 @@ int db_names_strings(int n, long *out, int max)
 {
     int ct = 0;
 
+    if (!part_ok(n))
+        return 0;
     if (parts[n].own_seek >= 0 && ct < max)
         out[ct++] = parts[n].own_seek;
     for (int j = 0; j < joint_ct && ct < max; j++)

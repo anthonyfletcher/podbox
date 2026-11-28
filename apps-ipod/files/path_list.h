@@ -31,11 +31,10 @@ struct path_list {
  * not in a core_alloc(). Three reasons, and the first is the one users notice:
  *
  *  - core_alloc() from a screen makes the audio buffer shrink and the current
- *    track rebuffer, so opening a list interrupted playback;
- *  - the handle had to be pinned for as long as the list was on screen, and a
- *    pinned block is one buflib cannot compact across -- so a viewer opened
- *    from the list got a smaller contiguous pool than the same viewer opened
- *    from anywhere else;
+ *    track rebuffer, so opening a list would interrupt playback;
+ *  - a core_alloc() handle would be pinned for as long as the list is on
+ *    screen, and buflib cannot compact across a pinned block -- so a viewer
+ *    opened from the list would get a smaller contiguous pool;
  *  - the scratch buffer has a fixed size, which bounds the read: only the
  *    first PATH_LIST_MAX lines are kept, whatever the file's size.
  *

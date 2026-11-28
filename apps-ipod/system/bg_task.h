@@ -4,17 +4,18 @@
  * Background tasks: the deferred work that keeps the database's derived
  * artifacts current.
  *
- * Three things rebuild themselves after the library changes -- the tag
- * database, the artwork thumbnail cache and the document and image index --
- * and the last two are identical in everything but the pass itself: wake on a
- * timer, acknowledge USB, wait for the database to settle, compare the
- * library's marks against those its own file was made for, run, record. That
- * shape lives here, so each task supplies only its pass.
+ * Two kinds of task. A ranked task -- the artwork thumbnail cache -- has the
+ * shape that lives here whole: wake on a timer, acknowledge USB, wait for the
+ * database to settle, compare the library's marks against those its own file
+ * was made for, run, record. It supplies only its pass. A request task -- the
+ * tag database, the document and image index, the names index -- keeps no
+ * marks: it takes the triggers through .request and, if it works on this
+ * thread, a step each tick through .tick.
  *
- * Every task runs on the one thread this owns, in rank order, sharing its
- * stack and queue: thread slots are few enough that a screen starting its own
- * thread can fail to get one. Each task keeps its pass, its events and its
- * abort check in its own file. What lives here is the thread and the policy:
+ * Every task but the tag database runs on the one thread this owns, in rank
+ * order, sharing its stack and queue: thread slots are few enough that a
+ * screen starting its own thread can fail to get one. Each task keeps its
+ * pass, its events and its abort check in its own file. What lives here is the thread and the policy:
  * when a task may run, and which task gives way to which.
  ****************************************************************************/
 
@@ -30,7 +31,9 @@
  * smaller number: it runs first, and it turns a running pass of the other
  * back. */
 #define BG_RANK_ART     1
-#define BG_RANK_FILES   2   /* last: a walk takes minutes, nothing waits on it */
+/* The file and names walks. They are request tasks, so this is read only
+ * when they ask whether they are preempted: the art cache turns them back */
+#define BG_RANK_FILES   2
 
 /* What "the library" looked like at some moment. A task is stale when the
  * marks move, so between them these are the whole definition of "something

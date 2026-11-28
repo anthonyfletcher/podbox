@@ -373,8 +373,8 @@ static void add_artist_tracks(int32_t seek,
  *
  * The search state here and in add_artist_tracks() is static, as
  * db_spoken.c's is: the two are open at once, which is some two and a half
- * kilobytes of the UI thread's stack. Only the UI thread builds, so one
- * build runs at a time. */
+ * kilobytes of a thread's stack. Two threads build (see 'building'), and
+ * that flag lets one build run at a time, so the state is never shared. */
 static void scan_track_artists(void)
 {
     static struct tagcache_search tcs;

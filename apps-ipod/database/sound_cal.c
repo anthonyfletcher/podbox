@@ -48,6 +48,9 @@
 
 #define CAL_FILE  LIB_SOUND_CAL_FILE
 #define CAL_MAGIC 0x4c414353   /* "SCAL" */
+/* Bump with the file's layout, and with any change to an axis formula in
+ * sound_mix_axes(): the ladder is percentiles of the axes, so a changed
+ * formula leaves the file describing coordinates nothing produces any more. */
 #define CAL_VER   2
 
 

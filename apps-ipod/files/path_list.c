@@ -4,11 +4,11 @@
  * A file of paths, a libfile of them each NUL-terminated, read into memory
  * and indexed.
  *
- * Two features keep lists of this shape -- the folders the artwork cache found
- * nothing for, and the documents and images the file index found -- and both
- * want the same three things: read it into a buffer, address the lines, give
- * the buffer back. That is all this is. It knows nothing about what the paths
- * mean.
+ * Several features keep lists of this shape -- the folders the artwork cache
+ * found nothing for, and the documents, images and games the file index found
+ * -- and all want the same three things: read it into a buffer, address the
+ * lines, give the buffer back. That is all this is. It knows nothing about
+ * what the paths mean.
  *
  * The buffer is claimed per open and released on close, so a list costs
  * nothing while its screen is shut.
@@ -24,9 +24,9 @@
 #include "path_list.h"
 
 /* One name for the claim, because only one list is ever loaded at a time --
- * the documents/images browser and the artwork health screen cannot both be
- * up. app_buffer compares owners by string, so the same literal must be used
- * to claim and to release. */
+ * the documents/images browser, the Arcade shelf and the artwork health
+ * screen are never up together. app_buffer compares owners by string, so
+ * claim and release need only the same text. */
 #define PATH_LIST_OWNER "path list"
 
 bool path_list_load(struct path_list *pl, const char *file, int max_entries)

@@ -624,7 +624,7 @@ struct pick
  * the chain weighs every eligible one at every slot -- so the pool has only
  * to know which member to give up next, and that is one scan when a
  * displacement happens rather than a shift per insert. It matters because
- * each candidate now carries its coordinates: a sorted insert would move a
+ * each candidate carries its coordinates: a sorted insert would move a
  * hundred and twenty bytes a step, several thousand times over an index. */
 static int mix_insert(struct pick *cand, struct sound_axes *cax, int held,
                       uint64_t key, int d, const struct sound_axes *ax,

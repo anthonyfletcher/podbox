@@ -83,12 +83,34 @@ struct sound_record
 #define SOUND_F_SHORT    0x04  /* The file ended before the window did */
 #define SOUND_F_FAILED   0x08  /* The decode failed. Kept so the file is not
                                   read again during the run that failed on it;
-                                  an update retries it. See sound_index.c */
+                                  an update retries it unless it is also
+                                  SOUND_F_FAULTED. See sound_index.c */
 #define SOUND_F_NO_MODE  0x10  /* Pitch content did not settle on a mode --
                                   common, and not a fault. See chroma.h */
 #define SOUND_F_WIDE     0x20  /* Measured with a 16-bit codec's samples
                                   widened. Such a codec's record without it
                                   read them as 32-bit, and is stale */
+#define SOUND_F_FAULTED  0x40  /* With SOUND_F_FAILED: the decoder crashed or
+                                  hung on it. Kept across updates, unlike a
+                                  plain failure, until the file changes. A
+                                  reader that does not know the bit sees a
+                                  failure, so no version moves for it */
+
+/* The window both front ends measure. A record measured over a different
+ * span is not comparable with one measured over this, and the player and the
+ * desktop tool write the same file: past the intro, and long enough for the
+ * tempo envelope to fill and then hold. */
+#define SOUND_START_PCT      15
+#define SOUND_START_MIN_MS   5000
+#define SOUND_START_MAX_MS   30000
+#define SOUND_WINDOW_MS      40000
+
+/* Tracks too short to measure. The tempo envelope alone wants seventeen
+ * seconds and the window starts after the intro. */
+#define SOUND_MIN_LENGTH_MS  25000
+
+/* Where the window starts in a track of this length. */
+unsigned long sound_index_window_start(unsigned long length_ms);
 
 /* How far the tempo may wander and still be usable. Two bounds in two units,
  * because each is dominated by something different.
@@ -138,6 +160,10 @@ void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,
                       uint32_t size, uint32_t genre_key, int year,
                       const struct track_sound *s, int decode_rc);
 
+/* Fill the record of a track whose decode never came back. */
+void sound_index_fill_faulted(struct sound_record *out, uint64_t key,
+                              uint32_t mtime, uint32_t size);
+
 /* ---- writing ---- */
 
 /* Open the scan's working file and learn what is already in it.
@@ -152,6 +178,11 @@ void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,
  *
  * SOUND_OK, or an error. */
 int sound_index_begin(int capacity, bool fresh);
+
+/* As sound_index_begin(.., false) for a run that writes nothing: what is
+ * done is read from the working file, or else the finished index, and
+ * neither is opened for writing. sound_index_add() refuses until closed. */
+int sound_index_begin_dry(int capacity);
 
 /* Whether this track is already measured and still current -- the staleness
  * rule described on the record above, in one place so the two front ends
@@ -172,6 +203,14 @@ bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size,
  * replacement keeps the stride but can leave that one record torn, part old
  * and part new. */
 bool sound_index_add(const struct sound_record *r);
+
+/* Say which track is about to be decoded, before decoding it. A fault record
+ * for it goes to the disk past the working file's count; the next add()
+ * replaces it and sound_index_close() removes it, so only a run that never
+ * got that far -- a decoder that crashed or hung -- leaves it, and the next
+ * sound_index_begin() records the track as faulted rather than reaching it
+ * and faulting again. Flushed, at one write a measured track. */
+void sound_index_attempt(uint64_t key, uint32_t mtime, uint32_t size);
 
 /* Records written into the working file so far, across resumes. */
 int sound_index_count(void);

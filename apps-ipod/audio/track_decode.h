@@ -103,6 +103,11 @@ int track_decode_run(const char *path,
 /* True while a run holds the codec slot. Playback must not start then. */
 bool track_decode_busy(void);
 
+/* After a run that never returned -- a desktop tool jumping out of a fault in
+ * the codec: close its file and give the slot back. The codec stays loaded;
+ * the next run's load replaces it. */
+void track_decode_abandon(void);
+
 /* The runs that follow decode on the 5G's second core where it takes them
  * (codec_cop.c), for Debug > Codec on COP Check. The sound scan never asks. */
 void track_decode_on_cop(bool on);

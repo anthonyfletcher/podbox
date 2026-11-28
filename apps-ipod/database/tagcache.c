@@ -3438,6 +3438,10 @@ static long walk_seen_count;
 /* Set when the walk skipped a folder or could not look a file up, so an
  * unmarked entry may still exist: deletions are checked on storage instead. */
 static bool walk_incomplete;
+/* The walk started with a filename file to look files up in. Without one --
+ * a first build, or a rebuild, which sets the database aside -- every file is
+ * new, and failing to look one up loses nothing. */
+static bool walk_had_names;
 /* The folders the walk could not open or read to the end. Storage cannot
  * answer for the files under them either, so their entries are kept; past
  * WALK_UNREAD_MAX the storage check is skipped altogether. */
@@ -3534,7 +3538,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         idx_id = find_entry_disk(path, false);
 
     /* find_entry_disk() drops the descriptor on a read error. */
-    if (!tc_stat.ramcache && filenametag_fd < 0)
+    if (!tc_stat.ramcache && walk_had_names && filenametag_fd < 0)
         walk_incomplete = true;
 
     if (idx_id >= 0 && idx_id < walk_seen_count)
@@ -4979,9 +4983,8 @@ static bool merge_temp(void)
          * Going on would rewrite all ten index files with the contents they
          * already have, and would drop the RAM copy below without asking for
          * it back -- only a commit that added entries starts the scan that
-         * reloads it. That is what left every search reading the disk, at a
-         * whole master-index scan each, for the rest of a session in which a
-         * host had written anything.
+         * reloads it -- and every search would then read the disk, a whole
+         * master-index scan each, for the rest of the session.
          *
          * tc_stat.ready is in the test because rewriting those files is also
          * how a dirty database is repaired: check_all_headers() above reports
@@ -5182,8 +5185,10 @@ static bool merge_temp(void)
 
         if (ramcache_buffer_stolen)
         {
+            /* Nothing left to give the merge maps back to */
             tempbuf = NULL;
             tempbuf_size = 0;
+            merge_bytes = 0;
             ramcache_buffer_stolen = false;
             tcrc_buffer_unlock();
         }
@@ -6209,11 +6214,10 @@ static bool allocate_tagcache(void)
      * Only when the allocation would come out of free space, though. Once the
      * audio buffer holds the pool -- which it does the moment playback has run
      * -- core_available() is near zero however much headroom there really is,
-     * because the memory this needs comes from shrinking that buffer. Applying
-     * the test then refused the RAM copy to every path that runs with the UI
-     * up, so a rebuild or update from the menu left the database on the disk
-     * for the rest of the session: slow browsing, and the deleted-file check
-     * giving up on its first line for want of a buffer.
+     * because the memory this needs comes from shrinking that buffer. Applied
+     * then, the test would refuse the RAM copy to every path that runs with
+     * the UI up, and a rebuild or update from the menu would leave the
+     * database on the disk for the rest of the session.
      *
      * Nothing is lost by standing aside: shrinking is negotiated, and
      * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE.
@@ -6750,19 +6754,12 @@ static bool check_deleted_files(void)
         else if (walk_unread_holds(buf))
         {;}
         /* A negative return means the lookup did not succeed; it does not say
-         * why in any form worth trusting. Upstream read absence out of the
-         * return value (`rc_cache == ENOENT`), which compares it against 2 --
-         * a *success* code the branch above has already taken -- so nothing
-         * deleted from the player was ever dropped from the database.
-         *
-         * errno is no better. dircache_search()'s "absent for sure" branch
-         * reports ENOENT only when its inner call returns exactly 0; a missing
-         * file here comes back rc=-15 with errno untouched at 0, so an errno
-         * test misses it just as completely.
+         * why. Trap: neither the return value nor errno says "absent" --
+         * `rc_cache == ENOENT` compares against 2, a success code taken
+         * above, and a missing file comes back rc=-15 with errno left at 0.
          *
          * So ask the filesystem instead of decoding the failure. It costs a
-         * stat, but only for entries that already failed to resolve -- 43 on
-         * the library this was found on, against 3502 scanned -- and deleting
+         * stat, only for entries that already failed to resolve, and deleting
          * an entry is destructive enough to be worth confirming directly. */
         else if (!file_exists(buf))
         {
@@ -7026,6 +7023,7 @@ void do_tagcache_build(const char *path[])
     }
 
     filenametag_fd = open_tag_fd(&header, tag_filename, false);
+    walk_had_names = filenametag_fd >= 0;
 
     cpu_boost(true);
 
@@ -7225,8 +7223,8 @@ static void free_ramcache(void)
     int handle = tcramcache.handle;
     tcramcache.handle = 0;
     core_free(handle);
-    /* No buffer means nothing allocated. Leaving the size standing let
-     * commit() take the branch that carves its tempbuf out of the RAM
+    /* No buffer means nothing allocated. A size left standing would send
+     * commit() down the branch that carves its tempbuf out of the RAM
      * copy, which with a freed one writes through (hdr + 1). */
     tc_stat.ramcache_allocated = 0;
 }
@@ -7420,9 +7418,9 @@ static void load_ramcache(void)
      * all-or-nothing -- a load stopped part way is a failure like any other
      * below, because a half-populated buffer must never be left where
      * tagcache_reload_ramcache() would switch it back on -- and a USB connect
-     * arriving mid-load stops one. Without this, that single interruption cost
-     * the RAM copy for the rest of the session, whatever happened afterwards:
-     * the free below is permanent and every later call returned here. */
+     * arriving mid-load stops one. The free below gives the buffer up, so
+     * without this one interruption would cost the RAM copy for the rest of
+     * the session. */
     if (!tcramcache.hdr && !allocate_tagcache())
         return ;
 
@@ -7616,10 +7614,11 @@ static void tagcache_thread(void)
                  * the next tick a second later picks it up.
                  *
                  * Deferring rather than aborting matters: load_ramcache()
-                 * treats a stopped load as failure and frees the buffer for
-                 * the rest of the session, which is why load_tagcache() uses
-                 * check_event_queue_no_usb() once it is under way. Not
-                 * starting costs nothing; stopping costs the RAM copy. */
+                 * treats a stopped load as failure and frees the buffer, so
+                 * the next one allocates and reads it all again, which is why
+                 * load_tagcache() uses check_event_queue_no_usb() once it is
+                 * under way. Not starting costs nothing; stopping costs the
+                 * whole load. */
                 if (usb_host_wants_storage())
                     break ;
 

@@ -38,7 +38,7 @@
 
 extern struct codec_api ci;   /* from codecs.c */
 
-static int              fd;
+static int              fd = -1;
 static off_t            file_len;
 
 static unsigned char   *window;
@@ -469,6 +469,13 @@ const char *track_decode_cop_why(void)
 #endif
 }
 
+static void close_file(void)
+{
+    if (fd >= 0)
+        close(fd);
+    fd = -1;
+}
+
 int track_decode_run(const char *path,
                      unsigned long start_ms, unsigned long length_ms,
                      void *buf, size_t bufsz,
@@ -492,14 +499,14 @@ int track_decode_run(const char *path,
     memset(&id3, 0, sizeof (id3));
     if (!get_metadata(&id3, fd, path))
     {
-        close(fd);
+        close_file();
         return TRACK_DECODE_NO_CODEC;
     }
 
     codec_fn = get_codec_filename(id3.codectype);
     if (codec_fn == NULL)
     {
-        close(fd);
+        close_file();
         return TRACK_DECODE_NO_CODEC;
     }
 
@@ -511,7 +518,7 @@ int track_decode_run(const char *path,
     file_len    = ffilesize(fd);
     if (file_len <= 0)
     {
-        close(fd);
+        close_file();
         return TRACK_DECODE_NO_FILE;
     }
 
@@ -593,7 +600,7 @@ int track_decode_run(const char *path,
     if (codec_load_file(codec_fn, &dci) < 0)
     {
         codec_borrowed = false;
-        close(fd);
+        close_file();
         return TRACK_DECODE_NO_CODEC;
     }
 
@@ -607,7 +614,7 @@ int track_decode_run(const char *path,
 
     codec_close();
     codec_borrowed = false;
-    close(fd);
+    close_file();
 
     stats.codec_status = status;
     stats.last_pos = (unsigned long)dci.curpos;
@@ -634,4 +641,10 @@ void track_decode_get_stats(struct track_decode_stats *out)
 bool track_decode_busy(void)
 {
     return codec_borrowed;
+}
+
+void track_decode_abandon(void)
+{
+    close_file();
+    codec_borrowed = false;
 }

@@ -56,15 +56,6 @@
 #include "database/sound_index.h"
 #include "soundscan.h"
 
-/* The window, as apps-ipod/screens/system/sound_scan.c takes it. These must
- * match: a record measured over a different span is not comparable with one
- * measured over this one, and both front ends write the same file. */
-#define START_PCT      15
-#define START_MIN_MS   5000
-#define START_MAX_MS   30000
-#define WINDOW_MS      40000
-#define MIN_LENGTH_MS  25000
-
 #define FILE_WINDOW    (256 * 1024)
 
 /* Deeper than any music library and shallow enough that a directory loop
@@ -201,11 +192,11 @@ static void on_interrupt(int sig)
     stop_asked = 1;
 }
 
-/* Record a track as unreadable, so no run tries it a second time. */
+/* Record a track as faulted, so no run tries it a second time: an update
+ * keeps a fault until the file changes. */
 static void file_failed(const char *path)
 {
     struct sound_record rec;
-    struct track_sound none;
     uint32_t sz = 0;
     int fd = open(path, O_RDONLY);
 
@@ -217,9 +208,7 @@ static void file_failed(const char *path)
         close(fd);
     }
 
-    memset(&none, 0, sizeof (none));
-    sound_index_fill(&rec, path_key(path), 0, sz, 0, 0, &none,
-                     TRACK_DECODE_FAILED);
+    sound_index_fill_faulted(&rec, path_key(path), 0, sz);
 
     if (!opt_dry)
         sound_index_add(&rec);
@@ -304,27 +293,20 @@ static bool measure(const char *path, uint32_t size)
     }
     close(fd);
 
-    if (id3.length < MIN_LENGTH_MS)
+    if (id3.length < SOUND_MIN_LENGTH_MS)
     {
         n_short++;
         return true;
     }
 
-    start_ms = id3.length / 100 * START_PCT;
-    if (start_ms < START_MIN_MS)
-        start_ms = START_MIN_MS;
-    if (start_ms > START_MAX_MS)
-        start_ms = START_MAX_MS;
-    if (id3.length < start_ms + 5000)
-        start_ms = 0;
-
+    start_ms = sound_index_window_start(id3.length);
 
     beat_probe_start();
 
-    /* The whole window, never stopping early -- see the note on SS_WINDOW_MS
-     * in sound_scan.c. The player and this must measure identically or their
-     * records are not comparable. */
-    rc = track_decode_run(path, start_ms, WINDOW_MS, file_window, FILE_WINDOW,
+    /* The whole window, never stopping early, as the player's Thorough
+     * analysis takes it: records from the two are then comparable. */
+    rc = track_decode_run(path, start_ms, SOUND_WINDOW_MS,
+                          file_window, FILE_WINDOW,
                           beat_probe_sink, NULL, NULL,
                           &analysed);
 
@@ -342,7 +324,7 @@ static bool measure(const char *path, uint32_t size)
                      sound_index_genre_key(id3.genre_string),
                      id3.year, &s, rc);
 
-    if (analysed < MIN_LENGTH_MS / 2)
+    if (analysed < SOUND_MIN_LENGTH_MS / 2)
         rec.flags |= SOUND_F_SHORT;
 
     n_done++;
@@ -467,7 +449,9 @@ static bool walk(const char *dir, bool counting, int *total, int depth)
              * ends the run just as surely as the fault would have. The next
              * load overwrites the handle instead: that leaks one module per
              * bad file, which for a handful of files is a trade worth making
-             * against not finishing at all. */
+             * against not finishing at all. The track's file is closed,
+             * though: the file table has 31 slots. */
+            track_decode_abandon();
             printf("\n  %s -- decoder crashed, skipped\n", path);
             file_failed(path);
             ok = true;
@@ -653,7 +637,6 @@ int main(int argc, char **argv)
     time_t t0;
     int total = 0;
     int i, rc;
-    bool had_part;
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -744,9 +727,9 @@ int main(int argc, char **argv)
         return 0;
 
     /* The index works in the part file, seeded from the finished one. A dry
-     * run removes it again unless a run on the player had one going. */
-    had_part = file_exists(LIB_SOUND_PART);
-    rc = sound_index_begin(total + 1, false);
+     * run only reads them, so it works on a read-only mount. */
+    rc = opt_dry ? sound_index_begin_dry(total + 1)
+                 : sound_index_begin(total + 1, false);
     if (rc != SOUND_OK)
     {
         printf("Could not open the index (%d)\n", rc);
@@ -781,8 +764,6 @@ int main(int argc, char **argv)
     if (opt_dry)
     {
         sound_index_close();
-        if (!had_part)
-            remove(LIB_SOUND_PART);
         printf("Dry run: nothing written.\n");
         return 0;
     }

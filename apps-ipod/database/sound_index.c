@@ -15,9 +15,9 @@
  * was keeping anyway.
  *
  * Parts, in order:
- *   - keys
+ *   - keys, and the window
  *   - the file header
- *   - the working file: begin, done, add, finish
+ *   - the working file: begin, done, add, attempt, finish
  *   - reading a finished index
  ****************************************************************************/
 
@@ -48,7 +48,9 @@
  *      without an mtime the desktop cannot reproduce. 56 bytes to 64.
  *
  * A working file's reserved field counts the records seeded into it from the
- * finished index; 0 in a finished index. */
+ * finished index; 0 in a finished index. A working file may also hold one
+ * record past its count, sound_index_attempt()'s; a reader that ignores it
+ * sees the file as it was before the attempt. */
 #define SOUND_MAGIC    0x534E4431  /* "SND1" */
 #define SOUND_VERSION  3
 
@@ -91,6 +93,8 @@ static int          table_sorted_upto; /* Entries [0, this) ascend by key.
 static uint32_t     part_seeded;    /* Records carried in from the finished
                                        index, kept in the working file's
                                        reserved field. 0 on a rebuild */
+static bool         part_attempt;   /* An attempt record sits past the
+                                       count. See sound_index_attempt() */
 
 bool (*sound_index_genre_of)(uint64_t key, char *buf, size_t size);
 
@@ -209,6 +213,30 @@ void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,
     }
 }
 
+void sound_index_fill_faulted(struct sound_record *out, uint64_t key,
+                              uint32_t mtime, uint32_t size)
+{
+    struct track_sound none;
+
+    memset(&none, 0, sizeof (none));
+    sound_index_fill(out, key, mtime, size, 0, 0, &none, TRACK_DECODE_FAILED);
+    out->flags |= SOUND_F_FAULTED;
+}
+
+unsigned long sound_index_window_start(unsigned long length_ms)
+{
+    unsigned long start_ms = length_ms / 100 * SOUND_START_PCT;
+
+    if (start_ms < SOUND_START_MIN_MS)
+        start_ms = SOUND_START_MIN_MS;
+    if (start_ms > SOUND_START_MAX_MS)
+        start_ms = SOUND_START_MAX_MS;
+    if (length_ms < start_ms + 5000)
+        start_ms = 0;
+
+    return start_ms;
+}
+
 
 /** The file header **/
 
@@ -277,11 +305,9 @@ static struct key_entry *table(void)
 
 /* How much of the table is in ascending key order, found in one pass.
  *
- * Both load paths leave a sorted run at the front: seed_from_finished()
- * copies a file that is sorted by key, and a working file is that same seed
- * with this run's appends after it. Nothing records where the join is, so it
- * is measured rather than assumed -- and an interrupted run whose tail is
- * partly ordered anyway gets the benefit of however much of it is.
+ * seed_from_finished() copies a file that is sorted by key, so the whole seed
+ * should be one run; measured rather than assumed, so a finished index out
+ * of order costs speed and not answers.
  *
  * Strictly ascending, so a duplicate key ends the run rather than being
  * searched for in a region a binary search would not find it in. */
@@ -327,6 +353,12 @@ static int key_cmp(const void *a, const void *b)
     return 0;
 }
 
+/* Whether a finished record is carried into an update. See below. */
+static bool seed_keeps(const struct sound_record *r)
+{
+    return !(r->flags & SOUND_F_FAILED) || (r->flags & SOUND_F_FAULTED);
+}
+
 /* Copy the finished index into the working file.
  *
  * An update has to start from what is already known or it is a rebuild with a
@@ -367,15 +399,19 @@ static bool seed_from_finished(void)
          * again. Dropping the record from the working file as well as the
          * table is what makes the scan measure the track; the cost is bounded
          * by the number of failures, which is small or the index is not worth
-         * keeping. */
-        if (r.flags & SOUND_F_FAILED)
+         * keeping.
+         *
+         * A fault is the exception: a decoder that crashes or hangs on the
+         * file would end every update at it. Kept, it stands until the file's
+         * size or mtime moves and sound_index_done() lets it be measured. */
+        if (!seed_keeps(&r))
             continue;
 
-        /* An index written before add() replaced in place can hold a track
-         * twice. The file is sorted by key, so the pair is adjacent and one
-         * comparison repairs it as the index is carried forward. Which of the
-         * two survives does not matter: if it is the stale one, its mtime and
-         * size say so and the track is measured again. */
+        /* An index can hold a track twice. The file is sorted by key, so the
+         * pair is adjacent and one comparison repairs it as the index is
+         * carried forward. Which of the two survives does not matter: if it
+         * is the stale one, its mtime and size say so and the track is
+         * measured again. */
         if (r.key == last_key)
             continue;
         last_key = r.key;
@@ -407,6 +443,49 @@ static bool seed_from_finished(void)
     return true;
 }
 
+/* Record the track an attempt record names as faulted: in place if the table
+ * already holds it -- a stale record being measured again -- or else as the
+ * next record, with the count moved over it. */
+static void load_fault(struct key_entry *t, const struct sound_record *r)
+{
+    struct sound_header h;
+    off_t at;
+    int i;
+
+    if (table_used >= table_max)
+        return;
+
+    for (i = 0; i < table_used; i++)
+    {
+        if (t[i].key == r->key)
+            break;
+    }
+
+    at = (off_t)sizeof (h)
+         + (off_t)(i < table_used ? t[i].ordinal : (uint32_t)table_used)
+           * (off_t)sizeof (*r);
+
+    if (lseek(part_fd, at, SEEK_SET) != at ||
+        write(part_fd, r, sizeof (*r)) != (ssize_t)sizeof (*r))
+    {
+        return;
+    }
+
+    if (i < table_used)
+    {
+        t[i].mtime = r->mtime;
+        t[i].size = r->size;
+        t[i].wide = (r->flags & SOUND_F_WIDE) != 0;
+        return;
+    }
+
+    table_append(t, r, 0);
+    table_sorted = false;
+    part_header_init(&h, (uint32_t)table_used);
+    lseek(part_fd, 0, SEEK_SET);
+    write(part_fd, &h, sizeof (h));
+}
+
 /* Read whatever the working file already holds into the table. A file whose
  * header is not ours is a file with nothing in it -- the same rule as the
  * rest of the fork's own files, and it earns its place here because a
@@ -425,11 +504,20 @@ static bool load_part(bool seed)
     struct sound_header h;
     struct sound_record r;
     struct key_entry *t = table();
+    uint32_t seeded;
     unsigned int i;
+    bool ours = read(part_fd, &h, sizeof (h)) == (ssize_t)sizeof (h) &&
+                header_ok(&h);
 
-    if (read(part_fd, &h, sizeof (h)) != (ssize_t)sizeof (h) ||
-        !header_ok(&h) || h.count == 0)
+    if (!ours || h.count == 0)
     {
+        /* An attempt record past the count is the track the last run was
+         * decoding when it ended without closing: it faulted. Here, before
+         * the run had added anything. */
+        bool fault = ours &&
+                     read(part_fd, &r, sizeof (r)) == (ssize_t)sizeof (r) &&
+                     (r.flags & SOUND_F_FAULTED);
+
         lseek(part_fd, 0, SEEK_SET);
         part_seeded = 0;
         part_header_init(&h, 0);
@@ -442,8 +530,15 @@ static bool load_part(bool seed)
         table_sorted = true;
         table_sorted_upto = 0;
 
-        return seed ? seed_from_finished() : true;
+        if (seed && !seed_from_finished())
+            return false;
+        if (fault)
+            load_fault(t, &r);
+
+        return true;
     }
+
+    seeded = h.reserved;
 
     for (i = 0; i < h.count && table_used < table_max; i++)
     {
@@ -453,28 +548,42 @@ static bool load_part(bool seed)
         table_append(t, &r, 0);
     }
 
+    part_seeded = seeded < (uint32_t)table_used ? seeded
+                                                : (uint32_t)table_used;
+
+    /* An attempt record, as above */
+    if (i == h.count && table_used < table_max &&
+        read(part_fd, &r, sizeof (r)) == (ssize_t)sizeof (r) &&
+        (r.flags & SOUND_F_FAULTED))
+    {
+        load_fault(t, &r);
+    }
+
     /* A count that ran past what the file holds is a run that was cut off
      * mid-write. What was read is sound; the header is corrected on the next
-     * add, and until then only the table is consulted. Records past the count
-     * are orphans of a header write that failed: add() addresses records by
-     * ordinal, so the file is cut back to what the table describes. */
-    part_seeded = h.reserved < (uint32_t)table_used ? h.reserved
-                                                    : (uint32_t)table_used;
+     * add, and until then only the table is consulted. Other records past the
+     * count are orphans of a header write that failed: add() addresses
+     * records by ordinal, so the file is cut back to what the table
+     * describes. */
     ftruncate(part_fd, (off_t)sizeof (h)
                        + (off_t)table_used * (off_t)sizeof (r));
-    table_sorted = false;
-    table_measure_sorted();
+
+    /* Sorted whole, so a resumed run's lookups are binary searches: the
+     * file is in walk order, and every track already measured is asked
+     * about before the first decode. Each entry keeps its ordinal. */
+    qsort(t, (size_t)table_used, sizeof (*t), key_cmp);
+    table_sorted = true;
+    table_sorted_upto = table_used;
 
     return true;
 }
 
-int sound_index_begin(int capacity, bool fresh)
+/* The key table, empty, for 'capacity' tracks and whatever an existing index
+ * carries in unless 'fresh'. */
+static int table_open(int capacity, bool fresh)
 {
     if (capacity < 1)
         capacity = 1;
-
-    if (fresh)
-        remove(SOUND_PART);
 
     /* Room for what is carried in as well as for what will be measured.
      *
@@ -513,6 +622,20 @@ int sound_index_begin(int capacity, bool fresh)
     table_sorted = true;
     table_sorted_upto = 0;
 
+    return SOUND_OK;
+}
+
+int sound_index_begin(int capacity, bool fresh)
+{
+    int rc;
+
+    if (fresh)
+        remove(SOUND_PART);
+
+    rc = table_open(capacity, fresh);
+    if (rc != SOUND_OK)
+        return rc;
+
     part_fd = open(SOUND_PART, O_RDWR | O_CREAT, 0666);
     if (part_fd < 0)
     {
@@ -531,6 +654,44 @@ int sound_index_begin(int capacity, bool fresh)
     return SOUND_OK;
 }
 
+int sound_index_begin_dry(int capacity)
+{
+    struct sound_header h;
+    struct sound_record r;
+    struct key_entry *t;
+    bool part = file_count(SOUND_PART) > 0;
+    int fd, rc;
+    unsigned int i;
+
+    rc = table_open(capacity, false);
+    if (rc != SOUND_OK)
+        return rc;
+
+    t = table();
+    fd = open(part ? SOUND_PART : SOUND_FILE, O_RDONLY);
+    if (fd >= 0 &&
+        read(fd, &h, sizeof (h)) == (ssize_t)sizeof (h) && header_ok(&h))
+    {
+        for (i = 0; i < h.count && table_used < table_max; i++)
+        {
+            if (read(fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
+                break;
+
+            /* What an update would carry in from the finished index */
+            if (part || seed_keeps(&r))
+                table_append(t, &r, 0);
+        }
+    }
+
+    if (fd >= 0)
+        close(fd);
+
+    qsort(t, (size_t)table_used, sizeof (*t), key_cmp);
+    table_sorted_upto = table_used;
+
+    return SOUND_OK;
+}
+
 /* Where this key already sits in the table, or -1.
  *
  * Binary search over the sorted run, then a linear scan of whatever was
@@ -538,7 +699,8 @@ int sound_index_begin(int capacity, bool fresh)
  * -- twice before it decides whether to decode at all -- so a linear search
  * of the whole table makes a run that skips every track cost O(n^2) in the
  * size of the library, which for twenty thousand tracks is the entire cost
- * of the run. The tail is only what this run has measured. */
+ * of the run. Every load leaves the table sorted, so the tail is only what
+ * this session has added, each behind a decode. */
 static int find_entry(uint64_t key)
 {
     struct key_entry *t = table();
@@ -659,18 +821,27 @@ bool sound_index_add(const struct sound_record *r)
         t[at].wide = (r->flags & SOUND_F_WIDE) != 0;
 
         /* The key set is unchanged, so a sorted table stays sorted and the
-         * count in the header still describes the file. */
+         * count in the header still describes the file. An attempt record
+         * for this track is answered, and goes. */
+        if (part_attempt)
+        {
+            ftruncate(part_fd, (off_t)sizeof (h)
+                               + (off_t)table_used * (off_t)sizeof (*r));
+            part_attempt = false;
+        }
         return true;
     }
 
     if (table_used >= table_max)
         return false;
 
-    /* At the offset the ordinal names rather than the end of the file. */
+    /* At the offset the ordinal names rather than the end of the file, which
+     * is where an attempt record sits: this replaces it, or cuts it off. */
     before = (off_t)sizeof (h) + (off_t)table_used * (off_t)sizeof (*r);
     if (lseek(part_fd, before, SEEK_SET) != before)
         return false;
 
+    part_attempt = false;
     if (write(part_fd, r, sizeof (*r)) != (ssize_t)sizeof (*r))
     {
         ftruncate(part_fd, before);
@@ -695,6 +866,30 @@ bool sound_index_add(const struct sound_record *r)
         fsync(part_fd);
 
     return true;
+}
+
+/* Flushed, unlike add(): what it guards against is a panic or a hang, and
+ * either loses whatever the file system still holds in RAM. */
+void sound_index_attempt(uint64_t key, uint32_t mtime, uint32_t size)
+{
+    struct sound_record r;
+    off_t at = (off_t)sizeof (struct sound_header)
+               + (off_t)table_used * (off_t)sizeof (r);
+
+    if (part_fd < 0 || table() == NULL || table_used >= table_max)
+        return;
+
+    sound_index_fill_faulted(&r, key, mtime, size);
+
+    if (lseek(part_fd, at, SEEK_SET) != at ||
+        write(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
+    {
+        ftruncate(part_fd, at);
+        return;
+    }
+
+    part_attempt = true;
+    fsync(part_fd);
 }
 
 int sound_index_count(void)
@@ -796,9 +991,15 @@ void sound_index_close(void)
 {
     if (part_fd >= 0)
     {
+        /* A run that closes came back from every decode it began */
+        if (part_attempt)
+            ftruncate(part_fd, (off_t)sizeof (struct sound_header)
+                               + (off_t)table_used
+                                 * (off_t)sizeof (struct sound_record));
         close(part_fd);
         part_fd = -1;
     }
+    part_attempt = false;
 
     if (table_handle > 0)
     {

@@ -33,8 +33,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "config.h"
+#include "system.h"
 #include "core_alloc.h"
 #include "kernel.h"
+#include "lang.h"
 #include "lcd.h"
 #include "font.h"
 #include "power.h"
@@ -65,31 +67,12 @@
 #include "api/misc.h"
 #include "system/format_time.h"
 
-/* The window, from the specification: past the intro, and long enough for the
- * tempo envelope to fill and then hold.
- *
- * The whole window is taken. Stopping as soon as beat_probe_settled() is true
- * ended the decode at around eleven seconds, and that is a tempo criterion
- * ending every other measurement with it -- loudness, the band levels, the
- * onset rates and the chroma all stop being sampled because the *tempo* has
- * converged. Measured over thirty tracks against a forty-second window, the
- * eleven-second one disagreed about the nearest track two times in three,
- * changed its mind about whether to trust the tempo on thirteen of them and
- * about major-versus-minor on twelve. Those axes carry most of the weight in
- * a match, so the early stop was buying scan time with the thing the scan is
- * for. */
-#define SS_START_PCT     15
-#define SS_START_MIN_MS  5000
-#define SS_START_MAX_MS  30000
-#define SS_WINDOW_MS     40000
+/* The window measured is SOUND_WINDOW_MS and its neighbours (sound_index.h),
+ * which the desktop tool shares. */
 
 /* The codec's view of the file. Must exceed the largest contiguous read any
  * codec asks for, or track_decode.c re-centres its window on every request. */
 #define SS_WINDOW_BYTES  (256 * 1024)
-
-/* Tracks too short to measure. The tempo envelope alone wants seventeen
- * seconds and the window starts after the intro. */
-#define SS_MIN_LENGTH_MS 25000
 
 static int           ss_handle;
 
@@ -117,33 +100,37 @@ static int           ss_event;     /* System event ss_abort() took, or 0 */
  * Long enough to need scrolling, which is the point: three of these four
  * paragraphs are things a user would be annoyed to discover afterwards, and
  * the fourth is the one that makes the other three acceptable. */
-static const char ss_explain[] =
-    "This measures how every track sounds -- its tempo, loudness, energy "
-    "and key -- and stores the result, so playlists can be built from how "
-    "the music feels rather than from its tags.\n"
-    "\n"
-    "It takes hours. A few thousand tracks is most of a night.\n"
-    "\n"
-    "The player has to stay plugged in, and stops if the charger is "
-    "removed. Nothing else runs while it works: the disk stays awake "
-    "throughout and the processor runs flat out, so the player will be warm "
-    "and will do nothing else until it has finished.\n"
-    "\n"
-    "Stopping costs nothing -- you can update the analysis, which will carry "
-    "on from where it left off.";
+static const int ss_explain_ids[] = {
+    LANG_SOUND_SCAN_EXPLAIN_WHAT, LANG_SOUND_SCAN_EXPLAIN_TIME,
+    LANG_SOUND_SCAN_EXPLAIN_POWER, LANG_SOUND_SCAN_EXPLAIN_STOP,
+};
 
-static const char ss_depth_explain[] =
-    "Thorough listens to forty seconds of each track. Quick stops as soon as "
-    "it has worked out the tempo, around eleven seconds, and gets through the "
-    "library about three and a half times faster.\n"
-    "\n"
-    "Quick is faster than it is accurate. Working out the tempo is what stops "
-    "it, and that ends the measurement of loudness, tone and key along with "
-    "it -- measured against a full analysis, Quick picked a different closest "
-    "track two times in three.\n"
-    "\n"
-    "Choose Quick if a full analysis on the player is too long to sit "
-    "through. The desktop tool does a whole library thoroughly in minutes.";
+static const int ss_depth_explain_ids[] = {
+    LANG_SOUND_SCAN_DEPTH_WHAT, LANG_SOUND_SCAN_DEPTH_COST,
+    LANG_SOUND_SCAN_DEPTH_CHOOSE,
+};
+
+/* One buffer per dialog: the prose dialog keeps its wrap by the body's
+ * address, so two bodies must not share one. */
+static char ss_explain[1024];
+static char ss_depth_explain[1024];
+
+/* A body of paragraphs, one lang string each */
+static const char *ss_paragraphs(char *buf, size_t size, const int *ids,
+                                 int n)
+{
+    int i;
+
+    buf[0] = '\0';
+    for (i = 0; i < n; i++)
+    {
+        if (i > 0)
+            strlcat(buf, "\n\n", size);
+        strlcat(buf, str(ids[i]), size);
+    }
+
+    return buf;
+}
 
 /* Asked once the run has been agreed rather than before it: this is a
  * question about how long to spend, which only matters to somebody who has
@@ -159,8 +146,13 @@ static void ss_ask_depth(void)
     bool thorough = global_settings.analysis_depth != ANALYSIS_QUICK;
 
     global_settings.analysis_depth =
-        dialog_prose_confirm("Analysis depth", ss_depth_explain,
-                             "Thorough", "Quick", thorough)
+        dialog_prose_confirm(str(LANG_ANALYSIS_DEPTH),
+                             ss_paragraphs(ss_depth_explain,
+                                           sizeof (ss_depth_explain),
+                                           ss_depth_explain_ids,
+                                           ARRAYLEN(ss_depth_explain_ids)),
+                             str(LANG_ANALYSIS_THOROUGH),
+                             str(LANG_ANALYSIS_QUICK), thorough)
         ? ANALYSIS_THOROUGH : ANALYSIS_QUICK;
 
     settings_save();
@@ -209,7 +201,7 @@ static void ss_draw(const char *paused)
 
     if (paused != NULL)
     {
-        lcd->putsxy(0, y, "Paused");
+        lcd->putsxy(0, y, str(LANG_SOUND_SCAN_PAUSED));
         y += fh;
         lcd->putsxy(0, y, paused);
         y += fh;
@@ -221,7 +213,7 @@ static void ss_draw(const char *paused)
     }
     else
     {
-        snprintf(line, sizeof (line), "Analysing %d of %d",
+        snprintf(line, sizeof (line), str(LANG_SOUND_SCAN_PROGRESS),
                  ss_done + ss_skipped, ss_total);
         lcd->putsxy(0, y, line);
         y += fh;
@@ -239,17 +231,17 @@ static void ss_draw(const char *paused)
             long eta = (ss_work / ss_done) * (left > 0 ? left : 0) / HZ;
 
             if (eta >= 3600)
-                snprintf(line, sizeof (line), "About %ldh %ldm left",
+                snprintf(line, sizeof (line), str(LANG_SOUND_SCAN_LEFT_HOURS),
                          eta / 3600, (eta % 3600) / 60);
             else
-                snprintf(line, sizeof (line), "About %ldm left",
+                snprintf(line, sizeof (line), str(LANG_SOUND_SCAN_LEFT_MINUTES),
                          (eta + 59) / 60);
 
             lcd->putsxy(0, y, line);
         }
         else
         {
-            lcd->putsxy(0, y, "Working out how long...");
+            lcd->putsxy(0, y, str(LANG_SOUND_SCAN_ESTIMATING));
         }
 
         y += fh;
@@ -268,7 +260,7 @@ static void ss_draw(const char *paused)
     /* One button, and it is the only thing this screen does. */
     dialog_draw_button(lcd, &style, content.width / 4,
                        content.height - bh, content.width / 2, bh,
-                       "Stop", true);
+                       str(LANG_SOUND_SCAN_STOP), true);
 
     lcd->set_viewport(&vp);
     lcd->update_viewport();
@@ -354,20 +346,21 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
         return true;
     }
 
-    start_ms = length_ms / 100 * SS_START_PCT;
-    if (start_ms < SS_START_MIN_MS)
-        start_ms = SS_START_MIN_MS;
-    if (start_ms > SS_START_MAX_MS)
-        start_ms = SS_START_MAX_MS;
-    if (length_ms < start_ms + 5000)
-        start_ms = 0;
+    start_ms = sound_index_window_start(length_ms);
 
     beat_probe_start();
 
+    /* So that a decode which never comes back is not tried again */
+    sound_index_attempt(key, mtime, size);
+
     t0 = current_tick;
     /* Quick hands the decode a reason to stop early; Thorough gives it none
-     * and takes the whole window. */
-    rc = track_decode_run(path, start_ms, SS_WINDOW_MS, buf, SS_WINDOW_BYTES,
+     * and takes the whole window. Trap: the early stop is a tempo criterion
+     * and ends every measurement with it -- loudness, the bands, the onsets
+     * and the chroma -- so a Quick record has measured less of the track on
+     * every axis; ss_depth_explain tells the user what that costs. */
+    rc = track_decode_run(path, start_ms, SOUND_WINDOW_MS,
+                          buf, SS_WINDOW_BYTES,
                           beat_probe_sink,
                           global_settings.analysis_depth == ANALYSIS_QUICK
                           ? beat_probe_settled : NULL,
@@ -395,7 +388,7 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
         ss_failed++;
     }
 
-    if (analysed < SS_MIN_LENGTH_MS / 2)
+    if (analysed < SOUND_MIN_LENGTH_MS / 2)
         rec.flags |= SOUND_F_SHORT;
 
     ss_audio_ms += analysed;
@@ -420,12 +413,12 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
 static bool ss_wait_for_charger(void)
 {
     if (!power_input_present() && global_settings.talk_menu)
-        talk_text("Connect the charger to continue", false);
+        talk_id(LANG_SOUND_SCAN_CONNECT_CHARGER, false);
     while (!power_input_present())
     {
         int button;
 
-        ss_draw("Connect the charger to continue");
+        ss_draw(str(LANG_SOUND_SCAN_CONNECT_CHARGER));
         reset_poweroff_timer();
 
         button = get_action(CONTEXT_STD, HZ / 2);
@@ -469,7 +462,7 @@ static bool ss_gate(bool *fresh)
 
     if (!tagcache_is_usable())
     {
-        splash(HZ * 3, "Needs the database");
+        splash(HZ * 3, ID2P(LANG_SOUND_SCAN_NEEDS_DATABASE));
         return false;
     }
 
@@ -482,11 +475,9 @@ static bool ss_gate(bool *fresh)
      * two questions when the thing below is already one. */
     if (sound_index_partial(&partial, &update))
     {
-        char q[64];
+        char q[128];
 
-        snprintf(q, sizeof (q),
-                 "An analysis is part finished (%d done). Carry on with it?",
-                 partial);
+        snprintf(q, sizeof (q), str(LANG_SOUND_SCAN_RESUME_ASK), partial);
 
         if (yesno_pop(q))
         {
@@ -494,7 +485,7 @@ static bool ss_gate(bool *fresh)
             return true;
         }
 
-        if (!yesno_pop("Start again from the beginning?"))
+        if (!yesno_pop(str(LANG_SOUND_SCAN_RESTART_ASK)))
             return false;
 
         /* Again as the same kind of run: an abandoned update must not turn
@@ -509,8 +500,12 @@ static bool ss_gate(bool *fresh)
         return true;
     }
 
-    if (!dialog_prose_confirm("Analyse library", ss_explain,
-                              "Start", "Not now", true))
+    if (!dialog_prose_confirm(str(LANG_SOUND_SCAN_TITLE),
+                              ss_paragraphs(ss_explain, sizeof (ss_explain),
+                                            ss_explain_ids,
+                                            ARRAYLEN(ss_explain_ids)),
+                              str(LANG_SOUND_SCAN_START),
+                              str(LANG_SOUND_SCAN_NOT_NOW), true))
     {
         return false;
     }
@@ -523,10 +518,10 @@ static bool ss_gate(bool *fresh)
      * just refused. */
     if (*fresh && ss_have_index())
     {
-        if (yesno_pop("You already have an index. Rebuild it from scratch?"))
+        if (yesno_pop(str(LANG_SOUND_SCAN_REBUILD_ASK)))
             return true;
 
-        if (!yesno_pop("Update it instead?"))
+        if (!yesno_pop(str(LANG_SOUND_SCAN_UPDATE_ASK)))
             return false;
 
         *fresh = false;
@@ -620,7 +615,7 @@ static void ss_run(bool fresh)
     if (ss_handle <= 0)
     {
         usb_set_mode(global_settings.usb_mode);
-        splash(HZ * 3, "Not enough memory");
+        splash(HZ * 3, ID2P(LANG_OUT_OF_MEMORY));
         return;
     }
 
@@ -629,7 +624,7 @@ static void ss_run(bool fresh)
     {
         core_free(ss_handle);
         usb_set_mode(global_settings.usb_mode);
-        splash(HZ * 3, "Could not open the index");
+        splash(HZ * 3, ID2P(LANG_SOUND_SCAN_OPEN_FAILED));
         return;
     }
 
@@ -652,7 +647,7 @@ static void ss_run(bool fresh)
         sound_index_close();
         core_free(ss_handle);
         usb_set_mode(global_settings.usb_mode);
-        splash(HZ * 3, "Database busy");
+        splash(HZ * 3, ID2P(LANG_TAGCACHE_BUSY));
         return;
     }
 
@@ -683,7 +678,7 @@ static void ss_run(bool fresh)
         strlcpy(ss_now, strrchr(path, '/') ? strrchr(path, '/') + 1 : path,
                 sizeof (ss_now));
 
-        if (length_ms < SS_MIN_LENGTH_MS)
+        if (length_ms < SOUND_MIN_LENGTH_MS)
         {
             ss_skipped++;
         }
@@ -735,7 +730,7 @@ static void ss_run(bool fresh)
      * not knowing. */
     complete = ss_live > 0 && ss_done + ss_skipped >= ss_live;
 
-    /* Losing the charger is no longer an ending -- the run waits for it and
+    /* Losing the charger is not an ending -- the run waits for it and
      * carries on -- so there are two: the user stopped, or it finished. */
     if (ss_stop)
     {
@@ -743,14 +738,14 @@ static void ss_run(bool fresh)
         if (ss_event)
             default_event_handler(ss_event);
         else
-            splashf(HZ * 4, "Stopped. %d of %d done",
+            splashf(HZ * 4, str(LANG_SOUND_SCAN_STOPPED),
                     ss_done + ss_skipped, ss_total);
         return;
     }
 
     /* Saving and calibrating take a while on a large index, and the box
      * would otherwise sit on the last track's name as if nothing moved. */
-    strlcpy(ss_now, "Saving the results...", sizeof (ss_now));
+    strlcpy(ss_now, str(LANG_SOUND_SCAN_SAVING), sizeof (ss_now));
     ss_draw(NULL);
 
     if (sound_index_finish(complete) == SOUND_OK)
@@ -761,14 +756,14 @@ static void ss_run(bool fresh)
          * against the hours behind it. */
         sound_cal_update();
 
-        snprintf(msg, sizeof (msg), "Done. %d measured, %d unreadable",
+        snprintf(msg, sizeof (msg), str(LANG_SOUND_SCAN_DONE),
                  ss_done - ss_failed, ss_failed);
         ss_result(msg);
     }
     else
     {
         sound_index_close();
-        ss_result("Could not write the index");
+        ss_result(str(LANG_SOUND_SCAN_WRITE_FAILED));
     }
 }
 

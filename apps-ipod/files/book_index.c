@@ -155,6 +155,7 @@ static int work_handle;
 static struct book_work *work;
 static int old_count;
 static int old_fd = -1;
+static bool old_capped;         /* the old file holds more than old[] */
 static struct libfile_writer writer;
 static bool writing, changed;
 
@@ -166,6 +167,7 @@ static void load_old(void)
     off_t at;
 
     old_count = 0;
+    old_capped = false;
     old_fd = libfile_open(BOOK_INDEX_FILE, LIB_BOOK_INDEX_MAGIC,
                           LIB_BOOK_INDEX_VERSION, 1, &h, NULL);
     if (old_fd < 0)
@@ -192,6 +194,8 @@ static void load_old(void)
         at += len;
         lseek(old_fd, at, SEEK_SET);
     }
+    old_capped = old_count == BOOK_INDEX_MAX
+                 && read(old_fd, &r, sizeof(r)) == (ssize_t)sizeof(r);
 }
 
 static bool copy_old(struct book_old *o)
@@ -303,6 +307,10 @@ bool book_index_end(bool completed)
 
     if (work_handle <= 0)
         return false;
+    /* A stopped walk carries over only the old books in old[], so past the
+     * cap it would lose the rest: the old file stays instead */
+    if (!completed && old_capped)
+        writing = false;
     for (i = 0; i < old_count && writing; i++)
     {
         if (work->old[i].copied)

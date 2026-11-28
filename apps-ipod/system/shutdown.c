@@ -120,11 +120,16 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             screens[i].update();
         }
 
+        /* The passes first, as restart_firmware() does: one holds a database
+         * search open, and the database waits for every search to close */
+        bg_task_halt(BG_HALT_TIMEOUT);
+
         if (batt_safe)
         {
             int level;
             if (!tagcache_prepare_shutdown())
             {
+                bg_task_resume();
                 cancel_shutdown();
                 splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
                 return false;
@@ -148,8 +153,6 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             splashf(0, "%s %s", str(LANG_WARNING_BATTERY_EMPTY),
                                 str(LANG_SHUTTINGDOWN));
         }
-
-        bg_task_halt(BG_HALT_TIMEOUT);
 
         /* A USB dock is told now, while the saves below give the USB
          * thread time to send it */

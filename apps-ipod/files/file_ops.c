@@ -295,19 +295,9 @@ static int copy_move_file(struct file_op_params *src, const char *dst_path,
         return rc;
     }
 
-    /* See if we can get the plugin buffer for the file copy buffer */
+    /* The scratch buffer: app_get_buffer() panics rather than fail */
     size_t buffersize;
     char *buffer = (char *) app_get_buffer(&buffersize, "file copy");
-    if (buffer == NULL || buffersize < 512) {
-        /* Not large enough, try for a disk sector worth of stack
-           instead */
-        buffersize = 512;
-        buffer = (char *)alloca(buffersize);
-    }
-
-    if (buffer == NULL) {
-        return FORC_NO_BUFFER_AVAIL;
-    }
 
     buffersize &= ~0x1ff;  /* Round buffer size to multiple of sector size */
 
