@@ -126,19 +126,9 @@ static int handle_usb_events(void)
     return 0;
 }
 
-#define MODE_NAME_LEN 32
-
-struct usb_screen_vps_t
-{
-    struct viewport parent;
-    struct viewport title;
-};
-
 static void usb_screen_fix_viewports(struct screen *screen,
-        struct usb_screen_vps_t *usb_screen_vps)
+                                     struct viewport *parent)
 {
-    struct viewport *parent = &usb_screen_vps->parent;
-
     /* No theme for the whole USB session: full screen, no SBS, no backdrop, and
      * no skin update at any point. The message below is plain fill and text
      * drawing, which is all this screen does.
@@ -155,27 +145,31 @@ static void usb_screen_fix_viewports(struct screen *screen,
 
     if (usb_hid)
     {
-        struct viewport *title = &usb_screen_vps->title;
-        *title = *parent;
-        title->height = font_get(parent->font)->height;
-
-        int i =0, langid = LANG_USB_KEYPAD_MODE;
-        while (langid >= 0) /* ensure the USB mode strings get cached */
-        {
-            font_getstringsize(str(langid), NULL, NULL, title->font);
-            langid = keypad_mode_name_get(i++);
-        }
+        /* Every mode's name is drawn after the fonts close, so its glyphs
+         * are cached now */
+        int i = 0, langid;
+        while ((langid = keypad_mode_name_get(i++)) >= 0)
+            font_getstringsize(str(langid), NULL, NULL, parent->font);
     }
 }
 
-/* The image centred on a screen filled with the background, the message's two
+/* With USB HID on, the keypad mode's name, the message's third line */
+static const char *usb_mode_name(void)
+{
+    int langid = usb_hid ? keypad_mode_name_get(usb_keypad_mode) : -1;
+    return langid >= 0 ? str(langid) : NULL;
+}
+
+/* The image centred on a screen filled with the background, the message's
  * lines under it, and its dark pixels in the foreground: both colours as the
  * dynamic colours give them. The whole screen is sent, where a splash sends
  * only its box. */
 static void usb_image_draw(struct screen *screen)
 {
-    static const int lines[] = { LANG_USB_CONNECTED,
-                                 LANG_USB_EJECT_BEFORE_DISCONNECT };
+    const char *lines[] = { str(LANG_USB_CONNECTED),
+                            str(LANG_USB_EJECT_BEFORE_DISCONNECT),
+                            usb_mode_name() };
+    unsigned nlines = lines[2] ? 3 : 2;
     struct viewport vp, *last;
     int w, h, y;
 
@@ -192,17 +186,16 @@ static void usb_image_draw(struct screen *screen)
     screen->set_foreground(dynamic_colors_resolve(global_settings.fg_color));
     screen->set_drawmode(DRMODE_FG);
 
-    y = MAX(0, (vp.height - usb_image_bm.height - h / 2 - 2 * h) / 2);
+    y = MAX(0, (vp.height - usb_image_bm.height - h / 2 - (int)nlines * h)
+               / 2);
     screen->mono_bitmap(core_get_data(usb_image),
                         (vp.width - usb_image_bm.width) / 2, y,
                         usb_image_bm.width, usb_image_bm.height);
     y += usb_image_bm.height + h / 2;
-    for (unsigned i = 0; i < ARRAYLEN(lines); i++, y += h)
+    for (unsigned i = 0; i < nlines; i++, y += h)
     {
-        const char *s = str(lines[i]);
-
-        font_getstringsize(s, &w, NULL, vp.font);
-        screen->putsxy((vp.width - w) / 2, y, s);
+        font_getstringsize(lines[i], &w, NULL, vp.font);
+        screen->putsxy((vp.width - w) / 2, y, lines[i]);
     }
 
     screen->set_drawmode(DRMODE_SOLID);
@@ -226,6 +219,9 @@ static void usb_screens_draw(void)
         FOR_NB_SCREENS(i)
             usb_image_draw(&screens[i]);
     }
+    else if (usb_mode_name())
+        splashf(0, "%s\n%s\n%s", str(LANG_USB_CONNECTED),
+                str(LANG_USB_EJECT_BEFORE_DISCONNECT), usb_mode_name());
     else
         splashf(0, "%s\n%s", str(LANG_USB_CONNECTED),
                              str(LANG_USB_EJECT_BEFORE_DISCONNECT));
@@ -234,7 +230,7 @@ static void usb_screens_draw(void)
 void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
 {
 
-    struct usb_screen_vps_t usb_screen_vps_ar[NB_SCREENS];
+    struct viewport usb_screen_vps_ar[NB_SCREENS];
 
     /* Shown at once: nothing here waits in get_action() to slide to it */
     transition_cancel();
@@ -289,14 +285,6 @@ void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
         usb_screens_draw();
     }
 
-    FOR_NB_SCREENS(i)
-    {
-        const struct viewport* vp = NULL;
-
-        vp = usb_hid ? &usb_screen_vps_ar[i].title : NULL;
-        if (vp)
-            screens[i].scroll_stop_viewport(vp);
-    }
     if (global_settings.usb_keypad_mode != usb_keypad_mode)
     {
         global_settings.usb_keypad_mode = usb_keypad_mode;

@@ -360,6 +360,13 @@ static bool host_muted;
  * 24 MHz, too slow to take every packet. */
 static bool stream_boosted;
 static unsigned int dsp_claims;
+/* The host has selected alternate 1 and local playback still holds the DSP:
+ * the stream starts once usb_audio_local_stopped() reports it let go. */
+static bool stream_waiting;
+
+/* notify_event() data */
+#define NOTIFY_PREBUFFERED   0
+#define NOTIFY_LOCAL_STOPPED 1
 
 /* buffers used for usb, queuing and playback */
 static unsigned char *rx_buffer;
@@ -510,7 +517,10 @@ static void set_playback_sampling_frequency(unsigned long f)
         hw_freq_sampr[as_playback_freq_idx], f);
     usb_log(USB_LOG_RATE, 0, 0, f, hw_freq_sampr[as_playback_freq_idx]);
 
-    mixer_set_frequency(hw_freq_sampr[as_playback_freq_idx]);
+    /* Setting the mixer rate stops the PCM, so only a running stream sets
+     * it here; usb_audio_start_playback() applies it otherwise. */
+    if (usb_audio_playing && !stream_waiting)
+        mixer_set_frequency(hw_freq_sampr[as_playback_freq_idx]);
 }
 
 unsigned long usb_audio_get_playback_sampling_frequency(void)
@@ -737,16 +747,17 @@ static void playback_audio_get_more(const void **start, size_t *size)
     usb_rx_overflow = false;
 }
 
+/* Takes the playback DSP and the mixer rate. Local playback must be stopped:
+ * the codec runs dsp_process() on the same dsp_config, and the transfer
+ * interrupt's pass would run inside the codec's. */
 static void usb_audio_start_playback(void)
 {
+    stream_waiting = false;
     if (!stream_boosted)
     {
         cpu_boost(true);
         stream_boosted = true;
     }
-    /* The playback DSP is set up here, not at connect: until the audio
-     * thread has stopped, music still being decoded through it plays as
-     * static once it expects our format. */
     dsp = dsp_get_config(CODEC_IDX_AUDIO);
     dsp_claims++;
     dsp_configure(dsp, DSP_RESET, 0);
@@ -798,10 +809,35 @@ static void usb_audio_start_playback(void)
     usb_drv_recv_nonblocking(EP_ISO_OUT, rx_buffer, BUFFER_SIZE);
 }
 
+/* The host's stream stops local playback. The USB thread must not wait on
+ * the audio thread inside SET_INTERFACE, so a playing player is asked to
+ * stop and the stream starts from notify_event() once it has. */
+static void usb_audio_request_playback(void)
+{
+    /* From here audio_start_playback() refuses to start local playback */
+    usb_audio_playing = true;
+    if (audio_status() == 0)
+    {
+        usb_audio_start_playback();
+        return;
+    }
+    stream_waiting = true;
+    usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_WAIT_LOCAL, 0, 0, 0);
+    audio_stop_for_usb_audio();
+}
+
+/* From the audio thread, each time local playback stops */
+void usb_audio_local_stopped(void)
+{
+    if (stream_waiting)
+        usb_signal_class_notify(USB_DRIVER_AUDIO, NOTIFY_LOCAL_STOPPED);
+}
+
 static void usb_audio_stop_playback(void)
 {
     logf("usbaudio: stop playback");
     usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_STOP, 0, 0, 0);
+    stream_waiting = false;
     if(usb_audio_playing)
     {
         mixer_channel_stop(PCM_MIXER_CHAN_USBAUDIO);
@@ -849,10 +885,7 @@ static int usb_audio_set_interface(int intf, int alt)
         usb_as_playback_intf_alt = alt;
 
         if(usb_as_playback_intf_alt == 1)
-        {
-            usb_log_sync();
-            usb_audio_start_playback();
-        }
+            usb_audio_request_playback();
         else
             usb_audio_stop_playback();
         logf("usbaudio: use playback alternate %d", alt);
@@ -1409,13 +1442,6 @@ static void usb_audio_transfer_complete(int ep, int dir, int status, int length)
     (void) length;
 }
 
-/*
- * Called by usb_core_transfer_complete().
- * The normal transfer complete handler system is too slow to deal with
- * ISO data at the rate required, so this is required.
- *
- * Return true if the transfer is handled, false otherwise.
- */
 static void start_mixer(void)
 {
     static const struct mixer_play_cbs cbs = {
@@ -1429,16 +1455,28 @@ static void start_mixer(void)
 #endif
 }
 
-/* Playback is started here, on the USB thread, once the transfer interrupt
- * has prebuffered enough */
+/* On the USB thread: the stream starts here once local playback has
+ * stopped, and the mixer once the transfer interrupt has prebuffered enough */
 static void usb_audio_notify_event(intptr_t data)
 {
-    (void)data;
+    if (data == NOTIFY_LOCAL_STOPPED)
+    {
+        if (stream_waiting && usb_as_playback_intf_alt == 1)
+            usb_audio_start_playback();
+        return;
+    }
     usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_THREAD_START, 0, 0, 0);
-    if (usb_audio_playing && !playback_audio_underflow)
+    if (usb_audio_playing && !stream_waiting && !playback_audio_underflow)
         start_mixer();
 }
 
+/*
+ * Called by usb_core_transfer_complete().
+ * The normal transfer complete handler system is too slow to deal with
+ * ISO data at the rate required, so this is required.
+ *
+ * Return true if the transfer is handled, false otherwise.
+ */
 static bool usb_audio_fast_transfer_complete(int ep, int dir, int status, int length)
 {
     bool retval = false;
@@ -1537,7 +1575,7 @@ static bool usb_audio_fast_transfer_complete(int ep, int dir, int status, int le
             logf("usbaudio: prebuffering done");
             usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_PREBUFFERED, 0, 0, 0);
             playback_audio_underflow = false;
-            usb_signal_class_notify(USB_DRIVER_AUDIO, 0);
+            usb_signal_class_notify(USB_DRIVER_AUDIO, NOTIFY_PREBUFFERED);
         }
         restore_irq(oldlevel);
         retval =  true;

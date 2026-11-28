@@ -212,6 +212,8 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_AUDIO_UNDERFLOW   5
 #define USB_LOG_AUDIO_OVERFLOW    6
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
+#define USB_LOG_AUDIO_WAIT_LOCAL  8 /* stream start waits for local playback
+                                     * to stop */
 
 /* The last sixteen commands are written as a pair of HISTORY entries each
  * when the host ends the configuration with the cable in */

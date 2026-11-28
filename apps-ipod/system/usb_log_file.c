@@ -319,7 +319,8 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
     static const char * const audio[] = {
         "init: NO BUFFERS, restart with the setting on", "stream start",
         "stream stop", "first packet", "prebuffered, playing",
-        "UNDERFLOW", "OVERFLOW", "playback started on USB thread" };
+        "UNDERFLOW", "OVERFLOW", "playback started on USB thread",
+        "stopping local playback first" };
     int n = snprintf(buf, size, "%4lu.%06lu ",
                      (unsigned long)(us / 1000000),
                      (unsigned long)(us % 1000000));

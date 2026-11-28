@@ -169,6 +169,15 @@ void usb_audio_host_gone(void);
  */
 unsigned int usb_audio_get_dsp_claims(void);
 
+/*
+ * The stream and local playback share the playback DSP, so a stream starts
+ * only with local playback stopped. The application supplies
+ * audio_stop_for_usb_audio(), which asks for that stop without waiting,
+ * and calls usb_audio_local_stopped() each time local playback stops.
+ */
+void audio_stop_for_usb_audio(void);
+void usb_audio_local_stopped(void);
+
 extern struct usb_class_driver usb_cdrv_audio;
 
 #endif
