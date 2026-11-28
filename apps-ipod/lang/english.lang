@@ -28477,3 +28477,17 @@
     *: "Wheel glide"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRECUT_AUTO
+  desc: Equalizer menu: Precut chosen while Auto Headroom sets it
+  user: core
+  <source>
+    *: "Auto Headroom sets Precut"
+  </source>
+  <dest>
+    *: "Auto Headroom sets Precut"
+  </dest>
+  <voice>
+    *: "Auto Headroom sets Precut"
+  </voice>
+</phrase>
