@@ -1745,6 +1745,17 @@ const char *get_token_value(struct gui_wps *gwps,
             itoa_buf(buf, buf_size, n);
             return buf;
         }
+        case SKIN_TOKEN_LIST_ITEM_DISC:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            int n = skinlist_get_item_disc(li->offset, li->wrap);
+            if (n <= 0)
+                return NULL;
+            /* Text only, as %Lp is */
+            itoa_buf(buf, buf_size, n);
+            return buf;
+        }
         case SKIN_TOKEN_LIST_ITEM_VALUE:
         {
             struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);

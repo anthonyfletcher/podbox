@@ -48,6 +48,7 @@
 #define SKIN_TOKEN_LOADING_ANIM     (SKIN_TOKEN_CUSTOM_BASE + 27)
 #define SKIN_TOKEN_BOOK_TIME_LEFT   (SKIN_TOKEN_CUSTOM_BASE + 28)
 #define SKIN_TOKEN_BOOK_HEARD_PERCENT (SKIN_TOKEN_CUSTOM_BASE + 29)
+#define SKIN_TOKEN_LIST_ITEM_DISC   (SKIN_TOKEN_CUSTOM_BASE + 30)
 
 /* %LH's fields: what its word names, held in the token's value */
 enum browser_header_field {

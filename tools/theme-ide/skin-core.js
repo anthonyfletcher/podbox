@@ -163,7 +163,8 @@ const UPSTREAM = {
   LH:["|S","The list's header: bare, its kind (album, on an album's tracks) or empty; with a field, that field: name, artist, year, tracks, length, discs, or art (the cover, filling the viewport)",["field"]],
   Lc:["","Set while drawing the selected row"],
   Lk:["|IS","Kind of a list row: 0 plain, 1 menu, 2 toggle, 3 setting, 4 action, 5 command, 6 container, 7 track, 8 file, 9 option, 10 custom, 11 custom menu",["offset","nowrap"]],
-  Lp:["|IS","Number of a row among the list's tracks, counted from the end on a podcast's newest-first lists; empty on other rows",["offset","nowrap"]],
+  Lp:["|IS","Number of a row among the list's tracks, or its disc's on an album of several, counted from the end on a podcast's newest-first lists; empty on other rows",["offset","nowrap"]],
+  Ls:["|IS","Disc of a track row on an album whose tracks are on more than one; empty on other rows and lists",["offset","nowrap"]],
   Lv:["|IS","Current value of a setting row",["offset","nowrap"]],
   Lr:["|IS","Where a number setting sits in its range, or how far through a book or podcast episode, 0-100; empty on other rows",["offset","nowrap"]],
   LP:["|IS","True on the row that is playing",["offset","nowrap"]],
@@ -421,6 +422,8 @@ const ARG_HELP = {
   "Lk:1": "'nowrap' stops the offset wrapping round the ends of the list.",
   "Lp:0": "row offset; 0 is the row being drawn.",
   "Lp:1": "'nowrap' stops the offset wrapping round the ends of the list.",
+  "Ls:0": "row offset; 0 is the row being drawn.",
+  "Ls:1": "'nowrap' stops the offset wrapping round the ends of the list.",
   "Lv:0": "row offset; 0 is the row being drawn.",
   "Lv:1": "'nowrap' stops the offset wrapping round the ends of the list.",
   "Lr:0": "row offset; 0 is the row being drawn.",
@@ -1911,6 +1914,10 @@ function evalTag(n, env) {
     case "Lp": {
       const r = rowAt(n, env);
       return r && r.kind === 7 && r.track !== undefined ? String(r.track) : "";
+    }
+    case "Ls": {
+      const r = rowAt(n, env);
+      return r && r.kind === 7 && r.disc ? String(r.disc) : "";
     }
     case "Lv": { const r = rowAt(n, env); return r && r.value ? r.value : ""; }
     case "Lr": { const r = rowAt(n, env); return r && r.range !== undefined ? String(r.range) : ""; }

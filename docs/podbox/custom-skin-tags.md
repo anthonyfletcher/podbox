@@ -58,6 +58,7 @@ preceding group repeats.
 | [`%Lb(label, width, height[, tile, art height])`](#lblabel-width-height-tile-art-height--art-row-height) | changed: art row height |
 | [`%Lk`](#lk--what-kind-of-row-this-is) | kind of row |
 | [`%Lp`](#lp--the-rows-number-among-the-tracks) | row's number among the tracks |
+| [`%Ls`](#ls--the-rows-disc) | row's disc, on an album of several |
 | [`%Lv`](#lv--a-setting-rows-value) | a setting row's value |
 | [`%Lr`](#lr--how-far-along-a-row-is) | how far along a number setting, book or episode is |
 | [`%LP`](#lp--is-this-row-playing) | is this row playing |
@@ -517,9 +518,9 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 ## List rows
 
 Tags for a skinned list: `%La`, `%Ld` and `%Lb`'s fifth argument draw cover
-art in the rows, and `%Lk`, `%Lp`, `%Lv`, `%Lr` and `%LP` say what a row is,
-beyond the text and icon `%LT` and `%LI` give. Those five take `%LT`'s arguments: an
-offset to ask about another row, and `nowrap`.
+art in the rows, and `%Lk`, `%Lp`, `%Ls`, `%Lv`, `%Lr` and `%LP` say what a row
+is, beyond the text and icon `%LT` and `%LI` give. Those six take `%LT`'s
+arguments: an offset to ask about another row, and `nowrap`.
 
 ### `%La(offset[, nowrap][, radius][, filters])` — list-item album art
 
@@ -676,12 +677,29 @@ The owner names their own rows, so a skin cannot recognise them by `%LT`;
 
 The row's place among the list's track rows, from `1`, and empty on any other
 row. A list's [Random] or [Resume] row does not shift the numbers, nor does a
-folder or an image among a folder's files.
+folder or an image among a folder's files. On an album whose tracks are on
+more than one disc, it starts again at `1` on each; [`%Ls`](#ls--the-rows-disc)
+says which disc.
 
 ```
 %?Lp<%Lp|>                     # numbers on tracks, nothing elsewhere
 %?if(%Lp,>,99)<...narrow digits...>
 ```
+
+### `%Ls` — the row's disc
+
+The disc a track row is on, on an album, book or show whose tracks are on
+more than one disc. Empty on every other row and list, and on a track that
+names no disc.
+
+```
+%?Ls<%Ls->%Lp                  # 1-1 ... 1-12, 2-1 ...
+```
+
+An album tagged disc 2 of 2 with no disc 1 in the library is one disc here.
+Leave room for it: `12-12` is more than twice as wide as `12`. Draw these
+from the left rather than centred, or `2-9` and `2-10` sit a digit apart and
+the hyphens do not line up.
 
 ### `%Lv` — a setting row's value
 
@@ -759,7 +777,7 @@ With a word it gives one field:
 | `year` | empty when untagged |
 | `tracks` | the tracks this list shows: chapters, episodes |
 | `length` | their total, `m:ss` or `h:mm:ss` |
-| `discs` | the highest disc number; empty for one disc |
+| `discs` | the highest disc number, where the tracks are on more than one disc and [`%Ls`](#ls--the-rows-disc) numbers them; empty otherwise. For choosing a `%Lb` row layout with room for `2-1` |
 | `art` | draws the cover in the middle of the viewport; `%LH(art, 6)` rounds its corners, as `%La` does a row's |
 
 A word it does not know fails the skin. A skin that uses `%LH` anywhere draws

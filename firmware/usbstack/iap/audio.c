@@ -58,6 +58,14 @@ static int                  staging_buffer_index;
 
 #define zero_buffer (staging_buffers[USB_BATCH_SLOTS])
 
+#ifndef USB_BATCH_NON_NATIVE
+/* The ARC controller fetches each packet by DMA only as the host asks for it,
+ * and from SDRAM, under codec, disk and screen DMA load, it misses many; from
+ * IRAM almost none. The silent packet, rarely sent, stays in SDRAM. */
+static uint8_t staging_iram[USB_BATCH_SLOTS][AS_PACKET_SIZE] IBSS_ATTR
+    __attribute__((aligned(32)));
+#endif
+
 static const uint8_t* pulled_buf;
 static size_t         pulled_buf_size;
 static size_t         pulled_buf_cursor;
@@ -449,6 +457,12 @@ bool iap_audio_init(void) {
     }
 
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
+#ifndef USB_BATCH_NON_NATIVE
+        if(i < USB_BATCH_SLOTS) {
+            staging_buffers[i].buf.ptr    = staging_iram[i];
+            staging_buffers[i].buf.handle = 0;
+        } else
+#endif
         check_act(iap_alloc_usb_send_buffer(AS_PACKET_SIZE, &staging_buffers[i].buf), goto error);
         staging_buffers[i].cursor = 0;
     }
@@ -475,10 +489,10 @@ bool iap_audio_init(void) {
 error:
     usb_drv_batch_deinit();
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
-        if(staging_buffers[i].buf.ptr != NULL) {
+        if(staging_buffers[i].buf.handle > 0)
             core_free(staging_buffers[i].buf.handle);
-            staging_buffers[i].buf.ptr = NULL;
-        }
+        staging_buffers[i].buf.ptr    = NULL;
+        staging_buffers[i].buf.handle = 0;
     }
     return false;
 }
@@ -488,8 +502,10 @@ bool iap_audio_deinit(void) {
     remove_event(PLAYBACK_EVENT_TRACK_CHANGE, on_track_change);
     check_act(usb_drv_batch_deinit() == 0, );
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
-        core_free(staging_buffers[i].buf.handle);
-        staging_buffers[i].buf.ptr = NULL;
+        if(staging_buffers[i].buf.handle > 0)
+            core_free(staging_buffers[i].buf.handle);
+        staging_buffers[i].buf.ptr    = NULL;
+        staging_buffers[i].buf.handle = 0;
     }
     return true;
 }

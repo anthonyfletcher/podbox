@@ -165,6 +165,10 @@ typedef int list_get_range(int selected_item, void * data);
  */
 typedef bool list_is_playing(int selected_item, void * data);
 
+/* Disc callback, read by %Ls and %Lp: the disc a track row is on, 0 for one
+ * that names none. */
+typedef int list_get_disc(int selected_item, void * data);
+
 struct list_selection_color
 {
     /* text color, in native lcd format
@@ -244,6 +248,9 @@ struct gui_synclist
     bool count_down;
     /* %Lp is empty: an order that numbers nothing */
     bool unnumbered;
+    /* Set on a list of tracks from more than one disc: %Lp starts again on
+     * each disc, and %Ls names it */
+    list_get_disc *callback_get_item_disc;
 
     /* Changes whenever the items may have: init, the item count or the kind
      * callback. Unique across lists, so a reused struct gets a new one. */
@@ -285,6 +292,9 @@ extern void gui_synclist_set_count_down(struct gui_synclist * lists,
                                         bool count_down);
 extern void gui_synclist_set_unnumbered(struct gui_synclist * lists,
                                         bool unnumbered);
+/* The answer to %Ls, NULL on a list of one disc or none. */
+extern void gui_synclist_set_disc_callback(struct gui_synclist * lists,
+                                           list_get_disc disc_callback);
 /* The answer to %LD. May be NULL. */
 extern void gui_synclist_set_description_callback(struct gui_synclist * lists,
                                                   list_get_name callback);
@@ -362,9 +372,12 @@ bool skinlist_item_is_playing(int offset, bool wrap);
 int skinlist_get_item_range(int offset, bool wrap);
 /* %LD of the list on screen, or NULL */
 const char *skinlist_get_selected_description(char *buf, int buf_size);
-/* %Lp: the row's number among the list's tracks, from 1; -1 on any row that
- * is not a track. */
+/* %Lp: the row's number among the list's tracks, or its disc's, from 1; -1 on
+ * any row that is not a track. */
 int skinlist_get_item_position(int offset, bool wrap);
+/* %Ls: the track row's disc on a list of several, 0 for one that names none;
+ * -1 on any other row and list. */
+int skinlist_get_item_disc(int offset, bool wrap);
 const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
                                                 struct dim *size,
                                                 const struct img_filter *filter,

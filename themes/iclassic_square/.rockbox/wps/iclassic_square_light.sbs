@@ -71,13 +71,14 @@
 %?and(%LD,%if(%ft(themes/iclassic_square_light.preferences,episode_notes:),!=,off))<%Vd(Notes)>
 #
 #Rows, as the iPod's: art 44 across the whole screen, five full covers
-#to the page; an album's tracks 24, numbered, under its header; any
+#to the page; an album's tracks 24, numbered, under its header, in a
+#wider column on an album of several discs; any
 #other list 24, a menu's beside the pane and the rest across the screen,
 #each row choosing as it draws: the title it goes by is a draw behind
 #when %Lb renders. A menu is the main menu, settings and the library's
 #Music, Audiobooks, Podcasts and custom menus; in the library, Rockbox
 #too, the main menu's title, which the library's first draw still has
-%?Ld<%Lb(Rows,320,24,-,44)|%?if(%LH,=,album)<%Lb(Tracks,320,24)|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%Lb(Rows,160,24,-,44)|%Lb(Rows,320,24,-,44)>>>
+%?Ld<%Lb(Rows,320,24,-,44)|%?if(%LH,=,album)<%?LH(discs)<%Lb(Discs,320,24)|%Lb(Tracks,320,24)>|%?or(%if(%cs,=,1),%if(%cs,=,6),%if(%cs,=,12),%if(%cs,=,15),%if(%cs,=,16),%if(%cs,=,19),%and(%if(%cs,=,8),%or(%if(%Lt,=,Rockbox),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)),%if(%Lt,=,%Sx(Podcasts)),%if(%Lt,=,%Sx(Custom menu)))),%and(%if(%cs,=,38),%if(%Lt,=,%Sx(Books))))<%Lb(Rows,160,24,-,44)|%Lb(Rows,320,24,-,44)>>>
 #
 #Set up list
 %Vi(list,0,20,160,220,3)%Vb(!ffffff)%Vf(!000000)
@@ -163,6 +164,13 @@
 %Vl(Tracks,0,0,32,24,6)%Vy
 %?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!6f6f6f)%?if(%Lm,=,m)<%Vf(vivid<50:186dbd)>>%ac%?Lm<%?if(%Lm,=,m)<×|Ö>|%?Lp<%Lp|%sel(%LT,%Sx([Random]),H,%Sx([Resume]),A,%Sx(Resume),A,%Sx([Play Unplayed]),A, )>>
 %Vl(Tracks,32,0,288,24,3)%Vy
+%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)
+#
+#- The same on an album of several discs, in a column wide enough for
+#  1-12 and from the left so the hyphens line up
+%Vl(Discs,0,0,40,24,6)%Vy
+%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!6f6f6f)%?if(%Lm,=,m)<%Vf(vivid<50:186dbd)>>%ac%?Lm<%?if(%Lm,=,m)<×|Ö>|%?Lp<%al %Ls-%Lp|%sel(%LT,%Sx([Random]),H,%Sx([Resume]),A,%Sx(Resume),A,%Sx([Play Unplayed]),A, )>>
+%Vl(Discs,40,0,280,24,3)%Vy
 %?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!404040,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40.70:003c73,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Shuffle Albums]),%trm(%LT,[]),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx(Finished),%trm(%LT,[]),%Sx(Not Started),%trm(%LT,[]),%Sx(In Progress),%trm(%LT,[]),%Sx(All Episodes),%trm(%LT,[]),%Sx([Play Unplayed]),%trm(%LT,[]),%LT)
 #
 #- Any other list's row across the screen, as the iPod's: the text, then

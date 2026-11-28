@@ -1391,7 +1391,9 @@ Lyre prototype 1 */
 #endif /* CONFIG_USBOTG */
 
 #if CONFIG_USBOTG == USBOTG_ARC
-#define USB_BATCH_SLOTS 16
+/* refilled on every SOF; 6 ms ahead is plenty, and small enough for the
+ * iAP audio packets to live in IRAM */
+#define USB_BATCH_SLOTS 6
 #else
 #define USB_BATCH_NON_NATIVE
 #define USB_BATCH_SLOTS 1
