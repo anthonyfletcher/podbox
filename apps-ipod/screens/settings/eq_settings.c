@@ -43,6 +43,7 @@
 #include "exported_settings.h"
 #include "audio/pcmbuf.h"
 #include "widgets/option_select.h"
+#include "widgets/splash.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "string-extra.h"
 #include "dsp_core.h"
@@ -64,8 +65,13 @@ const char* eq_q_format(char* buffer, size_t buffer_size, int value, const char*
 
 const char* eq_precut_format(char* buffer, size_t buffer_size, int value, const char* unit)
 {
-    snprintf(buffer, buffer_size, "%s%d.%d %s", value == 0 ? " " : "-",
-        value / EQ_USER_DIVISOR, value % EQ_USER_DIVISOR, unit);
+    if (global_settings.eq_auto_headroom)
+        snprintf(buffer, buffer_size, "%s (%s%d.%d %s)", str(LANG_AUTO),
+            value == 0 ? "" : "-",
+            value / EQ_USER_DIVISOR, value % EQ_USER_DIVISOR, unit);
+    else
+        snprintf(buffer, buffer_size, "%s%d.%d %s", value == 0 ? " " : "-",
+            value / EQ_USER_DIVISOR, value % EQ_USER_DIVISOR, unit);
     return buffer;
 }
 
@@ -127,8 +133,22 @@ int eq_setting_callback(int action,
 
     return action;
 }
+/* Auto Headroom would overwrite a value set here as the row is left */
+static int eq_precut_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    if (action == ACTION_ENTER_MENUITEM && global_settings.eq_auto_headroom)
+    {
+        splash(HZ*2, ID2P(LANG_EQUALIZER_PRECUT_AUTO));
+        return ACTION_EXIT_MENUITEM;
+    }
+    return eq_setting_callback(action, this_item, this_list);
+}
 MENUITEM_SETTING(eq_enable, &global_settings.eq_enabled, eq_setting_callback);
-MENUITEM_SETTING(eq_precut, &global_settings.eq_precut, eq_setting_callback);
+MENUITEM_SETTING(eq_auto_headroom, &global_settings.eq_auto_headroom,
+                 eq_setting_callback);
+MENUITEM_SETTING(eq_precut, &global_settings.eq_precut, eq_precut_callback);
 
 static const char* db_format(char* buffer, size_t buffer_size, int value,
                       const char* unit)
@@ -457,4 +477,4 @@ MENUITEM_FUNCTION(eq_presets, MENU_FUNC_CHECK_RETVAL,
                   eq_presets_screen, lowlatency_callback, Icon_NOICON);
 
 MAKE_MENU(equalizer_menu, ID2P(LANG_EQUALIZER), NULL, Icon_EQ,
-        &eq_enable, &eq_edit, &eq_presets, &eq_precut);
+        &eq_enable, &eq_edit, &eq_presets, &eq_auto_headroom, &eq_precut);

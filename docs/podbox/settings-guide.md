@@ -78,8 +78,8 @@ Settings
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Enable EQ | Master switch for the ten-band equaliser. Changing a band in Edit EQ, or choosing a preset, switches it on. | No |  |
-| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. While Auto Headroom is on it is set for you, and a value set here lasts only until the next EQ change. | 0 dB | **Adv** |
 | Auto Headroom | Sets Precut from the curve: the equaliser is turned down by as much as its highest boost, so a boosted preset does not clip. Off leaves Precut where you set it; the curve editor then shows by how much the curve clips. | Yes | **Adv** |
+| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. While Auto Headroom is on it is set for you and reads Auto; turn Auto Headroom off to set it yourself. | 0 dB | **Adv** |
 
 ### Sound Settings — Haas Surround
 
