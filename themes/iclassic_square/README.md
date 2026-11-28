@@ -15,6 +15,10 @@ screen, a header over an album's tracks, a book's chapters and a podcast's
 episodes, the iPod's blue dot for what is left to hear of an episode or
 chapter, and Cover Flow full screen with a tall reflection.
 
+With `Settings > Playback > Now Playing Screen > Select Action` set to
+`Scrub`, Select turns the progress bar into the iPod's scrubber: the bare
+track with a diamond that the wheel moves through the song.
+
 Three versions come in the one zip:
 
 - `iclassic_square` - the original look.
@@ -88,7 +92,7 @@ part the album's colour and `no` keeps it white in Dark, black in Light.
 
 | Preference | Values | Default | What it colours |
 |---|---|---|---|
-| `vivid_progress_bar` | `yes`, `no` | `yes` | The progress bar on the playing screen. |
+| `vivid_progress_bar` | `yes`, `no` | `yes` | The progress bar on the playing screen, and the scrubber's diamond. |
 | `vivid_volume_icons` | `yes`, `no` | `yes` | The speaker icons either side of the volume bar. |
 | `vivid_volume_bar` | `yes`, `no` | `yes` | The volume bar, shown in place of the progress bar while the volume changes. |
 | `vivid_transport_icon` | `yes`, `no` | `no` | The play, pause, fast-forward, rewind and hold icon in the title bar. |
