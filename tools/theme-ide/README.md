@@ -24,7 +24,8 @@ player by itself. The server answers only on this computer and only for
 that folder.
 
 The page also works without the server -- **File › Open theme folder** --
-and in Chrome or Edge it can then save too. Other browsers can only read the
+and in Chrome or Edge it can then save too: the first save asks for the
+same folder again, to be allowed to write it. Other browsers can only read the
 folder. Each release publishes it this way at
 <https://anthonyfletcher.github.io/podbox/theme-ide/>, nothing to install.
 

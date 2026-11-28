@@ -1,13 +1,12 @@
 /* The open theme: its files and where they live.
  *
  * A theme folder is the one holding .rockbox; every path here is relative to
- * it, spelt as the folder spells it. Three places a theme can come from:
+ * it, spelt as the folder spells it. Two places a theme can come from:
  *
  *   serve.py    reads and writes the folder it was started on, and says
  *               when a file changes on disk (/api/tree, /api/file, /api/events)
- *   a folder    opened with the browser's file access (Chromium): read and
- *               written in place
- *   a folder    picked with an <input> anywhere else: read only
+ *   a folder    picked with an <input>, and written in place where the
+ *               browser has file access (Chromium)
  *
  * Each source has list() -> [path], read(path) -> Uint8Array, and, when it
  * can, write(path, text). */
@@ -49,38 +48,37 @@ export class ServerSource {
     }
 }
 
-export class HandleSource {
-    constructor(dir) { this.dir = dir; this.writable = true; this.name = dir.name; this.handles = new Map(); }
-    async list() {
-        this.handles.clear();
-        const walk = async (dir, prefix) => {
-            for await (const [name, h] of dir.entries()) {
-                if (SKIP.has(name)) continue;
-                const p = prefix + name;
-                if (h.kind === 'directory') await walk(h, p + '/');
-                else this.handles.set(p, h);
-            }
-        };
-        await walk(this.dir, '');
-        return rooted(this, [...this.handles.keys()]);
-    }
-    async read(p) { return new Uint8Array(await (await this.handles.get(unrooted(this, p)).getFile()).arrayBuffer()); }
-    async write(p, text) {
-        const w = await this.handles.get(unrooted(this, p)).createWritable();
-        await w.write(text);
-        await w.close();
-    }
-}
-
+/* Read from the <input>'s files; written through the folder's handle, asked
+ * for at the first save. Trap: the browser's folder picker hides some file
+ * types from a page -- Edge lists no .cfg -- so it must not do the reading. */
 export class FileListSource {
     constructor(files) {
-        this.writable = false;
+        this.writable = !!window.showDirectoryPicker;
+        this.dir = null;
         this.files = new Map();
-        for (const f of files) this.files.set(f.webkitRelativePath.split('/').slice(1).join('/'), f);
+        for (const f of files) {
+            const parts = f.webkitRelativePath.split('/').slice(1);
+            if (!parts.some((p) => SKIP.has(p))) this.files.set(parts.join('/'), f);
+        }
         this.name = files.length ? files[0].webkitRelativePath.split('/')[0] : 'theme';
     }
     async list() { return rooted(this, [...this.files.keys()]); }
     async read(p) { return new Uint8Array(await this.files.get(unrooted(this, p)).arrayBuffer()); }
+    async write(p, text) {
+        if (!this.dir) {
+            let dir;
+            try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); }
+            catch (e) { throw new Error(e.name === 'AbortError' ? 'Not saved: no folder was chosen' : e.message); }
+            if (dir.name !== this.name) throw new Error('Not saved: choose the theme\'s own folder, ' + this.name);
+            this.dir = dir;
+        }
+        const parts = unrooted(this, p).split('/');
+        let d = this.dir;
+        for (const s of parts.slice(0, -1)) d = await d.getDirectoryHandle(s);
+        const w = await (await d.getFileHandle(parts[parts.length - 1])).createWritable();
+        await w.write(text);
+        await w.close();
+    }
 }
 
 /* A folder picked as .rockbox itself rather than the folder holding it: its
@@ -98,12 +96,14 @@ const unrooted = (source, p) => source.prefix && p.startsWith(source.prefix) ? p
 export class Theme {
     constructor(source) { this.source = source; this.files = new Map(); this.name = source.name; }
 
+    /* unreadable files are left out, and named in this.unreadable */
     async load() {
         const paths = await this.source.list();
         this.files.clear();
+        this.unreadable = [];
         await Promise.all(paths.map(async (p) => {
             try { this.files.set(p, this.entry(p, await this.source.read(p))); }
-            catch (e) { /* unreadable: left out */ }
+            catch (e) { this.unreadable.push(p); }
         }));
     }
 

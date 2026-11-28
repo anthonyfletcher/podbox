@@ -13,7 +13,7 @@ import { indentWithTab, undo, redo, toggleComment } from '@codemirror/commands';
 import { openSearchPanel, gotoLine } from '@codemirror/search';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { createDock } from './dock.js';
-import { Theme, ServerSource, HandleSource, FileListSource } from './theme.js';
+import { Theme, ServerSource, FileListSource } from './theme.js';
 import { Player } from './player.js';
 import { LIBRARY, albumDir } from './demo.js';
 import { skinLanguage, model as modelOf } from './skinlang.js';
@@ -227,23 +227,18 @@ function useCfg(path) {
     Player.apply(cfgPath());
 }
 
-ide.openFolder = async () => {
-    if (window.showDirectoryPicker) {
-        try {
-            const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
-            const t = new Theme(new HandleSource(dir));
-            await t.load();
-            await adopt(t);
-        } catch (e) { if (e.name !== 'AbortError') flash('Could not open the folder: ' + e.message, true); }
-    } else $('folder-input').click();
-};
+ide.openFolder = () => $('folder-input').click();
 $('folder-input').onchange = async (e) => {
     const files = [...e.target.files];
+    e.target.value = '';        /* the same folder chosen again is a change */
     if (!files.length) return;
     const t = new Theme(new FileListSource(files));
     await t.load();
     await adopt(t);
-    flash('This browser can only read the folder: save will not work. Chrome or Edge can write it.', true);
+    if (t.unreadable.length)
+        flash('Could not read ' + t.unreadable.map((p) => p.split('/').pop()).join(', '), true);
+    else if (!t.source.writable)
+        flash('This browser can only read the folder: save will not work. Chrome or Edge can write it.', true);
 };
 
 /* true when saved; a failure is shown, and thrown again for ctl.py */
