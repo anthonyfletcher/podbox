@@ -112,7 +112,7 @@ struct file_base_info
 #ifdef HAVE_MULTIVOLUME
     int                  volume;  /* file's volume (overlaps fatfile.volume) */
 #endif
-#if CONFIG_PLATFORM & PLATFORM_NATIVE
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) || defined(HOSTED_USES_STORAGEAPI)
     struct fat_file      fatfile; /* FS driver file info */
 #endif
     };
@@ -137,7 +137,7 @@ struct file_base_binding
 /* directory scanning position info */
 struct dirscan_info
 {
-#if CONFIG_PLATFORM & PLATFORM_NATIVE
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) || defined(HOSTED_USES_STORAGEAPI)
     struct fat_dirscan_info fatscan; /* FS driver scan info */
 #endif
 #ifdef HAVE_DIRCACHE
@@ -246,14 +246,6 @@ int uncached_readdir_internal(struct filestr_base *stream,
 void uncached_rewinddir_internal(struct file_base_info *infop);
 
 int test_dir_empty_internal(struct filestr_base *stream);
-
-struct dirinfo_internal
-{
-    unsigned int attr;
-    file_size_t  size;
-    uint16_t     wrtdate;
-    uint16_t     wrttime;
-};
 
 /** Synchronization used throughout **/
 

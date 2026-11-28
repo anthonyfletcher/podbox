@@ -2028,6 +2028,12 @@ static int audio_load_albumart(struct track_info *infop,
 static bool audio_buffer_codec(struct track_info *track_infop,
                                struct mp3entry *track_id3)
 {
+    /* A retried load (after the buffer was full) already has the codec:
+       opening another would leave the first handle on the buffer with
+       nothing referencing it, never read and never closed */
+    if (track_infop->codec_hid >= 0)
+        return true;
+
     /* This will not be the current track -> it cannot be the first and the
        current track cannot be ahead of buffering -> there is a previous
        track entry which is either current or ahead of the current */
@@ -3456,6 +3462,11 @@ static void audio_on_ff_rewind(long time)
         bool finish_load = cur_info.audio_hid < 0;
         if (finish_load)
         {
+            /* The codec seeks when the track starts, so no seek completion
+               will end seek mode: end it now, or PCM stays paused. Do it
+               before setting the resume time, since it syncs the position
+               from the codec */
+            audio_complete_codec_seek();
             // track is not yet loaded so simply update resume details for upcoming finish_load_track and quit
             playing_id3_sync(&cur_info, &(struct audio_resume_info){ time, 0 }, true);
             return;

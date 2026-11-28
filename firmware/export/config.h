@@ -33,7 +33,8 @@
 #define STORAGE_RAMDISK_NUM 4
 #define STORAGE_USB_NUM     5
 #define STORAGE_HOSTFS_NUM  6
-#define STORAGE_NUM_TYPES   7
+#define STORAGE_MS_NUM      7
+#define STORAGE_NUM_TYPES   8
 
 #define STORAGE_ATA         (1 << STORAGE_ATA_NUM)
 #define STORAGE_MMC         (1 << STORAGE_MMC_NUM)
@@ -43,6 +44,7 @@
 #define STORAGE_USB         (1 << STORAGE_USB_NUM)
  /* meant for APPLICATION targets (implicit for SIMULATOR) */
 #define STORAGE_HOSTFS      (1 << STORAGE_HOSTFS_NUM)
+#define STORAGE_MS          (1 << STORAGE_MS_NUM)
 
 /* CONFIG_TUNER (note these are combineable bit-flags) */
 #define TEA5767    0x02 /* Philips */
@@ -800,16 +802,6 @@ Lyre prototype 1 */
 #endif /* CONFIG_RDS */
 #endif /* HAVE_RDS_CAP */
 
-#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
-#if CONFIG_RTC == RTC_AS3514
-#if CONFIG_CPU == AS3525 || CONFIG_CPU == AS3525v2
-#define HAVE_RTC_IRQ
-#endif
-#elif CONFIG_RTC == RTC_MC13783
-#define HAVE_RTC_IRQ
-#endif
-#endif /* (CONFIG_PLATFORM & PLATFORM_NATIVE) */
-
 #ifndef CONFIG_ORIENTATION
 #if LCD_HEIGHT > LCD_WIDTH
 #define CONFIG_ORIENTATION SCREEN_PORTRAIT
@@ -1001,7 +993,7 @@ Lyre prototype 1 */
 /* Enable the directory cache and tagcache in RAM if we have
  * plenty of RAM. Both features can be enabled independently. */
 #if (MEMORYSIZE >= 8) && !defined(BOOTLOADER) && (defined(CHECKWPS) || !defined(__PCTOOL__)) \
-    && !defined(APPLICATION)
+    && (!defined(APPLICATION) || defined(HOSTED_USES_STORAGEAPI))
 #ifndef SIMULATOR
 #define HAVE_DIRCACHE
 #endif
@@ -1457,7 +1449,7 @@ Lyre prototype 1 */
 /* This attribute can be used to enable to detection of plugin file handles leaks.
  * When enabled, the plugin core will monitor open/close/creat and when the plugin exits
  * will display an error message if the plugin leaked some file handles */
-#if (CONFIG_PLATFORM & PLATFORM_NATIVE) || defined (SIMULATOR)
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) || defined (SIMULATOR) || defined(HOSTED_USES_STORAGEAPI)
 #define HAVE_PLUGIN_CHECK_OPEN_CLOSE
 #endif
 

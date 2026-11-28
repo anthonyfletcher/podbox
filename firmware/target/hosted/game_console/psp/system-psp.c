@@ -26,13 +26,17 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include "system.h"
+#include "sys_storage_psp.h"
 #include "kernel.h"
 #include "thread-console.h"
 #include "system-console.h"
 #include "button-console.h"
 #include "lcd-bitmap.h"
+#include "lcd.h"
 #include "panic.h"
+#include "powermgmt.h"
 #include "debug.h"
+#include "disk.h"
 
 #include <psploadexec.h>
 #include <pspmoduleinfo.h>
@@ -42,6 +46,7 @@
 
 #include "sys_timer.h"
 #include "sys_kernel_hook.h"
+#include "sys_display.h"
 
 PSP_MODULE_INFO("rockbox", PSP_MODULE_USER, 1, 0);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
@@ -49,9 +54,7 @@ PSP_MAIN_THREAD_STACK_SIZE_KB(1024);
 PSP_MAIN_THREAD_PRIORITY(24);
 PSP_HEAP_SIZE_KB(8 * 1024);
 
-/* filesystem */
-#include "bfile.h"
-sync_RWMutex file_internal_mrsw;
+/* filesystem: file_internal_mrsw is defined and set up by common/file_internal.c */
 
 const char      *audiodev = NULL;
 
@@ -60,22 +63,72 @@ void psp_sys_quit(void)
     sys_poweroff();
 }
 
+void sim_do_exit(void);
+
+/* scePowerSetClockFrequency() blocks its caller for about 150 ms. Every
+ * Rockbox thread runs in the main OS thread, so an OS thread of its own
+ * applies the changes; a burst of requests collapses to the last one. */
+#define CLOCK_THREAD_PRIORITY  23  /* it only waits: run it right away */
+
+static SceUID clock_thread = -1;
+static SceUID clock_event;
+static volatile long clock_wanted;
+static volatile bool clock_quit = false;
+
+static int clock_thread_run(SceSize args, void *argp)
+{
+    (void)args; (void)argp;
+    long applied = scePowerGetCpuClockFrequencyInt();
+    while (1)
+    {
+        sceKernelWaitSema(clock_event, 1, NULL);
+        if (clock_quit)
+            break;
+        long frequency = clock_wanted;
+        if (frequency != applied)
+        {
+            scePowerSetClockFrequency(frequency, frequency, frequency / 2);
+            applied = frequency;
+        }
+    }
+    return 0;
+}
+
+static void clock_thread_init(void)
+{
+    clock_event = sceKernelCreateSema("rb_clock", 0, 0, 1, NULL);
+    SceUID thread = sceKernelCreateThread("rb_clock", clock_thread_run,
+                                          CLOCK_THREAD_PRIORITY, 16 * 1024,
+                                          PSP_THREAD_ATTR_USER, NULL);
+    if (clock_event < 0 || thread < 0)
+        return; /* clock changes stay synchronous */
+    sceKernelStartThread(thread, 0, NULL);
+    clock_thread = thread;
+}
+
+static void clock_thread_quit(void)
+{
+    if (clock_thread < 0)
+        return;
+    clock_quit = true;
+    sceKernelSignalSema(clock_event, 1);
+    sceKernelWaitThreadEnd(clock_thread, NULL);
+    sceKernelDeleteThread(clock_thread);
+    sceKernelDeleteSema(clock_event);
+    clock_thread = -1;
+}
+
 void power_off(void)
 {
-    /* since sim_thread_shutdown() grabs the mutex we need to let it free,
-     * otherwise sys_wait_thread will deadlock */
-    struct thread_entry* t = sim_thread_unlock();
-    sim_thread_shutdown();
-
-    /* lock again before entering the scheduler */
-    sim_thread_lock(t);
-    /* sim_thread_shutdown() will cause sim_do_exit() to be called via longjmp,
-     * but only if we let the sdl thread scheduler exit the other threads */
-    while(1) yield();
+    /* Every Rockbox thread lives in this OS thread: none to join */
+    sim_do_exit();
 }
 
 void sim_do_exit()
 {
+    sys_storage_reattach();     /* give the card back to Sony's driver */
+    sys_display_quit();
+    clock_thread_quit();
     sim_kernel_shutdown();
     sys_timer_quit();
     exit(0);
@@ -83,6 +136,62 @@ void sim_do_exit()
 
 uintptr_t *stackbegin;
 uintptr_t *stackend;
+
+/* HOME-button exit.
+ *
+ * Without an exit callback, "Quit" from the HOME menu ends Rockbox without
+ * its shutdown: unsaved settings are lost, a FAT update could be left half
+ * done and ms0: stays detached until the system software reboots.
+ *
+ * The callback runs on its own OS thread, which is not a Rockbox thread, so
+ * it only raises a flag. The button driver polls it from the tick
+ * (psp_exit_poll) and calls sys_poweroff() there, as Rockbox's button code
+ * itself does for a long power-button press. The normal shutdown then ends
+ * in sim_do_exit(), which commits and reattaches ms0:. */
+
+static volatile int exit_requested;     /* 0 no, 1 requested, 2 handled */
+
+static int exit_callback(int arg1, int arg2, void *common)
+{
+    (void)arg1; (void)arg2; (void)common;
+    if (!exit_requested)
+        exit_requested = 1;
+    /* Rockbox ends the process itself (sceKernelExitGame) when its
+       shutdown is done; nothing more to do here */
+    return 0;
+}
+
+static int callback_thread(SceSize args, void *argp)
+{
+    (void)args; (void)argp;
+    int cbid = sceKernelCreateCallback("rb_exit", exit_callback, NULL);
+    if (cbid >= 0)
+        sceKernelRegisterExitCallback(cbid);
+    else
+        DEBUGF("exit callback: 0x%x\n", cbid);
+    sceKernelSleepThreadCB();               /* callbacks run in here */
+    return 0;
+}
+
+/* from the button driver, in tick context */
+void psp_exit_poll(void)
+{
+    if (exit_requested == 1) {
+        exit_requested = 2;
+        sys_poweroff();
+    }
+}
+
+static void exit_init(void)
+{
+    SceUID t = sceKernelCreateThread("rb_exitcb", callback_thread, 0x11,
+                                     4 * 1024, PSP_THREAD_ATTR_USER, NULL);
+    if (t >= 0)
+        sceKernelStartThread(t, 0, NULL);
+    else
+        DEBUGF("exit callback thread: 0x%x\n", t);
+}
+
 void system_init(void)
 {
     /* fake stack, OS manages size (and growth) */
@@ -90,6 +199,7 @@ void system_init(void)
     stackbegin = stackend = (uintptr_t*) &stack;
 
     atexit(sceKernelExitGame);
+    exit_init();            /* HOME exit through the normal shutdown */
 
     int result = sceKernelSetCompiledSdkVersion(0x06060010);
     if (result < 0) {
@@ -117,15 +227,22 @@ void system_init(void)
 
     sys_timer_init();
     sys_init_kernel_hook();
+    clock_thread_init();
 
-    /* filesystem */
-    sync_RWMutexInit(&file_internal_mrsw);
+    /* filesystem: filesystem_init() in apps/main.c */
 }
 
 
 void system_reboot(void)
 {
-    sim_thread_exception_wait();
+    /* panic or exception: give ms0: back before waiting for good, so the
+       card is in Sony's hands when the user quits from the HOME menu */
+    sys_storage_reattach();
+    /* wait here until "Quit" from the HOME menu; the tick that runs
+       psp_exit_poll() may be stopped, so check the request here */
+    while (!exit_requested)
+        sys_delay(100);
+    sceKernelExitGame();
 }
 
 void system_exception_wait(void)
@@ -153,7 +270,13 @@ void set_cpu_frequency(long frequency)
         return;
 
     /* DEBUGF("set_cpu_frequency: %ld Mhz\n", frequency); */
-   	scePowerSetClockFrequency(frequency, frequency, frequency / 2);
+    if (clock_thread >= 0)
+    {
+        clock_wanted = frequency;
+        sceKernelSignalSema(clock_event, 1);
+    }
+    else
+        scePowerSetClockFrequency(frequency, frequency, frequency / 2);
     cpu_frequency = frequency;
 }
 
