@@ -226,6 +226,18 @@ bool skinlist_item_is_playing(int offset, bool wrap)
     return current_list->callback_item_is_playing(item, current_list->data);
 }
 
+int skinlist_get_item_disc(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+
+    if (item < 0 || !current_list || !current_list->callback_get_item_disc
+        || !current_list->callback_get_item_kind
+        || current_list->callback_get_item_kind(item, current_list->data)
+           != LIST_ROW_TRACK)
+        return -1;
+    return current_list->callback_get_item_disc(item, current_list->data);
+}
+
 /* The tracks in rows [0, counted_to) of the list whose generation is
  * counted_generation. The count is kept across draws and walked to each row
  * asked for, so a wheel step costs a few kind() calls, not a recount. */
@@ -246,6 +258,17 @@ int skinlist_get_item_position(int offset, bool wrap)
         return -1;
     if (current_list->count_down)
         return current_list->nb_items - item;
+    if (current_list->callback_get_item_disc)
+    {
+        /* A disc is a few dozen rows at most, so walked back each time */
+        list_get_disc *disc = current_list->callback_get_item_disc;
+        int d = disc(item, data), n = 1;
+
+        while (--item >= 0 && kind(item, data) == LIST_ROW_TRACK
+               && disc(item, data) == d)
+            n++;
+        return n;
+    }
 
     if (counted_generation != current_list->generation
         || counted_nb_items != current_list->nb_items

@@ -158,6 +158,8 @@ struct browser_db_header {
     int year;
     int tracks;
     int discs;          /* the highest disc number, 0 for none */
+    bool several_discs; /* the list's tracks are on more than one, which
+                           is when %LH(discs) and %Ls answer */
     long length_ms;
     unsigned int art_hash;
     int album_row;      /* tagcache_album_get()'s, which the art is keyed by */
@@ -167,6 +169,8 @@ struct browser_db_header {
  * read from disk to count its tracks. */
 bool browser_db_album_header(struct browser_context *c,
                              struct browser_db_header *h);
+/* The disc a loaded track row is on, 0 for none or any other row */
+int browser_db_row_disc(struct browser_context *c, int row);
 
 /* The selected row's name, as it reads on screen. */
 char *browser_db_current_entry_name(char *buf, size_t bufsize);

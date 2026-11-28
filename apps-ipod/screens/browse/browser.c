@@ -278,6 +278,12 @@ static int browser_get_range(int selected_item, void * data)
     return -1;
 }
 
+/* Set only on a database list of several discs */
+static int browser_get_disc(int selected_item, void * data)
+{
+    return browser_db_row_disc((struct browser_context *)data, selected_item);
+}
+
 static const char *browser_get_description(int selected_item, void *data,
                                            char *buf, size_t size)
 {
@@ -892,7 +898,7 @@ const char *browser_header_text(int field, char *buf, size_t size)
             format_time(buf, size, db_header.length_ms);
             return buf;
         case BROWSER_HEADER_DISCS:
-            if (db_header.discs <= 1)
+            if (!db_header.several_discs)
                 return NULL;
             snprintf(buf, size, "%d", db_header.discs);
             return buf;
@@ -1081,6 +1087,9 @@ static int update_dir(void)
     gui_synclist_set_range_callback(list, browser_get_range);
     gui_synclist_set_count_down(list, id3db && browser_db_counts_down(&tc));
     gui_synclist_set_unnumbered(list, id3db && browser_db_unnumbered(&tc));
+    gui_synclist_set_disc_callback(list, db_showing_header
+                                         && db_header.several_discs
+                                         ? browser_get_disc : NULL);
     gui_synclist_set_description_callback(list, browser_get_description);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists

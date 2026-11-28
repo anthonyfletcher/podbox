@@ -6728,7 +6728,7 @@ bool browser_db_album_header(struct browser_context *c,
 {
     struct tagcache_album al;
     int level = c->currextra;
-    long seek;
+    long seek, last_disc = -1;
     int row, i;
     bool shared;
 
@@ -6794,9 +6794,13 @@ bool browser_db_album_header(struct browser_context *c,
         h->tracks++;
         if (tagcache_entry_numeric(e->idx_id, tag_length, &v) && v > 0)
             h->length_ms += v;
-        if (tagcache_entry_numeric(e->idx_id, tag_discnumber, &v)
-            && v > h->discs)
+        if (!tagcache_entry_numeric(e->idx_id, tag_discnumber, &v) || v < 0)
+            v = 0;
+        if (v > h->discs)
             h->discs = v;
+        if (last_disc >= 0 && v != last_disc)
+            h->several_discs = true;
+        last_disc = v;
     }
     return true;
 }
@@ -7837,6 +7841,17 @@ int browser_db_get_entry_range(struct browser_context *c, int id)
         || (idx_id = book_single_track(row, &al)) < 0)
         return -1;
     return book_track_percent(row, &al, idx_id);
+}
+
+int browser_db_row_disc(struct browser_context *c, int row)
+{
+    struct tagentry *e = loaded_entry(c, row);
+    long v;
+
+    if (row < c->special_entry_count || !e || e->newtable != TABLE_PLAYTRACK
+        || !tagcache_entry_numeric(e->idx_id, tag_discnumber, &v) || v < 0)
+        return 0;
+    return v;
 }
 
 int browser_db_get_icon(struct browser_context* c)
