@@ -363,7 +363,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-11-07 | `5ab1daaa1c` `a09648f7b4` `441a356d52` | Shortcuts: unsupported files as browse shortcuts; speak the Name | **Adopted** | Files were already `SHORTCUT_FILE` here. The Name is spoken with `talk_name()`, so the Built-in voice says it. |
 | 2026-11-26 | `0552824552` `92dddfa2b1` `936c75e2c7` `e97a3689c1` `0584374857` `cd32f77841` `6fc65b2d6a` `9a16664ec2` | FAT without an RTC, partition table cleared before a mount, multiboot volume root, `HAVE_RTC_IRQ` moved | **Adopted** | Merged as they are; none changes these players' behaviour. |
 | 2026-11-24 | `0259c369c2` | FusionPixel 8/10/12 px fonts | **N/A** | `make zip` ships no `fonts/`. The Arcade's text font is its own build from Fusion Pixel. |
-| 2026-11-12 | `3bd1bf52f5` | talk: use .talk clips by default | **Postponed** | Changes two defaults; the owner decides. |
+| 2026-11-12 | `3bd1bf52f5` | talk: use .talk clips by default | **Declined** | Both stay off. |
 | 2026-11-22 | `61d784e3de` `11b58b5f74` `2cd9df1d7d` | translation updates | **N/A** | Translation. |
 | 2026-11-18 | the PSP, YP-P2, nano 4G, erosqnative, Sansa utf8proc, Creative ZEN and manual commits | other targets | **N/A** | |
 
