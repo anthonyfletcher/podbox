@@ -2357,9 +2357,11 @@ static int listen_progress_callback(int action,
 static bool context_menu_add_to_shortcuts(void)
 {
     /* A directory shortcut browses into it; a file shortcut runs the file
-     * (SHORTCUT_FILE sets BROWSE_RUNFILE), rather than just opening its folder. */
-    shortcuts_add((selected_file.attr & ATTR_DIRECTORY) ? SHORTCUT_BROWSER
-                                                        : SHORTCUT_FILE,
+     * (SHORTCUT_FILE sets BROWSE_RUNFILE), rather than just opening its folder.
+     * A file of no known type has nothing to run it, so it browses to it. */
+    bool browse = (selected_file.attr & ATTR_DIRECTORY) ||
+                  !filetype_supported(selected_file.attr);
+    shortcuts_add(browse ? SHORTCUT_BROWSER : SHORTCUT_FILE,
                   selected_file.path);
     return false;
 }

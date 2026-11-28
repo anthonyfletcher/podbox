@@ -626,6 +626,13 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
         {
             talk_file(NULL, NULL, sc->talk_clip, NULL, NULL, false);
         }
+        else if (sc->name[0] && (sc->type == SHORTCUT_BROWSER ||
+                                 sc->type == SHORTCUT_FILE ||
+                                 sc->type == SHORTCUT_PLAYLISTMENU))
+        {
+            /* the name the owner gave it, rather than the file's */
+            talk_name(sc->name, false);
+        }
         else
         {
             switch (sc->type)
