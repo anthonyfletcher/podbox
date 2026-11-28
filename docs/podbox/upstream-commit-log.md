@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`c6fab89af5`**, merged 2026-11-21 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`b433cd0d5e`**, merged 2026-11-28 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -355,7 +355,19 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-11-16 | `a958507036` `15207b1fa4` | pcmbuf and recording buffers for 4 MiB targets | **N/A** | |
 | 2026-11-08 | the nano 4G, S5L8720, erosqnative, x1000, ATJ2137, PSP, agptek, nand-ingenic, cabbiev2, rbutil, manual and `$Id` commits | other targets | **N/A** | |
 
-Complete through `c6fab89af5` (2026-11-21), merged as `41f4a4e50a`.
+| 2026-11-26 | `7c05f36b9f` `58fc3a45f4` | ipod6g: ATA transfer start and end timeouts to 2 s | **Adopted** | A slow disk or flash adapter was given up on mid-transfer. |
+| 2026-11-17 | `1f9487aa15` | usb_storage: report a write cache, handle SYNCHRONIZE CACHE | **Adopted** | Both players: `HAVE_STORAGE_FLUSH` is on for ATA, so the host's flush reaches `ata_flush()`. |
+| 2026-11-27 | `be8d9fe1cd` | pcm_mixer: restart PCM if a channel starts as it idles out | **Adopted** | Beside our amplitude ramp. |
+| 2026-11-27 | `f3999061ff` `b433cd0d5e` | playback: end seek mode when a seek waits for the load; no second codec handle | **Adopted** | |
+| 2026-11-26 | `8cab900fbe` | skin_engine: clear the `%pb` image's dither and 9-segment flags | **Adopted** | |
+| 2026-11-07 | `5ab1daaa1c` `a09648f7b4` `441a356d52` | Shortcuts: unsupported files as browse shortcuts; speak the Name | **Adopted** | Files were already `SHORTCUT_FILE` here. The Name is spoken with `talk_name()`, so the Built-in voice says it. |
+| 2026-11-26 | `0552824552` `92dddfa2b1` `936c75e2c7` `e97a3689c1` `0584374857` `cd32f77841` `6fc65b2d6a` `9a16664ec2` | FAT without an RTC, partition table cleared before a mount, multiboot volume root, `HAVE_RTC_IRQ` moved | **Adopted** | Merged as they are; none changes these players' behaviour. |
+| 2026-11-24 | `0259c369c2` | FusionPixel 8/10/12 px fonts | **N/A** | `make zip` ships no `fonts/`. The Arcade's text font is its own build from Fusion Pixel. |
+| 2026-11-12 | `3bd1bf52f5` | talk: use .talk clips by default | **Postponed** | Changes two defaults; the owner decides. |
+| 2026-11-22 | `61d784e3de` `11b58b5f74` `2cd9df1d7d` | translation updates | **N/A** | Translation. |
+| 2026-11-18 | the PSP, YP-P2, nano 4G, erosqnative, Sansa utf8proc, Creative ZEN and manual commits | other targets | **N/A** | |
+
+Complete through `b433cd0d5e` (2026-11-28), merged as `1e5ad2631f`.
 
 ---
 
