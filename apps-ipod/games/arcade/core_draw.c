@@ -39,6 +39,10 @@
 #define NATIVE(name) int n_##name(struct vm *vm, struct value *a, int argc, \
                                   struct value *out)
 #define FAR (1 << 20)
+/* The camera's reach: far enough past FAR that whatever it leaves off the
+ * target stays off, and near enough that a coordinate less the camera
+ * stays clear of +-2^31 */
+#define CAM_FAR (1 << 30)
 /* Near the surface: within this of its corner, the fast paths' arithmetic
  * fits in 32 bits */
 #define NEAR32 8192
@@ -3743,14 +3747,13 @@ static void copy_rect(struct pen *p, const uint8_t *src, int32_t sw_img,
             if (u0 < sx + w - sw_img) u0 = sx + w - sw_img;
             if (u1 > sx + w) u1 = sx + w;
         }
-        if (u0 >= u1)
+        if (u0 >= u1 || v0 >= v1)
             return;
         /* the pen's own table, every colour itself and none clear, and
          * not flipped: rows copied whole */
         const int plain = xl == p->d->xlat && p->d->xlat_plain && !fx;
-        if (v1 > v0)
-            p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) *
-                       (plain ? PLAIN256 : PER16_COPY * 16) / 256;
+        p->cost += (uint32_t)((v1 - v0) * (u1 - u0)) *
+                   (plain ? PLAIN256 : PER16_COPY * 16) / 256;
         int32_t ua = (int32_t)u0, ub = (int32_t)u1;
         /* A surface copied onto itself: each row read whole before it is
          * written, and the rows taken from the bottom when the copy moves
@@ -4389,6 +4392,13 @@ NATIVE(map)
     int64_t j0 = cy < 0 ? -(int64_t)cy : 0, i0 = cx < 0 ? -(int64_t)cx : 0;
     int64_t j1 = (int64_t)mh - cy < ch ? (int64_t)mh - cy : ch;
     int64_t i1 = (int64_t)mw - cx < cw ? (int64_t)mw - cx : cw;
+    /* only the rows and columns whose tiles reach the clip: the cart's
+     * cells may run far past it */
+    int64_t by = (int64_t)sy + p.oy, bx = (int64_t)sx + p.ox;
+    if (j0 < (p.cy0 - by) >> 3) j0 = (p.cy0 - by) >> 3;
+    if (j1 > (p.cy1 - by + 7) >> 3) j1 = (p.cy1 - by + 7) >> 3;
+    if (i0 < (p.cx0 - bx) >> 3) i0 = (p.cx0 - bx) >> 3;
+    if (i1 > (p.cx1 - bx + 7) >> 3) i1 = (p.cx1 - bx + 7) >> 3;
     if (j0 >= j1 || i0 >= i1) {
         finish(vm, &p);
         return 1;
@@ -4604,8 +4614,8 @@ NATIVE(camera)
     WHOLE(0, 0, x, "camera");
     WHOLE(1, 0, y, "camera");
     struct draw *d = &vm->d;
-    d->cam_x = x;
-    d->cam_y = y;
+    d->cam_x = x < -CAM_FAR ? -CAM_FAR : x > CAM_FAR ? CAM_FAR : x;
+    d->cam_y = y < -CAM_FAR ? -CAM_FAR : y > CAM_FAR ? CAM_FAR : y;
     d->cam_turn = argc > 2 && is_num(a[2])
                   ? (int32_t)(wrap32(scaled(a[2])) & 0xffff) : 0;
     struct surf s;

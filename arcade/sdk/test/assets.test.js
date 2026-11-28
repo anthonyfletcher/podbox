@@ -410,6 +410,33 @@ function update() {}`
     assert.match(bad.errors.map((e) => e.message).join(), /lazy_images names nope/);
 });
 
+test('a lazy image whose copy nothing holds is read again after a collection', () => {
+    /* the copy let go, the heap churned through blocks of its size until
+     * it is collected, then loaded again from the lazy value kept */
+    const px = new Uint8Array(64 * 64);
+    for (let i = 0; i < px.length; i++) px[i] = 1 + i % 9;
+    const files = {
+        'cart.json': JSON.stringify({ id: '00000000000a55eb', name: 'Lazy', lazy_images: ['big'] }),
+        'images/big.png': png(64, 64, px),
+        'main.js': `var k, ticks = 0;
+function init() { k = IMG.big; img.load(k); IMG.big = null; }
+function update() {
+    for (var i = 0; i < 100; i++) new Uint8Array(4100);
+    if (++ticks == 20) {
+        var a = img.load(k);
+        printh(imgw(a) + "x" + imgh(a));
+        target(a);
+        printh(pget(1, 0) + " " + pget(63, 63));
+        target(SCREEN);
+    }
+}`
+    };
+    const r = run(folder('lazygc', files), 25);
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.status, 0, r.err);
+    assert.deepEqual(r.out.trim().split('\n'), ['64x64', '2 1']);
+});
+
 test('the loader refuses damaged assets, and loadmap and mapprop check their arguments', () => {
     const dir = folder('damaged', assetCart());
     const good = run(dir);

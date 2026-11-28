@@ -275,6 +275,13 @@ void gc_collect(struct vm *vm)
         mark_value(vm, vm->globals[i]);
     drain(vm);
     mark_engine_roots(vm);
+    /* A lazy image's copy is not a root: one nothing holds is freed, and
+     * the next img.load() makes another */
+    for (i = 0; i < vm->nlazyimgs; i++) {
+        struct lazyimg *r = &vm->lazyimgs[i];
+        if (r->copy && !(HDR(vm, r->copy)->info & (GC_MARK | GC_PERM)))
+            r->copy = 0;
+    }
 
     /* Sweep: merge each run of dead and free blocks into one. */
     memset(vm->freelist, 0, sizeof(vm->freelist));

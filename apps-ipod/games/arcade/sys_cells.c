@@ -684,6 +684,13 @@ NATIVE(cells_step)
     if (!field_of(vm, a[0], a[1], "cells.step", &s.f) ||
         !rules_of(vm, a[2], &s.r))
         return 0;
+    /* The step writes only the field, so the rules hold still: each
+     * partner bit stays true of some reaction's b, and the search for it
+     * ends */
+    for (int i = 0; i < R_FIELDS; i++)
+        if (s.r.f[i] == s.f.c)
+            return vm_fail(vm, "cells.step(): the rules' ", rule_keys[i],
+                           " is the field itself");
     uint32_t cells = (uint32_t)(s.f.w * s.f.h);
     s.moved = scratch(vm, (cells + 7) / 8);
     if (!s.moved)

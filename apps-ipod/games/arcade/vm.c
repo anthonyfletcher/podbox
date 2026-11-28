@@ -2410,6 +2410,11 @@ int arcade_between_calls(const struct vm *vm)
     return !vm->err && vm->nframes == 0;
 }
 
+int arcade_listening(const struct vm *vm)
+{
+    return vm->listening;
+}
+
 struct vm *arcade_resume(void *mem, uint32_t size,
                          const struct arcade_host *host)
 {

@@ -411,7 +411,8 @@ NATIVE(path_view)
     int32_t cy1 = (int64_t)y + r < w.b.h - 1 ? y + r : w.b.h - 1;
     int32_t cx0 = (int64_t)x - r > 0 ? x - r : 0;
     int32_t cx1 = (int64_t)x + r < w.b.w - 1 ? x + r : w.b.w - 1;
-    for (int32_t cy = cy0; cy <= cy1; cy++)
+    uint32_t paid = 0;
+    for (int32_t cy = cy0; cy <= cy1; cy++) {
         for (int32_t cx = cx0; cx <= cx1; cx++) {
             int64_t dx = (int64_t)cx - x, dy = (int64_t)cy - y;
             if (dx * dx + dy * dy > r2)
@@ -422,7 +423,13 @@ NATIVE(path_view)
                 seen++;
             }
         }
-    vm_charge(vm, 20 + (uint32_t)seen + steps / 4);
+        /* paid a row at a time, so a wide view is stopped */
+        uint32_t owed = (uint32_t)seen + steps / 4;
+        if (!vm_spend(vm, owed - paid))
+            return 0;
+        paid = owed;
+    }
+    vm_charge(vm, 20 + (uint32_t)seen + steps / 4 - paid);
     *out = mk(T_INT, seen);
     return 1;
 }

@@ -112,9 +112,14 @@ static bool read_cart(const char *path, struct cart *c)
     if (fd < 0)
         return false;
     memset(c, 0, sizeof(*c));
+    off_t size = ffilesize(fd);
     while (read(fd, hd, 8) == 8) {
         uint32_t len = le32(hd + 4);
         off_t at = lseek(fd, 0, SEEK_CUR);
+        /* the chunk and its CRC inside the file, so the walk moves on */
+        if (at < 0 || at > size || size - at < 4 ||
+            len > (uint32_t)(size - at) - 4)
+            break;
         if (!ok && memcmp(hd, "PBG1", 4))
             break;
         if (!memcmp(hd, "PBG1", 4)) {
@@ -126,9 +131,9 @@ static bool read_cart(const char *path, struct cart *c)
         } else if (!memcmp(hd, "META", 4)) {
             c->meta_at = (uint32_t)at;
             c->meta_len = len;
-            if (read(fd, meta, MIN(len, sizeof(meta))) > 0)
-                meta_text(meta, MIN(len, sizeof(meta)), 1, c->name,
-                          sizeof(c->name));
+            ssize_t n = read(fd, meta, MIN(len, sizeof(meta)));
+            if (n > 0)
+                meta_text(meta, (uint32_t)n, 1, c->name, sizeof(c->name));
         } else if (!memcmp(hd, "LOGO", 4)) {
             c->logo_at = (uint32_t)at;
             c->logo_len = len;

@@ -444,6 +444,9 @@ int arcade_between_calls(const struct vm *vm);
  * for its next tick, or NULL when mem is not one */
 struct vm *arcade_resume(void *mem, uint32_t size,
                          const struct arcade_host *host);
+/* whether the cart left beat.listen(true), as a resumed one may have: the
+ * host's analyser is started again to match */
+int arcade_listening(const struct vm *vm);
 
 /* sys_score.c: a cart's high scores. Its boards come from the cart (the
  * BORD chunk); the host fills them from its file when the cart starts and

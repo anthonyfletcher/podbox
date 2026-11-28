@@ -81,6 +81,9 @@
  * work on the disk or the library can cost far more time than its units.
  * A dialog's frames don't count, since they wait on the owner. */
 #define STALL (10 * HZ)
+/* A walk over the library is timed apart: STALL runs from its last step,
+ * and a call's walks all stop it this long after the call began */
+#define WALK_STALL (60 * HZ)
 
 /* Untouched this long, the game pauses: the pause menu hands the
  * backlight, the CPU and idle power-off back to their settings. */
@@ -208,17 +211,22 @@ static void sound_fill(void);
 
 static struct vm *sound_vm;     /* while a cart runs and may sound */
 static long call_began;         /* the current tick of a call or dialog frame */
+static long walk_stepped;       /* the tick of a library walk's last step */
 
 void shell_walk_yield(void)
 {
-    call_began = current_tick;
+    if (sound_vm && TIME_AFTER(current_tick, call_began + WALK_STALL))
+        arcade_set_ceiling(sound_vm, 0);
+    walk_stepped = current_tick;
     yield();
 }
 
 static void host_yield(void *ctx)
 {
     (void)ctx;
-    if (sound_vm && TIME_AFTER(current_tick, call_began + STALL))
+    long from = TIME_AFTER(walk_stepped, call_began) ? walk_stepped
+                                                     : call_began;
+    if (sound_vm && TIME_AFTER(current_tick, from + STALL))
         arcade_set_ceiling(sound_vm, 0);
     sound_fill();
 #ifdef HAVE_LCD_UPDATE_ASYNC
@@ -1058,7 +1066,9 @@ static int host_frame(void *ctx, unsigned *held, int *wheel)
 }
 
 /* A system event: saved first, since USB or a shutdown may follow; the
- * game redrawn after, over any splash the event showed. */
+ * game redrawn after, over any splash the event showed. USB ends the game,
+ * so the screen is handed back first: the USB screen then has the
+ * backlight's own timeouts and no boost. */
 static int event(struct vm *vm, long button)
 {
     sound_stop();
@@ -1066,6 +1076,8 @@ static int event(struct vm *vm, long button)
     save_write(vm);
     shell_options_keep(vm);
     shell_scores_write(vm, false);
+    if (button == SYS_USB_CONNECTED)
+        give_screen();
     /* the screen an event shows reads the wheel: the USB screen's wheel
      * is the volume while the player is a sound card */
     if (screen_held)
@@ -1081,7 +1093,8 @@ static int event(struct vm *vm, long button)
 
 /* The saves first, as event() writes them; the game to resume only where
  * none of the cart's code is running -- between ticks, in the pause menu or
- * the hold pause -- since inside a call the arena is mid-step */
+ * the hold pause -- since inside a call the arena is mid-step. Then the
+ * owner's playlist put back, before the shutdown saves the playlist. */
 void shell_power_off(void)
 {
     struct vm *vm = sound_vm;
@@ -1092,6 +1105,7 @@ void shell_power_off(void)
     shell_scores_write(vm, false);
     if (arcade_between_calls(vm))
         shell_suspend_write(vm);
+    shell_tracks_end();
 }
 
 /* The pause menu's rows: Resume, the cart's own (menuitem), Settings,
@@ -1473,6 +1487,8 @@ static int run(const char *path, void *mem, size_t size)
     last_wheel = -1;
     menu_down = menu_paused = menu_tapped = false;
     beat_start();
+    if (resumed)
+        beat_listen(NULL, arcade_listening(vm));
     shell_tracks_start();
     sound_path[0] = '\0';         /* the track's record is read afresh */
     int status = PLAYING;

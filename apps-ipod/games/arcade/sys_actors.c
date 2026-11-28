@@ -252,7 +252,24 @@ static int sweep(const struct vm *vm, int32_t *pos, int32_t v, int32_t size,
         *pos = (int32_t)((uint32_t)*pos + (uint32_t)v);
         return -1;
     }
+    const int64_t end = (int64_t)along << CELL_SHIFT;
     while (v) {
+        /* the cells off the map hold nothing: a leading edge beyond it and
+         * moving away goes the rest at once, and one moving toward it
+         * comes straight up to its edge */
+        int64_t edge = v > 0 ? (int64_t)*pos + size - 1 : *pos;
+        if (v > 0 ? edge >= end : edge < 0) {
+            *pos = (int32_t)((uint32_t)*pos + (uint32_t)v);
+            return -1;
+        }
+        if (v > 0 ? edge < -1 : edge > end) {
+            int64_t d = v > 0 ? -1 - edge : end - edge;
+            if (v > 0 ? d > v : d < v)
+                d = v;
+            *pos = (int32_t)(*pos + d);
+            v -= (int32_t)d;
+            continue;
+        }
         int32_t step = v > MAX_STEP ? MAX_STEP : v < -MAX_STEP ? -MAX_STEP : v;
         int32_t np = *pos + step;
         /* the leading edge's cell, and whether this step entered it */
@@ -938,7 +955,16 @@ NATIVE(actors_zones)
     struct value *on = ELEMS(vm, f[A_ON]), *zone = ELEMS(vm, f[A_ZONE]);
     struct value *x = ELEMS(vm, f[A_X]), *y = ELEMS(vm, f[A_Y]);
     struct value *w = ELEMS(vm, f[A_W]), *h = ELEMS(vm, f[A_H]);
+    /* measured on the rig: about 6 units an actor, and 2 a zone it is
+     * tried against; paid as it goes, so a long list of zones is stopped */
+    uint32_t owed = 0;
     for (uint32_t i = 0; i < n; i++) {
+        owed += 6 + (uint32_t)k * 2;
+        if (owed > 8192) {
+            if (!vm_spend(vm, owed))
+                return 0;
+            owed = 0;
+        }
         if (!vm_truthy(vm, on[i]))
             continue;
         int32_t cx = (fx(x[i]) + fx(w[i]) / 2) >> 16;
@@ -961,9 +987,7 @@ NATIVE(actors_zones)
             contact(&c, i, 4, in, column_at(&objs, (uint32_t)in * 5, 0));
         zone[i] = mk(T_INT, in);
     }
-    /* measured on the rig: about 6 units an actor, and 2 a zone it is
-     * tried against */
-    vm_charge(vm, 10 + n * (6 + (uint32_t)k * 2) + c.n * 2);
+    vm_charge(vm, 10 + owed + c.n * 2);
     *out = mk(T_INT, (int32_t)c.n);
     return 1;
 }

@@ -429,6 +429,15 @@ struct seg_counts
     uint32_t tests, kept, slid, seen;
 };
 
+/* The units the meetings so far cost: never less than it was */
+static uint32_t seg_units(const struct seg_counts *sc, uint32_t points,
+                          uint32_t skipped, uint32_t touched)
+{
+    return points * SEG_POINT + skipped * SEG_SKIP + sc->tests * SEG_TEST +
+           sc->kept * SEG_KEPT + touched * SEG_TOUCH + sc->slid * SEG_SLIDE +
+           sc->seen / SEG_SEEN;
+}
+
 enum { S_X0, S_Y0, S_X1, S_Y1, S_MAT, S_START, S_ITEMS, S_COUNT, S_OX, S_OY,
        S_MX, S_MY, S_MOVED, S_CELL, S_GX, S_GY, S_GW, S_GH, S_BX0, S_BY0,
        S_BX1, S_BY1, S_SIDE, S_FIELDS };
@@ -531,6 +540,21 @@ static int segs_of(struct vm *vm, struct value v, const char *fn,
         return vm_fail(vm, fn, "() needs a set whose arrays are as "
                        "segs.make() made them", "");
     s->nitems = I32(vm, f[S_ITEMS])->len;
+    return 1;
+}
+
+/* A set from segs_of() whose cells' runs are in order from 0, as
+ * segs.make() files them, so a search over every cell walks no more than
+ * the filed lines; 0 with the error set when they are not */
+static int segs_ordered(struct vm *vm, const struct segs *s, const char *fn)
+{
+    uint32_t cells = (uint32_t)s->gw * (uint32_t)s->gh;
+    int ordered = s->start[0] >= 0;
+    for (uint32_t i = 0; ordered && i < cells; i++)
+        ordered = s->start[i] <= s->start[i + 1];
+    if (!ordered)
+        return vm_fail(vm, fn, "() needs a set whose arrays are as "
+                       "segs.make() made them", "");
     return 1;
 }
 
@@ -829,7 +853,7 @@ NATIVE(segs_draw)
     if (!segs_of(vm, a[0], "segs.draw", &s))
         return 0;
     uint32_t c = (uint32_t)whole(a[1], 6);
-    int32_t seg[4 * BATCH];
+    static int32_t seg[4 * BATCH];     /* 4 KB: off the small main stack */
     uint32_t k = 0;
     while (k < s.count) {
         uint32_t m = 0;
@@ -2174,12 +2198,13 @@ NATIVE(links_step)
         }
     /* out of the segment sets' lines, and what each point touched */
     struct seg_counts sc = { 0, 0, 0, 0 };
-    uint32_t touched = 0, segpts = 0, skipped = 0;
+    uint32_t touched = 0, segpts = 0, skipped = 0, paid = 0;
     static struct segs sets[MAX_SETS];
     uint32_t nsets = 0;
     struct value sv = l.f[L_SEGS];
     if (sv.tag == T_OBJ) {
-        if (!segs_of(vm, sv, "links.step", &sets[0]))
+        if (!segs_of(vm, sv, "links.step", &sets[0]) ||
+            !segs_ordered(vm, &sets[0], "links.step"))
             return 0;
         nsets = 1;
     } else if (sv.tag == T_ARR) {
@@ -2187,9 +2212,10 @@ NATIVE(links_step)
         column_of(vm, sv, &sl);
         if (sl.len > MAX_SETS)
             return vm_fail(vm, "links.step() meets at most 16 sets", "", "");
-        for (uint32_t s = 0; s < sl.len; s++)
+        for (uint32_t s = 0; s < sl.len; s++, nsets++)
             if (!segs_of(vm, ((const struct value *)sl.p)[s], "links.step",
-                         &sets[nsets++]))
+                         &sets[nsets]) ||
+                !segs_ordered(vm, &sets[nsets], "links.step"))
                 return 0;
     }
     if (nsets) {
@@ -2283,6 +2309,11 @@ NATIVE(links_step)
             }
             if (which)
                 vm_out_set(vm, w, i, mk(T_INT, met));
+            /* paid a point at a time, so a costly meeting is stopped */
+            uint32_t owed = seg_units(&sc, segpts, skipped, touched);
+            if (!vm_spend(vm, owed - paid))
+                return 0;
+            paid = owed;
         }
     } else {
         /* no set to meet: what each touched is nothing, still written */
@@ -2345,10 +2376,7 @@ NATIVE(links_step)
     vm_charge(vm, 10 + np * 18 + nl * 3 + nl * (uint32_t)passes * 15 / 4 +
                   exact * 15 + (damp || drag ? np * 4 : 0) +
                   (mask ? np * 4 : 0) + (field ? np * 7 : 0) +
-                  segpts * SEG_POINT + skipped * SEG_SKIP +
-                  sc.tests * SEG_TEST +
-                  sc.kept * SEG_KEPT + touched * SEG_TOUCH +
-                  sc.slid * SEG_SLIDE + sc.seen / SEG_SEEN);
+                  seg_units(&sc, segpts, skipped, touched) - paid);
     *out = mk(T_INT, (int32_t)np);
     return 1;
 }

@@ -135,6 +135,48 @@ test('actors as tall as the world, moving as far as they can, move quickly', () 
     assert.ok(r.ms < 5000, 'took ' + r.ms + ' ms');
 });
 
+test('a camera at the edge of the numbers draws nothing, at once', () => {
+    /* the copy's rows lie about 2^31 away: none is on the target, and
+     * none is walked to find that out */
+    const r = run(`function init() {
+    for (var i = 0; i < 8; i++) sset(i, 0, 7);
+    camera(0, 2147483647);
+    for (var j = 0; j < 10; j++) sspr(0, 0, 8, 8, 0, -2);
+    camera(0, -2147483647); sspr(0, 0, 8, 8, 0, 2);
+    camera(2147483647, 0); blit(img(8, 8), -2, 0);
+    camera(); printh(pget(0, 0) + " " + pget(0, 119) + " " + pget(159, 0));
+}` + update);
+    assert.equal(r.status, 0, r.err);
+    assert.equal(r.out, '0 0 0\n');
+    assert.ok(r.ms < 5000, 'took ' + r.ms + ' ms');
+});
+
+test('cells.step refuses rules that are the field itself', () => {
+    const r = run(`function init() {
+    var f = new Uint8Array(256), rules = cells.rules();
+    rules.b = f;
+    cells.step(f, 16, rules);
+}` + update);
+    assert.equal(r.status, 1);
+    assert.match(r.err, /cells\.step\(\): the rules' b is the field itself/);
+});
+
+test('links.step refuses a set whose cells are filed out of order', () => {
+    const r = run(`function init() {
+    var p = links.pool(1, 0), s = segs.make([0, 2000, 2000, 0], [0, 0, 2000, 2000], 4);
+    links.point(p, 50, 10);
+    p.segs = s;
+    links.step(p, 0);
+    printh(s.start.length > 2);
+    for (var i = 0; i + 1 < s.start.length; i++)
+        s.start[i] = i % 2 ? 0 : s.items.length;
+    links.step(p, 0);
+}` + update);
+    assert.equal(r.out, '1\n', r.err);
+    assert.equal(r.status, 1);
+    assert.match(r.err, /links\.step\(\) needs a set whose arrays are as segs\.make\(\) made them/);
+});
+
 test('an array joined into itself stops at its size', () => {
     const r = run(`var a = [];
 function init() { for (var i = 0; i < 36; i++) a.push(a); a.join(""); }` + update);
