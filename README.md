@@ -1315,46 +1315,29 @@ licences of everything inside it in full, in `LICENSES.txt`.
 - Spun by Siebe Majoor aka [@majorsiebe](https://github.com/majorsiebe)
   (https://github.com/majorsiebe/Stats_for_iPod)
 - ProkBox5g by prokopto-dev (https://github.com/prokbox/prokbox5g), GPL v2 or later
-  - The PP5022's second DMA engine, which sends the 5G's screen to its video chip while
-    the CPU decodes music
-  - The design of automatic dither and its bit-perfect test
-  - Full Codec Voltage: the iPod Video's audio chip at Apple's 3.0 V
-  - A quicker save of a library update, and stopping a queue in which nothing can play
-  - The ID3 genres numbered 148 to 191, and refusing FLAC files too deep to decode
+  - The 5G's screen sent by the second DMA engine, Full Codec Voltage, ID3 genres 148 to
+    191, and library, queue and FLAC fixes; the design of automatic dither and its
+    bit-perfect test
 - RockWheel by Sergei Sarkisian aka [@ssarkisy](https://github.com/ssarkisy)
   (https://github.com/ssarkisy/RockWheel), GPL v2 or later
-  - Faster seeks in long files, smooth volume fades, the directory cache's name space,
-    an MP3 lead-in fix and lighter AAC decoding
-  - Decoding on the iPod Video's second processor design, and MP3's decoding
-    thread there
-  - Screen transitions design
-  - Small tweaks to the equalizer taken from this project
-  - Wheel Glide design, and a fix to the carousel's cover loader
-  - Damaged music, picture, font, skin and voice files refused rather than
-    crashed on, and file system and USB disk fixes
-  - A button press no longer lost at a change of track
-  - No audio packets lost to a car over the iPod Video's USB
+  - Playback, decoding, equalizer, carousel, damaged-file, file system and USB fixes, and
+    MP3's decoding thread on the iPod Video's second processor; the designs of decoding
+    there, screen transitions and Wheel Glide
 - RodBox by [@RodrigoM09](https://github.com/RodrigoM09)
   (https://github.com/RodrigoM09/RodBox), GPL v2
-  - Disk and USB drive fixes
-  - The iPod Classic's earphone remote fixes
-  - Quiet tracks no longer measure as silent in the playlist engine
-  - Analyze Music fixes, and a USB DAC's volume kept at or below 0 dB
+  - Disk, USB, earphone remote, playlist engine and Analyze Music fixes, and a USB DAC's
+    volume kept at or below 0 dB
 - AstraPod by [@gfhdhytghd](https://github.com/gfhdhytghd)
   (https://github.com/gfhdhytghd/AstraPod), GPL v2
-  - The USB Sound Card's mute, and the track's tags copied whole for a dock
-  - The iPod Classic's USB and file system fixes, and a dock that sees the
-    player restart
-  - Crash screens that keep the first fault, and less on the main stack
+  - The USB Sound Card's mute, dock fixes, the iPod Classic's USB and file system fixes,
+    and crash screen and stack fixes
 - rockbox-library-manager by cyberdeliaAI (https://github.com/cyberdeliaAI/rockbox-library-manager)
-  - Album covers from Deezer, Apple and Discogs
-  - Matching an album by its title and artist: a close match is used, and a near one listed
-    as unsure for you to check
+  - Album covers from Deezer, Apple and Discogs, and matching an album by its title and
+    artist
 - ipod-liner-notes and ipod-artist-photos by Polytracker (https://github.com/Polytracker/ipod-liner-notes,
   https://github.com/Polytracker/ipod-artist-photos)
-  - Liner notes from MusicBrainz credits, and which of the credits count
-  - Taking back the files a tool wrote, which became `--undo`
-  - Asking Last.fm again when it turns a request away
+  - Liner notes from MusicBrainz credits, retrying Last.fm, and the idea that became
+    `--undo`
 
 ### Album Artwork in Screenshots
 
