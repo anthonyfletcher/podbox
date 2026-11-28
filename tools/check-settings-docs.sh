@@ -4,15 +4,16 @@
 # Run from the repository root. Silence means they agree; every line printed
 # names a setting that has fallen out of step, and the file it is missing from.
 #
-# Six checks, because no single one sees everything:
+# Seven checks, because no single one sees everything:
 #
 #   1. every tagged setting has an Explain stanza
 #   2. every *named* setting has one, tagged or not -- an untagged setting is
 #      absent from both sides of check 1 and passes it unexamined
 #   3. every stanza reached settings-guide.md
-#   4. nothing in settings-guide.md was invented there
+#   4. every guide row quotes its own setting's stanza, whole
 #   5. every "action: " stanza still names a row that exists
 #   6. every stanza fits what Explain reads, whole
+#   7. no two stanzas share a heading, since Explain shows only the first
 #
 # Check 2 reads settings_list.c with a regexp and so has a known tail of false
 # positives: the remembered-state settings, which carry a lang id the table
@@ -43,12 +44,8 @@ KNOWN_UNDOCUMENTED='^(album covers articles carried|album covers year sort order
 
 # Byte order throughout, because sort and comm have to agree about what "in
 # order" means. Under a UTF-8 locale sort collates "usb hid", "usb keypad
-# mode" and "usb mode" with the space ignored, while comm compares bytes --
-# so comm is handed a file it considers unsorted, says so, and then reports
-# differences that are not there. It did exactly that to those three
-# settings, which have had stanzas all along. The checks that already pinned
-# this per command were right; the rest inherited whatever the machine had,
-# which is why this passes on one and fails on another.
+# mode" and "usb mode" with the space ignored, while comm compares bytes, so
+# comm reports differences that are not there -- and only on some machines.
 LC_ALL=C
 export LC_ALL
 
@@ -91,34 +88,62 @@ awk '
                     print "no guide row: " key }
 ' "$GUIDE" "$HELP" | grep -Ev "^no guide row: $NO_GUIDE_ROW" >> "$tmp/out"
 
-# ---- 4. nothing in the guide was invented there ----------------------------
+# ---- 4. every guide row quotes its own stanza, whole -----------------------
 
-# One line per stanza, paragraphs joined -- what a guide cell should quote.
-awk '
-    /^\[/        { if (n) print buf; buf = ""; n = 1; next }
+# One line per stanza, "key<TAB>text", paragraphs joined -- what a guide cell
+# should quote.
+tr -d '\r' < "$HELP" | awk '
+    /^\[/        { if (key != "") print key "\t" buf
+                   key = tolower(substr($0, 2, length($0) - 2)); buf = ""; next }
     /^#/         { next }
     /^[ 	]*$/   { next }   # blank line: paragraphs join with one space
                  { gsub(/^[ \t]+|[ \t]+$/, ""); buf = (buf == "" ? $0 : buf " " $0) }
-    END          { if (n) print buf }
-' "$HELP" > "$tmp/flat"
+    END          { if (key != "") print key "\t" buf }
+' > "$tmp/flat"
 
-# The guide's Library -- Maintenance table summarises the action rows in its
-# own shorter words, so it is skipped: its header is "| Action |", not
-# "| Setting |".
-awk '
-    NR == FNR { flat = flat "\n" $0; next }
+# "label<TAB>cfg name" for every setting declared with a LANG_ id, through the
+# English phrase of that id -- how a guide row's name finds its stanza.
+tr -d '\r' < "$PHRASES" | awk '
+    /^ *id:/              { id = $2; got = 0 }
+    /<source>/            { src = 1; next }
+    /<\/source>/          { src = 0 }
+    src && !got && /: *"/ { s = $0; sub(/^[^"]*"/, "", s); sub(/"[^"]*$/, "", s)
+                            if (s != "") { print id "\t" s; got = 1 } }
+' > "$tmp/idlabel"
+tr -d '\r' < "$LIST" | tr '\n' ' ' \
+  | grep -oE 'LANG_[A-Z0-9_]+ *,( *[^,"]+,)? *"[^"]+"' \
+  | sed 's/^\(LANG_[A-Z0-9_]*\).*"\(.*\)"$/\1	\2/' > "$tmp/idcfg"
+
+# A row's stanza is "action: <label>" or the cfg name of a setting whose
+# phrase is the label, the last part of the row's name; two settings can share
+# a label, so any of them will do. A row whose label leads to no cfg name -- a
+# TEXT_SETTING, or a colour declared with lang id -1 -- need only quote some
+# stanza whole, since it quotes the cfg stanza this cannot find. The guide's Library -- Maintenance table
+# summarises the action rows in its own shorter words, so it is skipped: its
+# header is "| Action |", not "| Setting |".
+awk -F '\t' '
+    FILENAME == ARGV[1] { flat[$1] = $2; any[$2] = 1; next }
+    FILENAME == ARGV[2] { label[$1] = $2; next }
+    FILENAME == ARGV[3] { if ($1 in label) cfgs[label[$1]] = cfgs[label[$1]] "\t" tolower($2)
+                          next }
     /^\| Action \| What it does \|/ { skip = 1 }
     /^\| Setting \|/                { skip = 0 }
     /^\| / {
         if (skip) next
-        split($0, f, "|")
+        n = split($0, f, "|")
         name = f[2]; text = f[3]
         gsub(/^ +| +$/, "", name); gsub(/^ +| +$/, "", text)
         if (name == "Setting" || name == "Action" || text == "") next
-        if (index(flat, text) == 0)
-            print "not in the help file: " name
+        last = name; sub(/.*▸ */, "", last)
+        keys = "action: " tolower(last) cfgs[last]
+        m = split(keys, k, "\t"); ok = 0
+        for (i = 1; i <= m; i++)
+            if (k[i] in flat && flat[k[i]] == text) ok = 1
+        if (!ok && cfgs[last] == "") ok = (text in any)
+        if (!ok)
+            print "guide row is not its stanza, whole: " name
     }
-' "$tmp/flat" "$GUIDE" >> "$tmp/out"
+' "$tmp/flat" "$tmp/idlabel" "$tmp/idcfg" "$GUIDE" >> "$tmp/out"
 
 # ---- 5. every action stanza still names a row ------------------------------
 
@@ -152,6 +177,14 @@ tr -d '\r' < "$HELP" | awk '
             n += length($0) + 1 }
     END   { done() }
 ' >> "$tmp/out"
+
+# ---- 7. no two stanzas share a heading -------------------------------------
+
+# settings_help_lookup() ignores case and returns the first match, so a second
+# stanza under the same heading is never shown. Two action rows that read the
+# same land here: give one a distinct label.
+tr -d '\r' < "$HELP" | grep -oE '^\[[^]]+\]' | tr 'A-Z' 'a-z' | sort | uniq -d \
+  | sed 's/^/stanza heading used twice: /' >> "$tmp/out"
 
 cat "$tmp/out"
 [ -s "$tmp/out" ] && exit 1

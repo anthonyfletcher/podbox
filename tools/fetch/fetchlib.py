@@ -498,9 +498,13 @@ EBOOK_EXTS = {".epub", ".fb2", ".mobi", ".prc", ".azw", ".azw3", ".pdb"}
 
 MUSIC, AUDIOBOOK, PODCAST, EBOOK = "music", "audiobook", "podcast", "ebook"
 
+# The player compares with strcasecmp: ASCII case only, nothing stripped.
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                             "abcdefghijklmnopqrstuvwxyz")
+
 
 def kind_of_genre(genre: str) -> str:
-    g = (genre or "").strip().casefold()
+    g = (genre or "").translate(_ASCII_LOWER)
     if g in _PODCAST_EXACT:
         return PODCAST
     if g in _SPOKEN_EXACT or any(n in g for n in _SPOKEN_CONTAINED):

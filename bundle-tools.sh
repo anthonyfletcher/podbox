@@ -37,10 +37,14 @@ TOOL="$ROOT/tools/soundscan/soundscan.exe"
 
 # The Windows simulator supplies the autoconf.h the tool compiles against and
 # the codecs it loads, which are the player's own built for the host.
+# Both players' tools are built against the 5G simulator, which is right only
+# while the database and art cache formats they write do not depend on the
+# target's config. One that comes to depend on it needs the 6G simulator here
+# for the 6G zip.
 CODECS="$ROOT/build-sim-ipodvideo-win32"
 if [ ! -f "$CODECS/autoconf.h" ]; then
-    echo "bundle-tools.sh: NOT shipping the desktop tools -- no Windows simulator" >&2
-    echo "bundle-tools.sh: build one first: ./build-sim.sh 5g win" >&2
+    echo "bundle-tools.sh: no Windows simulator yet, so no desktop tools in this zip" >&2
+    echo "bundle-tools.sh: to add them: ./build-sim.sh 5g win, then run this again" >&2
     exit 0
 fi
 

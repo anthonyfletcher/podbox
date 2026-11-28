@@ -14,7 +14,7 @@
 # that offers them all side by side invites unpacking the wrong one.
 #
 # Only `latest` is marked Latest. GitHub features that release and the
-# repository's front page links to it, so the other four are created with
+# repository's front page links to it, so the other four are published with
 # --latest=false: what a visitor is offered first has to be the firmware.
 #
 # The build server is not recorded here -- see PODBOX_BUILD_SERVER below.
@@ -41,9 +41,13 @@
 #   --root PATH   build directory on the server, relative to its home
 #                 directory. Defaults to $PODBOX_BUILD_ROOT or podbox-release.
 #   -y            don't ask for confirmation before publishing
-#   --draft       create the releases as drafts
+#   --draft       upload each release as a draft named <release>-next and
+#                 stop there: the published releases, their tags, the Tools
+#                 build and the Arcade's repositories are left as they are
 #   --dry-run     build and verify, then stop -- the existing releases stand.
 #                 Required on any branch but master.
+#   --first-release  publish although origin has no `latest` tag, listing
+#                 the whole history (capped) as the changes
 #   --no-sim      skip the simulator; leave the Simulator release as it is
 #   --no-voices   skip the voice files; leave the Voices release as it is
 #   --no-arcade   leave the Arcade's build action, game template and the
@@ -72,7 +76,7 @@ REMOTE_ROOT=${PODBOX_BUILD_ROOT:-podbox-release}
 
 TARGETS="ipod6g ipodvideo"
 
-# The four releases, reused forever. Their tags are moved to each commit built.
+# The five releases, reused forever. Their tags are moved to each commit built.
 RELEASE=latest
 SIM_RELEASE=Simulator
 THEMES_RELEASE=Themes
@@ -145,6 +149,7 @@ say() { echo; echo "==> $*"; }
 ASSUME_YES=
 DRAFT=
 DRY_RUN=
+FIRST_RELEASE=
 WITH_SIM=1
 WITH_VOICES=1
 WITH_ARCADE=1
@@ -155,6 +160,7 @@ while [ $# -gt 0 ]; do
         -y|--yes)   ASSUME_YES=1 ;;
         --draft)    DRAFT=--draft ;;
         --dry-run)  DRY_RUN=1 ;;
+        --first-release) FIRST_RELEASE=1 ;;
         --no-sim)   WITH_SIM= ;;
         --no-voices) WITH_VOICES= ;;
         --no-arcade) WITH_ARCADE= ;;
@@ -173,6 +179,10 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# A draft run publishes nothing, so it leaves the Tools build and the
+# Arcade's repositories alone too
+[ -z "$DRAFT" ] || { WITH_TOOLS=; WITH_ARCADE=; }
 
 [ -n "$SERVER" ] || die "no build server. Either
          export PODBOX_BUILD_SERVER=user@host
@@ -194,6 +204,10 @@ say "Checking the tree"
 # written, and a release has none.
 sh tools/check-settings-docs.sh ||
     die "settings and their documents disagree -- see the lines above"
+
+# Fetched first, so the comparison below and the notes' start point are
+# against origin as it is now, not as of this checkout's last fetch.
+git fetch --quiet --no-tags origin || die "can't fetch origin"
 
 # A rehearsal tags nothing, and builds from git archive, so it needs nothing
 # pushed: unpushed work can be rehearsed before it goes out.
@@ -268,21 +282,44 @@ PREV=$(printf '%s\n' "$REMOTE_TAG" | sed -n 's/^\([0-9a-f]\{7,\}\).*\^{}$/\1/p')
 [ -n "$PREV" ] ||
     PREV=$(printf '%s\n' "$REMOTE_TAG" | sed -n 's/^\([0-9a-f]\{7,\}\).*/\1/p')
 
-# A release published from some other checkout can name a commit this one has
-# never seen. Listing the whole history beats dying at the last step.
+# The notes start where the last release ended, so a release that cannot be
+# found, or names a commit HEAD does not contain, is refused: the first would
+# list the whole history and the second publishes an older build over a newer
+# one. A rehearsal only warns. --first-release lists the whole history.
 if [ -n "$PREV" ] && ! git cat-file -e "$PREV^{commit}" 2>/dev/null; then
-    echo "  the $RELEASE release names $PREV, which isn't in this checkout --"
-    echo "  listing the full history instead"
+    WHY="the $RELEASE release names $PREV, which origin does not have"
+elif [ -n "$PREV" ] && ! git merge-base --is-ancestor "$PREV" HEAD; then
+    WHY="the $RELEASE release names $PREV, which HEAD does not contain -- this
+       checkout is behind or has diverged from what was released"
+elif [ -z "$PREV" ] && [ -z "$FIRST_RELEASE" ]; then
+    WHY="origin has no $RELEASE tag (a failed swap leaves the build as the
+       draft $RELEASE-next: publish that, or pass --first-release)"
+else
+    WHY=
+fi
+if [ -n "$WHY" ]; then
+    [ -n "$DRY_RUN" ] || die "$WHY"
+    echo "  $WHY"
+    echo "  (--dry-run: listing the full history instead)"
     PREV=
 fi
 
 if [ -n "$PREV" ]; then
     HEADING="Changes since the last release"
-    CHANGES=$(git log --no-merges --pretty='- %s' "$PREV..HEAD")
+    RANGE=$PREV..HEAD
 else
     HEADING="Changes"
-    CHANGES=$(git log --no-merges --pretty='- %s')
+    RANGE=HEAD
 fi
+
+# Capped well inside GitHub's limit on a release's notes, which a whole
+# history passes many times over and which fails the create after the upload.
+MAX_CHANGES=300
+TOTAL=$(git rev-list --no-merges --count "$RANGE")
+CHANGES=$(git log --no-merges --pretty='- %s' -n "$MAX_CHANGES" "$RANGE")
+[ "$TOTAL" -le "$MAX_CHANGES" ] ||
+    CHANGES="$CHANGES
+- ...and $((TOTAL - MAX_CHANGES)) earlier commits."
 
 # Empty means HEAD is already what the release names -- a rebuild, not a
 # mistake, so say so rather than publishing an empty heading.
@@ -399,7 +436,7 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES" "$VOICES_NOTES"'
 
 cat <<PLAN
 
-  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}${WITH_TOOLS:+, then Tools on GitHub Actions}
+  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,}${WITH_VOICES:+ $VOICES_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (as -next drafts only)}${WITH_TOOLS:+, then Tools on GitHub Actions}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS${WITH_SIM:+  (firmware and Windows simulator)}
@@ -474,10 +511,9 @@ for target in $SIM_TARGETS; do
     ssh "$SERVER" "cd '$REMOTE_DIR' && PATH=\$HOME/bin:\$PATH ./build-sim.sh $target win"
 done
 
-# The desktop tool links against the Windows simulator, which is built after
-# the firmware -- so bundle-tools.sh inside build-hw.sh had no simulator to
-# build it from and shipped nothing. Added here instead, into zips that
-# already exist, which is what every bundle script does anyway.
+# The desktop tools link against the Windows simulator, which is built after
+# the firmware, so they are added here, into zips that already exist, as every
+# bundle script does.
 #
 # Under --no-sim there is no simulator and so no tool, and the check below
 # stops asking for one rather than failing a release that was never going to
@@ -684,16 +720,22 @@ fi
 # ---------------------------------------------------------------- publish ---
 # Everything below this line is visible outside, and is deliberately last.
 #
-# The order is themes, then simulator, then bootloader, then firmware. Only
-# the firmware is marked Latest, the release the repository's front page
-# offers; the others pass --latest=false, because GitHub otherwise moves the
-# badge to each release as it is created. A visitor must land on the build,
-# not on a theme, the simulator or the bootloader.
+# Each release is first uploaded as a draft named <release>-next while the old
+# one still stands, all five before any is replaced. A draft has no tag until
+# it is published, so a failed upload leaves every release and tag as it was
+# -- and the `latest` tag keeps the next run's notes to what is new. Then each
+# swap deletes the old release and its tag, and renames and publishes the
+# draft. A failure inside a swap leaves that build as its draft; publish it by
+# hand with
+#   gh release edit <release>-next --repo <slug> --tag <release> --draft=false
+# adding --latest for `latest` and --latest=false for the others. --draft
+# stops after the uploads.
 #
-# A failure in the last step leaves fresh Themes, Simulator and Bootloader
-# releases beside a stale `latest`. Everything is built and verified before
-# any of this runs, so what remains is a network or gh failure; re-running
-# the script republishes all four.
+# The swaps go themes, simulator, voices, bootloader, then firmware. Only the
+# firmware is marked Latest, the release the repository's front page offers;
+# the others pass --latest=false, because GitHub otherwise moves the badge to
+# each release as it is published. A visitor must land on the build, not on a
+# theme, the simulator or the bootloader.
 
 SHA=$(git rev-parse HEAD)
 
@@ -703,120 +745,68 @@ SHA=$(git rev-parse HEAD)
 # wrong repo. (CLAUDE.md's "no --repo" note describes running gh on the local
 # machine, where origin *is* the fork. It does not apply on the server.)
 #
-# Each release deletes its old self and its tag before the new one takes the
-# tag. `gh release create` reuses an existing tag rather than moving it, so a
-# leftover tag would publish these zips against an older commit. The second
+# A swap deletes the old release and its tag before the draft takes the tag.
+# Publishing a draft under an existing tag reuses it rather than moving it, so
+# a leftover tag would publish these zips against an older commit. The second
 # delete covers a tag left behind by a run that died between the two; it goes
-# through gh rather than
-# `git push --delete` because this script may itself be running on the server,
-# where the fork is an https remote with no credentials -- a push there fails
-# silently and leaves the stale tag for `gh release create` to reuse.
+# through gh rather than `git push --delete` because this script may itself be
+# running on the server, where the fork is an https remote with no
+# credentials -- a push there fails silently and leaves the stale tag to be
+# reused.
 #
 # --target names the commit each new tag is created at, on GitHub. Nothing tags
 # locally: a rolling tag left in the dev checkout only goes stale.
 
-say "Replacing the $THEMES_RELEASE release"
-ssh "$SERVER" "gh release delete '$THEMES_RELEASE' --repo '$SLUG' --yes \
-    --cleanup-tag || true"
-ssh "$SERVER" "gh api --method DELETE --silent \
-    'repos/$SLUG/git/refs/tags/$THEMES_RELEASE' 2>/dev/null || true"
-
-scp -q "$THEMES_NOTES" "$SERVER:$REMOTE_DIR/themes-notes.md"
-# The zips were named in the packing step, so there is nothing to rename here
-# -- unlike the firmware, whose two builds both make rockbox.zip.
-ssh "$SERVER" "cd '$REMOTE_DIR' && \
-    gh release create '$THEMES_RELEASE' \
-    --repo '$SLUG' \
-    --target '$SHA' \
-    --title 'Extra themes' \
-    --notes-file themes-notes.md \
-    --latest=false \
-    $DRAFT \
-    $ALL_THEMES_ASSET \
-    $(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done)"
-
-say "Published $COMMIT as $THEMES_RELEASE"
-echo "  https://github.com/$SLUG/releases/tag/$THEMES_RELEASE"
-
-if [ -n "$SIM_TARGETS" ]; then
-    say "Replacing the $SIM_RELEASE release"
-    ssh "$SERVER" "gh release delete '$SIM_RELEASE' --repo '$SLUG' --yes \
-        --cleanup-tag || true"
-    ssh "$SERVER" "gh api --method DELETE --silent \
-        'repos/$SLUG/git/refs/tags/$SIM_RELEASE' 2>/dev/null || true"
-
-    scp -q "$SIM_NOTES" "$SERVER:$REMOTE_DIR/simulator-notes.md"
+# stage_release NAME TITLE NOTES ASSET...: NAME-next, as a draft, from files
+# already in $REMOTE_DIR
+stage_release() {
+    name=$1 title=$2 notes=$3
+    shift 3
+    say "Uploading $name as the draft $name-next"
+    ssh "$SERVER" "gh release delete '$name-next' --repo '$SLUG' --yes || true"
+    scp -q "$notes" "$SERVER:$REMOTE_DIR/$name-notes.md"
     ssh "$SERVER" "cd '$REMOTE_DIR' && \
-        gh release create '$SIM_RELEASE' \
+        gh release create '$name-next' \
         --repo '$SLUG' \
         --target '$SHA' \
-        --title 'Windows simulator' \
-        --notes-file simulator-notes.md \
-        --latest=false \
-        $DRAFT \
-        $(sim_asset_name ipod6g) $(sim_asset_name ipodvideo)"
+        --title '$title' \
+        --notes-file '$name-notes.md' \
+        --draft \
+        $*"
+}
 
-    say "Published $COMMIT as $SIM_RELEASE"
-    echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
-fi
-
-if [ -n "$VOICE_TARGETS" ]; then
-    say "Replacing the $VOICES_RELEASE release"
-    ssh "$SERVER" "gh release delete '$VOICES_RELEASE' --repo '$SLUG' --yes \
+# swap_release NAME LATEST: NAME replaced by its draft; LATEST is --latest or
+# --latest=false
+swap_release() {
+    name=$1 latest=$2
+    say "Replacing the $name release"
+    ssh "$SERVER" "gh release delete '$name' --repo '$SLUG' --yes \
         --cleanup-tag || true"
     ssh "$SERVER" "gh api --method DELETE --silent \
-        'repos/$SLUG/git/refs/tags/$VOICES_RELEASE' 2>/dev/null || true"
+        'repos/$SLUG/git/refs/tags/$name' 2>/dev/null || true"
+    ssh "$SERVER" "gh release edit '$name-next' --repo '$SLUG' \
+        --tag '$name' --draft=false $latest"
+    say "Published $COMMIT as $name"
+    echo "  https://github.com/$SLUG/releases/tag/$name"
+}
 
-    scp -q "$VOICES_NOTES" "$SERVER:$REMOTE_DIR/voices-notes.md"
-    ssh "$SERVER" "cd '$REMOTE_DIR' && \
-        gh release create '$VOICES_RELEASE' \
-        --repo '$SLUG' \
-        --target '$SHA' \
-        --title 'Voices' \
-        --notes-file voices-notes.md \
-        --latest=false \
-        $DRAFT \
-        $(voices_asset_name ipod6g) $(voices_asset_name ipodvideo)"
+# The theme zips were named in the packing step, so there is nothing to
+# rename -- unlike the firmware, whose two builds both make rockbox.zip.
+stage_release "$THEMES_RELEASE" 'Extra themes' "$THEMES_NOTES" \
+    "$ALL_THEMES_ASSET" \
+    "$(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done)"
 
-    say "Published $COMMIT as $VOICES_RELEASE"
-    echo "  https://github.com/$SLUG/releases/tag/$VOICES_RELEASE"
-fi
+[ -z "$SIM_TARGETS" ] ||
+    stage_release "$SIM_RELEASE" 'Windows simulator' "$SIM_NOTES" \
+        "$(sim_asset_name ipod6g)" "$(sim_asset_name ipodvideo)"
 
-say "Replacing the $BOOT_RELEASE release"
-ssh "$SERVER" "gh release delete '$BOOT_RELEASE' --repo '$SLUG' --yes \
-    --cleanup-tag || true"
-ssh "$SERVER" "gh api --method DELETE --silent \
-    'repos/$SLUG/git/refs/tags/$BOOT_RELEASE' 2>/dev/null || true"
+[ -z "$VOICE_TARGETS" ] ||
+    stage_release "$VOICES_RELEASE" 'Voices' "$VOICES_NOTES" \
+        "$(voices_asset_name ipod6g)" "$(voices_asset_name ipodvideo)"
 
-scp -q "$BOOT_NOTES" "$SERVER:$REMOTE_DIR/bootloader-notes.md"
-ssh "$SERVER" "cd '$REMOTE_DIR' && \
-    gh release create '$BOOT_RELEASE' \
-    --repo '$SLUG' \
-    --target '$SHA' \
-    --title 'Bootloader installer' \
-    --notes-file bootloader-notes.md \
-    --latest=false \
-    $DRAFT \
-    $BOOT_ASSET"
+stage_release "$BOOT_RELEASE" 'Bootloader installer' "$BOOT_NOTES" \
+    "$BOOT_ASSET"
 
-say "Published $COMMIT as $BOOT_RELEASE"
-echo "  https://github.com/$SLUG/releases/tag/$BOOT_RELEASE"
-
-# The firmware is uploaded as a draft under $STAGING_TAG while the old release
-# still stands, so a failed upload leaves the old `latest` and its tag -- and
-# the tag keeps the next run's notes to what is new. A draft has no tag until
-# it is published, so the swap deletes the old release and tag, then renames
-# and publishes the draft. A failure inside the swap leaves the build as the
-# draft; publish it by hand with
-#   gh release edit latest-next --repo <slug> --tag latest --draft=false --latest
-STAGING_TAG=$RELEASE-next
-PUBLISH='--draft=false --latest'
-[ -z "$DRAFT" ] || PUBLISH=
-
-say "Uploading the $RELEASE release as a draft"
-ssh "$SERVER" "gh release delete '$STAGING_TAG' --repo '$SLUG' --yes || true"
-
-scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
 # Both targets produce a file called rockbox.zip, so they must be renamed
 # BEFORE upload. gh's `file#text` syntax does not do this -- it sets a display
 # label and leaves the asset name as the filename, so uploading that way sends
@@ -825,27 +815,25 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     cp build-hw-ipod6g/rockbox.zip $(asset_name ipod6g) && \
     cp build-hw-ipodvideo/rockbox.zip $(asset_name ipodvideo) && \
     cp build-hw-ipod6g/rockbox.map $(map_name ipod6g) && \
-    cp build-hw-ipodvideo/rockbox.map $(map_name ipodvideo) && \
-    gh release create '$STAGING_TAG' \
-    --repo '$SLUG' \
-    --target '$SHA' \
-    --title 'Latest build' \
-    --notes-file release-notes.md \
-    --draft \
-    $(asset_name ipod6g) $(asset_name ipodvideo) \
-    $(notools_asset_name ipod6g) $(notools_asset_name ipodvideo) \
-    $(map_name ipod6g) $(map_name ipodvideo)"
+    cp build-hw-ipodvideo/rockbox.map $(map_name ipodvideo)"
+stage_release "$RELEASE" 'Latest build' "$NOTES" \
+    "$(asset_name ipod6g)" "$(asset_name ipodvideo)" \
+    "$(notools_asset_name ipod6g)" "$(notools_asset_name ipodvideo)" \
+    "$(map_name ipod6g)" "$(map_name ipodvideo)"
 
-say "Replacing the $RELEASE release"
-ssh "$SERVER" "gh release delete '$RELEASE' --repo '$SLUG' --yes --cleanup-tag \
-    || true"
-ssh "$SERVER" "gh api --method DELETE --silent \
-    'repos/$SLUG/git/refs/tags/$RELEASE' 2>/dev/null || true"
-ssh "$SERVER" "gh release edit '$STAGING_TAG' --repo '$SLUG' \
-    --tag '$RELEASE' $PUBLISH"
+if [ -n "$DRAFT" ]; then
+    say "Uploaded $COMMIT as drafts; nothing published"
+    echo "  each is <release>-next; publish one with"
+    echo "  gh release edit <release>-next --repo $SLUG --tag <release> --draft=false"
+    echo "  local copies in dist/"
+    exit 0
+fi
 
-say "Published $COMMIT as $RELEASE"
-echo "  https://github.com/$SLUG/releases/tag/$RELEASE"
+swap_release "$THEMES_RELEASE" --latest=false
+[ -z "$SIM_TARGETS" ] || swap_release "$SIM_RELEASE" --latest=false
+[ -z "$VOICE_TARGETS" ] || swap_release "$VOICES_RELEASE" --latest=false
+swap_release "$BOOT_RELEASE" --latest=false
+swap_release "$RELEASE" --latest
 
 echo "  local copies in dist/"
 
@@ -854,8 +842,8 @@ echo "  local copies in dist/"
 # macOS runners and replaces the Tools release itself. Started on the tag
 # just published, so the tools are built from the same commit. Not waited
 # for: it takes several minutes, and a failure there leaves the firmware
-# release as it is. A draft creates no tag, so there is nothing to build.
-if [ -n "$WITH_TOOLS" ] && [ -z "$DRAFT" ]; then
+# release as it is.
+if [ -n "$WITH_TOOLS" ]; then
     if ssh "$SERVER" "gh workflow run fetch-tools.yml --repo '$SLUG' --ref '$RELEASE' -f publish=true"; then
         echo "  Tools: building on GitHub Actions -- https://github.com/$SLUG/actions/workflows/fetch-tools.yml"
     else

@@ -6,7 +6,15 @@
 # Run after `make zip`, from the build directory: check-zip-langs.sh rockbox.zip
 
 ZIP="${1:-rockbox.zip}"
-EMPTY=$(unzip -l "$ZIP" '.rockbox/langs/*.lng' | awk '/\.lng$/ && $1 < 1000 { print $4 }')
+LIST=$(unzip -l "$ZIP" '.rockbox/langs/*.lng') || {
+    echo "Cannot list the language files in $ZIP" >&2
+    exit 1
+}
+if ! printf '%s\n' "$LIST" | grep -q '\.lng$'; then
+    echo "No language files in $ZIP" >&2
+    exit 1
+fi
+EMPTY=$(printf '%s\n' "$LIST" | awk '/\.lng$/ && $1 < 1000 { print $4 }')
 if [ -n "$EMPTY" ]; then
     echo "Empty language files in $ZIP -- run the build again:" >&2
     echo "$EMPTY" >&2

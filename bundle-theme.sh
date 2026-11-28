@@ -72,10 +72,10 @@ for font in $CORE_FONTS; do
 done
 
 # The default iconset. buildzip.pl creates icons/ but copies nothing into it,
-# so DEFAULT_ICONSET ("tango_icons.16x16", settings_list.c) pointed at a file
-# that was never on the device. load_icons() fails silently and every icon
-# falls back to the compiled-in bm_default_icons, which is 6x8 -- a blob at
-# 320x240. The viewers set goes with it for the same reason.
+# and DEFAULT_ICONSET ("tango_icons.16x16", settings_list.c) names this file.
+# Without it load_icons() fails silently and every icon falls back to the
+# compiled-in bm_default_icons, which is 6x8 -- a blob at 320x240. The viewers
+# set goes with it for the same reason.
 mkdir -p "$STAGE/.rockbox/icons"
 cp "$ROOT/icons/tango_icons.16x16.bmp" "$STAGE/.rockbox/icons/"
 cp "$ROOT/icons/tango_icons_viewers.16x16.bmp" "$STAGE/.rockbox/icons/"
