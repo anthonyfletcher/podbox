@@ -9,11 +9,11 @@
 Modified to support dynamic colours and album/artist art, and redrawn after
 the iPod classic: a 20px title bar with the play state on the left and a
 glass battery on the right, gradient selection, the cover's reflection, six
-rows of your choosing and a glass progress bar on the playing screen, menus
-beside the cover and every other list across the whole screen, a header over
-an album's tracks, a book's chapters and a podcast's episodes, the iPod's blue
-dot for what is left to hear of an episode or chapter, and Cover Flow full
-screen with a tall reflection.
+rows of your choosing and a glass progress bar with its own reflection on the
+playing screen, menus beside the cover and every other list across the whole
+screen, a header over an album's tracks, a book's chapters and a podcast's
+episodes, the iPod's blue dot for what is left to hear of an episode or
+chapter, and Cover Flow full screen with a tall reflection.
 
 Three versions come in the one zip:
 
