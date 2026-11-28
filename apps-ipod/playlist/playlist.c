@@ -100,6 +100,7 @@
 #include "audio.h"
 #include "lcd.h"
 #include "kernel.h"
+#include "general.h"
 #include "settings/settings.h"
 #include "database/sound_mix.h"
 #include "audio/play_status.h"
@@ -1220,7 +1221,7 @@ static int create_and_play_dir(int direction, bool play_last)
         browser_disk_build_playlist(browser_get_context(), 0);
 
         if (global_settings.playlist_shuffle)
-             playlist_shuffle(current_tick, -1);
+             playlist_shuffle(0, -1);
 
         if (play_last && direction <= 0)
             index = current_playlist.amount - 1;
@@ -1608,12 +1609,17 @@ static int randomise_playlist_unlocked(struct playlist_info* playlist,
     int count;
     int candidate;
     unsigned long current = playlist->indices[playlist->index];
+    /* A seed supplied is replayed exactly; 0 asks for a new one */
+    bool need_reseed = seed != 0;
 
-    /* seed 0 is used to identify sorted playlist for resume purposes */
-    if (seed == 0)
-        seed = 1;
+    if (!need_reseed)
+    {
+        seed = prng_newseed();
+        /* the control file's 0 marks an unshuffled playlist */
+        if (seed == 0)
+            seed = 1;
+    }
 
-    /* seed with the given seed */
     srand(seed);
 
     /* randomise entire indices list */
@@ -1649,6 +1655,10 @@ static int randomise_playlist_unlocked(struct playlist_info* playlist,
         update_control_unlocked(playlist, PLAYLIST_COMMAND_SHUFFLE, seed,
             playlist->first_index, NULL, NULL, NULL);
     }
+
+    /* A fixed seed leaves rand() repeating its sequence for every user */
+    if (need_reseed)
+        srand(prng_newseed());
 
     return 0;
 }
@@ -3344,7 +3354,7 @@ int playlist_next(int steps)
             /* Repeat shuffle mode.  Re-shuffle playlist and resume play */
             playlist->first_index = 0;
             sort_playlist_unlocked(playlist, false, false);
-            randomise_playlist_unlocked(playlist, current_tick, false, true);
+            randomise_playlist_unlocked(playlist, 0, false, true);
             global_settings.playlist_shuffle = true;
             iap_on_shuffle_state(global_settings.playlist_shuffle);
 
@@ -4090,7 +4100,7 @@ void playlist_forget_inserts(void)
     playlist_write_unlock(playlist);
 }
 
-/* shuffle newly created playlist using random seed. */
+/* shuffle newly created playlist with the given seed, or a new one for 0 */
 int playlist_shuffle(int random_seed, int start_index)
 {
     struct playlist_info* playlist = &current_playlist;

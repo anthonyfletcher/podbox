@@ -410,15 +410,9 @@ static bool playlist_viewer_init(struct playlist_viewer * viewer,
     size_t buffer_size, index_buffer_size = 0;
     bool is_playing = audio_status() & AUDIO_STATUS_PLAY; /* playing or paused */
 
-    /* FIXME: On devices with a plugin buffer smaller than 512 KiB, the index buffer
-              is shared with the current playlist when playback is stopped, to enable
-              displaying larger playlists. This is generally unsafe, since it is possible
-              to start playback of a new playlist while another list is still open in the
-              viewer. Devices affected by this, as of the time of writing, appear to be:
-              - 80 KiB plugin buffer: Sansa c200v2
-              - 64 KiB plugin buffer: Sansa m200v4, Sansa Clip
-    */
-    bool require_index_buffer = filename && (is_playing || PLUGIN_BUFFER_SIZE >= 0x80000);
+    /* A playlist file gets an index buffer of its own: sharing the current
+     * playlist's would let playback started from elsewhere overwrite it */
+    bool require_index_buffer = filename != NULL;
 
     if (!filename && !is_playing)
     {
@@ -750,7 +744,7 @@ static int menu_shuffle(void)
     if (!yesno_pop_confirm(ID2P(LANG_SHUFFLE)))
         return ONPLAY_OK;
     playlist_sort(viewer.playlist, !viewer.playlist);
-    playlist_randomise(viewer.playlist, current_tick, !viewer.playlist);
+    playlist_randomise(viewer.playlist, 0, !viewer.playlist);
     viewer.selected_track = 0;
     menu_result = PV_CONTEXT_MODIFIED;
     return ONPLAY_OK;
@@ -1460,7 +1454,7 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                     if (!ret_val)
                     {
                         if (global_settings.playlist_shuffle)
-                            start_index = playlist_shuffle(current_tick, start_index);
+                            start_index = playlist_shuffle(0, start_index);
                         playlist_start(start_index, 0, 0);
 
                         if (viewer.initial_selection)

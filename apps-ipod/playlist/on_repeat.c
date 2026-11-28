@@ -435,7 +435,7 @@ static bool rep_start(const uint64_t *keys, int n)
         return false;
     /* Shuffled as a saved playlist is, and as a dock's choice of it is */
     if (global_settings.playlist_shuffle)
-        playlist_shuffle(current_tick, -1);
+        playlist_shuffle(0, -1);
     playlist_start(0, 0, 0);
     return true;
 }

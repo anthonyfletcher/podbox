@@ -417,21 +417,29 @@ static unsigned int playback_log_files(void)
 
 /* Open a mode's log for appending. An empty scrobbler log gets the
  * Audioscrobbler header first, however it came to be empty: uploaders that
- * check for it reject the file without it. */
+ * check for it reject the file without it. A header that will not fit is
+ * cut back off and the log does not open. */
 static int open_playbacklog(int mode)
 {
+    static const char scrobbler_header[] =
+        "#AUDIOSCROBBLER/1.1\n#TZ/UNKNOWN\n"
+        "#CLIENT/Rockbox " TARGET_NAME SCROBBLER_TIMELESS "\n"
+        "#ARTIST\t#ALBUM\t#TITLE\t#TRACKNUM\t#LENGTH\t#RATING\t"
+        "#TIMESTAMP\t#MUSICBRAINZ_TRACKID\n";
     const char *path = mode == PLAYBACK_LOG_LASTFM ? SCROBBLER_LOG_PATH
                                                    : PLAYBACK_LOG_PATH;
     int fd;
 
     DEBUGF("Opening %s \n", path);
     fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0666);
-    if (fd >= 0 && mode == PLAYBACK_LOG_LASTFM && lseek(fd, 0, SEEK_END) == 0)
-        fdprintf(fd,
-            "#AUDIOSCROBBLER/1.1\n#TZ/UNKNOWN\n"
-            "#CLIENT/Rockbox " TARGET_NAME SCROBBLER_TIMELESS "\n"
-            "#ARTIST\t#ALBUM\t#TITLE\t#TRACKNUM\t#LENGTH\t#RATING\t"
-            "#TIMESTAMP\t#MUSICBRAINZ_TRACKID\n");
+    if (fd >= 0 && mode == PLAYBACK_LOG_LASTFM && lseek(fd, 0, SEEK_END) == 0
+        && write(fd, scrobbler_header, sizeof(scrobbler_header) - 1)
+           != (ssize_t)sizeof(scrobbler_header) - 1)
+    {
+        ftruncate(fd, 0);
+        close(fd);
+        fd = -1;
+    }
     return fd;
 }
 
@@ -1469,26 +1477,37 @@ static size_t format_buffered(char *buf, size_t sz, struct mp3entry *id3,
 }
 
 /* Write the buffered lines of one mode to its file, without their digit.
- * False when the file would not open, leaving them all unwritten. */
+ * False when the file would not open or a write fell short, leaving them all
+ * unwritten: what this flush wrote is cut back off, or the next append would
+ * join a half line and the retry would repeat the whole ones. */
 static bool flush_buffered(const char *buf, size_t len, int mode)
 {
     const char *end = buf + len;
     int fd = -1;
-    while (buf < end)
+    off_t start = -1;
+    bool ok = true;
+    while (ok && buf < end)
     {
         const char *nl = memchr(buf, '\n', end - buf);
         const char *next = nl ? nl + 1 : end;
         if (*buf == '0' + mode)
         {
-            if (fd < 0 && (fd = open_playbacklog(mode)) < 0)
-                return false;
-            write(fd, buf + 1, next - buf - 1);
+            if (fd < 0)
+            {
+                if ((fd = open_playbacklog(mode)) < 0)
+                    return false;
+                start = lseek(fd, 0, SEEK_END);
+            }
+            ssize_t n = next - buf - 1;
+            ok = write(fd, buf + 1, n) == n;
         }
         buf = next;
     }
+    if (!ok && start >= 0)
+        ftruncate(fd, start);
     if (fd >= 0)
         close(fd);
-    return true;
+    return ok;
 }
 
 /* Keep only the buffered lines of the modes in 'unwritten', a bit
@@ -1596,8 +1615,10 @@ static void write_playbacklog(struct mp3entry *id3)
             len = sizeof(entry) - 1;
             entry[len - 1] = '\n';  /* or the next line joins this one */
         }
-        if (len > 0)
-            write(fd, entry, len);
+        /* A short write is cut back off, or the next line joins it */
+        off_t start = lseek(fd, 0, SEEK_END);
+        if (len > 0 && write(fd, entry, len) != len && start >= 0)
+            ftruncate(fd, start);
         close(fd);
     }
 }
@@ -3866,6 +3887,18 @@ static void audio_start_playback(const struct audio_resume_info *resume_info,
         /* Be sure channel is audible */
         pcmbuf_fade(false, true);
 
+#ifdef USB_ENABLE_AUDIO
+        /* Checked again with no yield before the status changes: setting
+         * the volume can wait on the codec's I2C bus, and a stream that
+         * starts meanwhile reads this status to decide that the DSP is
+         * free. */
+        if (usb_audio_get_active() && usb_audio_get_playing())
+        {
+            queue_reply(&audio_queue, 0);
+            return;
+        }
+#endif
+
         /* Update our state */
         play_status = PLAY_PLAYING;
         iap_on_play_status(play_status);
@@ -3985,6 +4018,9 @@ static void audio_stop_playback(bool allow_fade)
     filling = STATE_IDLE;
     cancel_cpu_boost();
     add_playbacklog(NULL); /* flush playback log */
+#ifdef USB_ENABLE_AUDIO
+    usb_audio_local_stopped();
+#endif
 }
 
 /* Pause the playback of the current track
@@ -4877,6 +4913,15 @@ void audio_stop(void)
     LOGFQUEUE("audio >| audio Q_AUDIO_STOP");
     audio_queue_send(Q_AUDIO_STOP, 0);
 }
+
+#ifdef USB_ENABLE_AUDIO
+/* From the USB thread, which must not wait on this one */
+void audio_stop_for_usb_audio(void)
+{
+    LOGFQUEUE("audio > audio Q_AUDIO_STOP");
+    audio_queue_post(Q_AUDIO_STOP, 0);
+}
+#endif
 
 /* Pause playback if playing */
 void audio_pause(void)

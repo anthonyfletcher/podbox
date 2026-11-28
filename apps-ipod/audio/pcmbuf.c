@@ -1397,8 +1397,8 @@ unsigned int pcmbuf_peek_lead_ms(size_t index)
     /* pcmbuf_peek_valid(), not index_committed(): a cursor that has caught up
      * sits *on* chunk_widx, which is not committed data but is the position
      * furthest ahead a reader can legitimately hold -- and is where a reader
-     * keeping up with the codec spends nearly all its time. Testing
-     * committedness here answered zero for the steady state. */
+     * keeping up with the codec spends nearly all its time, so a test of
+     * committedness would answer zero for the steady state. */
     if (!pcmbuf_peek_valid(index))
         return 0;
 

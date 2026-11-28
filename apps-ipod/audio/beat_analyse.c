@@ -27,13 +27,11 @@
  * catch up with after a stall, and still keeps up at the slowest frame rate
  * the screen will drop to.
  *
- * The cap matters more for what it forbids than for what it allows. At eight
- * the worst poll did sixty-four hops in one go -- measured at fourteen times
- * the median, which on a screen drawing every 30ms is a missed frame. And a
- * caller that has just stalled is the worst possible one to hand that to:
- * catching up in a single call is what causes the next stall. Four bounds
- * the worst poll to four times the median and spreads the recovery over a
- * few frames, which is where it belongs. */
+ * The cap bounds the worst poll, and a caller that has just stalled is the
+ * one handed it: catching up in a single call causes the next stall. At
+ * eight the worst poll runs sixty-four hops, fourteen times the median and a
+ * missed frame on a screen drawing every 30ms; at four it is four times the
+ * median, and the recovery spreads over a few frames. */
 #define BEAT_CHUNKS_PER_POLL  4
 
 static bool          running;

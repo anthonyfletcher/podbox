@@ -660,7 +660,6 @@ int browser_disk_enter(struct browser_context* c)
         c->selected_item=0;
     }
     else {
-        int seed = current_tick;
         bool play = false;
         int start_index=0;
 
@@ -730,7 +729,7 @@ int browser_disk_enter(struct browser_context* c)
                         start_index = browser_disk_build_playlist(c, c->selected_item);
                         if (global_settings.playlist_shuffle)
                         {
-                            start_index = playlist_shuffle(seed, start_index);
+                            start_index = playlist_shuffle(0, start_index);
                             /* when shuffling dir.: play all files
                                even if the file selected by user is
                                not the first one */

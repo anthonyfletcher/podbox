@@ -419,6 +419,9 @@ bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
     size_t dirlen, max_name;
     bool do_save = false;
     char *sep = strrchr(pl_name, PATH_SEPCH);
+    /* FAT ignores case, so case is ignored in telling the playlist's own
+     * name from another file's */
+    bool own_name = curr_pl_name && !strcasecmp(curr_pl_name, pl_name);
 
     if (sep)
     {
@@ -438,10 +441,13 @@ bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
     remove_extension(name);
 
     /* The wheel charset has no lowercase, so a lowercase prefill can't be
-     * retyped. ASCII only, to leave UTF-8 sequences intact. */
-    for (char *u = name; *u; u++)
-        if (*u >= 'a' && *u <= 'z')
-            *u -= 'a' - 'A';
+     * retyped; the playlist's own name keeps its case, since accepting it
+     * as it stands needs no retyping. ASCII only, to leave UTF-8 sequences
+     * intact. */
+    if (!own_name)
+        for (char *u = name; *u; u++)
+            if (*u >= 'a' && *u <= 'z')
+                *u -= 'a' - 'A';
 
     /* Leave room for the separator, ".m3u8" and the terminator. Guarded: the
      * subtraction is on size_t. */
@@ -475,7 +481,7 @@ bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
         apply_playlist_extension(pl_name, buf_size);
 
         /* warn before overwriting existing (different) playlist */
-        if (do_save && (!curr_pl_name || strcmp(curr_pl_name, pl_name))
+        if (do_save && (!curr_pl_name || strcasecmp(curr_pl_name, pl_name))
             && file_exists(pl_name))
             do_save = yesno_pop(ID2P(LANG_REALLY_OVERWRITE));
     }
