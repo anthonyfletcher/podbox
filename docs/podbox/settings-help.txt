@@ -1509,7 +1509,10 @@ opens the playing track's album on that track, where Go to Album Via says;
 a podcast or book kept apart opens in its own menu. Theme Options says
 Unavailable when the theme has none. Theme Toggle is offered once a theme
 option has been assigned to a button in Theme Options, or the theme names
-one. Holding Select always opens the now-playing menu.
+one. Scrub makes the wheel move through the song, as Select does on Apple's
+firmware: the music jumps there once the wheel rests, Select or five seconds
+untouched end it, and Menu leaves as usual. Holding Select always opens the
+now-playing menu.
 
 [context_wps]
 What pressing Select and Play together does on the now-playing screen: any

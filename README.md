@@ -80,6 +80,8 @@ Features include: **dynamic colours, menus you arrange yourself, a choice of art
   Album Covers, go to the playing album, add the track to a playlist, stop, and more
   - `Settings > Playback > Now Playing Screen > Select Action`, `Menu Action`,
     `Long Press Play Action` and `Select + Play Action`
+  - For Apple's scrubbing, set `Select Action` to `Scrub`: press `Select` and the wheel moves
+    through the song
   - `Go to Album Via` chooses whether the album opens on its own or inside Music
   - What Now Playing shows is under `Settings > Appearance > Now Playing Screen`, and what its
     buttons do under `Settings > Playback > Now Playing Screen`

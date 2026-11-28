@@ -50,6 +50,7 @@ preceding group repeats.
 | [`%Sb(bars[, align, radius, gap, peak, peakcolour, segment, segmentgap])`](#sbbars-align-radius-gap-peak-peakcolour-segment-segmentgap--spectrum-analyser) | spectrum analyser |
 | [`%bsp`](#bsp--sleep-timer-remaining-as-a-percentage) | sleep timer remaining, as a percentage |
 | [`%prb`, `%pbp`](#prb--pbp--the-audiobooks-time-left-and-how-much-is-heard) | the audiobook's time left, and how much is heard |
+| [`%ms`](#ms--scrubbing) | the wheel is moving the play position |
 | [`%lb`](#lb--background-index-building) | background work running |
 | [`%lw`](#lw--foreground-work-in-progress) | foreground work running |
 | [`%la`](#la--animated-spinner-frame) | spinner frame |
@@ -449,6 +450,19 @@ equal parts, lowest first:
 ```
 %?prb<%prb left in the book|%pr left>
 %?prb<%?pbp<%xd(Book,1)|%xd(Book,2)|%xd(Book,3)|%xd(Book,4)>>
+```
+
+### `%ms` — scrubbing
+
+Non-empty (`"s"`) while the owner is scrubbing: a Now Playing button set to
+**Scrub** has been pressed and the wheel moves the play position instead of
+the volume. Select, Menu, Left, Right or five seconds untouched end it.
+While it is set, `%pb`, `%pc` and `%pr` already show where the wheel has got
+to, so a theme needs it only to draw scrubbing differently, as Apple's
+firmware swaps the progress bar for a scrubber:
+
+```
+%?ms<%xd(Scrubber)|%xd(Bar)>%pb(10,200,300,8)
 ```
 
 ### `%lb` — background index building

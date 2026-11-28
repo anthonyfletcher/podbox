@@ -28399,3 +28399,437 @@
     *: "Hjulglid"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRECUT_AUTO
+  desc: Equalizer menu: Precut chosen while Auto Headroom sets it
+  user: core
+  <source>
+    *: "Auto Headroom sets Precut"
+  </source>
+  <dest>
+    *: "Automatisk headroom ställer in dämpningen"
+  </dest>
+  <voice>
+    *: "Automatisk headroom ställer in dämpningen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_CACHE_FULL
+  desc: splash in file search when the directory cache is full
+  user: core
+  <source>
+    *: "Cache full: some files not searched"
+  </source>
+  <dest>
+    *: "Cachen full: inte alla filer genomsökta"
+  </dest>
+  <voice>
+    *: "Cachen full, inte alla filer genomsökta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_NEEDS_DIRCACHE
+  desc: splash in file search when the directory cache is not ready
+  user: core
+  <source>
+    *: "Needs the directory cache"
+  </source>
+  <dest>
+    *: "Kräver mappcachen"
+  </dest>
+  <voice>
+    *: "Kräver mappcachen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HOTKEY_SCRUB
+  desc: Now Playing button action: the wheel moves the play position
+  user: core
+  <source>
+    *: "Scrub"
+  </source>
+  <dest>
+    *: "Spola"
+  </dest>
+  <voice>
+    *: "Spola"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_TITLE
+  desc: Analyse Library: title of the dialog explaining the analysis
+  user: core
+  <source>
+    *: "Analyse library"
+  </source>
+  <dest>
+    *: "Analysera biblioteket"
+  </dest>
+  <voice>
+    *: "Analysera biblioteket"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_WHAT
+  desc: Analyse Library: first paragraph of the explanation
+  user: core
+  <source>
+    *: "This measures how every track sounds -- its tempo, loudness, energy and key -- and stores the result, so playlists can be built from how the music feels rather than from its tags."
+  </source>
+  <dest>
+    *: "Det här mäter hur varje spår låter -- tempo, ljudstyrka, energi och tonart -- och sparar resultatet, så att spellistor kan byggas efter hur musiken känns i stället för efter taggarna."
+  </dest>
+  <voice>
+    *: "Det här mäter hur varje spår låter, tempo, ljudstyrka, energi och tonart, och sparar resultatet, så att spellistor kan byggas efter hur musiken känns i stället för efter taggarna."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_TIME
+  desc: Analyse Library: second paragraph of the explanation
+  user: core
+  <source>
+    *: "It takes hours. A few thousand tracks is most of a night."
+  </source>
+  <dest>
+    *: "Det tar timmar. Några tusen spår tar större delen av en natt."
+  </dest>
+  <voice>
+    *: "Det tar timmar. Några tusen spår tar större delen av en natt."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_POWER
+  desc: Analyse Library: third paragraph of the explanation
+  user: core
+  <source>
+    *: "The player has to stay plugged in, and stops if the charger is removed. Nothing else runs while it works: the disk stays awake throughout and the processor runs flat out, so the player will be warm and will do nothing else until it has finished."
+  </source>
+  <dest>
+    *: "Spelaren måste vara ansluten till laddaren och stannar om den kopplas bort. Inget annat körs under tiden: disken är igång hela tiden och processorn går för fullt, så spelaren blir varm och gör inget annat förrän den är klar."
+  </dest>
+  <voice>
+    *: "Spelaren måste vara ansluten till laddaren och stannar om den kopplas bort. Inget annat körs under tiden. Disken är igång hela tiden och processorn går för fullt, så spelaren blir varm och gör inget annat förrän den är klar."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_STOP
+  desc: Analyse Library: last paragraph of the explanation
+  user: core
+  <source>
+    *: "Stopping costs nothing -- you can update the analysis, which will carry on from where it left off."
+  </source>
+  <dest>
+    *: "Att stoppa kostar ingenting -- du kan uppdatera analysen, som fortsätter där den slutade."
+  </dest>
+  <voice>
+    *: "Att stoppa kostar ingenting. Du kan uppdatera analysen, som fortsätter där den slutade."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_START
+  desc: Analyse Library: button that starts the analysis
+  user: core
+  <source>
+    *: "Start"
+  </source>
+  <dest>
+    *: "Starta"
+  </dest>
+  <voice>
+    *: "Starta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NOT_NOW
+  desc: Analyse Library: button that closes the explanation without starting
+  user: core
+  <source>
+    *: "Not now"
+  </source>
+  <dest>
+    *: "Inte nu"
+  </dest>
+  <voice>
+    *: "Inte nu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_WHAT
+  desc: Analyse Library: first paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Thorough listens to forty seconds of each track. Quick stops as soon as it has worked out the tempo, around eleven seconds, and gets through the library about three and a half times faster."
+  </source>
+  <dest>
+    *: "Grundlig lyssnar på fyrtio sekunder av varje spår. Snabb slutar så fort tempot är klart, efter ungefär elva sekunder, och går igenom biblioteket ungefär tre och en halv gånger fortare."
+  </dest>
+  <voice>
+    *: "Grundlig lyssnar på fyrtio sekunder av varje spår. Snabb slutar så fort tempot är klart, efter ungefär elva sekunder, och går igenom biblioteket ungefär tre och en halv gånger fortare."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_COST
+  desc: Analyse Library: second paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Quick is faster than it is accurate. Working out the tempo is what stops it, and that ends the measurement of loudness, tone and key along with it -- measured against a full analysis, Quick picked a different closest track two times in three."
+  </source>
+  <dest>
+    *: "Snabb är snabbare än den är noggrann. Att tempot blir klart är det som stoppar den, och då slutar också mätningen av ljudstyrka, klang och tonart -- jämfört med en fullständig analys valde Snabb ett annat närmaste spår två gånger av tre."
+  </dest>
+  <voice>
+    *: "Snabb är snabbare än den är noggrann. Att tempot blir klart är det som stoppar den, och då slutar också mätningen av ljudstyrka, klang och tonart. Jämfört med en fullständig analys valde Snabb ett annat närmaste spår två gånger av tre."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_CHOOSE
+  desc: Analyse Library: last paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Choose Quick if a full analysis on the player is too long to sit through. The desktop tool does a whole library thoroughly in minutes."
+  </source>
+  <dest>
+    *: "Välj Snabb om en fullständig analys på spelaren tar för lång tid. Datorverktyget analyserar ett helt bibliotek grundligt på några minuter."
+  </dest>
+  <voice>
+    *: "Välj Snabb om en fullständig analys på spelaren tar för lång tid. Datorverktyget analyserar ett helt bibliotek grundligt på några minuter."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PAUSED
+  desc: Analyse Library: first line of the progress box while it waits for the charger
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "Pausad"
+  </dest>
+  <voice>
+    *: "Pausad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PROGRESS
+  desc: Analyse Library: progress line, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Analysing %d of %d"
+  </source>
+  <dest>
+    *: "Analyserar %d av %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_HOURS
+  desc: Analyse Library: time left, hours then minutes
+  user: core
+  <source>
+    *: "About %ldh %ldm left"
+  </source>
+  <dest>
+    *: "Cirka %ld h %ld min kvar"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_MINUTES
+  desc: Analyse Library: time left, in minutes
+  user: core
+  <source>
+    *: "About %ldm left"
+  </source>
+  <dest>
+    *: "Cirka %ld min kvar"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_ESTIMATING
+  desc: Analyse Library: in place of the time left, before the first track has finished
+  user: core
+  <source>
+    *: "Working out how long..."
+  </source>
+  <dest>
+    *: "Räknar ut hur länge..."
+  </dest>
+  <voice>
+    *: "Räknar ut hur länge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOP
+  desc: Analyse Library: the button that stops the analysis
+  user: core
+  <source>
+    *: "Stop"
+  </source>
+  <dest>
+    *: "Stoppa"
+  </dest>
+  <voice>
+    *: "Stoppa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_CONNECT_CHARGER
+  desc: Analyse Library: waiting for the charger to be connected
+  user: core
+  <source>
+    *: "Connect the charger to continue"
+  </source>
+  <dest>
+    *: "Anslut laddaren för att fortsätta"
+  </dest>
+  <voice>
+    *: "Anslut laddaren för att fortsätta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NEEDS_DATABASE
+  desc: Analyse Library: splash when the database cannot be used
+  user: core
+  <source>
+    *: "Needs the database"
+  </source>
+  <dest>
+    *: "Kräver databasen"
+  </dest>
+  <voice>
+    *: "Kräver databasen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESUME_ASK
+  desc: Analyse Library: question when an analysis is part finished, with the tracks done
+  user: core
+  <source>
+    *: "An analysis is part finished (%d done). Carry on with it?"
+  </source>
+  <dest>
+    *: "En analys är delvis klar (%d klara). Fortsätta med den?"
+  </dest>
+  <voice>
+    *: "En analys är delvis klar. Fortsätta med den?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESTART_ASK
+  desc: Analyse Library: question after declining to carry on a part-finished analysis
+  user: core
+  <source>
+    *: "Start again from the beginning?"
+  </source>
+  <dest>
+    *: "Börja om från början?"
+  </dest>
+  <voice>
+    *: "Börja om från början?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_REBUILD_ASK
+  desc: Analyse Library: question before a rebuild throws away a finished index
+  user: core
+  <source>
+    *: "You already have an index. Rebuild it from scratch?"
+  </source>
+  <dest>
+    *: "Du har redan ett index. Bygga om det från grunden?"
+  </dest>
+  <voice>
+    *: "Du har redan ett index. Bygga om det från grunden?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_UPDATE_ASK
+  desc: Analyse Library: question after declining the rebuild
+  user: core
+  <source>
+    *: "Update it instead?"
+  </source>
+  <dest>
+    *: "Uppdatera det i stället?"
+  </dest>
+  <voice>
+    *: "Uppdatera det i stället?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_OPEN_FAILED
+  desc: Analyse Library: splash when the sound index cannot be opened
+  user: core
+  <source>
+    *: "Could not open the index"
+  </source>
+  <dest>
+    *: "Kunde inte öppna indexet"
+  </dest>
+  <voice>
+    *: "Kunde inte öppna indexet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOPPED
+  desc: Analyse Library: splash after stopping, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Stopped. %d of %d done"
+  </source>
+  <dest>
+    *: "Stoppad. %d av %d klara"
+  </dest>
+  <voice>
+    *: "Stoppad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_SAVING
+  desc: Analyse Library: shown while the finished index is written
+  user: core
+  <source>
+    *: "Saving the results..."
+  </source>
+  <dest>
+    *: "Sparar resultaten..."
+  </dest>
+  <voice>
+    *: "Sparar resultaten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DONE
+  desc: Analyse Library: result, tracks measured and tracks that could not be read
+  user: core
+  <source>
+    *: "Done. %d measured, %d unreadable"
+  </source>
+  <dest>
+    *: "Klar. %d mätta, %d oläsbara"
+  </dest>
+  <voice>
+    *: "Klar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_WRITE_FAILED
+  desc: Analyse Library: result when the finished index could not be written
+  user: core
+  <source>
+    *: "Could not write the index"
+  </source>
+  <dest>
+    *: "Kunde inte skriva indexet"
+  </dest>
+  <voice>
+    *: "Kunde inte skriva indexet"
+  </voice>
+</phrase>

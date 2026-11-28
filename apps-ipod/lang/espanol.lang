@@ -28400,3 +28400,437 @@
     *: "Deslizamiento de la rueda"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRECUT_AUTO
+  desc: Equalizer menu: Precut chosen while Auto Headroom sets it
+  user: core
+  <source>
+    *: "Auto Headroom sets Precut"
+  </source>
+  <dest>
+    *: "El margen automático fija el precorte"
+  </dest>
+  <voice>
+    *: "El margen automático fija el precorte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_CACHE_FULL
+  desc: splash in file search when the directory cache is full
+  user: core
+  <source>
+    *: "Cache full: some files not searched"
+  </source>
+  <dest>
+    *: "Caché llena: algunos archivos sin buscar"
+  </dest>
+  <voice>
+    *: "Caché llena, algunos archivos sin buscar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_NEEDS_DIRCACHE
+  desc: splash in file search when the directory cache is not ready
+  user: core
+  <source>
+    *: "Needs the directory cache"
+  </source>
+  <dest>
+    *: "Necesita la caché de directorios"
+  </dest>
+  <voice>
+    *: "Necesita la caché de directorios"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HOTKEY_SCRUB
+  desc: Now Playing button action: the wheel moves the play position
+  user: core
+  <source>
+    *: "Scrub"
+  </source>
+  <dest>
+    *: "Desplazar"
+  </dest>
+  <voice>
+    *: "Desplazar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_TITLE
+  desc: Analyse Library: title of the dialog explaining the analysis
+  user: core
+  <source>
+    *: "Analyse library"
+  </source>
+  <dest>
+    *: "Analizar biblioteca"
+  </dest>
+  <voice>
+    *: "Analizar biblioteca"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_WHAT
+  desc: Analyse Library: first paragraph of the explanation
+  user: core
+  <source>
+    *: "This measures how every track sounds -- its tempo, loudness, energy and key -- and stores the result, so playlists can be built from how the music feels rather than from its tags."
+  </source>
+  <dest>
+    *: "Mide cómo suena cada pista -- su tempo, volumen, energía y tonalidad -- y guarda el resultado, para crear listas según cómo se siente la música en lugar de por sus etiquetas."
+  </dest>
+  <voice>
+    *: "Mide cómo suena cada pista, su tempo, volumen, energía y tonalidad, y guarda el resultado, para crear listas según cómo se siente la música en lugar de por sus etiquetas."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_TIME
+  desc: Analyse Library: second paragraph of the explanation
+  user: core
+  <source>
+    *: "It takes hours. A few thousand tracks is most of a night."
+  </source>
+  <dest>
+    *: "Tarda horas. Unos miles de pistas llevan casi toda una noche."
+  </dest>
+  <voice>
+    *: "Tarda horas. Unos miles de pistas llevan casi toda una noche."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_POWER
+  desc: Analyse Library: third paragraph of the explanation
+  user: core
+  <source>
+    *: "The player has to stay plugged in, and stops if the charger is removed. Nothing else runs while it works: the disk stays awake throughout and the processor runs flat out, so the player will be warm and will do nothing else until it has finished."
+  </source>
+  <dest>
+    *: "El reproductor debe seguir enchufado y se detiene si se quita el cargador. Nada más funciona mientras trabaja: el disco permanece activo todo el tiempo y el procesador va al máximo, así que el reproductor se calentará y no hará nada más hasta terminar."
+  </dest>
+  <voice>
+    *: "El reproductor debe seguir enchufado y se detiene si se quita el cargador. Nada más funciona mientras trabaja. El disco permanece activo todo el tiempo y el procesador va al máximo, así que el reproductor se calentará y no hará nada más hasta terminar."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_STOP
+  desc: Analyse Library: last paragraph of the explanation
+  user: core
+  <source>
+    *: "Stopping costs nothing -- you can update the analysis, which will carry on from where it left off."
+  </source>
+  <dest>
+    *: "Detenerlo no cuesta nada -- puede actualizar el análisis, que continuará donde se quedó."
+  </dest>
+  <voice>
+    *: "Detenerlo no cuesta nada. Puede actualizar el análisis, que continuará donde se quedó."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_START
+  desc: Analyse Library: button that starts the analysis
+  user: core
+  <source>
+    *: "Start"
+  </source>
+  <dest>
+    *: "Iniciar"
+  </dest>
+  <voice>
+    *: "Iniciar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NOT_NOW
+  desc: Analyse Library: button that closes the explanation without starting
+  user: core
+  <source>
+    *: "Not now"
+  </source>
+  <dest>
+    *: "Ahora no"
+  </dest>
+  <voice>
+    *: "Ahora no"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_WHAT
+  desc: Analyse Library: first paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Thorough listens to forty seconds of each track. Quick stops as soon as it has worked out the tempo, around eleven seconds, and gets through the library about three and a half times faster."
+  </source>
+  <dest>
+    *: "Exhaustivo escucha cuarenta segundos de cada pista. Rápido se detiene en cuanto averigua el tempo, unos once segundos, y recorre la biblioteca unas tres veces y media más deprisa."
+  </dest>
+  <voice>
+    *: "Exhaustivo escucha cuarenta segundos de cada pista. Rápido se detiene en cuanto averigua el tempo, unos once segundos, y recorre la biblioteca unas tres veces y media más deprisa."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_COST
+  desc: Analyse Library: second paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Quick is faster than it is accurate. Working out the tempo is what stops it, and that ends the measurement of loudness, tone and key along with it -- measured against a full analysis, Quick picked a different closest track two times in three."
+  </source>
+  <dest>
+    *: "Rápido es más rápido que preciso. Averiguar el tempo es lo que lo detiene, y con ello termina también la medida del volumen, el timbre y la tonalidad -- comparado con un análisis completo, Rápido eligió otra pista más cercana dos de cada tres veces."
+  </dest>
+  <voice>
+    *: "Rápido es más rápido que preciso. Averiguar el tempo es lo que lo detiene, y con ello termina también la medida del volumen, el timbre y la tonalidad. Comparado con un análisis completo, Rápido eligió otra pista más cercana dos de cada tres veces."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_CHOOSE
+  desc: Analyse Library: last paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Choose Quick if a full analysis on the player is too long to sit through. The desktop tool does a whole library thoroughly in minutes."
+  </source>
+  <dest>
+    *: "Elija Rápido si un análisis completo en el reproductor es demasiado largo. La herramienta de escritorio analiza a fondo toda una biblioteca en minutos."
+  </dest>
+  <voice>
+    *: "Elija Rápido si un análisis completo en el reproductor es demasiado largo. La herramienta de escritorio analiza a fondo toda una biblioteca en minutos."
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PAUSED
+  desc: Analyse Library: first line of the progress box while it waits for the charger
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "En pausa"
+  </dest>
+  <voice>
+    *: "En pausa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PROGRESS
+  desc: Analyse Library: progress line, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Analysing %d of %d"
+  </source>
+  <dest>
+    *: "Analizando %d de %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_HOURS
+  desc: Analyse Library: time left, hours then minutes
+  user: core
+  <source>
+    *: "About %ldh %ldm left"
+  </source>
+  <dest>
+    *: "Quedan unos %ld h %ld min"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_MINUTES
+  desc: Analyse Library: time left, in minutes
+  user: core
+  <source>
+    *: "About %ldm left"
+  </source>
+  <dest>
+    *: "Quedan unos %ld min"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_ESTIMATING
+  desc: Analyse Library: in place of the time left, before the first track has finished
+  user: core
+  <source>
+    *: "Working out how long..."
+  </source>
+  <dest>
+    *: "Calculando cuánto falta..."
+  </dest>
+  <voice>
+    *: "Calculando cuánto falta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOP
+  desc: Analyse Library: the button that stops the analysis
+  user: core
+  <source>
+    *: "Stop"
+  </source>
+  <dest>
+    *: "Detener"
+  </dest>
+  <voice>
+    *: "Detener"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_CONNECT_CHARGER
+  desc: Analyse Library: waiting for the charger to be connected
+  user: core
+  <source>
+    *: "Connect the charger to continue"
+  </source>
+  <dest>
+    *: "Conecte el cargador para continuar"
+  </dest>
+  <voice>
+    *: "Conecte el cargador para continuar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NEEDS_DATABASE
+  desc: Analyse Library: splash when the database cannot be used
+  user: core
+  <source>
+    *: "Needs the database"
+  </source>
+  <dest>
+    *: "Necesita la base de datos"
+  </dest>
+  <voice>
+    *: "Necesita la base de datos"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESUME_ASK
+  desc: Analyse Library: question when an analysis is part finished, with the tracks done
+  user: core
+  <source>
+    *: "An analysis is part finished (%d done). Carry on with it?"
+  </source>
+  <dest>
+    *: "Hay un análisis a medias (%d hechas). ¿Continuarlo?"
+  </dest>
+  <voice>
+    *: "Hay un análisis a medias. ¿Continuarlo?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESTART_ASK
+  desc: Analyse Library: question after declining to carry on a part-finished analysis
+  user: core
+  <source>
+    *: "Start again from the beginning?"
+  </source>
+  <dest>
+    *: "¿Empezar de nuevo desde el principio?"
+  </dest>
+  <voice>
+    *: "¿Empezar de nuevo desde el principio?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_REBUILD_ASK
+  desc: Analyse Library: question before a rebuild throws away a finished index
+  user: core
+  <source>
+    *: "You already have an index. Rebuild it from scratch?"
+  </source>
+  <dest>
+    *: "Ya tiene un índice. ¿Rehacerlo desde cero?"
+  </dest>
+  <voice>
+    *: "Ya tiene un índice. ¿Rehacerlo desde cero?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_UPDATE_ASK
+  desc: Analyse Library: question after declining the rebuild
+  user: core
+  <source>
+    *: "Update it instead?"
+  </source>
+  <dest>
+    *: "¿Actualizarlo en su lugar?"
+  </dest>
+  <voice>
+    *: "¿Actualizarlo en su lugar?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_OPEN_FAILED
+  desc: Analyse Library: splash when the sound index cannot be opened
+  user: core
+  <source>
+    *: "Could not open the index"
+  </source>
+  <dest>
+    *: "No se pudo abrir el índice"
+  </dest>
+  <voice>
+    *: "No se pudo abrir el índice"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOPPED
+  desc: Analyse Library: splash after stopping, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Stopped. %d of %d done"
+  </source>
+  <dest>
+    *: "Detenido. %d de %d hechas"
+  </dest>
+  <voice>
+    *: "Detenido"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_SAVING
+  desc: Analyse Library: shown while the finished index is written
+  user: core
+  <source>
+    *: "Saving the results..."
+  </source>
+  <dest>
+    *: "Guardando los resultados..."
+  </dest>
+  <voice>
+    *: "Guardando los resultados"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DONE
+  desc: Analyse Library: result, tracks measured and tracks that could not be read
+  user: core
+  <source>
+    *: "Done. %d measured, %d unreadable"
+  </source>
+  <dest>
+    *: "Hecho. %d medidas, %d ilegibles"
+  </dest>
+  <voice>
+    *: "Hecho"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_WRITE_FAILED
+  desc: Analyse Library: result when the finished index could not be written
+  user: core
+  <source>
+    *: "Could not write the index"
+  </source>
+  <dest>
+    *: "No se pudo escribir el índice"
+  </dest>
+  <voice>
+    *: "No se pudo escribir el índice"
+  </voice>
+</phrase>

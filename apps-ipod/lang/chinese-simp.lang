@@ -28399,3 +28399,437 @@
     *: "滚轮惯性滑动"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRECUT_AUTO
+  desc: Equalizer menu: Precut chosen while Auto Headroom sets it
+  user: core
+  <source>
+    *: "Auto Headroom sets Precut"
+  </source>
+  <dest>
+    *: "预增益由自动余量设置"
+  </dest>
+  <voice>
+    *: "预增益由自动余量设置"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_CACHE_FULL
+  desc: splash in file search when the directory cache is full
+  user: core
+  <source>
+    *: "Cache full: some files not searched"
+  </source>
+  <dest>
+    *: "缓存已满：部分文件未搜索"
+  </dest>
+  <voice>
+    *: "缓存已满，部分文件未搜索"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_SEARCH_NEEDS_DIRCACHE
+  desc: splash in file search when the directory cache is not ready
+  user: core
+  <source>
+    *: "Needs the directory cache"
+  </source>
+  <dest>
+    *: "需要目录缓存"
+  </dest>
+  <voice>
+    *: "需要目录缓存"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HOTKEY_SCRUB
+  desc: Now Playing button action: the wheel moves the play position
+  user: core
+  <source>
+    *: "Scrub"
+  </source>
+  <dest>
+    *: "拖动定位"
+  </dest>
+  <voice>
+    *: "拖动定位"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_TITLE
+  desc: Analyse Library: title of the dialog explaining the analysis
+  user: core
+  <source>
+    *: "Analyse library"
+  </source>
+  <dest>
+    *: "分析媒体库"
+  </dest>
+  <voice>
+    *: "分析媒体库"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_WHAT
+  desc: Analyse Library: first paragraph of the explanation
+  user: core
+  <source>
+    *: "This measures how every track sounds -- its tempo, loudness, energy and key -- and stores the result, so playlists can be built from how the music feels rather than from its tags."
+  </source>
+  <dest>
+    *: "测量每首曲目的声音（速度、响度、能量和调性）并保存结果，这样就能按音乐的感觉而不是标签来生成播放列表。"
+  </dest>
+  <voice>
+    *: "测量每首曲目的声音，速度、响度、能量和调性，并保存结果，这样就能按音乐的感觉而不是标签来生成播放列表。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_TIME
+  desc: Analyse Library: second paragraph of the explanation
+  user: core
+  <source>
+    *: "It takes hours. A few thousand tracks is most of a night."
+  </source>
+  <dest>
+    *: "需要数小时。几千首曲目大约要花一整夜。"
+  </dest>
+  <voice>
+    *: "需要数小时。几千首曲目大约要花一整夜。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_POWER
+  desc: Analyse Library: third paragraph of the explanation
+  user: core
+  <source>
+    *: "The player has to stay plugged in, and stops if the charger is removed. Nothing else runs while it works: the disk stays awake throughout and the processor runs flat out, so the player will be warm and will do nothing else until it has finished."
+  </source>
+  <dest>
+    *: "播放器必须一直连接充电器，拔掉充电器就会停止。分析期间不运行其他任何功能：硬盘全程保持运转，处理器满负荷工作，因此播放器会发热，完成之前无法做其他事情。"
+  </dest>
+  <voice>
+    *: "播放器必须一直连接充电器，拔掉充电器就会停止。分析期间不运行其他任何功能。硬盘全程保持运转，处理器满负荷工作，因此播放器会发热，完成之前无法做其他事情。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_EXPLAIN_STOP
+  desc: Analyse Library: last paragraph of the explanation
+  user: core
+  <source>
+    *: "Stopping costs nothing -- you can update the analysis, which will carry on from where it left off."
+  </source>
+  <dest>
+    *: "停止不会有任何损失，之后可以更新分析，它会从中断处继续。"
+  </dest>
+  <voice>
+    *: "停止不会有任何损失，之后可以更新分析，它会从中断处继续。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_START
+  desc: Analyse Library: button that starts the analysis
+  user: core
+  <source>
+    *: "Start"
+  </source>
+  <dest>
+    *: "开始"
+  </dest>
+  <voice>
+    *: "开始"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NOT_NOW
+  desc: Analyse Library: button that closes the explanation without starting
+  user: core
+  <source>
+    *: "Not now"
+  </source>
+  <dest>
+    *: "以后再说"
+  </dest>
+  <voice>
+    *: "以后再说"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_WHAT
+  desc: Analyse Library: first paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Thorough listens to forty seconds of each track. Quick stops as soon as it has worked out the tempo, around eleven seconds, and gets through the library about three and a half times faster."
+  </source>
+  <dest>
+    *: "完整模式会听每首曲目四十秒。快速模式一算出速度就停止，大约十一秒，处理整个媒体库的速度约快三倍半。"
+  </dest>
+  <voice>
+    *: "完整模式会听每首曲目四十秒。快速模式一算出速度就停止，大约十一秒，处理整个媒体库的速度约快三倍半。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_COST
+  desc: Analyse Library: second paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Quick is faster than it is accurate. Working out the tempo is what stops it, and that ends the measurement of loudness, tone and key along with it -- measured against a full analysis, Quick picked a different closest track two times in three."
+  </source>
+  <dest>
+    *: "快速模式重速度而非准确。算出速度就会停止，响度、音色和调性的测量也随之结束。与完整分析相比，快速模式每三次有两次选出了不同的最相近曲目。"
+  </dest>
+  <voice>
+    *: "快速模式重速度而非准确。算出速度就会停止，响度、音色和调性的测量也随之结束。与完整分析相比，快速模式每三次有两次选出了不同的最相近曲目。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DEPTH_CHOOSE
+  desc: Analyse Library: last paragraph explaining Analysis Depth
+  user: core
+  <source>
+    *: "Choose Quick if a full analysis on the player is too long to sit through. The desktop tool does a whole library thoroughly in minutes."
+  </source>
+  <dest>
+    *: "如果在播放器上完整分析耗时太久，请选择快速。电脑端工具几分钟就能完整分析整个媒体库。"
+  </dest>
+  <voice>
+    *: "如果在播放器上完整分析耗时太久，请选择快速。电脑端工具几分钟就能完整分析整个媒体库。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PAUSED
+  desc: Analyse Library: first line of the progress box while it waits for the charger
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "已暂停"
+  </dest>
+  <voice>
+    *: "已暂停"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_PROGRESS
+  desc: Analyse Library: progress line, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Analysing %d of %d"
+  </source>
+  <dest>
+    *: "正在分析 %d / %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_HOURS
+  desc: Analyse Library: time left, hours then minutes
+  user: core
+  <source>
+    *: "About %ldh %ldm left"
+  </source>
+  <dest>
+    *: "约剩 %ld 小时 %ld 分钟"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_LEFT_MINUTES
+  desc: Analyse Library: time left, in minutes
+  user: core
+  <source>
+    *: "About %ldm left"
+  </source>
+  <dest>
+    *: "约剩 %ld 分钟"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_ESTIMATING
+  desc: Analyse Library: in place of the time left, before the first track has finished
+  user: core
+  <source>
+    *: "Working out how long..."
+  </source>
+  <dest>
+    *: "正在估算时间..."
+  </dest>
+  <voice>
+    *: "正在估算时间"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOP
+  desc: Analyse Library: the button that stops the analysis
+  user: core
+  <source>
+    *: "Stop"
+  </source>
+  <dest>
+    *: "停止"
+  </dest>
+  <voice>
+    *: "停止"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_CONNECT_CHARGER
+  desc: Analyse Library: waiting for the charger to be connected
+  user: core
+  <source>
+    *: "Connect the charger to continue"
+  </source>
+  <dest>
+    *: "请连接充电器以继续"
+  </dest>
+  <voice>
+    *: "请连接充电器以继续"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_NEEDS_DATABASE
+  desc: Analyse Library: splash when the database cannot be used
+  user: core
+  <source>
+    *: "Needs the database"
+  </source>
+  <dest>
+    *: "需要数据库"
+  </dest>
+  <voice>
+    *: "需要数据库"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESUME_ASK
+  desc: Analyse Library: question when an analysis is part finished, with the tracks done
+  user: core
+  <source>
+    *: "An analysis is part finished (%d done). Carry on with it?"
+  </source>
+  <dest>
+    *: "有一次分析尚未完成（已完成 %d）。要继续吗？"
+  </dest>
+  <voice>
+    *: "有一次分析尚未完成。要继续吗？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_RESTART_ASK
+  desc: Analyse Library: question after declining to carry on a part-finished analysis
+  user: core
+  <source>
+    *: "Start again from the beginning?"
+  </source>
+  <dest>
+    *: "要从头开始吗？"
+  </dest>
+  <voice>
+    *: "要从头开始吗？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_REBUILD_ASK
+  desc: Analyse Library: question before a rebuild throws away a finished index
+  user: core
+  <source>
+    *: "You already have an index. Rebuild it from scratch?"
+  </source>
+  <dest>
+    *: "已有索引。要从头重建吗？"
+  </dest>
+  <voice>
+    *: "已有索引。要从头重建吗？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_UPDATE_ASK
+  desc: Analyse Library: question after declining the rebuild
+  user: core
+  <source>
+    *: "Update it instead?"
+  </source>
+  <dest>
+    *: "改为更新吗？"
+  </dest>
+  <voice>
+    *: "改为更新吗？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_OPEN_FAILED
+  desc: Analyse Library: splash when the sound index cannot be opened
+  user: core
+  <source>
+    *: "Could not open the index"
+  </source>
+  <dest>
+    *: "无法打开索引"
+  </dest>
+  <voice>
+    *: "无法打开索引"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_STOPPED
+  desc: Analyse Library: splash after stopping, tracks reached of tracks in the library
+  user: core
+  <source>
+    *: "Stopped. %d of %d done"
+  </source>
+  <dest>
+    *: "已停止。已完成 %d / %d"
+  </dest>
+  <voice>
+    *: "已停止"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_SAVING
+  desc: Analyse Library: shown while the finished index is written
+  user: core
+  <source>
+    *: "Saving the results..."
+  </source>
+  <dest>
+    *: "正在保存结果..."
+  </dest>
+  <voice>
+    *: "正在保存结果"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_DONE
+  desc: Analyse Library: result, tracks measured and tracks that could not be read
+  user: core
+  <source>
+    *: "Done. %d measured, %d unreadable"
+  </source>
+  <dest>
+    *: "完成。已测量 %d，无法读取 %d"
+  </dest>
+  <voice>
+    *: "完成"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SCAN_WRITE_FAILED
+  desc: Analyse Library: result when the finished index could not be written
+  user: core
+  <source>
+    *: "Could not write the index"
+  </source>
+  <dest>
+    *: "无法写入索引"
+  </dest>
+  <voice>
+    *: "无法写入索引"
+  </voice>
+</phrase>
