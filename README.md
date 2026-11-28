@@ -1333,6 +1333,7 @@ licences of everything inside it in full, in `LICENSES.txt`.
   - Damaged music, picture, font, skin and voice files refused rather than
     crashed on, and file system and USB disk fixes
   - A button press no longer lost at a change of track
+  - No audio packets lost to a car over the iPod Video's USB
 - RodBox by [@RodrigoM09](https://github.com/RodrigoM09)
   (https://github.com/RodrigoM09/RodBox), GPL v2
   - Disk and USB drive fixes

@@ -286,6 +286,7 @@
 
 #define DTD_NEXT_TERMINATE                   (0x00000001)
 #define DTD_IOC                              (0x00008000)
+#define DTD_MULTO_1                          (0x00000400) /* ISO: 1 packet */
 #define DTD_STATUS_ACTIVE                    (0x00000080)
 #define DTD_STATUS_HALTED                    (0x00000040)
 #define DTD_STATUS_DATA_BUFF_ERR             (0x00000020)
@@ -1469,11 +1470,68 @@ int usb_drv_batch_deinit() {
     return 0;
 }
 
+/* An isochronous IN dTD that retires with a transaction error and its whole
+ * length left was never sent. While the dTD after it has not been sent either,
+ * it can go again without reordering anything: the endpoint is flushed, the
+ * same dTD armed with the same buffer and the dQH pointed back at it. At most
+ * BATCH_MAX_RESENDS times, so the ring cannot stall on one packet.
+ * Returns whether the dTD at the write cursor was re-armed. */
+#define BATCH_MAX_RESENDS 3
+static int8_t batch_resent_slot = -1;
+static uint8_t batch_resent_tries;
+
+static bool batch_resend_lost(unsigned int sts) {
+    struct transfer_descriptor* const td = &batch_td_array[batch_write_cursor];
+    struct transfer_descriptor* const next =
+        &batch_td_array[(batch_write_cursor + 1) % USB_BATCH_SLOTS];
+
+    const bool was_resent = batch_resent_slot == batch_write_cursor;
+    batch_resent_slot = -1;
+
+    if(!(sts & DTD_STATUS_TRANSACTION_ERR) || !(sts & DTD_PACKET_SIZE))
+        return false;
+    if(!was_resent)
+        batch_resent_tries = 0;
+    if(batch_resent_tries >= BATCH_MAX_RESENDS)
+        return false;
+    if(!(next->size_ioc_sts & DTD_STATUS_ACTIVE))
+        return false;
+
+    const int pipe = ep_to_pipe_index(batch_ep);
+    const unsigned int mask = pipe2mask[pipe];
+    struct queue_head* const qh = &qh_array[pipe];
+
+    REG_ENDPTFLUSH = mask;
+    while(REG_ENDPTFLUSH & mask);
+
+    /* the controller leaves the buffer pointers alone: rearm the token only */
+    td->size_ioc_sts = (sts & DTD_PACKET_SIZE) | DTD_MULTO_1 |
+                       DTD_STATUS_ACTIVE;
+    qh->dtd.next_td_ptr  = (unsigned int)td;
+    qh->dtd.size_ioc_sts = 0;
+    REG_ENDPTPRIME |= mask;
+
+    batch_resent_slot = batch_write_cursor;
+    batch_resent_tries++;
+    return true;
+}
+
 /* returns how many slots were refilled, or -1 when the queue was stopped and
  * needs no priming */
 static int batch_fill_tds(void) {
     int filled = 0;
     while(!(batch_td_array[batch_write_cursor].size_ioc_sts & DTD_STATUS_ACTIVE)) {
+        struct transfer_descriptor* td = &batch_td_array[batch_write_cursor];
+        /* clear in a dTD never armed since batch_start, or already counted */
+        const unsigned int sts = td->size_ioc_sts;
+        if(sts != 0 && batch_resend_lost(sts))
+            break;
+        /* a packet lost for good */
+        if(sts & DTD_ERROR_MASK)
+            batch_failed++;
+        if(sts & DTD_STATUS_DATA_BUFF_ERR)
+            batch_buffer_errors++;
+
         /* batch_get_more may call batch_stop() through:
         *  - batch_get_more()
         *   - pcm_play_dma_complete_callback()
@@ -1483,16 +1541,15 @@ static int batch_fill_tds(void) {
         size_t len;
         batch_get_more(&ptr, &len);
         if(len == 0 || batch_stopped) {
+            td->size_ioc_sts = 0;
             return -1;
         }
 
-        struct transfer_descriptor* td = &batch_td_array[batch_write_cursor];
-        if(td->size_ioc_sts & DTD_ERROR_MASK)
-            batch_failed++;
-        if(td->size_ioc_sts & DTD_STATUS_DATA_BUFF_ERR)
-            batch_buffer_errors++;
         td_set_buf_ptr(td, ptr);
-        td->size_ioc_sts = (len << DTD_LENGTH_BIT_POS) | DTD_STATUS_ACTIVE;
+        /* one packet per dTD, stated in MultO as Linux's chipidea udc does
+         * for isochronous IN */
+        td->size_ioc_sts = (len << DTD_LENGTH_BIT_POS) | DTD_MULTO_1 |
+                           DTD_STATUS_ACTIVE;
         batch_write_cursor = (batch_write_cursor + 1)  % USB_BATCH_SLOTS;
         filled++;
     }
@@ -1505,6 +1562,7 @@ int usb_drv_batch_start(void) {
     /* reset variables */
     batch_write_cursor = 0;
     batch_stopped = false;
+    batch_resent_slot = -1;
 
     /* chain tds */
     memset(batch_td_array, 0, sizeof(struct transfer_descriptor) * USB_BATCH_SLOTS);
@@ -1613,24 +1671,17 @@ static void sof_received(void) {
         return;
     }
 
-    /* error recovery */
     const int pipe = ep_to_pipe_index(batch_ep);
     const unsigned int mask = pipe2mask[pipe];
-    struct queue_head* const qh = &qh_array[pipe];
-    struct transfer_descriptor* const td = (void*)qh->curr_dtd_ptr;
-    if(td->size_ioc_sts & DTD_ERROR_MASK) {
-        logf("td error status=0x%08X", td->size_ioc_sts);
-        REG_ENDPTPRIME |= mask;
-    }
 
     /* do refill. Every slot free means the last queued packet went out with
-     * nothing behind it. */
+     * nothing behind it. Lost packets are resent by batch_fill_tds(), and the
+     * controller follows the ring by itself while it runs, so only an endpoint
+     * that has stopped is primed. */
     const int filled = batch_fill_tds();
     if(filled == USB_BATCH_SLOTS)
         batch_ran_empty++;
-    if(filled >= 0) {
-        const int pipe = ep_to_pipe_index(batch_ep);
-        const unsigned int mask = pipe2mask[pipe];
+    if(filled >= 0 && !(REG_ENDPTSTATUS & mask)) {
         REG_ENDPTPRIME |= mask;
     }
 }
