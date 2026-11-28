@@ -2488,11 +2488,12 @@ int fat_closewrite(struct fat_filestr *filestr, uint32_t size,
         rc = update_short_entry(fat_bpb, file, size, fatentp);
         if (rc < 0)
         {
-            if (freed)
+            /* its entry, not written, still names the cluster: take it back
+               and the file names it again, for a later close to free. Trap:
+               never name it while it is free, or another file can be given
+               it while a stream here still writes to it */
+            if (freed && update_fat_entry(fat_bpb, freed, FAT_EOF_MARK) >= 0)
             {
-                /* its entry, not written, still names the cluster: so does
-                   the file again, which a later close then frees, where
-                   none would leave it taken by no file */
                 file->firstcluster = freed;
                 fat_rewind(filestr);
             }

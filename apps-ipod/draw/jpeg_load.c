@@ -120,6 +120,7 @@ struct prog_scan
     unsigned char ac_sel[4];
     unsigned char ss, se, ah, al; /* spectral band, successive approximation */
     int read_size;              /* bytes to refill with: about a row's */
+    int past_end;               /* bytes it asked for past the data */
     bool needed;
 };
 
@@ -133,6 +134,7 @@ struct prog
     int nscans;
     long end_pos;               /* file offset just past the image */
     int row;                    /* MCU row the stripe is decoded for next */
+    bool spent;                 /* every scan has run past the data */
     int eobrun;
     int restart;
     const unsigned char *loaded_dc[2]; /* tables now in the derived slots */
@@ -2630,19 +2632,32 @@ static void prog_scan_row(struct jpeg *p_jpeg, struct prog_scan *sc)
     prog_suspend(p_jpeg, sc);
 }
 
+/* more than the bit buffer's few bytes of a whole file's last row */
+#define JPEG_PAST_END_SLACK 16
+
 static void prog_decode_row(struct jpeg *p_jpeg)
 {
     struct prog *pr = &p_jpeg->prog;
     int i;
 
     memset(pr->stripe, 0, pr->stripe_bytes);
+    pr->spent = true;
     for (i = 0; i < pr->nscans; i++)
     {
-        if (pr->scans[i].needed)
-        {
-            prog_scan_row(p_jpeg, &pr->scans[i]);
-            yield();
-        }
+        struct prog_scan *sc = &pr->scans[i];
+        int past_end = p_jpeg->past_end;
+
+        if (!sc->needed)
+            continue;
+        prog_scan_row(p_jpeg, sc);
+        /* A scan cut short is dropped from the rows after, which keep what
+         * the scans before it decode */
+        sc->past_end += p_jpeg->past_end - past_end;
+        if (sc->past_end > JPEG_PAST_END_SLACK)
+            sc->needed = false;
+        else
+            pr->spent = false;
+        yield();
     }
     pr->row++;
 }
@@ -2841,9 +2856,6 @@ static void cmyk_to_rgb(unsigned char *px, unsigned width, int kind)
     }
 }
 
-/* more than the bit buffer's few bytes of a whole file's last row */
-#define JPEG_PAST_END_SLACK 16
-
 /* What is left of the data after the headers, in the read buffer and after
    it: an upper bound, as a segment skipped by a seek isn't counted off. */
 static uint64_t jpeg_data_left(const struct jpeg *p_jpeg)
@@ -2877,8 +2889,11 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
        which may claim 32767 x 32767 pixels in a few bytes: the rest of the
        picture is grey, as blocks of no coefficients decode, with nothing more
        read or decoded, so that its time follows its data. A whole file is
-       read at most a few bytes past its end, in its last row. */
-    if (!p_jpeg->mcu_row && UNLIKELY(p_jpeg->past_end > JPEG_PAST_END_SLACK))
+       read at most a few bytes past its end, in its last row. A progressive
+       one is grey only once every scan is spent (prog_decode_row()). */
+    if (!p_jpeg->mcu_row
+        && UNLIKELY(p_jpeg->progressive ? p_jpeg->prog.spent
+                    : p_jpeg->past_end > JPEG_PAST_END_SLACK))
     {
         p_jpeg->out_ptr = (unsigned char *)p_jpeg->img_buf;
         memset(p_jpeg->img_buf, 128, b_width * height);
@@ -3144,7 +3159,7 @@ static int decode_jpeg_fd(int fd, int flags,
        as one claiming 27848 x 8392 pixels in a kilobyte, is refused before
        any row is made: its decode and scaling would walk every row it
        claims. Half: a whole file cut short still shows what it holds. */
-    if ((uint64_t)jpeg_data_left(p_jpeg) * 8 < jpeg_coded_blocks(p_jpeg))
+    if (jpeg_data_left(p_jpeg) * 8 < jpeg_coded_blocks(p_jpeg))
     {
         JDEBUGF("data too short for %dx%d\n", p_jpeg->x_size, p_jpeg->y_size);
         return -17;

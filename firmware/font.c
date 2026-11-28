@@ -289,14 +289,11 @@ static struct font* font_load_in_memory(struct font* pf,
     if (pf->buffer_position > pf->buffer_end)
         return NULL;
 
-    /* each glyph within the bits, as font_get_bits() finds it and the drawing
-       reads it, and no wider than the widest, as a damaged file's could be:
-       the bits past them read. A glyph's bits as the file has them: the last
-       one's rounded up was a byte past them in many a font */
+    /* each glyph within the bits, at its own width, as font_get_bits() finds
+       it and the drawing reads it. A glyph's bits as the file has them: the
+       last one's rounded up was a byte past them in many a font */
     for (i = 0; i < pf->size; i++)
     {
-        if (pf->width && pf->width[i] > pf->maxwidth)
-            ((unsigned char *)pf->width)[i] = pf->maxwidth;
         uint32_t at;
         if (!pf->offset)
             at = i * glyph_bytes(pf, pf->maxwidth);
@@ -306,7 +303,8 @@ static struct font* font_load_in_memory(struct font* pf,
             at = ((const uint16_t *)pf->offset)[i];
         const int width = pf->width ? pf->width[i] : pf->maxwidth;
         if (at > (uint32_t)pf->bits_size
-            || (uint32_t)pf->bits_size - at < (uint32_t)glyph_bits_bytes(pf, width))
+            || (uint32_t)pf->bits_size - at
+               < (uint32_t)glyph_bits_bytes(pf, width))
             return NULL;
     }
 
@@ -775,18 +773,15 @@ static void font_enable(int font_id)
     if (pf->disabled && pf->fd < 0)
     {
         int fd = open(pdata->path, O_RDONLY);
-        if (fd >= 0 && !font_file_unchanged(fd, pdata))
-        {
-            close(fd);
-            fd = -1;
-        }
         /* without its file, or with another in its place, it stays as
            during USB until it's unloaded, its glyphs from the cache */
-        if (fd >= 0)
+        if (fd >= 0 && font_file_unchanged(fd, pdata))
         {
             pf->fd = fd;
             pf->disabled = false;
         }
+        else if (fd >= 0)
+            close(fd);
     }
     core_put_data_pinned(pdata);
 }
@@ -872,11 +867,17 @@ load_cache_entry(struct font_cache_entry* p, void* callback_data)
     {
         p->width = pf->maxwidth;
     }
-    /* no wider than the font's widest glyph, which its place in the cache is
-       made for: a damaged file's glyph, or a convbdf combining mark wider
-       than its font, wrote past it into the places after */
+    /* A glyph wider than the font's widest, as a damaged file's or a convbdf
+       combining mark's can be, is blank: its place in the cache is made for
+       the widest, and its bits cut to that width would be read at the wrong
+       stride */
     if (p->width > pf->maxwidth)
+    {
         p->width = pf->maxwidth;
+        memset(p->bitmap, 0, glyph_bytes(pf, pf->maxwidth));
+        lock_font_handle(pf->handle, false);
+        return;
+    }
 
     int32_t bitmap_offset = 0;
 

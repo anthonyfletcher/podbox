@@ -100,9 +100,15 @@ static bool          align_pending; /* The hop grid has yet to be put back on
                                        the track's own timeline */
 
 /* The retained samples, oldest first, so a group's window is always the last
- * group_tune[].window of them. In SDRAM: the 5G's core IRAM is full, and its
- * USB audio packets need it more (usbstack/iap/audio.c). */
+ * group_tune[].window of them. Every hop reads 3584, 617,000 a second, so
+ * they go in IRAM where there is room. Not on the 5G: its core IRAM is full,
+ * and its USB audio packets need it more (usbstack/iap/audio.c), so with no
+ * data cache each read there is a several-cycle SDRAM access. */
+#if CONFIG_USBOTG == USBOTG_ARC
 static int16_t       retain[BEAT_RETAIN];
+#else
+static int16_t       retain[BEAT_RETAIN] IBSS_ATTR;
+#endif
 static int           retain_fill;
 static unsigned long hop_ms;        /* Track time of the newest hop */
 static unsigned long hop_ms_1;      /* ...of the one before it, which is the

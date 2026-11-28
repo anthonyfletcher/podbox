@@ -219,40 +219,72 @@ static void offer_rates(int rates)
     }
 }
 
-/* The highest volume step at or below 0 dB: a DAC's maximum can be above it,
- * and the player applies its own volume, so more clips. Class 1 reads
- * GET_MIN, GET_MAX and GET_RES; class 2 a RANGE of one subrange. A control
- * that answers otherwise is left as it is. */
-static bool dac_safe_volume(int ch, uint8_t value[2])
+static int get_le16s(const uint8_t *p)
 {
-    uint8_t bounds[3][2];
-    int index = (fu_unit << 8) | status.ac_iface;
-    int selector = (UAC1_FU_VOLUME << 8) | ch;
-    int type = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-    if (status.uac == 1)
-    {
-        const int requests[] = { UAC1_GET_MIN, UAC1_GET_MAX, UAC1_GET_RES };
-        for (int i = 0; i < 3; i++)
-            if (usb_drv_host_control(dev_addr, type, requests[i], selector,
-                                     index, bounds[i], 2) != 2)
-                return false;
-    }
-    else
-    {
-        uint8_t b[8];
-        if (usb_drv_host_control(dev_addr, type, UAC2_RANGE, selector,
-                                 index, b, sizeof b) != sizeof b ||
-            b[0] != 1 || b[1] != 0)
-            return false;
-        memcpy(bounds, &b[2], sizeof bounds);
-    }
-    int low = (int16_t)(bounds[0][0] | bounds[0][1] << 8);
-    int high = (int16_t)(bounds[1][0] | bounds[1][1] << 8);
-    unsigned step = bounds[2][0] | bounds[2][1] << 8;
+    return (int16_t)(p[0] | p[1] << 8);
+}
+
+/* The highest step of low..high at or below 0 dB, false when there is none */
+static bool step_at_0db(int low, int high, unsigned step, int *target)
+{
     int ceiling = MIN(high, 0);
     if (low > ceiling)
         return false;
-    int target = step ? low + (int)((unsigned)(ceiling - low) / step * step) : ceiling;
+    *target = step ? low + (int)((unsigned)(ceiling - low) / step * step)
+                   : ceiling;
+    return true;
+}
+
+/* The highest volume step at or below 0 dB: a DAC's maximum can be above it,
+ * and the player applies its own volume, so more clips. Class 1 needs only
+ * GET_MAX, and without GET_MIN and GET_RES sets MIN(max, 0 dB); class 2 takes
+ * the best step across the RANGE's subranges. A control that answers
+ * otherwise is left as it is. */
+static bool dac_safe_volume(int ch, uint8_t value[2])
+{
+    int index = (fu_unit << 8) | status.ac_iface;
+    int selector = (UAC1_FU_VOLUME << 8) | ch;
+    int type = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+    int target = 0;
+    bool found = false;
+    if (status.uac == 1)
+    {
+        uint8_t lo[2], hi[2], res[2];
+        if (usb_drv_host_control(dev_addr, type, UAC1_GET_MAX, selector,
+                                 index, hi, 2) != 2)
+            return false;
+        if (usb_drv_host_control(dev_addr, type, UAC1_GET_MIN, selector,
+                                 index, lo, 2) == 2
+            && usb_drv_host_control(dev_addr, type, UAC1_GET_RES, selector,
+                                    index, res, 2) == 2)
+            found = step_at_0db(get_le16s(lo), get_le16s(hi),
+                                res[0] | res[1] << 8, &target);
+        else
+        {
+            target = MIN(get_le16s(hi), 0);
+            found = true;
+        }
+    }
+    else
+    {
+        uint8_t b[2 + 6 * 8];
+        int got = usb_drv_host_control(dev_addr, type, UAC2_RANGE, selector,
+                                       index, b, sizeof b);
+        int n = got >= 2 ? b[0] | b[1] << 8 : 0;
+        for (int i = 0; i < n && 2 + 6 * i + 6 <= got; i++)
+        {
+            const uint8_t *r = &b[2 + 6 * i];
+            int t;
+            if (step_at_0db(get_le16s(r), get_le16s(r + 2),
+                            r[4] | r[5] << 8, &t) && (!found || t > target))
+            {
+                target = t;
+                found = true;
+            }
+        }
+    }
+    if (!found)
+        return false;
     value[0] = (unsigned)target & 0xff;
     value[1] = ((unsigned)target >> 8) & 0xff;
     return true;
@@ -291,10 +323,11 @@ static void dac_unmute(void)
                 n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
                                          UAC2_CUR, selector, index, b, 2);
+                int get_cur = status.uac == 1 ? UAC1_GET_CUR : UAC2_CUR;
                 bool verified = n == 2 &&
                     usb_drv_host_control(dev_addr, USB_DIR_IN |
                                           USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-                                          status.uac == 1 ? UAC1_GET_CUR : UAC2_CUR,
+                                          get_cur,
                                           selector, index, actual, 2) == 2 &&
                     memcmp(b, actual, 2) == 0;
                 usb_log(USB_LOG_HOST_ENUM, verified, ch,

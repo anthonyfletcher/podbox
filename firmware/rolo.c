@@ -306,6 +306,15 @@ int rolo_load(const char* filename)
     lcd_update();
 #endif
 
+#if defined(IPOD_6G) && defined(IPOD_ACCESSORY_PROTOCOL)
+    /* The dock connector as a reset leaves it, for about as long as the
+     * bootloader would, so a seated dock identifies to the new image. Ahead
+     * of the flush: other threads write during the sleep. */
+    serial_accessory_release();
+    accessory_supply_set(false);
+    sleep(ROLO_ACCESSORY_OFF);
+#endif
+
 #ifdef HAVE_STORAGE_FLUSH
     lcd_puts(0, 1, "Flushing storage buffers...");
     lcd_update();
@@ -313,14 +322,6 @@ int rolo_load(const char* filename)
     lcd_clear_display();
     lcd_puts(0, 0, "ROLO");
     lcd_update();
-#endif
-
-#if defined(IPOD_6G) && defined(IPOD_ACCESSORY_PROTOCOL)
-    /* The dock connector as a reset leaves it, for about as long as the
-     * bootloader would, so a seated dock identifies to the new image. */
-    serial_accessory_release();
-    accessory_supply_set(false);
-    sleep(ROLO_ACCESSORY_OFF);
 #endif
 
     lcd_puts(0, 1, "Executing...");

@@ -354,7 +354,6 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-11-01 | `51cd988e61` `c4fdfae7a5` `01bcba89b7` `683b5fa76b` `c1a706228c` `ec11d6ba77` `230b3624aa` | tagnavi_edit, EQ Optimizer | **N/A** | No plugin system. |
 | 2026-11-16 | `a958507036` `15207b1fa4` | pcmbuf and recording buffers for 4 MiB targets | **N/A** | |
 | 2026-11-08 | the nano 4G, S5L8720, erosqnative, x1000, ATJ2137, PSP, agptek, nand-ingenic, cabbiev2, rbutil, manual and `$Id` commits | other targets | **N/A** | |
-
 | 2026-11-26 | `7c05f36b9f` `58fc3a45f4` | ipod6g: ATA transfer start and end timeouts to 2 s | **Adopted** | A slow disk or flash adapter was given up on mid-transfer. |
 | 2026-11-17 | `1f9487aa15` | usb_storage: report a write cache, handle SYNCHRONIZE CACHE | **Adopted** | Both players: `HAVE_STORAGE_FLUSH` is on for ATA, so the host's flush reaches `ata_flush()`. |
 | 2026-11-27 | `be8d9fe1cd` | pcm_mixer: restart PCM if a channel starts as it idles out | **Adopted** | Beside our amplitude ramp. |

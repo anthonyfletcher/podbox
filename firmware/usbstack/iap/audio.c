@@ -94,6 +94,7 @@ static long   asked_tick;
 /* An accessory that sets no rate on the stream within half a second of an
  * announcement plays the announced one: some never set one */
 static bool   host_set_rate = true; /* a SET_CUR since the announcement */
+static bool   stale_set; /* one SET_CUR of another rate since then */
 static long   announced_tick;
 /* An accessory that never answers GetAccessorySampleRateCaps but sets a rate
  * on the stream plays that rate, once it has sent nothing for two seconds,
@@ -180,6 +181,7 @@ static void sink_set_freq(uint16_t freq) {
     track_attrs_sent = true;
     track_changed    = false;
     host_set_rate    = false;
+    stale_set        = false;
     announced_tick   = current_tick;
     if(freq != acked_freq) {
         asked_freq = freq;
@@ -592,11 +594,15 @@ bool iap_audio_set_sampr(uint32_t sampr) {
          * breaking established cur_freq == set_freq.
          * Ignoring sets of frequencies that were not requested can work around this. */
         ERROR("wrong frequency set: expected=%d got=%d", set_freq, freq);
+        /* One late request leaves the half-second fallback, which plays the
+         * announced rate, to run. A second means the host wants its own
+         * rate, so the stream waits rather than play at the wrong pitch. */
+        if(stale_set)
+            host_set_rate = true;
+        stale_set = true;
         return true;
     }
 
-    /* after the stale request's return: an ignored one must not stop the
-     * half-second fallback that announces the rate again */
     host_set_rate = true;
     cur_freq = freq;
 
