@@ -636,6 +636,14 @@ static const char *colour_text(unsigned int c, char *buf, int len)
                           w->tone);
         if (w->shade && n < len)
             n += snprintf(buf + n, len - n, ".%u", w->shade - 1);
+        if (w->mix && w->mix_has_rgb && n < len)
+            n += snprintf(buf + n, len - n, "~%02x%02x%02x%u",
+                          RGB_UNPACK_RED(w->mix_rgb),
+                          RGB_UNPACK_GREEN(w->mix_rgb),
+                          RGB_UNPACK_BLUE(w->mix_rgb), w->mix - 1);
+        else if (w->mix && n < len)
+            n += snprintf(buf + n, len - n, "~%s%u", names[w->mix_kind],
+                          w->mix - 1);
         if (w->has_fallback && n < len)
             snprintf(buf + n, len - n, ":%02x%02x%02x",
                      RGB_UNPACK_RED(w->fallback),
@@ -679,7 +687,7 @@ static void dump_viewports(const char *name, struct wps_data *data,
         struct skin_viewport *svp = SKINOFFSETTOPTR(skin_buffer, vp->data);
         struct viewport base;
         const char *fg_from, *bg_from;
-        char flags[48], fg_text[24], bg_text[24];
+        char flags[48], fg_text[48], bg_text[48];
 
         if (!svp)
             break;

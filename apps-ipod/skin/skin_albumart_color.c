@@ -1926,10 +1926,20 @@ static unsigned int word_base(const struct color_word *w)
     return (w->bound > 0) == accent_lighter ? cache.accent : cache.dominant;
 }
 
-/* A palette word: the album's colour by role, then the tone bound, then the
- * shade. With no palette it is the fallback the skin wrote, as written, or
- * failing that the theme's foreground (its background, for `dominant`),
- * bounded and shaded the same way. */
+/* A word's colour by role alone: the album's, or with no palette the theme's
+ * foreground (its background, for `dominant`). */
+static unsigned int word_role(const struct color_word *w, bool palette)
+{
+    if (palette)
+        return word_base(w);
+    if (w->kind == COLOR_WORD_DOMINANT)
+        return global_settings.bg_color;
+    return global_settings.fg_color;
+}
+
+/* A palette word: its colour by role, then the tone bound, then the shade,
+ * then the mix. With no palette it is the fallback the skin wrote, as
+ * written, or failing that the theme's colours, treated the same way. */
 static unsigned int resolve_word(unsigned int original, bool palette)
 {
     const struct color_word *w = color_word(original);
@@ -1944,17 +1954,21 @@ static unsigned int resolve_word(unsigned int original, bool palette)
     if (word_from[i] == from)
         return word_out[i];
 
-    if (palette)
-        out = word_base(w);
-    else if (w->kind == COLOR_WORD_DOMINANT)
-        out = global_settings.bg_color;
-    else
-        out = global_settings.fg_color;
-
+    out = word_role(w, palette);
     out = color_tone_bound(out, w->tone, w->bound);
     if (w->shade)
         out = color_blend(LCD_RGBPACK(0, 0, 0), out,
                           ((w->shade - 1) * 256) / 100);
+    if (w->mix)
+    {
+        /* The target unbounded, so `~dominant` is exactly the colour the
+         * theme's background becomes: a fade into the page. */
+        struct color_word target = { .kind = w->mix_kind };
+        unsigned int to = w->mix_has_rgb ? w->mix_rgb
+                                         : word_role(&target, palette);
+
+        out = color_blend(out, to, ((w->mix - 1) * 256) / 100);
+    }
 
     word_out[i] = out;
     word_from[i] = from;

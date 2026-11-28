@@ -2299,10 +2299,10 @@ function applyImgFilters(px, w, h, steps) {
    palette at all, so here the prefix only has to be accepted and dropped.
    The palette words `accent`, `dominant` and `vivid` draw as their `:RRGGBB`
    fallback, exactly as written, or without one as the theme's foreground and
-   background (taken here as black and white), then bounded and shaded. A
-   `>NN`/`<NN` bound on a grey is the grey at that tone, on the player's
+   background (taken here as black and white), then bounded, shaded and mixed.
+   A `>NN`/`<NN` bound on a grey is the grey at that tone, on the player's
    luminance (gamma 2.0), which is all a theme colour here can be. */
-const PALETTE_WORD = /^(accent|dominant|vivid)(?:([<>])(\d{1,3}))?(?:\.(\d{1,3}))?(?::([0-9a-f]{6}))?$/i;
+const PALETTE_WORD = /^(accent|dominant|vivid)(?:([<>])(\d{1,3}))?(?:\.(\d{1,3}))?(?:~(accent|dominant|vivid|[0-9a-f]{6})(\d{1,3}))?(?::([0-9a-f]{6}))?$/i;
 const toneGrey = t => {
   const y = t <= 8 ? t * 27 / 24389 : Math.pow((t + 16) / 116, 3);
   return Math.round(255 * Math.sqrt(y));
@@ -2314,8 +2314,8 @@ const greyTone = v => {
 const hexToRgbAsWritten = s => {
   const w = PALETTE_WORD.exec(String(s).trim());
   if (w) {
-    if (w[5] !== undefined) {
-      const f = parseInt(w[5], 16);
+    if (w[7] !== undefined) {
+      const f = parseInt(w[7], 16);
       return [(f >> 16) & 255, (f >> 8) & 255, f & 255];
     }
     let v = w[1].toLowerCase() === "dominant" ? 255 : 0;
@@ -2324,7 +2324,18 @@ const hexToRgbAsWritten = s => {
       if (w[2] === ">" ? greyTone(v) < t : greyTone(v) > t) v = toneGrey(t);
     }
     if (w[4] !== undefined) v = Math.round(v * Math.min(100, +w[4]) / 100);
-    return [v, v, v];
+    if (w[5] === undefined) return [v, v, v];
+    const name = w[5].toLowerCase();
+    let to;
+    if (/^[0-9a-f]{6}$/.test(name)) {
+      const f = parseInt(name, 16);
+      to = [(f >> 16) & 255, (f >> 8) & 255, f & 255];
+    } else {
+      const g = name === "dominant" ? 255 : 0;
+      to = [g, g, g];
+    }
+    const k = Math.min(100, +w[6]) / 100;
+    return to.map(c => Math.round(v + (c - v) * k));
   }
   const m = /^!?([0-9a-f]{6})$/i.exec(String(s).trim().replace(/^#/, ""));
   if (!m) return null;

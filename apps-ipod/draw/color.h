@@ -45,14 +45,18 @@ enum color_word_kind
     COLOR_WORD_VIVID,           /* the album's most colourful colour */
 };
 
-/* What a skin wrote: `vivid>50.75:5ea8f0` is kind VIVID, bound +1, tone 50,
- * shade 76, fallback 5ea8f0. */
+/* What a skin wrote: `vivid>50.75~dominant40:5ea8f0` is kind VIVID, bound +1,
+ * tone 50, shade 76, mixed 40 percent toward DOMINANT, fallback 5ea8f0. */
 struct color_word
 {
     unsigned char kind;         /* enum color_word_kind */
     signed char bound;          /* +1 for `>tone`, -1 for `<tone`, 0 none */
     unsigned char tone;         /* 0..100 */
     unsigned char shade;        /* `.NN` plus one; 0 is none */
+    unsigned char mix;          /* `~` amount plus one; 0 is none */
+    unsigned char mix_kind;     /* the word mixed toward, unless mix_has_rgb */
+    bool mix_has_rgb;           /* mixed toward `~rrggbb` instead */
+    unsigned mix_rgb;           /* that colour, native, used as written */
     bool has_fallback;          /* `:rrggbb` was written */
     unsigned fallback;          /* that colour, native */
 };

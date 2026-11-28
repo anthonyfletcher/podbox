@@ -1249,6 +1249,22 @@ tone of the same colour is written, such as the lower half of a glossy bar:
 %pb(0,0,-,-,noborder)
 ```
 
+### Mix
+
+Add `~` with a target and an amount to mix the colour that far toward the
+target, from `0` (unchanged) to `100` (the target), applied last. The target
+is a word, or an `rrggbb` used exactly as written:
+
+```
+%Vf(accent~dominant40)      # 40 percent of the way to the album's background
+%Vf(vivid<60~ffffff70)      # 70 percent of the way to white
+```
+
+`dominant` as a target is exactly the colour your skin's background becomes
+under dynamic colours, so mixing toward it fades a colour into the page, such
+as a reflection under a progress bar. Over a background you fixed with `!`, mix
+toward that colour instead.
+
 ### With no album colours
 
 Before anything has played, or with **Dynamic Colours** off, a word is the
@@ -1261,8 +1277,8 @@ written, so the skin looks as designed until something plays:
 %Vf(vivid>40.75:2a7fd6)
 ```
 
-The parts go in that order: word, bound, shade, fallback. Like `!`, the words
-are skin-only; a `.cfg` does not take them.
+The parts go in that order: word, bound, shade, mix, fallback. Like `!`, the
+words are skin-only; a `.cfg` does not take them.
 
 ---
 

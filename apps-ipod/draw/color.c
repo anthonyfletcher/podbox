@@ -479,31 +479,43 @@ static bool parse_amount(const char **p, int max, int *out)
     return true;
 }
 
-/* `accent`, `dominant` or `vivid`, then optionally `>NN` or `<NN`, `.NN`
- * and `:rrggbb`, in that order. Identical words share one table entry, so a
- * skin pays for the distinct colours it names, not for each use. */
+static const char *const word_names[] = { "accent", "dominant", "vivid" };
+
+/* The word *p starts with, advancing *p past it, if the next character is one
+ * of `follow` (or the end). */
+static int parse_word_name(const char **p, const char *follow)
+{
+    int i;
+
+    for (i = 0; i < (int)ARRAYLEN(word_names); i++)
+    {
+        size_t len = strlen(word_names[i]);
+
+        if (strncasecmp(*p, word_names[i], len) == 0 &&
+            strchr(follow, (*p)[len]))          /* also matches the '\0' */
+        {
+            *p += len;
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* `accent`, `dominant` or `vivid`, then optionally `>NN` or `<NN`, `.NN`,
+ * `~` with a word or `rrggbb` and an amount, and `:rrggbb`, in that order.
+ * Identical words share one table entry, so a skin pays for the distinct
+ * colours it names, not for each use. */
 static bool parse_word(const char *text, int *value)
 {
-    static const char *const names[] = { "accent", "dominant", "vivid" };
     struct color_word w;
-    const char *p = NULL;
+    const char *p = text;
     int n, i;
 
     memset(&w, 0, sizeof w);
-    for (i = 0; i < (int)ARRAYLEN(names); i++)
-    {
-        size_t len = strlen(names[i]);
-
-        if (strncasecmp(text, names[i], len) == 0 &&
-            strchr("<>.:", text[len]))          /* also matches the '\0' */
-        {
-            w.kind = i;
-            p = text + len;
-            break;
-        }
-    }
-    if (!p)
+    i = parse_word_name(&p, "<>.~:");
+    if (i < 0)
         return false;
+    w.kind = i;
 
     if (*p == '>' || *p == '<')
     {
@@ -518,6 +530,26 @@ static bool parse_word(const char *text, int *value)
         if (!parse_amount(&p, 100, &n))
             return false;
         w.shade = n + 1;
+    }
+    if (*p == '~')
+    {
+        p++;
+        i = parse_word_name(&p, "0123456789");
+        if (i >= 0)
+            w.mix_kind = i;
+        else
+        {
+            int rgb;
+
+            if (hex_to_rgb(p, &rgb) < 0)
+                return false;
+            w.mix_has_rgb = true;
+            w.mix_rgb = rgb;
+            p += 6;
+        }
+        if (!parse_amount(&p, 100, &n))
+            return false;
+        w.mix = n + 1;
     }
     if (*p == ':')
     {
