@@ -22,7 +22,7 @@
  *
  * Parts, in order:
  *   - state init and the track-change event hook
- *   - seeking: ff/rewind, track skip, and the "hop" by time or track
+ *   - seeking: ff/rewind, track skip, the "hop" by time or track, and Scrub
  *   - backlight and LCD activation handling
  *   - entering and leaving: theme teardown, restore, and exit paths
  *   - gui_wps_show(): the input loop, one case per action
@@ -40,6 +40,7 @@
 #include "backlight.h"
 #include "rbpaths.h"
 #include "input/action.h"
+#include "button.h"         /* button_apply_acceleration */
 #include "kernel.h"
 #include "files/filetypes.h"
 #include "settings/settings.h"
@@ -534,6 +535,139 @@ static void play_hop(int direction)
     audio_ff_rewind(elapsed);
 }
 
+/* Scrub, as Select does on Apple's firmware: the wheel moves the play
+ * position. The music plays on until the wheel rests, then jumps there, so a
+ * turn is one seek rather than one per click. The progress tags draw the
+ * target through ff_rewind_count, which they add to the elapsed time. */
+#define SCRUB_SETTLE    (HZ*4/10)   /* the wheel still this long: seek */
+#define SCRUB_IDLE      (HZ*5)      /* no button this long: scrubbing ends */
+#define SCRUB_STEPS     200         /* one click moves length / SCRUB_STEPS */
+
+static struct
+{
+    bool on;
+    bool pending;           /* a target not yet sought to */
+    long target;            /* ms into the track */
+    long last_turn;
+    long last_input;
+    struct mp3entry *id3;   /* the track being scrubbed */
+} scrub;
+
+bool wps_scrubbing(void)
+{
+    return scrub.on;
+}
+
+static bool scrub_start(void)
+{
+    struct wps_state *state = get_wps_state();
+
+    if (global_settings.party_mode || !state->id3 || !state->id3->length)
+        return false;
+    scrub.on = true;
+    scrub.pending = false;
+    scrub.id3 = state->id3;
+    scrub.last_input = current_tick;
+    return true;
+}
+
+/* Seeks to the target, if the wheel has moved it */
+static void scrub_seek(void)
+{
+    struct wps_state *state = get_wps_state();
+
+    if (scrub.pending && state->id3 == scrub.id3)
+    {
+        state->id3->elapsed = scrub.target;
+        audio_pre_ff_rewind();
+        audio_ff_rewind(scrub.target);
+        if (global_settings.talk_menu)
+            talk_value(scrub.target / 1000, UNIT_TIME, false);
+    }
+    scrub.pending = false;
+    state->ff_rewind_count = 0;
+}
+
+/* 'seek' false drops a target the wheel had not yet reached */
+static void scrub_end(bool seek)
+{
+    if (!seek)
+        scrub.pending = false;
+    scrub_seek();
+    scrub.on = false;
+}
+
+static void scrub_turn(int direction)
+{
+    struct wps_state *state = get_wps_state();
+    long length = state->id3->length;
+    long step = MAX(1000, length / SCRUB_STEPS);
+    int clicks = 1;
+
+#ifdef HAVE_WHEEL_ACCELERATION
+    clicks = MAX(1, button_apply_acceleration(get_action_data()));
+#endif
+    if (!scrub.pending)
+        scrub.target = state->id3->elapsed;
+    scrub.target = MIN(MAX(scrub.target + direction * step * clicks, 0),
+                       length);
+    scrub.pending = true;
+    scrub.last_turn = current_tick;
+    state->ff_rewind_count = scrub.target - state->id3->elapsed;
+}
+
+/* A button while scrubbing. The wheel and Select are Scrub's own and Play
+ * pauses as ever; anything else ends it and then does its usual thing, Menu
+ * leaving as Apple's does. Left and Right drop an unsought target, so they
+ * skip from where the music is. */
+static long scrub_action(long button)
+{
+    struct wps_state *state = get_wps_state();
+
+    if (state->id3 != scrub.id3)    /* the track ended under the wheel */
+    {
+        scrub_end(false);
+        return button;
+    }
+    switch (button)
+    {
+        case ACTION_WPS_VOLUP:
+        case ACTION_WPS_VOLDOWN:
+            scrub.last_input = current_tick;
+            scrub_turn(button == ACTION_WPS_VOLUP ? 1 : -1);
+            return ACTION_NONE;
+        case ACTION_WPS_BROWSE:
+            scrub_end(true);
+            return ACTION_NONE;
+        case ACTION_WPS_PLAY:
+        case ACTION_UNKNOWN:    /* a press, whose release is the action */
+            scrub.last_input = current_tick;
+            return button;
+        case ACTION_WPS_SKIPPREV:
+        case ACTION_WPS_SKIPNEXT:
+        case ACTION_WPS_SEEKBACK:
+        case ACTION_WPS_SEEKFWD:
+        case ACTION_WPS_STOPSEEK:
+            scrub_end(false);
+            return button;
+        case ACTION_NONE:
+        case ACTION_REDRAW:
+            if (scrub.pending)
+            {
+                if (TIME_AFTER(current_tick, scrub.last_turn + SCRUB_SETTLE))
+                    scrub_seek();
+                else    /* the music moves on under a still target */
+                    state->ff_rewind_count = scrub.target - state->id3->elapsed;
+            }
+            if (TIME_AFTER(current_tick, scrub.last_input + SCRUB_IDLE))
+                scrub_end(true);
+            return button;
+        default:
+            scrub_end(true);
+            return button;
+    }
+}
+
 /*
  * If the user is unable to see the wps, because the display is deactivated,
  * we suppress updates until the wps is activated again (the lcd driver will
@@ -764,6 +898,7 @@ long gui_wps_show(void)
 
     ab_reset_markers();
 
+    scrub.on = false;
     wps_state_init();
     while ( 1 )
     {
@@ -832,6 +967,9 @@ long gui_wps_show(void)
 
         button = action_wpsab_single(button); /* iPods/X5/M5 */
 
+        if (scrub.on)
+            button = scrub_action(button);
+
         switch(button)
         {
             /* The buttons set from one list of actions */
@@ -888,6 +1026,11 @@ long gui_wps_show(void)
                 }
                 if (act == HOTKEY_OFF)
                     break;
+                if (act == HOTKEY_SCRUB)
+                {
+                    update = scrub_start();
+                    break;
+                }
                 /* Changes the theme in place, so the screen stays */
                 if (act == HOTKEY_THEME_TOGGLE)
                 {

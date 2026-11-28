@@ -98,6 +98,7 @@ const UPSTREAM = {
   mr:["","Set while the remote hold switch is on"],
   mm:["","Repeat mode"], mp:["","Playback status"],
   mv:["|D","Set briefly after the volume buttons are used",["timeout"]],
+  ms:["","Set while Scrub has the wheel moving the play position"],
 
   pm:["","Peak meter"], pL:["?[iP][iP][iP][iP]|s*","Left channel peak meter",["x","y","width","height"]],
   pR:["?[iP][iP][iP][iP]|s*","Right channel peak meter",["x","y","width","height"]],
@@ -1879,6 +1880,7 @@ function evalTag(n, env) {
     case "lw": return "";
     case "la": return String(env.frame % 1000);
     case "mv": return st.volumeChanging ? "v" : "";
+    case "ms": return st.scrubbing ? "s" : "";
     case "Tl": return (st.idle || 0) < (argNum(n, 0, env) || 0) ? "t" : "";
     case "cs": return String(st.screen);
     /* clock */

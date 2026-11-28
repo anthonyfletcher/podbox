@@ -2164,6 +2164,8 @@ const char *get_token_value(struct gui_wps *gwps,
                 *intval = (int)((current_tick / frame_ticks) % frames) + 1;
             }
             return "a";
+        case SKIN_TOKEN_SCRUBBING:
+            return wps_scrubbing() ? "s" : NULL;
         case SKIN_TOKEN_BUTTON_VOLUME:
             if (global_status.last_volume_change &&
                 TIME_BEFORE(current_tick, global_status.last_volume_change +

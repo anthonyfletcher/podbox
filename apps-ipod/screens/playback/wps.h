@@ -44,6 +44,9 @@ struct wps_state *get_wps_state(void);
  * caller's thread. A NULL track clears it. Position in milliseconds. */
 void wps_set_seek_preview(struct mp3entry *id3, unsigned long position);
 
+/* True while the wheel moves the play position (the Scrub action), for %ms */
+bool wps_scrubbing(void);
+
 /* in milliseconds */
 #define DEFAULT_SKIP_THRESH          3000l
 

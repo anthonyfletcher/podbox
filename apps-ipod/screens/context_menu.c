@@ -3105,6 +3105,13 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_NOICON },
+    /* Named here for the pickers; Now Playing runs it, as it stays there */
+    { .action = HOTKEY_SCRUB,
+      .lang_id = LANG_HOTKEY_SCRUB,
+      .func = HOTKEY_FUNC(NULL, NULL),
+      .return_code = ONPLAY_OK,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
       .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),
@@ -3206,6 +3213,9 @@ static int hotkey_list(intptr_t flag, bool execute, int current_action,
             continue;
         if (hotkey_items[i].action == HOTKEY_NOTES
             && !global_settings.liner_notes && current_action != HOTKEY_NOTES)
+            continue;
+        /* A button's action only: from a menu there is no screen to scrub */
+        if (hotkey_items[i].action == HOTKEY_SCRUB && execute)
             continue;
         if ((hotkey_items[i].flags & flag) == flag)
         {

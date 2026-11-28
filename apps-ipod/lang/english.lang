@@ -28897,3 +28897,17 @@
     *: "Auto Headroom sets Precut"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_HOTKEY_SCRUB
+  desc: Now Playing button action: the wheel moves the play position
+  user: core
+  <source>
+    *: "Scrub"
+  </source>
+  <dest>
+    *: "Scrub"
+  </dest>
+  <voice>
+    *: "Scrub"
+  </voice>
+</phrase>

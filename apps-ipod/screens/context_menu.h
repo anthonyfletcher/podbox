@@ -77,6 +77,7 @@ enum hotkey_action {
     HOTKEY_THEME_TOGGLE,
     HOTKEY_NOTES,
     HOTKEY_SPOKEN_SPEED,
+    HOTKEY_SCRUB,       /* wps.c's own: the wheel moves the play position */
     /* Append here, never insert: these values are packed HK_CTX_BITS at a
        time into the saved hotkey integers, so renumbering one repoints every
        hotkey the user has already configured. */

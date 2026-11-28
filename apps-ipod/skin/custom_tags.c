@@ -34,6 +34,9 @@ static const struct tag_info custom_tags[] =
      * audiobook. Names stop at three letters (MAX_TAG_LENGTH). */
     TAG(SKIN_TOKEN_BOOK_TIME_LEFT,     "prb", "",    SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_BOOK_HEARD_PERCENT, "pbp", "",    SKIN_REFRESH_DYNAMIC),
+    /* True while Scrub has the wheel moving the play position, for a theme
+     * to draw its scrubber; the progress tags already show the target. */
+    TAG(SKIN_TOKEN_SCRUBBING,          "ms", "",     SKIN_REFRESH_DYNAMIC),
     /* The wrap argument is lowercase 's' for the same reason as the filter
      * chain after it: upstream's 'S' would make the arguments past it
      * reachable only by also writing wrap or nowrap.
