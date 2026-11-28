@@ -1070,6 +1070,13 @@ static void update_fsinfo32(struct bpb *fat_bpb)
     dc_dirty_buf(fsinfo);
 }
 
+/* The cluster a FAT32 entry links to, or 0 at the end of the chain */
+static inline long fat32_link(uint32_t entry)
+{
+    long next = letoh32(entry) & 0x0fffffff;
+    return next >= FAT_EOF_MARK ? 0 : next;
+}
+
 static long get_next_cluster32(struct bpb *fat_bpb, long startcluster)
 {
     unsigned long entry = startcluster;
@@ -1086,11 +1093,7 @@ static long get_next_cluster32(struct bpb *fat_bpb, long startcluster)
         return -1;
     }
 
-    long next = letoh32(sec[offset]) & 0x0fffffff;
-
-    /* is this last cluster in chain? */
-    if (next >= FAT_EOF_MARK)
-        next = 0;
+    long next = fat32_link(sec[offset]);
 
     dc_unlock_cache();
     return next;
@@ -2817,10 +2820,7 @@ static long skip_clusters(struct bpb *fat_bpb, long cluster, long count)
 
         do
         {
-            cluster = letoh32(sec[cluster - first]) & 0x0fffffff;
-            /* is this last cluster in chain? */
-            if (cluster >= FAT_EOF_MARK)
-                cluster = 0;
+            cluster = fat32_link(sec[cluster - first]);
         }
         while (--count > 0 && cluster_in_volume(fat_bpb, cluster) &&
                (unsigned long)cluster - first < per_sector);

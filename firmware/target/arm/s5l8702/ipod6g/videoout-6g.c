@@ -699,10 +699,11 @@ static void svid_frames_start(void)
 }
 
 /* Before an update: waits until the frame last handed over is on show, so
- * the hidden one is no longer being read -- at most a field, yielding --
- * then copies in what the last update changed. Rectangles are widened to
- * even edges, as chroma covers 2x2 pixels. False when the output stopped
- * during the wait: the caller then writes nothing. */
+ * the hidden one is no longer being read -- at most a field, yielding
+ * unless interrupts are off, as a fatal screen must not let other threads
+ * run -- then copies in what the last update changed. Rectangles are
+ * widened to even edges, as chroma covers 2x2 pixels. False when the output
+ * stopped during the wait: the caller then writes nothing. */
 static bool svid_frames_prepare(void)
 {
     if (svid_flip_field >= 0)
@@ -711,7 +712,10 @@ static bool svid_frames_prepare(void)
         while ((int)(SVID_REG(SVID_ENCODER_BASE, SVID_ENC_FIELD) & 3) ==
                    svid_flip_field &&
                USEC_TIMER - start < 40000)
-            yield();
+        {
+            if (irq_enabled())
+                yield();
+        }
         svid_flip_field = -1;
         if (!svid_active || !svid_layer_active ||
             svid_output_framebuffer == NULL)

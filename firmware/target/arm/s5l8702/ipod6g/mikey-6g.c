@@ -21,8 +21,8 @@
 /* "Mikey" is the internal controller for the headphone jack microphone and
  * the inline earphone remote (I2C bus 0, address 0x72).
  *
- * Register protocol (reverse engineered on-device, 2026-07 and 2026-10).
- * There are eight registers; 0x08-0x1f read as copies of them.
+ * Register protocol, as read on the device. There are eight registers;
+ * 0x08-0x1f read as copies of them.
  *   reg0 = 0x2f     remote-reporting mode. The low 3 bits are the mic bias
  *                   level (7, same as the recording path uses); 0x28 arms
  *                   the button detection engine. The chip resets on jack
@@ -32,7 +32,7 @@
  *   reg4 & 0xe0     what is plugged in: 0x80 with an Apple remote, 0x20
  *                   with a generic three-button headset -- which can drop
  *                   to 0x00 mid-session, so nothing is gated on it. 0x40
- *                   has been seen latched on one 6G and never since.
+ *                   can latch; its meaning is unknown.
  *   reg4 & 0x01     centre button held; a level signal. Can flicker while
  *                   the mode is (re)armed, hence the "armed" guard below.
  *   reg4 & 0x04     some button loads the mic line: an Apple centre press,
@@ -87,11 +87,10 @@ extern int rec_hw_ver;   /* capture hardware version, gpio-s5l8702.c */
 
 /* Center-button handling: click-only. Every press is reported as a
  * fixed-length click at reg4's rise, so there is no hold or long-press and
- * the release time is never used. Upstream records the release arriving
- * ~1.8s late after ~5s of inactivity; a 7G trace shows every edge prompt,
- * so that delay is unconfirmed. A release must be seen for several
- * consecutive polls before a new rise counts, so bounce or an I2C NAK can't
- * double-fire a click. */
+ * the release time is never used: upstream reports releases arriving ~1.8s
+ * late after ~5s idle, which a 7G does not show. A release must be seen
+ * for several consecutive polls before a new rise counts, so bounce or an
+ * I2C NAK can't double-fire a click. */
 #define MIKEY_CENTER_PULSE_POLLS  3     /* reported click length */
 /* Release debounce. The two clicks of a double land about 90ms apart, so
  * this has to stay well under that or the second rise is swallowed. */

@@ -16,7 +16,7 @@
 #define HAVE_LBA48
 
 /* Recording support removed for this DAP-only fork. */
-//#define HAVE_RECORDING
+/* #define HAVE_RECORDING */
 
 /* Define bitmask of input sources - recordable bitmask can be defined
    explicitly if different */
@@ -81,7 +81,7 @@
  * bootloader clears its interrupt registers first; rtc_check_alarm_started()
  * falls back to matching the clock against the alarm registers within ten
  * seconds, which a 5G booting off a spinning disk rarely manages. */
-//#define HAVE_RTC_ALARM
+/* #define HAVE_RTC_ALARM */
 
 /* Define this if you can switch on/off the accessory power supply */
 #define HAVE_ACCESSORY_SUPPLY
@@ -184,12 +184,12 @@
 #endif
 
 /* Apple remote tuner accessory support -- disabled for this fork (matches
- * ipod6g.h): not something this build targets, and leaving it enabled left
- * a full FM radio UI surface (Radio Screen theme option, Radio Settings
- * menu, main-menu FM item) reachable but pointless. */
-//#define CONFIG_TUNER IPOD_REMOTE_TUNER
-//#define HAVE_RDS_CAP
-//#define CONFIG_RDS RDS_CFG_PUSH
+ * ipod6g.h). Defined, it brings the FM radio's screens with it: the Radio
+ * Screen theme option, the Radio Settings menu and the main menu's FM
+ * item. */
+/* #define CONFIG_TUNER IPOD_REMOTE_TUNER */
+/* #define HAVE_RDS_CAP */
+/* #define CONFIG_RDS RDS_CFG_PUSH */
 
 /* Define this if you have a PortalPlayer PP5022 */
 #define CONFIG_CPU PP5022

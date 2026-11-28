@@ -22,7 +22,7 @@
 #define HAVE_LBA48
 
 /* Recording support removed for this DAP-only fork. */
-//#define HAVE_RECORDING
+/* #define HAVE_RECORDING */
 //#define HAVE_AGC
 //#define HAVE_HISTOGRAM
 

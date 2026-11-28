@@ -89,6 +89,24 @@ static int stack_scan(uint32_t sp, uint32_t top, uint32_t *found, int most)
 static const struct thread_entry *hang_thread;
 static uint32_t hang_pc, hang_sp, hang_lr;
 
+/* The report runs on this rather than the stuck thread's stack, which can
+ * be 512 bytes with most of it in use. The unwinder alone needs about 650
+ * bytes. */
+#define REPORT_STACK_SIZE 4096
+static uint32_t report_stack[REPORT_STACK_SIZE / 4]
+    __attribute__((aligned(8)));
+
+/* Waits for the log's writer, which sleeps, so only a thread on the run
+ * queue may: the tick also interrupts the scheduler's idle loop, whose
+ * thread has already blocked, and sleeping that one again would corrupt the
+ * scheduler's lists. An interrupt can wake it in the meantime, which puts it
+ * back on the queue, so the state is read here rather than by the tick. */
+static void hang_sync(void)
+{
+    if (hang_thread && hang_thread->state == STATE_RUNNING)
+        usb_log_sync();
+}
+
 /* The UI thread, which starts the catcher; when it was first seen blocked
  * with keys unread, or 0; and whether that, not the core, is the report */
 static const struct thread_entry *ui_thread;
@@ -119,6 +137,14 @@ static void name8(const struct thread_entry *t, char name[8])
     strlcpy(name, t && t->name ? t->name : "?", 8);
 }
 
+/* Where a thread's stack is in use from. The thread the tick interrupted
+ * runs the report on the report stack, so its saved sp, once it has slept,
+ * points there. */
+static uint32_t scan_sp(const struct thread_entry *t)
+{
+    return t == hang_thread ? hang_sp : t->context.sp;
+}
+
 /* Every live thread: its name and state, the return address its switch
  * saved -- inside the call it is waiting in -- and the first caller found
  * on its stack. The thread the tick interrupted is drawing this, so its
@@ -135,8 +161,7 @@ static void stuck_log(void)
 
         if (t->state == STATE_KILLED)
             continue;
-        stack_scan(t->context.sp, (uint32_t)t->stack + t->stack_size, &call,
-                   1);
+        stack_scan(scan_sp(t), (uint32_t)t->stack + t->stack_size, &call, 1);
         name8(t, name);
         const uint8_t *c = (const uint8_t *)name;
         usb_log(USB_LOG_HANG, 4, state_letter(t->state),
@@ -144,7 +169,7 @@ static void stuck_log(void)
                 (uint32_t)c[4] << 24 | c[5] << 16 | c[6] << 8 | c[7]);
         usb_log(USB_LOG_HANG, 5, t == hang_thread, t->context.lr, call);
     }
-    usb_log_sync();
+    hang_sync();
 }
 
 static void stuck_draw(unsigned int *y)
@@ -161,7 +186,7 @@ static void stuck_draw(unsigned int *y)
 
         if (t->state == STATE_KILLED)
             continue;
-        stack_scan(t->context.sp, (uint32_t)t->stack + t->stack_size,
+        stack_scan(scan_sp(t), (uint32_t)t->stack + t->stack_size,
                    calls, 2);
         name8(t, name);
         lcd_putsf(1, (*y)++, "%-7.7s %c %08lx %08lx %08lx", name,
@@ -190,7 +215,7 @@ static void hang_log(const struct thread_entry *t, const uint32_t *calls,
     for (int i = 0; i < n; i += 2)
         usb_log(USB_LOG_HANG, 2, i / 2, calls[i],
                 i + 1 < n ? calls[i + 1] : 0);
-    usb_log_sync();
+    hang_sync();
 }
 
 /* Entered by the stuck thread itself, as the tick returned it here rather
@@ -260,7 +285,9 @@ static void hang_tick(void)
     uint32_t *ret = (uint32_t *)irq_stack_top - 1;
     long since = corep->next_tmo_check;
 
-    if (hang_thread)
+    /* Once: hang_pc, as hang_thread is NULL when the scheduler idles after
+     * a thread has exited */
+    if (hang_pc)
         return;
     if (holds)
     {
@@ -285,15 +312,20 @@ static void hang_tick(void)
     /* The IRQ handler's prologue pushes lr, already the interrupted pc,
      * highest of its registers, so at the top of the IRQ stack; its return
      * loads pc from there. The thread ran in system mode, whose sp and lr
-     * are banked away from IRQ mode's. */
+     * are banked away from IRQ mode's; its sp moves to the report stack.
+     * The thread interrupted need not be running: it can be one that has
+     * blocked, with the scheduler idling on its stack. */
     hang_thread = corep->running;
     hang_pc = *ret;
     asm volatile ("mrs r2, cpsr      \n"
                   "msr cpsr_c, #0xdf \n"
                   "mov %0, sp        \n"
                   "mov %1, lr        \n"
+                  "mov sp, %2        \n"
                   "msr cpsr_c, r2    \n"
-                  : "=r" (hang_sp), "=r" (hang_lr) : : "r2");
+                  : "=&r" (hang_sp), "=&r" (hang_lr)
+                  : "r" (report_stack + REPORT_STACK_SIZE / 4)
+                  : "r2", "lr");
     *ret = (uint32_t)hang_show;
 }
 

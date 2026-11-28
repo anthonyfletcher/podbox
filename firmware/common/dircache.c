@@ -2815,7 +2815,7 @@ int dircache_fileref_cmp(const struct dircache_fileref *dcfrefp1,
  * is there a complete cache to walk?
  *
  * Deliberately unlocked. dircache_get_info() answers the same question but
- * takes the lock to do it, and a build holds the writer for its whole
+ * takes the lock to do it, and a build holds the writer for nearly its whole
  * duration -- so asking that way during a scan blocks until the scan finishes,
  * which is exactly the wait a caller checks in order to avoid.
  */
@@ -2852,10 +2852,12 @@ int dircache_foreach_name(bool (*cb)(const char *name, int idx,
      * WRITER. The sweep only reads entries, and it is long enough that the
      * exclusive lock would hold off the audio thread's buffering for its whole
      * duration. Reader still excludes the scanning thread, which holds the
-     * writer across a build. */
+     * writer across a build but lets go between entries, so a build can
+     * have started while this waited for the lock: readiness is asked again
+     * once it is held. */
     file_internal_lock_READER();
 
-    if (!dircache_runinfo.handle)
+    if (!dircache_runinfo.handle || !dircache_is_ready())
         count = -1;
     else
     {

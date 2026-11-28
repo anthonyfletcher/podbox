@@ -801,6 +801,18 @@ static int ata_power_up(void)
     return 0;
 }
 
+/* Releases the ATA pins to inputs, then cuts the drive's rail: pins left
+ * driving an unpowered drive can keep it from resetting. */
+static void ata_power_cut(void)
+{
+    PCON(7) = 0;
+    PCON(8) = 0;
+    PCON(9) = 0;
+    PCON(10) &= ~0xffff;
+    PCON(11) &= ~0xf;
+    ide_power_enable(false);
+}
+
 static void ata_power_down(void)
 {
     if (!ata_powered)
@@ -808,12 +820,7 @@ static void ata_power_down(void)
 
     logf("ata POWERDOWN %ld", current_tick);
 
-    PCON(7) = 0;
-    PCON(8) = 0;
-    PCON(9) = 0;
-    PCON(10) &= ~0xffff;
-    PCON(11) &= ~0xf;
-    ide_power_enable(false);
+    ata_power_cut();
     ata_powered = false;
     ata_needs_full_init = true;
 }
@@ -947,7 +954,7 @@ static int ata_transfer_sectors(uint64_t sector, int count, void* buffer, int wr
         /* One power cycle and a second try, as ata_reset() gives a drive
          * that stops answering. A failed power-up leaves ata_powered false,
          * so ata_power_down() would not cut the rail. */
-        ide_power_enable(false);
+        ata_power_cut();
         sleep(HZ * 3);
         PASS_RC(ata_power_up(), 1, 0);
     }
@@ -1402,12 +1409,7 @@ int ata_event(long id, intptr_t data)
                 if (!ata_powered && !ata_needs_full_init)
                 {
                     logf("ata SSD DEEP %ld", current_tick);
-                    PCON(7) = 0;
-                    PCON(8) = 0;
-                    PCON(9) = 0;
-                    PCON(10) &= ~0xffff;
-                    PCON(11) &= ~0xf;
-                    ide_power_enable(false);
+                    ata_power_cut();
                     ata_needs_full_init = true;
                 }
                 mutex_unlock(&ata_mutex);
