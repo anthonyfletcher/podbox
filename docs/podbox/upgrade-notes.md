@@ -20,3 +20,10 @@
   now shows that cover.
 - A book's chapter list now goes up to 999 chapters instead of 99, and an
   .m4b of more than 255 chapters shows all of them.
+- With **USB Sound Card** on, a computer that starts playing through the
+  iPod now stops the iPod's own music first.
+- With **Read Aloud** on, the synthesised voice (1.5 MB) stays loaded all the
+  time rather than only while a book is open, so opening a book no longer
+  restarts the song. Set **Read Aloud** to Off if you never use it.
+- **Next Album** and **Previous Album** stop at the first track the database
+  does not know, rather than reading its tags from the disk.

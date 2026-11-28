@@ -415,8 +415,8 @@ default range is exactly what the next merge brings in; after a merge, pass
 
 `uisimulator/` is upstream-identical as well, but it is **built** -- the
 simulator uses it, along with `firmware/target/hosted/sdl/`. Three files there
-carry the `--screenshot` argument, and three a fix for a crash at boot;
-`upstream-divergence.md` lists them under *The simulator*.
+carry the `--screenshot` argument; `upstream-divergence.md` lists them under
+*The simulator*.
 
 ### Threading
 
@@ -464,7 +464,7 @@ sh tools/check-settings-docs.sh    # from the repository root
 
 Silence means the documents agree with the settings; every line it prints names
 a setting that has fallen out of step and the file it is missing from. It runs
-six checks, and check 2 is the one that earns its keep: check 1 asks
+seven checks, and check 2 is the one that earns its keep: check 1 asks
 `settings_tags.c` what the settings are, so an untagged setting is absent from
 both sides of that comparison and passes it without ever having been looked at.
 That is how **Audiobook Art Rows** and **Segregate Audiobooks** shipped with no
@@ -478,6 +478,9 @@ undocumented new setting goes in the documents, not in that list.
 Check 5 covers the action rows, which the other four cannot see: a stanza keyed
 `action: ` is checked against the phrases in `english.lang`, so renaming a row
 is caught rather than silently orphaning its explanation.
+
+Check 4 requires each guide cell to equal its own stanza, flattened; check 7
+rejects a stanza heading used twice, since **Explain** shows only the first.
 
 **What no check sees.** A setting reached through an action row has *two*
 stanzas -- one under its cfg name, one under `action: ` -- and only the second
@@ -663,21 +666,26 @@ export PODBOX_BUILD_SERVER=user@host   # or pass --server; never committed
 
 It builds both targets on the build server from a `git archive` of HEAD, checks
 each zip really contains the theme and the binary, and only then replaces the
-releases -- so a failed build leaves the previous ones standing. Four releases
-go out: `Themes`, `Simulator`, `Bootloader` and then `latest`. `Bootloader` is
+releases -- so a failed build leaves the previous ones standing. Five releases
+go out: `Themes`, `Simulator`, `Voices`, `Bootloader` and then `latest`, each
+uploaded first as a `<name>-next` draft and swapped in once all five are up;
+`--draft` stops after the uploads. `Voices` is `build-voices.sh`'s zip, one
+per player. `Bootloader` is
 `build-bootloader.sh`'s zip: both bootloaders, `ipodpatcher.exe` and
 `mks5lboot.exe` built from `utils/`, and the scripts and README in
 `tools/bootloader-installer/`. Then it starts
 `.github/workflows/fetch-tools.yml` on the new `latest` tag, which builds the
 fetch tools on Windows and macOS runners and replaces `Tools` itself
 (`--no-tools` skips it). **`latest` is the only release
-marked Latest** -- the other three pass `--latest=false` -- and GitHub features
+marked Latest** -- the other four pass `--latest=false` -- and GitHub features
 that one on the repository's front page.
 Release notes list every commit since the last release, using the `latest` tag
 itself as the start point -- read from origin, since nothing is tagged locally
 (a rolling tag in the dev checkout only goes stale). That tag always names a
 commit this script published, which is why no `--since` escape hatch is needed
-any more.
+any more. A run refuses to publish when origin's `latest` tag is missing or not
+an ancestor of HEAD (`--first-release` overrides the missing case), and caps
+the list at 300 commits.
 
 **Upgrade notes.** A change an owner should know about before updating -- a
 default that moves, a library file rebuilt or read again, a setting renamed --
