@@ -50,7 +50,7 @@ def licence_texts(dist):
 
 def python_licence():
     for place in (Path(sys.base_prefix), Path(sys.base_prefix) / "share/doc/python3",
-                  Path(re.__file__).parent):
+                  Path(re.__file__).parent.parent):
         if (place / "LICENSE.txt").is_file():
             return (place / "LICENSE.txt").read_text(encoding="utf-8", errors="replace")
     sys.exit("licenses.py: Python's LICENSE.txt not found")
