@@ -22,7 +22,6 @@
 #include "pathfuncs.h"
 #include "settings/settings.h"
 #include "art_cache.h"
-#include "settings/settings.h"
 #include "screens/playback/wps.h"
 #include "draw/image_load.h"
 #include "draw/gif_load.h"

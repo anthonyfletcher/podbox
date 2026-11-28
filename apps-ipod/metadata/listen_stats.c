@@ -115,30 +115,38 @@ void listen_stats_sum(int kind, struct listen_stats *all, int *items,
     close(fd);
 }
 
-/* Rewrites the file with 'r' first, streaming the others past one buffer */
+/* Rewrites the file with 'r' first, streaming the others past one buffer. A
+ * file that cannot be read whole is left as it is. */
 static void ls_save(const struct listen_stats *r)
 {
     static struct listen_stats old;
     struct libfile_writer w;
     struct libfile_header h;
-    int fd, kept = 1;
+    int fd = ls_open_file(&h), kept = 1;
     bool ok;
 
+    if (fd < 0 && !libfile_replaceable(LIB_LISTEN_STATS_FILE, fd))
+        return;
     if (!libfile_begin(&w, LIB_LISTEN_STATS_FILE, LIB_LISTEN_STATS_MAGIC,
                        LIB_LISTEN_STATS_VERSION, sizeof(struct listen_stats),
                        NULL))
+    {
+        if (fd >= 0)
+            close(fd);
         return;
+    }
     ok = libfile_write(&w, r, sizeof(*r), 1);
-    fd = ls_open_file(&h);
     if (fd >= 0)
     {
-        for (uint32_t i = 0; ok && kept < LS_MAX && i < h.count
-                             && ls_read(fd, &old); i++)
+        for (uint32_t i = 0; ok && kept < LS_MAX && i < h.count; i++)
         {
-            if (old.key == r->key)
-                continue;
-            ok = libfile_write(&w, &old, sizeof(old), 1);
-            kept++;
+            if (!ls_read(fd, &old))
+                ok = false;
+            else if (old.key != r->key)
+            {
+                ok = libfile_write(&w, &old, sizeof(old), 1);
+                kept++;
+            }
         }
         close(fd);
     }
@@ -159,7 +167,9 @@ static struct
 } cur;
 
 /* Plays not yet written. The audio thread adds and the saver takes; the
- * saver copies them out and clears the count before it yields. */
+ * saver copies them out and clears the count before it yields. Reading the
+ * clock can yield (the RTC is on I2C), so each side reads the day before it
+ * looks at the track or these. */
 static struct ls_pending
 {
     uint64_t key;
@@ -193,9 +203,9 @@ static void track_change_event(unsigned short id, void *ev_data)
 }
 
 /* What the playing track has added since its baseline, into the pending
- * plays; 'ended' when it played to its end. Yields nowhere, so the audio
- * thread and a saver cannot interleave in it. */
-static void take(const struct mp3entry *id3, bool ended)
+ * plays, on 'day' (ls_today()); 'ended' when it played to its end. Yields
+ * nowhere, so the audio thread and a saver cannot interleave in it. */
+static void take(const struct mp3entry *id3, bool ended, int day)
 {
     struct ls_pending *p = NULL;
     unsigned long ms, most;
@@ -224,7 +234,7 @@ static void take(const struct mp3entry *id3, bool ended)
     p->seconds += ms / 1000;
     if (ms / 1000 > p->longest)
         p->longest = ms / 1000;
-    p->day = ls_today();
+    p->day = day;
     if (ended && cur.kind == 1)
     {
         const char *name = book_resume_name(id3, p->book, sizeof(p->book));
@@ -241,21 +251,25 @@ static void track_finish_event(unsigned short id, void *ev_data)
 {
     const struct track_event *te = ev_data;
     const struct mp3entry *id3 = te->id3;
+    int day;
     (void)id;
 
+    if (!cur.live)
+        return;
+    day = ls_today();
     if (!cur.live || !id3 || path_key(id3->path) != cur.track)
         return;
     /* A seek to the track's start: the same track goes on from there */
     if (te->flags & TEF_REWIND)
     {
-        take(id3, false);
+        take(id3, false, day);
         cur.elapsed = 0;
         cur.tick = current_tick;
         return;
     }
     cur.live = false;
     take(id3, (te->flags & TEF_AUTO_SKIP)
-              && id3->elapsed + LS_END_SLACK_MS >= id3->length);
+              && id3->elapsed + LS_END_SLACK_MS >= id3->length, day);
 }
 
 /* One play into its record */
@@ -296,16 +310,17 @@ void listen_stats_flush(void)
 {
     static struct ls_pending copy[LS_PENDING];
     const struct mp3entry *id3;
-    int n;
+    int day, n;
 
     mutex_lock(&ls_mutex);
+    day = ls_today();
     id3 = audio_status() ? audio_current_track() : NULL;
 
     /* The track still playing counts what it has so far, from a fresh
      * baseline: a save comes with a pause, a stop or a shutdown */
     if (cur.live && id3 && path_key(id3->path) == cur.track)
     {
-        take(id3, false);
+        take(id3, false, day);
         cur.elapsed = id3->elapsed;
         cur.tick = current_tick;
     }

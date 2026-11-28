@@ -3,8 +3,7 @@
  * was: apps/plugins/lib/mul_id3.h
  * Copyright (C) 2023 Christian Soffke
  *
- * Ported from apps/plugins/lib/mul_id3.h to the core; used only by the
- * core Properties screen (viewers/properties.c).
+ * Used only by the Properties screen (viewers/properties.c).
  * GNU General Public License (version 2+)
  *
  * Interface to mul_id3.c and the dir_stats type.

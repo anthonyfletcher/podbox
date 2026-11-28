@@ -97,6 +97,7 @@
 #endif
     .align  2
     .global \name
+    .type   \name, %function
 \name:
     stmfd   sp!, { r4-r11, lr }
     sub     sp, sp, #FRAME
@@ -302,6 +303,7 @@
 9:  mov     r12, r2
     ldmfd   sp!, { r4-r7 }
     b       3b
+    .size   \name, .-\name
 .endm
 
     VV2 vorbis_vv2_d2_lsl_arm, 2, lsl

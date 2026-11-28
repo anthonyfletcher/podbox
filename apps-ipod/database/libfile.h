@@ -53,6 +53,13 @@ int libfile_open(const char *path, uint32_t magic, uint16_t version,
                  uint16_t record_size, struct libfile_header *hdr,
                  uint32_t *tail);
 
+/* Whether a file libfile_open() refused with rc may be replaced by a rewrite
+ * holding none of its records. An absent file may. A damaged one is set
+ * aside as path.bad first, or no rewrite would succeed until it was deleted
+ * by hand. One unread or from a later version is kept: its records are not
+ * lost. */
+bool libfile_replaceable(const char *path, int rc);
+
 /* The header alone, unchecked beyond magic and version: cheap enough for a
  * question asked often, such as whether the marks still hold. */
 bool libfile_peek(const char *path, uint32_t magic, uint16_t version,

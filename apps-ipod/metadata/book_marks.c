@@ -84,20 +84,31 @@ static bool scan(scan_fn fn, void *data)
     fd = libfile_open(MARKS_FILE, LIB_MARKS_MAGIC, LIB_MARKS_VERSION, 1, &h,
                       NULL);
     if (fd < 0)
-    {
-        /* A damaged file is set aside, or nothing could be added until it
-         * was deleted by hand */
-        if (fd == LIBFILE_BAD)
-            rename(MARKS_FILE, MARKS_FILE ".bad");
-        return !file_exists(MARKS_FILE);
-    }
+        return libfile_replaceable(MARKS_FILE, fd);
 
-    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
+    /* The header counts bytes, not marks. A read that fails before they are
+     * all read fails the scan: a rewrite from what came before it would
+     * drop every mark after it. */
+    uint32_t left = h.count;
+    bool ok = true;
+
+    while (left > 0)
     {
+        if (left < sizeof(r) || read(fd, &r, sizeof(r)) != (ssize_t)sizeof(r))
+        {
+            ok = false;
+            break;
+        }
+        left -= sizeof(r);
         if (r.path_len >= sizeof(path) || r.label_len >= sizeof(label)
+            || (uint32_t)r.path_len + r.label_len > left
             || read(fd, path, r.path_len) != r.path_len
             || read(fd, label, r.label_len) != r.label_len)
+        {
+            ok = false;
             break;
+        }
+        left -= r.path_len + r.label_len;
         path[r.path_len] = '\0';
         label[r.label_len] = '\0';
         m.elapsed = r.elapsed;
@@ -107,7 +118,7 @@ static bool scan(scan_fn fn, void *data)
     }
 
     close(fd);
-    return true;
+    return ok;
 }
 
 static bool write_mark(struct libfile_writer *w, uint64_t book,

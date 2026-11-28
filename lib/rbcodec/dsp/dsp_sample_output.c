@@ -175,7 +175,8 @@ void dsp_sample_output_format_change(struct sample_io_data *this,
     if (mode == DITHER_AUTO)
         this->output_samples = sample_output_auto;
     else
-        this->output_samples = fns[mode == DITHER_ALWAYS ? 1 : 0][channels - 1];
+        this->output_samples =
+            fns[mode == DITHER_ALWAYS ? 1 : 0][channels - 1];
     this->output_version = format->version;
 }
 

@@ -6,7 +6,7 @@
  * which is what lets an append extend it from the header's value.
  *
  * Parts, in order:
- *   - reading: libfile_open(), libfile_peek()
+ *   - reading: libfile_open(), libfile_replaceable(), libfile_peek()
  *   - writing a whole file
  *   - changing a file in place: append, marks
  ****************************************************************************/
@@ -98,7 +98,10 @@ int libfile_open(const char *path, uint32_t magic, uint16_t version,
     else if (n == (ssize_t)sizeof(*hdr) && hdr->magic == magic
              && hdr->version == version
              && hdr->record_size == record_size
-             && body >= (off_t)hdr->count * record_size)
+             /* 64-bit: the CRC skips the header, so a damaged count must
+              * not wrap a 32-bit off_t into passing */
+             && body >= 0
+             && (uint64_t)body >= (uint64_t)hdr->count * record_size)
     {
         if (!crc_rest(fd, &crc))
             rc = LIBFILE_UNREAD;
@@ -122,6 +125,18 @@ int libfile_open(const char *path, uint32_t magic, uint16_t version,
     if (tail)
         *tail = body - (off_t)hdr->count * record_size;
     return fd;
+}
+
+bool libfile_replaceable(const char *path, int rc)
+{
+    char bad[MAX_PATH];
+
+    if (rc == LIBFILE_BAD)
+    {
+        snprintf(bad, sizeof(bad), "%s.bad", path);
+        rename(path, bad);
+    }
+    return !file_exists(path);
 }
 
 bool libfile_peek(const char *path, uint32_t magic, uint16_t version,

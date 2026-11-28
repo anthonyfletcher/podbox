@@ -317,14 +317,11 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
     }
     if (fd < 0)
     {
-        /* A damaged file is set aside, or every save, mark and rekey that
-         * copies it would fail until it was deleted by hand. One that could
-         * not be read, or is from a later version, is kept and refused:
-         * those do not mean the positions in it are lost. */
-        if (fd == LIBFILE_BAD
-            && rename(BOOK_RESUME_FILE, BOOK_RESUME_FILE ".bad") == 0)
+        bool gone = libfile_replaceable(BOOK_RESUME_FILE, fd);
+
+        if (gone && fd == LIBFILE_BAD)
             writes++;
-        return !file_exists(BOOK_RESUME_FILE);
+        return gone;
     }
 
     /* The header counts bytes, not books. A read that fails before they are
@@ -907,6 +904,9 @@ void book_resume_save(void)
 
 static struct semaphore idle_saved;
 static volatile bool idle_armed;
+/* The UI thread runs the callbacks too, at USB and at shutdown, when the
+ * background thread throws the event away; it has the stack to save itself */
+static unsigned int idle_ui_thread;
 
 static bool book_playing(void)
 {
@@ -929,12 +929,20 @@ static struct bg_task idle_save_task = {
     .tick = idle_save_tick,
 };
 
-/* Storage thread. The callback is one-shot, so the tick arms it again. */
+/* Storage thread, or the UI thread. The callback is one-shot, so the tick
+ * arms it again. */
 static void storage_idle(void)
 {
     idle_armed = false;
     if (!book_playing())
         return;
+    if (thread_self() == idle_ui_thread)
+    {
+        book_resume_save();
+        return;
+    }
+    /* A save that finished after an earlier wait gave up leaves its release */
+    semaphore_wait(&idle_saved, 0);
     bg_task_post(&idle_save_task, IDLE_SAVE_EVENT);
     semaphore_wait(&idle_saved, IDLE_SAVE_WAIT);
 }
@@ -961,5 +969,6 @@ static void idle_save_tick(void)
 void book_resume_idle_init(void)
 {
     semaphore_init(&idle_saved, 1, 0);
+    idle_ui_thread = thread_self();
     bg_task_init(&idle_save_task);
 }

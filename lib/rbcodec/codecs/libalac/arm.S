@@ -438,6 +438,7 @@ alac_fir_adapt_\n\()_arm:
 #endif
     .align  2
     .global alac_deinterlace_24_arm
+    .type alac_deinterlace_24_arm, %function
 alac_deinterlace_24_arm:
     stmfd   sp!, { r4-r11, lr }
     add     r12, sp, #36
@@ -450,6 +451,7 @@ alac_deinterlace_24_arm:
     D24_LOOP 0, r8, r10, r9, r11
 .Ld24_ret:
     ldmpc   regs=r4-r11
+    .size alac_deinterlace_24_arm, .-alac_deinterlace_24_arm
 
 /* ---------------------------------------------------------------------------
    int alac_rice_decode_arm(int32_t *out, int n, struct alac_rice *st);
@@ -492,6 +494,7 @@ alac_deinterlace_24_arm:
 #endif
     .align  2
     .global alac_rice_decode_arm
+    .type alac_rice_decode_arm, %function
 alac_rice_decode_arm:
     stmfd   sp!, { r4-r11, lr }
     stmfd   sp!, { r1, r2 }           @ n, st
@@ -635,3 +638,4 @@ alac_rice_decode_arm:
     .byte  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     .byte  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 #endif
+    .size alac_rice_decode_arm, .-alac_rice_decode_arm

@@ -20,6 +20,20 @@
  * those tracks alone. One after a deletion, an Update, a Rebuild or a change
  * of format visits every folder, and only that kind removes the thumbnails of
  * folders that have gone and rewrites the lists of folders with no art.
+ *
+ * Parts, in order:
+ *   - the sizes, names and counts the screens ask for
+ *   - reading a thumbnail (.aat), and finding one by folder
+ *   - purging, orphans and the format version
+ *   - the folder table and the stamp file
+ *   - making thumbnails: decode, scale, write, placeholders
+ *   - finding a folder's art and caching it; the no-art lists
+ *   - people: who has a picture, and where it is found
+ *   - books: ebook and audiobook covers
+ *   - the pass
+ *   - a playing track's embedded art, offered between passes
+ *   - checking one file (Check a File's Art)
+ *   - events, settings callbacks, the task and its marks
  ****************************************************************************/
 
 #include <stdio.h>
@@ -67,6 +81,7 @@
 #include "system/appevents.h"
 #include "audio.h"
 #include "storage.h"
+#include "usb.h"                    /* usb_host_wants_storage() */
 #include "cpu.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
@@ -3377,9 +3392,12 @@ out:
         aa_remove_orphans();
     /* An interrupted move to new keys is taken up again by the next pass.
      * Without the RAM copy nothing moves, and the folders' keys are the ones
-     * in use, so that pass records the scheme all the same. */
-    aa_stamps_save(completed, aborted || failed || aa_io_failed
-                              ? aa_scheme_began : AA_SCHEME);
+     * in use, so that pass records the scheme all the same. A pass stopped
+     * for a USB host writes nothing more: the host is waiting for the disk,
+     * and the next pass adopts the thumbnails left unstamped. */
+    if (!aborted || !usb_host_wants_storage())
+        aa_stamps_save(completed, aborted || failed || aa_io_failed
+                                  ? aa_scheme_began : AA_SCHEME);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);

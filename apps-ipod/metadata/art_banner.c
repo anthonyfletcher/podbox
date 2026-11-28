@@ -470,16 +470,18 @@ struct banner_offset
 
 static struct banner_offset banner_offsets[BANNER_OFFSETS_MAX];
 
+/* The moved banners, into banner_offsets[]: their number, or -1 when the
+ * file is there and cannot be read whole, so a save does not replace it */
 static int banner_offsets_load(void)
 {
     struct libfile_header h;
     int fd = libfile_open(LIB_BANNER_OFFSETS_FILE, LIB_BANNER_OFFSETS_MAGIC,
                           LIB_BANNER_OFFSETS_VERSION,
                           sizeof(struct banner_offset), &h, NULL);
-    int n = 0;
+    int n = -1;
 
     if (fd < 0)
-        return 0;
+        return libfile_replaceable(LIB_BANNER_OFFSETS_FILE, fd) ? 0 : -1;
     if (h.count <= BANNER_OFFSETS_MAX)
     {
         ssize_t want = (ssize_t)(h.count * sizeof(struct banner_offset));
@@ -507,6 +509,8 @@ bool art_banner_set_offset(unsigned int key, int top)
     struct libfile_marks m;
     int n = banner_offsets_load(), i;
 
+    if (n < 0)
+        return false;
     for (i = 0; i < n && banner_offsets[i].key != key; i++)
         ;
     if (top < 0)
