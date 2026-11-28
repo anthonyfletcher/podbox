@@ -78,8 +78,8 @@ Settings
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Enable EQ | Master switch for the ten-band equaliser. Changing a band in Edit EQ, or choosing a preset, switches it on. | No |  |
+| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. While Auto Headroom is on it is set for you, and a value set here lasts only until the next EQ change. | 0 dB | **Adv** |
 | Auto Headroom | Sets Precut from the curve: the equaliser is turned down by as much as its highest boost, so a boosted preset does not clip. Off leaves Precut where you set it; the curve editor then shows by how much the curve clips. | Yes | **Adv** |
-| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. While Auto Headroom is on it is set for you and reads Auto; turn Auto Headroom off to set it yourself. | 0 dB | **Adv** |
 
 ### Sound Settings — Haas Surround
 
@@ -399,9 +399,9 @@ after new music, run it after `database_pb.exe`.
 | Dynamic Colours Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | Auto |  |
 | Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
 | Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
-| Line Selector Colours ▸ Primary Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
+| Line Selector Colours ▸ Primary Colour | The colour of the bar drawn behind the selected row, or its top edge when the selector is a gradient. | ffeb9c |  |
 | Line Selector Colours ▸ Secondary Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
-| Line Selector Colours ▸ Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
+| Line Selector Colours ▸ Selected Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
 | Line Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
 
 Several rows here are listed only while something reads them, whatever Settings
@@ -535,7 +535,7 @@ Shadow Colour only while there is a shadow to colour.
 | Text Viewer ▸ Reading Backlight | How long the backlight stays on after the last button press while the text viewer is open, put back to the player's own Backlight when you leave it. Always keeps it lit, which costs battery if the player is set down mid-page. | Same as Player |  |
 | Text Viewer ▸ Reading Orientation | Holds the page sideways, taller than wide, for reading in one hand. Right Hand turns pages with PLAY and MENU, Left Hand with MENU and PLAY. Double-click PLAY on an upright page to turn it, right hand. Sideways, the button at the top leaves, as MENU does upright; hold the one at the bottom to stand the page up again, or double-click it to swap hands. | Upright |  |
 | Text Viewer ▸ Wheel Scrubs | Turning the wheel moves through the book a percent at a time, showing the chapter and percentage it would go to; Select goes there, and any other button stays put. | No |  |
-| Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice, whether or not Speak Aloud is on. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. Select (or PLAY, upright) pauses it and goes on from the same sentence; with the Hold switch on the screen goes dark and it reads on. With Speak Aloud off, opening a book with it on restarts the playing song once, to make room for the voice. | Off |  |
+| Text Viewer ▸ Read Aloud | Reads the text aloud in the synthesised voice, whether or not Speak Aloud is on. Each Page reads the page you turn to, finishing the sentence it ends in; Continuously turns the page itself and carries on, until the last page or until you leave. Select (or PLAY, upright) pauses it and goes on from the same sentence; with the Hold switch on the screen goes dark and it reads on. With Speak Aloud off, switching it on restarts the playing song once, to make room for the voice, which then stays loaded while Read Aloud is on. | Off |  |
 | Lyrics Viewer ▸ Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | Theme |  |
 | Lyrics Viewer ▸ Alignment | Whether lyric lines are aligned left, centred or right. | Centre |  |
 | Lyrics Viewer ▸ Line Spacing | Extra pixels between lyric lines. | 2 | **Adv** |

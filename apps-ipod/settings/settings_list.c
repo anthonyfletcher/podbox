@@ -1315,7 +1315,8 @@ const struct settings_list settings[] = {
     INT_SETTING(F_TIME_SETTING, disk_spindown, LANG_SPINDOWN, 5, "disk spindown",
                     UNIT_SEC, 3, 254, 1, NULL, NULL, STORAGE_FUNCTION(spindown)),
     CHOICE_SETTING(0, storage_mode, LANG_STORAGE_MODE, 0,
-                   "storage mode", "auto,hdd,ssd", NULL, 3,
+                   "storage mode", "auto,hdd,ssd",
+                   STORAGE_FUNCTION(set_storage_mode), 3,
                    ID2P(LANG_AUTO), ID2P(LANG_STORAGE_HDD),
                    ID2P(LANG_STORAGE_SSD)),
     /* browser */
@@ -1891,8 +1892,10 @@ const struct settings_list settings[] = {
                    ID2P(LANG_OFF), ID2P(LANG_TEXT_VIEWER_PAGE_NUMBER),
                    ID2P(LANG_TEXT_VIEWER_CHAPTER_PROGRESS),
                    ID2P(LANG_TEXT_VIEWER_BOOK_PROGRESS)),
-    CHOICE_SETTING(0, text_viewer_read_aloud, LANG_TEXT_VIEWER_READ_ALOUD, 0,
-                   "text viewer read aloud", "off,page,continuous", NULL, 3,
+    CHOICE_SETTING(F_TEMPVAR|F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                   text_viewer_read_aloud, LANG_TEXT_VIEWER_READ_ALOUD, 0,
+                   "text viewer read aloud", "off,page,continuous",
+                   speech_voice_changed, 3,
                    ID2P(LANG_OFF), ID2P(LANG_READ_ALOUD_PAGE),
                    ID2P(LANG_READ_ALOUD_CONTINUOUS)),
     /* Synchronised lyrics viewer (apps-ipod/viewers/lyric_viewer) */

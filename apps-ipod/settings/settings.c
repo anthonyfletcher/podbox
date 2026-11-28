@@ -517,7 +517,7 @@ static bool config_is_theme(int fd, char *line, int line_size)
 /** Theme-local appearance overrides **/
 
 /* Every setting a theme load resets before reading the theme, and so also
- * every setting the overlay is allowed to carry.
+ * every setting the overlay may carry and Save Theme Settings writes.
  *
  * The union of the two flags, not either alone. F_THEMESETTING is the honest
  * description of "describes the look" and is what the wider reset is for -- a
@@ -1009,7 +1009,9 @@ static bool settings_write_config(const char* filename, int options)
                     continue;
                 break;
             case SETTINGS_SAVE_THEME:
-                if (!(setting->flags & F_THEMESETTING))
+                /* Everything loading the file resets, or it reads back
+                 * as the default */
+                if (!(setting->flags & F_THEME_RESET_MASK))
                     continue;
                 break;
             case SETTINGS_SAVE_EQPRESET:
@@ -1391,6 +1393,22 @@ void settings_apply(bool read_disk)
 #ifdef HAVE_MIKEY_REMOTE
     mikey_set_track_skip(global_settings.remote_track_skip);
 #endif
+    accessory_supply_set(global_settings.accessory_supply);
+    lineout_set(global_settings.lineout_active);
+#ifdef HAVE_CODEC_SUPPLY_LEVEL
+    /* The supply's step reaches the headphones: as its callback, not while
+     * a track is playing or paused */
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
+        codec_supply_set(global_settings.codec_supply_full);
+#endif
+    /* Setting the rate restarts the serial line's rate detection, so it is
+     * set only when it changes, not on every theme load with a dock talking */
+    static int applied_bitrate = -1;
+    if (global_settings.serial_bitrate != applied_bitrate)
+    {
+        applied_bitrate = global_settings.serial_bitrate;
+        iap_bitrate_set(applied_bitrate);
+    }
 
 #if BATTERY_CAPACITY_INC > 0
     /* only call if it's really exchangable */

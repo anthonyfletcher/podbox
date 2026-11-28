@@ -184,7 +184,7 @@ int file_search_run(void)
      * means one went away between the list being built and the press. */
     if (!dircache_is_ready())
     {
-        splash(HZ * 2, "Needs the directory cache");
+        splash(HZ * 2, ID2P(LANG_FILE_SEARCH_NEEDS_DIRCACHE));
         return GO_TO_PREVIOUS;
     }
 
@@ -194,7 +194,7 @@ int file_search_run(void)
         struct dircache_info info;
         dircache_get_info(&info);
         if (info.size >= info.size_limit)
-            splash(HZ, "Cache full: some files not searched");
+            splash(HZ, ID2P(LANG_FILE_SEARCH_CACHE_FULL));
     }
 
     /* str() is not a constant expression, so the title is filled in here

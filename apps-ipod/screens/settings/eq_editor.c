@@ -854,7 +854,7 @@ static void band_applied(int band)
         if (!ed.bypass)
             dsp_eq_enable(true);
     }
-    dsp_set_eq_coefs(band, s);
+    eq_apply_band(band);
     eq_curve_set_band(&curve, band, s);
     ed.peak = eq_curve_peak_of(&curve, global_settings.eq_band_settings);
     if (global_settings.eq_auto_headroom)

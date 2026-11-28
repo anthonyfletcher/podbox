@@ -30,6 +30,8 @@ extern struct eq_band_setting eq_defaults[EQ_NUM_BANDS];
 /* Sends every EQ setting to the DSP, first setting precut from the curve
  * when Auto Headroom is on. */
 void eq_apply(void);
+/* Sends one band to the DSP; flat if it does not fit either output rate. */
+void eq_apply_band(int band);
 /* The DSP's output rate, which the filters are designed at. */
 unsigned int eq_dsp_frequency(void);
 /* Asks for a name and saves the bands to EQS_DIR, leaving the path written

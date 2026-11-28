@@ -140,9 +140,8 @@ int settings_search_run(void)
 
         do_setting_from_menu_standalone(hits[chosen].item, NULL);
 
-        /* The change may have moved the setting out of the result set, and
-         * the hits hold pointers into a walk that is now stale. Re-running the
-         * scan on reopen is what makes that safe -- the dialog does it, since
-         * it reopens with the query pending. */
+        /* The hits point at the const menu tables, so they outlive the
+         * change; the dialog scans again anyway on reopen, since it reopens
+         * with the query pending, and so reads every label afresh. */
     }
 }
