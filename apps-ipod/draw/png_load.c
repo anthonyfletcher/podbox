@@ -701,10 +701,20 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
     if (p->h.interlaced)
     {
         /* The fewest passes whose reduced image is at least the target,
-         * then fewer while that does not fit beside the scaler's lines.
+         * then fewer while that does not fit in the grid's room: the larger
+         * of what follows the scaler's lines and the arena's unused tail.
          * Pass 1 alone needs no room: its rows stream. */
         int passes = 7, step = 1, pw, ph;
         size_t grid_bytes;
+        unsigned char *grid = free_start + lines;
+        size_t room = free_len - lines;
+        size_t at = ALIGN_UP(a->used, sizeof(uint32_t));
+
+        if (at < a->size && a->size - at > room)
+        {
+            grid = a->base + at;
+            room = a->size - at;
+        }
 
         while (step < 8 && (p->h.width + 2 * step - 1) / (2 * step)
                                >= bm->width
@@ -718,7 +728,7 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
             src_dim.width = (p->h.width + step - 1) / step;
             src_dim.height = (p->h.height + step - 1) / step;
             grid_bytes = (size_t)src_dim.width * src_dim.height * 3;
-            if (step == 8 || grid_bytes + lines <= (size_t)free_len)
+            if (step == 8 || grid_bytes <= room)
                 break;
             step *= 2;
             passes -= 2;
@@ -727,7 +737,7 @@ int read_png_stream(bs_stream *in, bs_arena *a, struct bitmap *bm,
             begin_pass(p, 0, &pw, &ph);
         else
         {
-            p->grid = free_start + lines;
+            p->grid = grid;
             if (!assemble(p, passes, step, p->grid, src_dim.width, p->out))
                 return -9;
             p->pw = src_dim.width;

@@ -71,12 +71,19 @@ struct word
 };
 
 /* The largest length no greater than 'len' that does not cut a character in
- * half. UTF-8 continuation bytes are 10xxxxxx, so walking back off them lands
- * on a lead byte. */
+ * half, but never less than the whole first character, so a word always
+ * advances. UTF-8 continuation bytes are 10xxxxxx, so walking back off them
+ * lands on a lead byte. */
 static int char_boundary(const char *p, int len)
 {
     while (len > 0 && (p[len] & 0xC0) == 0x80)
         len--;
+    if (len == 0 && p[0])
+    {
+        do
+            len++;
+        while ((p[len] & 0xC0) == 0x80);
+    }
     return len;
 }
 
@@ -192,7 +199,7 @@ static void ellipsise(struct word *line, int *n, int *pen, int max_w,
             int len = char_boundary(w->p, w->len - 1);
             int ww;
 
-            if (len < 1)
+            if (len >= w->len)
                 break;
             ww = str_width(w->p, len, w->font);
             *pen += ww - w->w;
@@ -323,13 +330,15 @@ static int walk(const struct card_text *t, int x, int y, int max_w,
                 if (guess < len)
                 {
                     len = char_boundary(p, guess);
-                    if (len < 1)
-                        len = char_boundary(p, guess + 1);
                     ww = str_width(p, len, t->run[i].font);
                 }
-                while (ww > max_w && len > 1)
+                while (ww > max_w)
                 {
-                    len = char_boundary(p, len - 1);
+                    int shorter = char_boundary(p, len - 1);
+
+                    if (shorter >= len)
+                        break;
+                    len = shorter;
                     ww = str_width(p, len, t->run[i].font);
                 }
             }

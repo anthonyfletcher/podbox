@@ -14,7 +14,8 @@
  * signature is `skip` bytes into the stream, and a reset of `in` goes back
  * to before them. Its state goes in `a`, which must not overlap the first
  * maxsize bytes of bm->data; an interlaced image is put together in the
- * room after the bitmap. A transparent pixel is drawn over black. */
+ * room after the bitmap or the arena's unused tail. A transparent pixel is
+ * drawn over black. */
 int read_gif_stream(bs_stream *in, int skip, bs_arena *a, struct bitmap *bm,
                     int maxsize, int format,
                     const struct custom_format *cformat);

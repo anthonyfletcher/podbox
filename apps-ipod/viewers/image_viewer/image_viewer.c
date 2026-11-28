@@ -29,8 +29,9 @@
  * the app buffer first, which leaves playback alone; a file, or a cover too
  * large for it, takes a core_alloc_maximum() block. That is pinned for the
  * whole session, so a USB connect would deadlock on it -- iv_usb_inserted()
- * drops it from the USB thread before that can happen, and the viewer takes
- * it back if no USB session follows (a charger).
+ * drops it from the USB thread before that can happen, or, mid-decode, marks
+ * it for the decode to stop and drop at its next row; the viewer takes it
+ * back if no USB session follows (a charger).
  *
  * Parts, in order:
  *   - session state and the shared iv_settings
@@ -112,7 +113,12 @@ static volatile bool iv_buf_idle = false;
  * not touch buf or image_info again until it has taken a new one. */
 static volatile bool iv_usb_dropped = false;
 
-/* When the hook freed it. A host that has not spoken by IV_HOST_WAIT after
+/* Set by the USB hook when it found the buffer busy: the main thread drops
+ * the buffer itself at its next safe point, a decode row or the wait for a
+ * key. */
+static volatile bool iv_usb_pending = false;
+
+/* When USB was plugged in. A host that has not spoken by IV_HOST_WAIT after
  * that is taken to be none: a charger, which never ends in a USB session. */
 static volatile long iv_usb_drop_tick;
 #define IV_HOST_WAIT (2*HZ)
@@ -174,6 +180,15 @@ static void iv_release_buffer(void)
         core_free(buf_handle);
         buf_handle = 0;
     }
+    iv_usb_pending = false;
+}
+
+/* Frees the buffer for a USB insertion, and tells the main thread it is
+ * gone. */
+static void iv_usb_drop(void)
+{
+    iv_release_buffer();
+    iv_usb_dropped = true;
 }
 
 /* SYS_EVENT_USB_INSERTED handler.
@@ -182,27 +197,35 @@ static void iv_release_buffer(void)
  * asks for exclusive storage (firmware/usb.c). The whole heap held pinned
  * blocks buflib and deadlocks the USB connect, however the viewer answers
  * SYS_USB_CONNECTED: button_get() hands that over only after the USB
- * machinery has run, so the buffer has to go here.
+ * machinery has run, so the buffer has to go first -- here, or before the
+ * host speaks, which on both players is a request after the insertion.
  *
- * Only safe while the main thread is idle in button_get(); mid-decode the
- * decoder holds pointers into the buffer. Rockbox threading is cooperative, so
- * this runs to completion without the main thread resuming underneath it. */
+ * Freeing is only safe while the main thread is idle in button_get();
+ * mid-decode the decoder holds pointers into the buffer, so the insertion is
+ * left in iv_usb_pending for iv_decode_row() to stop the decode on at its
+ * next row, or scroll_bmp() to act on before it waits. Rockbox
+ * threading is cooperative, so this runs to completion without the main
+ * thread resuming underneath it. */
 static void iv_usb_inserted(unsigned short id, void *event_data)
 {
     (void)id; (void)event_data;
 
-    if (!iv_buf_idle || buf_handle <= 0)
+    if (buf_handle <= 0)
         return;
 
-    iv_release_buffer();
     iv_usb_drop_tick = current_tick;
-    iv_usb_dropped = true;
+    if (!iv_buf_idle)
+    {
+        iv_usb_pending = true;
+        return;
+    }
+    iv_usb_drop();
 }
 
-/* After the hook dropped the buffer, with no SYS_USB_CONNECTED seen: waits
- * out what is left of IV_HOST_WAIT for a host to speak. IV_RELOAD when none
- * has -- a charger, or the cable gone again -- else PLUGIN_USB_CONNECTED, to
- * leave as for any USB session. */
+/* After the buffer went for an insertion, with no SYS_USB_CONNECTED seen:
+ * waits out what is left of IV_HOST_WAIT for a host to speak. IV_RELOAD
+ * when none has -- a charger, or the cable gone again -- else
+ * PLUGIN_USB_CONNECTED, to leave as for any USB session. */
 static int iv_after_drop(void)
 {
     long until = iv_usb_drop_tick + IV_HOST_WAIT;
@@ -434,7 +457,8 @@ void iv_decode_begin(void)
 }
 
 /* A press of Menu stops a decode in either key map: nothing else can be
- * done until it is over. */
+ * done until it is over. So does a USB insertion, which needs the buffer
+ * gone before the host speaks. */
 bool iv_decode_row(int done, int rows)
 {
     long button;
@@ -447,12 +471,15 @@ bool iv_decode_row(int done, int rows)
         iv_decode_stop = PLUGIN_ABORT;
     else if (button & SYS_EVENT)
         default_event_handler(button);
+    if (!iv_decode_stop && iv_usb_pending)
+        iv_decode_stop = IV_RELOAD;
     return !iv_decode_stop;
 }
 
 /* After a decode stopped: USB is let in, with the buffer gone first as in
  * scroll_bmp(), and the press of Menu that stopped it is let go of before
- * anything reads its release. PLUGIN_USB_CONNECTED or PLUGIN_ABORT. */
+ * anything reads its release. PLUGIN_USB_CONNECTED, PLUGIN_ABORT, or for an
+ * insertion iv_after_drop()'s answer. */
 static int iv_decode_stopped(void)
 {
     if (iv_decode_stop == PLUGIN_USB_CONNECTED)
@@ -460,6 +487,11 @@ static int iv_decode_stopped(void)
         iv_release_buffer();
         default_event_handler(SYS_USB_CONNECTED);
         return PLUGIN_USB_CONNECTED;
+    }
+    if (iv_decode_stop == IV_RELOAD)
+    {
+        iv_usb_drop();
+        return iv_after_drop();
     }
     while (button_status() & BUTTON_MENU)
         sleep(HZ/50);
@@ -566,7 +598,13 @@ static int scroll_bmp(struct image_info *info)
     while (true)
     {
         /* Nothing holds a pointer into the buffer while we wait here, so the
-         * USB hook is allowed to free it. */
+         * USB hook is allowed to free it. An insertion it found busy frees
+         * it now, with no wait for a key. */
+        if (iv_usb_pending)
+        {
+            iv_usb_drop();
+            return iv_after_drop();
+        }
         iv_buf_idle = true;
 
         if (iv_slideshow_enabled)
@@ -731,9 +769,9 @@ static int scroll_bmp(struct image_info *info)
         }
 
         default:
-            /* Reached only if the hook did not already drop the buffer (USB
-             * arrived mid-decode, outside the idle window). Free it before the
-             * USB screen runs so at least the reload has memory. */
+            /* Reached only while the buffer is still held -- the app buffer,
+             * which the hook leaves alone: free it before the USB screen
+             * runs. */
             if (button == SYS_USB_CONNECTED)
                 iv_release_buffer();
             if (default_event_handler(button) == SYS_USB_CONNECTED)
@@ -1017,10 +1055,11 @@ static int load_and_show(char *filename, struct image_info *info,
             scaled_centre(info, ds, &cx, &cy);
             status = imgdec->get_image(info, frame, ds);
         }
-        if (status == PLUGIN_ABORT || status == PLUGIN_USB_CONNECTED)
+        if (status == PLUGIN_ABORT || status == PLUGIN_USB_CONNECTED
+            || status == IV_RELOAD)
         {
             status = iv_decode_stopped();
-            if (status == PLUGIN_USB_CONNECTED)
+            if (status != PLUGIN_ABORT)
                 return status;
             /* A zoom that is stopped goes back to the whole picture, which
              * is kept; stopping the first decode leaves the viewer. */
@@ -1356,6 +1395,7 @@ int image_viewer(const char *file)
     /* Fires on the USB thread before the exclusive-storage request, so the
      * pinned buffer is gone before anything can deadlock on it. */
     iv_usb_dropped = false;
+    iv_usb_pending = false;
     add_event(SYS_EVENT_USB_INSERTED, iv_usb_inserted);
 
     /* file_pt[] points into the browser's name cache, which would otherwise

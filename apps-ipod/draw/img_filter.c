@@ -1472,8 +1472,8 @@ static void decimate(fb_data *dst, int cw, int ch,
  *
  * `half` rounds the divide to nearest. Truncating instead loses half a level
  * a pass, and there are four of them -- two passes, each horizontal then
- * vertical -- so the blurred picture came out two levels darker than the art
- * it was made from, on every channel. */
+ * vertical -- so the blurred picture would be two levels darker than the art
+ * it is made from, on every channel. */
 static void box_run(fb_data *p, int n, int step, uint32_t *line,
                     int taps, int shift)
 {

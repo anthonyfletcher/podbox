@@ -119,16 +119,9 @@ static int read_ppm_init_rest(int fd, struct ppm_info *ppm)
     ppm->x = ppm_getuint(fd);
     ppm->y = ppm_getuint(fd);
 
-    /* Both are int, and ppm_getuint() lets either reach a fifth of
-     * INT_MAX, so the product below is where a header decides how much
-     * gets written -- and it is the only thing that decides. 65536 by
-     * 65536 multiplies out to zero, clears the test that follows, and
-     * then writes a row at a time until the file runs out. -1 is also
-     * what ppm_getuint() returns for a header it could not read.
-     *
-     * Divide instead of multiplying: x*y*FB_DATA_SZ > buf_size is the
-     * same question, and this form cannot leave the range it is testing.
-     * y is at least 1 by the line above. */
+    /* The header alone sizes what is written, so the area is tested by
+     * dividing: the product can overflow and pass. -1 is a header
+     * ppm_getuint() could not read. */
     if (ppm->x < 1 || ppm->y < 1) {
         ppm_error("Image has no area.");
         return PLUGIN_ERROR;

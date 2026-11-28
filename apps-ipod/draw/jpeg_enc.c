@@ -1,28 +1,14 @@
 /***************************************************************************
- *             __________               __   ___.
- *   Open      \______   \ ____   ____ |  | _\_ |__   _______  ___
- *   Source     |       _//  _ \_/ ___\|  |/ /| __ \ /  _ \  \/  /
- *   Jukebox    |    |   (  <_> )  \___|    < | \_\ (  <_> > <  <
- *   Firmware   |____|_  /\____/ \___  >__|_ \|___  /\____/__/\_ \
- *                     \/            \/     \/    \/            \/
+ * GNU General Public License (version 2+)
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
- * KIND, either express or implied.
- *
- ****************************************************************************/
-
-/* A baseline JPEG encoder, small rather than fast: one 16x16 macroblock at a
+ * A baseline JPEG encoder, small rather than fast: one 16x16 macroblock at a
  * time -- four luminance blocks and one of each chrominance -- through a
  * fixed-point DCT, quantisation and the standard Huffman tables. No floating
  * point and no division per coefficient.
  *
  * Parts: the tables; the bit writer; the DCT and block coder; the headers;
- * jpeg_encode(). */
+ * jpeg_encode().
+ ****************************************************************************/
 
 #include <string.h>
 #include "jpeg_common.h"

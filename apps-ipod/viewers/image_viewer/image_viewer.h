@@ -122,8 +122,9 @@ extern unsigned iv_src_flags;
 void cb_progress(int current, int total);
 
 /* The row callback the viewer's decodes carry: draws progress, and
- * stops the decode for Menu or USB, leaving PLUGIN_ABORT or
- * PLUGIN_USB_CONNECTED in iv_decode_stop. iv_decode_begin() clears it. */
+ * stops the decode for Menu or USB, leaving PLUGIN_ABORT,
+ * PLUGIN_USB_CONNECTED or, for a USB insertion, IV_RELOAD in
+ * iv_decode_stop. iv_decode_begin() clears it. */
 extern int iv_decode_stop;
 void iv_decode_begin(void);
 bool iv_decode_row(int done, int rows);

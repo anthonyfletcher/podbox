@@ -13,6 +13,8 @@
  *
  * The PNG and GIF readers' state, and the stream they read, sit at the end
  * of the caller's buffer; the bitmap and the scaler's lines take the rest.
+ * An interlaced image's working copy goes in whichever is larger of the room
+ * left after the lines and the arena's unused tail.
  ****************************************************************************/
 
 #include <string.h>

@@ -74,6 +74,10 @@ struct bmp_header {
 /* the largest width or height read_bmp_fd() takes: struct dim's short */
 #define BMP_MAX_DIM 32767
 
+/* The largest area it takes: 8192x8192, far past any buffer the players
+ * have, and small enough that its int size sums cannot overflow. */
+#define BMP_MAX_AREA (8192u * 8192u)
+
 /* masks for supported BI_BITFIELDS encodings (16/32 bit) */
 static const struct uint8_rgb bitfields[][4] = {
     /* 15bit */
@@ -506,6 +510,12 @@ int read_bmp_fd(int fd,
     } else {              /* normal BMP */
         rset.rowstart = bm->height - 1;
         rset.rowstop = -1;
+    }
+
+    if ((uint32_t)bm->width * (uint32_t)bm->height > BMP_MAX_AREA) {
+        DEBUGF("read_bmp_fd: Bitmap too large: %dx%d\n",
+               bm->width, bm->height);
+        return -6;
     }
 
     /* need even rows (see lcd-16bit-common.c for details) */

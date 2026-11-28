@@ -145,6 +145,16 @@ void gif_decode(struct gif_decoder *d,
     /* initialize struct */
     memset(&bm, 0, sizeof(struct bitmap));
 
+    /* The canvas takes PIXELS_SZ and NATIVE_SZ from the pool, more than four
+     * bytes a pixel: a larger one cannot fit, and bounding it here keeps
+     * those int products from overflowing. */
+    if ((size_t)GifFile->SWidth * GifFile->SHeight > d->mem_size / 4)
+    {
+        d->error = D_GIF_ERR_NOT_ENOUGH_MEM;
+        DGifCloseFile(GifFile);
+        return;
+    }
+
     Size = GifFile->SWidth * sizeof(GifPixelType); /* Size in bytes one row.*/
     Line = (GifPixelType *)malloc(Size);
     if (Line == NULL)
@@ -232,6 +242,11 @@ void gif_decode(struct gif_decoder *d,
 
                      if (pixels_buffer[buf_idx] == NULL)
                          pixels_buffer[buf_idx] = (pixel_t *)malloc(PIXELS_SZ);
+                     if (pixels_buffer[buf_idx] == NULL)
+                     {
+                         d->error = D_GIF_ERR_NOT_ENOUGH_MEM;
+                         goto free_and_return;
+                     }
                 }
 
                 if (GifFile->Image.Interlace)
@@ -250,7 +265,7 @@ void gif_decode(struct gif_decoder *d,
                             }
 
                             gif2pixels(Line, pixels_buffer[buf_idx],
-                                       Row + j, Col, Width);
+                                       j, Col, Width);
                         }
 
                         if (pf_progress != NULL)
@@ -329,6 +344,11 @@ void gif_decode(struct gif_decoder *d,
                     if (GifFile->Image.GCB == NULL)
                         GifFile->Image.GCB = (GraphicsControlBlock *)
                             malloc(sizeof(GraphicsControlBlock));
+                    if (GifFile->Image.GCB == NULL)
+                    {
+                        d->error = D_GIF_ERR_NOT_ENOUGH_MEM;
+                        goto free_and_return;
+                    }
 
                     if (DGifExtensionToGCB(Extension[0],
                                            Extension + 1,

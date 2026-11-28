@@ -10,7 +10,8 @@
  *   LZW    - the image's codes into palette indices, across sub-blocks
  *   rows   - each row of indices as RGB, handed to the scaler; an
  *            interlaced image is put together first, in the room after the
- *            bitmap, and when it is too big for that, a band of rows at a
+ *            bitmap or the arena's unused tail, whichever is larger, and
+ *            when it is too big for that, a band of rows at a
  *            time, the image read again from its start for each band
  *
  * The frame is read at its own size, wherever it sits on the screen. A
@@ -348,12 +349,24 @@ int read_gif_stream(bs_stream *in, int skip, bs_arena *a, struct bitmap *bm,
     g->rgb = bs_alloc(a, g->w * sizeof(struct uint8_rgb));
     if (g->interlaced)
     {
-        long rows = (free_len - lines) / g->w;
+        /* The band takes the larger of the room after the scaler's lines
+         * and the arena's unused tail, which is the larger beside a cover
+         * sized to its bitmap */
+        unsigned char *band = free_start + lines;
+        long room = free_len - lines;
+        size_t at = ALIGN_UP(a->used, sizeof(uint32_t));
+        long rows;
 
+        if (at < a->size && (long)(a->size - at) > room)
+        {
+            band = a->base + at;
+            room = a->size - at;
+        }
+        rows = room / g->w;
         if (rows < 1)
             return -6;
         g->nband = rows < g->h ? (int)rows : g->h;
-        g->idx = free_start + lines;
+        g->idx = band;
     }
     else
         g->idx = bs_alloc(a, g->w);
