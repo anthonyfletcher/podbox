@@ -60,7 +60,8 @@ bool skin_take_dirty(enum screen_type screen);
  * SKIN_MAX_DIRTY_RECTS of them to `out`. Returns how many, 0 if none. */
 int skin_take_dirty_rects(enum screen_type screen,
                           struct skin_dirty_rect *out);
-/* Hold off the flush while something else owns the screen */
+/* Hold off the flush while something else owns the screen. Holds nest: each
+ * true is released by one false. */
 void skin_inhibit_flush(bool inhibit);
 bool skin_flush_inhibited(void);
 /* Draw scrolling lines static while something sits on top of the skin: the

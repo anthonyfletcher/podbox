@@ -7,6 +7,16 @@
  *
  * The skinned status bar (.sbs): drives a skin file as the status bar,
  * including the title text and icon other screens set.
+ *
+ * Parts, in order:
+ *   - the title and icon screens set, and what the loaded bar uses (%Lt,
+ *     %LH, %Lm, %Lb), recorded as it is parsed
+ *   - sb_process(): a bar loaded or unloaded
+ *   - the UI viewport (%Vi) other screens draw into, and its switches
+ *   - sb_skin_update(): the bar's refresh, throttled by update_delay
+ *   - the busy indicators (%lh, %lb, %lw) and the tick that animates them
+ *     on an otherwise still screen
+ *   - sb_create_from_settings(): the built-in bar for no .sbs
  ****************************************************************************/
 
 #include "config.h"
@@ -389,8 +399,8 @@ static void sb_busy_tick(void)
 
     /* Somebody is already driving the UI. The action loop is turning over and
      * the bar refreshes with it, so a wakeup here animates nothing and only
-     * lengthens the queue the wheel's own events are waiting in -- which is
-     * what made scrolling drag while the database was building.
+     * lengthens the queue the wheel's own events are waiting in, which drags
+     * scrolling while the database builds.
      *
      * Before was_busy is touched, deliberately: a fall that happens while the
      * user is scrolling is not lost, it is just handled on the next idle tick. */
@@ -411,8 +421,7 @@ static void sb_busy_tick(void)
      * is a dynamic tag, so the ordinary non-static refresh redraws it and the
      * dirty-rect flush transfers its rectangle alone. A full update repaints the
      * whole bar, backdrop composite included -- what a track change needs, and
-     * far more than a spinner frame does. Asking for one every frame is what
-     * made lists drag.
+     * far more than a spinner frame does: one every frame drags lists.
      *
      * The last poke is the exception and needs more. A tag that stops
      * producing text is not a change the engine notices, so its line is not

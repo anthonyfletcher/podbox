@@ -347,7 +347,6 @@ extern bool gui_synclist_keyclick_callback(int action, void* data);
 extern bool gui_synclist_do_button(struct gui_synclist * lists, int *action);
 struct listitem_viewport_cfg;
 
-bool skinlist_get_item(struct screen *display, struct gui_synclist *list, int x, int y, int *item);
 bool skinlist_draw(struct screen *display, struct gui_synclist *list);
 /* Before a list's draw: render the bar first where the row layout it sets
  * has been dropped since */

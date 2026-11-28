@@ -1,8 +1,8 @@
 /***************************************************************************
  * This build's extra skin tags, kept out of lib/skin_parser/tag_table.c so
- * that file can track RockBox unchanged. find_tag() falls back to
- * find_custom_tag() (weak-linked there) when a tag isn't in the upstream
- * table.
+ * that file can track RockBox unchanged. find_tag() asks find_custom_tag()
+ * (weak-linked there) first, and the upstream table only when this one has
+ * no match.
  * GNU General Public License (version 2+)
  *
  * Registry of this fork's non-upstream skin tags, kept separate so the

@@ -66,7 +66,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode);
  * A full update will be done if required (skin_do_full_update() == true)
  */
 /* Set when a skin has been rendered into the framebuffer but not yet flushed.
- * Nothing in the skin engine pushes pixels to the LCD any more; whoever runs
+ * Nothing in the skin engine pushes pixels to the LCD; whoever runs
  * the update (normally GUI_EVENT_ACTIONUPDATE) asks here whether one is owed.
  * Reading the flag clears it -- the caller is taking responsibility for it.
  *
@@ -84,19 +84,24 @@ static struct
     struct { int x1, y1, x2, y2; } r[SKIN_MAX_DIRTY_RECTS];  /* x2/y2 exclusive */
 } pending[NB_SCREENS];
 
-static bool flush_inhibited = false;
+/* A count, as skin_hold_scrolling()'s is: the holds nest */
+static int flush_inhibited = 0;
 
 /* Hold the flush off across an action that owns the screen itself -- a
  * progress splash, say, which the status bar would otherwise be redrawn over
- * and flushed on top of. Dirty flags survive, so the next update still paints. */
+ * and flushed on top of. Dirty flags survive, so the next update still paints.
+ * Every hold is released by a call with false. */
 void skin_inhibit_flush(bool inhibit)
 {
-    flush_inhibited = inhibit;
+    if (inhibit)
+        flush_inhibited++;
+    else if (flush_inhibited > 0)
+        flush_inhibited--;
 }
 
 bool skin_flush_inhibited(void)
 {
-    return flush_inhibited;
+    return flush_inhibited > 0;
 }
 
 /* A count, since a dialog can open another over itself */
@@ -249,10 +254,6 @@ int skin_take_dirty_rects(enum screen_type screen,
     return n;
 }
 
-/* Flush whatever a skin render left in the framebuffer. Only for code that
- * draws outside the action loop and needs the result on screen now -- a
- * progress indicator advancing while its caller blocks, say. Everything else
- * should let GUI_EVENT_ACTIONUPDATE do it. */
 /* Cost of the UI redraw, accumulated since boot. A frame is a render -- walk
  * the skin or list and paint into the framebuffer -- followed by a flush, the
  * push of those pixels to the LCD. Splitting the two says whether a slow
@@ -278,6 +279,10 @@ void skin_note_flush(unsigned int usec)
     flush_count++;
 }
 
+/* Flush whatever a skin render left in the framebuffer. Only for code that
+ * draws outside the action loop and needs the result on screen now -- a
+ * progress indicator advancing while its caller blocks, say. Everything else
+ * should let GUI_EVENT_ACTIONUPDATE do it. */
 void skin_flush_dirty(void)
 {
     FOR_NB_SCREENS(i)

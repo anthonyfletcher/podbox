@@ -813,14 +813,13 @@ bool action_userabort(int timeout)
      * progress splash is on screen (database build, file ops, playlist build,
      * ...). get_custom_action fires GUI_EVENT_ACTIONUPDATE, which re-renders
      * and flushes the status-bar skin over the splash -> flicker. Inhibit the
-     * flush across the poll so the splash keeps the screen. A caller already
-     * holding the inhibit keeps it afterwards. */
-    bool inhibited = skin_flush_inhibited();
+     * flush across the poll so the splash keeps the screen. The holds nest,
+     * so a caller already holding the inhibit keeps it afterwards. */
     skin_inhibit_flush(true);
     polling_abort = true;
     int  action = get_custom_action(CONTEXT_STD, timeout, NULL);
     polling_abort = false;
-    skin_inhibit_flush(inhibited);
+    skin_inhibit_flush(false);
     bool ret    = (action == ACTION_STD_CANCEL);
     if (!ret)
     {

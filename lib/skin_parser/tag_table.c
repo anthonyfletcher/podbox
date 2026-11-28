@@ -338,7 +338,9 @@ const struct tag_info* find_tag(const char *name)
      * (e.g. "sel") wins over a shorter upstream tag that prefixes it ("s").
      * The reverse order would let the upstream single-char search below shadow
      * every custom tag whose name starts with an existing 1- or 2-char tag.
-     * Safe because custom names are verified not to clash with upstream ones. */
+     * The cost: a custom name shadows an upstream tag of the same name, and
+     * one that extends an upstream name claims that name followed by its
+     * letters -- "%s" then "l" parses as "%sl". */
     if (find_custom_tag)
         tag = find_custom_tag(name);
     /* Then upstream: three, then two characters after the '%', then a single char */

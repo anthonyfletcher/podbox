@@ -8,6 +8,17 @@
  * Paints a list using a skin-defined %Vl viewport instead of the core
  * renderer, including album-art rows. Configured per screen by the skin
  * engine.
+ *
+ * Parts, in order:
+ *   - the row layout per screen: skinlist_set_cfg(), and skinlist_settle()
+ *     for a draw that would come before the bar sets it again
+ *   - the row being drawn, as the skin's %L tags ask after it: text, icon,
+ *     kind, value, range, disc, track position and art
+ *   - the list's geometry: art rows, row heights, columns, line count and
+ *     the scrollbar
+ *   - skinlist_draw(): each visible row through the layout's %Vl viewports,
+ *     the selected row on its own copies so its scrolling lines keep their
+ *     place
  ****************************************************************************/
 
 #include "config.h"
@@ -42,14 +53,14 @@ static struct gui_synclist *current_list;
  * The selected row cannot draw straight from the skin buffer the way the other
  * rows do: its scrolling lines outlive the draw, and the scroll engine keeps a
  * *pointer* to the viewport rather than a snapshot of it. So each viewport that
- * can hold a live line needs its own address -- sharing one made a later
- * viewport's geometry capture an earlier viewport's scrolling line, which then
- * animated at the wrong y.
+ * can hold a live line needs its own address: in a shared one, a later
+ * viewport's geometry captures an earlier viewport's scrolling line, which then
+ * animates at the wrong y.
  *
  * Static rather than per-cfg because only one list draws at a time per screen,
  * and skinlist_set_cfg() retires the lines when that changes. A layout with
- * more viewports than slots reuses the last one, which is the old behaviour for
- * the overflow only. */
+ * more viewports than slots shares the last one among the overflow, which then
+ * has that fault. */
 #define SKINLIST_SEL_VPS 12
 static struct skin_viewport selected_vps[NB_SCREENS][SKINLIST_SEL_VPS];
 
@@ -312,10 +323,9 @@ const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
  *
  * The art height only has to match the skin's own pitch, not beat it. A cover
  * that fills its row exactly is a deliberate layout -- one row's art meets the
- * next's with no gap down the screen -- and requiring a taller row refused it
- * silently: the theme lost its art rows altogether and nothing said why.
- * Shorter than the pitch still is not an art row; a height that small named
- * nothing to lay out. */
+ * next's with no gap down the screen -- and requiring a taller row would take
+ * the theme's art rows away with nothing to say why. Shorter than the pitch is
+ * not an art row; a height that small names nothing to lay out. */
 bool skinlist_item_is_art_row(enum screen_type screen, int offset, bool wrap)
 {
     (void)offset; (void)wrap;
@@ -413,22 +423,6 @@ void skinlist_get_scrollbar(int* nb_item, int* first_shown, int* last_shown)
     }
 }
 
-bool skinlist_get_item(struct screen *display, struct gui_synclist *list, int x, int y, int *item)
-{
-    const int screen = display->screen_type;
-    if (!skinlist_is_configured(screen, list))
-        return false;
-
-    int rh = listcfg[screen]->tile ? listcfg[screen]->height
-                                   : list_item_height(list, screen);
-    int row = y / rh;
-    int column = x / listcfg[screen]->width;
-    struct viewport *parent = (list->parent[screen]);
-    int cols = (parent->width / listcfg[screen]->width);
-    *item = row * cols + column;
-    return true;
-}
-
 bool skinlist_draw(struct screen *display, struct gui_synclist *list)
 {
     int cur_line, display_lines;
@@ -455,9 +449,9 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
     display_lines = skinlist_get_line_count(screen, list);
     /* No room for even one row -- a %Vi shorter than the skin's %Lb pitch. Give
      * the list back to the core renderer (gui_synclist_draw falls through to
-     * list_draw when this returns false), which clips a row instead. Drawing an
-     * empty box was the old outcome and is no better than the fault that comes
-     * of forcing a row through a config with no room for it. */
+     * list_draw when this returns false), which clips a row instead. An empty
+     * box would be no better than the fault that comes of forcing a row
+     * through a config with no room for it. */
     if (display_lines < 1)
         return false;
     label = (char *)SKINOFFSETTOPTR(get_skin_buffer(wps.data), listcfg[screen]->label);
@@ -602,7 +596,7 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
              * with the next entry's bytes stuck on its top half, and rendering
              * it lands far outside the buffer. Same declaration get_child()
              * uses in skin_render.c. On the player the two widths coincide, so
-             * the fault only ever showed up in the simulator. */
+             * the fault shows only in the simulator. */
             OFFSETTYPE(struct skin_element*) *children =
                 SKINOFFSETTOPTR(get_skin_buffer(wps.data), viewport->children);
             struct skin_element *first = children ?

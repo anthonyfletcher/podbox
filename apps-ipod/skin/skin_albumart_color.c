@@ -1112,22 +1112,22 @@ static bool palette_from_slot(int handle)
  * asks for a portrait only for a playlist built from an artist browse and falls
  * back to the cover, while the explicit Artist setting does not fall back,
  * because a missing portrait is meant to be visible rather than papered over. */
+static bool palette_wants_portrait(void)
+{
+    return global_settings.wps_art_source == WPS_ART_ARTIST ||
+           (global_settings.wps_art_source == WPS_ART_AUTO &&
+            playlist_is_from_artist());
+}
+
 static int palette_candidates(const char *path, unsigned int artist,
                               unsigned int cand[2])
 {
     int n = 0;
 
-    if (global_settings.wps_art_source == WPS_ART_ARTIST)
+    if (palette_wants_portrait())
         cand[n++] = artist;
-    else
-    {
-        if (global_settings.wps_art_source == WPS_ART_AUTO &&
-            playlist_is_from_artist())
-        {
-            cand[n++] = artist;
-        }
+    if (global_settings.wps_art_source != WPS_ART_ARTIST)
         cand[n++] = art_cache_track_key(path);
-    }
     return n;
 }
 
@@ -1481,7 +1481,9 @@ static void prefetch_path(const char *track_path, unsigned int artist)
  * their playlist paths, buffered or not: a skip lands on one of those, and
  * hi-res files leave little of it buffered. The playlist can read its file,
  * so only while the disk runs. Trap: the starting track takes a slot too, so
- * looking a full PREFETCH_SLOTS ahead evicts the palette about to be shown. */
+ * looking a full PREFETCH_SLOTS ahead evicts the palette about to be shown.
+ * A path names no artist, so while a portrait is wanted the look-ahead has
+ * nothing to read, and would only mark each track a miss. */
 static void prefetch_cb(unsigned short id, void *param)
 {
     struct mp3entry *id3 = ((struct track_event *)param)->id3;
@@ -1491,14 +1493,15 @@ static void prefetch_cb(unsigned short id, void *param)
     if (id3)
         prefetch_path(id3->path, id3_artist_key(id3));
     if (id != PLAYBACK_EVENT_TRACK_BUFFER || !global_settings.dynamic_colors
-        || palette_dim() == 0 || !storage_disk_is_active())
+        || palette_dim() == 0 || !storage_disk_is_active()
+        || palette_wants_portrait())
         return;
     for (int offset = 1; offset < PREFETCH_SLOTS; offset++)
     {
         p = playlist_peek(offset, path, sizeof(path));
         if (!p)
             break;
-        prefetch_path(p, 0);    /* a path names no artist: no portrait */
+        prefetch_path(p, 0);
     }
 }
 
