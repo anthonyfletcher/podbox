@@ -22,7 +22,9 @@
  * speaks iAP2 by sending the probe below, which is also a well-formed iAP1
  * packet that libiap refuses as an opening. With the answer switched on, the
  * probe is echoed as an iPhone does, and every report after it comes here
- * instead of to libiap. Everything here runs on the USB thread.
+ * instead of to libiap. Everything here runs on the USB thread but
+ * usb_iap2_audio_rate(), which runs where the iAP sink's rate is set: the
+ * audio thread, mostly.
  *
  * Parts, in file order:
  * - logging: the start of each packet's first report raw, and each packet

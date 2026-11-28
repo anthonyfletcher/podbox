@@ -324,17 +324,19 @@ static void group_end(void)
     m.b[m.group + 1] = n;
 }
 
-static void msg_send(void)
+/* False when it was too big for its packet, and dropped */
+static bool msg_send(void)
 {
     if (!m.ok)
     {
         event(USB_LOG_IAP2_DROPPED, m.id, m.len);
-        return;
+        return false;
     }
     m.b[2] = m.len >> 8;
     m.b[3] = m.len;
     usb_log(USB_LOG_IAP2_MSG, USB_LOG_IAP_FROM_PLAYER, m.len, m.id, 0);
     usb_iap2_message_send(m.len);
+    return true;
 }
 
 static void send_empty(uint16_t id)
@@ -393,7 +395,7 @@ static long due_in(long ticks)
 static uint8_t next_transfer = 0x80; /* file transfer IDs run 80 to FF */
 static uint8_t artwork;           /* the artwork transfer just named, or 0 */
 /* The artwork transfer under way: see the now playing part */
-enum { ART_IDLE, ART_FINDING, ART_ANNOUNCED, ART_SENDING };
+enum { ART_IDLE, ART_FINDING, ART_SETUP, ART_ANNOUNCED, ART_SENDING };
 static struct
 {
     int phase;
@@ -1212,17 +1214,27 @@ static size_t file_room(void)
     return usb_iap2_message_start(&room) && room > 2 ? room - 2 : 0;
 }
 
+/* A setup that finds no free slot is ART_SETUP, sent again by the pump for
+ * five seconds */
 static void announce_artwork(uint32_t size)
 {
     const uint8_t setup[10] = {0, 0, 0, 0, size >> 24, size >> 16,
                                size >> 8, size, 0, 2};
-    if (!file_packet(aw.id, 0x04, setup, sizeof(setup)) && no_file_session)
+    aw.size = size;
+    if (!file_packet(aw.id, 0x04, setup, sizeof(setup)))
     {
-        iap_library_artwork_stop();
-        aw.phase = ART_IDLE;
+        if (no_file_session)
+        {
+            iap_library_artwork_stop();
+            aw.phase = ART_IDLE;
+        }
+        else if (aw.phase != ART_SETUP)
+        {
+            aw.phase = ART_SETUP;
+            aw.started = current_tick;
+        }
         return;
     }
-    aw.size = size;
     aw.started = current_tick;
     aw.phase = ART_ANNOUNCED;
 }
@@ -1294,6 +1306,16 @@ static bool announce_late_artwork(uint32_t size)
 static void artwork_pump(void)
 {
     uint32_t size = 0;
+    if (aw.phase == ART_SETUP)
+    {
+        if (TIME_AFTER(current_tick, aw.started + 5 * HZ))
+        {
+            iap_library_artwork_stop();
+            aw.phase = ART_IDLE;
+        }
+        else
+            announce_artwork(aw.size);
+    }
     if (aw.phase == ART_FINDING && aw.pending)
     {
         const struct mp3entry *id3 = audio_current_track();
@@ -1543,15 +1565,18 @@ static bool announce_queue(const struct iap_library_list *l)
 
 /* The position alone, as an iPhone sends it about twice a second while
  * playing: this car does not run the position on itself, and its progress
- * bar stays at 0:00 without. */
-static void send_position(unsigned long elapsed)
+ * bar stays at 0:00 without. False when the link has no slot to spare: the
+ * last is kept for a change of track or state. */
+static bool send_position(unsigned long elapsed)
 {
-    if (!(playback_mask & 1u << PB_POSITION) || !msg_start(NOW_PLAYING_UPDATE))
-        return;
+    if (!(playback_mask & 1u << PB_POSITION))
+        return true;
+    if (usb_iap2_room() < 2 || !msg_start(NOW_PLAYING_UPDATE))
+        return false;
     group_start(1);
     param_u32(PB_POSITION, elapsed);
     group_end();
-    msg_send();
+    return msg_send();
 }
 
 /* What changed since the last update: the track, the state, or a position
@@ -1573,14 +1598,17 @@ static void poll_now_playing(void)
     if (!track && state == np_state && modes == np_modes &&
         drift < 3000 && drift > -3000)
     {
-        if (state == 1 && TIME_AFTER(current_tick, np_tick + HZ / 2))
+        if (state == 1 && TIME_AFTER(current_tick, np_tick + HZ / 2) &&
+            send_position(elapsed))
         {
             np_elapsed = elapsed;
             np_tick = current_tick;
-            send_position(elapsed);
         }
         return;
     }
+    /* Not with no free slot: what changed is still to send at the next */
+    if (!usb_iap2_room())
+        return;
     np_key = key;
     np_state = state;
     np_modes = modes;

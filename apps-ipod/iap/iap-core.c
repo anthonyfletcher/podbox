@@ -27,10 +27,19 @@
  *
  * Parts, in order:
  *   - packet buffers and the shared accessory/device state
- *   - receiving: framing bytes into packets and checking them
+ *   - the session reset when the accessory goes or loses power
+ *   - the 100 ms tick, which goes idle once nothing is left for it
+ *   - volume and mute
+ *   - the iAP thread, its buffers and the line's bit rate
  *   - sending: building, checksumming and transmitting a response
- *   - authentication and identification
+ *   - receiving: framing bytes into packets and checking them
+ *   - the playing track as the lingoes report it
+ *   - Restore on Exit: the shuffle and repeat an accessory set, put back
+ *     when it goes
+ *   - iap_periodic(): authentication's steps and timeouts, button
+ *     timeouts, and the notifications an accessory asked for
  *   - the dispatch that hands a packet to its lingo handler
+ *   - the debug screen
  ****************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
@@ -430,9 +439,22 @@ void iap_power_reset(void)
     post_reset(false);
 }
 
-bool iap_reset_is_pending(void)
+/* iAP thread. The accessory's poll runs every 100 ms, as iap_periodic() runs
+ * it, since on a target that polls only the poll sees an accessory leave. */
+bool iap_reply_must_stop(void)
 {
-    return reset_pending;
+#ifdef HAVE_IAP_ACCESSORY_POLL
+    static long next_poll;
+
+    if (TIME_AFTER(current_tick, next_poll))
+    {
+        next_poll = current_tick + MS_TO_TICKS(100);
+        iap_accessory_poll();
+    }
+#endif
+    return reset_pending
+           || queue_peek_ex(&iap_queue, NULL, 0,
+                            QPEEK_FILTER1(SYS_USB_CONNECTED));
 }
 
 /* iAP thread. An accessory that identified itself was the output -- a dock's

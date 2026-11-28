@@ -313,6 +313,10 @@ static struct Platform platform;
 static struct timeout  tick_tmo;
 static bool            iap_ctx_mutex_initialized = false;
 
+/* Unlocked (false) is for the notifications from playback, the UI and the
+ * PCM position callback, which can be an interrupt: they only set fields and
+ * bits for the locked tick to send, and never yield. Trap: a bit set while
+ * the tick clears another can be lost. */
 struct IAPContext* _iap_acquire_ctx(bool lock) {
     static struct IAPContext ctx;
     if(lock) {
@@ -323,6 +327,19 @@ struct IAPContext* _iap_acquire_ctx(bool lock) {
 
 void _iap_release_ctx() {
     mutex_unlock(&iap_ctx_mutex);
+}
+
+/* The lock libiap's handlers run under on the USB thread, where the library
+ * they call allocates nothing (iap_library_lock_held()) */
+static struct IAPContext* lock_handlers(void) {
+    struct IAPContext* ctx = _iap_acquire_ctx(true);
+    iap_library_lock_held(true);
+    return ctx;
+}
+
+static void unlock_handlers(void) {
+    iap_library_lock_held(false);
+    _iap_release_ctx();
 }
 
 bool iap_initialized;
@@ -505,6 +522,8 @@ static int usb_iap_init_connection(void) {
     return 0;
 
 cleanup_audio:
+    /* what it did allocate, or every later connection finds no slot */
+    iap_deinit_ctx(ctx);
     _iap_release_ctx();
     iap_audio_deinit();
     return -1;
@@ -575,8 +594,10 @@ static void usb_iap_disconnect(void) {
          * the switch says so. A car that never took it leaves playback alone
          * -- one that has only identified itself, or the connection the
          * player drops to come back to it without the sound card -- but an
-         * iAP1 accessory playing the line out is an output going too. */
-        if(pcm_current_sink() != PCM_SINK_IAP && !usb_iap2_keeps_playing()) {
+         * iAP1 accessory playing the line out is an output going too, unless
+         * it is only resetting the bus. */
+        const bool reset = usb_core_bus_resetting() && usb_detect() == USB_INSERTED;
+        if(pcm_current_sink() != PCM_SINK_IAP && !usb_iap2_keeps_playing() && !reset) {
             send_event(SYS_EVENT_OUTPUT_GONE, (void *)OUTPUT_ACCESSORY);
         }
         mixer_switch_sink(PCM_SINK_BUILTIN);
@@ -615,14 +636,14 @@ static void usb_iap_transfer_complete(int ep, int dir, int status, int length) {
             usb_log(USB_LOG_IAP_REPORT, 1, 0, 0, (current_tick - report_waiting_since) * 1000 / HZ);
             report_unread_logged = false;
         }
-        struct IAPContext* ctx = _iap_acquire_ctx(true);
+        struct IAPContext* ctx = lock_handlers();
         if(status == 0) {
             check_act(iap_notify_send_complete(ctx), );
         } else {
             ERROR("hid report failed, status=%d", status);
             check_act(iap_notify_send_failed(ctx), );
         }
-        _iap_release_ctx();
+        unlock_handlers();
     }
 }
 
@@ -700,12 +721,13 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
             }
 
             iap_audio_accessory_heard();
-            struct IAPContext* ctx = _iap_acquire_ctx(true);
+            iap_library_open();
+            struct IAPContext* ctx = lock_handlers();
             iap_log_report(ctx, reqdata, req->wLength, false);
             /* The report arrived whatever libiap makes of it. A STALL would
              * tell the accessory the transfer failed, not the frame. */
             iap_feed_hid_report(ctx, reqdata, req->wLength);
-            _iap_release_ctx();
+            unlock_handlers();
 
             usb_core_control_response(USB_CONTROL_ACK, NULL, 0);
             return true;
@@ -791,7 +813,7 @@ static void usb_iap_notify_event(intptr_t data) {
         }
         log_audio_counts();
         iap_log_tick();
-        struct IAPContext* ctx = _iap_acquire_ctx(true);
+        struct IAPContext* ctx = lock_handlers();
         watch_report(ctx);
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
@@ -799,7 +821,7 @@ static void usb_iap_notify_event(intptr_t data) {
         iap_platform_track_tick(ctx);
         if(iap_platform_control_waits(ctx)) {
             /* waiting for playback begins */
-            _iap_release_ctx();
+            unlock_handlers();
             return;
         }
 
@@ -827,7 +849,7 @@ static void usb_iap_notify_event(intptr_t data) {
 
         iap_audio_tick();
         check_act(iap_periodic_tick(ctx), );
-        _iap_release_ctx();
+        unlock_handlers();
     } break;
     }
 }

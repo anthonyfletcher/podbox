@@ -78,6 +78,14 @@ IAPBool iap_feed_hid_report(struct IAPContext* ctx, const uint8_t* const data, c
         check_ret(report_size == (int)size - 1, iap_false, "%d != %d", report_size, (int)size - 1);
     }
 
+    if(ctx->hid_recv_held > 0) {
+        /* a second request before the frame is out: the held one is answered
+         * now, and its reply cuts that frame short */
+        const size_t held  = ctx->hid_recv_held;
+        ctx->hid_recv_held = 0;
+        _iap_feed_packet(ctx, ctx->hid_recv_buf, held);
+    }
+
     const uint8_t payload_size = report_size - 1;
     check_act(ctx->hid_recv_buf_cursor + payload_size <= HID_BUFFER_SIZE, { ctx->hid_recv_buf_cursor = 0; return iap_false; }, "hid buffer overflow");
     if(!(report->link_control & IAPHIDReportLinkControlBits_Continue)) {
@@ -93,6 +101,13 @@ IAPBool iap_feed_hid_report(struct IAPContext* ctx, const uint8_t* const data, c
     ctx->hid_recv_buf_cursor += payload_size;
     if(!(report->link_control & IAPHIDReportLinkControlBits_MoreToFollow)) {
         /* no more to follow, last packet */
+        if(ctx->send_buf_sending_cursor < ctx->send_buf_sending_range_end) {
+            /* A reply now would overwrite the frame being sent, and the
+             * chain that sent it has moved on: answered once it is out */
+            ctx->hid_recv_held       = ctx->hid_recv_buf_cursor;
+            ctx->hid_recv_buf_cursor = 0;
+            return iap_true;
+        }
         const IAPBool ret        = _iap_feed_packet(ctx, ctx->hid_recv_buf, ctx->hid_recv_buf_cursor);
         ctx->hid_recv_buf_cursor = 0;
         check_ret(ret, iap_false);
@@ -137,6 +152,15 @@ static const struct ReportSize* find_optimal_report_size(struct IAPContext* ctx,
 }
 
 IAPBool _iap_send_next_report(struct IAPContext* ctx) {
+    if(ctx->send_buf_sending_cursor >= ctx->send_buf_sending_range_end && ctx->hid_recv_held > 0) {
+        /* the request held by iap_feed_hid_report goes before the chain */
+        const size_t held  = ctx->hid_recv_held;
+        ctx->hid_recv_held = 0;
+        _iap_feed_packet(ctx, ctx->hid_recv_buf, held);
+        if(ctx->send_busy || ctx->send_buf_sending_cursor < ctx->send_buf_sending_range_end) {
+            return iap_true;
+        }
+    }
     if(ctx->send_buf_sending_cursor >= ctx->send_buf_sending_range_end) {
         if(ctx->on_send_complete != NULL) {
             IAPOnSendComplete cb  = ctx->on_send_complete;

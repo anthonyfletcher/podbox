@@ -210,9 +210,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  5   0x02  Command ID (bits 7:0)
              *  6   0xF7  Telegram payload checksum byte
              *
-             * We Return that the track does not have chapter information by
-             * returning chapter index -1 (0xFFFFFFFF) and chapter count 0
-             * (0x00000000)
+             * A track with no chapters returns chapter index -1 (0xFFFFFFFF)
+             * and chapter count 0
              */
         {
             struct iap_chapter_info chapter;
@@ -286,9 +285,6 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  8   0xNN  Chapter index (bits 15:8)
              *  9   0xNN  Chapter index (bits 7:0)
              * 10   0xNN  Telegram payload checksum byte
-             *
-             * We don't do anything with this as we don't support chapters,
-             * so just return BAD_PARAM
              */
         {
             CHECKLEN(7);
@@ -331,8 +327,6 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * The returned data includes 4 bytes for Chapter Length followed
              * by 4 bytes of elapsed time If there is no currently playing
              * chapter, length and elapsed are 0
-             * We don't do anything with this as we don't support chapters,
-             * so just return BAD_PARAM
              */
         {
             struct iap_chapter_info chapter;
@@ -407,9 +401,6 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  8   0xNN  Chapter index (bits 15:8)
              *  9   0xNN  Chapter index (bits 7:0)
              * 10   0xNN  Telegram payload checksum byte
-             *
-             * We don't do anything with this as we don't support chapters,
-             * so just return BAD_PARAM
              */
         {
             struct iap_chapter_info chapter;
@@ -556,10 +547,6 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *            If 1, the original setting is restored on detach;
              *            if 0, the newsetting persists after accessory detach.
              *  8   0xNN  Telegram payload checksum byte
-             *
-             *
-             * We don't do anything with this as we don't support chapters,
-             * so just return BAD_PARAM
              */
         {
             /* Normal speed only: the player has no other */
@@ -1422,9 +1409,10 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 read_count = total - start_index;
 
             /* A whole library is minutes at 19200 baud: an accessory that
-             * leaves meanwhile is not sent the rest */
+             * leaves meanwhile is not sent the rest, and nor is one when
+             * USB connects, which waits on this thread */
             for (uint32_t i = start_index;
-                 i < start_index + read_count && !iap_reset_is_pending(); i++)
+                 i < start_index + read_count && !iap_reply_must_stop(); i++)
             {
                 if (queue)
                 {

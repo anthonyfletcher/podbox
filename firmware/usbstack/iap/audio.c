@@ -119,8 +119,10 @@ static volatile uint32_t count_bytes, count_chunks, count_silent, count_odd;
 extern struct pcm_sink iap_pcm_sink;
 
 /* The sink offers the rates of samprs[] whose indexes are set in listed,
- * 48 kHz the default where it is one. The list does not change under a sink
- * in use, which gives way to the built-in one while it does. */
+ * 48 kHz the default where it is one. A sink in use whose rate the new list
+ * has keeps playing it, silent while the list changes and announcing it
+ * again after. One whose rate the list lacks gives way to the built-in sink
+ * while it changes, so that the mixer takes the new rate. */
 static void offer_rates(unsigned listed) {
     struct pcm_sink_caps* caps = &iap_pcm_sink.caps;
     unsigned long         list[ARRAYLEN(samprs)];
@@ -140,8 +142,17 @@ static void offer_rates(unsigned listed) {
     }
 
     const bool in_use = pcm_current_sink() == PCM_SINK_IAP;
-    if(in_use) {
+    uint8_t    keep   = n; /* the playing rate's index in list, or n */
+    for(uint8_t i = 0; in_use && i < n; i += 1) {
+        if(list[i] == RATE(iap_pcm_sink.pending_freq)) {
+            keep = i;
+        }
+    }
+    const bool give_way = in_use && keep == n;
+    if(give_way) {
         mixer_switch_sink_quiet(PCM_SINK_BUILTIN);
+    } else if(in_use) {
+        pcm_play_lock();
     }
     /* the stream's packets are sized from it in the USB interrupt */
     const int oldlevel = disable_irq_save();
@@ -155,9 +166,17 @@ static void offer_rates(unsigned listed) {
     asked_freq         = -1;
     /* so iap_audio_connected() announces a rate from the new list */
     track_attrs_sent   = false;
+    if(in_use && !give_way) {
+        /* the indexes are the new list's, and the rate is set again */
+        iap_pcm_sink.pending_freq    = keep;
+        iap_pcm_sink.configured_freq = -1U;
+    }
     restore_irq(oldlevel);
-    if(in_use) {
+    if(give_way) {
         mixer_switch_sink_quiet(PCM_SINK_IAP);
+    } else if(in_use) {
+        pcm_apply_settings();
+        pcm_play_unlock();
     }
 }
 

@@ -231,14 +231,16 @@ static IAPBool send_artwork_chunk(struct IAPContext* ctx) {
     }
     struct IAPSpan artwork;
     size_t         copy_size = 0;
+    IAPBool        more      = iap_true; /* a single-report first chunk holds none of the image */
     if(!ctx->opts.artwork_single_report || ctx->artwork_chunk_index != 0) {
         check_ret(iap_platform_get_artwork_ptr(ctx, &ctx->artwork, &artwork), iap_false);
         check_ret(iap_span_read(&artwork, ctx->artwork_cursor) != NULL, iap_false); /* skip already read chunk */
         copy_size = min((ctx->opts.artwork_single_report ? 48 : request.size), artwork.size);
         memcpy(iap_span_alloc(&request, copy_size), iap_span_read(&artwork, copy_size), copy_size);
+        more = artwork.size > 0;
     }
     check_ret(_iap_send_packet(ctx, ctx->artwork_data_lingo, ctx->artwork_data_command, ctx->artwork_trans_id, request.ptr), iap_false);
-    if(artwork.size > 0) {
+    if(more) {
         /* more to send, ask to call again */
         ctx->artwork_cursor += copy_size;
         ctx->artwork_chunk_index += 1;
@@ -265,19 +267,26 @@ static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
     return iap_false;
 }
 
-/* The time is ignored, as a track has one image; a request for another
- * track's ends the transfer under way */
-static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
-    read_request(IAPGetTrackArtworkDataPayload);
-    check_ret(swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID, -IAPAckStatus_EBadParameter);
-    /* The transfer this one ends sends no more chunks */
-    if(ctx->on_send_complete == send_artwork_chunk_cb) {
+static IAPBool send_db_record_cb(struct IAPContext* ctx);
+
+/* A cover and a list of records are sent through the one on_send_complete,
+ * so a request for either ends a transfer of both */
+static void end_artwork_and_records(struct IAPContext* ctx) {
+    if(ctx->on_send_complete == send_artwork_chunk_cb || ctx->on_send_complete == send_db_record_cb) {
         ctx->on_send_complete = NULL;
     }
     if(ctx->artwork.valid) {
         iap_platform_close_artwork(ctx, &ctx->artwork);
         ctx->artwork.valid = iap_false;
     }
+}
+
+/* The time is ignored, as a track has one image; a request for another
+ * track's ends the transfer under way */
+static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
+    read_request(IAPGetTrackArtworkDataPayload);
+    check_ret(swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID, -IAPAckStatus_EBadParameter);
+    end_artwork_and_records(ctx);
 
     check_ret(iap_platform_open_artwork(ctx, swap_32(request->track_index), &ctx->artwork), -IAPAckStatus_EBadParameter);
     ctx->artwork.valid       = iap_true;
@@ -1112,6 +1121,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 response_span->ptr = NULL;
                 return 0;
             }
+            end_artwork_and_records(ctx);
             ctx->db_record_type     = request->type;
             ctx->db_record_index    = index;
             ctx->db_record_end      = index + count;

@@ -49,6 +49,14 @@ bool iap_library_queue_lent(void);
 enum { IAP_LIBRARY_SERIAL = 1, IAP_LIBRARY_USB = 2 };
 void iap_library_claim(int transport);
 void iap_library_close(int transport);
+/* USB iAP1 calls the entry points under a lock the playback threads also
+ * take, and allocating the lists can wait on them. So open allocates them,
+ * once a connection, before that lock is taken, and lock_held marks the
+ * thread holding it (true after taking it, false before letting it go): on
+ * that thread nothing is allocated, and an entry point that needs the lists
+ * finds none. */
+void iap_library_open(void);
+void iap_library_lock_held(bool held);
 
 /* The library as iAP2 sends it: every track, while the database is in RAM.
  * A track's key is path_key() of its file, so it survives a rebuild and

@@ -266,9 +266,10 @@ void iap_tx_strlcpy(const unsigned char *str);
 
 void iap_reset_auth(struct auth_t* auth);
 void iap_reset_device(struct device_t* device);
-/* The accessory has gone or lost power, and the session resets once the
- * handler running now returns: a long reply stops sending */
-bool iap_reset_is_pending(void);
+/* Whether a long reply stops sending: the accessory has gone or lost power,
+ * and the session resets once the handler running now returns, or USB is
+ * waiting for this thread to answer its connection */
+bool iap_reply_must_stop(void);
 
 void iap_shuffle_state(bool state);
 void iap_repeat_state(unsigned char state);

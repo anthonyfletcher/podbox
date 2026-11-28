@@ -74,6 +74,7 @@ struct IAPContext {
     /* iap_feed_hid_report */
     uint8_t* hid_recv_buf;
     size_t   hid_recv_buf_cursor;
+    size_t   hid_recv_held; /* a request's size, held until the frame being sent is out, or 0 */
     /* _iap_send_packet, _iap_send_hid_reports */
     uint8_t* send_buf;
     size_t   send_buf_sending_cursor;

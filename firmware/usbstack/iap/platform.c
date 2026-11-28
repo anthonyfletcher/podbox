@@ -67,8 +67,12 @@ void* iap_platform_malloc(struct IAPContext* iap_ctx, size_t size, int flags) {
     return NULL;
 }
 
+/* NULL, what a failed iap_init_ctx() leaves, frees nothing */
 void iap_platform_free(struct IAPContext* iap_ctx, void* ptr) {
     struct Platform* plt = iap_ctx->platform;
+    if(ptr == NULL) {
+        return;
+    }
     for(size_t i = 0; i < ARRAYLEN(plt->malloc_results); i += 1) {
         if(plt->malloc_results[i].ptr == ptr) {
             core_free(plt->malloc_results[i].handle);
