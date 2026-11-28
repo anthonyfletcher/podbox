@@ -4,12 +4,14 @@
  * The synthesiser as the player uses it: what it loads, the text it is
  * given, and the samples it renders for the voice thread.
  *
- * Two files are loaded while Speak Aloud is on with a voice it speaks:
- * the dictionary, .rockbox/speech/cmudict.bin, for lexicon.c, and the
- * language's voice strings, .rockbox/langs/<language>.vstrings (English's
- * when the language has none), the text a .voice file would have recorded
- * for each language string. Both are
- * loaded at boot by talk_init(), before the audio buffer takes the memory.
+ * Two files are loaded while Speak Aloud is on with a voice it speaks, or
+ * the text viewer's Read Aloud is on: the language's voice strings,
+ * .rockbox/langs/<language>.vstrings (English's when the language has
+ * none), the text a .voice file would have recorded for each language
+ * string, and then the dictionary, .rockbox/speech/cmudict.bin, for
+ * lexicon.c. Both are loaded at boot by talk_init(), before the audio
+ * buffer takes the memory, or when one of those settings is switched on,
+ * and are kept until it is switched off.
  *
  * Text is turned into phonemes on the caller's thread, when it is queued,
  * so that the voice thread only renders. The phonemes wait in a ring, one
@@ -35,6 +37,7 @@
 #include "rbpaths.h"
 #include "lang.h"
 #include "settings/settings.h"
+#include "viewers/text_viewer/text_viewer.h"
 #include "lexicon.h"
 #include "normalise.h"
 #include "synth.h"
@@ -154,25 +157,21 @@ static void load_strings(const char *lang)
         strings_handle = core_free(strings_handle);
 }
 
-static bool reader_on;
-
 bool speech_wanted(void)
 {
     /* Voice File Only with no file that loads, as after an update without
      * the matching voices, would leave the player silent, menus and all */
-    return reader_on
+    return global_settings.text_viewer_read_aloud != TV_READ_OFF
            || (global_settings.talk_menu
                && (global_settings.talk_voice != TALK_VOICE_FILE_ONLY
                    || !talk_has_voicefile()));
 }
 
-void speech_reader(bool on)
+static void free_files(void)
 {
-    bool was = speech_wanted();
-
-    reader_on = on;
-    if (speech_wanted() != was)
-        talk_speech_changed();
+    lexicon_init(NULL, 0);
+    dict_handle = core_free(dict_handle);
+    strings_handle = core_free(strings_handle);
 }
 
 void speech_apply_settings(void)
@@ -183,13 +182,9 @@ void speech_apply_settings(void)
 
     if (!speech_wanted())
     {
-        lexicon_init(NULL, 0);
-        dict_handle = core_free(dict_handle);
-        strings_handle = core_free(strings_handle);
+        free_files();
         return;
     }
-    if (!dict_handle)
-        load_dictionary();
     if (strings_handle && strcasecmp(strings_lang, lang))
         strings_handle = core_free(strings_handle);
     if (!strings_handle)
@@ -203,6 +198,12 @@ void speech_apply_settings(void)
             strmemccpy(strings_lang, lang, sizeof(strings_lang));
         }
     }
+    /* the synthesiser is off without the strings, so the dictionary is
+     * loaded only after them */
+    if (!strings_handle)
+        free_files();
+    else if (!dict_handle)
+        load_dictionary();
 }
 
 bool speech_enabled(void)

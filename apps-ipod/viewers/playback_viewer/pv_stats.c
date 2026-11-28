@@ -537,7 +537,9 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
      * what fits would silently drop the rest. */
     if (n_artist > t_artist.cap || n_title > t_title.cap
         || n_album > t_album.cap || n_days > day_cap
-        || n_artist < 0 || n_title < 0 || n_album < 0 || n_days < 0)
+        || n_artist < 0 || n_title < 0 || n_album < 0 || n_days < 0
+        || badge_state.daytrk_n < 0
+        || badge_state.daytrk_n > PV_BADGE_DAYTRK)
         goto fail;
 
     if (!pv_index_read(t_artist.items, (size_t)n_artist * sizeof(struct pv_agg))

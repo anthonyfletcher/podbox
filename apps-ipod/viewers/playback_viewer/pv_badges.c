@@ -526,7 +526,9 @@ void pv_badges_save(void)
         rec.seen = bit_get(seen, i);
         ok = libfile_write(&w, &rec, sizeof(rec), 1);
     }
-    libfile_finish(&w, ok);
+    /* what is saved is what later badges are new against */
+    if (libfile_finish(&w, ok))
+        had_progress = true;
 }
 
 int pv_badges_classify(void)

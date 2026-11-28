@@ -60,7 +60,7 @@
 #include "ts_io_core.h"
 #include "text_viewer.h"
 #include "speech/talk.h"
-#include "speech/speech.h"     /* speech_enabled, speech_reader */
+#include "speech/speech.h"     /* speech_enabled */
 #include "audio/voice_thread.h" /* voice_is_playing */
 #include "powermgmt.h"   /* reset_poweroff_timer */
 #include "backlight.h"   /* backlight_set_brightness, backlight_set_timeout */
@@ -1829,8 +1829,7 @@ static void tv_places_upgrade_v2(void)
         ok = libfile_write(&w, &p, sizeof(p), 1);
     }
     close(fd);
-    if (ok)
-        libfile_finish(&w, true);
+    libfile_finish(&w, ok);     /* a no-op if libfile_begin() failed */
 }
 
 /* Version 1's places as version 3's, their chapters unknown */
@@ -1864,8 +1863,7 @@ static void tv_places_upgrade(void)
         ok = libfile_write(&w, &p, sizeof(p), 1);
     }
     close(fd);
-    if (ok)
-        libfile_finish(&w, true);
+    libfile_finish(&w, ok);     /* a no-op if libfile_begin() failed */
 }
 
 static int tv_places_open(struct libfile_header *h)
@@ -2227,7 +2225,6 @@ static void tv_close(void)
     backlight_set_brightness(global_settings.brightness);
     backlight_set_timeout(global_settings.backlight_timeout);
     backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);
-    speech_reader(false);
 
     if (tv.user_font >= 0)
     {
@@ -2358,9 +2355,7 @@ static void tv_apply_settings(void)
     int margin;
 
     tv_apply_font();
-    /* Put back in tv_close(), as are the reader's claim on the voice and
-     * the backlight timeout */
-    speech_reader(global_settings.text_viewer_read_aloud != TV_READ_OFF);
+    /* Put back in tv_close(), as is the backlight timeout */
     backlight_set_brightness(global_settings.text_viewer_brightness
                              ? global_settings.text_viewer_brightness
                              : global_settings.brightness);

@@ -80,10 +80,19 @@ static void put_spelled(struct out *o, const char *w, int len)
 
 /** Characters **/
 
+/* The character at p, and where the next starts; never past the NUL, which
+ * reads as 0 again. Trap: utf8decode() steps past a NUL, both the one it
+ * starts on and one ending a cut character. */
 static ucschar_t peek(const unsigned char *p, const unsigned char **next)
 {
     ucschar_t c;
     *next = utf8decode(p, &c);
+    for (const unsigned char *q = p; q < *next; q++)
+        if (*q == '\0')
+        {
+            *next = q;
+            return q == p ? 0 : 0xfffd;
+        }
     return c;
 }
 

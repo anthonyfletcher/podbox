@@ -181,7 +181,8 @@ static void path_join(const char *base, const char *href, char *out, size_t cap)
 /* A manifest entry costs one short id string and one int. The href is
  * resolved to a zip index the moment it is parsed and then discarded: on a
  * 2000-chapter book, keeping the hrefs instead would cost a quarter of a
- * megabyte, which is more than some targets can spare for the whole plugin. */
+ * megabyte, which is more than some targets can spare for the whole text
+ * viewer. */
 typedef struct mitem {
     char *id;
     int   zi;

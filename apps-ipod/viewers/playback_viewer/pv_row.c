@@ -60,9 +60,9 @@
 /* Milliseconds a frame is allowed to take.
  *
  * Uncapped the row runs at ninety frames a second, starves the codec and
- * pushes the panel three times for every frame anyone could see. Thirty is
- * both the fix and the saving -- it is a third of the CPU rather than two
- * thirds, and it is what made drawing every card every frame affordable. */
+ * pushes the panel three times for every frame anyone could see. Thirty
+ * takes a third of the CPU rather than two thirds, which is what pays for
+ * drawing every card every frame. */
 #define FRAME_MS    33
 
 /* Not a year: what year_menu() answers when a setting has changed that
@@ -76,10 +76,9 @@
  * it is tall and the painter takes the middle rows out of this, which crops
  * rather than squashes.
  *
- * This is the one thing held between frames. Finished cards are not cached --
- * measured on a 5G, holding them cost 387 KB and was slower, because the art
- * had to come out of the same buffer and what was left could not hold a
- * screen's worth of cards. */
+ * This is the one thing held between frames. Trap: caching finished cards
+ * costs 387 KB on a 5G and is slower, because they come out of the same
+ * buffer as the art and what is left cannot hold a screen's worth. */
 #define ART_PX      128
 #define ART_SLOTS     6
 
@@ -124,7 +123,7 @@ static int          art_square_idx = -1;  /* the 128px, read straight */
  *
  * Order is the point. Fetching the look-ahead before the card being looked at
  * leaves a pattern on screen while the reads go to cards nobody can see yet,
- * which is the whole complaint the look-ahead was meant to answer. */
+ * which is what the look-ahead is there to prevent. */
 static unsigned     art_want[MAX_VISIBLE + 4];
 static int          art_want_n;
 static int          art_want_at;
@@ -157,9 +156,8 @@ static void art_init(void *buf)
  *
  * The carousel's cache size is 128 x 128 -- exactly the picture band's width
  * -- so there is no scaling at all, and the file is 32 KB against the 300px
- * size's 180 KB. Measured on a 5G, a load through the 300px path cost 211 ms
- * and was 87% of every frame's time while scrolling; almost all of that is
- * reading the file.
+ * size's 180 KB. On a 5G a load through the 300px path costs 211 ms, 87% of
+ * every frame's time while scrolling, almost all of it reading the file.
  *
  * It is stored COLUMN-major, because the carousel draws slides column by
  * column, and art_cache_load_aat() refuses such a file for that reason.
@@ -546,9 +544,8 @@ static void composite(void)
      * notes what is missing; the reading happens after the frame has been
      * flushed, out of what is left of the frame's own time (see the loop).
      *
-     * A file read inside the drawing is what made this screen slow: on a 5G
-     * one load measured 211 ms, so a load a frame was not a small cost paid
-     * smoothly but every frame taking a fifth of a second. */
+     * Trap: a file read inside the drawing makes every frame that loads
+     * take a fifth of a second; one load measures 211 ms on a 5G. */
     art_budget = 0;
     art_want_n = art_want_at = 0;
     for (int i = 0; i < n; i++)
@@ -873,9 +870,8 @@ static int row_session(bool *again)
 
     /* Two consumers share this, and dividing it is the screen's job because
      * the screen is the only thing that knows both exist. The artwork takes a
-     * fixed slice off the front; the model sizes itself to what is left --
-     * except for the pass that resolves names, which runs before the slice is
-     * in use and is given all of it. See build_model().
+     * fixed slice off the front; the model, and the pass that resolves its
+     * names, size themselves to what is left. See build_model().
      *
      * With artwork switched off the slice is not taken at all, which is the
      * second reason that setting exists: it is the largest fixed claim Spun
@@ -1000,6 +996,15 @@ static int row_session(bool *again)
                 default_event_handler(btn);
                 continue;
             }
+#ifdef HAVE_MULTIMEDIA_KEYS
+            /* a dock's, a car's or the inline remote's keys, which the
+             * handler plays, skips and turns the volume with */
+            if (btn & BUTTON_MULTIMEDIA)
+            {
+                default_event_handler(btn);
+                continue;
+            }
+#endif
 
             /* Raw button codes rather than an action context, the way the
              * rest of Spun does it. CONTEXT_STD maps Right and Select to one
@@ -1007,7 +1012,7 @@ static int row_session(bool *again)
              *
              * Trap: BUTTON_REL rides in the same word as the button, so a
              * switch that masks off only BUTTON_REPEAT never matches a
-             * release -- which is how Menu stopped being a way out. Menu is
+             * release, and Menu is no way out. Menu is
              * the one button that cares about the release, so it is taken
              * first and every other release is dropped; without that, the
              * release of Select would toggle a second time. */
@@ -1136,7 +1141,17 @@ static int row_session(bool *again)
                         {
                             splash(0, ID2P(LANG_WAIT));
                             year = y2;
-                            build_model(buf, bufsz, art_on, &totals, year);
+                            r = build_model(buf, bufsz, art_on, &totals,
+                                            year);
+                            if (r != PV_BUILD_OK)
+                            {
+                                /* a model that failed is half built, and
+                                 * nothing is left to show */
+                                splash(HZ * 2, r == PV_BUILD_NO_LOG
+                                               ? ID2P(LANG_PV_NO_LOG)
+                                               : ID2P(LANG_PV_NO_MEMORY));
+                                goto done;
+                            }
                             memset(art_key, 0, sizeof(art_key));
                             memset(hue_key, 0, sizeof(hue_key));
                         }

@@ -25,8 +25,8 @@
  *     off the progress line.
  *   - Everything lives in the app buffer, never core_alloc(): the screen is
  *     used while music plays, and taking memory from the audio buffer stops
- *     the track. Two banners are kept, so going back to the page before
- *     does not make its banner again.
+ *     the track. One banner is kept, the one on screen, so opening its page
+ *     again does not make it again; going back to another page does.
  *
  * Links are drawn in the accent colour, and one is current, drawn inverted:
  * the one nearest the reading line, a third of the way down, or at the top

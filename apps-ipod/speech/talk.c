@@ -1757,15 +1757,34 @@ static int text_item(const char *text, bool enqueue, bool join)
     while (normalise_find_script(text, &start, &end, &script))
     {
         static char before[MAX_PATH];
-        size_t n = MIN((size_t)(start - text), sizeof(before) - 1);
 
-        memcpy(before, text, n);
-        before[n] = '\0';
+        /* the text before the run goes in pieces that fit before[], each
+         * cut after a space where it has one, and never through a
+         * character */
         item = -1;
-        if (n > 0)
+        while (text < start)
         {
+            size_t n = start - text;
+
+            if (n > sizeof(before) - 1)
+            {
+                size_t cut = sizeof(before) - 1;
+
+                while (cut > 0 && (text[cut] & 0xc0) == 0x80)
+                    cut--;
+                for (size_t i = cut; i > 1; i--)
+                    if (text[i - 1] == ' ')
+                    {
+                        cut = i;
+                        break;
+                    }
+                n = cut > 0 ? cut : sizeof(before) - 1;
+            }
+            memcpy(before, text, n);
+            before[n] = '\0';
             item = queue_text(before, enqueue, join);
-            enqueue = true;
+            text += n;
+            enqueue = join = true;
         }
         talk_id(script_ids[script], enqueue);
         if (!*end)

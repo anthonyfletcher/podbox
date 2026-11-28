@@ -658,7 +658,7 @@ static void build_new(void)
     }
 }
 
-static int wk_week;
+static int wk_week = -1;    /* which week the week scan's tables describe */
 
 int pv_tiles_build(enum pv_sec sec, const struct pv_totals *t)
 {
@@ -734,8 +734,7 @@ struct wk_named
 
 static struct wk_named wk_art[WK_SLOTS], wk_trk[WK_SLOTS];
 static int  wk_art_n, wk_trk_n;
-static int  wk_songs;
-static int  wk_week = -1;       /* which week the three above describe */
+static int  wk_songs;           /* the three lines describe wk_week */
 static char wk_top_artist[PV_NAME_MAX];
 static char wk_top_track[PV_NAME_MAX];
 

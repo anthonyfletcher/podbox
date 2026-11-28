@@ -162,6 +162,10 @@ static int dict_lookup(const char *word, int len, uint8_t *phones)
         if (clen == len && !memcmp(current, word, len))
         {
             int n = count < MAX_PHONES ? count : MAX_PHONES;
+            /* a code past phone_ipa[] is a damaged entry */
+            for (int i = 0; i < n; i++)
+                if (PHONE(ph[i]) > ZH)
+                    return -1;
             memcpy(phones, ph, n);
             return n;
         }
