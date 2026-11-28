@@ -891,7 +891,7 @@ static int sound_album_run(void)
 
 /* Trap: ATTR_DIRECTORY does not mean "a folder on disk". The database browser
  * sets it on every row that is not a track -- artist, album and genre alike
- * (browser_db.c:4909) -- and under CONTEXT_ID3DB the path beside it is that
+ * -- and under CONTEXT_ID3DB the path beside it is that
  * row's display name with a slash put in front, which opendir() cannot open.
  * So the two contexts are told apart and read their tracks differently,
  * rather than one path being made to serve both. */
@@ -1044,7 +1044,7 @@ static int add_to_playlist(void* arg)
         /* nothing is currently playing so begin playing what we just
            inserted; a book plays in order whatever Shuffle says */
         if (global_settings.playlist_shuffle && !ctx_in_order)
-            playlist_shuffle(current_tick, -1);
+            playlist_shuffle(0, -1);
         playlist_start(0, 0, 0);
         context_menu_result = ONPLAY_START_PLAY;
     }
@@ -1257,7 +1257,9 @@ int context_menu_show_playlist(const char* path, int attr, void (*playlist_inser
     ctx_go_to = false;
     push_current_activity(ACTIVITY_CONTEXTMENU);
     hiding_begin();
-    do_menu(&browser_playlist_menu, NULL, NULL, false);
+    if (do_menu(&browser_playlist_menu, NULL, NULL, false)
+        == MENU_ATTACHED_USB)
+        context_menu_result = ONPLAY_MAINMENU;
     hiding_end();
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
@@ -1404,12 +1406,22 @@ static int clipboard_paste_many(void)
                         O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (rest >= 0)
         {
-            while (read_line(fd, name, sizeof(name)) > 0)
-                if (i++ >= done && name[0])
-                    fdprintf(rest, "%s\n", name);
-            close(rest);
-            remove(CLIPBOARD_LIST);
-            rename(CLIPBOARD_LIST ".tmp", CLIPBOARD_LIST);
+            /* A short write keeps the whole list rather than part of it */
+            bool ok = true;
+
+            while (ok && read_line(fd, name, sizeof(name)) > 0)
+                if (i++ >= done && name[0]
+                    && fdprintf(rest, "%s\n", name) != (int)strlen(name) + 1)
+                    ok = false;
+            if (close(rest) < 0)
+                ok = false;
+            if (ok)
+            {
+                remove(CLIPBOARD_LIST);
+                rename(CLIPBOARD_LIST ".tmp", CLIPBOARD_LIST);
+            }
+            else
+                remove(CLIPBOARD_LIST ".tmp");
         }
         if (fd >= 0)
             close(fd);
@@ -1778,12 +1790,13 @@ static const char *split_part_name(int selected_item, void *data,
     return buffer;
 }
 
-bool context_menu_pick_artist(long *seek)
+bool context_menu_pick_artist(long *seek, bool *to_root)
 {
     struct simplelist_info info;
     int check[DB_FEATURED_MAX_GUESTS];
     int n, pick = 0;
 
+    *to_root = false;
     if (!db_names_ensure())
         return true;
     n = db_names_joint_parts(*seek, split_parts, ARRAYLEN(split_parts));
@@ -1797,7 +1810,8 @@ bool context_menu_pick_artist(long *seek)
     {
         simplelist_info_init(&info, str(LANG_GO_TO_WHICH_ARTIST), n, NULL);
         info.get_name = split_part_name;
-        if (simplelist_show_list(&info) || info.selection < 0)
+        *to_root = simplelist_show_list(&info);
+        if (*to_root || info.selection < 0)
             return false;
         pick = info.selection;
         /* The table is rebuilt by a database change, which may come while
@@ -1815,12 +1829,17 @@ static int go_to_artist(void)
     struct tagcache_album album;
     char name[MAX_PATH];
     long seek;
+    bool to_root;
 
     if (!selected_track_album(&album))
         return 0;
     seek = album.artist_seek;
-    if (!context_menu_pick_artist(&seek))
+    if (!context_menu_pick_artist(&seek, &to_root))
+    {
+        if (to_root)
+            context_menu_result = ONPLAY_MAINMENU;
         return 0;
+    }
     if (!tagcache_seek_string(tag_albumartist, seek, name, sizeof(name)))
         name[0] = '\0';
 
@@ -2871,8 +2890,8 @@ static int hotkey_add_to_playlist(void)
     hiding_end();
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
-    return ret == GO_TO_ROOT || ret == GO_TO_MAINMENU ? ONPLAY_MAINMENU
-                                                      : ONPLAY_RELOAD_DIR;
+    return ret == GO_TO_ROOT || ret == GO_TO_MAINMENU
+           || ret == MENU_ATTACHED_USB ? ONPLAY_MAINMENU : ONPLAY_RELOAD_DIR;
 }
 
 static int hotkey_main_menu(void)
@@ -3897,6 +3916,8 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
     if (menu_selection == GO_TO_ROOT)
         return ONPLAY_MAINMENU;
     if (menu_selection == GO_TO_MAINMENU)
+        return ONPLAY_MAINMENU;
+    if (menu_selection == MENU_ATTACHED_USB)
         return ONPLAY_MAINMENU;
     if (menu_selection == GO_TO_PLAYLIST_VIEWER)
         return ONPLAY_PLAYLIST;

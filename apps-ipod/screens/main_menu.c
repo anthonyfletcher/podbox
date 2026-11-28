@@ -489,18 +489,9 @@ MENUITEM_FUNCTION(settings_changed_item, MENU_FUNC_CHECK_RETVAL,
                   NULL, Icon_NOICON);
 
 /* Six branches, cut by what a person is trying to do rather than by which
- * subsystem implements it.
- *
- * General Settings is gone. It had fourteen unrelated branches under one word,
- * and it was where anything that was not obviously Sound or Theme ended up:
- * playlists, the database, the backlight, the USB mode, the language. Battery &
- * Power is the branch this re-cut exists for -- it is what an iPod owner tunes
- * most, and its settings were spread over four places with the word "battery"
- * appearing in none of them.
- *
- * Search and Changed Settings bracket the tree deliberately: one for when you
- * know what you want and not where it lives, the other for when you want to
- * know what you have already changed. */
+ * subsystem implements it, so a new setting goes where its user would look
+ * for it. Search and Changed Settings bracket the tree: one for knowing what
+ * you want and not where it lives, the other for what you have changed. */
 MAKE_MENU(main_menu_, ID2P(LANG_SETTINGS), NULL,
         Icon_Submenu_Entered,
         &settings_search_item,

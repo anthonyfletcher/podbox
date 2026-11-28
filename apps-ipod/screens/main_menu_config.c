@@ -31,27 +31,19 @@ static struct menu_table *menu_table;
 static int menu_item_count;
 
 #define MAX_ITEM_NAME 64
-/* Must scale with TAGNAVI_MAIN_MENU_SLOTS, never be a fixed number.
+/* Must scale with TAGNAVI_MAIN_MENU_SLOTS, never be a fixed number:
  * root_menu.c's menu_table[] holds its fixed entries plus one slot per
- * tagnavi.config root-menu row (see root_menu.h), and the tagnavi slots
- * alone can exceed any fixed guess -- which silently overflows menu_items[]
- * below rather than failing cleanly.
- *
- * The fixed part is 10 today and grows whenever a root entry is added, so the
- * constant carries enough headroom that adding one is not silently fatal. */
+ * tagnavi.config root-menu row (see root_menu.h). Its fixed part is 19 entries
+ * and grows whenever a root entry is added, so the constant carries headroom;
+ * load_from_cfg() stops at MAX_ITEMS rather than overrun menu_items[]. */
 #define MAX_ITEMS (24 + TAGNAVI_MAIN_MENU_SLOTS)
 
-/* Sized per item, for the same reason as MAX_ITEMS above. This buffer holds
- * the "key, !key, key, ..." config string, an item that is turned off written
- * where it stands with a '!' before it; with keys up to 11 chars
- * ("pictureflow", "system_menu", "tagnavi19"), the '!' and ", ", 14 bytes per
- * item is the worst case.
- *
- * It must not be undersized: root_menu_write_to_cfg()'s buf_len bookkeeping
- * does not defend against running past the end. buf_len is an int, goes
- * negative on overflow, and the next snprintf() reinterprets it as a huge
- * size_t -- so the failure is a silent stack overflow, not a truncated
- * string. */
+/* The "key, !key, key, ..." config string, an item that is turned off written
+ * where it stands with a '!' before it. 14 bytes an item is an average, not a
+ * bound: keys run to 15 characters ("artistportraits", "currentplaylist"),
+ * and every item turned off takes 433 bytes of the 616. A string that does
+ * not fit is cut short, here and in root_menu_write_to_cfg() alike, and the
+ * items past the cut load as turned off. */
 #define CFG_STR_SIZE (MAX_ITEMS * 14)
 
 _Static_assert(CFG_STR_SIZE + sizeof("root menu order: ") <= SETTINGS_MAX_LINE,
@@ -87,11 +79,9 @@ static const char * menu_get_name(int selected_item, void * data,
     unsigned char *p = menu_items[selected_item].name;
     int id = P2ID(p);
 
-    /* Both branches point at the same kind of string, but str() yields
-     * "unsigned char *" while p was cast to "char *". Mixing them in one
-     * conditional makes the result "void *", which %s cannot be given.
-     * Behaviour was correct -- the pointer is valid either way -- but the
-     * types have to agree, so settle on const char * for both. */
+    /* Both cast: str() yields "unsigned char *", and mixing the two pointer
+     * types in one conditional makes the result "void *", which %s cannot be
+     * given. */
     const char *label = (id != -1) ? (const char *)str(id) : (const char *)p;
 
     snprintf(buffer, buffer_len, "%s: %s", label,
@@ -108,11 +98,9 @@ static enum themable_icons menu_get_icon(int selected_item, void * data)
     if (selected_item == moving_item)
         return Icon_Moving;
 
-    /* Every row, enabled or not. Icon_NOICON for the disabled ones left a
-     * blank cell wherever an entry was not in the root menu -- which is all of
-     * the tagnavi rows until one is added -- and that reads as a missing icon
-     * rather than as "off". The state is in the row text either way:
-     * menu_get_name() appends ": On" / ": Off". */
+    /* Every row, enabled or not: a blank cell reads as a missing icon, not as
+     * "off". The state is in the row text, which menu_get_name() ends with
+     * ": On" / ": Off". */
     return Icon_Config;
 }
 
@@ -211,7 +199,9 @@ static void save_to_cfg(void)
     int i, j = 0;
 
     out[0] = '\0';
-    for (i = 0; i < menu_item_count; i++)
+    /* snprintf() returns what it would have written, so j passes the end
+     * on truncation, and sizeof(out) - j would then wrap */
+    for (i = 0; i < menu_item_count && j < (int)sizeof(out); i++)
     {
         j += snprintf(&out[j], sizeof(out) - j, "%s%s, ",
                       menu_items[i].enabled ? "" : "!", menu_items[i].string);
@@ -350,8 +340,6 @@ void main_menu_place_item(const struct menu_item_ex *item,
 
 int main_menu_config(void)
 {
-    bool show_icons = global_settings.show_icons;
-    global_settings.show_icons = true;
     struct gui_synclist list;
     bool done = false;
     bool changed = false;
@@ -371,6 +359,10 @@ int main_menu_config(void)
         viewportmanager_theme_enable(i, true, NULL);
 
     gui_synclist_init(&list, menu_get_name, NULL, false, 1, NULL);
+    /* The move marker is an icon, so this list shows them whatever Show Icons
+     * says. Set on the list, never on the setting, which any settings flush
+     * while the screen is up would write out. */
+    list.show_icons = true;
     if (global_settings.talk_menu)
         gui_synclist_set_voice_callback(&list, menu_speak_item);
     gui_synclist_set_icon_callback(&list, menu_get_icon);
@@ -433,13 +425,22 @@ int main_menu_config(void)
                 break;
             case ACTION_STD_CONTEXT:
             {
+                int choice;
+
                 if (moving_item >= 0) /* OK drops, CANCEL puts back */
                     break;
 
                 MENUITEM_STRINGLIST(menu, ID2P(LANG_MAIN_MENU_SETTINGS), NULL,
                                     ID2P(LANG_MOVE),
                                     ID2P(LANG_LOAD_DEFAULT_CONFIGURATION));
-                switch (do_menu(&menu, NULL, NULL, false))
+                choice = do_menu(&menu, NULL, NULL, false);
+                if (choice == MENU_ATTACHED_USB)
+                {
+                    ret = SYS_USB_CONNECTED;
+                    done = true;
+                    break;
+                }
+                switch (choice)
                 {
                     case 0:
                         moving_item = moving_from = cur_sel;
@@ -497,7 +498,6 @@ int main_menu_config(void)
         global_settings.root_menu_customized = true;
         settings_save();
     }
-    global_settings.show_icons = show_icons;
 
     FOR_NB_SCREENS(i)
         viewportmanager_theme_undo(i, false);

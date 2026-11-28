@@ -10,8 +10,9 @@
  * The tracks do need the database: the table records a master-index id per
  * credit and nothing else, because a title and an album artist are strings
  * the table would otherwise have to hold a second copy of. So a track list
- * retrieves its rows when it opens, into borrowed memory, and gives it back
- * before anything else can want it.
+ * retrieves its rows when it opens, into the app buffer, and gives it back
+ * whenever the list goes down, since a context menu can reach screens that
+ * claim it.
  *
  * Parts, in order:
  *   - the guest list, in name order
@@ -219,9 +220,8 @@ static const char *track_get_name(int n, void *data, char *buffer,
  * appearances play on through one another rather than stopping after one.
  *
  * The paths are not in the table: the filename is the one tag the ramcache
- * does not hold as a string, so each is retrieved here. Nothing borrows the
- * app buffer for this, which is why the rows have to have been given back
- * before it runs -- playlist_insert_context_add() takes it itself. */
+ * does not hold as a string, so each is retrieved here, needing no buffer
+ * beyond the one path. */
 static int play_from(int start)
 {
     struct tagcache_search tcs;
@@ -312,30 +312,47 @@ static bool insert_tracks(int position, bool queue, bool create_new)
     return added > 0;
 }
 
-/* Every track in track_id[], written to a playlist file */
+/* Every track in track_id[], written to a playlist file. A failed write
+ * removes a new playlist and cuts an existing one back to where this began. */
 static int write_tracks(const char *playlist, bool new_playlist)
 {
     struct tagcache_search tcs;
     char path[MAX_PATH];
     int fd, written = 0;
+    off_t start = 0;
+    bool failed = false;
 
     if (!tagcache_search(&tcs, tag_filename))
         return -1;
     fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
                       : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
-    if (fd >= 0)
+    if (fd < 0)
     {
-        for (int i = 0; i < track_ct; i++)
-        {
-            if (tagcache_retrieve(&tcs, track_id[i], tag_filename,
-                                  path, sizeof(path))
-                && fdprintf(fd, "%s\n", path) > 0)
-                written++;
-        }
-        close(fd);
+        tagcache_search_finish(&tcs);
+        return -1;
     }
+    if (!new_playlist)
+        start = lseek(fd, 0, SEEK_END);
+    for (int i = 0; i < track_ct; i++)
+    {
+        if (!tagcache_retrieve(&tcs, track_id[i], tag_filename,
+                               path, sizeof(path)))
+            continue;
+        if (fdprintf(fd, "%s\n", path) != (int)strlen(path) + 1)
+        {
+            failed = true;
+            break;
+        }
+        written++;
+    }
+    if (failed && !new_playlist)
+        ftruncate(fd, start);
+    if (close(fd) < 0)
+        failed = true;
+    if (failed && new_playlist)
+        remove(playlist);
     tagcache_search_finish(&tcs);
-    return written > 0 ? 0 : -1;
+    return written > 0 && !failed ? 0 : -1;
 }
 
 /* Where a context menu sent us, as the screen code the shelf leaves for, or
@@ -455,8 +472,8 @@ static int run_track_list(const char *title)
         else if (info.selection == -2)
             ret = GO_TO_WPS;
 
-        /* Given back before anything is played: the insert context wants
-         * it. */
+        /* Given back before the track's menu opens: what it reaches may
+         * claim the app buffer itself. */
         app_release_buffer("featured tracks");
         track_rows = NULL;
 

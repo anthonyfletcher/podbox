@@ -82,7 +82,6 @@
 #include "draw/bmp.h"              /* read_bmp_file */
 #include "draw/jpeg_load.h"        /* read_jpeg_file */
 #include "power.h"
-#include "backlight.h"        /* backlight_set_timeout(_plugged) */
 #include "cpu.h"
 #include "skin/skin_engine.h"  /* skin_inhibit_flush */
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
@@ -116,20 +115,6 @@
  * album index (id3_get_index()) and to look up album art (retrieve_id3()).
  */
 static struct mp3entry id3;
-
-enum ePFS{ePFS_ARTIST = 0, ePFS_ALBUM};
-
-/*
- * States: pf_idle <-> pf_scrolling (browsing covers); SELECT on a cover
- * jumps straight into the core database's track list for that album (see
- * browser_db_enter_artist_album_tracks_on_next_load(), called from
- * album_covers_loop()). There is no in-house cover-zoom or track-list
- * browsing state; the database browser is the track list.
- */
-enum pf_states {
-    pf_idle = 0,
-    pf_scrolling
-};
 
 /* struct carousel_model (the engine<->data seam) is declared in carousel.h. */
 
@@ -751,8 +736,7 @@ static bool reinit(void)
 /* carousel_model.enter for the album model: either drill into the selected
  * album's track list or play it, per "On album select". Identifies the album by
  * its own tagcache seek, not by name -- browser_db.c and db_summary.c both
- * filter directly on this, so there's no name/sort matching involved (the
- * earlier, much more fragile design that this replaced).
+ * filter directly on this, so there's no name/sort matching involved.
  *
  * Playing does not happen here. It needs the app buffer to put the album in
  * order, and this screen is still holding a claim on it -- so the album is
@@ -815,10 +799,7 @@ int carousel_settings_menu(void)
 
 /* carousel_model.on_menu: open the shared Carousel settings menu and apply
  * whatever changed on the way out. Returns a GO_TO_* to exit the carousel, or a
- * CAROUSEL_MENU_* sentinel to stay (the engine loop restores the display).
- *
- * (The old hand-rolled menu's navigation items are gone: Go-To-WPS is the Play
- * button, and Go-To-Last-Album was dropped.) */
+ * CAROUSEL_MENU_* sentinel to stay (the engine loop restores the display). */
 static int album_on_menu(void)
 {
     /* Snapshot the settings whose change needs more than a cheap layout redraw. */
@@ -838,10 +819,10 @@ static int album_on_menu(void)
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
 
-    /* A cache rebuild/update (those items bump cache_version), a caption-layout
-     * change, a status-bar change or a reflection change needs a full rebuild
-     * -- init() recomputes the text margin and the viewport and, when the cache
-     * was invalidated, regenerates the index. */
+    /* A caption-layout change, a status-bar change or a reflection change
+     * needs a full rebuild -- init() recomputes the text margin and the
+     * viewport. So does a cache_version change, a cache rebuild requested
+     * through album_covers_task, after which init() regenerates the index. */
     if (pf_cfg.cache_version != old_cache_ver
         || global_settings.album_covers_show_album_name != old_show_name
         || global_settings.album_covers_statusbar != old_statusbar
@@ -958,9 +939,10 @@ static int cover_go_to_artist(void)
 {
     char name[TAGCACHE_BUFSZ];
     long seek = cover_album.artist_seek;
+    bool to_root;
 
-    if (!context_menu_pick_artist(&seek))
-        return ONPLAY_OK;
+    if (!context_menu_pick_artist(&seek, &to_root))
+        return to_root ? ONPLAY_MAINMENU : ONPLAY_OK;
     if (!tagcache_seek_string(tag_albumartist, seek, name, sizeof(name)))
         name[0] = '\0';
     browser_db_enter_artist_albums_on_next_load(seek, name);

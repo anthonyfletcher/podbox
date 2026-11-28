@@ -28,7 +28,6 @@
  *   - fixed-point and geometry constants, module state, theme colours
  *   - config load/save, and the database availability check
  *   - fixed-point arithmetic and trig
- *   - pixel row output helpers for the three source formats
  *   - scrolling text lines
  *   - the slide cache: the .pfraw format, the worker thread, and the
  *     index-linked-list that tracks slot use
@@ -87,7 +86,6 @@
 #include "draw/bmp.h"              /* read_bmp_file */
 #include "draw/jpeg_load.h"        /* read_jpeg_file */
 #include "power.h"
-#include "backlight.h"        /* backlight_set_timeout(_plugged) */
 #include "cpu.h"
 #include "skin/skin_engine.h"  /* skin_inhibit_flush */
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
@@ -111,7 +109,6 @@ static fb_data *lcd_fb;
 #define PF_JMP_PREV ACTION_LISTTREE_PGUP
 
 #define PF_QUIT (LAST_ACTION_PLACEHOLDER + 1)
-#define PF_TRACKLIST (LAST_ACTION_PLACEHOLDER + 2)
 #define PF_SORTING_NEXT (LAST_ACTION_PLACEHOLDER + 3)
 #define PF_SORTING_PREV (LAST_ACTION_PLACEHOLDER + 4)
 #define PF_RANDOM (LAST_ACTION_PLACEHOLDER + 5)
@@ -159,9 +156,6 @@ const struct button_mapping *pf_contexts[] =
 
 static pix_t pf_bg_color;     /* theme background, replaces G_BRIGHT(0) */
 pix_t pf_fg_color;     /* theme foreground, replaces G_BRIGHT(255) */
-static pix_t pf_lss_color;    /* selector start color for gradient */
-static pix_t pf_lse_color;    /* selector end color for gradient */
-static pix_t pf_lst_color;    /* selector text color */
 
 /* Pre-extracted RGB565 channel masks for fade_color() performance */
 static unsigned int pf_bg_rb;  /* pf_bg_color & 0xf81f */
@@ -188,9 +182,6 @@ static void pf_update_dynamic_colors(void)
         pf_fg_color = (pix_t)(color_contrast(white, custom) >=
                               color_contrast(black, custom) ? white : black);
     }
-    pf_lss_color = (pix_t)dynamic_colors_resolve(global_settings.lss_color);
-    pf_lse_color = (pix_t)dynamic_colors_resolve(global_settings.lse_color);
-    pf_lst_color = (pix_t)dynamic_colors_resolve(global_settings.lst_color);
     pf_bg_rb = pf_bg_color & 0xf81f;
     pf_bg_g  = pf_bg_color & 0x7e0;
 }
@@ -231,10 +222,7 @@ static void pf_update_dynamic_colors(void)
 #define PF_REFLECT_GAP   2
 
 #define MAX_SLIDES_COUNT 10
-/* Number of side slides rendered per side (3 visible + 1 animation buffer).
- * Was a user-configurable field in the original plugin's config struct, but
- * was never actually exposed in any settings menu, so it's now a fixed
- * constant. */
+/* Number of side slides rendered per side (3 visible + 1 animation buffer) */
 #define ALBUM_COVERS_NUM_SLIDES 4
 
 /* --- The flat view ---------------------------------------------------------
@@ -318,13 +306,6 @@ static void pf_update_dynamic_colors(void)
 #define EV_EXIT 9999
 #define EV_WAKEUP 1337
 
-/* Ordered Bayer dithering for 24-bit to RGB565 conversion */
-static const unsigned char pf_dither_table[16] =
-    {   0,192, 48,240, 12,204, 60,252,  3,195, 51,243, 15,207, 63,255 };
-#define PF_DITHERY(y) (pf_dither_table[(y) & 15] & 0xAA)
-#define PF_DITHERX(x) (pf_dither_table[(x) & 15])
-#define PF_DITHERXDY(x,dy) (PF_DITHERX(x) ^ dy)
-
 /* some magic numbers for cache_version. */
 
 /* current version for cover cache */
@@ -346,18 +327,6 @@ struct slide_cache {
     int hid;        /* handle ID of the cached slide */
     short next; /* "next" slide, with LRU last */
     short prev; /* "previous" slide */
-};
-
-struct rect {
-    int left;
-    int right;
-    int top;
-    int bottom;
-};
-
-struct load_slide_event_data {
-    int slide_index;
-    int cache_index;
 };
 
 struct pf_slide_cache
@@ -483,9 +452,6 @@ static int anim_frac;
 static int anim_avg4_ms = 4 * 1000 / PF_MAX_FPS;
 static int anim_owed_ms;
 static bool anim_started;
-/* Always 0: nothing sets it any more, but render_all_slides()'s fade
- * arithmetic still reads it, so it stays as a no-op term. */
-static int extra_fade;
 int center_index = 0; /* index of the slide that is in the center */
 static int itilt;
 static PFreal offsetX;
@@ -549,8 +515,7 @@ static bool glide_ticking;
 static struct pf_slide_cache pf_sldcache;
 
 /* use long for aligning */
-unsigned long thread_stack[THREAD_STACK_SIZE / sizeof(long)];
-/* queue (as array) for scheduling load_surface */
+static unsigned long thread_stack[THREAD_STACK_SIZE / sizeof(long)];
 
 static int empty_slide_hid;
 
@@ -559,8 +524,8 @@ static int empty_slide_hid;
  * cache). */
 static int pf_cover_size_idx = -1;
 
-unsigned int thread_id;
-struct event_queue thread_q;
+static unsigned int thread_id;
+static struct event_queue thread_q;
 
 static struct buflib_context buf_ctx;
 
@@ -607,15 +572,10 @@ static int  caption_index;
 static int  caption_variant;
 static bool caption_valid;
 
-enum ePFS{ePFS_ARTIST = 0, ePFS_ALBUM};
-
 /*
- * States: pf_idle <-> pf_scrolling (browsing covers); SELECT on a cover
- * jumps straight into the core database's track list for that album (see
- * browser_db_enter_album_tracks_on_next_load(), called from
- * album_covers_loop()) instead of an in-house zoom animation and track-list
- * screen -- there are no separate cover-zoom/track-list browsing states
- * anymore, unlike the original plugin.
+ * States: pf_idle <-> pf_scrolling (browsing covers). SELECT on a cover hands
+ * it to the model's enter(), which opens the database's list for it, so the
+ * carousel has no states of its own beyond these two.
  */
 enum pf_states {
     pf_idle = 0,
@@ -627,7 +587,6 @@ static int pf_state;
 /** code */
 static bool free_slide_prio(int prio);
 bool load_new_slide(void);
-int load_surface(int);
 static void free_all_slide_prio(int prio);
 
 /* The artist-portraits model lives in artist_portraits.c (over the same
@@ -945,89 +904,6 @@ static inline PFreal fcos(int iangle)
     return fsin(iangle + (IANGLE_MAX >> 2));
 }
 
-static void output_row_8_transposed(uint32_t row, void * row_in,
-                                       struct scaler_context *ctx)
-{
-    pix_t *dest = (pix_t*)ctx->bm->data + row;
-    pix_t *end = dest + ctx->bm->height * ctx->bm->width;
-    struct uint8_rgb *qp = (struct uint8_rgb*)row_in;
-    unsigned r, g, b;
-    int col = 0;
-    uint8_t dy = PF_DITHERY(row);
-    for (; dest < end; dest += ctx->bm->height, col++)
-    {
-        int delta = ctx->dither ? PF_DITHERXDY(col, dy) : 127;
-        r = (31 * qp->red + (qp->red >> 3) + delta) >> 8;
-        g = (63 * qp->green + (qp->green >> 2) + delta) >> 8;
-        b = (31 * qp->blue + (qp->blue >> 3) + delta) >> 8;
-        qp++;
-        *dest = FB_RGBPACK_LCD(r, g, b);
-    }
-}
-
-/* read_image_file() is called without FORMAT_TRANSPARENT so
- * it's safe to ignore alpha channel in the next two functions */
-static void output_row_32_transposed(uint32_t row, void * row_in,
-                                       struct scaler_context *ctx)
-{
-    pix_t *dest = (pix_t*)ctx->bm->data + row;
-    pix_t *end = dest + ctx->bm->height * ctx->bm->width;
-    struct uint32_argb *qp = (struct uint32_argb*)row_in;
-    int r, g, b;
-    int col = 0;
-    uint8_t dy = PF_DITHERY(row);
-    for (; dest < end; dest += ctx->bm->height, col++)
-    {
-        int delta = ctx->dither ? PF_DITHERXDY(col, dy) : 127;
-        r = SC_OUT(qp->r, ctx);
-        g = SC_OUT(qp->g, ctx);
-        b = SC_OUT(qp->b, ctx);
-        qp++;
-        r = (31 * r + (r >> 3) + delta) >> 8;
-        g = (63 * g + (g >> 2) + delta) >> 8;
-        b = (31 * b + (b >> 3) + delta) >> 8;
-        *dest = FB_RGBPACK_LCD(r, g, b);
-    }
-}
-
-static void output_row_32_transposed_fromyuv(uint32_t row, void * row_in,
-                                       struct scaler_context *ctx)
-{
-    pix_t *dest = (pix_t*)ctx->bm->data + row;
-    pix_t *end = dest + ctx->bm->height * ctx->bm->width;
-    struct uint32_argb *qp = (struct uint32_argb*)row_in;
-    int col = 0;
-    uint8_t dy = PF_DITHERY(row);
-    for (; dest < end; dest += ctx->bm->height, col++)
-    {
-        unsigned r, g, b, y, u, v;
-        int delta = ctx->dither ? PF_DITHERXDY(col, dy) : 127;
-        y = SC_OUT(qp->b, ctx);
-        u = SC_OUT(qp->g, ctx);
-        v = SC_OUT(qp->r, ctx);
-        qp++;
-        yuv_to_rgb(y, u, v, &r, &g, &b);
-        r = (31 * r + (r >> 3) + delta) >> 8;
-        g = (63 * g + (g >> 2) + delta) >> 8;
-        b = (31 * b + (b >> 3) + delta) >> 8;
-        *dest = FB_RGBPACK_LCD(r, g, b);
-    }
-}
-
-static unsigned int get_size(struct bitmap *bm)
-{
-    return bm->width * bm->height * sizeof(pix_t);
-}
-
-const struct custom_format format_transposed = {
-    .output_row_8 = output_row_8_transposed,
-    .output_row_32 = {
-        output_row_32_transposed,
-        output_row_32_transposed_fromyuv
-    },
-    .get_size = get_size
-};
-
 static const struct button_mapping* get_context_map(int context)
 {
     /* action_code_lookup() ORs in CONTEXT_REMOTE for any button with
@@ -1236,12 +1112,10 @@ static int create_empty_slide(bool force)
  */
 static void thread(void)
 {
-    /* SSD mode: poll more frequently since disk access is cheap */
-    long sleep_time = (global_settings.storage_mode == 2)
-                      ? HZ : 5 * HZ;
     struct queue_event ev;
     while (1) {
-        queue_wait_w_tmo(&thread_q, &ev, sleep_time);
+        /* Only an event starts a run, so there is nothing to poll for */
+        queue_wait(&thread_q, &ev);
         switch (ev.id) {
             case EV_EXIT:
                 return;
@@ -1269,43 +1143,41 @@ static void thread(void)
                 continue;
         }
 
-        if(ev.id != SYS_TIMEOUT) {
-            bool usb_pending = false;
-            while (1) {
-                /* Drain the wakeups that piled up while we were loading, and
-                 * keep going, rather than abandoning the run to fetch them.
-                 *
-                 * A wakeup means the centre slide moved. It does not mean this
-                 * run is stale: load_new_slide() reads center_index afresh
-                 * every call, so the next load already aims at the new
-                 * neighbourhood -- going back through the queue to learn that
-                 * changes nothing except when the loading resumes. Trap:
-                 * abandoning the run on any pending event loads roughly one
-                 * slide per centre change during a scroll, against the
-                 * 2 * ALBUM_COVERS_NUM_SLIDES + 1 a moving centre needs, so the
-                 * art only catches up once the animation stops. */
-                while (!queue_empty(&thread_q)) {
-                    queue_wait_w_tmo(&thread_q, &ev, 0);
-                    if (ev.id == EV_EXIT)
-                        return;
-                    if (ev.id == SYS_USB_CONNECTED) {
-                        /* Put it back and stop the run: the acknowledgement
-                         * belongs in one place, and the outer loop is it. */
-                        queue_post(&thread_q, ev.id, ev.data);
-                        usb_pending = true;
-                        break;
-                    }
+        bool usb_pending = false;
+        while (1) {
+            /* Drain the wakeups that piled up while we were loading, and
+             * keep going, rather than abandoning the run to fetch them.
+             *
+             * A wakeup means the centre slide moved. It does not mean this
+             * run is stale: load_new_slide() reads center_index afresh
+             * every call, so the next load already aims at the new
+             * neighbourhood -- going back through the queue to learn that
+             * changes nothing except when the loading resumes. Trap:
+             * abandoning the run on any pending event loads roughly one
+             * slide per centre change during a scroll, against the
+             * 2 * ALBUM_COVERS_NUM_SLIDES + 1 a moving centre needs, so the
+             * art only catches up once the animation stops. */
+            while (!queue_empty(&thread_q)) {
+                queue_wait_w_tmo(&thread_q, &ev, 0);
+                if (ev.id == EV_EXIT)
+                    return;
+                if (ev.id == SYS_USB_CONNECTED) {
+                    /* Put it back and stop the run: the acknowledgement
+                     * belongs in one place, and the outer loop is it. */
+                    queue_post(&thread_q, ev.id, ev.data);
+                    usb_pending = true;
+                    break;
                 }
-                if (usb_pending)
-                    break;
-
-                buf_ctx_lock();
-                bool slide_loaded = load_new_slide();
-                buf_ctx_unlock();
-                if (!slide_loaded)
-                    break;
-                yield();
             }
+            if (usb_pending)
+                break;
+
+            buf_ctx_lock();
+            bool slide_loaded = load_new_slide();
+            buf_ctx_unlock();
+            if (!slide_loaded)
+                break;
+            yield();
         }
     }
 }
@@ -3066,9 +2938,8 @@ bool pf_resume_last_album = false;
  * init() calls pf_config_load() (reloading pf_cfg from its on-disk file)
  * before set_initial_slide() runs, which clobbers whatever was just
  * assigned to pf_cfg.last_album in the PF_SELECT handler below with
- * whatever index was last saved to disk -- silently resuming the wrong
- * album (observed as always landing back on the first one). This is a
- * purely transient, in-memory signal that must never round-trip through
+ * whatever index was last saved to disk, and resume the wrong album. This is
+ * a purely transient, in-memory signal that must never round-trip through
  * the persisted config. */
 int pf_resume_album_index;
 
@@ -3592,7 +3463,7 @@ static void coverflow_render(void)
     if (step == 0) {
         /* no animation, boring plain rendering */
         for (index = nleft - 2; index >= 0; index--) {
-            alpha = ((index < nleft - 2) ? 256 : 128) - extra_fade;
+            alpha = (index < nleft - 2) ? 256 : 128;
             if (alpha > 0)
                 left_alpha[index] = right_alpha[index] = alpha;
         }
@@ -3864,10 +3735,8 @@ static void update_scroll_animation(void)
     /* Advance by elapsed time, not per call. speed is calibrated as a
      * per-frame step at CAROUSEL_NOMINAL_FPS; a slower frame then takes a
      * bigger step instead of making the flip take longer. Frame cost varies
-     * with the settings, and playback competes for the CPU (see
-     * app_claim_buffer()'s comment in init()), so a per-call advance cost
-     * twice over: fewer frames per second, and a flip that stretched in
-     * proportion because it still needed the same number of frames.
+     * with the settings and with what playback takes of the CPU; a per-call
+     * advance would make the flip's length vary with it.
      *
      * Timed in ms from USEC_TIMER, not in ticks: at HZ 100 a 70 ms frame is
      * 6, 7 or 8 ticks by rounding alone, which jitters the step by a sixth.
@@ -4016,12 +3885,6 @@ static void cleanup(void)
     }
     end_pf_thread();
 
-    /* Turn on backlight timeout (revert to settings) -- inlined equivalent
-     * of apps/plugins/lib/helper.c's backlight_use_settings(), which isn't
-     * linkable from core code. */
-    backlight_set_timeout(global_settings.backlight_timeout);
-    backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);
-
     /* Nothing to free: carousel_idx.buf points into the shared app buffer (see
      * init()), not a buflib handle. But that buffer was claimed for this
      * screen's lifetime, so hand it back -- otherwise the next screen to want
@@ -4029,15 +3892,6 @@ static void cleanup(void)
      * owned by settings.c, not unloaded here. */
     app_release_buffer("album covers");
 }
-
-enum {
-    PF_SORT_ALBUMS_BY,
-    PF_GOTO_LAST_ALBUM,
-    PF_GOTO_WPS,
-    PF_REBUILD_CACHE,
-    PF_UPDATE_CACHE,
-    PF_MENU_QUIT,
-};
 
 static void error_wait(const char *message)
 {
@@ -4074,9 +3928,9 @@ static bool init(void)
      * less stops the SBS drawing into our area. Showing it means pushing it
      * ON, and holding that: this screen is reachable from the WPS as well as
      * from the menu (wps.c disables the theme and calls album_covers()
-     * directly), so the ambient state is not "enabled" whatever the caller.
-     * Reading the viewport under a temporary push and then restoring the
-     * ambient state left the bar missing on exactly that path.
+     * directly), so the ambient state is not "enabled" whatever the caller,
+     * and restoring it after reading the viewport loses the bar on that
+     * path.
      *
      * Trap: %Vi is whichever %VI the SBS last selected, so this is read before
      * the SBS has seen the new activity -- a theme picking none for it leaves
@@ -4113,18 +3967,12 @@ static bool init(void)
      * Set before the caption strip below, which measures it. */
     pf_bold_font = font_get_ui_bold();
 
-    /* Reserve real, empty vertical space for draw_album_text()'s overlay,
-     * rather than just biasing where the up/down split falls: since
-     * pf_lower_half is *defined* as pf_height - pf_half_height, upper and
-     * lower always summed to exactly pf_height no matter how the split was
-     * biased (a "+8"-style offset, tried first, only shifts which rows go
-     * above vs below center -- it never actually shrinks the total drawn
-     * area, so the art always ran the full height of the viewport
-     * regardless). Actually keeping clear of the text means genuinely
-     * reducing the drawable height by a margin sized to match
-     * draw_album_text()'s own geometry, and -- for a *top*-anchored
-     * caption -- also shifting the render origin down so the reserved
-     * strip is skipped rather than just repositioning within it.
+    /* Reserve real, empty vertical space for draw_album_text()'s overlay by
+     * reducing the drawable height by a margin sized to its geometry, and
+     * for a top-anchored caption by moving the render origin down past it.
+     * Trap: biasing where the up/down split falls reserves nothing, since
+     * pf_lower_half is defined as pf_height - pf_half_height and the two
+     * always sum to the full height.
      *
      * The band is always sized for a two-line caption, whichever mode is set,
      * so the covers do not change size between the album and artist screens --
@@ -4597,6 +4445,11 @@ static int album_covers_loop(void)
          * screen closes, as it would refuse to open. */
         if (!db_summary_current(&carousel_idx))
         {
+            /* A system event is handled before the button is dropped: a USB
+             * connect that never reaches the handler is never acknowledged. */
+            if (IS_SYSEVENT(button)
+                && default_event_handler(button) == SYS_USB_CONNECTED)
+                return GO_TO_ROOT;
             if (!check_database())
             {
                 splash(HZ, tagcache_ram_failed()
@@ -4950,7 +4803,6 @@ static int album_covers_loop(void)
             action_wait_for_release();
             return model->on_context(center_index);
 
-        case PF_TRACKLIST:
         case PF_SELECT:
         {
             /* Settle the animation onto the slide the user is looking at, so
@@ -5000,10 +4852,7 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
 
     /* render_slide() writes pixels directly into lcd_fb, and pf_framebuffer
      * (assigned to pf_vp.buffer in init()) needs the real frame_buffer_t
-     * contents -- both dropped silently during the plugin-to-core port,
-     * leaving every direct pixel write going to a NULL pointer (lcd_fb's
-     * BSS default) instead of the real framebuffer. Matches plugin_start()'s
-     * original setup exactly. */
+     * contents. Both are set before init(): until then lcd_fb is NULL. */
     {
         struct viewport *vp_main = lcd_set_viewport(NULL);
         lcd_fb = vp_main->buffer->fb_ptr;

@@ -284,8 +284,9 @@ static void shortcuts_ata_idle_callback(void)
      * raw shortcut pointer, and the reload at the end of this function frees
      * the whole chain -- which the lock does not prevent, since a free is not
      * a move. The write stays owed and do_shortcut_menu() registers it again
-     * as it closes; registering it from here is a no-op, because this
-     * one-shot event is still in its slot while it runs. */
+     * as it closes. Trap: registering it from here asks the send that is
+     * running it to run it again at once, up to ONESHOT_RUNS times, with the
+     * lock still taken each time. */
     if (buflib_move_lock > 0)
         return;
 
@@ -1011,10 +1012,11 @@ int do_shortcut_menu(void *ignored)
                     }
                     else
                     {
-                        context_menu_show_playlist(sc->u.path,
+                        if (context_menu_show_playlist(sc->u.path,
                                                   dir_exists(sc->u.path) ? ATTR_DIRECTORY :
                                                   filetype_get_attr(sc->u.path),
-                                                  NULL, false);
+                                                  NULL, false) == ONPLAY_MAINMENU)
+                            done = GO_TO_ROOT;
                     }
                     break;
                 case SHORTCUT_FILE:

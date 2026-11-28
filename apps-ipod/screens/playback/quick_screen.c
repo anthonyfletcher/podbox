@@ -45,9 +45,9 @@
 #define CENTER_ICONAREA_SIZE (MARGIN+8*2)
 
 /* The viewports live here rather than on gui_syncquickscreen_run's stack so
- * that the redraw callback can paint from them directly. Deferring the redraw
- * to the main loop instead left the screen showing a stale frame until the
- * next pass, which is visible as a flicker. */
+ * that the redraw callback can paint from them directly. Trap: a redraw
+ * deferred to the main loop shows a stale frame until the next pass, visible
+ * as a flicker. */
 struct gui_quickscreen
 {
     const struct settings_list *items[QUICKSCREEN_ITEM_COUNT];

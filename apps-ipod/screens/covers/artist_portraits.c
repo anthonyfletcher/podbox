@@ -31,11 +31,11 @@
 #include "database/db_names.h"
 
 /* "Resume to this slide on next open", set by artist_enter() and consumed by
- * artist_set_initial(). The album model's pf_resume_* pair is deliberately not
- * reused: the two indices address different arrays (albums here, artists
- * there), nothing in the shared pair records which model wrote it, and either
- * model's set_initial() consumes whatever is pending -- so an album index left
- * behind by Album Covers used to open this screen on an unrelated artist. */
+ * artist_set_initial(). Trap: the album model's pf_resume_* pair cannot be
+ * shared. The indices address different arrays, nothing records which model
+ * wrote one, and either model's set_initial() consumes whatever is pending, so
+ * an album index left by Album Covers would open this screen on an unrelated
+ * artist. */
 static int  artist_resume_index;
 static bool artist_resume_valid = false;
 

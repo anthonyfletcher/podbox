@@ -69,7 +69,12 @@ static int row_action_callback(int action, struct gui_synclist *lists)
         MENUITEM_STRINGLIST(menu, ID2P(LANG_CONTEXT_MENUS), NULL,
                             ID2P(LANG_SHOW_ALL_ROWS));
 
-        if (do_menu(&menu, NULL, NULL, false) == 0)
+        int ret = do_menu(&menu, NULL, NULL, false);
+
+        /* Out the way MENU goes, so the caller unwinds to the root */
+        if (ret == MENU_ATTACHED_USB)
+            return ACTION_STD_MENU;
+        if (ret == 0)
             global_settings.context_hidden[edit_kind] = 0;
         gui_synclist_set_title(lists, lists->title, lists->title_icon);
         return ACTION_REDRAW;

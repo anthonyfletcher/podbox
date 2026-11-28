@@ -594,7 +594,6 @@ static void init(void) INIT_ATTR;
 static void init(void)
 {
     int rc;
-    bool mounted = false;
 
     system_init();
     core_allocator_init();
@@ -699,57 +698,54 @@ static void init(void)
 
 
 
-    if (!mounted)
+    boot_progress(BOOT_MOUNT, 0, 0, NULL);
+    CHART(">disk_mount_all");
+    rc = disk_mount_all();
+    CHART("<disk_mount_all");
+    if (rc<=0)
     {
-        boot_progress(BOOT_MOUNT, 0, 0, NULL);
-        CHART(">disk_mount_all");
-        rc = disk_mount_all();
-        CHART("<disk_mount_all");
-        if (rc<=0)
-        {
-            int line=0;
-            lcd_clear_display();
-            lcd_putsf(0, line++, "No partition found (%d).", rc);
-            lcd_puts(0, line++, "Insert USB cable");
-            lcd_puts(0, line++, "and fix it.");
-            lcd_puts(0, line++, rbversion);
+        int line=0;
+        lcd_clear_display();
+        lcd_putsf(0, line++, "No partition found (%d).", rc);
+        lcd_puts(0, line++, "Insert USB cable");
+        lcd_puts(0, line++, "and fix it.");
+        lcd_puts(0, line++, rbversion);
 
-            struct storage_info sinfo;
-            storage_get_info(0, &sinfo);
+        struct storage_info sinfo;
+        storage_get_info(0, &sinfo);
 #ifdef MAX_PHYS_SECTOR_SIZE
-            lcd_putsf(0, line++, "id: '%s' s:%u*%u", sinfo.product, sinfo.sector_size, sinfo.phys_sector_mult);
+        lcd_putsf(0, line++, "id: '%s' s:%u*%u", sinfo.product, sinfo.sector_size, sinfo.phys_sector_mult);
 #else
-            lcd_putsf(0, line++, "id: '%s' s:%u", sinfo.product, sinfo.sector_size);
+        lcd_putsf(0, line++, "id: '%s' s:%u", sinfo.product, sinfo.sector_size);
 #endif
-            struct partinfo pinfo;
-            for (int i = 0 ; i < NUM_VOLUMES ; i++) {
-                disk_partinfo(i, &pinfo);
-                if (pinfo.type)
-                    lcd_putsf(0, line++, "P%d T%02x S%llx",
-                              i, pinfo.type, (unsigned long long)pinfo.size);
-            }
-            lcd_update();
+        struct partinfo pinfo;
+        for (int i = 0 ; i < NUM_VOLUMES ; i++) {
+            disk_partinfo(i, &pinfo);
+            if (pinfo.type)
+                lcd_putsf(0, line++, "P%d T%02x S%llx",
+                          i, pinfo.type, (unsigned long long)pinfo.size);
+        }
+        lcd_update();
 
 #if defined(MAX_VIRT_SECTOR_SIZE) && defined(DEFAULT_VIRT_SECTOR_SIZE)
-                disk_set_sector_multiplier(IF_MD(i,) DEFAULT_VIRT_SECTOR_SIZE/SECTOR_SIZE);
+            disk_set_sector_multiplier(IF_MD(i,) DEFAULT_VIRT_SECTOR_SIZE/SECTOR_SIZE);
 #endif
 
-            usb_start_monitoring();
-            while(button_get(true) != SYS_USB_CONNECTED) {};
-            gui_usb_screen_run(true, button_get_data());
+        usb_start_monitoring();
+        while(button_get(true) != SYS_USB_CONNECTED) {};
+        gui_usb_screen_run(true, button_get_data());
 
 #if !defined(DEBUG) && !(CONFIG_STORAGE & STORAGE_RAMDISK)
-            system_reboot();
+        system_reboot();
 #else
-            rc = disk_mount_all();
-            if (rc <= 0) {
-                lcd_putsf(0, 4, "Error mounting: %08x", rc);
-                lcd_update();
-                sleep(HZ*5);
-                system_reboot();
-            }
-#endif
+        rc = disk_mount_all();
+        if (rc <= 0) {
+            lcd_putsf(0, 4, "Error mounting: %08x", rc);
+            lcd_update();
+            sleep(HZ*5);
+            system_reboot();
         }
+#endif
     }
 
     pcm_init();

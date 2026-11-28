@@ -165,8 +165,9 @@ int context_menu_notes_result(int go_to);
 /* Go to Artist under Split Album Artists: makes *seek, an album-artist seek,
  * the handle of the artist to browse -- asking which, for a joint string --
  * so the artist's joint albums come too. Leaves the seek as it is with the
- * setting off. False if the list was left without a choice. */
-bool context_menu_pick_artist(long *seek);
+ * setting off. False if the list was left without a choice, and then
+ * *to_root says it was left for the root menu, by MENU or a USB connect. */
+bool context_menu_pick_artist(long *seek, bool *to_root);
 
 /* Returns ONPLAY_START_PLAY when a row started playback. 'in_order' leaves
  * out the shuffled rows, for something heard in order, such as a book. */

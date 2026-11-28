@@ -341,27 +341,35 @@ static void change_dir(int direction)
     action_wait_for_release();
 }
 
-/* The album of the playlist entry steps away, "" when it has none. False at
- * either end of the playlist. */
-static bool peek_album(int steps, char *album, size_t size)
+enum peek_result
+{
+    PEEK_END,       /* past either end of the playlist */
+    PEEK_UNKNOWN,   /* a track the database's RAM copy does not have */
+    PEEK_FOUND,
+};
+
+/* The album of the playlist entry steps away, "" when it has none. Read from
+ * the RAM copy only: anything else opens the file, on the UI thread. */
+static enum peek_result peek_album(int steps, char *album, size_t size)
 {
     static struct mp3entry id3;
     char buf[MAX_PATH];
     const char *name = playlist_peek(steps, buf, sizeof(buf));
 
     if (!name)
-        return false;
-    if (!tagcache_fill_tags(&id3, name) && !get_metadata(&id3, -1, name))
-        id3.album = NULL;
+        return PEEK_END;
+    if (!tagcache_fill_tags(&id3, name))
+        return PEEK_UNKNOWN;
     strlcpy(album, id3.album ? id3.album : "", size);
-    return true;
+    return PEEK_FOUND;
 }
 
 /* Skips by album tag rather than by folder, so it works however the
  * playlist was built: forward to the first track of the next album, or back
- * to the first track of the one before the current album. Each step can
- * read the disk on the UI thread, so without the database in RAM it skips
- * by folder instead, and it looks no further than ALBUM_SCAN_MAX tracks. */
+ * to the first track of the one before the current album. Each step reads
+ * the database's RAM copy, so without one it skips by folder instead; a
+ * track the copy lacks counts as another album. It looks no further than
+ * ALBUM_SCAN_MAX tracks. */
 #define ALBUM_SCAN_MAX 200
 
 static void change_album(int direction)
@@ -371,6 +379,7 @@ static void change_album(int direction)
     char current[MAX_PATH];
     char album[MAX_PATH];
     int steps = direction;
+    enum peek_result peek = PEEK_END;
 
     if (global_settings.prevent_skip || !state->id3)
         return;
@@ -384,20 +393,23 @@ static void change_album(int direction)
 
     while (abs(steps) < amount)
     {
-        if (!peek_album(steps, album, sizeof(album)))
+        peek = peek_album(steps, album, sizeof(album));
+        if (peek == PEEK_END)
             return;
-        if (strcmp(album, current))
+        if (peek == PEEK_UNKNOWN || strcmp(album, current))
             break;
         steps += direction;
     }
     if (abs(steps) >= amount)
         return;
 
-    if (direction < 0)
+    /* An unknown track is an album of one, so only a named one is walked
+     * back to its first track */
+    if (direction < 0 && peek == PEEK_FOUND)
     {
         strlcpy(current, album, sizeof(current));
         while (abs(steps - 1) < amount
-               && peek_album(steps - 1, album, sizeof(album))
+               && peek_album(steps - 1, album, sizeof(album)) == PEEK_FOUND
                && !strcmp(album, current))
             steps--;
     }

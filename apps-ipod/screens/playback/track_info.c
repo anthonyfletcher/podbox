@@ -504,17 +504,13 @@ bool browse_id3_ex(struct mp3entry *id3, struct playlist_info *playlist,
     /* "Live" mode -- exit when playback stops and re-read on track change -- only
      * when we're actually showing the currently playing track's id3. The live
      * callers (wps.c, context_menu.c) pass audio_current_track(); static
-     * viewers (properties, playlist viewer) pass their own id3. Deciding by
-     * identity is robust; the old activity check treated any non-plugin
-     * caller as live, which flashed-and-closed the core Properties ->
-     * Track Info view. */
+     * viewers (properties, playlist viewer) pass their own id3, so the test
+     * is by identity: a static view taken as live closes at once. */
     bool is_curr_track_info = (id3 != NULL && id3 == audio_current_track());
     /* Push unconditionally: the activity is what a skin branches on (%cs), so
-     * every caller has to set it, not just the live ones. Tied to the test
-     * above it left Track Info reporting whichever browser opened it -- 7 from
-     * Files, 8 from Music -- and those pick different header viewports, so the
-     * title drew at a different x depending on the route. Live mode keeps the
-     * id3-identity test; only the activity moves. */
+     * every caller has to set it, not just the live ones. Otherwise Track
+     * Info reports whichever browser opened it, and the skin picks that
+     * browser's header viewports. */
     push_current_activity(ACTIVITY_ID3SCREEN);
 refresh_info:
     info.count = 0;

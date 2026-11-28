@@ -532,23 +532,12 @@ static int browser(void* param)
                 row_table = tc->currtable;
             }
             /* Leave the database browser as a fresh Music entry would find it.
-             *
-             * A shortcut enters at dirlevel 0 so one BACK leaves, which means
-             * it never passes back through the Music menu -- and it was that
-             * pass that used to put currtable right, browser_db_exit()
-             * restoring it from table_history on the way up. Without it,
-             * currtable was left pointing at the shortcut's own listing, and
-             * the plain Music entry inherits whatever is there: choosing Music
-             * opened the album list, and every later database screen was
-             * confused in turn.
-             *
-             * Same repair, and the same reason, as GO_TO_ALBUM_COVERS_TRACKS
-             * below. Clearing the resume position with it is deliberate:
-             * dirlevel and currtable have to agree, so keeping a stored depth
-             * against a reset table is what caused this in the first place.
-             * These shortcuts used to leave the Music position alone; entering
-             * at level 0 is what costs that, and a shortcut that quietly
-             * breaks Music is the worse trade. */
+             * A shortcut enters at dirlevel 0 so one BACK leaves, so it never
+             * passes back up through the Music menu, where browser_db_exit()
+             * restores currtable from table_history. Left alone, currtable
+             * points at the shortcut's own listing, and the next plain Music
+             * entry opens that instead. The resume position is cleared with
+             * it, as dirlevel and currtable have to agree. */
             tc->dirlevel = last_ft_dirlevel;
             tc->currtable = 0;
             last_db_dirlevel = 0;
@@ -574,57 +563,27 @@ static int browser(void* param)
 
         case GO_TO_ALBUM_COVERS_TRACKS:
             tc->dirlevel = last_ft_dirlevel;
-            /* enter_album_tracks_directly() left tc->currtable/currextra
-             * pointing at the album's flat track listing (TABLE_NAVIBROWSE,
-             * extra=1) -- unlike dirlevel, nothing here ever restored those.
-             * A later, unrelated GO_TO_DBBROWSER ("Music") entry doesn't
-             * reset currtable itself (it assumes whatever's left over from
-             * the last real Music session), so it silently inherited this
-             * album's stale view instead of the actual Music resume point --
-             * observed as: start playing a track from here, open the plain
-             * Music menu later, and it opens back into this exact album
-             * even though dirlevel claims to be at the top, so BACK skips
-             * straight past Artist/base-Music-menu to the main menu. Reset
-             * currtable to 0 (forces browser_db_load()'s fresh-root path) and
-             * clear the Music resume position so the next Music entry
-             * always starts at the base Music menu rather than in an
-             * inconsistent dirlevel/currtable state. */
+            /* enter_album_tracks_directly() leaves currtable/currextra at the
+             * album's flat track listing, and a later plain Music entry does
+             * not reset currtable itself, so it would open this album with
+             * dirlevel claiming the top. currtable 0 forces
+             * browser_db_load()'s fresh-root path, and the Music resume
+             * position is cleared so the two agree. */
             tc->currtable = 0;
             last_db_dirlevel = 0;
             last_db_selection = 0;
-            /* Unlike the general tag-tree browse cases above, redirecting
-             * GO_TO_ROOT here is safe: this entry point is only ever reached
-             * from Album covers (never from the main Music menu), and
-             * browser_db.c's enter_album_tracks_directly() never advances
-             * dirlevel past 0 -- so there's no deeper history that a
-             * redirect could hijack or trap the user in, unlike an earlier
-             * version of this that tried the same translation for the
-             * general two-hop Album browse (GO_TO_ROOT there is ambiguous
-             * between "backed out" and "pressed MENU" *at any depth*, which
-             * did trap users). Requested explicitly: BACK from an album's
-             * track list should return straight to Album covers, not the
-             * main menu.
+            /* BACK from an album's track list returns straight to Album
+             * covers, not the main menu. Redirecting GO_TO_ROOT is safe here
+             * and nowhere else in the tag-tree cases: this entry point is
+             * reached only from Album covers and never passes dirlevel 0, so
+             * GO_TO_ROOT can only mean BACK or MENU, and
+             * browser_left_by_menu() tells them apart.
              *
-             * GO_TO_PREVIOUS, not GO_TO_ALBUM_COVERS directly: this case's
-             * items[] entry is invoked through load_screen(), which already
-             * tracks "the screen active before this one" itself (its local
-             * old_previous, restored into the global last_screen exactly
-             * when a callee returns GO_TO_PREVIOUS). Returning
-             * GO_TO_ALBUM_COVERS directly bypassed that and left last_screen
-             * pointing at GO_TO_ALBUM_COVERS_TRACKS itself (the screen that
-             * "ran" from load_screen()'s point of view) -- a value that
-             * only makes sense as a one-shot dispatch armed by Album
-             * covers' own select handler, never as something to resume.
-             * The next time Album covers' own quick-MENU (PF_QUIT) returned
-             * GO_TO_PREVIOUS, root_menu()'s loop resolved *that* against
-             * the poisoned last_screen and re-entered the plain database
-             * browser instead of Album covers -- an endless bounce between
-             * Album covers and the bare Music menu that never reached the
-             * real main menu. GO_TO_PREVIOUS here instead lets
-             * load_screen()'s own bookkeeping do this correctly: it was
-             * called with old_previous already equal to GO_TO_ALBUM_COVERS
-             * (Album covers is the only caller of this entry point), so
-             * returning GO_TO_PREVIOUS resolves back to exactly that. Menu
+             * Trap: GO_TO_PREVIOUS, never GO_TO_ALBUM_COVERS. load_screen()
+             * restores last_screen from its old_previous, which is Album
+             * covers, only on GO_TO_PREVIOUS; any other code leaves
+             * last_screen at GO_TO_ALBUM_COVERS_TRACKS, and Album covers'
+             * next GO_TO_PREVIOUS then bounces to the bare Music menu. Menu
              * is not redirected: it goes to the main menu, as in any list. */
             if (ret_val == GO_TO_ROOT && !browser_left_by_menu())
                 ret_val = GO_TO_PREVIOUS;
@@ -1808,15 +1767,10 @@ char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
         if (i == count)
             break;
 
-        /* Stop rather than let buf_len go negative: snprintf()'s return
-         * value is how much it *would* have written, uncapped by the
-         * buffer size, so on truncation this can exceed buf_len. Letting
-         * that make buf_len negative and feeding it back into the next
-         * snprintf() call (int -> size_t, wrapping around to a huge
-         * value) was a real out-of-bounds write once enough items were
-         * enabled to overrun the caller's buffer, not just a truncated
-         * string -- was masked before now only by callers happening to
-         * pass a buffer big enough that this never triggered. */
+        /* Stop once the buffer is full. snprintf() returns how much it
+         * would have written, so on truncation buf_len goes negative, and
+         * passed to the next call it converts to a huge size_t: an
+         * out-of-bounds write, not a truncated string. */
         if (buf_len <= 0)
             break;
         for (j=0; j<MAX_MENU_ITEMS; j++)

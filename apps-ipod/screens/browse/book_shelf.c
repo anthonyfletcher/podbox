@@ -1210,23 +1210,45 @@ static bool menu_insert(int position, bool queue, bool create_new)
     return ok;
 }
 
+struct write_ctx
+{
+    int fd;
+    bool failed;
+};
+
+/* The walk stops at a failed write but still returns the count so far, so
+ * the failure is recorded here */
 static bool write_track(const char *path, void *data)
 {
-    return fdprintf(*(int *)data, "%s\n", path) > 0;
+    struct write_ctx *ctx = data;
+
+    if (fdprintf(ctx->fd, "%s\n", path) != (int)strlen(path) + 1)
+        ctx->failed = true;
+    return !ctx->failed;
 }
 
-/* Add to Playlist's rows */
+/* Add to Playlist's rows. A failed write removes a new playlist and cuts an
+ * existing one back to where the book began. */
 static int menu_add_to_playlist(const char *playlist, bool new_playlist)
 {
-    int fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
-                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    struct write_ctx ctx = { .failed = false };
+    off_t start = 0;
     int n;
 
-    if (fd < 0)
+    ctx.fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
+                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    if (ctx.fd < 0)
         return -1;
-    n = menu_tracks(write_track, &fd);
-    close(fd);
-    return n > 0 ? 0 : -1;
+    if (!new_playlist)
+        start = lseek(ctx.fd, 0, SEEK_END);
+    n = menu_tracks(write_track, &ctx);
+    if (ctx.failed && !new_playlist)
+        ftruncate(ctx.fd, start);
+    if (close(ctx.fd) < 0)
+        ctx.failed = true;
+    if (ctx.failed && new_playlist)
+        remove(playlist);
+    return n > 0 && !ctx.failed ? 0 : -1;
 }
 
 static bool first_track(const char *path, void *data)

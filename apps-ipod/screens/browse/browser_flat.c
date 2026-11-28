@@ -299,7 +299,10 @@ static int types_run(void)
 
     while (1)
     {
+        /* The list read again after a viewer can be empty */
         fill_types();
+        if (type_ct == 0)
+            return GO_TO_PREVIOUS;
         simplelist_info_init(&info, str(LANG_SORT_TYPE), type_ct, NULL);
         info.get_name = type_name;
         info.get_icon = type_icon;
